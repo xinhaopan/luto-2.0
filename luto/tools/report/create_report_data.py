@@ -47,7 +47,8 @@ def save_report_data(raw_data_dir:str):
 
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir)
-    
+    files.drop(files[files['path'].str.contains('data_for_carbon_price')].index, inplace=True)
+
     # Set the years to be int
     files['Year'] = files['Year'].astype(int)
     
