@@ -155,6 +155,8 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg_offland_commodity(data, yr_cal, path_yr)
     write_biodiversity(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
+
+    write_npy(data, yr_cal, path_yr)
     
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
     
@@ -1290,5 +1292,315 @@ def write_ghg_offland_commodity(data: Data, yr_cal, path):
     
     # Save to disk
     offland_ghg.to_csv(os.path.join(path, f'GHG_emissions_offland_commodity_{yr_cal}.csv'), index = False)
-    
-    
+
+def write_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
+    write_rev_cost_npy(data, yr_cal, path, yr_cal_sim_pre)
+    write_cost_transition_npy(data, yr_cal, path, yr_cal_sim_pre)
+    write_GHG_npy(data, yr_cal, path)
+    write_map_npy(data, yr_cal, path)
+
+def save_map_to_npy(data, product, filename_prefix, yr_cal, path):
+    """
+    Creates a map array and saves it as a TIFF file. Creates the directory if it does not exist.
+    """
+    # Check if the path exists, create it if not
+    path = path + "/" + "data_for_carbon_price"
+    os.makedirs(path, exist_ok=True)
+
+    filename = f"{filename_prefix}_{yr_cal}.npy"
+    full_path = os.path.join(path, filename)
+    np.save(f"{full_path}", product)
+    print(f'Map saved to {full_path}')
+
+    '''
+    # Create the map array
+    map_arr = create_2d_map(data, product, filler = data.MASK_LU_CODE)
+
+    # Construct the filename and save the TIFF file
+    filename = f"{filename_prefix}_{yr_cal}.tiff"
+    full_path = os.path.join(path, filename)
+    write_gtiff(map_arr, full_path)
+    print(f"Map saved to {full_path}")
+    '''
+
+
+def write_rev_cost_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
+    yr_idx = yr_cal - data.YR_CAL_BASE
+
+    ##############################################
+    ## write agricultural revenue and cost maps to tiff ##
+    ##############################################
+
+    # Get the ag_dvar_mrj in the yr_cal
+    ag_dvar_mrj = data.ag_dvars[yr_cal]
+
+    # Get agricultural revenue/cost for year in mrjs format. Note the s stands for sources:
+    # E.g., Sources for crops only contains ['Revenue'],
+    #    but sources for livestock includes ['Meat', 'Wool', 'Live Exports', 'Milk']
+    ag_rev_df_rjms = ag_revenue.get_rev_matrices(data, yr_idx, aggregate=False)
+    ag_cost_df_rjms = ag_cost.get_cost_matrices(data, yr_idx, aggregate=False)
+    ag_rev_df_rjms = ag_rev_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_rev_df_rjms.columns.levels),
+                                            fill_value=0)
+    ag_rev_rjms = ag_rev_df_rjms.values.reshape(-1, *ag_rev_df_rjms.columns.levshape)
+
+    ag_cost_df_rjms = ag_cost_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_cost_df_rjms.columns.levels),
+                                              fill_value=0)
+    ag_cost_rjms = ag_cost_df_rjms.values.reshape(-1, *ag_cost_df_rjms.columns.levshape)
+
+    # Multiply the ag_dvar_mrj with the ag_rev_mrj to get the ag_rev_jm
+    ag_rev_r = np.einsum('mrj,rjms -> r', ag_dvar_mrj, ag_rev_rjms)
+    ag_cost_r = np.einsum('mrj,rjms -> r', ag_dvar_mrj, ag_cost_rjms)
+
+    # Use the function to save agricultural revenue and cost maps
+    save_map_to_npy(data, ag_rev_r, 'revenue_ag', yr_cal, path)
+    save_map_to_npy(data, ag_cost_r, 'cost_ag', yr_cal, path)
+
+    ##############################################
+    ## write agricultural management revenue and cost maps to tiff ##
+    ##############################################
+
+    # Get the revenue/cost matirces for each agricultural land-use
+    ag_rev_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
+    ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
+
+    # Get the revenuecost matrices for each agricultural management
+    am_revenue_mat = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx)
+    am_cost_mat = ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx)
+
+    # Iterate through agricultural management and non-agricultural land uses
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
+        am_desc = AG_MANAGEMENTS_TO_LAND_USES[am]
+        am_code = [data.DESC2AGLU[desc] for desc in am_desc]
+        am_dvar = data.ag_man_dvars[yr_cal][am][:, :, am_code]
+
+        # Calculate the result arrays for agricultural management revenue and costs
+        am_rev_r = np.einsum('mrj,mrj->r', am_dvar, np.nan_to_num(am_revenue_mat[am]))
+        am_cost_r = np.einsum('mrj,mrj->r', am_dvar, np.nan_to_num(am_cost_mat[am]))
+
+        save_map_to_npy(data, am_rev_r, f'revenue_am_{am}', yr_cal, path)
+        save_map_to_npy(data, am_cost_r, f'cost_am_{am}', yr_cal, path)
+
+    ##############################################
+    ## write non-agricultural land use revenue and cost maps to tiff ##
+    ##############################################
+
+    # Get the non-agricultural decision variables
+    non_ag_dvar = data.non_ag_dvars[yr_cal]  # rk
+
+    # Get the non-agricultural revenue/cost matrices
+    ag_r_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
+    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data, ag_r_mrj, data.lumaps[yr_cal])  # rk
+    ag_c_mrj = ag_cost.get_cost_matrices(data, yr_idx)
+    non_ag_cost_mat = non_ag_cost.get_cost_matrix(data, ag_c_mrj, data.lumaps[yr_cal])  # rk
+
+    # Replace nan with 0
+    non_ag_rev_mat = np.nan_to_num(non_ag_rev_mat)
+    non_ag_cost_mat = np.nan_to_num(non_ag_cost_mat)
+
+    # Assuming non_ag_rev_mat and non_ag_cost_mat have been correctly computed
+    for index, non_ag in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+        rev_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], non_ag_rev_mat[:, index])
+        cost_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], non_ag_cost_mat[:, index])
+
+        save_map_to_npy(data, rev_non_ag_r, f'revenue_non_ag_{non_ag}', yr_cal, path)
+        save_map_to_npy(data, cost_non_ag_r, f'cost_non_ag_{non_ag}', yr_cal, path)
+
+
+def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
+    # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
+    simulated_year_list = sorted(list(data.lumaps.keys()))
+    # Get index of yr_cal in timeseries (e.g., if yr_cal is 2050 then yr_idx = 40)
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
+    yr_idx_sim = simulated_year_list.index(yr_cal)
+    # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
+    yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
+
+    # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
+    # Get the decision variables for agricultural land-use
+    ag_dvar = data.ag_dvars[yr_cal]  # (m,r,j)
+    # Get the non-agricultural decision variable
+    non_ag_dvar = data.non_ag_dvars[yr_cal]  # (r,k)
+
+    # ---------------------------------------------------------------------
+    #              Agricultural land-use transition costs
+    # ---------------------------------------------------------------------
+
+    # Get the transition cost matrices for agricultural land-use
+    if yr_idx == 0:
+        base_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+        ag_transitions_cost_mat = {k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+                                   for k in ['Establishment cost', 'Water license cost', 'GHG emissions cost']}
+    else:
+        # Get the base_year mrj matirx
+        base_mrj = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])
+        # Get the transition cost matrices for agricultural land-use
+        ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data,
+                                                                         yr_idx,
+                                                                         yr_cal_sim_pre,
+                                                                         data.lumaps,
+                                                                         data.lmmaps,
+                                                                         separate=True)
+
+    cost_dfs = []
+    # Convert the transition cost matrices to a DataFrame
+    for lu_desc, lu_idx in data.DESC2AGLU.items():
+        for cost_type in ag_transitions_cost_mat.keys():
+            base_lu_arr = base_mrj[:, :, lu_idx]  # Get the base land-use array                       (m,r)
+            arr = np.nan_to_num(
+                ag_transitions_cost_mat[cost_type])  # Get the transition cost matrix                    (m,r,j)
+            arr = np.einsum('mr,mrj,mrj->r', base_lu_arr, arr, ag_dvar)  # Multiply by decision variables
+            cost_dfs.append(arr)
+    summed_array_r = np.sum(cost_dfs, axis=0)
+    save_map_to_npy(data, summed_array_r, f'cost_transition_ag2ag', yr_cal, path)
+    cost_dfs = []
+
+    # ---------------------------------------------------------------------
+    #              Agricultural management transition costs
+    # ---------------------------------------------------------------------
+
+    # The agricultural management transition cost are all zeros, so skip the calculation here
+    # am_cost = ag_transitions.get_agricultural_management_transition_matrices(sim.data)
+
+    # --------------------------------------------------------------------
+    #              Non-agricultural land-use transition costs (from ag to non-ag)
+    # --------------------------------------------------------------------
+
+    # Get the transition cost matirces for non-agricultural land-use
+    if yr_idx == 0:
+        non_ag_transitions_cost_mat = {k: {'Transition cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
+                                       for k in data.NON_AGRICULTURAL_LANDUSES}
+    else:
+        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(data,
+                                                                                       yr_idx,
+                                                                                       yr_cal_sim_pre,
+                                                                                       data.lumaps[yr_cal],
+                                                                                       data.lmmaps[yr_cal],
+                                                                                       separate=True)
+
+    for idx, non_ag_type in enumerate(non_ag_transitions_cost_mat):
+        for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
+            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]  # Get the transition cost matrix
+            arr = np.einsum('mrj,r->r', np.nan_to_num(arr, nan=0.0), np.nan_to_num(non_ag_dvar[:,
+                                                                                   idx],
+                                                                                   nan=0.0))  # Multiply the transition cost matrix by the cost of non-agricultural land-use
+            cost_dfs.append(arr)
+    summed_array_r = np.sum(cost_dfs, axis=0)
+    save_map_to_npy(data, summed_array_r, f'cost_transition_ag2non_ag', yr_cal, path)
+    cost_dfs = []
+    # --------------------------------------------------------------------
+    #              Non-agricultural land-use transition costs (from non-ag to ag)
+    # --------------------------------------------------------------------
+
+    # Get the transition cost matirces for non-agricultural land-use
+    if yr_idx == 0:
+        non_ag_transitions_cost_mat = {k: {'Transition cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
+                                       for k in data.NON_AGRICULTURAL_LANDUSES}
+    else:
+        non_ag_transitions_cost_mat = non_ag_transitions.get_to_ag_transition_matrix(data,
+                                                                                     yr_idx,
+                                                                                     data.lumaps[yr_cal],
+                                                                                     data.lmmaps[yr_cal],
+                                                                                     separate=True)
+    for non_ag_type in non_ag_transitions_cost_mat:
+        for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
+            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]  # Get the transition cost matrix
+            arr = np.einsum('mrj,mrj->r', arr,
+                            ag_dvar)  # Multiply the transition cost matrix by the cost of non-agricultural land-use
+            cost_dfs.append(arr)
+    summed_array_r = np.sum(cost_dfs, axis=0)
+    save_map_to_npy(data, summed_array_r, f'cost_transition_non_ag2ag', yr_cal, path)
+
+
+def write_GHG_npy(data: Data, yr_cal, path):
+    yr_idx = yr_cal - data.YR_CAL_BASE
+
+    # -------------------------------------------------------#
+    # Get greenhouse gas emissions from agricultural landuse #
+    # -------------------------------------------------------#
+
+    # Get the ghg_df
+    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
+    dvar_rmj = data.ag_dvars[yr_cal]
+    ag_g_r = np.einsum('mrj,mrj -> r', dvar_rmj, ag_g_mrj)
+    save_map_to_npy(data, ag_g_r, 'GHG_ag', yr_cal, path)
+
+    # -----------------------------------------------------------#
+    # Get greenhouse gas emissions from non-agricultural landuse #
+    # -----------------------------------------------------------#
+    # Get the non_ag GHG reduction
+    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal])
+
+    # Multiply with decision variable to get the GHG in yr_cal
+    non_ag_g_rk = non_ag_g_rk * data.non_ag_dvars[yr_cal]
+    lmmap_mr = np.stack([data.lmmaps[yr_cal] == 0, data.lmmaps[yr_cal] == 1], axis=0)
+
+    # get the non_ag GHG reduction on dry/irr land
+    non_ag_g_r = np.einsum('rk, mr -> r', non_ag_g_rk, lmmap_mr)
+    save_map_to_npy(data, non_ag_g_r, 'GHG_non-ag', yr_cal, path)
+
+    # -------------------------------------------------------------------#
+    # Get greenhouse gas emissions from landuse transformation penalties #
+    # -------------------------------------------------------------------#
+
+    # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
+    simulated_year_list = sorted(list(data.lumaps.keys()))
+
+    # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
+    yr_idx_sim = simulated_year_list.index(yr_cal)
+
+    # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
+    if yr_cal == data.YR_CAL_BASE:
+        ghg_t = np.zeros(data.ag_dvars[yr_cal].shape, dtype=np.bool_)
+    else:
+        yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
+        ghg_t = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[yr_cal_sim_pre])
+
+    # Get the GHG emissions from lucc-convertion compared to the previous year
+    ghg_t_r = np.einsum('mrj,mrj -> r', data.ag_dvars[yr_cal], ghg_t)
+    save_map_to_npy(data, ghg_t_r, 'GHG_transition', yr_cal, path)
+
+    # -------------------------------------------------------------------#
+    # Get greenhouse gas emissions from agricultural management          #
+    # -------------------------------------------------------------------#
+
+    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
+
+    # Get the ag_man_g_mrj
+    ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, yr_idx)
+
+    am_dfs = []
+    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
+        # Get the lucc_code for this the agricultural management in this loop
+        am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
+
+        # Get the GHG emission from agricultural management, then reshape it to starte with row (r) dimension
+        am_ghg_mrj = ag_man_g_mrj[am] * data.ag_man_dvars[yr_cal][am][:, :, am_j]
+        am_ghg_r = np.einsum('mrj -> r', am_ghg_mrj)
+        save_map_to_npy(data, am_ghg_r, f'GHG_{am}', yr_cal, path)
+
+    # -------------------------------------------------------------------#
+    # Get greenhouse gas emissions from off_land          #
+    # -------------------------------------------------------------------#
+
+
+def write_map_npy(data: Data, yr_cal, path):
+    # Get the Agricultural Management applied to each pixel
+    ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _, v in data.ag_man_dvars[yr_cal].items()]).T  # (r, am)
+    ag_man_dvar_mask = ag_man_dvar.sum(
+        1) > 0.01  # Meaning that they have at least 1% of agricultural management applied
+    ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1  # Start from 1
+    ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0).astype(np.float32)
+
+    # Get the non-agricultural landuse for each pixel
+    non_ag_dvar = data.non_ag_dvars[yr_cal]  # (r, k)
+    non_ag_dvar_mask = non_ag_dvar.sum(
+        1) > 0.01  # Meaning that they have at least 1% of non-agricultural landuse applied
+    non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE  # Start from 100
+    non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0).astype(np.float32)
+
+    save_map_to_npy(data, ag_man_dvar_argmax, f'am_map', yr_cal, path)
+    save_map_to_npy(data, non_ag_dvar_argmax, f'non_ag_map', yr_cal, path)
+    save_map_to_npy(data, data.lumaps[yr_cal], f'lu_map', yr_cal, path)
+    save_map_to_npy(data, data.lmmaps[yr_cal], f'lm_map', yr_cal, path)
+
