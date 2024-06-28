@@ -24,8 +24,9 @@ gurobi.log
 *.zip
 *.dat
 
+.idea/
 temp*
 *.ipynb
 *.gitignore
 myCode/
-temp*
+output/
