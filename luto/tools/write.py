@@ -1577,7 +1577,7 @@ def write_GHG_npy(data: Data, yr_cal, path):
         # Get the GHG emission from agricultural management, then reshape it to starte with row (r) dimension
         am_ghg_mrj = ag_man_g_mrj[am] * data.ag_man_dvars[yr_cal][am][:, :, am_j]
         am_ghg_r = np.einsum('mrj -> r', am_ghg_mrj)
-        save_map_to_npy(data, am_ghg_r, f'GHG_{am}', yr_cal, path)
+        save_map_to_npy(data, am_ghg_r, f'GHG_am_{am}', yr_cal, path)
 
     # -------------------------------------------------------------------#
     # Get greenhouse gas emissions from off_land          #
