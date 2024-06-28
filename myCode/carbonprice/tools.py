@@ -4,6 +4,9 @@ import os
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from tqdm import *
+
+
 from myCode.carbonprice.helpers import *
 
 def amortize_costs(path_name, file_name = "cost_transition_ag2non_ag", rate=0.07, horizon=30):
@@ -22,7 +25,7 @@ def amortize_costs(path_name, file_name = "cost_transition_ag2non_ag", rate=0.07
     costs = {}
 
     # 读取所有年份的文件
-    for year in range(2010, 2051):
+    for year in trange(2010, 2051):
         full_file_name = os.path.join(path_name, f"out_{year}/data_for_carbon_price/{file_name}_{year}.npy")
         costs[year] = np.load(full_file_name)
 
@@ -63,51 +66,63 @@ def calculate_payment(path_name):
     # 初始化结果列表
     results = []
     columns_name = ["Year", "cost_ag(M$)", "cost_am(M$)", "cost_non_ag(M$)", "cost_transition_ag2ag(M$)",
-                    "cost_transition_ag2non_ag_amortised(M$)",
-                    "revenue_ag(M$)", "revenue_am(M$)", "GHG Emission(MtCOe2)", "Total cost for Discriminatory Payment(M$)",
-                    "GHG Abatement(MCOe2)",
+                    "cost_transition_ag2non_ag_amortised(M$)", "revenue_ag(M$)", "revenue_am(M$)", "revenue_non_ag(M$)",
+                    "GHG Emission target(MtCOe2)", "Total cost for Discriminatory Payment(M$)", "GHG Abatement(MCOe2)",
                     "Carbon Price for Discriminatory Payment average($/tCO2e)"]
-    prefixes = columns_name[2:8]
-    for year in range(2010, 2051):
-        path_dir = os.path.join(path_name, f"out_{year}/data_for_carbon_price")
 
-        # 读取成本数据
-        cost_arr = np.load(os.path.join(path_dir, f"cost_ag_{year}.npy"))
-        rows_nums = [year, np.sum(cost_arr) / 1000000]
+    # 初始化字典来存储每年的利润
+    profits = {}
+
+    for year in trange(2010, 2051):
+        rows_nums = [year]
+        path_dir = os.path.join(path_name, f"out_{year}/data_for_carbon_price")
+        prefixes = columns_name[1:9]
 
         for prefix in prefixes:
             arr = sum_files(path_dir, prefix[:-4])
-            rows_nums.append(np.sum(arr)/1000000)
-            cost_arr += arr
+            rows_nums.append(np.sum(arr) / 1000000)
 
         ghg_arr = sum_files(path_dir, "GHG_")
-        rows_nums.append(np.sum(ghg_arr)/1000000)
+        rows_nums.append(np.sum(ghg_arr) / 1000000)
+
+        # 读取成本和收入数组
+        cost_arr = np.load(os.path.join(path_dir, f"cost_ag_{year}.npy"))
+        cost_arr += sum_files(path_dir, "cost_non_ag_")
+        cost_arr += sum_files(path_dir, "cost_am_")
+
+        rev_arr = np.load(os.path.join(path_dir, f"revenue_ag_{year}.npy"))
+        rev_arr += sum_files(path_dir, "revenue_non_ag_")
+        rev_arr += sum_files(path_dir, "revenue_am_")
+
+        profit_arr = rev_arr - cost_arr
+        profits[year] = profit_arr  # 存储当年的利润
 
         if year > 2010:
-            path_dir_last = os.path.join(path_name, f"out_{year - 1}/data_for_carbon_price")
-            cost_arr -= sum_files(path_dir_last, "cost_ag_")
-            cost_arr -= sum_files(path_dir_last, "rev_ag_")
-            cost_arr -= sum_files(path_dir_last, "rev_am_")
-            rows_nums.append(np.sum(cost_arr)/1000000)
+            # 直接从字典中获取前一年的利润
+            profit_arr_last = profits[year - 1]
 
-            ghg_arr -= sum_files(path_dir_last, "GHG_ag_")
+            tra_arr = np.load(os.path.join(path_dir, f"cost_transition_ag2ag_{year}.npy")) + np.load(
+                os.path.join(path_dir, f"cost_transition_ag2non_ag_amortised_{year}.npy"))
+            payment_arr = tra_arr + (profit_arr - profit_arr_last)
+            rows_nums.append(np.sum(payment_arr) / 1000000)
+
+            ghg_arr -= sum_files(os.path.join(path_name, f"out_{year - 1}/data_for_carbon_price"), "GHG_ag_")
             ghg_arr = -ghg_arr
-            rows_nums.append(np.sum(ghg_arr)/1000000)
+            rows_nums.append(np.sum(ghg_arr) / 1000000)
 
             with np.errstate(divide='ignore', invalid='ignore'):
-                cp_arr = np.divide(cost_arr, ghg_arr)
+                cp_arr = np.divide(payment_arr, ghg_arr)
                 cp_arr[np.isinf(cp_arr)] = 0
                 cp_arr = np.nan_to_num(cp_arr, nan=0.0)
             rows_nums.append(np.sum(cp_arr * ghg_arr) / np.sum(ghg_arr))
 
             save_path = os.path.join(path_name, "data_for_carbon_price")
             os.makedirs(save_path, exist_ok=True)
-            np.save(os.path.join(save_path, f"cost_{year}.npy"), cost_arr)
+            np.save(os.path.join(save_path, f"payment_{year}.npy"), payment_arr)
             np.save(os.path.join(save_path, f"ghg_{year}.npy"), ghg_arr)
             np.save(os.path.join(save_path, f"cp_{year}.npy"), cp_arr)
 
         results.append(rows_nums)
-        print(f"Saved cost and ghg for year {year}")
 
     df_results = pd.DataFrame(results, columns=columns_name)
     df_results.to_excel(os.path.join(path_name, "cost_revenue_summary1.xlsx"), index=False)
@@ -117,34 +132,19 @@ def caculate_carbonprice(path_name,percentile_num=95,mask_use=True):
     path_name = "output/" + path_name
     # 初始化列表以存储每年的数据
     results = []
-    for year in range(2011, 2051):
+    for year in trange(2011, 2051):
         # 加载每年的 .npy 文件
-        cost_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"cost_{year}.npy"))
+        payment_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"payment_{year}.npy"))
         ghg_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"ghg_{year}.npy"))
         cp_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"cp_{year}.npy"))
 
-        output_file = f"carbon_price_analysis_{percentile_num}_nomask.csv"
+        output_file = f"carbon_price_analysis_{percentile_num}_nomask1.csv"
         # 使用 mask 过滤掉 ghg_arr < 1的值
         if mask_use:
             mask = ghg_arr >= 1
-            cp_arr = cp_arr[mask]
-            ghg_arr = ghg_arr[mask]
-            cost_arr = cost_arr[mask]
-            output_file =  f"carbon_price_analysis_{percentile_num}_mask.csv"
+            cp_arr1 = cp_arr[mask]
+            output_file =  f"carbon_price_analysis_{percentile_num}_mask1.csv"
 
-        print(str(year))
-        # 计算所需的值
-        carbon_price_uniform = np.percentile(cp_arr, percentile_num)
-        total_emissions_abatement = np.sum(ghg_arr)
-        total_cost_uniform = carbon_price_uniform * total_emissions_abatement
-        total_cost_discriminatory = np.sum(cp_arr * ghg_arr)
-        carbon_price_discriminatory_avg = total_cost_discriminatory / total_emissions_abatement if total_emissions_abatement != 0 else 0
-        mask = ghg_arr >= 1
-        cp_arr1 = cp_arr[mask]
-        ghg_arr1 = ghg_arr[mask]
-        cost_arr1 = cost_arr[mask]
-
-        print(str(year))
         # 计算所需的值
         carbon_price_uniform = np.percentile(cp_arr1, percentile_num)
         total_emissions_abatement = np.sum(ghg_arr)
@@ -175,10 +175,6 @@ def caculate_carbonprice_compare(path_name,percentiles = [100, 99, 98, 97, 96, 9
     # 定义分位数列表
     # percentiles = [100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84, 83, 82, 81, 80]
 
-    # 初始化结果字典
-    results_with_mask = {percentile: [] for percentile in percentiles}
-    results_without_mask = {percentile: [] for percentile in percentiles}
-
     # 初始化表格字典
     carbon_price_with_mask = {year: [] for year in range(2011, 2051)}
     ghg_max_cp_with_mask = {year: [] for year in range(2011, 2051)}
@@ -189,40 +185,38 @@ def caculate_carbonprice_compare(path_name,percentiles = [100, 99, 98, 97, 96, 9
     cost_max_cp_without_mask = {year: [] for year in range(2011, 2051)}
 
     # 循环每个年份
-    for year in range(2011, 2051):
+    for year in trange(2011, 2051):
         # 加载每年的 .npy 文件
-        cost_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"cost_{year}.npy"))
+        payment_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"payment_{year}.npy"))
         ghg_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"ghg_{year}.npy"))
         cp_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"cp_{year}.npy"))
 
-        print(f"Processing year: {year}")
+        # 不使用 mask 直接使用原始数组
+        filtered_cp_arr_without_mask = cp_arr
+        filtered_ghg_arr_without_mask = ghg_arr
+        filtered_payment_arr_without_mask = payment_arr
 
         # 使用 mask 过滤掉 ghg_arr 在 -1 到 1 范围内的值
         mask = ghg_arr >= 1
         filtered_cp_arr_with_mask = cp_arr[mask]
         filtered_ghg_arr_with_mask = ghg_arr[mask]
-        filtered_cost_arr_with_mask = cost_arr[mask]
-
-        # 不使用 mask 直接使用原始数组
-        filtered_cp_arr_without_mask = cp_arr
-        filtered_ghg_arr_without_mask = ghg_arr
-        filtered_cost_arr_without_mask = cost_arr
+        filtered_payment_arr_with_mask = payment_arr[mask]
 
         # 循环每个分位数
         for percentile_num in percentiles:
             # 计算使用 mask 的值
             carbon_price_uniform_with_mask = np.percentile(filtered_cp_arr_with_mask, percentile_num)
-            total_emissions_abatement_with_mask = np.sum(filtered_ghg_arr_with_mask)
-            total_cost_uniform_with_mask = carbon_price_uniform_with_mask * total_emissions_abatement_with_mask
+            # total_emissions_abatement_with_mask = np.sum(filtered_ghg_arr_with_mask)
+            # total_cost_uniform_with_mask = carbon_price_uniform_with_mask * total_emissions_abatement_with_mask
 
             # 找到分位数所在位置对应的索引
             percentile_value_with_mask = np.percentile(filtered_cp_arr_with_mask, percentile_num)
             max_index_with_mask = np.unravel_index(np.argmax(filtered_cp_arr_with_mask >= percentile_value_with_mask),
                                                    filtered_cp_arr_with_mask.shape)
 
-            # 获取对应位置的 ghg_arr 和 cost_arr 的值
+            # 获取对应位置的 ghg_arr 和 payment_arr 的值
             ghg_value_at_max_cp_with_mask = filtered_ghg_arr_with_mask[max_index_with_mask]
-            cost_value_at_max_cp_with_mask = filtered_cost_arr_with_mask[max_index_with_mask]
+            cost_value_at_max_cp_with_mask = filtered_payment_arr_with_mask[max_index_with_mask]
 
             carbon_price_with_mask[year].append(carbon_price_uniform_with_mask)
             ghg_max_cp_with_mask[year].append(ghg_value_at_max_cp_with_mask)
@@ -230,8 +224,8 @@ def caculate_carbonprice_compare(path_name,percentiles = [100, 99, 98, 97, 96, 9
 
             # 计算不使用 mask 的值
             carbon_price_uniform_without_mask = np.percentile(filtered_cp_arr_without_mask, percentile_num)
-            total_emissions_abatement_without_mask = np.sum(filtered_ghg_arr_without_mask)
-            total_cost_uniform_without_mask = carbon_price_uniform_without_mask * total_emissions_abatement_without_mask
+            # total_emissions_abatement_without_mask = np.sum(filtered_ghg_arr_without_mask)
+            # total_cost_uniform_without_mask = carbon_price_uniform_without_mask * total_emissions_abatement_without_mask
 
             # 找到分位数所在位置对应的索引
             percentile_value_without_mask = np.percentile(filtered_cp_arr_without_mask, percentile_num)
@@ -239,9 +233,9 @@ def caculate_carbonprice_compare(path_name,percentiles = [100, 99, 98, 97, 96, 9
                 np.argmax(filtered_cp_arr_without_mask >= percentile_value_without_mask),
                 filtered_cp_arr_without_mask.shape)
 
-            # 获取对应位置的 ghg_arr 和 cost_arr 的值
+            # 获取对应位置的 ghg_arr 和 payment_arr 的值
             ghg_value_at_max_cp_without_mask = filtered_ghg_arr_without_mask[max_index_without_mask]
-            cost_value_at_max_cp_without_mask = filtered_cost_arr_without_mask[max_index_without_mask]
+            cost_value_at_max_cp_without_mask = filtered_payment_arr_without_mask[max_index_without_mask]
 
             carbon_price_without_mask[year].append(carbon_price_uniform_without_mask)
             ghg_max_cp_without_mask[year].append(ghg_value_at_max_cp_without_mask)
@@ -266,7 +260,7 @@ def caculate_carbonprice_compare(path_name,percentiles = [100, 99, 98, 97, 96, 9
     df_cost_max_cp_without_mask.columns = percentiles
 
     # 保存结果到Excel文件
-    output_excel_path = os.path.join(path_name, "carbon_price_comparison.xlsx")
+    output_excel_path = os.path.join(path_name, "carbon_price_comparison1.xlsx")
     with pd.ExcelWriter(output_excel_path) as writer:
         df_carbon_price_with_mask.to_excel(writer, sheet_name='Carbon Price with Mask', index_label='Year')
         df_ghg_max_cp_with_mask.to_excel(writer, sheet_name='Ghg Max Cp with Mask', index_label='Year')
@@ -282,7 +276,7 @@ def draw_histogram(path_name,year=2050, mask_use=True):
     print("Start to draw histogram.")
     path_name = "output/" + path_name
     # 加载 2050 年的 .npy 文件
-    cost_arr_2050 = np.load(os.path.join(path_name, "data_for_carbon_price", f"cost_{year}.npy"))
+    payment_arr_2050 = np.load(os.path.join(path_name, "data_for_carbon_price", f"payment_{year}.npy"))
     ghg_arr_2050 = np.load(os.path.join(path_name, "data_for_carbon_price", f"ghg_{year}.npy"))
     cp_arr_2050 = np.load(os.path.join(path_name, "data_for_carbon_price", f"cp_{year}.npy"))
 
@@ -292,7 +286,7 @@ def draw_histogram(path_name,year=2050, mask_use=True):
         mask = ghg_arr_2050 >= 1
         filtered_cp_arr_with_mask = cp_arr_2050[mask]
         filtered_ghg_arr_with_mask = ghg_arr_2050[mask]
-        filtered_cost_arr_with_mask = cost_arr_2050[mask]
+        filtered_payment_arr_with_mask = payment_arr_2050[mask]
         output_name = f"histogram_{year}_mask.png"
 
     # 绘制直方图
@@ -313,7 +307,7 @@ def draw_histogram(path_name,year=2050, mask_use=True):
     plt.ylabel('Frequency')
 
     plt.subplot(1, 3, 3)
-    plt.hist(filtered_cost_arr_with_mask, bins=50)
+    plt.hist(filtered_payment_arr_with_mask, bins=50)
     plt.yscale('log')
     plt.title(f'Cost with mask - {year}')
     plt.xlabel('Cost')
@@ -416,7 +410,7 @@ def summarize_from_csv(path_name):
             df_result1.to_excel(writer, sheet_name=key[:-9], index=False, columns=columns_to_write)
 
 def carbon_price(path_name):
-    amortize_costs(path_name)
+    # amortize_costs(path_name)
     calculate_payment(path_name)
     caculate_carbonprice(path_name)
     caculate_carbonprice_compare(path_name)
