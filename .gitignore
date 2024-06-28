@@ -27,4 +27,5 @@ gurobi.log
 temp*
 *.ipynb
 *.gitignore
-/myCode
+myCode/
+temp*
