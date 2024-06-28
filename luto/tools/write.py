@@ -208,11 +208,11 @@ def write_files(data: Data, yr_cal, path):
     
     # Save raw agricultural decision variables (float array).
     ag_X_mrj_fname = f'ag_X_mrj_{yr_cal}.npy'
-    np.save(os.path.join(path, ag_X_mrj_fname), data.ag_dvars[yr_cal].astype(np.float16))
+    np.save(os.path.join(path, ag_X_mrj_fname), data.ag_dvars[yr_cal])
     
     # Save raw non-agricultural decision variables (float array).
     non_ag_X_rk_fname = f'non_ag_X_rk_{yr_cal}.npy'
-    np.save(os.path.join(path, non_ag_X_rk_fname), data.non_ag_dvars[yr_cal].astype(np.float16))
+    np.save(os.path.join(path, non_ag_X_rk_fname), data.non_ag_dvars[yr_cal])
 
     # Save raw agricultural management decision variables (float array).
     for am in AG_MANAGEMENTS_TO_LAND_USES:
@@ -221,7 +221,7 @@ def write_files(data: Data, yr_cal, path):
 
         snake_case_am = tools.am_name_snake_case(am)
         am_X_mrj_fname = f'ag_man_X_mrj_{snake_case_am}_{yr_cal}.npy'
-        np.save(os.path.join(path, am_X_mrj_fname), data.ag_man_dvars[yr_cal][am].astype(np.float16))
+        np.save(os.path.join(path, am_X_mrj_fname), data.ag_man_dvars[yr_cal][am])
     
     # Write out raw numpy arrays for land-use and land management
     lumap_fname = f'lumap_{yr_cal}.npy'
@@ -634,9 +634,9 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
 
     # Get the non-agricultural revenue/cost matrices
     ag_r_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
-    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data, ag_r_mrj, data.lumaps[yr_cal])    # rk
+    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data, yr_cal, ag_r_mrj, data.lumaps[yr_cal])    # rk
     ag_c_mrj = ag_cost.get_cost_matrices(data, yr_idx)
-    non_ag_cost_mat = non_ag_cost.get_cost_matrix(data, ag_c_mrj, data.lumaps[yr_cal])     # rk
+    non_ag_cost_mat = non_ag_cost.get_cost_matrix(data, ag_c_mrj, data.lumaps[yr_cal], yr_cal)     # rk
 
     # Replace nan with 0
     non_ag_rev_mat = np.nan_to_num(non_ag_rev_mat)
