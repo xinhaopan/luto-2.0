@@ -30,3 +30,4 @@ temp*
 *.gitignore
 myCode/
 output/
+input/
