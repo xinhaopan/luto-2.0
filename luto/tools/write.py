@@ -1298,6 +1298,7 @@ def write_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     write_cost_transition_npy(data, yr_cal, path, yr_cal_sim_pre)
     write_GHG_npy(data, yr_cal, path)
     write_map_npy(data, yr_cal, path)
+    write_rev_non_ag_npy(data, yr_cal, path)
 
 def save_map_to_npy(data, product, filename_prefix, yr_cal, path):
     """
@@ -1389,9 +1390,9 @@ def write_rev_cost_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get the non-agricultural revenue/cost matrices
     ag_r_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
-    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data, ag_r_mrj, data.lumaps[yr_cal])  # rk
+    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data, yr_cal, ag_r_mrj, data.lumaps[yr_cal])  # rk
     ag_c_mrj = ag_cost.get_cost_matrices(data, yr_idx)
-    non_ag_cost_mat = non_ag_cost.get_cost_matrix(data, ag_c_mrj, data.lumaps[yr_cal])  # rk
+    non_ag_cost_mat = non_ag_cost.get_cost_matrix(data, ag_c_mrj, data.lumaps[yr_cal], yr_cal)  # rk
 
     # Replace nan with 0
     non_ag_rev_mat = np.nan_to_num(non_ag_rev_mat)
@@ -1603,4 +1604,96 @@ def write_map_npy(data: Data, yr_cal, path):
     save_map_to_npy(data, non_ag_dvar_argmax, f'non_ag_map', yr_cal, path)
     save_map_to_npy(data, data.lumaps[yr_cal], f'lu_map', yr_cal, path)
     save_map_to_npy(data, data.lmmaps[yr_cal], f'lm_map', yr_cal, path)
+
+def write_rev_non_ag_npy(data: Data, yr_cal, path):
+    from luto import tools
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    non_ag_dvar = data.non_ag_dvars[yr_cal]  # rk
+    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, data.lumaps[yr_cal])
+    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, data.lumaps[yr_cal])
+    ag_r_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
+
+    # rev_sheep_agroforestry-------------------------------------------------------------------------------------------
+    sheep_j = tools.get_sheep_code(data)
+
+    # Only use the dryland version of sheep
+    sheep_rev = ag_r_mrj[0, :, sheep_j]
+    base_agroforestry_rev = non_ag_revenue.get_rev_agroforestry_base(data, yr_cal)
+
+    # Calculate contributions and return the sum
+    sheep_agroforestry_contr = base_agroforestry_rev * agroforestry_x_r
+    sheep_contr = sheep_rev * (1 - agroforestry_x_r)
+
+    index = 2
+
+    rev_non_ag_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], sheep_agroforestry_contr)
+    rev_non_ag_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], sheep_contr)
+
+    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non_ag_non_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
+    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
+
+
+    # rev_beef_agroforestry-------------------------------------------------------------------------------------------
+    beef_j = tools.get_beef_code(data)
+
+    # Only use the dryland version of beef
+    beef_rev = ag_r_mrj[0, :, beef_j]
+    base_agroforestry_rev = non_ag_revenue.get_rev_agroforestry_base(data, yr_cal)
+
+    # Calculate contributions and return the sum
+    beef_agroforestry_contr = base_agroforestry_rev * agroforestry_x_r
+    beef_contr = beef_rev * (1 - agroforestry_x_r)
+
+    index = 3
+    non_ag_dvar = data.non_ag_dvars[yr_cal]  # rk
+
+    rev_non_ag_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], beef_agroforestry_contr)
+    rev_non_ag_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], beef_contr)
+
+    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non_ag_non_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal,
+                    path)
+    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
+
+    # rev_sheep_carbon_plantings_belt-------------------------------------------------------------------------------------------
+    sheep_j = tools.get_sheep_code(data)
+
+    # Only use the dryland version of sheep
+    sheep_rev = ag_r_mrj[0, :, sheep_j]
+    base_cp_rev = non_ag_revenue.get_rev_carbon_plantings_belt_base(data, yr_cal)
+
+    # Calculate contributions and return the sum
+    sheep_cp_contr = base_cp_rev * cp_belt_x_r
+    sheep_contr = sheep_rev * (1 - cp_belt_x_r)
+
+    index = 5
+    non_ag_dvar = data.non_ag_dvars[yr_cal]  # rk
+
+    rev_non_ag_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], sheep_cp_contr)
+    rev_non_ag_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], sheep_contr)
+
+    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non_ag_non_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal,
+                    path)
+    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
+
+    # rev_beef_carbon_plantings_belt-------------------------------------------------------------------------------------------
+    beef_j = tools.get_beef_code(data)
+
+    # Only use the dryland version of beef
+    beef_rev = ag_r_mrj[0, :, beef_j]
+    base_cp_rev = non_ag_revenue.get_rev_carbon_plantings_belt_base(data, yr_cal)
+
+    # Calculate contributions and return the sum
+    beef_cp_contr = base_cp_rev * cp_belt_x_r
+    beef_contr = beef_rev * (1 - cp_belt_x_r)
+
+    index = 6
+    non_ag_dvar = data.non_ag_dvars[yr_cal]  # rk
+
+    rev_non_ag_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], beef_cp_contr)
+    rev_non_ag_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], beef_contr)
+
+    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non_ag_non_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal,
+                    path)
+    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
+
 
