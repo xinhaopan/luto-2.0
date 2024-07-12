@@ -87,7 +87,7 @@ class LutoSolver:
         self.ag_management_constraints_r = defaultdict(list)
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
-        self.water_limit_constraints_r = None
+        self.water_limit_constraints = []
         self.ghg_emissions_expr = None
         self.ghg_emissions_limit_constraint = None
         self.biodiversity_expr = None
@@ -543,12 +543,10 @@ class LutoSolver:
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
-        if settings.WATER_NET_YIELD_LIMITS != "on":
+        if settings.WATER_LIMITS != "on":
             return
         
         print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
-
-        self.water_limit_constraints_r = defaultdict(list)
 
         # Ensure water use remains below limit for each region
         for region, (reg_name, _, w_net_yield_limit, ind) in self._input_data.limits["water"].items():
@@ -591,7 +589,7 @@ class LutoSolver:
             if not type(w_net_yield_region) == int:
                 constr = self.gurobi_model.addConstr(w_net_yield_region >= w_net_yield_limit)
                 for r in ind:
-                    self.water_limit_constraints_r[r].append(constr)
+                    self.water_limit_constraints.append(constr)
 
             if settings.VERBOSE == 1:
                 print(f"    ...net water yield in {reg_name} >= {w_net_yield_limit:.2f} ML")
@@ -654,12 +652,12 @@ class LutoSolver:
         )
 
     def _add_biodiversity_limit_constraints(self):
-        if settings.BIODIVERSITY_LIMITS != "on" and not settings.BIODIVERSITY_REPORT:
+        if settings.BIODIVERSITY_LIMITS != "on":
             return
         
         print('  ...biodiversity constraints...')
 
-        # Returns biodiversity limits. Note that the biodiversity limits is 0 if not set BIODIVERSITY_LIMITS = "on".
+        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSITY_LIMITS != "on".
         biodiversity_limits = self._input_data.limits["biodiversity"]
 
         ag_contr = gp.quicksum(
@@ -875,16 +873,17 @@ class LutoSolver:
         for r in updated_cells:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
             self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
-            if self.water_limit_constraints_r is not None:
-                self.gurobi_model.remove(self.water_limit_constraints_r.pop(r, []))
         
         self.gurobi_model.remove(self.adoption_limit_constraints)
         self.gurobi_model.remove(self.demand_penalty_constraints)
         if self.biodiversity_limit_constraint is not None:
             self.gurobi_model.remove(self.biodiversity_limit_constraint)
+        if self.water_limit_constraints:
+            self.gurobi_model.remove(self.water_limit_constraints)
         
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
+        self.water_limit_constraints = []
 
         if self.ghg_emissions_limit_constraint is not None:
             self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
