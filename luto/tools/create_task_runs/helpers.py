@@ -198,6 +198,15 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
             if isinstance(v, list):
                 bash_file.write(f'{k}=({ " ".join([str(elem) for elem in v])})\n')
                 file.write(f'{k}={v}\n')
+            elif k == 'SSP':
+                v = str(v)
+                file.write(f'{k}="{v}"\n')
+                bash_file.write(f'{k}="{v}"\n')
+            elif k == 'CARBON_PRICES_FIELD':
+                print(f'{k}="{v}"\n')
+                v = str(v)
+                file.write(f'{k}="{v}"\n')
+                bash_file.write(f'{k}="{v}"\n')
             # Dict values need to be converted to bash variables
             elif isinstance(v, dict):
                 file.write(f'{k}={v}\n')
@@ -293,12 +302,23 @@ def create_run_folders(col):
     # Create an output folder for the task
     os.makedirs(f'{TASK_ROOT_DIR}/{col}/output', exist_ok=True)
 
-
+def convert_to_unix(file_path):
+    with open(file_path, 'rb') as file:
+        content = file.read()
+    content = content.replace(b'\r\n', b'\n')
+    with open(file_path, 'wb') as file:
+        file.write(content)
 
 
 def submit_task(cwd:str, col:str):
+    task_dir = os.path.join(TASK_ROOT_DIR, col)
+    slurm_script_path = os.path.join(task_dir, 'slurm.sh')
+
     # Copy the slurm script to the task folder
-    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/slurm_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
+    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/slurm_cmd.sh', slurm_script_path)
+
+    # Convert the line endings to UNIX format using Python
+    convert_to_unix(slurm_script_path)
     # Start the task if the os is linux
     if os.name == 'posix':
         os.chdir(f'{TASK_ROOT_DIR}/{col}')

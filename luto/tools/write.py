@@ -162,12 +162,9 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg_offland_commodity(data, yr_cal, path_yr)
     write_biodiversity(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
-<<<<<<< HEAD
+    write_biodiversity_contribution(data, yr_cal, path_yr)
 
     write_npy(data, yr_cal, path_yr)
-=======
-    write_biodiversity_contribution(data, yr_cal, path_yr)
->>>>>>> c3a6f30beccfb92d41d8754827d1da56122f86ee
     
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
     
@@ -1037,7 +1034,7 @@ def write_biodiversity(data: Data, yr_cal, path):
 
     # Get biodiversity score from model
     if yr_cal >= data.YR_CAL_BASE + 1:
-        biodiv_score = data.prod_data[yr_cal]['Biodiversity']
+        biodiv_score = 0 # data.prod_data[yr_cal]['Biodiversity']
     else:
         # Return the base year biodiversity score
         biodiv_score = data.BIODIV_GBF_TARGET_2[data.YR_CAL_BASE]

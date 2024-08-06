@@ -9,6 +9,20 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="s222552331@10.136.177.2:22 password (2)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/s222552331/LUTO2_XH/LUTO2" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="s222552331@127.0.0.1:6000 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/s222552331/LUTO2_XH/LUTO2" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="s222552331@52.255.34.63:8080 password">
         <serverdata>
           <mappings>
