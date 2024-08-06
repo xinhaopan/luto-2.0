@@ -26,7 +26,7 @@ import pandas as pd
 
 import luto.settings as settings
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
-from luto.settings import AG_MANAGEMENTS
+from luto.settings import AG_MANAGEMENTS,LIVESTOCK_DRINKING_WATER
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
@@ -183,7 +183,7 @@ def get_cost_lvstk(data: Data, lu, lm, yr_idx):
         raise KeyError(f"Unknown {lm} land management. Check `lm` key.")
 
     # Water delivery costs equal drinking water plus irrigation water req per head * yield (head/ha)
-    costs_w = (data.AGEC_LVSTK['WR_DRN', lvstype] * settings.LIVESTOCK_DRINKING_WATER + WR_IRR) * yield_pot
+    costs_w = (data.AGEC_LVSTK['WR_DRN', lvstype] * LIVESTOCK_DRINKING_WATER + WR_IRR) * yield_pot
     costs_w *= data.WATER_DELIVERY_PRICE * data.WP_COST_MULTS[yr_cal]  # $/ha
 
     # Convert costs to $ per cell including resfactor.
