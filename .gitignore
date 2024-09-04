@@ -24,6 +24,7 @@ gurobi.log
 *.zip
 *.dat
 
+# Xinhao's personal settings
 .idea/
 temp*
 *.ipynb
@@ -32,3 +33,8 @@ myCode/
 output/
 input/
 .idea
+# The mannual build files
+/docs/manual/*
+luto/tools/create_task_runs/*
+luto/tools/create_task_runs/
+
