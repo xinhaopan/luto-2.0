@@ -1,4 +1,3 @@
-
 import os
 import json
 import re
@@ -17,13 +16,14 @@ from luto.tools.report.data_tools.parameters import (AG_LANDUSE,
                                                      COMMODITIES_ALL,
                                                      COMMODITIES_OFF_LAND, 
                                                      GHG_CATEGORY, 
-                                                     GHG_NAMES, 
+                                                     GHG_NAMES,
                                                      LANDUSE_ALL_RENAMED,
                                                      LU_CROPS, 
                                                      LU_NATURAL,
                                                      LVSTK_MODIFIED, 
                                                      LVSTK_NATURAL, 
                                                      NON_AG_LANDUSE_RAW, 
+                                                     RENAME_NON_AG,
                                                      RENAME_AM_NON_AG)
 
 
@@ -49,11 +49,14 @@ def save_report_data(raw_data_dir:str):
     files = get_all_files(raw_data_dir)
     files.drop(files[files['path'].str.contains('data_for_carbon_price')].index, inplace=True)
 
+    # The land-use groupings to combine the land-use into a single category
+    lu_group = pd.read_csv('luto/tools/report/Assets/lu_group.csv')
+    lu_group_expand = lu_group.set_index(['Category', 'color_HEX']).apply(lambda x: x.str.split(', ').explode()).reset_index()
+
     # Set the years to be int
     files['Year'] = files['Year'].astype(int)
     
-    # Select the years to reduce the column number to 
-    # avoid cluttering in the multi-level axis graphing
+    # Select the years to reduce the column number to avoid cluttering in the multi-level axis graphing
     years = sorted(files['Year'].unique().tolist())
     years_select = select_years(years)
     
@@ -77,18 +80,37 @@ def save_report_data(raw_data_dir:str):
 
     area_dvar = pd.concat([ag_dvar_area, non_ag_dvar_area], ignore_index=True)
     area_dvar = area_dvar.replace(RENAME_AM_NON_AG)
+    
+    # Add the category and color
+    area_dvar = area_dvar.merge(lu_group_expand, left_on='Land-use', right_on='Land-use', how='left')
+    area_dvar = area_dvar.rename(columns={
+        'Category': 'category_name',
+        'color_HEX': 'category_HEX_color'
+    })
+    
+    # Plot_1-0: Total Area (km2) in grouped land-use
+    lu_group_area = area_dvar.groupby(['Year','category_name', 'category_HEX_color']).sum(numeric_only=True).reset_index()
+    lu_group_area = lu_group_area\
+        .groupby(['category_name', 'category_HEX_color'])[['Year','Area (million km2)']]\
+        .apply(lambda x:list(map(list,zip(x['Year'], x['Area (million km2)']))))\
+        .reset_index()
+        
+    lu_group_area.columns = ['name','color','data']
+    lu_group_area['type'] = 'column'
+    lu_group_area.to_json(f'{SAVE_DIR}/area_0_grouped_lu_area_wide.json', orient='records')
+    
 
     # Plot_1-1: Total Area (km2)
     lu_area_dvar = area_dvar.groupby(['Year','Land-use']).sum(numeric_only=True).reset_index()
     lu_area_dvar = lu_area_dvar\
         .groupby('Land-use')[['Year','Area (million km2)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
+        .apply(lambda x:list(map(list,zip(x['Year'], x['Area (million km2)']))))\
         .reset_index()
         
     lu_area_dvar.columns = ['name','data']
     lu_area_dvar['type'] = 'column'
     lu_area_dvar['sort_index'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-    lu_area_dvar = lu_area_dvar.sort_values('sort_index').drop('sort_index',axis=1)
+    lu_area_dvar = lu_area_dvar.sort_values('sort_index').drop('sort_index', axis=1)
     lu_area_dvar['color'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
     
     lu_area_dvar.to_json(f'{SAVE_DIR}/area_1_total_area_wide.json', orient='records')
@@ -471,7 +493,7 @@ def save_report_data(raw_data_dir:str):
     rev_cost_net_wide.columns = ['name','data']
     rev_cost_net_wide['type'] = 'spline'
     
-    rev_cost_wide_json = pd.concat([rev_cost_all_wide,rev_cost_net_wide],axis=0)
+    rev_cost_wide_json = pd.concat([rev_cost_all_wide, rev_cost_net_wide],axis=0)
     
     # Define the specific order
     order = ['Agricultural land-use (revenue)', 
@@ -687,13 +709,13 @@ def save_report_data(raw_data_dir:str):
                                             
     cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_trans_mat\
                                            .set_index(['Year','From land-use', 'To land-use'])\
-                                           .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, NON_AG_LANDUSE_RAW],
+                                           .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, RENAME_NON_AG.values()],
                                                     names = ['Year','From land-use', 'To land-use'])).reset_index()
                                            
     cost_transition_ag2non_ag_trans_mat['idx_from'] = cost_transition_ag2non_ag_trans_mat['From land-use']\
                                                     .apply(lambda x: AG_LANDUSE.index(x))
     cost_transition_ag2non_ag_trans_mat['idx_to']  = cost_transition_ag2non_ag_trans_mat['To land-use']\
-                                                    .apply(lambda x: NON_AG_LANDUSE_RAW.index(x))
+                                                    .apply(lambda x: list(RENAME_NON_AG.values()).index(x))
                                                     
 
     cost_transition_ag2non_ag_trans_mat_data = cost_transition_ag2non_ag_trans_mat\
@@ -704,7 +726,7 @@ def save_report_data(raw_data_dir:str):
     
     
     cost_transition_ag2non_ag_trans_mat_json = {'categories_from': AG_LANDUSE,
-                                                'categories_to': NON_AG_LANDUSE_RAW,
+                                                'categories_to': list(RENAME_NON_AG.values()),
                                                 'series': json.loads(cost_transition_ag2non_ag_trans_mat_data.to_json(orient='records'))}
     
     
@@ -1073,35 +1095,38 @@ def save_report_data(raw_data_dir:str):
     #                     5) Water                     #
     ####################################################
     
-
     water_df_total = files.query('category == "water" \
         and year_types == "single_year" \
-        and ~base_name.str.contains("separate") \
+        and ~base_name.str.contains("separate_") \
         and ~base_name.str.contains("outside_LUTO")').reset_index(drop=True)
     water_df_total = pd.concat([pd.read_csv(path) for path in water_df_total['path']], ignore_index=True)
     
-    water_df_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
-    water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
-    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
-    
+
     water_df_outside_LUTO = files.query('category == "water" \
         and year_types == "single_year" \
         and base_name.str.contains("outside_LUTO")').reset_index(drop=True)
     water_df_outside_LUTO = pd.concat([pd.read_csv(path) for path in water_df_outside_LUTO['path']], ignore_index=True)
 
 
+    water_df_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
+    water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
+    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
+
     # Plot_5-1: Water net yield compared to limit (%)
-    water_df_total_pct = water_df_total.query('Variable == "PROPORTION_ALL_%"')
-    water_df_total_pct_wide = water_df_total_pct\
-                                .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
-                                .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
-                                .reset_index()
-                                
-    water_df_total_pct_wide.columns = ['name','data']
-    water_df_total_pct_wide['type'] = 'spline'
-    water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_percent_of_limit.json', orient='records')
-
-
+    for i, var in enumerate(["PROPORTION_ALL_%", "PROPORTION_ALL_%_CC", "PROPORTION_ALL_%_LU"]):
+        water_df_total_pct = water_df_total.query('Variable == @var')
+        water_df_total_pct_wide = water_df_total_pct\
+                                    .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
+                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
+                                    .reset_index()
+                                    
+        water_df_total_pct_wide.columns = ['name','data']
+        water_df_total_pct_wide['type'] = 'spline'
+        water_df_total_pct_wide.loc[len(water_df_total_pct_wide)] = ['', [[2010, 0], [2011, 0]], 'column']
+        water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_{i+1}_percent_of_limit.json', orient='records')
+        
+        
+        
 
 
     # Plot_5-2: Water net yield compared to limite (ML)
@@ -1113,6 +1138,7 @@ def save_report_data(raw_data_dir:str):
 
     water_df_total_yield_wide.columns = ['name','data']
     water_df_total_yield_wide['type'] = 'spline'
+    water_df_total_yield_wide.loc[len(water_df_total_yield_wide)] = ['', [[2010, 0], [2011, 0]], 'column']
     water_df_total_yield_wide.to_json(f'{SAVE_DIR}/water_2_yield_to_limit.json', orient='records')                        
     
     
@@ -1167,6 +1193,7 @@ def save_report_data(raw_data_dir:str):
     water_df_seperate_lu_wide.to_json(f'{SAVE_DIR}/water_4_net_yield_by_landuse.json', orient='records')
     
     
+    
     # Plot_5-5: Water net yield by Water_supply (ML)
     water_df_seperate_irr = water_df_separate.groupby(['Year','Water_supply']).sum()[['Water Net Yield (ML)']].reset_index()
     
@@ -1178,6 +1205,9 @@ def save_report_data(raw_data_dir:str):
     water_df_seperate_irr_wide.columns = ['name','data']
     water_df_seperate_irr_wide['type'] = 'column'
     water_df_seperate_irr_wide.to_json(f'{SAVE_DIR}/water_5_net_yield_by_Water_supply.json', orient='records')
+    
+    
+    # Plot_5-6: Water net yield by Water_supply (ML)
     
 
 
@@ -1291,6 +1321,7 @@ def save_report_data(raw_data_dir:str):
             
         bio_df_species_group.columns = ['name','data']
         bio_df_species_group['type'] = 'spline'
+        bio_df_species_group.loc[len(bio_df_species_group)] = ['', [[2010, 0], [2011, 0]], 'column']
         bio_df_species_group.to_json(f'{SAVE_DIR}/biodiversity_5_contribution_score_by_group.json', orient='records')
 
 

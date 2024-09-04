@@ -54,7 +54,7 @@ def get_wreq_matrices(data: Data, yr_idx):
             w_req_mrj[1, :, j] = w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)       # Water reqs depend on initial stocking rate for irrigation
     
     # Convert to ML per cell via REAL_AREA
-    w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/head|ha> * <unit: head|ha/cell> -> <unit: ML/cell>
+    w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
 
     return w_req_mrj
 
@@ -100,19 +100,19 @@ def get_wyield_matrices(data: Data, yr_idx) -> np.ndarray:
     return w_yield_mrj
 
 
-def get_water_ccimpact(data: Data, yr_idx) -> dict[int, float]:
+def get_water_public_land(data: Data) -> dict[int, dict[int, float]]:
     """
-    Return water climate change (CC) impact matrices by land management, cell, and land-use type.
+    Return water climate change (CC) impact matrices by land management, cell, and land-use type. 
+    Note the impact comes from cells that LUTO does not look at (Urban, Public services, etc.).
     
     Parameters:
         data (object): The data object containing the required data.
         yr_idx (int): The index of the year.
     
     Returns:
-        dict[int, float]: <unit: ML/cell> dictionary of water CC impact amounts, keys being region IDs
+        dict[int, dict[int, float]]: <unit: ML/cell> dictionary of water CC impact amounts.
+            The first key is year and the second key is region ID.
     """
-    yr_cal = data.YR_CAL_BASE + yr_idx
-
     if settings.WATER_REGION_DEF == 'River Region':
         ccimpact_array = data.RR_CCIMPACT
 
@@ -125,7 +125,7 @@ def get_water_ccimpact(data: Data, yr_idx) -> dict[int, float]:
             f"(must be either 'River Region' or 'Drainage Division')."
         )
     
-    return ccimpact_array.loc[yr_cal, :].to_dict()
+    return {yr: ccimpact_array.loc[yr, :].to_dict() for yr in ccimpact_array.index}
 
 
 def get_water_net_yield_matrices(data: Data, yr_idx):
@@ -358,7 +358,28 @@ def get_agricultural_management_water_matrices(data: Data, yr_idx) -> dict[str, 
     }
 
 
-def calc_water_net_yield_by_region_in_year(
+def calc_water_net_yield_for_region(
+    region_ind: np.ndarray,
+    am2j: dict[str, list[int]],
+    ag_dvars: np.ndarray,
+    non_ag_dvars: np.ndarray,
+    ag_man_dvars: dict[str, np.ndarray],
+    ag_w_mrj: np.ndarray,
+    non_ag_w_rk: np.ndarray,
+    ag_man_w_mrj: dict[str, np.ndarray],
+    w_cc_impact_reg: float,
+) -> float:
+    ag_contr = (ag_w_mrj[:, region_ind, :] * ag_dvars[:, region_ind, :]).sum()
+    non_ag_contr = (non_ag_w_rk[region_ind, :] * non_ag_dvars[region_ind, :]).sum()
+    ag_man_contr = sum(
+        (ag_man_w_mrj[am][:, region_ind, j_idx] * ag_man_dvars[am][:, region_ind, j]).sum()
+        for am, am_j_list in am2j.items()
+        for j_idx, j in enumerate(am_j_list)
+    )
+    return ag_contr + non_ag_contr + ag_man_contr + w_cc_impact_reg
+    
+
+def calc_water_net_yield_by_region_in_year_from_data(
     data: Data,
     yr_cal: int,
     ag_w_mrj: Optional[np.ndarray] = None,
@@ -404,7 +425,7 @@ def calc_water_net_yield_by_region_in_year(
         data, ag_w_mrj, data.lumaps[yr_cal], yr_idx
     )
     ag_man_w_mrj = ag_man_w_mrj if ag_man_w_mrj is not None else get_agricultural_management_water_matrices(data, yr_idx)
-    w_cc_impact = w_cc_impact if w_cc_impact is not None else get_water_ccimpact(data, yr_idx)
+    w_cc_impact = w_cc_impact if w_cc_impact is not None else get_water_public_land(data)[yr_cal]
     
     # Calculate net yields
     net_yield_by_region = {}
@@ -412,14 +433,17 @@ def calc_water_net_yield_by_region_in_year(
         # Get indices of cells in region
         ind = np.flatnonzero(region_id == region).astype(np.int32)
 
-        ag_contr = (ag_w_mrj[:, ind, :] * data.ag_dvars[yr_cal][:, ind, :]).sum()
-        non_ag_contr = (non_ag_w_rk[ind, :] * data.non_ag_dvars[yr_cal][ind, :]).sum()
-        ag_man_contr = sum(
-            (ag_man_w_mrj[am][:, ind, j_idx] * data.ag_man_dvars[yr_cal][am][:, ind, j]).sum()
-            for am, am_j_list in am2j.items()
-            for j_idx, j in enumerate(am_j_list)
+        net_yield_by_region[region] = calc_water_net_yield_for_region(
+            ind,
+            am2j,
+            data.ag_dvars[yr_cal],
+            data.non_ag_dvars[yr_cal],
+            data.ag_man_dvars[yr_cal],
+            ag_w_mrj,
+            non_ag_w_rk,
+            ag_man_w_mrj,
+            w_cc_impact[region],
         )
-        net_yield_by_region[region] = ag_contr + non_ag_contr + ag_man_contr + w_cc_impact[region]
 
     return net_yield_by_region
 
@@ -469,7 +493,7 @@ def _get_historical_water_usage_by_regions(data: Data) -> dict[int, tuple[str, f
     return net_baseline_reg_water_yield
 
 
-def get_water_net_yield_limits(
+def get_water_net_yield_limit_values(
     data: Data, yr_cal: int,
 ) -> dict[int, tuple[str, float, float, np.ndarray]]:
     """
@@ -510,7 +534,7 @@ def get_water_net_yield_limits(
     
     # Limits do not yet exist and must be calculated
     historical_yields_dict = _get_historical_water_usage_by_regions(data)
-    base_yr_net_yield_by_reg = calc_water_net_yield_by_region_in_year(data, data.YR_CAL_BASE)
+    base_yr_net_yield_by_reg = calc_water_net_yield_by_region_in_year_from_data(data, data.YR_CAL_BASE)
 
     limits_by_region_year = defaultdict(dict)
 
