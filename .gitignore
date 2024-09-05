@@ -36,5 +36,5 @@ input/
 # The mannual build files
 /docs/manual/*
 luto/tools/create_task_runs/*
-luto/tools/create_task_runs/
+luto/tools/create_task_runs
 
