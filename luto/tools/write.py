@@ -31,6 +31,7 @@ import geopandas as gpd
 
 from datetime import datetime
 from joblib import Parallel, delayed
+from multiprocessing import Lock
 
 from luto import settings
 from luto import tools
@@ -115,10 +116,6 @@ def write_data(data: Data):
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(data.path)
     data2html(data.path)
-    
-    
-
-
 
 def write_logs(data: Data):
     # Move the log files to the output directory
@@ -130,12 +127,10 @@ def write_logs(data: Data):
     [shutil.move(log, f"{data.path}/{os.path.basename(log)}") for log in logs if os.path.exists(log)]
 
 
-
 def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
-    
     years = sorted(list(data.lumaps.keys()))
-    
+
     if not os.path.isdir(path_yr):
         os.mkdir(path_yr)
 
@@ -145,10 +140,10 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
         write_files_separate(data, yr_cal, path_yr)
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    # The area here was calculated from lumap/lmmap, which {maby not accurate !!!} 
+    # The area here was calculated from lumap/lmmap, which {maby not accurate !!!}
     # compared to the area calculated from dvars
     write_crosstab(data, yr_cal, path_yr, yr_cal_sim_pre)
-    
+
     # Write the reset outputs
     write_dvar_area(data, yr_cal, path_yr)
     write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
@@ -165,7 +160,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity_contribution(data, yr_cal, path_yr)
 
     write_npy(data, yr_cal, path_yr)
-    
+
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
     
     
@@ -1051,7 +1046,7 @@ def write_biodiversity(data: Data, yr_cal, path):
 def write_biodiversity_separate(data: Data, yr_cal, path):
 
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSITY_LIMITS == 'on' and not settings.BIODIVERSITY_REPORT:
+    if not settings.BIODIVERSITY_LIMITS == 'on' and not settings.BIODIVERSITY_CONTRIBUTION_REPORT:
         return
     
     print(f'Writing biodiversity_separate outputs for {yr_cal}')
@@ -1121,38 +1116,39 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     # Write to file
     biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False) 
     
-
+biodiversity_lock = Lock()
 def write_biodiversity_contribution(data: Data, yr_cal, path):
     
     print(f'Writing biodiversity contribution score for {yr_cal}')
 
-    # Get the decision variables for the year and convert them to xarray
-    ag_dvar_reprj_to_bio = data.ag_dvars_2D_reproj_match[yr_cal]
-    am_dvar_reprj_to_bio = data.ag_man_dvars_2D_reproj_match[yr_cal]
-    non_ag_dvar_reprj_to_bio = data.non_ag_dvars_2D_reproj_match[yr_cal]
-                
-    # Calculate the biodiversity contribution scores
-    if settings.BIO_CALC_LEVEL == 'group':
-        bio_score_group = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc', chunks='auto')
-        bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})  # Calculate the mean score of all species
-        bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']       # Combine the mean score with the original score
-        bio_contribution_shards = [bio_score_group.sel(year=yr_cal, group=group) for group in bio_score_group['group'].values] 
-    elif settings.BIO_CALC_LEVEL == 'species':
-        bio_raw_path = f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc'
-        bio_his_score_sum = calc_bio_hist_sum(bio_raw_path)
-        bio_contribution_species = calc_bio_score_species(bio_raw_path, bio_his_score_sum)
-        bio_contribution_shards = interp_bio_species_to_shards(bio_contribution_species, yr_cal)
-    else:
-        raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
-    
-    # Write the biodiversity contribution to csv
-    bio_df = calc_bio_score_by_yr(
-        ag_dvar_reprj_to_bio, 
-        am_dvar_reprj_to_bio, 
-        non_ag_dvar_reprj_to_bio, 
-        bio_contribution_shards)
-    
-    bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
+    with biodiversity_lock:
+        # Get the decision variables for the year and convert them to xarray
+        ag_dvar_reprj_to_bio = data.ag_dvars_2D_reproj_match[yr_cal]
+        am_dvar_reprj_to_bio = data.ag_man_dvars_2D_reproj_match[yr_cal]
+        non_ag_dvar_reprj_to_bio = data.non_ag_dvars_2D_reproj_match[yr_cal]
+
+        # Calculate the biodiversity contribution scores
+        if settings.BIO_CALC_LEVEL == 'group':
+            bio_score_group = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc', chunks='auto')
+            bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})  # Calculate the mean score of all species
+            bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']       # Combine the mean score with the original score
+            bio_contribution_shards = [bio_score_group.sel(year=yr_cal, group=group) for group in bio_score_group['group'].values]
+        elif settings.BIO_CALC_LEVEL == 'species':
+            bio_raw_path = f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc'
+            bio_his_score_sum = calc_bio_hist_sum(bio_raw_path)
+            bio_contribution_species = calc_bio_score_species(bio_raw_path, bio_his_score_sum)
+            bio_contribution_shards = interp_bio_species_to_shards(bio_contribution_species, yr_cal)
+        else:
+            raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
+
+        # Write the biodiversity contribution to csv
+        bio_df = calc_bio_score_by_yr(
+            ag_dvar_reprj_to_bio,
+            am_dvar_reprj_to_bio,
+            non_ag_dvar_reprj_to_bio,
+            bio_contribution_shards)
+
+        bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
     
     
 
