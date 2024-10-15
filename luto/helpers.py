@@ -57,7 +57,7 @@ write_outputs(data)
 
 # Generating report on existing output folder
 from luto.tools import report_on_path
-data_path = r'N:\LUF-Modelling\LUTO2_BB\LUTO_2.0.2\output\2024_05_23__17_52_34_soft_maxprofit_RF10_P1e5_2010-2050_snapshot_-269Mt'
+data_path = 'N:/LUF-Modelling/LUTO2_BB/LUTO_2.0.2/output/2024_05_23__17_52_34_soft_maxprofit_RF10_P1e5_2010-2050_snapshot_-269Mt'
 report_on_path(data_path, remake_map=True, remake_csv=True)  
 
 
@@ -73,11 +73,6 @@ create_task_runs()              # This will create seperate folders in "Custom_r
 
 
 
-# Write input arrays to tiff files
-from luto.tools.report.write_input_data.array2tif import write_input2tiff
-write_input2tiff(data, 2010)
-
-
 
 
 
@@ -90,7 +85,6 @@ import luto.simulation as sim
 import luto.economics.agricultural.transitions as ag_transition
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.revenue as ag_revenue
-from luto.economics.production import get_production
 from luto.economics.agricultural.ghg import get_ghg_transition_penalties
 from luto import settings
 import random as rand

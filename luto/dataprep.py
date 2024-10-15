@@ -53,6 +53,7 @@ def create_new_dataset():
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
     bio_contributions_inpath = 'N:/Data-Master/Biodiversity/biodiversity_contribution/data'
+    HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
     
     # Set data output paths
     raw_data = RAW_DATA + '/' # '../raw_data/'
@@ -114,6 +115,32 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     
+    # Copy HACS data from DCCEEW
+    shutil.copyfile(HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
+    
+    
+    # Copy biodiversity contribution layers for each species (total ~10k species)
+    '''
+    The actual data processing was done in  `N:/Data-Master/Biodiversity/biodiversity_contribution`.
+    
+    The biodiversity contribution were calculated following below steps:
+        - For each species, we have a `Raw_suitability` raster layer (~5 km resolution) that shows the species' suitability (ranges betwen 0 adn 100) across Australia. 
+        - For each species, we summed the suitability values across all the cells to get the `Total_suitability_val`.
+        - For each species, the `Contribution` =  `Raw_suitability` / `Total_suitability_val`.
+        
+    Because there are ~10k species, we grouped them into broader catogories for reporting. 
+    For each category, the `Contribution` is the average of all species's `Contribution` within.
+        - `group` level: ['amphibians', 'birds', 'mammals', 'plants', 'reptiles'].
+        - `endanger` level: ['']  !!! Under development !!!
+    '''
+    
+    # Copy biodiversity contribution files
+    bio_ncs = glob(f'{bio_contributions_inpath}/*.nc')
+    for nc in bio_ncs:
+        shutil.copy(nc, outpath)
+        
+    
+
     
     
     ############### Read data
@@ -473,35 +500,18 @@ def create_new_dataset():
     ############### Get biodiversity priority layers 
     
     # Biodiversity priorities under the four SSPs
-    biodiv_priorities = bioph[['BIODIV_PRIORITY_SSP126', 'BIODIV_PRIORITY_SSP245', 'BIODIV_PRIORITY_SSP370', 'BIODIV_PRIORITY_SSP585', 'NATURAL_AREA_CONNECTIVITY']].copy()
+    biodiv_priorities = bioph[[
+        'BIODIV_PRIORITY_SSP126', 
+        'BIODIV_PRIORITY_SSP245', 
+        'BIODIV_PRIORITY_SSP370', 
+        'BIODIV_PRIORITY_SSP585', 
+        'NATURAL_AREA_CONNECTIVITY',
+        'DCCEEW_NCI']].copy()
     
     # Save to file
     biodiv_priorities.to_hdf(outpath + 'biodiv_priorities.h5', key = 'biodiv_priorities', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
-    
-    
-    ############### Get biodiversity contribution layers for each species (total ~10k species)
-    '''
-    The actual data processing was done in  `N:/Data-Master/Biodiversity/biodiversity_contribution`.
-    
-    The biodiversity contribution were calculated following below steps:
-        - For each species, we have a `Raw_suitability` raster layer (~5 km resolution) that shows the species' suitability (ranges betwen 0 adn 100) across Australia. 
-        - For each species, we summed the suitability values across all the cells to get the `Total_suitability_val`.
-        - For each species, the `Contribution` =  `Raw_suitability` / `Total_suitability_val`.
-        
-    Because there are ~10k species, we grouped them into broader catogories for reporting. 
-    For each category, the `Contribution` is the average of all species's `Contribution` within.
-        - `group` level: ['amphibians', 'birds', 'mammals', 'plants', 'reptiles'].
-        - `endanger` level: ['']  !!! Under development !!!
-    '''
-    
-    # Copy biodiversity contribution files
-    bio_ncs = glob(f'{bio_contributions_inpath}/*.nc')
-    for nc in bio_ncs:
-        shutil.copy(nc, outpath)
-    
-
 
 
     ############### Get stream length 
@@ -881,14 +891,8 @@ def create_new_dataset():
     
     # Save to HDF5
     demand.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
-    
-
-    
-    # Complete processing and report back
-    t = round(time.time() - start_time)
-    print('Completed input data refresh at', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), ', taking', t, 'seconds')
-    
-    
+     
+   
     
     ############## BECCS data 
     # from Lei Gao at CSIRO (N:\Data-Master\BECCS\From_CSIRO\20211124_as_submitted)
@@ -940,4 +944,14 @@ def create_new_dataset():
     cell_xy.to_hdf(outpath + 'cell_BECCS_df.h5', key = 'cell_BECCS_df', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
-
+    
+    
+    
+    
+    
+    # Complete processing and report back
+    laps_time = round(time.time() - start_time)
+    print('Completed input data refresh at', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), ', taking', laps_time, 'seconds')
+    
+    
+    
