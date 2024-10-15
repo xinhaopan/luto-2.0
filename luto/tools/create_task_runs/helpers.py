@@ -13,10 +13,6 @@ from joblib import delayed, Parallel
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_TO_EVAL, TASK_ROOT_DIR
 from luto import settings
 
-
-
-
-
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
 
     # Save the settings template to the root task folder
@@ -92,7 +88,8 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         # Create a folder for each run
         create_run_folders(col)    
         # Write the custom settings to the task folder
-        write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)  
+        write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
+        update_thread_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
         # Submit the task
         submit_task(cwd, col)
         
@@ -225,10 +222,60 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
             # Write the rest as strings
             else:
                 file.write(f'{k}={v}\n')
-                bash_file.write(f'{k}={v}\n')  
-    
-    
-                
+                bash_file.write(f'{k}={v}\n')
+
+def update_thread_settings(task_dir: str, settings_dict: dict):
+    # Read existing settings
+    settings_file_path = f'{task_dir}/luto/settings.py'
+    bash_file_path = f'{task_dir}/luto/settings_bash.py'
+
+    # Read current content of settings.py
+    with open(settings_file_path, 'r') as file:
+        content = file.readlines()
+
+    # Update or append THREADS and WRITE_THREADS in settings.py
+    cpu_per_task = settings_dict.get('CPU_PER_TASK', 30)  # Default to 30 if not specified
+    found_threads = False
+    found_write_threads = False
+
+    with open(settings_file_path, 'w') as file:
+        for line in content:
+            if 'THREADS=' in line:
+                file.write(f'THREADS={cpu_per_task}\n')
+                found_threads = True
+            elif 'WRITE_THREADS=' in line:
+                file.write(f'WRITE_THREADS={cpu_per_task}\n')
+                found_write_threads = True
+            else:
+                file.write(line)
+        if not found_threads:
+            file.write(f'THREADS={cpu_per_task}\n')
+        if not found_write_threads:
+            file.write(f'WRITE_THREADS={cpu_per_task}\n')
+
+    # Repeat the process for settings_bash.py
+    with open(bash_file_path, 'r') as bash_file:
+        bash_content = bash_file.readlines()
+
+    found_threads = False  # Reset the flag for the bash file
+    found_write_threads = False  # Reset the flag for WRITE_THREADS
+
+    with open(bash_file_path, 'w') as bash_file:
+        for line in bash_content:
+            if 'THREADS=' in line:
+                bash_file.write(f'THREADS={cpu_per_task}\n')
+                found_threads = True
+            elif 'WRITE_THREADS=' in line:
+                bash_file.write(f'WRITE_THREADS={cpu_per_task}\n')
+                found_write_threads = True
+            else:
+                bash_file.write(line)
+        if not found_threads:
+            bash_file.write(f'THREADS={cpu_per_task}\n')
+        if not found_write_threads:
+            bash_file.write(f'WRITE_THREADS={cpu_per_task}\n')
+
+
                 
 def update_settings(settings_dict:dict, n_tasks:int, col:str):
     

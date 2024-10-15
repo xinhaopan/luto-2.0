@@ -47,7 +47,7 @@ def save_report_data(raw_data_dir:str):
 
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir)
-    files.drop(files[files['path'].str.contains('data_for_carbon_price')].index, inplace=True)
+    files.drop(files[files['path'].str.contains('data_for_carbon_price')].index, inplace=True) # Remove the data_for_carbon_price files
 
     # The land-use groupings to combine the land-use into a single category
     lu_group = pd.read_csv('luto/tools/report/Assets/lu_group.csv')

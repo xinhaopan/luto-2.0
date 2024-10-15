@@ -570,7 +570,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     cost_dfs = []
     for idx,non_ag_type in enumerate(non_ag_transitions_cost_mat):
         for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
-            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix 
+            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix
             arr = np.einsum('mrj,r->mj', arr, non_ag_dvar[:,idx])              # Multiply the transition cost matrix by the cost of non-agricultural land-use
 
 
@@ -609,7 +609,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     for non_ag_type in non_ag_transitions_cost_mat:
         for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
 
-            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix 
+            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix
             arr = np.einsum('mrj,mrj->mj', arr, ag_dvar)                       # Multiply the transition cost matrix by the cost of non-agricultural land-use
 
 
@@ -1344,7 +1344,7 @@ def save_map_to_npy(data, product, filename_prefix, yr_cal, path):
     filename = f"{filename_prefix}_{yr_cal}.npy"
     full_path = os.path.join(path, filename)
     np.save(f"{full_path}", product)
-    print(f'Map saved to {full_path}')
+    print(f'Map saved to {filename}')
 
     '''
     # Create the map array
@@ -1402,14 +1402,23 @@ def write_rev_cost_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     am_cost_mat = ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx)
 
     # Iterate through agricultural management and non-agricultural land uses
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        am_desc = AG_MANAGEMENTS_TO_LAND_USES[am]
+    for am, am_desc in AG_MANAGEMENTS_TO_LAND_USES.items():
+        if not AG_MANAGEMENTS[am]:
+            continue
+
+        # Get the land use codes for the agricultural management
         am_code = [data.DESC2AGLU[desc] for desc in am_desc]
+
+        # Get the revenue/cost matrix for the agricultural management
+        am_rev = np.nan_to_num(am_revenue_mat[am])  # Replace NaNs with 0
+        am_cost = np.nan_to_num(am_cost_mat[am])  # Replace NaNs with 0
+
+        # Get the decision variable for each agricultural management
         am_dvar = data.ag_man_dvars[yr_cal][am][:, :, am_code]
 
-        # Calculate the result arrays for agricultural management revenue and costs
-        am_rev_r = np.einsum('mrj,mrj->r', am_dvar, np.nan_to_num(am_revenue_mat[am]))
-        am_cost_r = np.einsum('mrj,mrj->r', am_dvar, np.nan_to_num(am_cost_mat[am]))
+        # Multiply the decision variable by revenue matrix
+        am_rev_r = np.einsum('mrj,mrj->r', am_dvar, am_rev)
+        am_cost_r = np.einsum('mrj,mrj->r', am_dvar, am_cost)
 
         save_map_to_npy(data, am_rev_r, f'revenue_am_{am}', yr_cal, path)
         save_map_to_npy(data, am_cost_r, f'cost_am_{am}', yr_cal, path)
@@ -1538,7 +1547,7 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                                                                      separate=True)
     for non_ag_type in non_ag_transitions_cost_mat:
         for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
-            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]  # Get the transition cost matrix
+            arr = np.nan_to_num(non_ag_transitions_cost_mat[non_ag_type][cost_type])  # Get the transition cost matrix
             arr = np.einsum('mrj,mrj->r', arr,
                             ag_dvar)  # Multiply the transition cost matrix by the cost of non-agricultural land-use
             cost_dfs.append(arr)
