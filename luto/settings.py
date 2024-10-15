@@ -50,7 +50,7 @@ RAW_DATA = '../raw_data'
 # Scenario parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
 
-# Climate change assumptions. Options include '126', '245', '370', '585'
+# Climate change assumptions. Options include '126', '245', '360', '585'
 SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
@@ -95,7 +95,7 @@ AMORTISATION_PERIOD = 30 # years
 # Model parameters
 # ---------------------------------------------------------------------------- #
 
-# Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 9 x 9 cell block
+# Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
 RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
@@ -205,19 +205,16 @@ NON_AG_LAND_USES_REVERSIBLE = {
 CARBON_PRICES_FIELD = '1.8C 67%'
 
 # Cost of fencing per linear metre
-FENCING_COST_PER_M = 5
+FENCING_COST_PER_M = 10
 
 # Environmental Plantings Parameters
 EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
-ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    # Set benefit level of EP, AF, and RP (0 = none, 1 = full)
-
 # Carbon Plantings Block Parameters
 CP_BLOCK_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
 CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
-CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
 
 # Carbon Plantings Belt Parameters
 CP_BELT_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
@@ -229,16 +226,12 @@ CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACIN
 cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2     # Length (average) of fencing required per ha in metres
 
-CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
-
 # Riparian Planting Parameters
 RP_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
 RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 RIPARIAN_PLANTING_BUFFER_WIDTH = 30
 RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
-
-RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
 
 # Agroforestry Parameters
 AF_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
@@ -250,10 +243,6 @@ AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_
 no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
 
-AGROFORESTRY_BIODIV_BENEFIT = 0.75
-
-# BECCS Parameters
-BECCS_BIODIVERSITY_BENEFIT = 0
 
 
 # ---------------------------------------------------------------------------- #
@@ -334,7 +323,7 @@ SOC_AMORTISATION = 15
 
 
 # Water use yield and parameters *******************************
-WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+WATER_LIMITS = 'off'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
 RELAXED_WATER_LIMITS_FOR_INFEASIBILITY = 'on'
     
@@ -356,7 +345,7 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 # should then be historical net yield * (1 - water stress * agricultural share)
 
 WATER_STRESS = 0.2
-AG_SHARE_OF_WATER_USE = 0.7
+AG_SHARE_OF_WATER_USE = 1.0
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 
 # Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that 
@@ -378,49 +367,89 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 # Biodiversity limits and parameters *******************************
 
-# Set the influence of landscape connectivity on biodiversity value in modified land
-""" Applies to modified land only. The most distant cell receives this biodiversity score multiplier. Creates a
-    gradient of scores from 1 (natural land and modified land cells adjacent to natural land and water) to the most 
-    distant cell which received the score specified under CONNECTIVITY_WEIGHTING. The scores are linearly rescaled 
-    Euclidean distance to natural areas. Setting CONNECTIVITY_WEIGHTING = 1.0 means no effect of connectivity on biodiversity score. 
-"""
-CONNECTIVITY_WEIGHTING = 0.7
 
-# Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
-BIODIV_LIVESTOCK_IMPACT = 0.3
+# ------------------- Agricultural biodiversity parameters -------------------
+
+# Connectivity source source
+'''
+    The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
+    This score is normalised between 0 (fartherst) and 1 (closest).
+    Can be either 'NCI' or 'DWI'.
+        - if 'NCI' is selected, the connectivity score is sourced from the DCCEEW's National Connectivity Index (v3.0).
+        - if 'DWI' is selected, the connectivity score is calculated as distance to the nearest area of natural land as mapped 
+          by the National Land Use Map of Australia. 
+        - if 'NONE' is selected, the connectivity score is not used in the biodiversity calculation.
+'''
+CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
+
+
+# Connectivity score importance
+'''
+    !!!!!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   !!!!!
+    The relative importance of the connectivity score in the biodiversity calculation.
+    I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
+'''
+connect_importance = 0.3                 
+CONNECTIVITY_LB = 1 - connect_importance    # Weighting of connectivity score in biodiversity calculation (0 - 1)
+
+
+
+# Habitat condition data source
+HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
+'''
+    It is used to calculate the biodiversity benifits for aricultural landuses.
+    - If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
+    - If 'USER_DEFINED' is selected, the habitat condition is calculated using the user defined values in the 'HCAS_USER_DEFINED' dictionary.
+'''
+
+
+# HCAS percentile for each land-use type
+''' Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the 
+    suitability for wild animals ranging between 0-1) for each land-use type.
+
+    Here is the parameter defining the percentile used to represent each land-use's degradation scale to biodiversity. Avaliable percentiles
+    is one of [10, 25, 50, 75, 90]. 
+    
+    For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land has 22% biodiversity compared to if it was restored 
+    to a perfect natural land.
+'''
+HCAS_PERCENTILE = 50
 
 # Biodiversity value under default late dry season savanna fire regime
 ''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value 
     (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.'''
 LDS_BIODIVERSITY_VALUE = 0.8
 
-# Biodiversity impact of non-agricultural lands
-NON_AG_BIO_IMPACT = {
-    '1 Conservation and natural environments':0,
-    '2 Production from relatively natural environments':0.1,
-    '3 Production from dryland agriculture and plantations':0.1,
-    '4 Production from irrigated agriculture and plantations':0.1,
-    '5 Intensive uses':1, 
-    '6 Water':0, 
-    'No data':0}
 
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-BIODIVERSITY_CONTRIBUTION_REPORT = True  # True or False, report biodiversity contribution 
+# ------------------- Non-agricultural biodiversity parameters -------------------
+''' The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
+    For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
+    will be 0.6 * 0.8 = 0.48.
+'''
+ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    
+CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
+CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
+RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
+AGROFORESTRY_BIODIV_BENEFIT = 0.75
+BECCS_BIODIVERSITY_BENEFIT = 0
 
+
+# ------------------- Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
     in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
-# Set biodiversity targets in dictionary below (i.e., year: proportion of degraded land restored)
 BIODIV_GBF_TARGET_2_DICT = {                     
               2010: 0,    # Proportion of degraded land restored in year 2010
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
               2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
               2100: 0.3   # Stays at 2050 level
              }            # (can add more years/targets)\
-                 
-                 
+
+
+# ------------------- Biodiversity contribution reporting -------------------            
+BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+BIODIVERSITY_CONTRIBUTION_REPORT = True  # True or False, report biodiversity contribution    
 BIO_CALC_LEVEL = 'group'  # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
     

@@ -10,7 +10,7 @@ import pandas as pd
 
 from joblib import delayed, Parallel
 
-from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_TO_EVAL, TASK_ROOT_DIR
+from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR
 from luto import settings
 
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
@@ -59,7 +59,7 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
 
 
 
-def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
+def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv', run:bool=True):
      
     # Read the custom settings file
     custom_settings = pd.read_csv(from_path, index_col=0)
@@ -88,9 +88,10 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         # Create a folder for each run
         create_run_folders(col)    
         # Write the custom settings to the task folder
-        write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        update_thread_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
         # Submit the task
+        write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)  
+        # Submit the task if the os is linux
+        update_thread_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
         submit_task(cwd, col)
         
 
@@ -213,8 +214,8 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
                     bash_file.write(f'{k}_{key}={value}\n')
             # If the value is a number, write it as number
             elif str(v).isdigit() or is_float(v):
-                file.write(f'{k}={v}\n')
-                bash_file.write(f'{k}={v}\n')
+                file.write(f'{k}="{v}"\n') if k in PARAMS_NUM_AS_STR else file.write(f'{k}={v}\n')
+                bash_file.write(f'{k}="{v}"\n') if k in PARAMS_NUM_AS_STR else bash_file.write(f'{k}={v}\n')
             # If the value is a string, write it as a string
             elif isinstance(v, str):
                 file.write(f'{k}="{v}"\n')
@@ -282,7 +283,7 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     if settings_dict['NODE'] == 'Please specify the node name':
         if os.name == 'nt':         
             # If the os is windows, do nothing
-            print('This will only create task folders, and not submit job to run!')
+            print('This will only create task folders, and NOT submit job to run!')
         elif os.name == 'posix':    
             # If the os is linux, submit the job
             raise ValueError('NODE must be specified!')
