@@ -629,7 +629,7 @@ class LutoSolver:
                 self._input_data.w_ccimpact[self.final_target_year][region]
                 - self._input_data.w_ccimpact[self._input_data.target_year][region]
             )
-            constr_wny_limit = w_net_yield_limit + cc_impact_yield_delta
+            constr_wny_limit = w_net_yield_limit - cc_impact_yield_delta
             wny_limit_updated = False
             if self._input_data.base_year_ag_sol is not None and settings.RELAXED_WATER_LIMITS_FOR_INFEASIBILITY == 'on':
                 base_year_water_yield_with_current_layers = self._get_water_nyield_base_year_vars_current_year_layers(region, ind)

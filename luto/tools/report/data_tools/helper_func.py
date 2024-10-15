@@ -97,8 +97,15 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
         # get the base name of the file
         data_name = os.path.basename(data_path).split('.')[0]
 
-        with open(data_path, 'r') as file:
-            raw_string = file.read()
+        print(f"Processing {data_path}")
+        if os.path.isfile(data_path):
+            with open(data_path, 'r') as file:
+                raw_string = file.read()
+        else:
+            print(f"Skipping {data_path} because it is a directory.")
+
+        # with open(data_path, 'r') as file:
+        #     raw_string = file.read()
 
         pre_element = etree.SubElement(new_div, "pre")
         pre_element.set("id", f"{data_name}_csv")

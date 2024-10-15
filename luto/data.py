@@ -1325,7 +1325,10 @@ class Data:
         '''
         Convert the dvar from 1D vector to 2D array.
         '''
-        map_resfactored = self.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
+        if settings.RESFACTOR > 1:
+            map_resfactored = self.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
+        else:
+            map_resfactored = self.LUMAP_2D.copy().astype(np.float32)
         np.place(map_resfactored, (map_resfactored != self.MASK_LU_CODE) & (map_resfactored != self.NODATA), map_) 
         return map_resfactored
     
