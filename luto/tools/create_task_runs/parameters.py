@@ -41,4 +41,9 @@ PARAMS_TO_EVAL = [
     'AMORTISE_UPFRONT_COSTS',
 ]
 
+# Parameters that are numbers but are stored as strings in the settings
+PARAMS_NUM_AS_STR = [
+    'SSP',
+]
+
 EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code']

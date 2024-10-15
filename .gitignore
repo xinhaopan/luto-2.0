@@ -23,6 +23,7 @@ gurobi.log
 # Some potential temporary files
 *.zip
 *.dat
+debug.log
 
 # Xinhao's personal settings
 .idea/
@@ -35,6 +36,9 @@ input/
 .idea
 # The mannual build files
 /docs/manual/*
+<<<<<<< HEAD
 luto/tools/create_task_runs/*
 luto/tools/create_task_runs
+=======
+>>>>>>> 0ec04212e340afd3bc3ca84ddd9d9a8347f080fe
 
