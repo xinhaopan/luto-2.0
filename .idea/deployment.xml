@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="s222552331@52.255.34.63:8080 password" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="xp7241@gadi.nci.org.au:22 password (2)" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="Azure2HPC">
         <serverdata>
@@ -27,6 +27,20 @@
         <serverdata>
           <mappings>
             <mapping deploy="/home/s222552331/LUTO2_XH/LUTO2" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="xp7241@gadi.nci.org.au:22 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/scratch/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="xp7241@gadi.nci.org.au:22 password (2)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/scratch/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

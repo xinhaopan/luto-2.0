@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.12 (LUTO2-PFMKqMM_)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.12" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.12.7 (sftp://xp7241@gadi.nci.org.au:22/scratch/jk53/miniforge/envs/luto/bin/python)" project-jdk-type="Python SDK" />
 </project>

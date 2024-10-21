@@ -59,7 +59,11 @@ def run( data: Data, base: int, target: int) -> None:
             raise ValueError( "Not enough years in demands time series.")
 
         steps = target - base
-        solve_timeseries(data, steps, base, target)
+        try:
+            solve_timeseries(data, steps, base, target)
+        except Exception as e:
+            print(f"Error in solve_timeseries: {e}")
+            return  # End the function if an error occurs
 
     elif settings.MODE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
