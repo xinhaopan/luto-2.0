@@ -1493,7 +1493,7 @@ class Data:
         )
 
         # Create path name
-        self.path = f"{OUTPUT_DIR}/{self.timestamp_sim}{post}"
+        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp_sim}{post}"
 
         # Get all paths
         paths = (
@@ -1518,7 +1518,7 @@ class Data:
         # Create all paths
         for p in paths:
             if not os.path.exists(p):
-                os.mkdir(p)
+                os.makedirs(p)
 
         return self.path
     

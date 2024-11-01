@@ -345,7 +345,7 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 # should then be historical net yield * (1 - water stress * agricultural share)
 
 WATER_STRESS = 0.2
-AG_SHARE_OF_WATER_USE = 1.0
+AG_SHARE_OF_WATER_USE = 0.8
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 
 # Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that 
