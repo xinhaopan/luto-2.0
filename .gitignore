@@ -30,15 +30,11 @@ debug.log
 temp*
 *.ipynb
 *.gitignore
-myCode/
+myCode/draw_all/output/
+myCode/Map/Assets/basemap.tif
+myCode/Map/Assets/shp/
 output/
 input/
 .idea
 # The mannual build files
 /docs/manual/*
-<<<<<<< HEAD
-luto/tools/create_task_runs/*
-luto/tools/create_task_runs
-=======
->>>>>>> 0ec04212e340afd3bc3ca84ddd9d9a8347f080fe
-

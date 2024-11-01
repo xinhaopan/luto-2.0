@@ -114,7 +114,7 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
 
     # Step 5: Insert the new div
     content_div.addnext(new_div)
-
+    print(f"Attempting to write to: {html_path}")  # 打印路径
     # Step 6: Save the changes
     tree.write(html_path, method="html")
 
