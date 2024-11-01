@@ -1,6 +1,6 @@
-
-from math import e
 import os
+os.chdir('../..')
+from math import e
 import re
 import shutil
 import random
@@ -10,7 +10,7 @@ import pandas as pd
 
 from joblib import delayed, Parallel
 
-from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR
+from myCode.tasks_run_in_windows.tools.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR
 from luto import settings
 
 def create_settings_template(to_path:str=TASK_ROOT_DIR):

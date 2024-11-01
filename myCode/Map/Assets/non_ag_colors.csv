@@ -1,0 +1,12 @@
+lu_code,lu_desc,lu_color_HEX,Note
+100,Environmental plantings,#abcd66,
+101,Riparian plantings,#005ce6,
+102,Sheep agroforestry,#c500ff,
+103,Beef agroforestry,#ff0000,
+104,Carbon plantings (Block),#267300,
+105,Sheep Carbon Plantings (Belt),#F2A361,
+106,Beef Carbon Plantings (Belt),#E56E51,
+107,BECCS,#FFB715,
+0,Agricultural Land,#cccccc,
+-1,Public land,#A9A9A9,
+-2,Public land,#A9A9A9,

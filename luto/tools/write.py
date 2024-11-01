@@ -103,6 +103,18 @@ def write_data(data: Data):
 
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     begin_end_path = f"{data.path}/begin_end_compare_{years[0]}_{years[-1]}"
+    if not os.path.exists(begin_end_path):
+        os.makedirs(begin_end_path)
+
+    # 构建 `out_{years[0]}` 和 `out_{years[-1]}` 子目录路径
+    out_first_year = os.path.join(begin_end_path, f"out_{years[0]}")
+    out_last_year = os.path.join(begin_end_path, f"out_{years[-1]}")
+
+    # 检查并创建 `out_{years[0]}` 和 `out_{years[-1]}` 子目录
+    if not os.path.exists(out_first_year):
+        os.makedirs(out_first_year)
+    if not os.path.exists(out_last_year):
+        os.makedirs(out_last_year)
     jobs += [delayed(write_output_single_year)(data, years[-1], f"{begin_end_path}/out_{years[-1]}", years[0])] if settings.MODE == 'timeseries' else []
 
     # Parallel write the outputs for each year
@@ -113,9 +125,27 @@ def write_data(data: Data):
     shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
 
     # Create the report HTML and png maps
+    delete_empty_dirs(data.path)
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(data.path)
     data2html(data.path)
+
+def delete_empty_dirs(root_dir):
+    """
+    删除指定目录下的所有空文件夹，如果文件夹中的子文件夹也为空，则递归删除。
+
+    Args:
+        root_dir (str): 需要检查并删除空文件夹的根目录路径
+    """
+    # 检查每个子文件夹
+    for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
+        # 如果当前文件夹没有子文件夹或文件
+        if not dirnames and not filenames:
+            try:
+                os.rmdir(dirpath)
+                print(f"Deleted empty directory: {dirpath}")
+            except OSError as e:
+                print(f"Could not delete directory {dirpath}: {e}")
 
 def write_logs(data: Data):
     # Move the log files to the output directory
@@ -159,7 +189,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity_separate(data, yr_cal, path_yr)
     write_biodiversity_contribution(data, yr_cal, path_yr)
 
-    write_npy(data, yr_cal, path_yr)
+    # write_npy(data, yr_cal, path_yr)
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
     
