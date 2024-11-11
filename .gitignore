@@ -38,3 +38,6 @@ input/
 .idea
 # The mannual build files
 /docs/manual/*
+
+*.png
+*.tif
