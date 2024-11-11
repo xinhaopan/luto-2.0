@@ -1,11 +1,7 @@
-from helper import *
-import config as cfg
+from .map_helper import *
 
-def draw_maps(overlay_geo_tif, colors_csv, output_png, legend_png_name):
-    intermediate_files = [
-        cfg.basemap_rgb_tif, cfg.overlay_reproject_geo_tif, cfg.overlay_reproject_rgb_tif,
-        cfg.overlay_rgb_tif, cfg.crop_rbg_tif, cfg.shp_add_rgb_tif, cfg.scalebar_rgb_tif
-    ]
+def draw_maps(overlay_geo_tif, colors_sheet, output_png, legend_png_name, cfg):
+    intermediate_files = cfg.get_intermediate_files()
 
     # 1. 生成基础地图
     generate_basemap(cfg.basemap_geo_tif, cfg.basemap_rgb_tif, write_png=cfg.write_png)
@@ -14,7 +10,7 @@ def draw_maps(overlay_geo_tif, colors_csv, output_png, legend_png_name):
     reproject_overlay(overlay_geo_tif, cfg.basemap_geo_tif, cfg.overlay_reproject_geo_tif, write_png=cfg.write_png)
 
     # 3. 给叠加图分配颜色
-    assign_colors_to_overlay(cfg.overlay_reproject_geo_tif, colors_csv, cfg.overlay_reproject_rgb_tif, write_png=cfg.write_png)
+    assign_colors_to_overlay(cfg.overlay_reproject_geo_tif, colors_sheet, cfg.overlay_reproject_rgb_tif, write_png=cfg.write_png)
 
     # 4. 叠加底图和重投影的叠加图
     overlay_map(cfg.basemap_rgb_tif, cfg.overlay_reproject_rgb_tif, cfg.overlay_rgb_tif, write_png=cfg.write_png)
@@ -37,7 +33,7 @@ def draw_maps(overlay_geo_tif, colors_csv, output_png, legend_png_name):
     convert_tif_to_png(final_tif, output_png)
 
     # 9. 创建图例（无论是否添加到最终图像）
-    create_legend(colors_csv, legend_png_name=legend_png_name, legend_title=cfg.legend_title,
+    create_legend(colors_sheet, legend_png_name=legend_png_name, legend_title=cfg.legend_title,
                   legend_fontsize=cfg.legend_fontsize, legend_title_fontsize=cfg.legend_title_fontsize,
                   legend_ncol=cfg.legend_ncol, legend_figsize=cfg.legend_figsize)
 
@@ -53,7 +49,7 @@ def draw_maps(overlay_geo_tif, colors_csv, output_png, legend_png_name):
         intermediate_files.append(legend_png_name)  # 添加到中间文件列表
 
     # 删除中间文件
-    if not cfg.intermediate_files:
+    if cfg.remove_intermediate_files:
         for file in intermediate_files:
             if os.path.exists(file):
                 os.remove(file)
@@ -61,4 +57,4 @@ def draw_maps(overlay_geo_tif, colors_csv, output_png, legend_png_name):
             if os.path.exists(png_file):
                 os.remove(png_file)
 
-    print(f"Finish: {overlay_geo_tif}")
+    # print(f"Finish: {overlay_geo_tif}")
