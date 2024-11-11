@@ -43,14 +43,6 @@ def show_image(image_path):
     img.show()
 
 
-def get_path(path_name, path_dir):
-    output_path = f"../../output/{path_name}/output"
-    if os.path.exists(output_path):
-        subdirectories = os.listdir(output_path)
-        numeric_starting_subdir = [s for s in subdirectories if s[0].isdigit()][0]
-        subdirectory_path = os.path.join(output_path, numeric_starting_subdir, f"out_2050/{path_dir}.tiff")
-    return subdirectory_path
-
 
 def convert_tif_to_png(tif_path,output_png=None):
     """
@@ -75,7 +67,7 @@ def convert_tif_to_png(tif_path,output_png=None):
         pil_image.save(output_png)
 
     # 显示图像
-    plt.imshow(rgb_image)
+    # plt.imshow(rgb_image)
     plt.axis('off')  # 关闭坐标轴
     plt.show()
     print(f"PNG image saved to {output_png}")
@@ -194,7 +186,7 @@ def reproject_overlay(overlay_tif, basemap_tif, output_tif, background_value=-99
         print(f"Reprojected overlay saved to {output_tif}")
 
 
-def assign_colors_to_overlay(overlay_reproject_geo_tif, colors_csv, overlay_reproject_rgb_tif, background_value=-9999,write_png=False):
+def assign_colors_to_overlay(overlay_reproject_geo_tif, colors_sheet, overlay_reproject_rgb_tif, background_value=-9999,write_png=False):
     """
     根据唯一值设置颜色，并将叠加图保存为带颜色和坐标的 GeoTIFF 文件。
 
@@ -211,11 +203,11 @@ def assign_colors_to_overlay(overlay_reproject_geo_tif, colors_csv, overlay_repr
         overlay_crs = overlay_src.crs
 
     # 读取颜色映射
-    color_mapping = pd.read_csv(colors_csv)
+    color_mapping = pd.read_excel('tools/land use colors.xlsx',sheet_name=colors_sheet)
 
     # 获取 lu_code 和 lu_color_HEX
-    lu_codes = color_mapping['lu_code'].values
-    lu_colors = color_mapping['lu_color_HEX'].values
+    lu_codes = color_mapping['code'].values
+    lu_colors = color_mapping['color'].values
 
     # 创建颜色映射字典，确保每个 lu_code 对应一个颜色
     color_dict = {code: color for code, color in zip(lu_codes, lu_colors)}
@@ -223,8 +215,9 @@ def assign_colors_to_overlay(overlay_reproject_geo_tif, colors_csv, overlay_repr
     # 检查 overlay_data 中的值是否都能映射到 color_dict，并忽略背景值
     unique_values = set(np.unique(overlay_data))
     unmapped_values = unique_values - set(color_dict.keys()) - {background_value}
-    if unmapped_values:
-        raise ValueError(f"Some lu_codes in the overlay_data do not have a corresponding color: {unmapped_values}")
+    for value in unmapped_values:
+        overlay_data[overlay_data == value] = -2
+        # raise ValueError(f"Some lu_codes in the overlay_data do not have a corresponding color: {unmapped_values}")
 
     # 创建用于绘图的 RGB 图像
     rgb_image = np.zeros((overlay_data.shape[0], overlay_data.shape[1], 3), dtype=np.uint8)
@@ -542,7 +535,7 @@ def add_scalebar(tif_path, output_tif, dpi=300, unit='km', length=500, location=
     plt.close(fig)
 
 
-def create_legend(colors_csv, legend_png_name = "legend_png.png", legend_title="Legend", legend_fontsize=8,
+def create_legend(colors_sheet, legend_png_name = "legend_png.png", legend_title="Legend", legend_fontsize=8,
                   legend_title_fontsize=10, legend_ncol=1, legend_figsize=(4, 4)):
     """
     创建图例并单独保存为 PNG 文件，背景为透明。
@@ -558,18 +551,18 @@ def create_legend(colors_csv, legend_png_name = "legend_png.png", legend_title="
     """
 
     # 读取 CSV 文件
-    data = pd.read_csv(colors_csv)
+    data = pd.read_excel('tools/land use colors.xlsx',sheet_name=colors_sheet)
     data['original_order'] = range(len(data))  # 为每行添加一个原始顺序索引
 
     # 根据 'lu_desc' 进行合并，并保留原始顺序
-    df_merged = data.groupby('lu_desc', as_index=False).first()
+    df_merged = data.groupby('desc', as_index=False).first()
 
     # 按原始顺序排序
     df_merged = df_merged.sort_values('original_order')
 
     # 创建 patches 列表，用于显示图例
     patches = [
-        mpatches.Patch(color=row['lu_color_HEX'], label=row['lu_desc'])
+        mpatches.Patch(color=row['color'], label=row['desc'])
         for _, row in df_merged.iterrows()
     ]
 
@@ -586,7 +579,7 @@ def create_legend(colors_csv, legend_png_name = "legend_png.png", legend_title="
 
     # 保存图例为 PNG 文件，背景透明
     plt.savefig(legend_png_name, dpi=300, bbox_inches='tight', pad_inches=0, transparent=True)
-    plt.show()
+    # plt.show()
     plt.close(fig)
     # print(f"Legend saved to {output_legend_png}")
 
@@ -675,6 +668,54 @@ def add_north_arrow_to_png(png_path, output_png, arrow_image_path, location=(0.9
 
     # print(f"Image with north arrow saved to {output_png}")
 
+from PIL import Image
+from collections import defaultdict
+import os
+from tools.parameters import *
+
+def concatenate_images(image_files, output_image, rows=3, cols=3):
+    """
+    将多张图片拼接成一个网格，保持原始大小，背景透明。
+
+    Parameters:
+    - image_files: List[str], 要拼接的图片文件路径列表。
+    - output_image: str, 输出的拼接图片文件路径。
+    - rows: int, 网格的行数，默认 3。
+    - cols: int, 网格的列数，默认 3。
+    """
+    # 打开所有图片，并确保每张图片使用 RGBA 模式（支持透明背景）
+    images = [Image.open(image_file).convert("RGBA") for image_file in image_files]
+
+    # 获取每张图片的宽度和高度
+    widths = [img.width for img in images]
+    heights = [img.height for img in images]
+
+    # 计算网格的最大宽度和总高度
+    max_width_per_col = [max(widths[i::cols]) for i in range(cols)]
+    total_width = sum(max_width_per_col)
+    total_height = sum(max(heights[row * cols:(row + 1) * cols]) for row in range(rows))
+
+    # 创建一个空白的透明画布，用来放置拼接后的图片
+    new_img = Image.new('RGBA', (total_width, total_height), (255, 255, 255, 0))
+
+    # 逐行拼接图片
+    y_offset = 0
+    for row in range(rows):
+        x_offset = 0
+        row_height = max(heights[row * cols:(row + 1) * cols])
+        for col in range(cols):
+            img_index = row * cols + col
+            if img_index >= len(images):
+                break
+            img = images[img_index]
+
+            # 粘贴图片到新画布
+            new_img.paste(img, (x_offset, y_offset), img)
+            x_offset += max_width_per_col[col]
+        y_offset += row_height
+
+    # 保存拼接后的图片
+    new_img.save(output_image)
 
 
 

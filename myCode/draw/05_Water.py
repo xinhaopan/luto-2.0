@@ -15,7 +15,7 @@ sys.path.append(os.path.abspath('../../luto'))
 import settings
 
 # 导入本地 helper 模块的函数
-from helper import *
+from tools.helper import *
 
 def plot_line_chart(df, df_colors, output_file='line_plot.png'):
     """绘制 df 的点线图，使用指定颜色，并统一图像布局."""

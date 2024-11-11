@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sys
 import numpy as np
-from helper import *
+from tools.helper import *
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.image as mpimg
 
@@ -180,9 +180,9 @@ if __name__ == "__main__":
     #     ('ON_MAXPROFIT_GHG_18C_67_R5', 'quantity_comparison', 'Prod_targ_year (tonnes, KL)')
     # }
     input_files = {
-        ('ON_MAXPROFIT_GHG_15C_67_R10', 'quantity_comparison', 'Prod_targ_year (tonnes, KL)'),
-        ('ON_MAXPROFIT_GHG_15C_50_R10', 'quantity_comparison', 'Prod_targ_year (tonnes, KL)'),
-        ('ON_MAXPROFIT_GHG_18C_67_R10', 'quantity_comparison', 'Prod_targ_year (tonnes, KL)')
+        ('0_BIO_0_GHG_1_5C_67_1', 'quantity_comparison', 'Prod_targ_year (tonnes, KL)'),
+        ('0_BIO_0_GHG_1_5C_67_1', 'quantity_comparison', 'Prod_targ_year (tonnes, KL)'),
+        ('0_BIO_0_GHG_1_5C_67_1', 'quantity_comparison', 'Prod_targ_year (tonnes, KL)')
     }
     # 图像文件列表
     image_files = ['Food Demand.png', 'ON_MAXPROFIT_GHG_15C_67_R10.png', 'ON_MAXPROFIT_GHG_15C_50_R10.png',
