@@ -41,5 +41,6 @@ input/
 
 *.png
 *.tif
+*.shp
 myCode/**/Assets/
 
