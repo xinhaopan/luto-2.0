@@ -5,6 +5,7 @@ import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 import sys
 from scipy.interpolate import interp1d
+from tools.parameters import *
 
 from tools.plot_helper import process_single_df
 
@@ -69,7 +70,7 @@ def draw_coloum(data, legend_colors, output_file, fontsize=22, y_range=(0, 200),
     ax.yaxis.set_label_coords(-0.06, -1)  # 调整 y 轴标签位置
     ax.set_ylabel(ylabel, fontsize=fontsize)  # y轴标签字体大小
 
-    ax.set_xlim(2010, 2050)
+    ax.set_xlim(2009.5, 2050.5)
     ax.set_xticks(range(2010, 2051, 10))  # 假设 df 的索引是年份
     ax.set_xlabel('Year', fontsize=font_size)
     ax.tick_params(axis='x', labelsize=font_size, rotation=45)
@@ -242,8 +243,7 @@ def get_biodiversity_target(INPUT_DIR, BIODIV_GBF_TARGET_2_DICTs):
 font_size = 25
 # GHG
 # 读取 Excel 文件
-input_dir = '../../../input'
-df = pd.read_excel(input_dir + '/GHG_targets.xlsx', index_col=0)
+df = pd.read_excel(INPUT_DIR + '/GHG_targets.xlsx', index_col=0)
 
 # 选择 2010 到 2050 年的数据
 df_filtered = df.loc[2010:2050,
@@ -257,7 +257,7 @@ draw_plot_lines(df_filtered, colors, 'GHG Emissions (Mt CO2e)', (-300, 100), 100
 
 
 # Food demand
-dd = pd.read_hdf(os.path.join(input_dir, 'demand_projections.h5'))
+dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5'))
 demand_data = dd.loc[(settings.SCENARIO,
                       settings.DIET_DOM,
                       settings.DIET_GLOB,
@@ -286,45 +286,13 @@ BIODIV_GBF_TARGET_2_DICTs = [
 
 
 
-df = get_biodiversity_target(input_dir, BIODIV_GBF_TARGET_2_DICTs ) / 1e6
+df = get_biodiversity_target(INPUT_DIR, BIODIV_GBF_TARGET_2_DICTs ) / 1e6
 colors = ['#E74C3C', '#3498DB', '#2ECC71']  # 根据数据列数调整颜色列表
 draw_plot_lines(df, colors, 'Area Quality-weighted Biodiversity Importance (Million ha)', (0, 120), 40, "../output/03_biodiversity_limit.png", font_size=font_size)
 
 
 # water
-# 读取初始的 dd_ccimpact_df 数据
-dd_ccimpact_df = pd.read_hdf(os.path.join(input_dir, 'water_yield_2010_2100_cc_dd_ml.h5'))
-
-# 获取并处理原始的列和行数据，删除不需要的索引层
-dd_ccimpact_columns = dd_ccimpact_df.columns
-dd_ccimpact_df.columns = dd_ccimpact_df.columns.droplevel("Region_name")
-dd_ccimpact_df = dd_ccimpact_df.loc[:, pd.IndexSlice[:, settings.SSP]]
-dd_ccimpact_df.columns = dd_ccimpact_df.columns.droplevel('ssp')
-
-# 获取处理后的列（不再是MultiIndex）
-processed_columns = dd_ccimpact_df.columns
-
-# 找到原始MultiIndex中去掉'Region_name'和'ssp'后的列
-original_filtered_columns = dd_ccimpact_columns.droplevel(['Region_name', 'ssp'])
-
-# 创建一个映射关系：处理后的列 -> 原始第一层index
-column_mapping = {col: dd_ccimpact_columns[original_filtered_columns == col].get_level_values(0)[0]
-                  for col in processed_columns}
-
-# 使用 column_mapping 修改 dd_ccimpact_df 的列名
-dd_ccimpact_df.columns = [column_mapping[col] for col in dd_ccimpact_df.columns]
-
-# 将行索引从字符串转换为整数类型
-dd_ccimpact_df.index = dd_ccimpact_df.index.astype(int)
-
-# 计算 2050 年行与其他行的差值
-dd_ccimpact_delta_df = (dd_ccimpact_df.loc[2050, :] - dd_ccimpact_df) / 1e6
-
-# 保留 2010-2050 年的数据
-dd_ccimpact_delta_df = dd_ccimpact_delta_df.loc[range(2010, 2051), :]
-
-# 读取其他所需数据
-dd = pd.read_hdf(os.path.join(input_dir, "draindiv_lut.h5"), index_col='HR_DRAINDIV_ID')
+dd = pd.read_hdf(os.path.join(INPUT_DIR, "draindiv_lut.h5"), index_col='HR_DRAINDIV_ID')
 
 # 生成 2010 到 2050 的年份作为行索引
 years = pd.Index(range(2010, 2051), name='Year')
@@ -336,7 +304,19 @@ dd_yield_df = pd.DataFrame(index=years)
 for name, value in zip(dd['HR_DRAINDIV_NAME'], dd['WATER_YIELD_HIST_BASELINE_ML']):
     dd_yield_df[name] = value * settings.WATER_YIELD_TARGET_AG_SHARE / 1e6
 
-dd_water_limit_df = dd_yield_df - dd_ccimpact_delta_df
+dd_outside_luto = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'))
+water_yield_natural_land = dd_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]] / 1e6
+water_cci_delta = pd.DataFrame()
+for col_name, col_data in water_yield_natural_land.items():
+    min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
+    before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
+    min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
+    min_gap_df = pd.DataFrame({col_name: min_gap})
+    water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
+
+water_cci_delta.columns = dd_yield_df.columns
+# 对两个 DataFrame 逐列相加
+dd_water_limit_df = dd_yield_df + water_cci_delta
 
 mapping_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='water')
 dd_water_limit_df, legend_colors = process_single_df(dd_water_limit_df, mapping_df)

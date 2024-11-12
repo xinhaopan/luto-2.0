@@ -5,7 +5,7 @@
       <excludeFolder url="file://$MODULE_DIR$/output" />
       <excludePattern pattern="output" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.9" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="temp_nci_11122024" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">

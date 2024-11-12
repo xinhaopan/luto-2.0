@@ -26,11 +26,11 @@ def create_settings_template(to_path: str = TASK_ROOT_DIR):
     #     conda_f.write(conda_pkgs)
     #     pip_f.write(pip_pkgs)
 
-    if os.path.exists(f'{to_path}/settings_template.csv'):
+    if os.path.exists(f'{to_path}/settings_template0.csv'):
         print('settings_template.csv already exists! Skip creating a new one!')
     else:
         # Get the settings from luto.settings
-        with open('luto/settings.py', 'r') as file:
+        with open('../../luto/settings.py', 'r') as file:
             lines = file.readlines()
 
             # Regex patterns that matches variable assignments from settings
@@ -51,8 +51,8 @@ def create_settings_template(to_path: str = TASK_ROOT_DIR):
         # Create a template for cutom settings
         settings_df = pd.DataFrame({k: [v] for k, v in settings_dict.items()}).T.reset_index()
         settings_df.columns = ['Name', 'Default_run']
-        settings_df = settings_df.map(str)
-        settings_df.to_csv(f'{to_path}/settings_template.csv', index=False)
+        settings_df = settings_df.applymap(str)
+        settings_df.to_csv(f'{to_path}/settings_template0.csv', index=False)
 
 
 def process_column(col, custom_settings, num_task, cwd):
@@ -104,10 +104,16 @@ def create_task_runs(from_path: str = f'{TASK_ROOT_DIR}/settings_template.csv',u
 def run_task(cwd, col):
     print(f"Running task for column {col}...")
     log_file = f'output/{col}/output/error_log.txt'  # 定义日志文件路径
+
+    # 根据操作系统选择 Python 解释器路径
+    if os.name == 'nt':
+        python_path = r'F:\xinhao\miniforge\envs\luto\python.exe'  # 修改为 Windows 上的 Python 路径
+    elif os.name == 'posix':
+        python_path = '/scratch/jk53/miniforge/envs/luto/bin/python'  # 修改为 Linux 上的 Python 3 路径
     try:
         # 运行子进程，捕获标准输出和标准错误
         result = subprocess.run(
-            ['python', 'temp_runs.py'],
+            [python_path, 'temp_runs.py'],
             cwd=f'output/{col}',
             capture_output=True,  # 捕获输出
             text=True  # 将输出转换为文本
