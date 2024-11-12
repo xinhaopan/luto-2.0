@@ -1,4 +1,4 @@
-INPUT_DIR = '../../input'
+INPUT_DIR = '../../../input'
 input_files = [
     '2_BIO_0_GHG_1_8C_67_1',
     '1_BIO_0_GHG_1_5C_50_1',

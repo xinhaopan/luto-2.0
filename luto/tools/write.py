@@ -1356,7 +1356,6 @@ def write_ghg_offland_commodity(data: Data, yr_cal, path):
     # Save to disk
     offland_ghg.to_csv(os.path.join(path, f'GHG_emissions_offland_commodity_{yr_cal}.csv'), index = False)
 
-<<<<<<< HEAD
 def write_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     write_rev_cost_npy(data, yr_cal, path, yr_cal_sim_pre)
     write_cost_transition_npy(data, yr_cal, path, yr_cal_sim_pre)
