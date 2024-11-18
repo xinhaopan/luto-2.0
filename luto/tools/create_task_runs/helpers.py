@@ -1,6 +1,5 @@
-import os
-os.chdir('../..')
 from math import e
+import os
 import re
 import shutil
 import random
@@ -10,8 +9,9 @@ import pandas as pd
 
 from joblib import delayed, Parallel
 
-from myCode.tasks_run_in_windows.tools.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR
+from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR
 from luto import settings
+
 
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
 
@@ -88,10 +88,8 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv', run
         # Create a folder for each run
         create_run_folders(col)    
         # Write the custom settings to the task folder
-        # Submit the task
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)  
         # Submit the task if the os is linux
-        update_thread_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
         submit_task(cwd, col)
         
 
@@ -196,15 +194,6 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
             if isinstance(v, list):
                 bash_file.write(f'{k}=({ " ".join([str(elem) for elem in v])})\n')
                 file.write(f'{k}={v}\n')
-            elif k == 'SSP':
-                v = str(v)
-                file.write(f'{k}="{v}"\n')
-                bash_file.write(f'{k}="{v}"\n')
-            elif k == 'CARBON_PRICES_FIELD':
-                print(f'{k}="{v}"\n')
-                v = str(v)
-                file.write(f'{k}="{v}"\n')
-                bash_file.write(f'{k}="{v}"\n')
             # Dict values need to be converted to bash variables
             elif isinstance(v, dict):
                 file.write(f'{k}={v}\n')
@@ -223,6 +212,7 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
             # Write the rest as strings
             else:
                 file.write(f'{k}={v}\n')
+<<<<<<< HEAD
                 bash_file.write(f'{k}={v}\n')
 
 def update_thread_settings(task_dir: str, settings_dict: dict):
@@ -350,6 +340,7 @@ def create_run_folders(col):
     # Create an output folder for the task
     os.makedirs(f'{TASK_ROOT_DIR}/{col}/output', exist_ok=True)
 
+<<<<<<< HEAD
 def convert_to_unix(file_path):
     with open(file_path, 'rb') as file:
         content = file.read()
@@ -367,6 +358,13 @@ def submit_task(cwd:str, col:str):
 
     # Convert the line endings to UNIX format using Python
     convert_to_unix(slurm_script_path)
+=======
+
+
+
+def submit_task(cwd:str, col:str):
+    # Copy the slurm script to the task folder
+    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/slurm_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
     # Start the task if the os is linux
     if os.name == 'posix':
         os.chdir(f'{TASK_ROOT_DIR}/{col}')

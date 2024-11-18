@@ -646,7 +646,6 @@ class LutoSolver:
             
             cc_impact_yield_delta = self._input_data.water_yield_natural_land_cc_impact_delta.loc[self._input_data.target_year, region]
             constr_wny_limit = w_hist_yield_limit + cc_impact_yield_delta
-
             wny_limit_updated = False
             if self._input_data.base_year_ag_sol is not None and settings.RELAXED_WATER_LIMITS_FOR_INFEASIBILITY == 'on':
                 base_year_water_yield_with_current_layers = self._get_water_nyield_base_year_vars_current_year_layers(region, ind)

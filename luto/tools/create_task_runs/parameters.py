@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = 'myCode/tasks_run_in_windows/Custom_runs'
+TASK_ROOT_DIR = '../Custom_runs'
 
 
 # The path to the script that import settings as variables
@@ -46,4 +46,5 @@ PARAMS_NUM_AS_STR = [
     'SSP',
 ]
 
-EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code','myCode']
+EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code']
+
