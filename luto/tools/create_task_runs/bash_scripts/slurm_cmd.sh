@@ -5,7 +5,6 @@ source luto/settings_bash.py
 export PATH=$PATH:/usr/local/bin
 NODE=$(hostname)
 
-# Check for gurobi license file
 if [ -f ~/gurobi.lic ]; then
     grb_license=~/gurobi.lic
 else
@@ -52,6 +51,13 @@ fi
 
 # Activate conda environment
 source /run/user/219976/python/miniforge3/etc/profile.d/conda.sh
+=======
+
+# Write the script content to the file
+cat << OUTER_EOF > $SCRIPT_SLURM
+#!/bin/bash
+# Activate the Conda environment
+source ~/miniforge3/etc/profile.d/conda.sh
 conda activate luto
 
 # Change to the directory where this script is located
@@ -86,6 +92,7 @@ sim.run(data=data, base=2010, target=2050)
 from luto.tools.write import write_outputs
 write_outputs(data)
 INNER_EOF
+<<<<<<< HEAD
 
 # Sync output files if the simulation was successful
 if [ \$? -eq 0 ]; then
@@ -125,6 +132,9 @@ fi
 # You might want to comment this line if you want to debug the script
 # rm $SCRIPT
 =======
+=======
+OUTER_EOF
+
 
 
 # Define the script content based on the HPC system type

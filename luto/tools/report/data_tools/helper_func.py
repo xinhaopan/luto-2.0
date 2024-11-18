@@ -97,15 +97,8 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
         # get the base name of the file
         data_name = os.path.basename(data_path).split('.')[0]
 
-        print(f"Processing {data_path}")
-        if os.path.isfile(data_path):
-            with open(data_path, 'r') as file:
-                raw_string = file.read()
-        else:
-            print(f"Skipping {data_path} because it is a directory.")
-
-        # with open(data_path, 'r') as file:
-        #     raw_string = file.read()
+        with open(data_path, 'r') as file:
+            raw_string = file.read()
 
         pre_element = etree.SubElement(new_div, "pre")
         pre_element.set("id", f"{data_name}_csv")
@@ -114,7 +107,6 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
 
     # Step 5: Insert the new div
     content_div.addnext(new_div)
-    print(f"Attempting to write to: {html_path}")  # 打印路径
     # Step 6: Save the changes
     tree.write(html_path, method="html")
 
