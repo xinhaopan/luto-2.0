@@ -75,6 +75,8 @@ def process_single_df(df, mapping_df):
     renamed_df = df.rename(columns={orig_col: column_mapping.get(re.sub(r'-', '', orig_col.lower()), orig_col)
                                     for orig_col in df.columns})
     processed_df = renamed_df.reindex(columns=categories, fill_value=0)
+    if 'Year' in processed_df.columns:
+        processed_df = processed_df.set_index('Year')
 
     return processed_df, legend_colors
 
@@ -104,15 +106,24 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
             # 仅隐藏刻度标签，保留刻度和网格线
             # 仅隐藏刻度和刻度标签，保留水平网格线
             if not is_left_col:
+                # 如果不是左侧列的子图
                 ax.tick_params(axis='y', which='both', left=False, labelleft=False)  # 隐藏 y 轴的刻度和标签
                 ax.spines['left'].set_visible(False)  # 隐藏左边框
             else:
+                # 如果是左侧列的子图
                 ax.spines['left'].set_visible(True)  # 显示左边框
-                ax.yaxis.set_ticks_position('left')
-                ax.set_ylim(y_range[0] - 0.5, y_range[1] + 1)
-                ax.set_yticks(np.arange(y_range[0], y_range[1], y_ticks))
-                ax.tick_params(axis='y', labelsize=font_size)  # 显示 y 轴刻度标签
+                ax.yaxis.set_ticks_position('left')  # y 轴刻度在左侧
+                ax.set_ylim(y_range[0], y_range[1])  # 设置 y 轴范围
 
+                # 生成 y 轴刻度
+                yticks = np.arange(y_range[0], y_range[1] + y_ticks, y_ticks)
+
+                # 如果是底部行的子图，移除最底部的刻度值
+                if is_bottom_row:
+                    yticks = yticks[1:]  # 从第二个刻度值开始
+
+                ax.set_yticks(yticks)  # 更新刻度
+                ax.tick_params(axis='y', labelsize=font_size)  # 设置刻度标签字体大小
 
             if is_bottom_row:
                 ax.spines['bottom'].set_visible(True)  # 显示 x 轴边框
@@ -120,7 +131,7 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
                 ax.tick_params(axis='x', labelsize=font_size)
                 ax.set_xlim(x_range[0] - 0.5, x_range[1] + 0.5)
                 ax.set_xticks(np.arange(x_range[0], x_range[1] + 1, x_ticks))
-                ax.set_xticklabels(ax.get_xticks(), rotation=45, ha='right', fontsize=font_size)
+                ax.set_xticklabels(ax.get_xticks(), rotation=0, fontsize=font_size)
             else:
                 ax.spines['bottom'].set_visible(False)  # 隐藏 x 轴边框
                 ax.xaxis.set_ticks([])  # 隐藏 x 轴刻度
@@ -200,8 +211,8 @@ def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_
     line = ax.plot(years, merged_df[point_data], color='red', marker='o', linewidth=1.5, label=point_data, markersize=3)
 
     # 设置 x 和 y 轴范围
-    ax.set_xlim(x_range[0] - 0.5, x_range[1] + 0.5)
-    ax.set_ylim(y_range[0], y_range[1]+1)
+    # ax.set_xlim(x_range[0] - 0.5, x_range[1] + 0.5)
+    # ax.set_ylim(y_range[0], y_range[1]+1)
     ax.tick_params(axis='both', direction='in')
     return bar_list, line
 
@@ -242,8 +253,8 @@ def plot_stacked_bar(ax, merged_dict, input_name, legend_colors, font_size=10,
     ax.set_xlim(x_range[0] - 0.5, x_range[1] + 0.5)
 
     # Set y-axis limits and ticks
-    ax.set_ylim(y_range[0], y_range[1])
-    if y_ticks is not None:
-        ax.set_yticks(np.arange(y_range[0], y_range[1] + 1, y_ticks))
+    # ax.set_ylim(y_range[0], y_range[1])
+    # if y_ticks is not None:
+    #     ax.set_yticks(np.arange(y_range[0], y_range[1] + 1, y_ticks))
 
     return bar_list
