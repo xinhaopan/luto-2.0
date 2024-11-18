@@ -7,13 +7,20 @@ import itertools
 import multiprocessing
 import pandas as pd
 import subprocess
-
+from datetime import datetime
 
 from joblib import delayed, Parallel
 
 from myCode.tasks_run_in_windows.tools.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR,OUTPUT_DIR
 from luto import settings
 
+
+def print_with_time(message):
+    """
+    打印带有时间戳的消息。
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] {message}")
 
 def create_settings_template(to_path: str = TASK_ROOT_DIR):
     # Save the settings template to the root task folder
@@ -69,7 +76,6 @@ def process_column(col, custom_settings, num_task, cwd):
     # 如果系统为 Linux，更新线程设置并提交任务
     update_thread_settings(f'{OUTPUT_DIR}/{col}', custom_dict)
     run_task(cwd, col)  # 执行任务
-    print(f"Task for column {col} completed.")
 
 
 def create_task_runs(from_path: str = f'{TASK_ROOT_DIR}/settings_template.csv',use_multithreading=True,  num_workers: int = 4):
@@ -102,7 +108,8 @@ def create_task_runs(from_path: str = f'{TASK_ROOT_DIR}/settings_template.csv',u
 
 
 def run_task(cwd, col):
-    print(f"Running task for column {col}...")
+    print_with_time(f"{col}: running task for column...")
+    start_time = time.time()  # 记录任务开始时间
     log_file = f'output/{col}/output/error_log.txt'  # 定义日志文件路径
 
     # 根据操作系统选择 Python 解释器路径
@@ -125,14 +132,18 @@ def run_task(cwd, col):
                 f.write(f"Error running temp_runs.py for {col}:\n")
                 f.write(f"stdout:\n{result.stdout}\n")
                 f.write(f"stderr:\n{result.stderr}\n")
-            print(f"Error occurred while running temp_runs.py for {col}, see {log_file} for details.")
+            print_with_time(f"{col}: error occurred while running temp_runs.py, see {log_file} for details.")
 
     except Exception as e:
         # 捕获 Python 异常，并将其写入日志文件
         with open(log_file, 'a') as f:
             f.write(f"Exception occurred while running temp_runs.py for {col}:\n")
             f.write(f"{str(e)}\n")
-        print(f"Exception occurred during execution of {col}, see {log_file} for details.")
+        print_with_time(f"{col}: exception occurred during execution, see {log_file} for details.")
+
+    end_time = time.time()  # 记录任务结束时间
+    elapsed_time = (end_time - start_time) / 3600  # 计算用时，单位：小时
+    print_with_time(f"{col}: completed. Elapsed time: {elapsed_time:.2f} h")
 
 
 # Grid search to set grid search parameters

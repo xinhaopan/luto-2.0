@@ -1,15 +1,16 @@
 INPUT_DIR = '../../../input'
 input_files = [
-    '2_BIO_0_GHG_1_8C_67_1',
-    '1_BIO_0_GHG_1_5C_50_1',
-    '0_BIO_0_GHG_1_5C_67_1',
-    '5_BIO_0_3_GHG_1_8C_67_1',
-    '4_BIO_0_3_GHG_1_5C_50_1',
-    '3_BIO_0_3_GHG_1_5C_67_1',
+    '2_BIO_0_GHG_1_8C_67',
+    '1_BIO_0_GHG_1_5C_50',
+    '0_BIO_0_GHG_1_5C_67',
+    '5_BIO_0_3_GHG_1_8C_67',
+    '4_BIO_0_3_GHG_1_5C_50',
+    '3_BIO_0_3_GHG_1_5C_67',
     '8_BIO_0_5_GHG_1_8C_67',
     '7_BIO_0_5_GHG_1_5C_50',
     '6_BIO_0_5_GHG_1_5C_67',
 ]
+input_files = [f"{file}_2" for file in input_files]
 
 # 子任务及对应颜色配置文件
 sub_tasks = [

@@ -30,26 +30,26 @@ ghg_group_dict,legend_colors = get_colors(ghg_group_dict, 'tools/land use colors
 output_png = '../output/04_ghg_emissions.png'
 plot_Combination_figures(ghg_group_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,
                              point_data='Net emissions', n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(-800, 201),
-                             x_ticks=10, y_ticks=200,
+                             x_ticks=20, y_ticks=200,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 draw_dict,legend_colors = get_colors(ag_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
 output_png = '../output/04_ghg_ag_emissions.png'
 plot_Combination_figures(draw_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                              point_data=None, n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(-1, 100),
-                             x_ticks=10, y_ticks=25,
+                             x_ticks=20, y_ticks=25,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 draw_dict,legend_colors = get_colors(am_dict, 'tools/land use colors.xlsx', sheet_name='am')
 output_png = '../output/04_ghg_am_emissions.png'
 plot_Combination_figures(draw_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                              point_data=None, n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(-80, 20),
-                             x_ticks=10, y_ticks=20,
+                             x_ticks=20, y_ticks=20,
                              legend_position=(0.5, -0.3), show_legend='last', legend_n_rows=3)
 
 draw_dict,legend_colors = get_colors(non_ag_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
 output_png = '../output/04_ghg_non_ag_emissions.png'
 plot_Combination_figures(draw_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                              point_data=None, n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(-800, 0),
-                             x_ticks=10, y_ticks=200,
+                             x_ticks=20, y_ticks=200,
                              legend_position=(0.5, -0.45), show_legend='last', legend_n_rows=4)

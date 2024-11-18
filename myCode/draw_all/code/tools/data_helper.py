@@ -36,6 +36,7 @@ def get_dict_data(input_files, csv_name, value_column_name, filter_column_name):
 
     # 遍历每个 input_file 进行处理
     for input_name in input_files:
+        # print(f"Processing {input_name}...")
         base_path = get_path(input_name)
 
         # 创建以年份为索引的 DataFrame
@@ -55,6 +56,54 @@ def get_dict_data(input_files, csv_name, value_column_name, filter_column_name):
                 for value in unique_values:
                     total_value = df[df[filter_column_name] == value][value_column_name].sum() / 1e6
                     temp_results.loc[year, value] = total_value  # 将结果填入年份索引中
+
+        # 将结果 DataFrame 添加到字典
+        data_dict[input_name] = temp_results
+
+    return data_dict
+
+import os
+import pandas as pd
+
+def get_dict_sum_data(input_files, csv_name, value_column_name, give_column_name):
+    """
+    从多个文件中读取数据，对指定列求和，并将结果保存为新的 CSV 文件。
+
+    参数:
+    - input_files (list): 输入文件的列表。
+    - csv_name (str): 目标 CSV 文件的名称前缀（不含年份）。
+    - value_column_name (str): 要求和的列名。
+    - give_column_name (str): 保存求和结果的新列名。
+
+    返回:
+    - dict: 包含每个输入文件的汇总数据的字典。
+    """
+    data_dict = {}
+
+    # 遍历每个 input_file 进行处理
+    for input_name in input_files:
+        # 获取输入文件的基本路径
+        base_path = get_path(input_name)
+
+        # 创建以年份为索引的 DataFrame
+        temp_results = pd.DataFrame(index=range(2010, 2051))
+        temp_results.index.name = 'Year'
+
+        # 遍历2010到2050年的文件
+        for year in range(2010, 2051):
+            file_path = os.path.join(base_path, f'out_{year}', f'{csv_name}_{year}.csv')
+
+            # 如果文件存在，进行处理
+            if os.path.exists(file_path):
+                df = pd.read_csv(file_path)
+
+                # 对指定列求和
+                total_value = df[value_column_name].sum() / 1e6  # 将结果单位转换为百万
+                temp_results.loc[year, give_column_name] = total_value
+
+        # 保存结果到新的 CSV 文件
+        output_file = os.path.join(base_path, f'{csv_name}_summed_results.csv')
+        temp_results.to_csv(output_file)
 
         # 将结果 DataFrame 添加到字典
         data_dict[input_name] = temp_results
@@ -109,8 +158,6 @@ def aggregate_by_mapping(data_dict, mapping_file, from_field, to_field, sheet_na
         aggregated_dict[key] = aggregated_df
 
     return aggregated_dict
-
-
 
 
 def concatenate_dicts_by_year(data_dicts):
