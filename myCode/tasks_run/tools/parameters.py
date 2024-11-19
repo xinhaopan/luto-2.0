@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = 'myCode/tasks_run_in_windows/Custom_runs'
+TASK_ROOT_DIR = 'myCode/tasks_run/Custom_runs'
 OUTPUT_DIR = 'output'
 
 # The path to the script that import settings as variables
