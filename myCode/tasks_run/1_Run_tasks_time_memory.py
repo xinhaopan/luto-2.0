@@ -6,7 +6,7 @@ from memory_profiler import memory_usage
 def main():
     os.chdir('../..')  # 改变工作目录
     from myCode.tasks_run_in_windows.tools.helpers import create_task_runs
-    file_path = 'myCode/tasks_run_in_windows/Custom_runs/settings_template4.csv'
+    file_path = 'myCode/tasks_run/Custom_runs/settings_template4.csv'
     create_task_runs(from_path=file_path,use_multithreading=False, num_workers=1)
 
 

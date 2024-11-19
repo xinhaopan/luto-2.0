@@ -4,21 +4,21 @@
 source luto/settings_bash.py
 export PATH=$PATH:/usr/local/bin
 
-# Check for gurobi license file
-if [ -f ~/gurobi.lic ]; then
-    grb_license=~/gurobi.lic
-else
-    grb_license=~/gurobi_${NODE}.lic
-fi
 
-export GRB_LICENSE_FILE=$grb_license
-
-# Create a temporary script fileaa
+# Create a temporary script file
 SCRIPT=$(mktemp)
 
 # Write the script content to the file, directly substituting variables
 cat << OUTER_EOF > $SCRIPT
 #!/bin/bash
+#PBS -N ${JOB_NAME}
+#PBS -l select=1:ncpus=${THREADS}:mem=${MEM}
+#PBS -l walltime=${TIME}
+#PBS -j oe
+#PBS -q ${NODE}
+
+# Load necessary modules
+module load python/3.8
 
 # Read the settings_bash file ==> NODE, TIME, MEM, THREADS, JOB_NAME
 source luto/settings_bash.py
@@ -49,7 +49,6 @@ else
     echo "Current node is mem, no sync performed."
 fi
 
-
 # Activate conda environment
 source /run/user/219976/python/miniforge3/etc/profile.d/conda.sh
 conda activate luto
@@ -70,31 +69,8 @@ fi
 
 OUTER_EOF
 
-# Submit the job using sbatch
-if [[ "$NODE" == "gc1" ]]; then
-    sbatch -p normal \
-    --nodelist=hpc-gc-b-1 \
-    --time=${TIME} \
-    --mem=${MEM} \
-    --cpus-per-task=${THREADS} \
-    --job-name=${JOB_NAME} \
-    ${SCRIPT}
-elif [[ "$NODE" == "gc2" ]]; then
-    sbatch -p normal \
-    --nodelist=hpc-gc-b-2 \
-    --time=${TIME} \
-    --mem=${MEM} \
-    --cpus-per-task=${THREADS} \
-    --job-name=${JOB_NAME} \
-    ${SCRIPT}
-else
-    sbatch -p ${NODE} \
-    --time=${TIME} \
-    --mem=${MEM} \
-    --cpus-per-task=${THREADS} \
-    --job-name=${JOB_NAME} \
-    ${SCRIPT}
-fi
+# Submit the job using qsub
+qsub $SCRIPT
 
 # Optionally remove the temporary script after job submission
 # You might want to comment this line if you want to debug the script

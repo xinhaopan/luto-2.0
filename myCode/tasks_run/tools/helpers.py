@@ -11,7 +11,7 @@ from datetime import datetime
 
 from joblib import delayed, Parallel
 
-from myCode.tasks_run_in_windows.tools.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR,OUTPUT_DIR
+from myCode.tasks_run.tools.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR,OUTPUT_DIR
 from luto import settings
 
 
