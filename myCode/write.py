@@ -1312,17 +1312,6 @@ def save_map_to_npy(data, product, filename_prefix, yr_cal, path):
     np.save(f"{full_path}", product)
     print(f'Map saved to {full_path}')
 
-    '''
-    # Create the map array
-    map_arr = create_2d_map(data, product, filler = data.MASK_LU_CODE)
-
-    # Construct the filename and save the TIFF file
-    filename = f"{filename_prefix}_{yr_cal}.tiff"
-    full_path = os.path.join(path, filename)
-    write_gtiff(map_arr, full_path)
-    print(f"Map saved to {full_path}")
-    '''
-
 
 def write_rev_cost_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     yr_idx = yr_cal - data.YR_CAL_BASE
@@ -1339,13 +1328,10 @@ def write_rev_cost_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     #    but sources for livestock includes ['Meat', 'Wool', 'Live Exports', 'Milk']
     ag_rev_df_rjms = ag_revenue.get_rev_matrices(data, yr_idx, aggregate=False)
     ag_cost_df_rjms = ag_cost.get_cost_matrices(data, yr_idx, aggregate=False)
-    ag_rev_df_rjms = ag_rev_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_rev_df_rjms.columns.levels),
-                                            fill_value=0)
-    ag_rev_rjms = ag_rev_df_rjms.values.reshape(-1, *ag_rev_df_rjms.columns.levshape)
 
-    ag_cost_df_rjms = ag_cost_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_cost_df_rjms.columns.levels),
-                                              fill_value=0)
-    ag_cost_rjms = ag_cost_df_rjms.values.reshape(-1, *ag_cost_df_rjms.columns.levshape)
+    # Expand the original df with zero values to convert it to a **mrjs** array
+    ag_rev_rjms = ag_rev_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_rev_df_rjms.columns.levels), fill_value=0).values.reshape(-1, *ag_rev_df_rjms.columns.levshape)
+    ag_cost_rjms = ag_cost_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_cost_df_rjms.columns.levels), fill_value=0).values.reshape(-1, *ag_cost_df_rjms.columns.levshape)
 
     # Multiply the ag_dvar_mrj with the ag_rev_mrj to get the ag_rev_jm
     ag_rev_r = np.einsum('mrj,rjms -> r', ag_dvar_mrj, ag_rev_rjms)
@@ -1368,9 +1354,16 @@ def write_rev_cost_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     am_cost_mat = ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx)
 
     # Iterate through agricultural management and non-agricultural land uses
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        am_desc = AG_MANAGEMENTS_TO_LAND_USES[am]
+    for am, am_desc in AG_MANAGEMENTS_TO_LAND_USES.items():
+        if not AG_MANAGEMENTS[am]:
+            continue
+        # Get the land use codes for the agricultural management
         am_code = [data.DESC2AGLU[desc] for desc in am_desc]
+
+        am_rev = np.nan_to_num(am_revenue_mat[am])  # Replace NaNs with 0
+        am_cost = np.nan_to_num(am_cost_mat[am])  # Replace NaNs with 0
+
+        # Get the decision variable for each agricultural management
         am_dvar = data.ag_man_dvars[yr_cal][am][:, :, am_code]
 
         # Calculate the result arrays for agricultural management revenue and costs

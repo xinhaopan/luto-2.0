@@ -75,8 +75,18 @@ def plot_all_transition_matrices(matrices, labels_list, label_mapping, output_pa
         else:
             short_labels = [label_mapping.get(label, label) for label in labels]
 
+        # Normalize the matrix by row sums to calculate proportions
+        row_sums = matrix.sum(axis=1, keepdims=True)
+        normalized_matrix = np.divide(
+            matrix,
+            row_sums,
+            out=np.zeros_like(matrix, dtype=float),
+            where=row_sums != 0
+        )
+
         ax = axes[i // 3, i % 3]
-        cax = ax.imshow(matrix, cmap='YlOrRd', interpolation='nearest')
+        # Use normalized matrix for color mapping, original matrix for text
+        cax = ax.imshow(normalized_matrix, cmap='YlOrRd', interpolation='nearest')
 
         # Set the tick labels
         ax.set_xticks(np.arange(len(short_labels)))
@@ -84,18 +94,30 @@ def plot_all_transition_matrices(matrices, labels_list, label_mapping, output_pa
         ax.set_xticklabels(short_labels, ha="center", fontsize=font_size)
         ax.set_yticklabels(short_labels, fontsize=font_size)
 
-        # Display values within each cell
+        # Display original values (area) within each cell
         for x in range(len(short_labels)):
             for y in range(len(short_labels)):
-                value = matrix[x, y]
-                color = "white" if value > np.max(matrix) / 2 else "black"
+                value = matrix[x, y]  # Original value (area)
+                proportion = normalized_matrix[x, y]  # Normalized value (proportion)
+                color = "white" if proportion > 0.5 else "black"
                 ax.text(y, x, f"{value:.1f}", ha="center", va="center", color=color, fontsize=font_size)
 
     # Add color bar
-    cbar_ax = fig.add_axes([0.15, 0.06, 0.7, 0.02])
+    cbar_ax = fig.add_axes([0.15, 0.06, 0.7, 0.02])  # 设置颜色条的位置
     cbar = fig.colorbar(cax, cax=cbar_ax, orientation='horizontal')
-    cbar.set_label('Transition Area (M ha)', fontsize=font_size+5)
-    cbar.ax.tick_params(labelsize=font_size+5)
+
+    # 手动设置颜色条的范围，使其映射到 0-1 的数据比例范围
+    cbar.mappable.set_clim(0, 1)  # 设置颜色条的颜色范围为 0 到 1
+
+    # 设置刻度为归一化的比例
+    cbar.set_ticks([0, 0.25, 0.5, 0.75, 1.0])  # 颜色条刻度位置
+    cbar.set_ticklabels(['0%', '25%', '50%', '75%', '100%'])  # 设置对应的刻度标签
+
+    # 设置颜色条标签
+    cbar.set_label('Proportion of Transition', fontsize=font_size + 5)
+
+    # 设置颜色条刻度字体大小
+    cbar.ax.tick_params(labelsize=font_size + 5)
 
     # Save the plot
     plt.savefig(output_path, dpi=300, bbox_inches='tight', transparent=True)
