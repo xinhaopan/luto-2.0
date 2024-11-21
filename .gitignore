@@ -43,6 +43,11 @@ input/
 *.tif
 *.shp
 myCode/**/Assets/
+/myCode/tasks_run/rsync/rsync_password
+
+# Ignore rsync sensitive files
+myCode/tasks_run/rsync/rsync_password
+myCode/tasks_run/rsync/sync_files.sh
 
 # The mannual build files
 /docs/manual/*
