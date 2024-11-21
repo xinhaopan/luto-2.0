@@ -8,6 +8,7 @@ import multiprocessing
 import pandas as pd
 import subprocess
 from datetime import datetime
+import time
 
 from joblib import delayed, Parallel
 
@@ -75,7 +76,10 @@ def process_column(col, custom_settings, num_task, cwd):
     write_custom_settings(f'{OUTPUT_DIR}/{col}', custom_dict)
     # 如果系统为 Linux，更新线程设置并提交任务
     update_thread_settings(f'{OUTPUT_DIR}/{col}', custom_dict)
-    run_task(cwd, col)  # 执行任务
+    if os.name == 'nt':
+        run_task_windows(cwd, col)  # 执行任务
+    elif os.name == 'posix':
+        run_task_linux(cwd, col, custom_dict)  # 执行任务
 
 
 def create_task_runs(from_path: str = f'{TASK_ROOT_DIR}/settings_template.csv',use_multithreading=True,  num_workers: int = 4):
@@ -107,16 +111,12 @@ def create_task_runs(from_path: str = f'{TASK_ROOT_DIR}/settings_template.csv',u
             process_column(col, custom_settings, num_task, cwd)
 
 
-def run_task(cwd, col):
+def run_task_windows(cwd, col):
     print_with_time(f"{col}: running task for column...")
     start_time = time.time()  # 记录任务开始时间
     log_file = f'output/{col}/output/error_log.txt'  # 定义日志文件路径
 
-    # 根据操作系统选择 Python 解释器路径
-    if os.name == 'nt':
-        python_path = r'F:\xinhao\miniforge\envs\luto\python.exe'  # 修改为 Windows 上的 Python 路径
-    elif os.name == 'posix':
-        python_path = '/scratch/jk53/miniforge/envs/luto/bin/python'  # 修改为 Linux 上的 Python 3 路径
+    python_path = r'F:\xinhao\miniforge\envs\luto\python.exe'
     try:
         # 运行子进程，捕获标准输出和标准错误
         result = subprocess.run(
@@ -278,7 +278,7 @@ def update_thread_settings(task_dir: str, settings_dict: dict):
         content = file.readlines()
 
     # Update or append THREADS and WRITE_THREADS in settings.py
-    cpu_per_task = settings_dict.get('CPU_PER_TASK', 30)  # Default to 30 if not specified
+    cpu_per_task = settings_dict.get('CPU_PER_TASK', 50)  # Default to 30 if not specified
     found_threads = False
     found_write_threads = False
 
@@ -323,12 +323,14 @@ def update_thread_settings(task_dir: str, settings_dict: dict):
 def update_settings(settings_dict: dict, n_tasks: int, col: str):
     if settings_dict['NODE'] == 'Please specify the node name':
         if os.name == 'nt':
+            print('running on windows')
             # If the os is windows, do nothing
             # print('This will only create task folders, and NOT submit job to run!')
             pass
         elif os.name == 'posix':
+            print('running on linux')
             # If the os is linux, submit the job
-            raise ValueError('NODE must be specified!')
+            # raise ValueError('NODE must be specified!')
 
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = '../../input'
@@ -381,6 +383,12 @@ def create_run_folders(col):
     # Copy codes to the each custom run folder, excluding {EXCLUDE_DIRS} directories
     from_to_files = copy_folder_custom(os.getcwd(), f'{OUTPUT_DIR}/{col}', EXCLUDE_DIRS)
     worker = min(settings.WRITE_THREADS, len(from_to_files))
+    for s, d in from_to_files:
+        if not os.path.exists(s):
+            print(f"Source file not found: {s}")
+        if not os.path.exists(os.path.dirname(d)):
+            print(f"Destination directory does not exist: {os.path.dirname(d)}")
+
     Parallel(n_jobs=worker, backend="threading")(delayed(shutil.copy2)(s, d) for s, d in from_to_files)
     # Create an output folder for the task
     os.makedirs(f'{OUTPUT_DIR}/{col}/output', exist_ok=True)
@@ -393,23 +401,64 @@ def convert_to_unix(file_path):
     with open(file_path, 'wb') as file:
         file.write(content)
 
+def run_task_linux(cwd, col, config):
+    """
+    提交单个 PBS 作业。
+    :param cwd: 当前工作目录
+    :param col: 作业列名称，用于区分任务
+    :param config: 单个作业的配置字典，包含 walltime, ncpus, mem, queue, job_name, script_content 等参数。
+    """
+    # 从配置字典中读取参数
+    job_name = config.get("JOB_NAME", "default_job")
+    walltime = config.get("TIME", "04:00:00")
+    ncpus = config.get("CPU_PER_TASK", "50")
+    mem = config.get("MEM", "150") + "GB"
+    queue = config.get("queue", "normal")
+    dir = f"{cwd}/output/{col}"
+    script_content = config.get("script_content", f"/g/data/jk53/LUTO_XH/apps/miniforge3/envs/luto/bin/python {dir}/temp_runs.py")
 
+    # 动态生成 PBS 脚本内容
+    pbs_script = f"""#!/bin/bash
+    # 作业名称
+    #PBS -N {job_name}
+    # 分配资源：CPU核心数和内存
+    #PBS -l ncpus={ncpus}
+    #PBS -l mem={mem}
+    # 最大运行时间
+    #PBS -l walltime={walltime}
+    # 合并标准输出和错误输出到同一文件
+    #PBS -j oe
+    #PBS -o {dir}/output
+    # 提交到指定队列
+    #PBS -q {queue}
 
+    # 指定需要的存储路径（按实际配置调整）
+    #PBS -l storage=gdata/jk53+scratch/jk53
 
+    cd {dir}
+    # 设置日志目录
+    LOG_DIR={dir}/output
+    mkdir -p $LOG_DIR
 
+    # 输出作业开始时间到日志
+    echo "Job started at $(date)" > $LOG_DIR/$PBS_JOBID.log
 
+    # 执行脚本内容
+    {script_content} >> $LOG_DIR/$PBS_JOBID.log 2>&1
 
+    # 输出作业结束时间到日志
+    echo "Job finished at $(date)" >> $LOG_DIR/$PBS_JOBID.log
+    """
 
+    # 写入 PBS 脚本到文件
+    script_file = f"{dir}/output/{job_name}.pbs"
+    with open(script_file, "w") as f:
+        f.write(pbs_script)
 
-
-
-
-
-
-
-
-
-
-
-
-
+    # 提交作业
+    try:
+        result = subprocess.run(["qsub", script_file], check=True, capture_output=True, text=True)
+        print(f"Job '{job_name}' submitted successfully!")
+        print("Job ID:", result.stdout.strip())
+    except subprocess.CalledProcessError as e:
+        print(f"Error submitting job '{job_name}':", e.stderr)

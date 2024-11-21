@@ -1,0 +1,1 @@
+ssh -R 2222:localhost:22 xp7241@gadi.nci.org.au "hostname > ~/active_tunnel_node.txt && bash"
