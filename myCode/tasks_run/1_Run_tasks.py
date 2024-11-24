@@ -4,7 +4,7 @@ def main():
     os.chdir('../..')  # 这里改变工作目录
     from myCode.tasks_run.tools.helpers import create_task_runs
     input_file = 'myCode/tasks_run/Custom_runs/settings_template.csv'
-    create_task_runs(input_file, use_multithreading=False, num_workers=3)
+    create_task_runs(input_file, use_multithreading=True, num_workers=8)
 
 if __name__ == "__main__":
     main()
