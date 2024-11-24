@@ -97,6 +97,10 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
         # get the base name of the file
         data_name = os.path.basename(data_path).split('.')[0]
 
+        print(data_path)
+        if data_path.endswith('Map_data'):
+            pass
+        data_path = data_path.replace('\\', '/')
         with open(data_path, 'r') as file:
             raw_string = file.read()
 

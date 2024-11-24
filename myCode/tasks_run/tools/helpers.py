@@ -60,7 +60,7 @@ def create_settings_template(to_path: str = TASK_ROOT_DIR):
         settings_df = pd.DataFrame({k: [v] for k, v in settings_dict.items()}).T.reset_index()
         settings_df.columns = ['Name', 'Default_run']
         settings_df = settings_df.applymap(str)
-        settings_df.to_csv(f'{to_path}/settings_template0.csv', index=False)
+        settings_df.to_csv(f'{to_path}/settings_template.csv', index=False)
 
 
 def process_column(col, custom_settings, num_task, cwd):
@@ -323,12 +323,12 @@ def update_thread_settings(task_dir: str, settings_dict: dict):
 def update_settings(settings_dict: dict, n_tasks: int, col: str):
     if settings_dict['NODE'] == 'Please specify the node name':
         if os.name == 'nt':
-            print('running on windows')
+            print(f'{col} running on windows')
             # If the os is windows, do nothing
             # print('This will only create task folders, and NOT submit job to run!')
             pass
         elif os.name == 'posix':
-            print('running on linux')
+            print(f'{col} running on linux')
             # If the os is linux, submit the job
             # raise ValueError('NODE must be specified!')
 
@@ -401,9 +401,10 @@ def convert_to_unix(file_path):
     with open(file_path, 'wb') as file:
         file.write(content)
 
+
 def run_task_linux(cwd, col, config):
     """
-    提交单个 PBS 作业。
+    提交单个 PBS 作业，并在作业成功完成后执行同步操作。
     :param cwd: 当前工作目录
     :param col: 作业列名称，用于区分任务
     :param config: 单个作业的配置字典，包含 walltime, ncpus, mem, queue, job_name, script_content 等参数。
@@ -415,7 +416,8 @@ def run_task_linux(cwd, col, config):
     mem = config.get("MEM", "150") + "GB"
     queue = config.get("queue", "normal")
     dir = f"{cwd}/output/{col}"
-    script_content = config.get("script_content", f"/g/data/jk53/LUTO_XH/apps/miniforge3/envs/luto/bin/python {dir}/temp_runs.py")
+    script_content = config.get("script_content",
+                                f"/g/data/jk53/LUTO_XH/apps/miniforge3/envs/luto/bin/python {dir}/temp_runs.py")
 
     # 动态生成 PBS 脚本内容
     pbs_script = f"""#!/bin/bash
@@ -458,7 +460,96 @@ def run_task_linux(cwd, col, config):
     # 提交作业
     try:
         result = subprocess.run(["qsub", script_file], check=True, capture_output=True, text=True)
-        print(f"Job '{job_name}' submitted successfully!")
-        print("Job ID:", result.stdout.strip())
+        job_id = result.stdout.strip()
+        print(f"Job '{job_name}' submitted successfully! ID: {job_id}")
+        # 等待作业完成
+        log_file = f"{dir}/output/simulation_log.txt"
+        if wait_for_job_to_complete(job_id, log_file):
+            # 作业完成后执行同步操作
+            sync_files(cwd,col)
     except subprocess.CalledProcessError as e:
         print(f"Error submitting job '{job_name}':", e.stderr)
+
+
+def wait_for_job_to_complete(job_id, log_file):
+    """
+    检查 PBS 作业的状态，直到作业完成，并检查作业是否成功完成。
+    :param job_id: PBS 作业 ID
+    :param log_file: 作业输出的日志文件路径
+    :return: 如果作业成功返回 True，失败返回 False
+    """
+    while True:
+        # 使用 qstat 查询作业状态
+        result = subprocess.run(["qstat", job_id], check=False, capture_output=True, text=True)
+
+        # 如果作业没有返回结果，说明作业已经完成
+        if result.returncode != 0:
+            print(f"Job {job_id} completed.")
+
+            # 检查日志文件，确认作业是否成功完成
+            with open(log_file, 'r') as log:
+                log_content = log.read()
+                if 'Total time for simulation' in log_content:
+                    print(f"Job {job_id} completed successfully.")
+                    return True  # 作业成功，返回 True
+                else:
+                    print(f"Job {job_id} failed or was incomplete, check the log file for more details.")
+                    return False  # 作业失败，返回 False
+        time.sleep(30)
+
+
+def sync_files(cwd,col):
+    # 获取日志文件路径
+    source_file = f"{cwd}/output/{col}/"  # 示例路径
+    log_file_path = f"{source_file}/output/simulation_log.txt"
+
+    try:
+        # 读取 simulation_log 文件中的开始时间
+        with open(log_file_path, 'r') as log_file:
+            lines = log_file.readlines()
+
+        # 查找 "Simulation started" 的时间行
+        start_time_line = next((line for line in lines if "Simulation started" in line), None)
+        if not start_time_line:
+            print("Could not find 'Simulation started' in the log file.")
+            return
+
+        # 提取时间戳并转换为 datetime 对象
+        start_time_str = start_time_line.split("Simulation started at ")[1].strip()
+        start_time = datetime.strptime(start_time_str, "%a %b %d %H:%M:%S %Y")
+
+        # 记录同步开始时间
+        sync_start_time = time.time()
+        with open(log_file_path, 'a') as log_file:
+            log_file.write(f"Sync started at {time.ctime(sync_start_time)}\n")
+
+        dest_file = f"/cygdrive/n/LUF-Modelling/LUTO2_XH/LUTO2/output/{col}"  # Windows 上的路径
+        rsync_log_file = f"{source_file}/output/rsync_log.txt"
+        # 使用rsync同步文件夹
+        rsync_command = [
+            'rsync', '-avz',  # 使用rsync的archive模式，压缩，显示详细信息
+            '-e', f"ssh -p 2222",  # 使用指定的SSH端口
+            f'--log-file={rsync_log_file}',  # 指定日志文件路径
+            source_file,  # 源目录
+            f"xinhao@localhost:{dest_file}"  # 目标目录（Windows上的路径）
+        ]
+
+        subprocess.run(rsync_command, check=True)
+        print(f"Files successfully synchronized from {source_file} to {dest_file}")
+
+        # 记录同步结束时间
+        sync_end_time = time.time()
+        sync_duration = (sync_end_time - sync_start_time) / 3600
+
+        # 记录同步结束时间和同步用时
+        with open(log_file_path, 'a') as log_file:
+            log_file.write(f"Sync finished at {time.ctime(sync_end_time)}\n")
+            log_file.write(f"Sync duration: {sync_duration:.2f} h\n")
+
+        # 计算总的用时并记录
+        total_duration = (sync_end_time - start_time.timestamp()) / 3600
+        with open(log_file_path, 'a') as log_file:
+            log_file.write(f"Total time: {total_duration:.2f} h\n")
+
+    except Exception as e:
+        print(f"Error occurred during the synchronization process: {e}")

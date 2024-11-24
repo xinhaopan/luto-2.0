@@ -49,6 +49,9 @@
           <mappings>
             <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" />
           </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/output" />
+          </excludedPaths>
         </serverdata>
       </paths>
       <paths name="xp7241@localhost:1419 password">

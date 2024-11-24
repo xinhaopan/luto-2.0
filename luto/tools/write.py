@@ -31,10 +31,6 @@ import geopandas as gpd
 
 from datetime import datetime
 from joblib import Parallel, delayed
-<<<<<<< HEAD
-from multiprocessing import Lock
-=======
->>>>>>> 2e398e47e84ec20eae65026d04776a9d7742894f
 
 from luto import settings
 from luto import tools
@@ -66,8 +62,6 @@ from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
 from luto.tools.xarray_tools import calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, calc_bio_score_by_yr
-
-
 
 
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
@@ -164,7 +158,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
     write_biodiversity_contribution(data, yr_cal, path_yr)
-    # write_npy(data, yr_cal, path_yr)
+    write_npy(data, yr_cal, path_yr)
 
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
@@ -1329,24 +1323,24 @@ def write_ghg_offland_commodity(data: Data, yr_cal, path):
     # Save to disk
     offland_ghg.to_csv(os.path.join(path, f'GHG_emissions_offland_commodity_{yr_cal}.csv'), index = False)
 
-<<<<<<< HEAD
 def write_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     write_rev_cost_npy(data, yr_cal, path, yr_cal_sim_pre)
     write_cost_transition_npy(data, yr_cal, path, yr_cal_sim_pre)
     write_GHG_npy(data, yr_cal, path)
     write_map_npy(data, yr_cal, path)
-    write_rev_non_ag_npy(data, yr_cal, path)
+    # write_rev_non_ag_npy(data, yr_cal, path)
 
 def save_map_to_npy(data, product, filename_prefix, yr_cal, path):
     """
     Creates a map array and saves it as a TIFF file. Creates the directory if it does not exist.
     """
     # Check if the path exists, create it if not
-    path = path + "/" + "data_for_carbon_price"
+    path = os.path.join(path,"data_for_carbon_price")
     os.makedirs(path, exist_ok=True)
 
     filename = f"{filename_prefix}_{yr_cal}.npy"
     full_path = os.path.join(path, filename)
+    full_path = full_path.replace('\\', '/')
     np.save(f"{full_path}", product)
     print(f'Map saved to {filename}')
 
