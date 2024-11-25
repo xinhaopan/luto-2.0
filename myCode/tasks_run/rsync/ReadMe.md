@@ -22,7 +22,8 @@ nohup：忽略挂起信号。
 
 关闭方式：
 ```
-ps -ef | grep python
+ssh gadi-login-02.gadi.nci.org.au # 日志中有在哪个节点运行
+ps -ef | grep python | grep -v grep
 ```
 ```
 kill -9 <ID>

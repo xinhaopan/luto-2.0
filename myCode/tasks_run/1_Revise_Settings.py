@@ -1,11 +1,17 @@
 import pandas as pd
 import os
+from datetime import datetime
+from tools.helpers import create_grid_search_template, create_task_runs, create_settings_template
 
-output = "settings_template"  # 输出文件名
+output = "GHG_penalty_test_template_1"  # 输出文件名
+current_time = datetime.now().strftime("%Y%m%d")
+# Create a template for the custom settings, and then create the custom settings
+# create_settings_template('Custom_runs')
+
 GHG_Name = {
-            "1.8C (67%) excl. avoided emis": "1_8C_67",
-            "1.5C (50%) excl. avoided emis": "1_5C_50",
-            "1.5C (67%) excl. avoided emis": "1_5C_67"
+            "1.8C (67%) excl. avoided emis": "GHG_1_8C_67",
+            "1.5C (50%) excl. avoided emis": "GHG_1_5C_50",
+            "1.5C (67%) excl. avoided emis": "GHG_1_5C_67"
             }
 BIO_Name = {
     "{2010: 0, 2030: 0, 2050: 0, 2100: 0}": "BIO_0",
@@ -15,7 +21,7 @@ BIO_Name = {
 
 # 读取数据
 df = pd.read_csv("Custom_runs/settings_template.csv")  # 原始数据
-df_revise = pd.read_excel("Custom_runs/Revise_settings_template.xlsx")  # 修订数据
+df_revise = pd.read_excel("Custom_runs/Revise_settings_template.xlsx",sheet_name="using")  # 修订数据
 
 # 创建一个新的DataFrame，第一列复制df的第一列
 new_df = pd.DataFrame(df.iloc[:, :2])  # 前两列为df的前两列
@@ -36,15 +42,18 @@ for idx, row in df_revise.iterrows():
 # 提取 GHG_LIMITS_FIELD 和 BIODIV_GBF_TARGET_2_DICT 两行
 ghg_limits_field = new_df.iloc[new_df[new_df.iloc[:, 0] == "GHG_LIMITS_FIELD"].index[0]]
 biodiv_gbf_target_2_dict = new_df.iloc[new_df[new_df.iloc[:, 0] == "BIODIV_GBF_TARGET_2_DICT"].index[0]]
+ghg_penalty_field = new_df.iloc[new_df[new_df.iloc[:, 0] == "GHG_PENALTY"].index[0]]
 
 # 遍历列名，根据字典映射生成新列名
 new_column_names = []
-for col in new_df.columns[1:]:  # 跳过第一列（通常为ID或索引列）
+for col in new_df.columns[2:]:  # 跳过第一列（通常为ID或索引列）
     ghg_value = GHG_Name.get(ghg_limits_field[col], "Unknown_GHG")  # 映射 GHG 值
     bio_value = BIO_Name.get(biodiv_gbf_target_2_dict[col], "Unknown_BIO")  # 映射 BIO 值
-    new_name = f"{col}_GHG_{ghg_value}_BIO_{bio_value}".replace(".", "_")  # 拼接新列名并替换点号
+    ghg_penalty_value = ghg_penalty_field[col]
+    new_name = f"{current_time}_{col}_{ghg_value}_{bio_value}_{ghg_penalty_value}".replace(".", "_")  # 拼接新列名并替换点号
     new_column_names.append(new_name)
 
+new_df.columns = new_df.columns[:2].tolist() + new_column_names  # 更新列名
 # 检查文件是否存在
 output_path = f"Custom_runs/{output}.csv"
 if os.path.exists(output_path):
