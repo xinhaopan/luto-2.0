@@ -25,7 +25,7 @@ bio_dict,legend_colors = get_colors(bio_dict, 'tools/land use colors.xlsx', shee
 output_png = '../output/05_bio.png'
 plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 105),
-                             x_ticks=10, y_ticks=35,
+                             x_ticks=20, y_ticks=35,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = 'biodiversity_separate', 'Biodiversity score', 'Landuse'
@@ -35,7 +35,7 @@ bio_dict,legend_colors = get_colors(bio_ag_group_dict, 'tools/land use colors.xl
 output_png = '../output/05_bio_ag_group.png'
 plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 105),
-                             x_ticks=10, y_ticks=35,
+                             x_ticks=20, y_ticks=35,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = 'biodiversity_separate', 'Biodiversity score', 'Landuse subtype'
@@ -44,7 +44,7 @@ bio_dict,legend_colors = get_colors(bio_am_dict, 'tools/land use colors.xlsx', s
 output_png = '../output/05_bio_am.png'
 plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 3),
-                             x_ticks=10, y_ticks=1,
+                             x_ticks=20, y_ticks=1,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = 'biodiversity_separate', 'Biodiversity score', 'Landuse'
@@ -53,5 +53,5 @@ bio_dict,legend_colors = get_colors(bio_am_dict, 'tools/land use colors.xlsx', s
 output_png = '../output/05_bio_non-ag.png'
 plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 16),
-                             x_ticks=10, y_ticks=4,
+                             x_ticks=20, y_ticks=4,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
