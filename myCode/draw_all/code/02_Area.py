@@ -32,10 +32,11 @@ plot_Combination_figures(area_ag_group_dict, output_png, input_files, plot_stack
 csv_name, value_column_name, filter_column_name = 'area_agricultural_management', 'Area (ha)', 'Type'
 area_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 area_am_dict,legend_colors = get_colors(area_am_dict, 'tools/land use colors.xlsx', sheet_name='am')
+y_range, y_ticks = calculate_y_axis_range(area_am_dict)
 output_png = '../output/02_area_am_group.png'
 plot_Combination_figures(area_am_dict, output_png, input_files, plot_stacked_bar, legend_colors,
-                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 120),
-                             x_ticks=20, y_ticks=40,
+                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
+                             x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = 'area_non_agricultural_landuse', 'Area (ha)', 'Land-use'

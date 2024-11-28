@@ -30,19 +30,19 @@ def draw_plot_lines(df, colors, ylabel, y_range, y_tick_interval, output_file, f
         ax.plot(df.index, df[column], marker='o', color=colors[i], linewidth=2.5, label=column)
 
     # 设置刻度朝内
-    ax.tick_params(axis='both', which='both', direction='in', labelsize=font_size)
+    ax.tick_params(axis='both', which='both', direction='in', labelsize=font_size, pad=10)
 
     # 设置 x 轴刻度为年份，旋转 90 度
     ax.set_xlim(2010, 2050)
-    ax.set_xticks(range(2010, 2051, 10))  # 假设 df 的索引是年份
+    ax.set_xticks(range(2010, 2051, 20))  # 假设 df 的索引是年份
     ax.set_xlabel('Year', fontsize=font_size)
-    ax.tick_params(axis='x', labelsize=font_size, rotation=45)
+    ax.tick_params(axis='x', labelsize=font_size, pad=10)
 
     # 设置 y 轴范围和间隔，传入的范围参数和间隔
     ax.set_ylim(y_range[0], y_range[1])
     ax.set_yticks(range(y_range[0], y_range[1] + 1, y_tick_interval))  # 以传入的间隔为步长
     ax.set_ylabel(ylabel, fontsize=font_size)
-    ax.tick_params(axis='y', labelsize=font_size)
+    ax.tick_params(axis='y', labelsize=font_size, pad=10)
 
     # 设置图例，并去掉框
     ax.legend(fontsize=font_size, frameon=False,loc='lower left')
@@ -71,13 +71,13 @@ def draw_coloum(data, legend_colors, output_file, fontsize=22, y_range=(0, 200),
     ax.set_ylabel(ylabel, fontsize=fontsize)  # y轴标签字体大小
 
     ax.set_xlim(2009.5, 2050.5)
-    ax.set_xticks(range(2010, 2051, 10))  # 假设 df 的索引是年份
+    ax.set_xticks(range(2010, 2051, 20))  # 假设 df 的索引是年份
     ax.set_xlabel('Year', fontsize=font_size)
-    ax.tick_params(axis='x', labelsize=font_size, rotation=45)
+    ax.tick_params(axis='x', labelsize=font_size, pad=10)
 
     # 设置刻度朝内
-    ax.tick_params(axis='y', direction='in', labelsize=fontsize)  # y轴刻度字体大小
-    ax.tick_params(axis='x', direction='in', labelsize=fontsize)  # x轴刻度字体大小
+    ax.tick_params(axis='y', direction='in', labelsize=fontsize, pad=10)  # y轴刻度字体大小
+    ax.tick_params(axis='x', direction='in', labelsize=fontsize, pad=10)  # x轴刻度字体大小
 
     # 调整布局
     plt.tight_layout()

@@ -127,7 +127,7 @@ mapping_data_path = 'tools/land use group.xlsx'
 matrices = []
 for input_dir in input_files:
     file_dir = get_path(input_dir)
-    land_use_data_path = file_dir + '/out_2050/transition_matrix_2010_2050.csv'
+    land_use_data_path = os.path.join(file_dir, 'out_2050/transition_matrix_2010_2050.csv')
     matrice = calculate_transition_matrix(land_use_data_path, mapping_data_path)
     matrices.append(matrice / 1e6)
 labels = list(matrice)

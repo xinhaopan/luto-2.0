@@ -13,6 +13,7 @@ import time
 from joblib import delayed, Parallel
 
 from myCode.tasks_run.tools.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR,OUTPUT_DIR
+from myCode.tasks_run.tools import calculate_total_cost
 from luto import settings
 
 
@@ -85,6 +86,8 @@ def process_column(col, custom_settings, num_task, cwd):
 def create_task_runs(from_path: str = f'{TASK_ROOT_DIR}/settings_template.csv',use_multithreading=True,  num_workers: int = 4):
     """读取设置模板文件并并行运行任务"""
     # 读取自定义设置文件
+    if os.name == 'posix':
+        calculate_total_cost(pd.read_csv(from_path))
     custom_settings = pd.read_csv(from_path, index_col=0)
     custom_settings = custom_settings.dropna(how='all', axis=1)
 
@@ -126,13 +129,23 @@ def run_task_windows(cwd, col):
             text=True  # 将输出转换为文本
         )
 
-        # 如果子进程返回码不为0，或者有异常输出到stderr，说明有错误发生
-        if result.returncode != 0 or result.stderr:
+        end_time = time.time()  # 记录任务结束时间
+        elapsed_time = (end_time - start_time) / 3600  # 计算用时，单位：小时
+
+        # 检查子进程的返回码和错误输出
+        if result.returncode == 0 and not result.stderr:
+            # 如果成功运行，记录成功信息
+            with open(log_file, 'a') as f:
+                f.write(f"Success running temp_runs.py for {col}:\n")
+                f.write(f"stdout:\n{result.stdout}\n")
+            print_with_time(f"{col}: successfully completed. Elapsed time: {elapsed_time:.2f} h")
+        else:
+            # 如果运行失败，记录错误信息
             with open(log_file, 'a') as f:
                 f.write(f"Error running temp_runs.py for {col}:\n")
                 f.write(f"stdout:\n{result.stdout}\n")
                 f.write(f"stderr:\n{result.stderr}\n")
-            print_with_time(f"{col}: error occurred while running temp_runs.py, see {log_file} for details.")
+            print_with_time(f"{col}: error occurred. Elapsed time: {elapsed_time:.2f} h")
 
     except Exception as e:
         # 捕获 Python 异常，并将其写入日志文件
@@ -141,9 +154,7 @@ def run_task_windows(cwd, col):
             f.write(f"{str(e)}\n")
         print_with_time(f"{col}: exception occurred during execution, see {log_file} for details.")
 
-    end_time = time.time()  # 记录任务结束时间
-    elapsed_time = (end_time - start_time) / 3600  # 计算用时，单位：小时
-    print_with_time(f"{col}: completed. Elapsed time: {elapsed_time:.2f} h")
+
 
 
 # Grid search to set grid search parameters
@@ -374,7 +385,7 @@ def check_settings_name(settings: dict, col: str):
     for idx, _ in settings.iterrows():
         if settings.loc[idx, col] != settings.loc[idx, 'Default_run']:
             changed_params = changed_params + 1
-            print(f'"{col}" has changed <{idx}>: "{settings.loc[idx, "Default_run"]}" ==> "{settings.loc[idx, col]}">')
+            # print(f'"{col}" has changed <{idx}>: "{settings.loc[idx, "Default_run"]}" ==> "{settings.loc[idx, col]}">')
 
     print(f'"{col}" has no changed parameters compared to "Default_run"') if changed_params == 0 else None
 
@@ -461,7 +472,8 @@ def run_task_linux(cwd, col, config):
     try:
         result = subprocess.run(["qsub", script_file], check=True, capture_output=True, text=True)
         job_id = result.stdout.strip()
-        print(f"Job '{job_name}' submitted successfully! ID: {job_id}")
+        submission_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        print(f"{submission_time}: Job '{job_name}' submitted successfully! ID: {job_id}.")
         # 等待作业完成
         log_file = f"{dir}/output/simulation_log.txt"
         if wait_for_job_to_complete(job_id, log_file):

@@ -101,6 +101,11 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
             is_left_col = (i % n_cols == 0)
             is_bottom_row = (i >= (n_rows - 1) * n_cols)
 
+            # 生成 y 轴刻度
+            yticks = np.arange(y_range[0], y_range[1] + y_ticks, y_ticks)
+            ax.set_yticks(yticks)  # 更新刻度
+            ax.set_ylim(y_range[0], y_range[1])
+
             # 显示所有图的水平网格线
             ax.grid(True, axis='y', linestyle='--', linewidth=0.5)
             # 仅隐藏刻度标签，保留刻度和网格线
@@ -113,10 +118,7 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
                 # 如果是左侧列的子图
                 ax.spines['left'].set_visible(True)  # 显示左边框
                 ax.yaxis.set_ticks_position('left')  # y 轴刻度在左侧
-                ax.set_ylim(y_range[0], y_range[1])  # 设置 y 轴范围
-
-                # 生成 y 轴刻度
-                yticks = np.arange(y_range[0], y_range[1] + y_ticks, y_ticks)
+                # ax.set_ylim(y_range[0], y_range[1])  # 设置 y 轴范围
 
                 # 如果是底部行的子图，移除最底部的刻度值
                 if is_bottom_row:
@@ -151,8 +153,12 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
             # 只在最后一个图获取图例句柄和标签
             if i == total_plots - 1:
                 handles, labels_legend = ax.get_legend_handles_labels()
-                all_handles.extend(handles[:len(legend_colors)])
-                all_labels.extend(labels_legend[:len(legend_colors)])
+                if point_data is not None:
+                    all_handles.extend(handles[:len(legend_colors)+1])
+                    all_labels.extend(labels_legend[:len(legend_colors)+1])
+                else:
+                    all_handles.extend(handles[:len(legend_colors)])
+                    all_labels.extend(labels_legend[:len(legend_colors)])
 
     ncol = math.ceil(len(legend_colors) / legend_n_rows)
     output_file = output_png.replace(".png", "_legend.png")
@@ -212,7 +218,7 @@ def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_
 
     # 设置 x 和 y 轴范围
     # ax.set_xlim(x_range[0] - 0.5, x_range[1] + 0.5)
-    # ax.set_ylim(y_range[0], y_range[1]+1)
+    ax.set_ylim(y_range[0], y_range[1]+1)
     ax.tick_params(axis='both', direction='in')
     return bar_list, line
 
@@ -253,8 +259,38 @@ def plot_stacked_bar(ax, merged_dict, input_name, legend_colors, font_size=10,
     ax.set_xlim(x_range[0] - 0.5, x_range[1] + 0.5)
 
     # Set y-axis limits and ticks
-    # ax.set_ylim(y_range[0], y_range[1])
+    ax.set_ylim(y_range[0], y_range[1])
     # if y_ticks is not None:
     #     ax.set_yticks(np.arange(y_range[0], y_range[1] + 1, y_ticks))
 
     return bar_list
+
+def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3):
+    """
+    计算累积柱状图的 Y 轴范围和刻度
+    :param data_dict: 包含多个 DataFrame 的字典，每行代表一个柱状图的柱子
+    :param multiplier: 范围是该值的倍数（默认 10）
+    :param divisible_by: 范围除以该值后得到间隔（默认 3）
+    :return: Y 轴范围 (最小值, 最大值) 和刻度间隔
+    """
+    min_value, max_value = 0, 0
+
+    # 遍历字典中的每个 DataFrame 和行
+    for df in data_dict.values():
+        row_sums = df.sum(axis=1)  # 每行累积总和
+        min_value = min(min_value, row_sums.min())  # 累积总和的最小值
+        max_value = max(max_value, row_sums.max())  # 累积总和的最大值
+
+    # 将最小值向下取整到 multiplier 的倍数
+    y_min = np.floor(min_value / multiplier) * multiplier
+
+    # 将最大值向上取整到 multiplier 的倍数
+    y_max = np.ceil(max_value / multiplier) * multiplier
+
+    # 确保 (y_max - y_min) 可以整除 divisible_by
+    while (y_max - y_min) % divisible_by != 0:
+        y_max += multiplier
+
+    interval = (y_max - y_min) // divisible_by
+
+    return (y_min, y_max), interval
