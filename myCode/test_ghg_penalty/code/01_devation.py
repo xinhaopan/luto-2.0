@@ -9,7 +9,7 @@ def get_folders_containing_string(path, string):
     return [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f)) and string in f]
 
 base_path = "../../../output"
-string = "20241203_test_2_GHG_1_8C_67_BIO_0"
+string = "20241203_test_3_GHG_1_8C_67_BIO_0"
 filtered_folders = get_folders_containing_string(base_path, string)
 
 for folder in filtered_folders:
@@ -30,7 +30,7 @@ for folder in filtered_folders:
         ghg_actual = df_ghg.loc["GHG_EMISSIONS_TCO2e", "Emissions (t CO2e)"]
         ghg_difference = ghg_actual - ghg_limit
         ghg_absolute_difference = abs(ghg_difference)
-        ghg_deviation_ratio = ghg_difference / ghg_limit
+        ghg_deviation_ratio = ghg_difference / ghg_limit * 100
 
         # 处理 Demand 数据
         df_demand = pd.read_csv(os.path.join(path, f"out_{year}", f"quantity_comparison_{year}.csv"))
@@ -38,7 +38,7 @@ for folder in filtered_folders:
         demand_target = df_demand["Prod_targ_year (tonnes, KL)"].sum()
         demand_difference = demand_target - demand_base
         demand_absolute_difference = abs(demand_difference)
-        demand_deviation_ratio = demand_difference / demand_base
+        demand_deviation_ratio = demand_difference / demand_base * 100
 
         # 处理 Cost 数据
         cost_files = [
