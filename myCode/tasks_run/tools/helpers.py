@@ -63,6 +63,43 @@ def create_settings_template(to_path: str = TASK_ROOT_DIR):
         settings_df = settings_df.applymap(str)
         settings_df.to_csv(f'{to_path}/settings_template.csv', index=False)
 
+def create_default_settings(to_path: str = TASK_ROOT_DIR, name="default"):
+    # Save the settings template to the root task folder
+    None if os.path.exists(to_path) else os.makedirs(to_path)
+
+
+    if os.path.exists(f'{to_path}/settings_template0.csv'):
+        print('settings_template.csv already exists! Skip creating a new one!')
+    else:
+        # Get the settings from luto.settings
+        with open('../../luto/settings.py', 'r') as file:
+            lines = file.readlines()
+
+            # Regex patterns that matches variable assignments from settings
+            parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
+            settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
+
+            # Reorder the settings dictionary to match the order in the settings.py file
+            settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
+            settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
+
+            # Add the NODE parameters
+            settings_dict['NODE'] = 'Please specify the node name'
+            settings_dict['MEM'] = 'auto'
+            settings_dict['CPU_PER_TASK'] = settings_dict['THREADS']
+            settings_dict['TIME'] = 'auto'
+            settings_dict['JOB_NAME'] = 'auto'
+
+        # Create a template for cutom settings
+        settings_df = pd.DataFrame({k: [v] for k, v in settings_dict.items()}).T.reset_index()
+        settings_df.columns = ['Name', 'Default_run']
+        settings_df = settings_df.applymap(str)
+        settings_df.to_csv(f'{to_path}/{name}.csv', index=False)
+        df = pd.read_csv(f'{to_path}/{name}.csv')
+        df["default"] = df.iloc[:, 1]
+        df.to_csv(f'{to_path}/{name}.csv', index=False)
+
+
 
 def process_column(col, custom_settings, num_task, cwd):
     os.chdir(cwd)

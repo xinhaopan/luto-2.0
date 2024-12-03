@@ -45,7 +45,7 @@ def recommend_resources(df):
         print(f"  - Current MEM: {mem} GB, Recommended MEM for CPU {rec_cpu} GB")
         break
 
-output = "setting_template_windows_all"  # 输出文件名
+output = "setting_template_windows"  # 输出文件名
 current_time = datetime.datetime.now().strftime("%Y%m%d")
 # Create a template for the custom settings, and then create the custom settings
 # create_settings_template('Custom_runs')
@@ -94,25 +94,30 @@ new_column_names = []
 name_column = df_revise.columns[0]  # 第一列的列名（如 'Name'）
 
 # 检查 Name1 是否存在于第一列中
-if "Name1" in df_revise[name_column].values:
-    # 获取 Name1 行
-    name1_row = df_revise[df_revise[name_column] == "Name1"].iloc[0]  # 获取 Name1 行数据
+if "Name1" not in df_revise[name_column].values:
+    raise ValueError(f"Name1 不存在于列 {name_column} 中，请检查数据！")
 
-    for col in new_df.columns[2:]:  # 跳过前两列
-        ghg_value = GHG_Name.get(ghg_limits_field[col], "Unknown_GHG")  # 映射 GHG 值
-        bio_value = BIO_Name.get(biodiv_gbf_target_2_dict[col], "Unknown_BIO")  # 映射 BIO 值
+# 获取 Name1 行
+name1_row = df_revise[df_revise[name_column] == "Name1"].iloc[0]  # 获取 Name1 行数据
 
-        # 从 Name1 行中获取对应列的值
-        name1_value = name1_row.get(col, "")  # 获取列对应的值，如果不存在则返回空字符串
-        name1_insert = name1_value if pd.notna(name1_value) else ""
+# 初始化新列名列表
+new_column_names = []
 
-        # 根据条件拼接新列名
-        col = str(col).split('.')[0]
-        if name1_insert:  # 如果 Name1 有值
-            new_name = f"{current_time}_{name1_insert}_{col}_{ghg_value}_{bio_value}".replace(".", "_")
-        else:  # 如果 Name1 没有值
-            new_name = f"{current_time}_{col}_{ghg_value}_{bio_value}".replace(".", "_")
-        new_column_names.append(new_name)
+for col in new_df.columns[2:]:  # 跳过前两列
+    ghg_value = GHG_Name.get(ghg_limits_field[col], "Unknown_GHG")  # 映射 GHG 值
+    bio_value = BIO_Name.get(biodiv_gbf_target_2_dict[col], "Unknown_BIO")  # 映射 BIO 值
+
+    # 从 Name1 行中获取对应列的值
+    name1_value = name1_row.get(col, "")  # 获取列对应的值，如果不存在则返回空字符串
+
+    # 确保 Name1 行中有值
+    if pd.isna(name1_value) or name1_value == "":
+        raise ValueError(f"Name1 行在列 {col} 中没有有效值，请检查数据！")
+
+    # 根据条件拼接新列名
+    col = str(col).split('.')[0]
+    new_name = f"{current_time}_{name1_value}_{col}_{ghg_value}_{bio_value}".replace(".", "_")
+    new_column_names.append(new_name)
 
 new_df.columns = new_df.columns[:2].tolist() + new_column_names  # 更新列名
 # 检查文件是否存在
