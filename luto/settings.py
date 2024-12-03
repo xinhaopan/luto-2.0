@@ -18,7 +18,6 @@
 
 import pandas as pd
 
-
 NOBJECTIVE = True
 # ---------------------------------------------------------------------------- #
 # LUTO model version.                                                                 #

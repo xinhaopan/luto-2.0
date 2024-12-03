@@ -336,19 +336,48 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        objective = (
+        self.objective = (
             ag_obj_contr 
             + ag_man_obj_contr 
             + non_ag_obj_contr
         )
 
-        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            objective += gp.quicksum(self.V[c] for c in range(self.ncms))
+        if settings.NOBJECTIVE == False:
+            if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+                self.objective += gp.quicksum(self.V[c] for c in range(self.ncms))
 
-        if settings.GHG_CONSTRAINT_TYPE == "soft":
-            objective += self.E * settings.GHG_PENALTY
+            if settings.GHG_CONSTRAINT_TYPE == "soft":
+                self.objective += self.E * settings.GHG_PENALTY
 
-        self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
+            self.gurobi_model.setObjective(self.objective, GRB.MINIMIZE)
+
+        elif settings.NOBJECTIVE == True:
+            if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+                self.total_demand_deviation = gp.quicksum(self.V[c] for c in range(self.ncms))
+                self.gurobi_model.setObjectiveN(
+                    self.total_demand_deviation,
+                    index=0,
+                    priority=2,
+                    weight=1.0,
+                    name="MinimizeDemandDeviation"
+                )
+
+            if settings.GHG_CONSTRAINT_TYPE == "soft":
+                self.gurobi_model.setObjectiveN(
+                    self.E,
+                    index=1,
+                    priority=2,
+                    weight=1.0,
+                    name="MinimizeGHGDeviation"
+                )
+
+            self.gurobi_model.setObjectiveN(
+                self.objective,
+                index=2,
+                priority=1,
+                weight=1.0,
+                name="Economicsob"
+            )
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
@@ -979,7 +1008,28 @@ class LutoSolver:
         # Magic.
         self.gurobi_model.optimize()
 
-        print("Completed solve, collecting results...\n", flush=True)
+        if self.gurobi_model.status == gp.GRB.INFEASIBLE:
+            print("Model is infeasible. Computing IIS...")
+            self.gurobi_model.computeIIS()
+            self.gurobi_model.write("model.ilp")
+            print("IIS written to model.ilp. Check the file for conflict details.")
+
+        elif self.gurobi_model.status == gp.GRB.OPTIMAL:
+            print("Model optimized successfully.")
+        else:
+            print(f"Optimization ended with status: {self.gurobi_model.status}")
+
+        if settings.NOBJECTIVE == True:
+            for o in range(self.gurobi_model.NumObj):
+                # Set which objective we will query
+                self.gurobi_model.params.ObjNumber = o
+                # Query the o-th objective value
+                print(f"Objective {self.gurobi_model.ObjNName} value: {self.gurobi_model.ObjNVal}")
+
+        GHG_deviation = self.E.X * settings.GHG_PENALTY
+        demand_deviation = sum(self.V[c].X for c in range(self.ncms))
+        economic_objective = self.objective.getValue() - GHG_deviation - demand_deviation
+        print(f"GHG deviation: {GHG_deviation}; Demand deviation: {demand_deviation};  economic objective: {economic_objective}")
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
 
