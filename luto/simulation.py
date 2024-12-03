@@ -35,6 +35,15 @@ from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
 from luto.tools.report.data_tools import get_all_files
 
+import sys, traceback
+
+def trace_error():
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    traceback_details = traceback.extract_tb(exc_traceback)
+    for frame in traceback_details:
+        print(f"File: {frame.filename}, Line: {frame.lineno}, Function: {frame.name}")
+        print(f"Code: {frame.line}")
+
 # Get date and time
 timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
@@ -68,6 +77,7 @@ def run( data: Data, base: int, target: int) -> None:
             solve_timeseries(data, steps, base, target)
         except Exception as e:
             print(f"Error in solve_timeseries: {e}")
+            trace_error()
             return  # End the function if an error occurs
 
     elif settings.MODE == 'snapshot':
