@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
 #
 # This file is part of LUTO 2.0.
@@ -340,18 +341,22 @@ class LutoSolver:
         self.demand_objective = gp.quicksum(self.V/self.d_c) / self.V.shape[0]
         self.ghg_objective = self.E/self._input_data.limits["ghg"]
 
-        if settings.NOBJECTIVE == False:
-            # Adjust the objective function based on the constraints type
-            self.solve_objective = self.economic_objective.copy()
-            self.solve_objective += self.demand_objective * settings.SOLVE_WEIGHT_DEVITATIONS           if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
-            self.solve_objective += self.ghg_objective  * settings.SOLVE_WEIGHT_DEVITATIONS  if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        # Get the objective values for each sector
+        self.obj_economy = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.BASE_YR_economic_val) / abs(
+            self._input_data.BASE_YR_economic_val)
+        self.obj_demand = gp.quicksum(self.V / abs(self.d_c)) if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_ghg = self.E / abs(self._input_data.limits["ghg"]) if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
 
-            self.gurobi_model.setObjective(self.solve_objective, GRB.MINIMIZE)
+        if settings.NOBJECTIVE == False:
+            # Set the objective function
+            self.objective = self.obj_economy * (1 - settings.SOLVE_WEIGHT_DEVIATIONS) + (
+                        self.obj_demand + self.obj_ghg) * settings.SOLVE_WEIGHT_DEVIATIONS
+            self.gurobi_model.setObjective(self.objective, GRB.MINIMIZE)
 
         elif settings.NOBJECTIVE == True:
             if settings.DEMAND_CONSTRAINT_TYPE == "soft":
                 self.gurobi_model.setObjectiveN(
-                    self.demand_objective,
+                    self.obj_demand,
                     index=0,
                     priority=2,
                     weight=1.0,
@@ -360,7 +365,7 @@ class LutoSolver:
 
             if settings.GHG_CONSTRAINT_TYPE == "soft":
                 self.gurobi_model.setObjectiveN(
-                    self.ghg_objective,
+                    self.obj_ghg,
                     index=1,
                     priority=2,
                     weight=1.0,
@@ -368,14 +373,14 @@ class LutoSolver:
                 )
 
             self.gurobi_model.setObjectiveN(
-                self.economic_objective,
+                self.obj_economy,
                 index=2,
                 priority=1,
                 weight=1.0,
                 name="Economics"
             )
-        
-        
+        elif:
+            print("Unknown objective")
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
@@ -709,8 +714,8 @@ class LutoSolver:
                 self.ghg_emissions_expr <= ghg_limit, name="ghg_hard_constraint"
             )
         elif settings.GHG_CONSTRAINT_TYPE == 'soft':
-            print(f"...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-            print(f"    ...GHG emissions penalty: {settings.SOLVE_WEIGHT_DEVITATIONS}")
+            print(f"  ...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
+            print(f"    ...GHG emissions penalty: {settings.SOLVE_WEIGHT_DEVIATIONS}")
             self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit <= self.E, name="ghg_upper_bound")
             self.gurobi_model.addConstr(ghg_limit - self.ghg_emissions_expr <= self.E, name="ghg_lower_bound")
         else:
@@ -975,17 +980,16 @@ class LutoSolver:
             self.gurobi_model.computeIIS()
             self.gurobi_model.write(f"{settings.OUTPUT_DIR}/model.ilp")
             print("IIS written to model.ilp. Check the file for conflict details.")
-
         elif self.gurobi_model.status == gp.GRB.UNBOUNDED:
             # gurobi_model.getAttr('UnbdRay', gurobi_model.getVars())
             print("Model UNBOUNDED.")
         elif self.gurobi_model.status == gp.GRB.OPTIMAL:
-            self.gurobi_model.write(f"{settings.OUTPUT_DIR}/optimized_model.sol")
+            print("Model is optimal.")
+            # self.gurobi_model.write(f"{settings.OUTPUT_DIR}/optimized_model.sol")
 
-
-        GHG_deviation = self.ghg_objective.getValue()
-        demand_deviation = self.demand_objective.getValue()
-        economic_objective = self.economic_objective.getValue()
+        GHG_deviation = self.obj_ghg.getValue()
+        demand_deviation = self.obj_demand.getValue()
+        economic_objective = self.obj_economy.getValue()
         print(f"GHG deviation: {GHG_deviation}; Demand deviation: {demand_deviation}; Economic objective: {economic_objective}")
 
         if settings.NOBJECTIVE == True:
