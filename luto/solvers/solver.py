@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
 #
 # This file is part of LUTO 2.0.
@@ -1197,3 +1198,4 @@ class LutoSolver:
             for j in range(self._input_data.n_ag_lus)
             if self._input_data.lu2pr_pj[p, j]
         ]
+
