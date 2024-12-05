@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
 # Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
 #
 # This file is part of LUTO 2.0.
@@ -335,13 +333,6 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        BASE_YR_economy = self._input_data.BASE_YR_cost if settings.OBJECTIVE == "mincost" else (
-                    self._input_data.BASE_YR_revenue - self._input_data.BASE_YR_cost)
-
-        self.economic_objective = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr) / BASE_YR_economy
-        self.demand_objective = gp.quicksum(self.V/self.d_c) / self.V.shape[0]
-        self.ghg_objective = self.E/self._input_data.limits["ghg"]
-
         # Get the objective values for each sector
         self.obj_economy = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.BASE_YR_economic_val) / abs(
             self._input_data.BASE_YR_economic_val)
@@ -380,7 +371,7 @@ class LutoSolver:
                 weight=1.0,
                 name="Economics"
             )
-        elif:
+        else:
             print("Unknown objective")
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
@@ -985,7 +976,7 @@ class LutoSolver:
             # gurobi_model.getAttr('UnbdRay', gurobi_model.getVars())
             print("Model UNBOUNDED.")
         elif self.gurobi_model.status == gp.GRB.OPTIMAL:
-            print("Model is optimal.")
+            print("Model optimal success.")
             # self.gurobi_model.write(f"{settings.OUTPUT_DIR}/optimized_model.sol")
 
         GHG_deviation = self.obj_ghg.getValue()
@@ -1000,7 +991,7 @@ class LutoSolver:
                 # Query the o-th objective value
                 print(f"Objective {self.gurobi_model.ObjNName} value: {self.gurobi_model.ObjNVal}")
         else:
-            objective_value = self.solve_objective.getValue()
+            objective_value = self.objective.getValue()
             print(f"Objective value: {objective_value}")
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
