@@ -8,20 +8,23 @@ def get_folders_containing_string(path, string):
     """筛选出路径下包含特定字符串的文件夹"""
     return [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f)) and string in f]
 
-base_path = "../../../output"
-string = "20241203_test_3_GHG_1_8C_67_BIO_0"
-filtered_folders = get_folders_containing_string(base_path, string)
+def get_folders(file_path):
+    """获取文件夹"""
+    df = pd.read_csv(file_path)
 
-for folder in filtered_folders:
-    path = get_path(folder)
-    df_devation = pd.DataFrame(columns=[
-        "Year",
-        "GHG Absolute Difference",
-        "GHG Deviation Ratio",
-        "Demand Absolute Difference",
-        "Demand Deviation Ratio",
-        "Profit"
-    ])
+    # 获取所有列名
+    all_columns = df.columns.tolist()
+
+    # 排除 'Name' 和 'Default_run' 列
+    filtered_columns = [col for col in all_columns if col not in ["Name", "Default_run"]]
+    return filtered_columns
+
+def calculate_deviation(path, folder):
+    """
+    计算并保存 GHG 和 Demand 偏差数据
+    """
+    # 用列表收集每年的数据
+    all_data = []
 
     for year in range(2011, 2051):
         # 处理 GHG 数据
@@ -40,90 +43,136 @@ for folder in filtered_folders:
         demand_absolute_difference = abs(demand_difference)
         demand_deviation_ratio = demand_difference / demand_base * 100
 
-        # 处理 Cost 数据
-        cost_files = [
-            os.path.join(path, f"out_{year}", file)
-            for file in os.listdir(os.path.join(path, f"out_{year}"))
-            if file.startswith(f"cost_") and file.endswith(f"_{year}.csv")
-        ]
-        total_cost = 0
-        for cost_file in cost_files:
-            df_cost = pd.read_csv(cost_file)
-            total_cost += df_cost["Value ($)"].sum() if "Value ($)" in df_cost.columns else df_cost["Cost ($)"].sum()
+        # 处理 Cost 和 Revenue 数据
+        total_cost = sum(pd.read_csv(os.path.join(path, f"out_{year}", file))[(
+            "Value ($)" if "Value ($)" in pd.read_csv(os.path.join(path, f"out_{year}", file)).columns else "Cost ($)"
+        )].sum() for file in os.listdir(os.path.join(path, f"out_{year}")) if file.startswith("cost_"))
 
-        # 处理 Revenue 数据
-        revenue_files = [
-            os.path.join(path, f"out_{year}", file)
-            for file in os.listdir(os.path.join(path, f"out_{year}"))
-            if file.startswith(f"revenue_") and file.endswith(f"_{year}.csv")
-        ]
-        total_revenue = 0
-        for revenue_file in revenue_files:
-            df_revenue = pd.read_csv(revenue_file)
-            total_revenue += df_revenue["Value ($)"].sum()
+        total_revenue = sum(pd.read_csv(os.path.join(path, f"out_{year}", file))["Value ($)"].sum()
+                            for file in os.listdir(os.path.join(path, f"out_{year}")) if file.startswith("revenue_"))
 
         # 计算 Profit
         profit = total_revenue - total_cost
 
-        # 将当前年的结果存储为 DataFrame 行
-        current_data = pd.DataFrame([{
+        # 添加当前年的数据到列表
+        all_data.append({
             "Year": year,
             "GHG Absolute Difference": ghg_absolute_difference,
             "GHG Deviation Ratio": ghg_deviation_ratio,
             "Demand Absolute Difference": demand_absolute_difference,
             "Demand Deviation Ratio": demand_deviation_ratio,
             "Profit": profit
-        }])
+        })
 
-        # 合并结果
-        df_devation = pd.concat([df_devation, current_data], ignore_index=True)
+    # 用收集的数据一次性创建 DataFrame
+    df_devation = pd.DataFrame(all_data)
 
-    df_devation.to_excel(f"../{folder}_devation_from_result.xlsx", index=False)
+    return df_devation
 
-    # 定义存储结果的 DataFrame
-    df_result = pd.DataFrame(columns=["Year", "Demand Deviation", "GHG Deviation", "Economic Objective"])
+
+def extract_log_data(path, folder):
+    """
+    从日志中提取 GHG 偏差、Demand 偏差、经济目标和最优目标数据
+    """
+    # 定义结果 DataFrame
+    df_result = pd.DataFrame(columns=["Timestamp", "Optimal Objective", "GHG Deviation", "Demand Deviation", "Economic Objective"])
 
     # 定义正则表达式
-    # 第一个部分匹配 Demand deviation 和 economic objective
-    demand_pattern = re.compile(
-        r"(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - Demand deviation: (?P<demand_deviation>[\d\.e\-]+); "
-        r"GHG deviation: (?P<ghg_deviation>[\d\.e\-]+),\s+economic objective: (?P<economic_objective>[\d\.e\-]+)"
+    optimal_objective_pattern = re.compile(
+        r"(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - Optimal objective (?P<optimal_objective>[\d\.e\-\+]+)"
     )
-    # 第二个部分匹配年份
-    year_pattern = re.compile(r"Processing for (?P<year>\d{4}) completed in (?P<time_taken>\d+) seconds")
-    pattern = re.compile(r"\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}")
-    match = pattern.search(path).group()
-    # 读取日志文件
-    txt_file_path = f"{path}/run_{match}_stdout.log"
+    deviation_pattern = re.compile(
+        r"(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - GHG deviation: (?P<ghg_deviation>[\d\.e\-]+); "
+        r"Demand deviation: (?P<demand_deviation>[\d\.e\-]+);\s+economic objective: (?P<economic_objective>[\d\.e\-]+)"
+    )
+
+    # 提取日志文件的路径
+    timestamp_pattern = re.compile(r"\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}")
+    match = timestamp_pattern.search(path)
+    if not match:
+        raise ValueError(f"无法从路径 {path} 提取时间戳。")
+    log_timestamp = match.group()
+    txt_file_path = os.path.join(path, f"run_{log_timestamp}_stdout.log")
+
+    # 读取日志文件内容
+    if not os.path.exists(txt_file_path):
+        raise FileNotFoundError(f"日志文件不存在: {txt_file_path}")
 
     with open(txt_file_path, "r") as file:
         lines = file.readlines()
 
-    # 将多行内容组合处理
-    content = "\n".join(lines)
+    # 匹配日志内容
+    optimal_objective = None
+    for line in lines:
+        match_optimal = optimal_objective_pattern.search(line)
+        if match_optimal:
+            optimal_objective = float(match_optimal.group("optimal_objective"))
+            timestamp = match_optimal.group("timestamp")
 
-    # 匹配所有符合 demand_pattern 的内容
-    demand_matches = demand_pattern.findall(content)
+        match_deviation = deviation_pattern.search(line)
+        if match_deviation:
+            ghg_deviation = float(match_deviation.group("ghg_deviation"))
+            demand_deviation = float(match_deviation.group("demand_deviation"))
+            economic_objective = float(match_deviation.group("economic_objective"))
+            timestamp = match_deviation.group("timestamp")
 
-    # 匹配所有符合 year_pattern 的内容
-    year_matches = year_pattern.findall(content)
+            # 添加匹配结果到 DataFrame
+            df_result = pd.concat([df_result, pd.DataFrame([{
+                "Timestamp": timestamp,
+                "Optimal Objective": optimal_objective,
+                "GHG Deviation": ghg_deviation,
+                "Demand Deviation": demand_deviation,
+                "Economic Objective": economic_objective
+            }])], ignore_index=True)
 
-    # 确保两种匹配数量一致
-    if len(demand_matches) != len(year_matches):
-        raise ValueError("Demand deviation and year information count mismatch.")
+    return df_result
 
-    # 遍历匹配结果并添加到 DataFrame
-    for i in range(len(demand_matches)):
-        timestamp, demand_deviation, ghg_deviation, economic_objective = demand_matches[i]
-        year, _ = year_matches[i]
+def match_files_in_folder(keywords, folder_path="../../../output"):
+    """
+    根据指定的关键字匹配文件夹内所有合适的文件名，返回匹配的文件名列表。
 
-        # 添加到 DataFrame
-        df_result = pd.concat([df_result, pd.DataFrame([{
-            "Year": int(year),
-            "Demand Deviation": float(demand_deviation),
-            "GHG Deviation": float(ghg_deviation),
-            "Economic Objective": float(economic_objective)
-        }])], ignore_index=True)
+    :param folder_path: 文件夹路径
+    :param keywords: 字符串或字符串列表，用于匹配文件名
+    :return: 匹配的文件名列表
+    """
+    # 确保 keywords 是列表
+    if isinstance(keywords, str):
+        keywords = [keywords]
 
-    # 保存结果到 CSV 文件
-    df_result.to_excel(f"../{folder}_devation_from_log.xlsx", index=False)
+    matched_files = []
+
+    # 遍历文件夹中的所有文件
+    for root, dirs, _ in os.walk(folder_path):
+        for dir_name in dirs:
+            # 如果文件夹名称包含任何一个关键字，加入列表
+            if any(keyword in dir_name for keyword in keywords):
+                matched_files.append(dir_name)
+
+    return matched_files
+
+file_path = "../../tasks_run/Custom_runs/setting_template_windows.csv"
+# folders = get_folders(file_path)
+folders = match_files_in_folder("20241203_Weight")
+output_log_file = "output_log.xlsx"
+output_result_file = "output_result.xlsx"
+
+# # 写入 df_devation 到 output_result_file
+# with pd.ExcelWriter(output_result_file, engine="openpyxl") as result_writer:
+#     for folder in folders:
+#         print(f"Processing folder for deviations: {folder}")
+#         path = get_path(folder)  # 获取路径
+#         df_devation = calculate_deviation(path, folder)
+#         sheet_name = f"{folder}_devation"[:31]  # 确保 sheet_name 不超过 31 个字符
+#         df_devation.to_excel(result_writer, sheet_name=sheet_name, index=False)
+#     print(f"Deviation results saved to {output_result_file}")
+
+# 写入 df_result 到 output_log_file
+with pd.ExcelWriter(output_log_file, engine="openpyxl") as log_writer:
+    for folder in folders:
+        print(f"Processing folder for logs: {folder}")
+        path = get_path(folder)  # 获取路径
+        df_result = extract_log_data(path, folder)
+        sheet_name = f"{folder}_log"[:31]  # 确保 sheet_name 不超过 31 个字符
+        df_result.to_excel(log_writer, sheet_name=sheet_name, index=False)
+    print(f"Log results saved to {output_log_file}")
+

@@ -45,7 +45,7 @@ def recommend_resources(df):
         print(f"  - Current MEM: {mem} GB, Recommended MEM for CPU {rec_cpu} GB")
         break
 
-output = "setting_template_windows"  # 输出文件名
+output = "setting_template_windows_m"  # 输出文件名
 current_time = datetime.datetime.now().strftime("%Y%m%d")
 # Create a template for the custom settings, and then create the custom settings
 # create_settings_template('Custom_runs')
@@ -67,6 +67,16 @@ df_revise = pd.read_excel("Custom_runs/Revise_settings_template.xlsx",sheet_name
 df_revise.columns = df_revise.columns.astype(str)
 df_revise = df_revise.loc[:, ~df_revise.columns.str.startswith('Unnamed')]
 
+if df_revise.isnull().values.any():
+    # 找到所有空值的位置
+    null_positions = df_revise[df_revise.isnull().any(axis=1)]  # 筛选有空值的行
+    for index, row in null_positions.iterrows():
+        null_columns = row[row.isnull()].index.tolist()  # 找到该行中为空的列
+        print(f"行 {index} 的以下列存在空值：{null_columns}")
+    # 停止程序
+    raise ValueError("DataFrame 中存在空值，请处理后再继续执行！")
+
+
 # 创建一个新的DataFrame，第一列复制df的第一列
 new_df = pd.DataFrame(df.iloc[:, :2])  # 前两列为df的前两列
 new_df.columns = df.columns[:2]  # 保持列名一致
@@ -86,7 +96,6 @@ for idx, row in df_revise.iterrows():
 # 提取 GHG_LIMITS_FIELD 和 BIODIV_GBF_TARGET_2_DICT 两行
 ghg_limits_field = new_df.iloc[new_df[new_df.iloc[:, 0] == "GHG_LIMITS_FIELD"].index[0]]
 biodiv_gbf_target_2_dict = new_df.iloc[new_df[new_df.iloc[:, 0] == "BIODIV_GBF_TARGET_2_DICT"].index[0]]
-ghg_penalty_field = new_df.iloc[new_df[new_df.iloc[:, 0] == "GHG_PENALTY"].index[0]]
 
 # 遍历列名，根据字典映射生成新列名
 new_column_names = []
@@ -116,7 +125,7 @@ for col in new_df.columns[2:]:  # 跳过前两列
 
     # 根据条件拼接新列名
     col = str(col).split('.')[0]
-    new_name = f"{current_time}_{name1_value}_{col}_{ghg_value}_{bio_value}".replace(".", "_")
+    new_name = f"{current_time}_{col}_{name1_value}_{ghg_value}_{bio_value}".replace(".", "_")
     new_column_names.append(new_name)
 
 new_df.columns = new_df.columns[:2].tolist() + new_column_names  # 更新列名
