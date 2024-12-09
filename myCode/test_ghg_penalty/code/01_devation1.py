@@ -31,7 +31,7 @@ def calculate_deviation(path, folder):
         df_ghg = pd.read_csv(os.path.join(path, f"out_{year}", f"GHG_emissions_{year}.csv"), index_col=0)
         ghg_limit = df_ghg.loc["GHG_EMISSIONS_LIMIT_TCO2e", "Emissions (t CO2e)"]
         ghg_actual = df_ghg.loc["GHG_EMISSIONS_TCO2e", "Emissions (t CO2e)"]
-        ghg_difference = ghg_actual - ghg_limit
+        ghg_difference = abs(ghg_actual - ghg_limit)
         ghg_deviation_ratio = ghg_difference / ghg_limit * 100
 
         # 处理 Demand 数据
@@ -59,6 +59,7 @@ def calculate_deviation(path, folder):
             "GHG Deviation Ratio (%)": ghg_deviation_ratio,
             "Demand Difference": demand_difference,
             "Demand Deviation Ratio (%)": demand_deviation_ratio,
+            "Demand_target": demand_target,
             "Profit": profit
         })
 
@@ -239,12 +240,12 @@ def match_files_in_folder(keywords, folder_path="../../../output"):
 
     return matched_files
 
-file_path = "../../tasks_run/Custom_runs/setting_template_windows.csv"
+file_path = "../../tasks_run/Custom_runs/setting_template_windows_9.csv"
 # folders = get_folders(file_path)
 folders = match_files_in_folder("20241205_10_w10_GHG_1_8C_67_BIO_0_2")
-output_log_coeff_file = "../Result/output_log_coeff2.xlsx"
-output_log_file = "../Result/output_log2.xlsx"
-output_result_file = "../Result/output_result2.xlsx"
+output_log_coeff_file = "../Result/output_log_coeff.xlsx"
+output_log_file = "../Result/output_log.xlsx"
+output_result_file = "../Result/output_result12.xlsx"
 
 # 写入 df_devation 到 output_result_file
 with pd.ExcelWriter(output_result_file, engine="openpyxl") as result_writer:
@@ -252,7 +253,7 @@ with pd.ExcelWriter(output_result_file, engine="openpyxl") as result_writer:
         print(f"Processing folder for deviations: {folder}")
         path = get_path(folder)  # 获取路径
         df_devation = calculate_deviation(path, folder)
-        sheet_name = '_'.join(f"{folder}_coeff".split('_')[2:])[:31]  # 确保 sheet_name 不超过 31 个字符
+        sheet_name = '_'.join(f"{folder}_devation".split('_')[2:])[:31]  # 确保 sheet_name 不超过 31 个字符
         df_devation.to_excel(result_writer, sheet_name=sheet_name, index=False)
     print(f"Deviation results saved to {output_result_file}")
 
@@ -261,7 +262,7 @@ with pd.ExcelWriter(output_log_file, engine="openpyxl") as log_writer:
         print(f"Processing folder for logs: {folder}")
         path = get_path(folder)  # 获取路径
         df_result = extract_log_data(path, folder)
-        sheet_name = '_'.join(f"{folder}_coeff".split('_')[2:])[:31]  # 确保 sheet_name 不超过 31 个字符
+        sheet_name = '_'.join(f"{folder}_value".split('_')[2:])[:31]  # 确保 sheet_name 不超过 31 个字符
         df_result.to_excel(log_writer, sheet_name=sheet_name, index=False)
     print(f"Log results saved to {output_log_file}")
 

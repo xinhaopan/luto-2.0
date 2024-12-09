@@ -45,7 +45,7 @@ def recommend_resources(df):
         print(f"  - Current MEM: {mem} GB, Recommended MEM for CPU {rec_cpu} GB")
         break
 
-output = "setting_template_windows_m"  # 输出文件名
+output = "setting_template_windows"  # 输出文件名
 current_time = datetime.datetime.now().strftime("%Y%m%d")
 # Create a template for the custom settings, and then create the custom settings
 # create_settings_template('Custom_runs')

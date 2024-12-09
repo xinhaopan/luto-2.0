@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="xp7241@gadi.nci.org.au:22 password (3)" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
+  <component name="PublishConfigData" autoUpload="Always" serverName="xp7241@gadi.nci.org.au:22 password (3)" exclude=".svn;.cvs;.idea;.DS_Store;.git;.hg;*.hprof;*.pyc;~$*;*.sync.*;" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
     <serverData>
       <paths name="Azure2HPC">
         <serverdata>
