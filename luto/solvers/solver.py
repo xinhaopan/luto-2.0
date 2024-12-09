@@ -338,6 +338,7 @@ class LutoSolver:
             self._input_data.BASE_YR_economic_val)
         self.obj_demand = gp.quicksum(self.V / abs(self.d_c)) if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
         self.obj_ghg = self.E / abs(self._input_data.limits["ghg"]) if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        # self.obj_ghg = self.E /  150880164.62 if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
 
         if settings.NOBJECTIVE == False:
             # Set the objective function
@@ -350,8 +351,8 @@ class LutoSolver:
                 self.gurobi_model.setObjectiveN(
                     self.obj_demand,
                     index=0,
-                    priority=2,
-                    weight=1.0,
+                    priority=1,
+                    weight=settings.SOLVE_WEIGHT_DEVIATIONS,
                     name="MinimizeDemandDeviation"
                 )
 
@@ -359,8 +360,8 @@ class LutoSolver:
                 self.gurobi_model.setObjectiveN(
                     self.obj_ghg,
                     index=1,
-                    priority=2,
-                    weight=1.0,
+                    priority=1,
+                    weight=settings.SOLVE_WEIGHT_DEVIATIONS,
                     name="MinimizeGHGDeviation"
                 )
 
@@ -368,7 +369,7 @@ class LutoSolver:
                 self.obj_economy,
                 index=2,
                 priority=1,
-                weight=1.0,
+                weight=(1 - settings.SOLVE_WEIGHT_DEVIATIONS),
                 name="Economics"
             )
         else:
@@ -875,6 +876,7 @@ class LutoSolver:
                         0 if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc]
                         else self._input_data.non_ag_lb_rk[r, k]
                     )
+                    # x_lb = min(x_lb, 1)  # Ensure lower bound is not greater than 1
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                         lb=x_lb, ub=self._input_data.non_ag_x_rk[r, k], name=f"X_non_ag_{k}_{r}",
                     )
@@ -971,7 +973,8 @@ class LutoSolver:
             print("Model is infeasible. Computing IIS...")
             self.gurobi_model.computeIIS()
             self.gurobi_model.write(f"{settings.OUTPUT_DIR}/model.ilp")
-            print("IIS written to model.ilp. Check the file for conflict details.")
+            self.gurobi_model.write(f"{settings.OUTPUT_DIR}/model.mps")
+            print("IIS written to model.ilp and model.mps. Check the file for conflict details.")
         elif self.gurobi_model.status == gp.GRB.UNBOUNDED:
             # gurobi_model.getAttr('UnbdRay', gurobi_model.getVars())
             print("Model UNBOUNDED.")
@@ -982,7 +985,7 @@ class LutoSolver:
         GHG_deviation = self.obj_ghg.getValue()
         demand_deviation = self.obj_demand.getValue()
         economic_objective = self.obj_economy.getValue()
-        print(f"GHG deviation: {GHG_deviation}; Demand deviation: {demand_deviation}; Economic objective: {economic_objective}")
+        print(f"GHG deviation value: {GHG_deviation}; Demand deviation value: {demand_deviation}; Economic objective value: {economic_objective}")
 
         if settings.NOBJECTIVE == True:
             for o in range(self.gurobi_model.NumObj):
@@ -993,6 +996,11 @@ class LutoSolver:
         else:
             objective_value = self.objective.getValue()
             print(f"Objective value: {objective_value}")
+            GHG_deviation_coeff = self.obj_ghg.getCoeff(0) * settings.SOLVE_WEIGHT_DEVIATIONS
+            demand_deviation_coeff = sum(self.obj_demand.item().getCoeff(i) for i in range(self.obj_demand.item().size())) * settings.SOLVE_WEIGHT_DEVIATIONS / self.obj_demand.item().size()
+            economic_objective_coeff = sum(self.obj_economy.getCoeff(i) for i in range(self.obj_economy.size())) * (1-settings.SOLVE_WEIGHT_DEVIATIONS) / self.obj_economy.size()
+            print(
+                f"GHG deviation Coeff: {GHG_deviation_coeff}; Demand deviation Coeff: {demand_deviation_coeff}; Economic objective Coeff: {economic_objective_coeff}")
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
 

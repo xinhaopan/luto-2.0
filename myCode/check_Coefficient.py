@@ -123,3 +123,16 @@ Largest Coefficient: 13418.0146484375, Variable: X_ag_irr_14_4546, Value: 2.1103
 Constraint: ghg_lower_bound
 Smallest Coefficient: -1.0, Variable: E, Value: 6617196972.87017
 Largest Coefficient: -166191168.0, Variable: X_ag_dry_5_4384, Value: 9.509890816518177e-10
+
+
+self.obj_economy.size()
+Out[47]: 917199
+ag_obj_contr.size()
+Out[48]: 254953
+ag_man_obj_contr.size()
+Out[49]: 533124
+non_ag_obj_contr.size()
+Out[50]: 129122
+self.obj_demand.item().size()
+Out[52]: 26
+

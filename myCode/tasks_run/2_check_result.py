@@ -17,7 +17,7 @@ def delete_path(path):
     except Exception as e:
         print(f"Error deleting {path}: {e}")
 
-def delete_folder_multiprocessing(folder_path, num_processes=128):
+def delete_folder_multiprocessing(folder_path, num_processes=32):
     """使用多进程删除单个目录内容"""
     if not os.path.exists(folder_path):
         print(f"Path does not exist: {folder_path}")
@@ -122,9 +122,7 @@ def delete_except(folder_path, folder_to_keep, file_to_keep='simulation_log.txt'
 
         # 删除文件或文件夹
         try:
-            if os.path.isfile(item_path):
-                os.remove(item_path)  # 删除文件
-            elif os.path.isdir(item_path):
+            if os.path.isdir(item_path):
                 delete_folder_multiprocessing(item_path)  # 删除文件夹及其内容
         except Exception as e:
             print(f"Error deleting {item_path}: {e}")
@@ -183,7 +181,7 @@ def check_csv(csv_path):
             delete_except(directory, last_part)
 
 
-csv_path = 'Custom_runs/settings_template_windows_all_failed.csv'
+csv_path = 'Custom_runs/setting_template_windows.csv'
 check_csv(csv_path)
 
 
