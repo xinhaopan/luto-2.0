@@ -271,12 +271,13 @@ class LutoSolver:
         )
 
         # Get the objective values for each sector
-        self._input_data.BASE_YR_economic_val = -29.68 * 10e9
+
         self.obj_economy = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.BASE_YR_economic_val) / abs(
             self._input_data.BASE_YR_economic_val)
         self.obj_demand = gp.quicksum(self.V / abs(self.d_c)) if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
-        self.obj_ghg = self.E / abs(self._input_data.limits["ghg"]) if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
-        # self.obj_ghg = self.E /  150880164.62 if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_ghg = self.E / (
+                    abs(self._input_data.limits["ghg"]) + 100000000) if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        self.objective = self.obj_economy * (1 - settings.SOLVE_WEIGHT_DEVIATIONS) - (gp.quicksum(self.obj_demand) + self.obj_ghg) * settings.SOLVE_WEIGHT_DEVIATIONS
 
         if settings.NOBJECTIVE == False:
             # Set the objective function
@@ -1135,4 +1136,3 @@ class LutoSolver:
             for j in range(self._input_data.n_ag_lus)
             if self._input_data.lu2pr_pj[p, j]
         ]
-
