@@ -18,6 +18,6 @@ qdel <job_id>
 ```
 nci_account -P jk53 
 ```
-Res = 10, snapshot, 70GB, 0.5h
-Res = 10, timeseries, 70GB, 3.5h
-Res = 5, timeSeries, 70GB, 15h
+Res = 10, snapshot, 40GB, 0.5h
+Res = 10, timeseries, 40GB, 3.5h
+Res = 5, timeSeries, 40GB, 15h
