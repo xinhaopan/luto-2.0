@@ -7,8 +7,9 @@ import itertools
 import multiprocessing
 import pandas as pd
 import subprocess
-from datetime import datetime
+import datetime
 import time
+import numpy as np
 
 from joblib import delayed, Parallel
 
@@ -21,7 +22,7 @@ def print_with_time(message):
     """
     打印带有时间戳的消息。
     """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] {message}")
 
 def create_settings_template(to_path: str = TASK_ROOT_DIR):
@@ -35,7 +36,7 @@ def create_settings_template(to_path: str = TASK_ROOT_DIR):
     #     conda_f.write(conda_pkgs)
     #     pip_f.write(pip_pkgs)
 
-    if os.path.exists(f'{to_path}/settings_template0.csv'):
+    if os.path.exists(f'{to_path}/settings_template.csv'):
         print('settings_template.csv already exists! Skip creating a new one!')
     else:
         # Get the settings from luto.settings
@@ -565,7 +566,7 @@ def sync_files(cwd,col):
 
         # 提取时间戳并转换为 datetime 对象
         start_time_str = start_time_line.split("Simulation started at ")[1].strip()
-        start_time = datetime.strptime(start_time_str, "%a %b %d %H:%M:%S %Y")
+        start_time = datetime.datetime.strptime(start_time_str, "%a %b %d %H:%M:%S %Y")
 
         # 记录同步开始时间
         sync_start_time = time.time()
@@ -602,3 +603,233 @@ def sync_files(cwd,col):
 
     except Exception as e:
         print(f"Error occurred during the synchronization process: {e}")
+
+def recommend_resources(df):
+    """
+    Recommend suitable CPU based on MEM or suitable MEM based on CPU.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame with rows containing CPU_PER_TASK and MEM.
+
+    Returns:
+        None: Prints the recommendations for each task.
+    """
+    # 如果 DataFrame 中存在 'Default_run' 列，则删除它
+    df = df.drop(columns=['Default_run']) if 'Default_run' in df.columns else df
+    df.columns = df.columns.astype(str)
+    df = df.loc[:, ~df.columns.str.startswith('Unnamed')]
+
+    cpu_row = df[df['Name'] == 'CPU_PER_TASK']
+    mem_row = df[df['Name'] == 'MEM']
+
+    cpu_values = cpu_row.iloc[0, 1:].astype(float)
+    mem_values = mem_row.iloc[0, 1:].astype(float)
+
+    recommended_cpus = np.ceil(mem_values / 4)
+    recommended_mem = cpu_values * 4
+
+    for task, cpu, mem, rec_cpu, rec_mem in zip(cpu_values.index, cpu_values, mem_values, recommended_cpus, recommended_mem):
+        print(f"Task {task}:")
+        print(f"  - Current CPU: {cpu}, Recommended MEM: {rec_mem} GB")
+        print(f"  - Current MEM: {mem} GB, Recommended MEM for CPU {rec_cpu} GB")
+        break
+
+def check_null_values(df):
+    """
+    Check for null values in the DataFrame and print their locations.
+
+    Args:
+        df (pd.DataFrame): DataFrame to check for null values.
+
+    Returns:
+        None: Raises a ValueError if null values are found.
+    """
+    if df.isnull().values.any():
+        null_positions = df[df.isnull().any(axis=1)]
+        for index, row in null_positions.iterrows():
+            null_columns = row[row.isnull()].index.tolist()
+            print(f"行 {index} 的以下列存在空值：{null_columns}")
+        raise ValueError("DataFrame 中存在空值，请处理后再继续执行！")
+
+
+def generate_column_names(new_df, df_revise, ghg_name_map=None, bio_name_map=None):
+    """
+    Generate new column names based on mappings and input data.
+
+    Args:
+        new_df (pd.DataFrame): DataFrame to update column names.
+        df_revise (pd.DataFrame): DataFrame with revision information.
+        ghg_name_map (dict): Mapping for GHG names.
+        bio_name_map (dict): Mapping for BIO names.
+
+    Returns:
+        list: List of new column names.
+    """
+    if ghg_name_map is None:
+        ghg_name_map = {
+            "1.8C (67%) excl. avoided emis": "GHG_1_8C_67",
+            "1.5C (50%) excl. avoided emis": "GHG_1_5C_50",
+            "1.5C (67%) excl. avoided emis": "GHG_1_5C_67"
+        }
+
+    if bio_name_map is None:
+        bio_name_map = {
+            "{2010: 0, 2030: 0, 2050: 0, 2100: 0}": "BIO_0",
+            "{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}": "BIO_3",
+            "{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}": "BIO_5"
+        }
+    current_time = datetime.datetime.now().strftime("%Y%m%d")
+
+    # 获取 GHG 和 BIO 对应的行值
+    ghg_limits_field = new_df.iloc[new_df[new_df.iloc[:, 0] == "GHG_LIMITS_FIELD"].index[0]]
+    biodiv_gbf_target_2_dict = new_df.iloc[new_df[new_df.iloc[:, 0] == "BIODIV_GBF_TARGET_2_DICT"].index[0]]
+
+    # 检查 Name1 是否存在
+    name_column = df_revise.columns[0]
+    if "Name1" not in df_revise[name_column].values:
+        print("警告：Name1 不存在于修订模板中，相关内容将被省略。")
+        name1_row = None
+    else:
+        name1_row = df_revise[df_revise[name_column] == "Name1"].iloc[0]
+
+    new_column_names = []
+    for col in new_df.columns[2:]:  # 跳过前两列
+        # 获取 GHG 和 BIO 的映射值
+        ghg_value = ghg_name_map.get(ghg_limits_field[col], "Unknown_GHG")
+        bio_value = bio_name_map.get(biodiv_gbf_target_2_dict[col], "Unknown_BIO")
+
+        # 初始化列名部分
+        col = str(col).split('.')[0]
+        new_name = f"{current_time}_{col}"
+
+        # 如果 Name1 存在并且有值，则添加到列名中
+        if name1_row is not None:
+            name1_value = name1_row.get(col, "")
+            if not pd.isna(name1_value) and name1_value != "":
+                new_name += f"_{name1_value}"
+            else:
+                print(f"警告：列 {col} 中 Name1 没有有效值，已跳过添加相关内容。")
+
+        # 添加 GHG 和 BIO 的内容
+        new_name += f"_{ghg_value}_{bio_value}"
+        new_column_names.append(new_name)
+
+    return new_column_names
+
+
+def generate_csv(
+    input_csv="Custom_runs/settings_template.csv",
+    revise_excel="Custom_runs/Revise_settings_template.xlsx",
+    output_csv="Custom_runs/setting_template_windows.csv",
+    ghg_name_map=None,
+    bio_name_map=None
+):
+    """
+    Process input CSV and Revise Excel, generate new CSV file with updated settings.
+
+    Args:
+        input_csv (str): Path to the input CSV file. Default: "Custom_runs/settings_template.csv".
+        revise_excel (str): Path to the revise Excel file. Default: "Custom_runs/Revise_settings_template.xlsx".
+        output_csv (str): Path for the output CSV file. Must be specified.
+        ghg_name_map (dict): Mapping for GHG names. Default: provided example map.
+        bio_name_map (dict): Mapping for BIO names. Default: provided example map.
+
+    Returns:
+        None
+    """
+
+    df = pd.read_csv(input_csv)
+    df_revise = pd.read_excel(revise_excel, sheet_name="using")
+    df_revise.columns = df_revise.columns.astype(str)
+    df_revise = df_revise.loc[:, ~df_revise.columns.str.startswith('Unnamed')]
+
+    check_null_values(df_revise)
+
+    new_df = pd.DataFrame(df.iloc[:, :2])
+    new_df.columns = df.columns[:2]
+
+    for col_name in df_revise.columns[1:]:
+        new_df[col_name] = df["Default_run"]
+
+    for idx, row in df_revise.iterrows():
+        match_value = row[df_revise.columns[0]]
+        matching_condition = new_df.iloc[:, 0] == match_value
+        if matching_condition.any():
+            for col_name in df_revise.columns[1:]:
+                new_df.loc[matching_condition, col_name] = row[col_name]
+
+    new_column_names = generate_column_names(new_df, df_revise, ghg_name_map, bio_name_map)
+    new_df.columns = new_df.columns[:2].tolist() + new_column_names
+
+    if os.path.exists(output_csv):
+        print(f"文件 '{output_csv}' 已经存在，未覆盖保存。")
+    else:
+        new_df.to_csv(output_csv, index=False)
+        print(f"新的DataFrame已生成，并保存为 '{output_csv}'")
+
+    total_cost = calculate_total_cost(df_revise)
+    print(f"Job Cost: {total_cost}k")
+    recommend_resources(df_revise)
+
+
+def create_grid_search_template(grid_dict, map_dict, output_file, template_df_dir='Custom_runs') -> pd.DataFrame:
+    create_settings_template('Custom_runs')
+    template_df = pd.read_csv(os.path.join('Custom_runs','settings_template.csv'))
+
+    # Collect new columns in a list
+    template_grid_search = template_df.copy()
+
+    # Check if all keys in grid_dict exist in the first column of the template DataFrame
+    template_keys = template_df["Name"].unique()  # Assuming the first column is named "Name"
+    all_keys = set(grid_dict.keys()).union(set(map_dict.keys()))
+    missing_keys = [key for key in all_keys if key not in template_keys]
+    if missing_keys:
+        raise KeyError(f"The following keys are not found in the template: {missing_keys}")
+
+    # Convert all values in the grid_dict to string representations
+    grid_dict = {k: [str(v) for v in v] for k, v in grid_dict.items()}
+
+    # Create a list of dictionaries with all possible permutations
+    keys, values = zip(*grid_dict.items())
+    permutations = [dict(zip(keys, v)) for v in itertools.product(*values)]
+
+    permutations_df = pd.DataFrame(permutations)
+    permutations_df.insert(0, 'run_idx', range(1, len(permutations_df) + 1))
+
+    # Reporting the grid search template
+    print(f'Grid search template has been created with {len(permutations_df)} permutations!')
+    permutations_df.to_csv(output_file, index=False)
+
+    # Loop through the permutations DataFrame and create new columns with updated settings
+    for _, row in permutations_df.iterrows():
+        # Copy the default settings
+        new_column = template_df['Default_run'].copy()
+
+        # Replace the settings using the key-value pairs in the permutation item
+        for k, v in row.items():
+            if k != 'run_idx':
+                new_column.loc[template_df['Name'] == k] = v
+
+        # Rename the column and add it to the DataFrame
+        new_column.name = f'Run_{row["run_idx"]}'
+        template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]}')], axis=1)
+
+    for ghg, carbon in zip(map_dict['GHG_LIMITS_FIELD'], map_dict['CARBON_PRICES_FIELD']):
+        # 获取 GHG_LIMITS_FIELD 对应行和 CARBON_PRICES_FIELD 对应行的索引
+        ghg_row = template_grid_search.loc[template_grid_search['Name'] == 'GHG_LIMITS_FIELD']
+        carbon_row = template_grid_search.loc[template_grid_search['Name'] == 'CARBON_PRICES_FIELD']
+
+        # 遍历所有需要修改的列，替换对应值
+        for col in template_grid_search.columns[1:]:  # 跳过第一列（Name 列）
+            template_grid_search.loc[carbon_row.index, col] = (
+                template_grid_search.loc[ghg_row.index, col].replace(ghg, carbon)
+            )
+
+    # Save the grid search template to the root task folder
+
+    template_grid_search.columns = template_grid_search.columns[:2].tolist() + generate_column_names(template_grid_search, template_grid_search)
+    template_grid_search.to_csv(output_file, index=False)
+    total_cost = calculate_total_cost(template_grid_search)
+    print(f"Job Cost: {total_cost}k")
+    recommend_resources(template_grid_search)
+    return template_grid_search
