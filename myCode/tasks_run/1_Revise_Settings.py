@@ -7,8 +7,9 @@ from tools.helpers import create_settings_template, generate_csv,create_grid_sea
 
 grid_search = {
     # Computational settings, which are not relevant to LUTO itself
-    'MEM': ['80'],
-    'CPU_PER_TASK': [20],
+    'NOBJECTIVE': ['TRUE',"FALSE"],
+    'MEM': ['72'],
+    'CPU_PER_TASK': [18],
     'TIME': ['3:30:00'],
 
     'MODE': [
@@ -36,6 +37,6 @@ map_dict = {
 }
 
 
-output_file = os.path.join("Custom_runs", "setting_template_windows_test2.csv")
+output_file = os.path.join("Custom_runs", "setting_template_windows_4.csv")
 grid_search_df = create_grid_search_template(grid_search,map_dict,output_file)
 

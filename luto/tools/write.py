@@ -126,8 +126,10 @@ def write_logs(data: Data):
             f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stdout.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log"]
 
-    [shutil.move(log, f"{data.path}/{os.path.basename(log)}") for log in logs if os.path.exists(log)]
-    
+    # [shutil.move(log, f"{data.path}/{os.path.basename(log)}") for log in logs if os.path.exists(log)]
+    [shutil.move(log, f"{data.path}/{os.path.basename(log)}") for log in logs if
+     os.path.exists(log) and not os.path.isfile(log)]
+
     return None
 
 
@@ -937,7 +939,7 @@ def write_water(data: Data, yr_cal, path):
     # Write the separate water use to CSV
     df_water_seperate = pd.concat(df_water_seperate_dfs)
     df_water_seperate = df_water_seperate.melt(
-        id_vars=['Year','region','Landuse Type','Landuse','Water_supply'],
+        id_vars=['Year','region','Landuse Type', 'Landuse subtype','Landuse','Water_supply'],
         value_vars=['Without CCI', 'With CCI'],
         var_name='Climate Change existence',
         value_name='Value (ML)'

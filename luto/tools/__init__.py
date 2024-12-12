@@ -652,6 +652,7 @@ def calc_water(
     
     return pd.concat([ag_df, non_ag_df, AM_df])
 
+# import portalocker  # 新增引入文件锁库
 
 class LogToFile:
     def __init__(self, log_path, mode:str='w'):
@@ -680,6 +681,25 @@ class LogToFile:
                     # Reset stdout and stderr
                     sys.stdout = original_stdout
                     sys.stderr = original_stderr
+
+            # with open(self.log_path_stdout, self.mode) as file_stdout, portalocker.Lock(file_stdout, 'a'), \
+            #         open(self.log_path_stderr, self.mode) as file_stderr, portalocker.Lock(file_stderr, 'a'):
+            #     original_stdout = sys.stdout
+            #     original_stderr = sys.stderr
+            #     try:
+            #         sys.stdout = self.StreamToLogger(file_stdout, original_stdout)
+            #         sys.stderr = self.StreamToLogger(file_stderr, original_stderr)
+            #         return func(*args, **kwargs)
+            #     except Exception as e:
+            #         # 捕获错误并抛出更明确的信息
+            #         exc_info = traceback.format_exc()
+            #         sys.stderr.write(exc_info + '\n')
+            #         raise RuntimeError(f"Failed to acquire lock or write logs: {e}")
+            #     finally:
+            #         # 确保 stdout 和 stderr 恢复原状
+            #         sys.stdout = original_stdout
+            #         sys.stderr = original_stderr
+
         return wrapper
 
     class StreamToLogger(object):

@@ -3,20 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
 
-def process_all_sheets(tasks, use_parallel=True):
-    """
-    处理所有Sheet的绘图任务。
-    """
-    if use_parallel:
-        # 使用并行处理
-        Parallel(n_jobs=-1)(
-            delayed(process_sheet)(sheet_name, df, y_ranges, output_path)
-            for sheet_name, df, y_ranges, output_path in tasks
-        )
-    else:
-        # 顺序处理
-        for sheet_name, df, y_ranges, output_path in tasks:
-            process_sheet(sheet_name, df, y_ranges, output_path)
 def process_sheet(sheet_name, df, y_ranges, output_path):
     """
     处理单个Sheet的绘图任务。
@@ -94,7 +80,7 @@ def plot_dual_axis(x, y1, y2, label1, label2, ylabel1, ylabel2, y1_range, y2_ran
     ax2.set_ylim(y2_range)
 
     plt.title(title)
-    fig.legend(bbox_to_anchor=(0.45, 0.25))
+    fig.legend(loc="upper right", bbox_to_anchor=(0.85, 0.85))
     plt.tight_layout()
     plt.savefig(output_file)
     plt.close()
@@ -124,61 +110,42 @@ def get_local_min_max(df, columns):
             local_min_max[col] = [df[col].min(), df[col].max()]
     return local_min_max
 
-def process_all_sheets(tasks, use_parallel=True):
-    """
-    处理所有Sheet的绘图任务。
-    """
-    if use_parallel:
-        # 使用并行处理
-        Parallel(n_jobs=-1)(
-            delayed(process_sheet)(sheet_name, df, y_ranges, output_path)
-            for sheet_name, df, y_ranges, output_path in tasks
-        )
-    else:
-        # 顺序处理
-        for sheet_name, df, y_ranges, output_path in tasks:
-            process_sheet(sheet_name, df, y_ranges, output_path)
+# 读取Excel文件
+file_path = '../result/output_log_coeff.xlsx'
+output_path = '../Figure'
+excel_data = pd.ExcelFile(file_path)
 
+# 指定需要处理的列
+columns = ['GHG Deviation']
 
-if __name__ == '__main__':
-    # 读取Excel文件
-    file_path = '../result/output_result_0.xlsx'
-    output_path = '../Figure'
-    excel_data = pd.ExcelFile(file_path)
+# 计算全局最小值和最大值
+use_global_y_range = False  # 设置是否启用统一的Y轴范围
+global_min_max = calculate_global_min_max(excel_data, columns) if use_global_y_range else None
 
-    # 设置是否并行执行
-    use_parallel = False  # 修改为 False 即可关闭并行
+# 遍历所有Sheet并并行绘制图表
+tasks = []
+for sheet_name in excel_data.sheet_names:
+    df = excel_data.parse(sheet_name)
 
-    # 指定需要处理的列
-    columns = ['GHG Difference', 'GHG Deviation Ratio (%)',
-               'Demand Difference', 'Demand Deviation Ratio (%)', 'Profit']
+    # 确保数据列存在
+    required_columns = ['Year'] + columns
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        print(f"Sheet {sheet_name} 缺少以下列：{missing_columns}，跳过...")
+        continue
 
-    # 是否启用统一的Y轴范围
-    use_global_y_range = False
-    if use_global_y_range:
-        global_min_max = calculate_global_min_max(excel_data, columns)
-    else:
-        global_min_max = None
+    # 动态计算当前Sheet的最小值和最大值
+    local_min_max = get_local_min_max(df, columns) if not use_global_y_range else None
 
-    # 构建任务列表
-    tasks = []
-    for sheet_name in excel_data.sheet_names:
-        df = excel_data.parse(sheet_name)
+    # 获取Y轴范围
+    y_ranges = global_min_max if use_global_y_range else local_min_max
 
-        # 确保所需列存在
-        required_columns = ['Year'] + columns
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Sheet {sheet_name} 缺少以下列：{missing_columns}，跳过...")
-            continue
+    # 添加任务
+    tasks.append((sheet_name, df, y_ranges, output_path))
 
-        # 获取当前Sheet的Y轴范围
-        local_min_max = get_local_min_max(df, columns) if not use_global_y_range else None
-        y_ranges = global_min_max if use_global_y_range else local_min_max
+# 并行处理任务
+Parallel(n_jobs=-1)(
+    delayed(process_sheet)(sheet_name, df, y_ranges, output_path) for sheet_name, df, y_ranges, output_path in tasks
+)
 
-        # 添加任务
-        tasks.append((sheet_name, df, y_ranges, output_path))
-
-    process_all_sheets(tasks, use_parallel)
-
-    print("所有图表已生成并保存。")
+print("所有图表已生成并保存。")

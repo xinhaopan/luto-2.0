@@ -161,7 +161,7 @@ def run_task_windows(cwd, col):
     try:
         # 运行子进程，捕获标准输出和标准错误
         result = subprocess.run(
-            [python_path, 'temp_runs.py'],
+            [python_path, '0_runs.py'],
             cwd=f'output/{col}',
             capture_output=True,  # 捕获输出
             text=True  # 将输出转换为文本
@@ -466,7 +466,7 @@ def run_task_linux(cwd, col, config):
     queue = config.get("queue", "normal")
     dir = f"{cwd}/output/{col}"
     script_content = config.get("script_content",
-                                f"/g/data/jk53/LUTO_XH/apps/miniforge3/envs/luto/bin/python {dir}/temp_runs.py")
+                                f"/g/data/jk53/LUTO_XH/apps/miniforge3/envs/luto/bin/python {dir}/0_runs.py")
 
     # 动态生成 PBS 脚本内容
     pbs_script = f"""#!/bin/bash
@@ -513,10 +513,10 @@ def run_task_linux(cwd, col, config):
         submission_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         print(f"{submission_time}: Job '{job_name}' submitted successfully! ID: {job_id}.")
         # 等待作业完成
-        log_file = f"{dir}/output/simulation_log.txt"
-        if wait_for_job_to_complete(job_id, log_file):
-            # 作业完成后执行同步操作
-            sync_files(cwd,col)
+        # log_file = f"{dir}/output/simulation_log.txt"
+        # if wait_for_job_to_complete(job_id, log_file):
+        #     # 作业完成后执行同步操作
+        #     sync_files(cwd,col)
     except subprocess.CalledProcessError as e:
         print(f"Error submitting job '{job_name}':", e.stderr)
 
@@ -814,16 +814,12 @@ def create_grid_search_template(grid_dict, map_dict, output_file, template_df_di
         new_column.name = f'Run_{row["run_idx"]}'
         template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]}')], axis=1)
 
-    for ghg, carbon in zip(map_dict['GHG_LIMITS_FIELD'], map_dict['CARBON_PRICES_FIELD']):
-        # 获取 GHG_LIMITS_FIELD 对应行和 CARBON_PRICES_FIELD 对应行的索引
-        ghg_row = template_grid_search.loc[template_grid_search['Name'] == 'GHG_LIMITS_FIELD']
-        carbon_row = template_grid_search.loc[template_grid_search['Name'] == 'CARBON_PRICES_FIELD']
+    ghg_row = template_grid_search.loc[template_grid_search['Name'] == 'GHG_LIMITS_FIELD']
 
-        # 遍历所有需要修改的列，替换对应值
-        for col in template_grid_search.columns[1:]:  # 跳过第一列（Name 列）
-            template_grid_search.loc[carbon_row.index, col] = (
-                template_grid_search.loc[ghg_row.index, col].replace(ghg, carbon)
-            )
+    for col in template_grid_search.columns[1:]:  # 跳过 'Name' 列
+        ghg_value = ghg_row[col].values[0]  # 获取当前列 GHG_LIMITS_FIELD 的值
+        corresponding_value = dict(zip(map_dict['GHG_LIMITS_FIELD'], map_dict['CARBON_PRICES_FIELD'])).get(ghg_value)
+        template_grid_search.loc[template_grid_search['Name'] == 'CARBON_PRICES_FIELD', col] = corresponding_value
 
     # Save the grid search template to the root task folder
 
