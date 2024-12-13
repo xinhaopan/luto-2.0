@@ -80,7 +80,7 @@ def run( data: Data, base: int, target: int) -> None:
         except Exception as e:
             print(f"Error in solve_timeseries: {e}")
             trace_error()
-            return  # End the function if an error occurs
+            raise e
 
     elif settings.MODE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
@@ -223,7 +223,7 @@ def load_data_from_disk(path: str) -> Data:
         raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
 
     # Update the timestamp
-    data.timestamp_sim = timestamp
+    data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     
     return data
     
