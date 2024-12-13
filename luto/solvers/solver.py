@@ -47,6 +47,8 @@ gurenv.setParam("NumericFocus", settings.NUMERIC_FOCUS)
 gurenv.setParam("Threads", settings.THREADS)
 gurenv.setParam("BarHomogeneous", settings.BARHOMOGENOUS)
 gurenv.setParam("Crossover", settings.CROSSOVER)
+gurenv.setParam("DualReductions", 0)
+gurenv.setParam("InfUnbdInfo", 1)
 gurenv.start()
 
 
@@ -59,7 +61,7 @@ class SolverSolution:
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
     prod_data: dict[str, float]
-    obj_val: dict[str, float]
+    obj_val: float
 
 
 class LutoSolver:
@@ -231,8 +233,71 @@ class LutoSolver:
         """
         print(f"Setting objective function to {settings.OBJECTIVE}...", flush=True)
 
-        # Get the objective values matrices for each sector
-        ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
+        if settings.OBJECTIVE == "maxprofit":
+
+            # Pre-calculate revenue minus (production and transition) costs
+            ag_obj_mrj = (
+                -(
+                        self._input_data.ag_r_mrj
+                        - (
+                                self._input_data.ag_c_mrj
+                                + self._input_data.ag_t_mrj
+                                + self._input_data.non_ag_to_ag_t_mrj
+                        )
+                )
+            )
+
+            non_ag_obj_rk = (
+                -(
+                        self._input_data.non_ag_r_rk
+                        - (
+                                self._input_data.non_ag_c_rk
+                                + self._input_data.non_ag_t_rk
+                                + self._input_data.ag_to_non_ag_t_rk
+                        )
+                )
+            )
+
+            # Get effects of alternative agr. management options (stored in a dict)
+            ag_man_objs = {
+                am: -(
+                        self._input_data.ag_man_r_mrj[am]
+                        - (
+                                self._input_data.ag_man_c_mrj[am]
+                                + self._input_data.ag_man_t_mrj[am]
+                        )
+                )
+                for am in self._input_data.am2j
+            }
+
+        elif settings.OBJECTIVE == "mincost":
+            # Pre-calculate sum of production and transition costs
+            ag_obj_mrj = (
+                    self._input_data.ag_c_mrj
+                    + self._input_data.ag_t_mrj
+                    + self._input_data.non_ag_to_ag_t_mrj
+            )
+
+            non_ag_obj_rk = (
+                    self._input_data.non_ag_c_rk
+                    + self._input_data.non_ag_t_rk
+                    + self._input_data.ag_to_non_ag_t_rk
+            )
+
+            # Store calculations for each agricultural management option in a dict
+            ag_man_objs = {
+                am: (
+                        self._input_data.ag_man_c_mrj[am]
+                        + self._input_data.ag_man_t_mrj[am]
+                )
+                for am in self._input_data.am2j
+            }
+
+        else:
+            print("Unknown objective")
+
+        ag_obj_mrj = np.nan_to_num(ag_obj_mrj)
+        non_ag_obj_rk = np.nan_to_num(non_ag_obj_rk)
 
         # Production costs + transition costs for all agricultural land uses.
         ag_obj_contr = gp.quicksum(
@@ -261,17 +326,46 @@ class LutoSolver:
         )
 
         # Get the objective values for each sector
-        self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.economic_base_sum
-        self.obj_demand = self.V * self._input_data.economic_BASE_YR_prices if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
-        self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_economy = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.BASE_YR_economic_val) / abs(
+            self._input_data.BASE_YR_economic_val)
+        self.obj_demand = gp.quicksum(self.V / abs(self.d_c)) if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+        # self.obj_ghg = self.E / abs(self._input_data.limits["ghg"]) if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_ghg = self.E / (abs(self._input_data.limits["ghg"]) + 100000000) if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
 
-        # Set the objective function
-        sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE
+        if settings.NOBJECTIVE == False:
+            # Set the objective function
+            self.objective = self.obj_economy * (1 - settings.SOLVE_WEIGHT_DEVIATIONS) + (
+                    self.obj_demand + self.obj_ghg) * settings.SOLVE_WEIGHT_DEVIATIONS
+            self.gurobi_model.setObjective(self.objective, GRB.MINIMIZE)
 
-        objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT \
-                    - (gp.quicksum(self.obj_demand) + self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+        elif settings.NOBJECTIVE == True:
+            if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+                self.gurobi_model.setObjectiveN(
+                    self.obj_demand,
+                    index=0,
+                    priority=1,
+                    weight=settings.SOLVE_WEIGHT_DEVIATIONS,
+                    name="MinimizeDemandDeviation"
+                )
 
-        self.gurobi_model.setObjective(objective, sense)
+            if settings.GHG_CONSTRAINT_TYPE == "soft":
+                self.gurobi_model.setObjectiveN(
+                    self.obj_ghg,
+                    index=1,
+                    priority=1,
+                    weight=settings.SOLVE_WEIGHT_DEVIATIONS,
+                    name="MinimizeGHGDeviation"
+                )
+
+            self.gurobi_model.setObjectiveN(
+                self.obj_economy,
+                index=2,
+                priority=1,
+                weight=(1 - settings.SOLVE_WEIGHT_DEVIATIONS),
+                name="Economics"
+            )
+        else:
+            print("Unknown objective")
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
@@ -295,7 +389,7 @@ class LutoSolver:
                 + x_non_ag_vars.sum(axis=0)
         )
         for r, expr in zip(cells, X_sum_r):
-            self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(expr == 1)
+            self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(expr == 1, f"cell_usage_constraint_{r}")
 
     def _add_agricultural_management_constraints(
             self, cells: Optional[np.array] = None
@@ -317,12 +411,14 @@ class LutoSolver:
 
                 for r in lm0_r_vals:
                     constr = self.gurobi_model.addConstr(
-                        self.X_ag_man_dry_vars_jr[am][j_idx, r] <= self.X_ag_dry_vars_jr[j, r]
+                        self.X_ag_man_dry_vars_jr[am][j_idx, r] <= self.X_ag_dry_vars_jr[j, r],
+                        f"am_dry_{am}_{j_idx}_{r}"
                     )
                     self.ag_management_constraints_r[r].append(constr)
                 for r in lm1_r_vals:
                     constr = self.gurobi_model.addConstr(
-                        self.X_ag_man_irr_vars_jr[am][j_idx, r] <= self.X_ag_irr_vars_jr[j, r]
+                        self.X_ag_man_irr_vars_jr[am][j_idx, r] <= self.X_ag_irr_vars_jr[j, r],
+                        f"am_irr_{am}_{j_idx}_{r}"
                     )
                     self.ag_management_constraints_r[r].append(constr)
 
@@ -345,7 +441,7 @@ class LutoSolver:
                     self.X_ag_irr_vars_jr[j, :]
                 )
                 constr = self.gurobi_model.addConstr(
-                    ag_man_vars_sum <= adoption_limit * all_vars_sum
+                    ag_man_vars_sum <= adoption_limit * all_vars_sum, f"am_adoption_{am}_{j_idx}"
                 )
 
                 self.adoption_limit_constraints.append(constr)
@@ -453,12 +549,12 @@ class LutoSolver:
 
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             upper_bound_constraints = self.gurobi_model.addConstrs(
-                (self.d_c[c] - self.total_q_exprs_c[c]) <= self.V[c]
-                for c in range(self.ncms)
+                ((self.d_c[c] - self.total_q_exprs_c[c]) <= self.V[c] for c in range(self.ncms)),
+                name="demand_upper_bound"
             )
             lower_bound_constraints = self.gurobi_model.addConstrs(
-                (self.total_q_exprs_c[c] - self.d_c[c]) <= self.V[c]
-                for c in range(self.ncms)
+                ((self.total_q_exprs_c[c] - self.d_c[c]) <= self.V[c] for c in range(self.ncms)),
+                name="demand_lower_bound"
             )
 
             self.demand_penalty_constraints.extend(upper_bound_constraints.values())
@@ -466,7 +562,7 @@ class LutoSolver:
 
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
             quantity_meets_demand_constraints = self.gurobi_model.addConstrs(
-                (self.total_q_exprs_c[c] >= self.d_c[c]) for c in range(self.ncms)
+                ((self.total_q_exprs_c[c] >= self.d_c[c]) for c in range(self.ncms)), name="demand_hard"
             )
             self.demand_penalty_constraints.extend(
                 quantity_meets_demand_constraints.values()
@@ -538,7 +634,8 @@ class LutoSolver:
                     f"Unknown choice for `WATER_REGION_DEF` setting: must be either 'River Region' or 'Drainage Division'")
 
             # Add the constraint that the water yield in the region must be greater than the limit
-            constr = self.gurobi_model.addConstr(w_net_yield_region >= water_yield_constraint)
+            constr = self.gurobi_model.addConstr(w_net_yield_region >= water_yield_constraint,
+                                                 f"water_limit_{reg_name}")
             self.water_limit_constraints.append(constr)
 
             # Report on the water yield in the region
@@ -599,12 +696,16 @@ class LutoSolver:
         if settings.GHG_CONSTRAINT_TYPE == 'hard':
             print(f"...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
             self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
-                self.ghg_emissions_expr <= ghg_limit
+                self.ghg_emissions_expr <= ghg_limit, name="ghg_hard_constraint"
             )
         elif settings.GHG_CONSTRAINT_TYPE == 'soft':
             print(f"  ...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-            self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit <= self.E)
-            self.gurobi_model.addConstr(ghg_limit - self.ghg_emissions_expr <= self.E)
+            print(f"    ...GHG emissions penalty: {settings.SOLVE_WEIGHT_DEVIATIONS}")
+            self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
+                self.ghg_emissions_expr <= ghg_limit, name="ghg_hard_constraint"
+            )
+            self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit <= self.E, name="ghg_upper_bound")
+            self.gurobi_model.addConstr(ghg_limit - self.ghg_emissions_expr <= self.E, name="ghg_lower_bound")
         else:
             raise ValueError("Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'")
 
@@ -652,7 +753,7 @@ class LutoSolver:
 
         print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}")
         self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
-            self.biodiversity_expr >= biodiversity_limits
+            self.biodiversity_expr >= biodiversity_limits, name="biodiversity_constraint"
         )
 
     def update_formulation(
@@ -768,6 +869,7 @@ class LutoSolver:
                         0 if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc]
                         else self._input_data.non_ag_lb_rk[r, k]
                     )
+                    # x_lb = min(x_lb, 1)  # Ensure lower bound is not greater than 1
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                         lb=x_lb, ub=self._input_data.non_ag_x_rk[r, k], name=f"X_non_ag_{k}_{r}",
                     )
@@ -860,6 +962,44 @@ class LutoSolver:
 
         # Magic.
         self.gurobi_model.optimize()
+        print(f"Optimization ended with status: {self.gurobi_model.status}")
+        if self.gurobi_model.status == gp.GRB.INFEASIBLE:
+            print("Model is infeasible. Computing IIS...")
+            self.gurobi_model.computeIIS()
+            self.gurobi_model.write(f"{settings.OUTPUT_DIR}/model.ilp")
+            self.gurobi_model.write(f"{settings.OUTPUT_DIR}/model.mps")
+            print("IIS written to model.ilp and model.mps. Check the file for conflict details.")
+        elif self.gurobi_model.status == gp.GRB.UNBOUNDED:
+            # gurobi_model.getAttr('UnbdRay', gurobi_model.getVars())
+            print("Model UNBOUNDED.")
+        elif self.gurobi_model.status == gp.GRB.OPTIMAL:
+            print("Model optimal success.")
+            # self.gurobi_model.write(f"{settings.OUTPUT_DIR}/optimized_model.sol")
+
+        GHG_deviation = self.obj_ghg.getValue()
+        demand_deviation = self.obj_demand.getValue()
+        economic_objective = self.obj_economy.getValue()
+        print(
+            f"GHG deviation value: {GHG_deviation}; Demand deviation value: {demand_deviation}; Economic objective value: {economic_objective}")
+
+        if settings.NOBJECTIVE == True:
+            for o in range(self.gurobi_model.NumObj):
+                # Set which objective we will query
+                self.gurobi_model.params.ObjNumber = o
+                # Query the o-th objective value
+                print(f"Objective {self.gurobi_model.ObjNName} value: {self.gurobi_model.ObjNVal}")
+        else:
+            objective_value = self.objective.getValue()
+            print(f"Objective value: {objective_value}")
+            GHG_deviation_coeff = self.obj_ghg.getCoeff(0) * settings.SOLVE_WEIGHT_DEVIATIONS
+            demand_deviation_coeff = sum(self.obj_demand.item().getCoeff(i) for i in range(
+                self.obj_demand.item().size())) * settings.SOLVE_WEIGHT_DEVIATIONS / self.obj_demand.item().size()
+            economic_objective_coeff = sum(self.obj_economy.getCoeff(i) for i in range(self.obj_economy.size())) * (
+                        1 - settings.SOLVE_WEIGHT_DEVIATIONS) / self.obj_economy.size()
+            print(
+                f"GHG deviation Coeff: {GHG_deviation_coeff}; Demand deviation Coeff: {demand_deviation_coeff}; Economic objective Coeff: {economic_objective_coeff}")
+
+        prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
 
         print("Completed solve, collecting results...\n", flush=True)
 
@@ -1013,6 +1153,9 @@ class LutoSolver:
         if self.biodiversity_expr:
             prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
 
+        ag_X_mrj_processed[:, non_ag_bools_r, :] = False
+        non_ag_X_rk_processed[~non_ag_bools_r, :] = False
+
         return SolverSolution(
             lumap=lumap,
             lmmap=lmmap,
@@ -1021,11 +1164,7 @@ class LutoSolver:
             non_ag_X_rk=non_ag_X_sol_rk,
             ag_man_X_mrj=ag_man_X_mrj_processed,
             prod_data=prod_data,
-            obj_val={
-                'SUM': self.gurobi_model.ObjVal,
-                'Economy': self.obj_economy.getValue(),
-                'Demand': self.obj_demand.getValue().sum(),
-                'GHG': self.obj_ghg.getValue()}
+            obj_val=self.gurobi_model.ObjVal,
         )
 
     @property
@@ -1055,3 +1194,4 @@ class LutoSolver:
             for j in range(self._input_data.n_ag_lus)
             if self._input_data.lu2pr_pj[p, j]
         ]
+
