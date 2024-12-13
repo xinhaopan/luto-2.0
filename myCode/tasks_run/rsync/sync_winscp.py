@@ -139,18 +139,20 @@ option confirm off
         for file in files:
             file = file.strip()
             remote_path = f"{remote_dir}/{file}"
-            local_path = f"{local_dir}/{file}"
-            local_path = f"{local_dir}/{file}".replace("\\", "/")
-
-            # 检查远程路径是否为文件夹或文件
-            if os.path.isdir(remote_path):
-                # 如果是文件夹，使用 synchronize 命令同步文件夹
-                script_file.write(f'synchronize local "{local_path}" "{remote_path}"\n')
-            elif os.path.isfile(remote_path):
-                # 如果是文件，使用 get 命令下载文件
-                script_file.write(f'get "{remote_path}" "{local_path}"\n')
+            local_path = f"{local_dir}\\{file}"
+            script_file.write(f'get "{remote_path}" "{local_path}"\n')
 
         script_file.write("# Close connection\nexit\n")
+
+    with open(script_path, 'r') as file:
+        content = file.read()
+
+        # 替换所有的 \\ 为 \
+    content = content.replace('\\', '\\')
+
+    # 将修改后的内容写回文件
+    with open(script_path, 'w') as file:
+        file.write(content)
 
     print(f"WinSCP script saved to {script_path}")
 
