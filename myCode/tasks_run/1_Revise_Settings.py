@@ -15,10 +15,9 @@ grid_search = {
         # 'snapshot',
         'timeseries'
     ],
-    'RESFACTOR': [30],
+    'RESFACTOR': [10],
 
-    'SOLVE_ECONOMY_WEIGHT': [0.5, 0.1, 0.9],
-    'SOLVE_ECONOMY_SCALE': [1, 1e5],
+    'SOLVE_ECONOMY_WEIGHT': [0.25],
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis',
         '1.5C (50%) excl. avoided emis',
@@ -26,8 +25,8 @@ grid_search = {
     ],
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0, 2050: 0, 2100: 0 },
-        # {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 },
-        # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
+        {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 },
+        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
     ]
 }
 
@@ -38,7 +37,6 @@ map_dict = {
     ]
 }
 
-
-output_file = os.path.join("Custom_runs", "setting_template_windows_10.csv")
+output_file = os.path.join("Custom_runs", "setting_template_windows_0_test.csv")
 grid_search_df = create_grid_search_template(grid_search,map_dict,output_file)
 

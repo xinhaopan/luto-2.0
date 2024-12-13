@@ -39,7 +39,6 @@ PARAMS_TO_EVAL = [
     # 'WATER_YIELD_TARGETS',
     # Bools to be evaluated from str to bool
     'AMORTISE_UPFRONT_COSTS',
-    'NOBJECTIVE',
 ]
 
 # Parameters that are numbers but are stored as strings in the settings

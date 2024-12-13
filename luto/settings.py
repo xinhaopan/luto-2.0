@@ -18,7 +18,6 @@
 
 import pandas as pd
 
-NOBJECTIVE = False
 
 # ---------------------------------------------------------------------------- #
 # LUTO model version.                                                                 #
@@ -100,8 +99,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -327,8 +326,8 @@ SOC_AMORTISATION = 15
 GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
-SOLVE_ECONOMY_WEIGHT = 1e-4
-SOLVE_ECONOMY_SCALE = 1
+''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
+SOLVE_ECONOMY_WEIGHT = 0.25
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -351,7 +350,7 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 # should then be historical net yield * (1 - water stress * agricultural share)
 
 WATER_STRESS = 0.2
-AG_SHARE_OF_WATER_USE = 0.7
+AG_SHARE_OF_WATER_USE = 1.0
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 
 
@@ -419,7 +418,7 @@ HCAS_PERCENTILE = 50
 LDS_BIODIVERSITY_VALUE = 0.8
 
 
-# Non-agricultural biodiversity parameters 
+# Non-agricultural biodiversity parameters
 ''' The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
     For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
     will be 0.6 * 0.8 = 0.48.
@@ -439,13 +438,13 @@ BECCS_BIODIVERSITY_BENEFIT = 0
 """
 BIODIV_GBF_TARGET_2_DICT = {
               2010: 0,    # Proportion of degraded land restored in year 2010
-              2030: 0,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0   # Stays at 2050 level
+              2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
+              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.3   # Stays at 2050 level
              }            # (can add more years/targets)\
 
 
-# Biodiversity contribution reporting 
+# Biodiversity contribution reporting
 BIODIVERSITY_LIMITS = 'on'                 # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
 CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will urn off reprojecting decision variables to xarray so speed up the model run.
 BIO_CALC_LEVEL = 'group'                    # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level

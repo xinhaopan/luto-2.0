@@ -1,0 +1,10 @@
+# Open SCP connection
+open scp://xp7241@gadi.nci.org.au/ -privatekey="C:\Users\s222552331\.ssh\id_rsa.ppk"
+# Enable batch mode
+option batch on
+# Disable confirmation prompts
+option confirm off
+get "/g/data/jk53/LUTO_XH/LUTO2/output/test1.txt" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\test1.txt"
+get "/g/data/jk53/LUTO_XH/LUTO2/output/test1 (1).txt" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\test1 (1).txt"
+# Close connection
+exit
