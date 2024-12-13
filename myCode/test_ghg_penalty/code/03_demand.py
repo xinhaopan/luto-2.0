@@ -148,7 +148,7 @@ def plot_cumulative_bar_chart(input_excel_file, output_folder, column_name):
         print(f"Chart for {column_name} in sheet {sheet_name} saved to {chart_image_path}")
 
 
-file_path = "../../tasks_run/Custom_runs/setting_template_windows_5.csv"
+file_path = "../../tasks_run/Custom_runs/setting_template_windows_10.csv"
 folders = get_folders(file_path)
 
 # i=0

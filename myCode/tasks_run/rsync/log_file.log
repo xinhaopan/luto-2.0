@@ -1,0 +1,97 @@
+[INFO] Sync time updated to: 2024-12-13 13:21:19
+File list saved to sync_list.txt
+WinSCP script saved to winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 13:47:52
+File list saved to sync_list.txt
+WinSCP script saved to winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:00:20
+File list saved to sync_list.txt
+WinSCP script saved to winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:01:18
+File list saved to sync_list.txt
+WinSCP script saved to winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:03:14
+File list saved to sync_list.txt
+WinSCP script saved to winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:03:53
+File list saved to sync_list.txt
+Lock acquired successfully.
+2024-12-13 14:03:53: Starting task...
+[INFO] Sync time updated to: 2024-12-13 14:03:53
+File list saved to sync_list.txt
+WinSCP script saved to winscp_script.txt
+WinSCP script saved to winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:06:28
+File list saved to sync_list.txt
+WinSCP script saved to winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:08:37
+File list saved to sync_list.txt
+WinSCP script saved to winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:09:23
+Lock acquired successfully.
+2024-12-13 14:09:23: Starting task...
+[INFO] Sync time updated to: 2024-12-13 14:09:23
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:14:36
+File list saved to sync_list.txt
+Traceback (most recent call last):
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\sync_winscp.py", line 44, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\sync_winscp.py", line 125, in generate_winscp_script
+    sync_file = os.path.join(current_dir, sync_file)
+                             ^^^^^^^^^^^
+NameError: name 'current_dir' is not defined
+
+Lock acquired successfully.
+2024-12-13 14:14:36: Starting task...
+[INFO] Sync time updated to: 2024-12-13 14:14:36
+File list saved to sync_list.txt
+Traceback (most recent call last):
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\sync_winscp.py", line 44, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\sync_winscp.py", line 125, in generate_winscp_script
+    sync_file = os.path.join(current_dir, sync_file)
+                             ^^^^^^^^^^^
+NameError: name 'current_dir' is not defined
+
+Task failed: name 'current_dir' is not defined
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:14:54
+File list saved to sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:23:43
+File list saved to sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:24:45
+File list saved to sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:25:53
+File list saved to sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:26:55
+File list saved to sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:29:57
+File list saved to sync_list.txt
+Lock acquired successfully.
+2024-12-13 14:29:57: Starting task...
+[INFO] Sync time updated to: 2024-12-13 14:29:57
+File list saved to sync_list.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-13 14:33:20
+File list saved to sync_list.txt

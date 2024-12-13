@@ -18,7 +18,7 @@
 
 import pandas as pd
 
-NOBJECTIVE = True
+NOBJECTIVE = False
 
 # ---------------------------------------------------------------------------- #
 # LUTO model version.                                                                 #
@@ -311,7 +311,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis'
+GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
 
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or None.
 # Setting to None falls back to the 'Default' scenario.
@@ -327,10 +327,8 @@ SOC_AMORTISATION = 15
 GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
-''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. 
-    Values from 1e-2 to 1e-3 is a practical range for the weight. 
-'''
-SOLVE_ECONOMY_WEIGHT = 0.16
+SOLVE_ECONOMY_WEIGHT = 1e-4
+SOLVE_ECONOMY_SCALE = 1
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.

@@ -142,7 +142,7 @@ def process_all_sheets(tasks, use_parallel=True):
 
 if __name__ == '__main__':
     # 读取Excel文件
-    file_path = '../result/output_result_0.xlsx'
+    file_path = '../result/output_result_10.xlsx'
     output_path = '../Figure'
     excel_data = pd.ExcelFile(file_path)
 

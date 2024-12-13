@@ -1,81 +1,122 @@
 import os
 import json
-import numpy as np
 import pandas as pd
 import plotnine as p9
-
 from luto.tools.create_task_runs.parameters import TASK_ROOT_DIR
-from luto.tools.report.data_tools import get_all_files
 
 
-TASK_ROOT_DIR = "C:/Users/Jinzhu/Desktop/Snapshoot_multiple_scenarios"
-grid_search_params = pd.read_csv(f"{TASK_ROOT_DIR}/grid_search_parameters.csv")
+def load_json_data(json_path, filename):
+    with open(os.path.join(json_path, filename)) as f:
+        return pd.json_normalize(json.load(f), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
 
-grid_paras = set(grid_search_params.columns.tolist()) - set(['run_idx', 'MEM', 'NCPUS', 'MODE'])
+def get_run_parameters(run_idx, grid_search_params):
+    return grid_search_params.query(f'run_idx == {run_idx}').to_dict(orient='records')[0]
 
+def process_profit_data(json_path):
+    df = load_json_data(json_path, 'economics_0_rev_cost_all_wide.json')
+    return df.query('name == "Profit"')
 
-
-# Get the last run directory
-report_data = pd.DataFrame()
-
-for _, row in grid_search_params.iterrows():
-    
-    # Get the last run directory
-    json_path = f"{TASK_ROOT_DIR}/Run_{row['run_idx']}/DATA_REPORT/data"
-    
-    # Get the profit data
-    with open(f"{json_path}/economics_0_rev_cost_all_wide.json") as f:
-        data = json.load(f)
-        
-    df = pd.json_normalize(data, 'data', ['name', 'type'])\
-           .rename(columns={0: 'year', 1: 'val'})
-    df_profit = df.query('name == "Profit"')
-    
-
-    # Get the GHG deviation 
-    with open(f"{json_path}/GHG_2_individual_emission_Mt.json") as f:
-        data = json.load(f)
-        
-    df = pd.json_normalize(data, 'data', ['name', 'type'])\
-           .rename(columns={0: 'year', 1: 'val'})
+def process_ghg_deviation_data(json_path):
+    df = load_json_data(json_path, 'GHG_2_individual_emission_Mt.json')
     df_target = df.query('name == "GHG emissions limit"')
     df_actual = df.query('name == "Net emissions"')
     df_deviation = df_target.merge(df_actual, on='year', suffixes=('_target', '_actual'))
     df_deviation['name'] = 'GHG deviation'
     df_deviation['val'] = df_deviation['val_actual'] - df_deviation['val_target']
-    
-    # Combine the data
+    return df_deviation
+
+def process_demand_data(json_path):
+    df_demand = load_json_data(json_path, 'production_5_6_demand_Production_commodity_from_LUTO.json')
+    df_luto = load_json_data(json_path, 'production_5_5_demand_Production_commodity.json')
+    df_delta = df_demand.merge(df_luto, on=['year', 'name'], suffixes=('_luto', '_demand'))
+    df_delta['deviation_t'] = df_delta.eval('val_luto - val_demand')
+    df_delta['deviation_%'] = df_delta.eval('(val_luto - val_demand) / val_demand * 100')
+    return df_delta
+
+
+# Load the grid search parameters
+grid_search_params = pd.read_csv(f"{TASK_ROOT_DIR}/grid_search_parameters.csv")
+grid_paras = set(grid_search_params.columns.tolist()) - set(['MEM', 'NCPUS', 'MODE'])
+run_dirs = [i for i in os.listdir(TASK_ROOT_DIR) if os.path.isdir(os.path.join(TASK_ROOT_DIR, i))]
+
+# Loop through the run directories and extract the data
+report_data = pd.DataFrame()
+report_data_demand = pd.DataFrame()
+
+for dir in run_dirs:
+    run_idx = int(dir.split('_')[-1])
+    run_paras = get_run_parameters(run_idx, grid_search_params)
+    json_path = os.path.join(TASK_ROOT_DIR, dir, 'DATA_REPORT', 'data')
+
+    if not os.path.exists(json_path):
+        print(f"Path does not exist: {json_path}")
+        continue
+
+    df_profit = process_profit_data(json_path)
+    df_deviation = process_ghg_deviation_data(json_path)
+    df_delta = process_demand_data(json_path)
+
     report_data = pd.concat([
         report_data,
-        df_profit[['year','name', 'val']].assign(**row),
-        df_deviation[['year','name', 'val']].assign(**row)
+        df_profit[['year', 'name', 'val']].assign(**run_paras),
+        df_deviation[['year', 'name', 'val']].assign(**run_paras)
+    ]).reset_index(drop=True)
+
+    report_data_demand = pd.concat([
+        report_data_demand,
+        df_delta.assign(**run_paras)
     ]).reset_index(drop=True)
 
 
-report_data.query('BIODIV_GBF_TARGET_2_DICT == "{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}" and year == 2050 and name == "Profit"')
-
-
-
-# Pivot the data
-report_data_wide = report_data.pivot(index=['year', 'run_idx', 'SOLVE_ECONOMY_WEIGHT'], columns='name', values='val').reset_index()      
-report_data_wide = report_data_wide.query('year != "2010"')
 
 
 # Plot the data
+report_data_wide = report_data\
+    .pivot(index=['year'] + list(grid_paras), columns='name', values='val')\
+    .reset_index()\
+    .query('year != 2010 and SOLVE_ECONOMY_WEIGHT > 0')
+
+report_data_demand_filterd = report_data_demand \
+    .query('year != 2010 and SOLVE_ECONOMY_WEIGHT > 0')
+    
+    
+    
 p9.options.figure_size = (15, 8)
 p9.options.dpi = 150
 
-p = (p9.ggplot(report_data_wide, 
-               p9.aes(x='GHG deviation', 
-                      y='Profit', 
-                      color='SOLVE_ECONOMY_WEIGHT')
-               ) +
-     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-     p9.geom_point() +
-     p9.theme_bw() 
+
+p_ghg_vs_profit = (
+    p9.ggplot(report_data_wide, p9.aes(x='GHG deviation', y='Profit')) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_point() +
+    p9.theme_bw()
     )
 
+p_weight_vs_profit = (
+    p9.ggplot(report_data_wide, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='Profit')) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_point() +
+    p9.theme_bw() +
+    # p9.scale_x_log10() +
+    p9.ylab('Profit (billion AUD)')
+    )
 
+p_weight_vs_ghg = (
+    p9.ggplot(report_data_wide, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='GHG deviation')) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_point() +
+    p9.theme_bw() +
+    p9.scale_x_log10() +
+    p9.ylab('GHG deviation (Mt)')
+    )
 
+p_weigth_vs_demand = (
+    p9.ggplot(report_data_demand_filterd, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='deviation_%', fill='name')) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_col() +
+    p9.theme_bw() +
+    p9.scale_x_log10() +
+    p9.guides(fill=p9.guide_legend(ncol=1))
+    )
 
 

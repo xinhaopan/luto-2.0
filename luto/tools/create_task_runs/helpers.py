@@ -94,7 +94,10 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
 
 
 def create_task_runs(custom_settings:pd.DataFrame):
-     
+    
+    # Get current working directory
+    cwd = os.getcwd()
+    
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
     custom_settings = custom_settings.set_index('Name')
@@ -103,24 +106,28 @@ def create_task_runs(custom_settings:pd.DataFrame):
     custom_settings.columns = [re.sub(r'\W+', '_', col.strip()) for col in custom_settings.columns]
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
     custom_cols = [col for col in custom_settings.columns if col not in ['Default_run']]
-
+    
+    # Check if there are any custom settings
     if not custom_cols:
         raise ValueError('No custom settings found in the settings_template.csv file!')
 
-    cwd = os.getcwd()
-    for col in custom_cols:
-        # Evaluate the parameters that need to be evaluated
-        with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file: eval_vars = file.read().splitlines()
+    def process_col(col):
+        # Read the non-string values from the file
+        with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
+            eval_vars = file.read().splitlines()
+        # Evaluate the non-string values to their original types
         custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(eval)
-        # Get the settings for the run
-        custom_dict = update_settings(custom_settings[col].to_dict(), col)    
-        # Create a folder for each run
-        create_run_folders(col)    
-        # Write the custom settings to the task folder
-        write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)  
-        # Submit the task if the os is linux
+        # Update the settings dictionary
+        custom_dict = update_settings(custom_settings[col].to_dict(), col)
+        
+        # Submit the task
+        create_run_folders(col)
+        write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
         submit_task(cwd, col)
         
+    # Submit the tasks in parallel; Using 4 threads is a safe number because 
+    # we are submitting jobs in the login node, which has limited resources
+    Parallel(n_jobs=4)(delayed(process_col)(col) for col in custom_cols)
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -234,9 +241,13 @@ def update_settings(settings_dict:dict, col:str):
         MEM = "150G" 
     elif int(settings_dict['RESFACTOR']) <= 5:
         MEM = "100G"
-    else:
+    elif int(settings_dict['RESFACTOR']) <= 10:
         MEM = "80G"
-        
+    else:
+        MEM = "40G"
+    
+    # Set the carbon prices field based on the GHG limits field
+    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
    
     # Update the settings dictionary
     settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
@@ -271,5 +282,5 @@ def submit_task(cwd:str, col:str):
     if os.name == 'posix':
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
         os.system('bash task_cmd.sh')
-        os.chdir(cwd)    
-    
+        os.chdir(cwd)
+
