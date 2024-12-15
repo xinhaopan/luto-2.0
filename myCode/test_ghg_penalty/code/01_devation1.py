@@ -2,11 +2,6 @@ import pandas as pd
 import os
 import re
 from tools import get_path
-from joblib import Parallel, delayed
-
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
-
 
 
 def get_folders_containing_string(path, string):
@@ -36,14 +31,14 @@ def calculate_deviation(path, folder):
         df_ghg = pd.read_csv(os.path.join(path, f"out_{year}", f"GHG_emissions_{year}.csv"), index_col=0)
         ghg_limit = df_ghg.loc["GHG_EMISSIONS_LIMIT_TCO2e", "Emissions (t CO2e)"]
         ghg_actual = df_ghg.loc["GHG_EMISSIONS_TCO2e", "Emissions (t CO2e)"]
-        ghg_difference = ghg_actual - ghg_limit
+        ghg_difference = abs(ghg_actual - ghg_limit)
         ghg_deviation_ratio = ghg_difference / ghg_limit * 100
 
         # 处理 Demand 数据
         df_demand = pd.read_csv(os.path.join(path, f"out_{year}", f"quantity_comparison_{year}.csv"))
         demand_base = df_demand["Prod_base_year (tonnes, KL)"].sum()
         demand_target = df_demand["Prod_targ_year (tonnes, KL)"].sum()
-        demand_difference = (demand_target - demand_base)
+        demand_difference = demand_target - demand_base
         demand_deviation_ratio = demand_difference / demand_base * 100
 
         # 处理 Cost 和 Revenue 数据
@@ -64,6 +59,7 @@ def calculate_deviation(path, folder):
             "GHG Deviation Ratio (%)": ghg_deviation_ratio,
             "Demand Difference": demand_difference,
             "Demand Deviation Ratio (%)": demand_deviation_ratio,
+            "Demand_target": demand_target,
             "Profit": profit
         })
 
@@ -244,253 +240,40 @@ def match_files_in_folder(keywords, folder_path="../../../output"):
 
     return matched_files
 
-def process_deviation_task(folder):
-    path = get_path(folder)  # 获取路径
-    df_devation = calculate_deviation(path, folder)
-    sheet_name = '_'.join(f"{folder}_deviation".split('_')[1:])[:31]  # 确保 sheet_name 不超过 31 个字符
-    return sheet_name, df_devation
+file_path = "../../tasks_run/Custom_runs/setting_template_windows_9.csv"
+# folders = get_folders(file_path)
+folders = match_files_in_folder("20241205_10_w10_GHG_1_8C_67_BIO_0_2")
+output_log_coeff_file = "../Result/output_log_coeff.xlsx"
+output_log_file = "../Result/output_log.xlsx"
+output_result_file = "../Result/output_result12.xlsx"
 
-def process_log_task(folder):
-    path = get_path(folder)  # 获取路径
-    df_result = extract_log_data(path, folder)
-    sheet_name = '_'.join(f"{folder}_value".split('_')[2:])[:31]  # 确保 sheet_name 不超过 31 个字符
-    return sheet_name, df_result
-
-def process_log_coeff_task(folder):
-    path = get_path(folder)  # 获取路径
-    df_result = extract_log_coeff_data(path, folder)
-    sheet_name = '_'.join(f"{folder}_coeff".split('_')[2:])[:31]  # 确保 sheet_name 不超过 31 个字符
-    return sheet_name, df_result
-
-
-def process_tasks(use_parallel=True):
-    """
-    处理任务，并通过 `use_parallel` 参数控制是否启用并行。
-    """
-    # 处理 deviation 任务
-    if use_parallel:
-        deviation_results = Parallel(n_jobs=-1)(delayed(process_deviation_task)(folder) for folder in folders)
-    else:
-        deviation_results = [process_deviation_task(folder) for folder in folders]
-
-    with pd.ExcelWriter(output_result_file, engine="openpyxl") as result_writer:
-        for sheet_name, df_devation in deviation_results:
-            df_devation.to_excel(result_writer, sheet_name=sheet_name, index=False)
+# 写入 df_devation 到 output_result_file
+with pd.ExcelWriter(output_result_file, engine="openpyxl") as result_writer:
+    for folder in folders:
+        print(f"Processing folder for deviations: {folder}")
+        path = get_path(folder)  # 获取路径
+        df_devation = calculate_deviation(path, folder)
+        sheet_name = '_'.join(f"{folder}_devation".split('_')[2:])[:31]  # 确保 sheet_name 不超过 31 个字符
+        df_devation.to_excel(result_writer, sheet_name=sheet_name, index=False)
     print(f"Deviation results saved to {output_result_file}")
 
-    # 处理 log 任务
-    if use_parallel:
-        log_results = Parallel(n_jobs=-1)(delayed(process_log_task)(folder) for folder in folders)
-    else:
-        log_results = [process_log_task(folder) for folder in folders]
-
-    with pd.ExcelWriter(output_log_file, engine="openpyxl") as log_writer:
-        for sheet_name, df_result in log_results:
-            df_result.to_excel(log_writer, sheet_name=sheet_name, index=False)
+with pd.ExcelWriter(output_log_file, engine="openpyxl") as log_writer:
+    for folder in folders:
+        print(f"Processing folder for logs: {folder}")
+        path = get_path(folder)  # 获取路径
+        df_result = extract_log_data(path, folder)
+        sheet_name = '_'.join(f"{folder}_value".split('_')[2:])[:31]  # 确保 sheet_name 不超过 31 个字符
+        df_result.to_excel(log_writer, sheet_name=sheet_name, index=False)
     print(f"Log results saved to {output_log_file}")
 
-    # 处理 log coefficients 任务
-    if use_parallel:
-        log_coeff_results = Parallel(n_jobs=-1)(delayed(process_log_coeff_task)(folder) for folder in folders)
-    else:
-        log_coeff_results = [process_log_coeff_task(folder) for folder in folders]
+# 写入 df_result 到 output_log_file
+with pd.ExcelWriter(output_log_coeff_file, engine="openpyxl") as log_writer:
+    for folder in folders:
+        print(f"Processing folder for logs: {folder}")
+        path = get_path(folder)  # 获取路径
+        df_result = extract_log_coeff_data(path, folder)
+        sheet_name = '_'.join(f"{folder}_coeff".split('_')[2:])[:31]  # 确保 sheet_name 不超过 31 个字符
+        df_result.to_excel(log_writer, sheet_name=sheet_name, index=False)
+    print(f"Log results saved to {output_log_coeff_file}")
 
-    with pd.ExcelWriter(output_log_coeff_file, engine="openpyxl") as log_writer:
-        for sheet_name, df_result in log_coeff_results:
-            df_result.to_excel(log_writer, sheet_name=sheet_name, index=False)
-    print(f"Log coefficients saved to {output_log_coeff_file}")
-
-import os
-import pandas as pd
-import matplotlib.pyplot as plt
-from joblib import Parallel, delayed
-
-def process_all_sheets(tasks, use_parallel=True):
-    """
-    处理所有Sheet的绘图任务。
-    """
-    if use_parallel:
-        # 使用并行处理
-        Parallel(n_jobs=-1)(
-            delayed(process_sheet)(sheet_name, df, y_ranges, output_path)
-            for sheet_name, df, y_ranges, output_path in tasks
-        )
-    else:
-        # 顺序处理
-        for sheet_name, df, y_ranges, output_path in tasks:
-            process_sheet(sheet_name, df, y_ranges, output_path)
-def process_sheet(sheet_name, df, y_ranges, output_path):
-    """
-    处理单个Sheet的绘图任务。
-    """
-    x = df['Year']
-
-    # 绘制双Y轴图表
-    plot_dual_axis(
-        x,
-        df['GHG Difference'],
-        df['GHG Deviation Ratio (%)'],
-        'GHG Difference',
-        'GHG Deviation Ratio',
-        'GHG Difference',
-        'GHG Deviation Ratio (%)',
-        y_ranges['GHG Difference'],
-        y_ranges['GHG Deviation Ratio (%)'],
-        f"GHG Differences - {sheet_name}",
-        os.path.join(output_path, f"{sheet_name}_ghg.png")
-    )
-
-    plot_dual_axis(
-        x,
-        df['Demand Difference'],
-        df['Demand Deviation Ratio (%)'],
-        'Demand Difference',
-        'Demand Deviation Ratio',
-        'Demand Difference',
-        'Demand Deviation Ratio (%)',
-        y_ranges['Demand Difference'],
-        y_ranges['Demand Deviation Ratio (%)'],
-        f"Demand Differences - {sheet_name}",
-        os.path.join(output_path, f"{sheet_name}_demand.png")
-    )
-
-    # 绘制单Y轴图表
-    plot_single_axis(
-        x,
-        df['Profit'],
-        'Profit',
-        'Profit',
-        y_ranges['Profit'],
-        f"Profit - {sheet_name}",
-        os.path.join(output_path, f"{sheet_name}_profit.png")
-    )
-    print(f"Sheet {sheet_name} 图表已生成。")
-
-def calculate_global_min_max(excel_data, columns):
-    """
-    计算所有Sheet中指定列的全局最小值和最大值。
-    """
-    global_min_max = {col: [float('inf'), float('-inf')] for col in columns}
-    for sheet_name in excel_data.sheet_names:
-        df = excel_data.parse(sheet_name)
-        for column in columns:
-            if column in df.columns:
-                global_min_max[column][0] = min(global_min_max[column][0], df[column].min())
-                global_min_max[column][1] = max(global_min_max[column][1], df[column].max())
-    return global_min_max
-
-def plot_dual_axis(x, y1, y2, label1, label2, ylabel1, ylabel2, y1_range, y2_range, title, output_file):
-    """
-    绘制双Y轴点线图。
-    """
-    fig, ax1 = plt.subplots()
-    ax2 = ax1.twinx()
-
-    ax1.plot(x, y1, 'g.-', label=label1)
-    ax2.plot(x, y2, 'b.-', label=label2)
-
-    ax1.set_xlabel('Year')
-    ax1.set_ylabel(ylabel1, color='g')
-    ax2.set_ylabel(ylabel2, color='b')
-    ax1.set_ylim(y1_range)
-    ax2.set_ylim(y2_range)
-
-    plt.title(title)
-    fig.legend(bbox_to_anchor=(0.45, 0.25))
-    plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
-
-def plot_single_axis(x, y, label, ylabel, y_range, title, output_file):
-    """
-    绘制单Y轴点线图。
-    """
-    plt.figure()
-    plt.plot(x, y, 'm.-', label=label)
-    plt.xlabel('Year')
-    plt.ylabel(ylabel)
-    plt.ylim(y_range)
-    plt.title(title)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
-
-def get_local_min_max(df, columns):
-    """
-    获取当前Sheet中指定列的最小值和最大值。
-    """
-    local_min_max = {}
-    for col in columns:
-        if col in df.columns:
-            local_min_max[col] = [df[col].min(), df[col].max()]
-    return local_min_max
-
-def process_all_sheets(tasks, use_parallel=True):
-    """
-    处理所有Sheet的绘图任务。
-    """
-    if use_parallel:
-        # 使用并行处理
-        Parallel(n_jobs=-1)(
-            delayed(process_sheet)(sheet_name, df, y_ranges, output_path)
-            for sheet_name, df, y_ranges, output_path in tasks
-        )
-    else:
-        # 顺序处理
-        for sheet_name, df, y_ranges, output_path in tasks:
-            process_sheet(sheet_name, df, y_ranges, output_path)
-
-
-if __name__ == "__main__":
-    # file_path = "../../tasks_run/Custom_runs/setting_template_windows_1.csv"
-    # folders = get_folders(file_path)
-    i = 4
-    folders = match_files_in_folder(f"20241206_{i}_w90_GHG_1_8C_67_BIO_0")
-    output_log_coeff_file = f"../Result/output_log_coeff_{i}.xlsx"
-    output_log_file = f"../Result/output_log_{i}.xlsx"
-    output_result_file = f"../Result/output_result_{i}.xlsx"
-    use_parallel = False  # 设置是否启用并行
-    process_tasks(use_parallel)
-
-    file_path = f'../result/output_result_{i}.xlsx'
-    output_path = '../Figure'
-    excel_data = pd.ExcelFile(file_path)
-
-    # 设置是否并行执行
-    use_parallel = False  # 修改为 False 即可关闭并行
-
-    # 指定需要处理的列
-    columns = ['GHG Difference', 'GHG Deviation Ratio (%)',
-               'Demand Difference', 'Demand Deviation Ratio (%)', 'Profit']
-
-    # 是否启用统一的Y轴范围
-    use_global_y_range = True
-    if use_global_y_range:
-        global_min_max = calculate_global_min_max(excel_data, columns)
-    else:
-        global_min_max = None
-
-    # 构建任务列表
-    tasks = []
-    for sheet_name in excel_data.sheet_names:
-        df = excel_data.parse(sheet_name)
-
-        # 确保所需列存在
-        required_columns = ['Year'] + columns
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Sheet {sheet_name} 缺少以下列：{missing_columns}，跳过...")
-            continue
-
-        # 获取当前Sheet的Y轴范围
-        local_min_max = get_local_min_max(df, columns) if not use_global_y_range else None
-        y_ranges = global_min_max if use_global_y_range else local_min_max
-
-        # 添加任务
-        tasks.append((sheet_name, df, y_ranges, output_path))
-
-    process_all_sheets(tasks, use_parallel)
-
-    print("所有图表已生成并保存。")
 

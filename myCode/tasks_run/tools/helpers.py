@@ -652,7 +652,7 @@ def check_null_values(df):
         raise ValueError("DataFrame 中存在空值，请处理后再继续执行！")
 
 
-def generate_column_names(new_df, df_revise, ghg_name_map=None, bio_name_map=None):
+def generate_column_names(new_df, df_revise,suffix='', ghg_name_map=None, bio_name_map=None):
     """
     Generate new column names based on mappings and input data.
 
@@ -711,7 +711,7 @@ def generate_column_names(new_df, df_revise, ghg_name_map=None, bio_name_map=Non
                 print(f"警告：列 {col} 中 Name1 没有有效值，已跳过添加相关内容。")
 
         # 添加 GHG 和 BIO 的内容
-        new_name += f"_{ghg_value}_{bio_value}"
+        new_name += f"_{ghg_value}_{bio_value}" + suffix
         new_column_names.append(new_name)
 
     return new_column_names
@@ -758,7 +758,7 @@ def generate_csv(
             for col_name in df_revise.columns[1:]:
                 new_df.loc[matching_condition, col_name] = row[col_name]
 
-    new_column_names = generate_column_names(new_df, df_revise, ghg_name_map, bio_name_map)
+    new_column_names = generate_column_names(new_df, df_revise,suffix, ghg_name_map, bio_name_map)
     new_df.columns = new_df.columns[:2].tolist() + new_column_names
 
     if os.path.exists(output_csv):
@@ -772,7 +772,7 @@ def generate_csv(
     recommend_resources(df_revise)
 
 
-def create_grid_search_template(grid_dict, map_dict, output_file, template_df_dir='Custom_runs') -> pd.DataFrame:
+def create_grid_search_template(grid_dict, map_dict, output_file,suffix="", template_df_dir='Custom_runs') -> pd.DataFrame:
     create_settings_template('Custom_runs')
     template_df = pd.read_csv(os.path.join('Custom_runs','settings_template.csv'))
 
@@ -823,7 +823,7 @@ def create_grid_search_template(grid_dict, map_dict, output_file, template_df_di
 
     # Save the grid search template to the root task folder
 
-    template_grid_search.columns = template_grid_search.columns[:2].tolist() + generate_column_names(template_grid_search, template_grid_search)
+    template_grid_search.columns = template_grid_search.columns[:2].tolist() + generate_column_names(template_grid_search, template_grid_search, suffix)
     template_grid_search.to_csv(output_file, index=False)
     total_cost = calculate_total_cost(template_grid_search)
     print(f"Job Cost: {total_cost}k")
