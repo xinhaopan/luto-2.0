@@ -16,7 +16,8 @@ results = pd.DataFrame(columns=["Folder", "Weight", "GHG Deviation %", "Demand D
 custom_runs = ["setting_template_windows", "setting_template_windows_1", "setting_template_windows_2"]
 
 # 指定需要绘图的分组
-selected_groups = ["0", "1", "2", "3", "4", "5"]
+# selected_groups = ["0", "1", "2", "3", "4", "5"]
+selected_groups = [ "4"]
 output_file = "../Result/ghg_weight_results_1.xlsx"
 
 # 构建筛选关键词

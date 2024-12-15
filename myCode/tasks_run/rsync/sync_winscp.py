@@ -219,6 +219,7 @@ def remove_lock():
             print("Lock file removed.")
     except Exception as e:
         print(f"Error removing lock file: {str(e)}")
+
 @LogToFile('log_file.log', mode='a')
 def execute_sync_task():
     datetime_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -261,8 +262,10 @@ def execute_sync_task():
         clean_large_txt_files(log_file)
         clean_large_txt_files(output_file)
         clean_large_txt_files(sync_time_file)
+        print("")
     except Exception as e:
         print(f"Task failed: {e}")
+        print("")
     finally:
         # 任务完成后删除锁文件
         remove_lock()

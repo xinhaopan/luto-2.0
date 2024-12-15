@@ -301,9 +301,9 @@ def process_tasks(use_parallel=True):
     print(f"Log coefficients saved to {output_log_coeff_file}")
 
 if __name__ == "__main__":
-    file_path = "../../tasks_run/Custom_runs/setting_template_windows_10.csv"
+    file_path = "../../tasks_run/Custom_runs/setting_template_windows_5.csv"
     folders = get_folders(file_path)
-    i = 1
+    i = 0
     # folders = match_files_in_folder(f"20241206_{i}_w90_GHG_1_8C_67_BIO_0")
     output_log_coeff_file = f"../Result/output_log_coeff_{i}.xlsx"
     output_log_file = f"../Result/output_log_{i}.xlsx"
