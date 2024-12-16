@@ -55,7 +55,7 @@ class LogToFile:
 
 
 # 读取上次运行时间，如果文件不存在或为空则返回默认时间
-@LogToFile('log_file.log', mode='a')
+@LogToFile('0_log_file.txt', mode='a')
 def read_last_sync_time(file_path):
     # 默认时间
     default_time = '2023-01-01 00:00:00'
@@ -72,14 +72,14 @@ def read_last_sync_time(file_path):
 
 
 # 更新时间戳文件为当前时间
-@LogToFile('log_file.log', mode='a')
+@LogToFile('0_log_file.txt', mode='a')
 def update_sync_time(file_path):
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     with open(file_path, 'w') as f:
         f.write(current_time)
     print(f"[INFO] Sync time updated to: {current_time}")
 
-@LogToFile('log_file.log', mode='a')
+@LogToFile('0_log_file.txt', mode='a')
 def create_sync_list(hostname, port, username, private_key_path, remote_dir, sync_time_str, output_file):
     # 将字符串时间转换为 datetime 对象
     sync_time = datetime.strptime(sync_time_str, "%Y-%m-%d %H:%M:%S")
@@ -120,7 +120,7 @@ def create_sync_list(hostname, port, username, private_key_path, remote_dir, syn
     print(f"File list saved to {output_file}")
 
 # 生成 WinSCP 脚本来同步文件
-@LogToFile('log_file.log', mode='a')
+@LogToFile('0_log_file.txt', mode='a')
 def generate_winscp_script(sync_file, winscp_path, script_path, local_dir, remote_dir, private_key_path):
     with open(sync_file, 'r') as f:
         files = f.readlines()
@@ -157,43 +157,46 @@ option confirm off
     print(f"WinSCP script saved to {script_path}")
 
 # 调用 WinSCP 执行同步
-@LogToFile('log_file.log', mode='a')
-def execute_winscp_script(winscp_path, script_path):
+@LogToFile('0_log_file.txt', mode='a')
+def execute_winscp_script(winscp_path, script_path, log_file_path):
     print("Starting synchronization...")
+
     # 使用 Popen 来捕获 stdout 和 stderr
-    process = subprocess.Popen([winscp_path, '/script', script_path],
+    process = subprocess.Popen([winscp_path, '/script=' + script_path, '/log=' + log_file_path],
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
-                               text=True)
+                               text=True,
+                               encoding='utf-8')
 
     # 捕获标准输出和标准错误
     stdout, stderr = process.communicate()
 
-    if result.returncode != 0:
-        print(f"Error: {result.stderr}")
+    # 检查进程的返回码
+    if process.returncode != 0:
+        print(f"Error: {stderr}")
     else:
-        print(f"Synchronization completed successfully.")
-        print(f"Output: {result.stdout}")
-@LogToFile('log_file.log', mode='a')
-def clean_large_txt_files(directory, max_size_mb=10):
+        print("Synchronization completed successfully.")
+        print(f"Output: {stdout}")
+@LogToFile('0_log_file.txt', mode='a')
+def clean_large_txt_files(file_path, max_size_mb=10):
     # 将最大文件大小转换为字节
     max_size_bytes = max_size_mb * 1024 * 1024
 
-    # 遍历指定目录中的所有文件
-    for filename in os.listdir(directory):
-        file_path = os.path.join(directory, filename)
+    # 判断传入的是文件且是 .txt 文件
+    if os.path.isfile(file_path) and file_path.endswith('.txt'):
+        # 获取文件的大小
+        file_size = os.path.getsize(file_path)
 
-        # 只处理 .txt 文件
-        if os.path.isfile(file_path) and filename.endswith('.txt'):
-            # 获取文件的大小
-            file_size = os.path.getsize(file_path)
-
-            # 如果文件大小大于指定的最大值，则删除文件
-            if file_size > max_size_bytes:
-                print(f"Deleting {file_path} - Size: {file_size / (1024 * 1024):.2f} MB")
-                os.remove(file_path)
-                print(f"Cleaned {directory} files.")
-@LogToFile('log_file.log', mode='a')
+        # 如果文件大小大于指定的最大值，则删除文件
+        if file_size > max_size_bytes:
+            print(f"Deleting {file_path} - Size: {file_size / (1024 * 1024):.2f} MB")
+            os.remove(file_path)
+            print(f"Cleaned file: {file_path}")
+        else:
+            print(f"File {file_path} is under the size limit. No cleaning required.")
+    else:
+        print(f"Invalid file path or not a .txt file: {file_path}")
+@LogToFile('0_log_file.txt', mode='a')
 def check_and_create_lock():
     """
     检查锁文件是否存在，并创建锁文件。如果锁文件存在，返回 False，表示任务正在执行。
@@ -208,7 +211,7 @@ def check_and_create_lock():
     except TimeoutError:
         print(f"Another task is already running.")
         return False  # 如果任务正在执行，返回 False
-@LogToFile('log_file.log', mode='a')
+@LogToFile('0_log_file.txt', mode='a')
 def remove_lock():
     """
     删除锁文件，任务完成后调用此方法
@@ -220,7 +223,7 @@ def remove_lock():
     except Exception as e:
         print(f"Error removing lock file: {str(e)}")
 
-@LogToFile('log_file.log', mode='a')
+@LogToFile('0_log_file.txt', mode='a')
 def execute_sync_task():
     datetime_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     if not check_and_create_lock():
@@ -229,9 +232,9 @@ def execute_sync_task():
 
     try:
         print(f"{datetime_str}: Starting task...")
-        log_file = 'sync_log.txt'
-        output_file = 'sync_list.txt'  # 输出文件路径
-        sync_time_file = 'last_sync_time.txt'
+        sync_time_file = '1_last_sync_time.txt' # 上次同步时间文件
+        output_file = '2_sync_list.txt'  # 同步文件路径
+        log_file = '3_sync_log.txt'  # 同步日志路径
 
         # 读取上次同步时间
         last_sync_time = read_last_sync_time(sync_time_file)
@@ -244,9 +247,8 @@ def execute_sync_task():
         username = 'xp7241'  # SSH用户名
         private_key_path = r"C:\Users\s222552331\.ssh\id_rsa.ppk"  # 私钥路径
         remote_dir = "/g/data/jk53/LUTO_XH/LUTO2/output"   # 远程文件夹路径
-        sync_time_str = '2024-12-12 00:00:00'  # 需要同步的文件修改时间
 
-        create_sync_list(hostname, port, username, private_key_path, remote_dir, sync_time_str, output_file)
+        create_sync_list(hostname, port, username, private_key_path, remote_dir, last_sync_time, output_file)
 
         # 配置同步的本地路径和远程路径
         local_dir = r'N:\LUF-Modelling\LUTO2_XH\LUTO2\output'  # 本地目录
@@ -258,10 +260,11 @@ def execute_sync_task():
         generate_winscp_script(output_file, winscp_path, script_path, local_dir, remote_dir, private_key_path)
 
         # 执行 WinSCP 脚本
-        execute_winscp_script(winscp_path, script_path)
+        execute_winscp_script(winscp_path, script_path, log_file)
         clean_large_txt_files(log_file)
         clean_large_txt_files(output_file)
         clean_large_txt_files(sync_time_file)
+        clean_large_txt_files('0_log_file.txt')
         print("")
     except Exception as e:
         print(f"Task failed: {e}")

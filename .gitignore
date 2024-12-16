@@ -42,6 +42,7 @@ input/
 *.png
 *.tif
 *.shp
+*.ffs_db
 myCode/**/Assets/
 /myCode/tasks_run/rsync/rsync_password
 

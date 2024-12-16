@@ -1,0 +1,335 @@
+. 2024-12-16 14:38:33.118 --------------------------------------------------------------------------
+. 2024-12-16 14:38:33.118 WinSCP 版本5.19.2 (构建版本 11614) (OS 10.0.17763 - Windows Server 2019 Datacenter)
+. 2024-12-16 14:38:33.118 Configuration: HKCU\Software\Martin Prikryl\WinSCP 2\
+. 2024-12-16 14:38:33.118 Log level: Normal
+. 2024-12-16 14:38:33.118 Local account: DU\s222552331
+. 2024-12-16 14:38:33.118 Working directory: F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync
+. 2024-12-16 14:38:33.118 Process ID: 192536
+. 2024-12-16 14:38:33.300 Ancestor processes: WinSCP, python, pycharm64, explorer, ...
+. 2024-12-16 14:38:33.301 Command-line: "C:\Program Files (x86)\WinSCP\WinSCP.exe" /console=5.19.2 /consoleinstance=_59044_129 "/script=F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt" "/log=3_sync_log.txt" 
+. 2024-12-16 14:38:33.301 Time zone: Current: GMT+11, Standard: GMT+10 (AUS Eastern Standard Time), DST: GMT+11 (AUS Eastern Daylight Time), DST Start: 6/10/2024, DST End: 7/04/2024
+. 2024-12-16 14:38:33.301 Login time: Monday, 16 December 2024 2:38:33 PM
+. 2024-12-16 14:38:33.301 --------------------------------------------------------------------------
+. 2024-12-16 14:38:33.301 Script: Retrospectively logging previous script records:
+> 2024-12-16 14:38:33.301 Script: open scp://xp7241@gadi.nci.org.au/ -privatekey="C:\Users\s222552331\.ssh\id_rsa.ppk"
+. 2024-12-16 14:38:33.301 --------------------------------------------------------------------------
+. 2024-12-16 14:38:33.301 Session name: xp7241@gadi.nci.org.au (Ad-Hoc site)
+. 2024-12-16 14:38:33.301 Host name: gadi.nci.org.au (Port: 22)
+. 2024-12-16 14:38:33.301 User name: xp7241 (Password: No, Key file: Yes, Passphrase: No)
+. 2024-12-16 14:38:33.301 Tunnel: No
+. 2024-12-16 14:38:33.301 Transfer Protocol: SCP
+. 2024-12-16 14:38:33.301 Ping type: Off, Ping interval: 30 sec; Timeout: 15 sec
+. 2024-12-16 14:38:33.301 Disable Nagle: No
+. 2024-12-16 14:38:33.301 Proxy: None
+. 2024-12-16 14:38:33.301 Send buffer: 262144
+. 2024-12-16 14:38:33.301 SSH protocol version: 2; Compression: No
+. 2024-12-16 14:38:33.301 Bypass authentication: No
+. 2024-12-16 14:38:33.301 Try agent: Yes; Agent forwarding: No; TIS/CryptoCard: No; KI: Yes; GSSAPI: Yes
+. 2024-12-16 14:38:33.302 GSSAPI: KEX: No; Forwarding: No; Libs: gssapi32,sspi,custom; Custom: 
+. 2024-12-16 14:38:33.302 Ciphers: aes,chacha20,blowfish,3des,WARN,arcfour,des; Ssh2DES: No
+. 2024-12-16 14:38:33.302 KEX: ecdh,dh-gex-sha1,dh-group14-sha1,rsa,WARN,dh-group1-sha1
+. 2024-12-16 14:38:33.302 SSH Bugs: Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto
+. 2024-12-16 14:38:33.302 Simple channel: Yes
+. 2024-12-16 14:38:33.302 Return code variable: Autodetect; Lookup user groups: Auto
+. 2024-12-16 14:38:33.302 Shell: default
+. 2024-12-16 14:38:33.302 EOL: LF, UTF: Auto
+. 2024-12-16 14:38:33.302 Clear aliases: Yes, Unset nat.vars: Yes, Resolve symlinks: Yes; Follow directory symlinks: No
+. 2024-12-16 14:38:33.302 LS: ls -la, Ign LS warn: Yes, Scp1 Comp: No; Exit code 1 is error: No
+. 2024-12-16 14:38:33.302 Local directory: default, Remote directory: home, Update: Yes, Cache: Yes
+. 2024-12-16 14:38:33.302 Cache directory changes: Yes, Permanent: Yes
+. 2024-12-16 14:38:33.302 Recycle bin: Delete to: No, Overwritten to: No, Bin path: 
+. 2024-12-16 14:38:33.302 DST mode: Unix;Timezone offset: 0h 0m
+. 2024-12-16 14:38:33.302 --------------------------------------------------------------------------
+< 2024-12-16 14:38:33.302 Script: 寻找主机...
+. 2024-12-16 14:38:33.303 Looking up host "gadi.nci.org.au" for SSH connection
+. 2024-12-16 14:38:33.308 Connecting to 203.0.19.85 port 22
+< 2024-12-16 14:38:33.320 Script: 连接到主机...
+. 2024-12-16 14:38:33.320 We claim version: SSH-2.0-WinSCP_release_5.19.2
+. 2024-12-16 14:38:33.352 Remote version: SSH-2.0-OpenSSH_8.0
+. 2024-12-16 14:38:33.352 Using SSH protocol version 2
+. 2024-12-16 14:38:33.352 Have a known host key of type ssh-ed25519
+. 2024-12-16 14:38:33.359 Doing ECDH key exchange with curve Curve25519 and hash SHA-256
+. 2024-12-16 14:38:33.439 Server also has ecdsa-sha2-nistp256/ssh-rsa host keys, but we don't know any of them
+. 2024-12-16 14:38:33.439 Host key fingerprint is:
+. 2024-12-16 14:38:33.439 ssh-ed25519 255 2a:4f:25:0f:56:66:bb:21:a8:a4:37:55:77:7c:83:a4 4VAftRK1D11TnXKVeWDsb/wonDJXW6p5Bt0J5XH4T+s=
+< 2024-12-16 14:38:33.439 Script: 正在验证...
+. 2024-12-16 14:38:33.440 Host key matches cached key
+. 2024-12-16 14:38:33.440 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] outbound encryption
+. 2024-12-16 14:38:33.440 Initialised HMAC-SHA-256 outbound MAC algorithm
+. 2024-12-16 14:38:33.440 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] inbound encryption
+. 2024-12-16 14:38:33.440 Initialised HMAC-SHA-256 inbound MAC algorithm
+. 2024-12-16 14:38:33.451 Reading key file "C:\Users\s222552331\.ssh\id_rsa.ppk"
+! 2024-12-16 14:38:33.451 Using username "xp7241".
+< 2024-12-16 14:38:33.451 Script: 使用用户名 "xp7241"。
+. 2024-12-16 14:38:33.465 Server offered these authentication methods: publickey,gssapi-keyex,gssapi-with-mic,password,hostbased
+. 2024-12-16 14:38:33.465 Offered public key
+. 2024-12-16 14:38:33.485 Offer of public key accepted
+! 2024-12-16 14:38:33.485 Authenticating with public key "imported-openssh-key"
+< 2024-12-16 14:38:33.485 Script: 使用公钥"imported-openssh-key"进行认证。
+. 2024-12-16 14:38:34.110 Sent public key signature
+. 2024-12-16 14:38:34.148 Access granted
+. 2024-12-16 14:38:34.148 Opening main session channel
+. 2024-12-16 14:38:34.605 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:3: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-16 14:38:34.626 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:3: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-16 14:38:34.626 Opened main channel
+. 2024-12-16 14:38:34.639 Started a shell/command
+< 2024-12-16 14:38:34.639 Script: 已验证。
+. 2024-12-16 14:38:34.639 --------------------------------------------------------------------------
+. 2024-12-16 14:38:34.639 Using SCP protocol.
+. 2024-12-16 14:38:34.639 Doing startup conversation with host.
+< 2024-12-16 14:38:34.639 Script: 正在开始会话...
+. 2024-12-16 14:38:34.639 Skipping host startup message (if any).
+> 2024-12-16 14:38:34.639 echo "WinSCP: this is end-of-file:0"
+< 2024-12-16 14:38:34.650 ###############################################################################
+< 2024-12-16 14:38:34.650 #                  Welcome to the NCI National Facility!                      #
+< 2024-12-16 14:38:34.650 #      This service is for authorised clients only. It is a criminal          #
+< 2024-12-16 14:38:34.650 #      offence to:                                                            #
+< 2024-12-16 14:38:34.650 #                - Obtain access to data without permission                   #
+< 2024-12-16 14:38:34.650 #                - Damage, delete, alter or insert data without permission    #
+< 2024-12-16 14:38:34.650 #      Use of this system requires acceptance of the Conditions of Use        #
+< 2024-12-16 14:38:34.650 #      published at http://nci.org.au/users/nci-terms-and-conditions-access   #
+< 2024-12-16 14:38:34.650 ###############################################################################
+< 2024-12-16 14:38:34.650 |         gadi.nci.org.au - 260,760 processor InfiniBand x86_64 cluster       | 
+< 2024-12-16 14:38:34.650 ===============================================================================
+< 2024-12-16 14:38:34.650 Nov 30 ANUMAS Applications Close
+< 2024-12-16 14:38:34.650    The ANUMAS Call for Applications closes on 30th November. Applications
+< 2024-12-16 14:38:34.650    from ANU researchers can be made at https://anumas.nci.org.au/
+< 2024-12-16 14:38:34.650 Dec 25 2024 - 1 Jan 2025 End of Year Closure
+< 2024-12-16 14:38:34.650    NCI systems will operate normally across the Christmas-New Year period
+< 2024-12-16 14:38:34.650    (25 December 2024 â€“ 1 January 2025). NCI staff will not work during this
+< 2024-12-16 14:38:34.650    period, which is a mandatory ANU staff holiday. Support requests received
+< 2024-12-16 14:38:34.650    during the holiday period will be addressed as soon as possible after
+< 2024-12-16 14:38:34.650    2 January.
+< 2024-12-16 14:38:34.650 ===============================================================================
+< 2024-12-16 14:38:35.060 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:35.060 Detecting variable containing return code of last command.
+. 2024-12-16 14:38:35.060 Trying "$status".
+> 2024-12-16 14:38:35.060 echo "$status" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-16 14:38:35.071 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:35.071 The response is not numerical exit code
+. 2024-12-16 14:38:35.071 Trying "$?".
+> 2024-12-16 14:38:35.071 echo "$?" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-16 14:38:35.082 0
+< 2024-12-16 14:38:35.082 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:35.082 Return code variable "$?" selected.
+> 2024-12-16 14:38:35.082 printenv LANG ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.095 WinSCP: this is end-of-file:1
+. 2024-12-16 14:38:35.095 We will not use UTF-8
+. 2024-12-16 14:38:35.095 Clearing all aliases.
+> 2024-12-16 14:38:35.095 unalias "ls" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.106 -/bin/bash: line 5: unalias: ls: not found
+< 2024-12-16 14:38:35.126 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.126 unalias "echo" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.137 -/bin/bash: line 6: unalias: echo: not found
+< 2024-12-16 14:38:35.137 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.137 unalias "pwd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.148 -/bin/bash: line 7: unalias: pwd: not found
+< 2024-12-16 14:38:35.168 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.168 unalias "cd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.179 -/bin/bash: line 8: unalias: cd: not found
+< 2024-12-16 14:38:35.199 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.199 unalias "groups" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.210 -/bin/bash: line 9: unalias: groups: not found
+< 2024-12-16 14:38:35.210 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.210 unalias "scp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.220 -/bin/bash: line 10: unalias: scp: not found
+< 2024-12-16 14:38:35.240 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.240 unalias "rm" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.251 -/bin/bash: line 11: unalias: rm: not found
+< 2024-12-16 14:38:35.251 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.251 unalias "mv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.261 -/bin/bash: line 12: unalias: mv: not found
+< 2024-12-16 14:38:35.261 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.261 unalias "mkdir" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.272 -/bin/bash: line 13: unalias: mkdir: not found
+< 2024-12-16 14:38:35.292 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.292 unalias "chmod" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.303 -/bin/bash: line 14: unalias: chmod: not found
+< 2024-12-16 14:38:35.303 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.303 unalias "chgrp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.314 -/bin/bash: line 15: unalias: chgrp: not found
+< 2024-12-16 14:38:35.334 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.334 unalias "chown" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.345 -/bin/bash: line 16: unalias: chown: not found
+< 2024-12-16 14:38:35.365 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.365 unalias "unset" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.376 -/bin/bash: line 17: unalias: unset: not found
+< 2024-12-16 14:38:35.396 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.396 unalias "unalias" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.407 -/bin/bash: line 18: unalias: unalias: not found
+< 2024-12-16 14:38:35.427 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.427 unalias "ln" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.438 -/bin/bash: line 19: unalias: ln: not found
+< 2024-12-16 14:38:35.458 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.458 unalias "cp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.469 -/bin/bash: line 20: unalias: cp: not found
+< 2024-12-16 14:38:35.469 WinSCP: this is end-of-file:1
+> 2024-12-16 14:38:35.469 unalias "printenv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-16 14:38:35.479 -/bin/bash: line 21: unalias: printenv: not found
+< 2024-12-16 14:38:35.479 WinSCP: this is end-of-file:1
+. 2024-12-16 14:38:35.479 Clearing national user variables.
+> 2024-12-16 14:38:35.479 unset "LANG" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.490 WinSCP: this is end-of-file:0
+> 2024-12-16 14:38:35.490 unset "LANGUAGE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.501 WinSCP: this is end-of-file:0
+> 2024-12-16 14:38:35.501 unset "LC_CTYPE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.512 WinSCP: this is end-of-file:0
+> 2024-12-16 14:38:35.512 unset "LC_COLLATE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.522 WinSCP: this is end-of-file:0
+> 2024-12-16 14:38:35.523 unset "LC_MONETARY" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.533 WinSCP: this is end-of-file:0
+> 2024-12-16 14:38:35.534 unset "LC_NUMERIC" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.544 WinSCP: this is end-of-file:0
+> 2024-12-16 14:38:35.545 unset "LC_TIME" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.555 WinSCP: this is end-of-file:0
+> 2024-12-16 14:38:35.555 unset "LC_MESSAGES" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.566 WinSCP: this is end-of-file:0
+> 2024-12-16 14:38:35.566 unset "LC_ALL" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.577 WinSCP: this is end-of-file:0
+> 2024-12-16 14:38:35.577 unset "HUMAN_BLOCKS" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.587 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:35.588 Looking up groups and users.
+> 2024-12-16 14:38:35.588 groups ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.602 jk53 Deakin
+< 2024-12-16 14:38:35.622 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:35.622 Following groups found:
+. 2024-12-16 14:38:35.622   "jk53" [0]
+. 2024-12-16 14:38:35.622   "Deakin" [0]
+. 2024-12-16 14:38:35.622 Following membership found:
+. 2024-12-16 14:38:35.622   "jk53" [0]
+. 2024-12-16 14:38:35.622   "Deakin" [0]
+. 2024-12-16 14:38:35.622 No users found.
+. 2024-12-16 14:38:35.622 Getting current directory name.
+> 2024-12-16 14:38:35.622 pwd ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.633 /home/582/xp7241
+< 2024-12-16 14:38:35.653 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:35.653 Startup conversation with host finished.
+< 2024-12-16 14:38:35.653 Script: 会话已开始。
+< 2024-12-16 14:38:35.653 Script: 活动的会话：[1] xp7241@gadi.nci.org.au
+> 2024-12-16 14:38:35.654 Script: option batch on
+< 2024-12-16 14:38:35.654 Script: batch           on        
+> 2024-12-16 14:38:35.654 Script: option confirm off
+< 2024-12-16 14:38:35.654 Script: confirm         off       
+> 2024-12-16 14:38:35.654 Script: get "/g/data/jk53/LUTO_XH/LUTO2/output/test1.txt" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\test1.txt"
+. 2024-12-16 14:38:35.654 Listing file "/g/data/jk53/LUTO_XH/LUTO2/output/test1.txt".
+> 2024-12-16 14:38:35.654 ls -la -d  "/g/data/jk53/LUTO_XH/LUTO2/output/test1.txt" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.672 -rw-r--r-- 1 xp7241 jk53 24 Dec 12 20:59 /g/data/jk53/LUTO_XH/LUTO2/output/test1.txt
+< 2024-12-16 14:38:35.693 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:35.693 test1.txt;-;24;2024-12-12T09:59:00.000Z;1;"xp7241" [0];"jk53" [0];rw-r--r--;0
+. 2024-12-16 14:38:35.693 Copying 1 files/directories to local directory "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\" - total size: 24
+. 2024-12-16 14:38:35.693   PrTime: Yes; PrRO: No; Rght: rw-r--r--; PrR: No (No); FnCs: N; RIC: 0100; Resume: S (102400); CalcS: No; Mask: test1.txt
+. 2024-12-16 14:38:35.693   TM: B; ClAr: No; RemEOF: No; RemBOM: No; CPS: 0; NewerOnly: No; EncryptNewFiles: Yes; ExcludeHiddenFiles: No; ExcludeEmptyDirectories: No; InclM: ; ResumeL: 0
+. 2024-12-16 14:38:35.693   AscM: *.*html; *.htm; *.txt; *.php; *.php3; *.cgi; *.c; *.cpp; *.h; *.pas; *.bas; *.tex; *.pl; *.js; .htaccess; *.xtml; *.css; *.cfg; *.ini; *.sh; *.xml
+. 2024-12-16 14:38:35.693 Copying 1 files/directories to local directory "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\"
+. 2024-12-16 14:38:35.693   PrTime: Yes; PrRO: No; Rght: rw-r--r--; PrR: No (No); FnCs: N; RIC: 0100; Resume: S (102400); CalcS: No; Mask: test1.txt
+. 2024-12-16 14:38:35.693   TM: B; ClAr: No; RemEOF: No; RemBOM: No; CPS: 0; NewerOnly: No; EncryptNewFiles: Yes; ExcludeHiddenFiles: No; ExcludeEmptyDirectories: No; InclM: ; ResumeL: 0
+. 2024-12-16 14:38:35.693   AscM: *.*html; *.htm; *.txt; *.php; *.php3; *.cgi; *.c; *.cpp; *.h; *.pas; *.bas; *.tex; *.pl; *.js; .htaccess; *.xtml; *.css; *.cfg; *.ini; *.sh; *.xml
+> 2024-12-16 14:38:35.693 echo "WinSCP: this is begin-of-file" ; scp -r -p -d -f "/g/data/jk53/LUTO_XH/LUTO2/output/test1.txt" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.721 WinSCP: this is begin-of-file
+. 2024-12-16 14:38:35.721 Sending NULL.
+< 2024-12-16 14:38:35.734 T1733997583 0 1734319561 0
+. 2024-12-16 14:38:35.734 Sending NULL.
+< 2024-12-16 14:38:35.745 C0644 24 test1.txt
+. 2024-12-16 14:38:35.745 File: '/g/data/jk53/LUTO_XH/LUTO2/output/test1.txt' [2024-12-12T09:59:43.000Z] [24]
+. 2024-12-16 14:38:35.780 Sending NULL.
+. 2024-12-16 14:38:35.780 Binary transfer mode selected.
+. 2024-12-16 14:38:35.812 SCP remote side confirmation (0)
+. 2024-12-16 14:38:35.812 Sending NULL.
+. 2024-12-16 14:38:35.812 Preserving timestamp [2024-12-12T09:59:43.000Z]
+. 2024-12-16 14:38:35.823 Transfer done: '/g/data/jk53/LUTO_XH/LUTO2/output/test1.txt' => 'N:\LUF-Modelling\LUTO2_XH\LUTO2\output\test1.txt' [24]
+< 2024-12-16 14:38:35.834 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:35.834 Copying finished: Transferred: 24, Elapsed: 0:00:00, CPS: 0/s
+> 2024-12-16 14:38:35.834 Script: get "/g/data/jk53/LUTO_XH/LUTO2/output/test1 (1).txt" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\test1 (1).txt"
+. 2024-12-16 14:38:35.835 Listing file "/g/data/jk53/LUTO_XH/LUTO2/output/test1 (1).txt".
+> 2024-12-16 14:38:35.835 ls -la -d  "/g/data/jk53/LUTO_XH/LUTO2/output/test1 (1).txt" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.851 -rw-r--r-- 1 xp7241 jk53 24 Dec 13 14:25 /g/data/jk53/LUTO_XH/LUTO2/output/test1 (1).txt
+< 2024-12-16 14:38:35.872 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:35.872 test1 (1).txt;-;24;2024-12-13T03:25:00.000Z;1;"xp7241" [0];"jk53" [0];rw-r--r--;0
+. 2024-12-16 14:38:35.872 Copying 1 files/directories to local directory "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\" - total size: 24
+. 2024-12-16 14:38:35.872   PrTime: Yes; PrRO: No; Rght: rw-r--r--; PrR: No (No); FnCs: N; RIC: 0100; Resume: S (102400); CalcS: No; Mask: test1 (1).txt
+. 2024-12-16 14:38:35.872   TM: B; ClAr: No; RemEOF: No; RemBOM: No; CPS: 0; NewerOnly: No; EncryptNewFiles: Yes; ExcludeHiddenFiles: No; ExcludeEmptyDirectories: No; InclM: ; ResumeL: 0
+. 2024-12-16 14:38:35.872   AscM: *.*html; *.htm; *.txt; *.php; *.php3; *.cgi; *.c; *.cpp; *.h; *.pas; *.bas; *.tex; *.pl; *.js; .htaccess; *.xtml; *.css; *.cfg; *.ini; *.sh; *.xml
+. 2024-12-16 14:38:35.872 Copying 1 files/directories to local directory "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\"
+. 2024-12-16 14:38:35.872   PrTime: Yes; PrRO: No; Rght: rw-r--r--; PrR: No (No); FnCs: N; RIC: 0100; Resume: S (102400); CalcS: No; Mask: test1 (1).txt
+. 2024-12-16 14:38:35.872   TM: B; ClAr: No; RemEOF: No; RemBOM: No; CPS: 0; NewerOnly: No; EncryptNewFiles: Yes; ExcludeHiddenFiles: No; ExcludeEmptyDirectories: No; InclM: ; ResumeL: 0
+. 2024-12-16 14:38:35.872   AscM: *.*html; *.htm; *.txt; *.php; *.php3; *.cgi; *.c; *.cpp; *.h; *.pas; *.bas; *.tex; *.pl; *.js; .htaccess; *.xtml; *.css; *.cfg; *.ini; *.sh; *.xml
+> 2024-12-16 14:38:35.872 echo "WinSCP: this is begin-of-file" ; scp -r -p -d -f "/g/data/jk53/LUTO_XH/LUTO2/output/test1 (1).txt" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:35.883 WinSCP: this is begin-of-file
+. 2024-12-16 14:38:35.883 Sending NULL.
+< 2024-12-16 14:38:35.894 T1734060340 0 1734319561 0
+. 2024-12-16 14:38:35.894 Sending NULL.
+< 2024-12-16 14:38:35.904 C0644 24 test1 (1).txt
+. 2024-12-16 14:38:35.905 File: '/g/data/jk53/LUTO_XH/LUTO2/output/test1 (1).txt' [2024-12-13T03:25:40.000Z] [24]
+. 2024-12-16 14:38:35.930 Sending NULL.
+. 2024-12-16 14:38:35.930 Binary transfer mode selected.
+. 2024-12-16 14:38:35.961 SCP remote side confirmation (0)
+. 2024-12-16 14:38:35.961 Sending NULL.
+. 2024-12-16 14:38:35.961 Preserving timestamp [2024-12-13T03:25:40.000Z]
+. 2024-12-16 14:38:35.972 Transfer done: '/g/data/jk53/LUTO_XH/LUTO2/output/test1 (1).txt' => 'N:\LUF-Modelling\LUTO2_XH\LUTO2\output\test1 (1).txt' [24]
+< 2024-12-16 14:38:35.984 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:35.984 Copying finished: Transferred: 24, Elapsed: 0:00:00, CPS: 0/s
+> 2024-12-16 14:38:35.984 Script: get "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stderr.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\run_2024_12_16__13_18_33_stderr.log"
+. 2024-12-16 14:38:35.984 Listing file "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stderr.log".
+> 2024-12-16 14:38:35.984 ls -la -d  "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stderr.log" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:36.000 -rw-r--r-- 1 xp7241 jk53 0 Dec 16 13:18 /g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stderr.log
+< 2024-12-16 14:38:36.021 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:36.021 run_2024_12_16__13_18_33_stderr.log;-;0;2024-12-16T02:18:00.000Z;1;"xp7241" [0];"jk53" [0];rw-r--r--;0
+. 2024-12-16 14:38:36.021 Copying 1 files/directories to local directory "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\" - total size: 0
+. 2024-12-16 14:38:36.021   PrTime: Yes; PrRO: No; Rght: rw-r--r--; PrR: No (No); FnCs: N; RIC: 0100; Resume: S (102400); CalcS: No; Mask: run_2024_12_16__13_18_33_stderr.log
+. 2024-12-16 14:38:36.021   TM: B; ClAr: No; RemEOF: No; RemBOM: No; CPS: 0; NewerOnly: No; EncryptNewFiles: Yes; ExcludeHiddenFiles: No; ExcludeEmptyDirectories: No; InclM: ; ResumeL: 0
+. 2024-12-16 14:38:36.021   AscM: *.*html; *.htm; *.txt; *.php; *.php3; *.cgi; *.c; *.cpp; *.h; *.pas; *.bas; *.tex; *.pl; *.js; .htaccess; *.xtml; *.css; *.cfg; *.ini; *.sh; *.xml
+. 2024-12-16 14:38:36.021 Copying 1 files/directories to local directory "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\"
+. 2024-12-16 14:38:36.021   PrTime: Yes; PrRO: No; Rght: rw-r--r--; PrR: No (No); FnCs: N; RIC: 0100; Resume: S (102400); CalcS: No; Mask: run_2024_12_16__13_18_33_stderr.log
+. 2024-12-16 14:38:36.021   TM: B; ClAr: No; RemEOF: No; RemBOM: No; CPS: 0; NewerOnly: No; EncryptNewFiles: Yes; ExcludeHiddenFiles: No; ExcludeEmptyDirectories: No; InclM: ; ResumeL: 0
+. 2024-12-16 14:38:36.021   AscM: *.*html; *.htm; *.txt; *.php; *.php3; *.cgi; *.c; *.cpp; *.h; *.pas; *.bas; *.tex; *.pl; *.js; .htaccess; *.xtml; *.css; *.cfg; *.ini; *.sh; *.xml
+> 2024-12-16 14:38:36.021 echo "WinSCP: this is begin-of-file" ; scp -r -p -d -f "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stderr.log" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:36.032 WinSCP: this is begin-of-file
+. 2024-12-16 14:38:36.032 Sending NULL.
+< 2024-12-16 14:38:36.043 T1734315513 0 1734315513 0
+. 2024-12-16 14:38:36.043 Sending NULL.
+< 2024-12-16 14:38:36.053 C0644 0 run_2024_12_16__13_18_33_stderr.log
+. 2024-12-16 14:38:36.054 File: '/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stderr.log' [2024-12-16T02:18:33.000Z] [0]
+. 2024-12-16 14:38:36.066 Sending NULL.
+. 2024-12-16 14:38:36.066 Binary transfer mode selected.
+. 2024-12-16 14:38:36.077 SCP remote side confirmation (0)
+. 2024-12-16 14:38:36.077 Sending NULL.
+. 2024-12-16 14:38:36.077 Preserving timestamp [2024-12-16T02:18:33.000Z]
+. 2024-12-16 14:38:36.088 Transfer done: '/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stderr.log' => 'N:\LUF-Modelling\LUTO2_XH\LUTO2\output\run_2024_12_16__13_18_33_stderr.log' [0]
+< 2024-12-16 14:38:36.099 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:36.099 Copying finished: Transferred: 0, Elapsed: 0:00:00, CPS: 0/s
+> 2024-12-16 14:38:36.100 Script: get "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stdout.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\run_2024_12_16__13_18_33_stdout.log"
+. 2024-12-16 14:38:36.100 Listing file "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stdout.log".
+> 2024-12-16 14:38:36.100 ls -la -d  "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stdout.log" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:36.117 -rw-r--r-- 1 xp7241 jk53 289 Dec 16 13:19 /g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stdout.log
+< 2024-12-16 14:38:36.137 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:36.137 run_2024_12_16__13_18_33_stdout.log;-;289;2024-12-16T02:19:00.000Z;1;"xp7241" [0];"jk53" [0];rw-r--r--;0
+. 2024-12-16 14:38:36.137 Copying 1 files/directories to local directory "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\" - total size: 289
+. 2024-12-16 14:38:36.137   PrTime: Yes; PrRO: No; Rght: rw-r--r--; PrR: No (No); FnCs: N; RIC: 0100; Resume: S (102400); CalcS: No; Mask: run_2024_12_16__13_18_33_stdout.log
+. 2024-12-16 14:38:36.137   TM: B; ClAr: No; RemEOF: No; RemBOM: No; CPS: 0; NewerOnly: No; EncryptNewFiles: Yes; ExcludeHiddenFiles: No; ExcludeEmptyDirectories: No; InclM: ; ResumeL: 0
+. 2024-12-16 14:38:36.137   AscM: *.*html; *.htm; *.txt; *.php; *.php3; *.cgi; *.c; *.cpp; *.h; *.pas; *.bas; *.tex; *.pl; *.js; .htaccess; *.xtml; *.css; *.cfg; *.ini; *.sh; *.xml
+. 2024-12-16 14:38:36.137 Copying 1 files/directories to local directory "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\"
+. 2024-12-16 14:38:36.137   PrTime: Yes; PrRO: No; Rght: rw-r--r--; PrR: No (No); FnCs: N; RIC: 0100; Resume: S (102400); CalcS: No; Mask: run_2024_12_16__13_18_33_stdout.log
+. 2024-12-16 14:38:36.137   TM: B; ClAr: No; RemEOF: No; RemBOM: No; CPS: 0; NewerOnly: No; EncryptNewFiles: Yes; ExcludeHiddenFiles: No; ExcludeEmptyDirectories: No; InclM: ; ResumeL: 0
+. 2024-12-16 14:38:36.137   AscM: *.*html; *.htm; *.txt; *.php; *.php3; *.cgi; *.c; *.cpp; *.h; *.pas; *.bas; *.tex; *.pl; *.js; .htaccess; *.xtml; *.css; *.cfg; *.ini; *.sh; *.xml
+> 2024-12-16 14:38:36.137 echo "WinSCP: this is begin-of-file" ; scp -r -p -d -f "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stdout.log" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-16 14:38:36.148 WinSCP: this is begin-of-file
+. 2024-12-16 14:38:36.148 Sending NULL.
+< 2024-12-16 14:38:36.159 T1734315581 0 1734319561 0
+. 2024-12-16 14:38:36.159 Sending NULL.
+< 2024-12-16 14:38:36.170 C0644 289 run_2024_12_16__13_18_33_stdout.log
+. 2024-12-16 14:38:36.170 File: '/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stdout.log' [2024-12-16T02:19:41.000Z] [289]
+. 2024-12-16 14:38:36.208 Sending NULL.
+. 2024-12-16 14:38:36.208 Binary transfer mode selected.
+. 2024-12-16 14:38:36.239 SCP remote side confirmation (0)
+. 2024-12-16 14:38:36.239 Sending NULL.
+. 2024-12-16 14:38:36.239 Preserving timestamp [2024-12-16T02:19:41.000Z]
+. 2024-12-16 14:38:36.250 Transfer done: '/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stdout.log' => 'N:\LUF-Modelling\LUTO2_XH\LUTO2\output\run_2024_12_16__13_18_33_stdout.log' [289]
+< 2024-12-16 14:38:36.261 WinSCP: this is end-of-file:0
+. 2024-12-16 14:38:36.262 Copying finished: Transferred: 289, Elapsed: 0:00:00, CPS: 0/s
+> 2024-12-16 14:38:36.262 Script: exit
+. 2024-12-16 14:38:36.262 Script: Exit code: 0
+. 2024-12-16 14:38:36.262 Closing connection.
+. 2024-12-16 14:38:36.262 Sending special code: 1
+. 2024-12-16 14:38:36.273 Session sent command exit status 0
+. 2024-12-16 14:38:36.273 Main session channel closed
+. 2024-12-16 14:38:36.274 All channels closed
