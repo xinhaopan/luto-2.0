@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="xp7241@gadi.nci.org.au:22 password (3)" exclude=".svn;.cvs;.idea;.DS_Store;.git;.hg;*.hprof;*.pyc;~$*;*.sync.*;" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
+  <component name="PublishConfigData" serverName="xp7241@gadi.nci.org.au:22 password (4)" exclude=".svn;.cvs;.idea;.DS_Store;.git;.hg;*.hprof;*.pyc;~$*;*.sync.*;" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
     <serverData>
       <paths name="Azure2HPC">
         <serverdata>
@@ -30,21 +30,7 @@
           </mappings>
         </serverdata>
       </paths>
-      <paths name="xp7241@gadi.nci.org.au:22 password">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="xp7241@gadi.nci.org.au:22 password (2)">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/tmp/pycharm_project_321" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="xp7241@gadi.nci.org.au:22 password (3)">
+      <paths name="xp7241@gadi.nci.org.au:22 password (4)">
         <serverdata>
           <mappings>
             <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" />
@@ -62,6 +48,5 @@
         </serverdata>
       </paths>
     </serverData>
-    <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>

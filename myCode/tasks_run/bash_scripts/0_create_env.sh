@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 自定义安装路径
-path="/g/data/jk53/LUTO_XH/apps"
+path="/home/582/xp7241/apps"
 # 将 Conda 的二进制文件添加到 PATH
 export PATH="${path}/miniforge3/bin:$PATH"
 

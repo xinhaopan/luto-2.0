@@ -6,5 +6,7 @@ option batch on
 option confirm off
 get "/g/data/jk53/LUTO_XH/LUTO2/output/test1.txt" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\test1.txt"
 get "/g/data/jk53/LUTO_XH/LUTO2/output/test1 (1).txt" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\test1 (1).txt"
+get "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stderr.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\run_2024_12_16__13_18_33_stderr.log"
+get "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stdout.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\run_2024_12_16__13_18_33_stdout.log"
 # Close connection
 exit

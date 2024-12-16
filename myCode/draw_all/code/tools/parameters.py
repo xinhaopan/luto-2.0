@@ -1,18 +1,18 @@
 INPUT_DIR = '../../../input'
 
-time = '20241126'
-middle = 'mincost'
-suffix = ''
+time = ''
+middle = ''
+suffix = 'test'
 senerios = [
-    '1_GHG_1_8C_67_BIO_0',
-    '7_GHG_1_5C_50_BIO_0',
-    '4_GHG_1_5C_67_BIO_0',
-    '2_GHG_1_8C_67_BIO_3',
-    '8_GHG_1_5C_50_BIO_3',
-    '5_GHG_1_5C_67_BIO_3',
-    '3_GHG_1_8C_67_BIO_5',
-    '9_GHG_1_5C_50_BIO_5',
-    '6_GHG_1_5C_67_BIO_5',
+    '20241213_Run_7_GHG_1_8C_67_BIO_0',
+    '20241213_Run_4_GHG_1_5C_50_BIO_0',
+    '20241213_Run_1_GHG_1_5C_67_BIO_0',
+    '20241213_Run_5_GHG_1_5C_50_BIO_3',
+    '20241213_Run_8_GHG_1_8C_67_BIO_3',
+    '20241213_Run_2_GHG_1_5C_67_BIO_3',
+    '20241213_Run_6_GHG_1_5C_50_BIO_5',
+    '20241213_Run_9_GHG_1_8C_67_BIO_5',
+    '20241213_Run_3_GHG_1_5C_67_BIO_5',
 ]
 
 input_files = [
