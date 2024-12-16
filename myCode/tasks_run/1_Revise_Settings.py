@@ -9,7 +9,7 @@ grid_search = {
     # Computational settings, which are not relevant to LUTO itself
     'MEM': ['72'],
     'CPU_PER_TASK': [18],
-    'TIME': ['3:30:00'],
+    'TIME': ['5:00:00'],
 
     'MODE': [
         # 'snapshot',
@@ -17,7 +17,6 @@ grid_search = {
     ],
     'RESFACTOR': [10],
 
-    'SOLVE_ECONOMY_WEIGHT': [0.25],
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis',
         '1.5C (50%) excl. avoided emis',
@@ -37,7 +36,7 @@ map_dict = {
     ]
 }
 
-output_file = os.path.join("Custom_runs", "setting_template_windows_0_test.csv")
-suffix='_test'
+output_file = os.path.join("Custom_runs", "setting_template_windows_0.csv")
+suffix=''
 grid_search_df = create_grid_search_template(grid_search,map_dict,output_file,suffix)
 
