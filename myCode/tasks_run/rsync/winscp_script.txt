@@ -4,9 +4,6 @@ open scp://xp7241@gadi.nci.org.au/ -privatekey="C:\Users\s222552331\.ssh\id_rsa.
 option batch on
 # Disable confirmation prompts
 option confirm off
-get "/g/data/jk53/LUTO_XH/LUTO2/output/test1.txt" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\test1.txt"
-get "/g/data/jk53/LUTO_XH/LUTO2/output/test1 (1).txt" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\test1 (1).txt"
-get "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stderr.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\run_2024_12_16__13_18_33_stderr.log"
-get "/g/data/jk53/LUTO_XH/LUTO2/output/run_2024_12_16__13_18_33_stdout.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\run_2024_12_16__13_18_33_stdout.log"
+get "/g/data/jk53/LUTO_XH/LUTO2/output/20241216_Run_1_GHG_1_5C_67_BIO_0_test" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\20241216_Run_1_GHG_1_5C_67_BIO_0_test"
 # Close connection
 exit

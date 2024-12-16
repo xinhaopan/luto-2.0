@@ -13,3 +13,52 @@ Starting synchronization...
 Synchronization completed successfully.
 Task failed: 'charmap' codec can't encode characters in position 457-462: character maps to <undefined>
 
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-16 15:31:59
+File list saved to 2_sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Lock acquired successfully.
+2024-12-16 15:31:59: Starting task...
+[INFO] Sync time updated to: 2024-12-16 15:31:59
+File list saved to 2_sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Task failed: 'charmap' codec can't encode characters in position 457-462: character maps to <undefined>
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-16 16:31:59
+File list saved to 2_sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Lock acquired successfully.
+2024-12-16 16:31:59: Starting task...
+[INFO] Sync time updated to: 2024-12-16 16:31:59
+File list saved to 2_sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Task failed: 'charmap' codec can't encode characters in position 457-462: character maps to <undefined>
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-16 17:31:59
+File list saved to 2_sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 09:40:59
+File list saved to 2_sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Lock acquired successfully.
+2024-12-17 09:40:59: Starting task...
+[INFO] Sync time updated to: 2024-12-17 09:40:59
+File list saved to 2_sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Task failed: 'charmap' codec can't encode characters in position 457-462: character maps to <undefined>
+

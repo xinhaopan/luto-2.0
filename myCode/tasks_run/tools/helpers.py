@@ -466,7 +466,7 @@ def run_task_linux(cwd, col, config):
     queue = config.get("queue", "normal")
     dir = f"{cwd}/output/{col}"
     script_content = config.get("script_content",
-                                f"/g/data/jk53/LUTO_XH/apps/miniforge3/envs/luto/bin/python {dir}/0_runs_linux.py")
+                                f"/home/582/xp7241/apps/miniforge3/envs/luto/bin/python {dir}/0_runs_linux.py")
 
     # 动态生成 PBS 脚本内容
     pbs_script = f"""#!/bin/bash
