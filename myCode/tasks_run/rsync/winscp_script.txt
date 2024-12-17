@@ -4,13 +4,5 @@ open scp://xp7241@gadi.nci.org.au/ -privatekey="C:\Users\s222552331\.ssh\id_rsa.
 option batch on
 # Disable confirmation prompts
 option confirm off
-get "/g/data/jk53/LUTO_XH/LUTO2/output/20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/run_2024_12_17__10_20_18_stdout.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/run_2024_12_17__10_20_18_stdout.log"
-get "/g/data/jk53/LUTO_XH/LUTO2/output/20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/130776977.gadi-pbs.OU" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/130776977.gadi-pbs.OU"
-get "/g/data/jk53/LUTO_XH/LUTO2/output/20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/2024_12_17__10_20_18_RF10_2010-2050_timeseries/out_2050/transition_matrix_2010_2050.csv" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/2024_12_17__10_20_18_RF10_2010-2050_timeseries/out_2050/transition_matrix_2010_2050.csv"
-get "/g/data/jk53/LUTO_XH/LUTO2/output/20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/2024_12_17__10_20_18_RF10_2010-2050_timeseries/model_run_settings.txt" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/2024_12_17__10_20_18_RF10_2010-2050_timeseries/model_run_settings.txt"
-get "/g/data/jk53/LUTO_XH/LUTO2/output/20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/130776977.gadi-pbs.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/130776977.gadi-pbs.log"
-get "/g/data/jk53/LUTO_XH/LUTO2/output/20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/write_2024_12_17__10_20_18_stdout.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/write_2024_12_17__10_20_18_stdout.log"
-get "/g/data/jk53/LUTO_XH/LUTO2/output/20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/write_2024_12_17__10_20_18_stderr.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\20241217_Run_1_GHG_1_5C_67_BIO_0_test/output/write_2024_12_17__10_20_18_stderr.log"
-get "/g/data/jk53/LUTO_XH/LUTO2/output/20241217_Run_1_GHG_1_5C_67_BIO_0_test/gurobi.log" "N:\LUF-Modelling\LUTO2_XH\LUTO2\output\20241217_Run_1_GHG_1_5C_67_BIO_0_test/gurobi.log"
 # Close connection
 exit

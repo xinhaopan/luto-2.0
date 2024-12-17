@@ -20,8 +20,11 @@ Writes model output and statistics to files.
 
 import os, re
 import shutil
+import threading
+import time
 import numpy as np
 import pandas as pd
+import psutil
 import xarray as xr
 import geopandas as gpd
 
@@ -31,6 +34,7 @@ from joblib import Parallel, delayed
 from luto import settings
 from luto import tools
 from luto.data import Data
+from luto.tools.create_task_runs.helpers import log_memory_usage
 from luto.tools.spatializers import create_2d_map, write_gtiff
 from luto.tools.compmap import lumap_crossmap, lmmap_crossmap, crossmap_irrstat, crossmap_amstat
 
@@ -63,6 +67,10 @@ from luto.tools.xarray_tools import calc_bio_hist_sum, calc_bio_score_species, i
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 def write_outputs(data: Data):
+
+    # memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    # memory_thread.start()
+
     # Write the model outputs to file
     write_data(data)
     # Move the log files to the output directory
@@ -119,6 +127,8 @@ def write_data(data: Data):
     save_report_data(data.path)
     data2html(data.path)
 
+
+
 def write_logs(data: Data):
     # Move the log files to the output directory
     logs = [f"{settings.OUTPUT_DIR}/run_{data.timestamp_sim}_stdout.log",
@@ -126,15 +136,15 @@ def write_logs(data: Data):
             f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stdout.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log"]
 
-    # [shutil.move(log, f"{data.path}/{os.path.basename(log)}") for log in logs if os.path.exists(log)]
-    [shutil.move(log, f"{data.path}/{os.path.basename(log)}") for log in logs if
-     os.path.exists(log) and not os.path.isfile(log)]
-
+    [shutil.move(log, f"{data.path}/{os.path.basename(log)}") for log in logs if os.path.exists(log)]
+    
     return None
+
 
 
 def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
+
     years = sorted(list(data.lumaps.keys()))
 
     if not os.path.isdir(path_yr):
@@ -1091,6 +1101,7 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     # Write to file
     biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False)
 
+
 def write_biodiversity_contribution(data: Data, yr_cal, path):
     
     # Do nothing if no need to calculate biodiversity contribution
@@ -1126,6 +1137,8 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
         bio_contribution_shards)
 
     bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
+
+
 
 
 def write_ghg_separate(data: Data, yr_cal, path):

@@ -1,12 +1,1857 @@
 Lock acquired successfully.
-[INFO] Sync time updated to: 2024-12-16 14:38:32
+[INFO] Sync time updated to: 2024-12-17 12:21:03
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+20241217_Run_1_GHG_1_5C_67_BIO_0_test |            0 B |    0.0 KB/s | binary |   0%
+requirements.txt          |          470 B |    0.0 KB/s | binary | 100%
+docs                      |            0 B |    0.0 KB/s | binary |   0%
+luto2-overview.pdf        |         321 KB |  936.3 KB/s | binary | 100%
+LUTO 2.0 summary and status.docx |          54 KB |  829.3 KB/s | binary | 100%
+luto2-overview.tex        |          55 KB |  726.2 KB/s | binary | 100%
+landuses_products_commodities.docx |         126 KB |  728.9 KB/s | binary | 100%
+Deploy luto on HPC.docx   |          95 KB |  746.4 KB/s | binary | 100%
+temp_run1.py              |          802 B |  675.5 KB/s | binary | 100%
+temp_run_local.py         |           2 KB |  636.5 KB/s | binary | 100%
+temp_run_in_nci.py        |           2 KB |  593.9 KB/s | binary | 100%
+temp_draw.py              |           3 KB |  550.5 KB/s | binary | 100%
+xinhao_environment.yml    |          24 KB |  543.1 KB/s | binary | 100%
+temp_writes1.py           |           4 KB |  514.7 KB/s | binary | 100%
+temp_temp_1.py            |           2 KB |  487.8 KB/s | binary | 100%
+luto                      |            0 B |  477.4 KB/s | binary |   0%
+simulation.py             |          10 KB |  455.0 KB/s | binary | 100%
+__pycache__               |            0 B |  446.0 KB/s | binary |   0%
+simulation.cpython-312.pyc |          13 KB |  437.6 KB/s | binary | 100%
+data.cpython-312.pyc      |          88 KB |  437.3 KB/s | binary | 100%
+ag_managements.cpython-39.pyc |           1 KB |  413.2 KB/s | binary | 100%
+simulation.cpython-39.pyc |           5 KB |  397.1 KB/s | binary | 100%
+ag_managements.cpython-312.pyc |           1 KB |  377.6 KB/s | binary | 100%
+settings.cpython-39.pyc   |           4 KB |  363.8 KB/s | binary | 100%
+settings.cpython-312.pyc  |           4 KB |  353.6 KB/s | binary | 100%
+solvers                   |            0 B |  349.0 KB/s | binary |   0%
+__pycache__               |            0 B |  344.4 KB/s | binary |   0%
+input_data.cpython-312.pyc |          29 KB |  341.2 KB/s | binary | 100%
+solver.cpython-312.pyc    |          58 KB |  356.0 KB/s | binary | 100%
+input_data.py             |          22 KB |  354.1 KB/s | binary | 100%
+solver.py                 |          44 KB |  358.2 KB/s | binary | 100%
+dataprep.py               |          49 KB |  361.8 KB/s | binary | 100%
+ag_managements.py         |           2 KB |  349.1 KB/s | binary | 100%
+tools                     |            0 B |  345.5 KB/s | binary |   0%
+write.py                  |          82 KB |  360.0 KB/s | binary | 100%
+__pycache__               |            0 B |  356.3 KB/s | binary |   0%
+spatializers.cpython-312.pyc |           7 KB |  344.9 KB/s | binary | 100%
+xarray_tools.cpython-312.pyc |           8 KB |  334.6 KB/s | binary | 100%
+__init__.cpython-312.pyc  |          35 KB |  334.4 KB/s | binary | 100%
+compmap.cpython-312.pyc   |          11 KB |  330.2 KB/s | binary | 100%
+write.cpython-312.pyc     |          79 KB |  342.1 KB/s | binary | 100%
+__init__.cpython-39.pyc   |          21 KB |  339.4 KB/s | binary | 100%
+plotmap.py                |           6 KB |  332.8 KB/s | binary | 100%
+Manual_jupyter_books      |            0 B |  330.2 KB/s | binary |   0%
+helpers                   |            0 B |  328.8 KB/s | binary |   0%
+parameters.py             |          483 B |  322.5 KB/s | binary | 100%
+__init__.py               |           6 KB |  312.1 KB/s | binary | 100%
+Add_tags_to_jb.ipynb      |           1 KB |  305.5 KB/s | binary | 100%
+asset                     |            0 B |  303.2 KB/s | binary |   0%
+lvstk_data_description.csv |          684 B |  283.6 KB/s | binary | 100%
+fig_2d_to_1d.png          |          17 KB |  277.9 KB/s | binary | 100%
+crop_data_description.csv |          335 B |  273.4 KB/s | binary | 100%
+sa2_2011_aus              |            0 B |  271.6 KB/s | binary |   0%
+SA2_2011_AUST_continental_simplified.shp.xml |           8 KB |  269.0 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.prj |          145 B |  264.0 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.shp |         884 KB |  419.8 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.sbn |          22 KB |  414.2 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.shx |          17 KB |  411.4 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.dbf |         822 KB |  543.5 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.cpg |            5 B |  537.5 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.sbx |           1 KB |  529.0 KB/s | binary | 100%
+Chap_1_LUTO_overview.ipynb |        4661 KB | 1194.8 KB/s | binary | 100%
+report                    |            0 B | 1188.9 KB/s | binary |   0%
+map_tools                 |            0 B | 1186.2 KB/s | binary |   0%
+__pycache__               |            0 B | 1180.4 KB/s | binary |   0%
+__init__.cpython-312.pyc  |          17 KB | 1166.5 KB/s | binary | 100%
+map_making.cpython-312.pyc |           7 KB | 1154.0 KB/s | binary | 100%
+helper.cpython-39.pyc     |           6 KB | 1136.4 KB/s | binary | 100%
+parameters.cpython-312.pyc |           2 KB | 1123.8 KB/s | binary | 100%
+helper.cpython-312.pyc    |           7 KB | 1109.9 KB/s | binary | 100%
+__init__.cpython-39.pyc   |          11 KB | 1089.8 KB/s | binary | 100%
+helper.py                 |           6 KB | 1076.5 KB/s | binary | 100%
+map_making.py             |           5 KB | 1065.7 KB/s | binary | 100%
+parameters.py             |           4 KB | 1046.2 KB/s | binary | 100%
+__init__.py               |          16 KB | 1033.3 KB/s | binary | 100%
+create_html.py            |           3 KB | 1023.2 KB/s | binary | 100%
+__pycache__               |            0 B | 1018.9 KB/s | binary |   0%
+create_static_maps.cpython-39.pyc |           2 KB | 1007.1 KB/s | binary | 100%
+create_report_data.cpython-39.pyc |          35 KB |  995.6 KB/s | binary | 100%
+create_static_maps.cpython-312.pyc |           3 KB |  984.3 KB/s | binary | 100%
+create_report_data.cpython-312.pyc |          79 KB |  984.7 KB/s | binary | 100%
+create_html.cpython-39.pyc |           2 KB |  973.6 KB/s | binary | 100%
+create_html.cpython-312.pyc |           3 KB |  941.5 KB/s | binary | 100%
+data_tools                |            0 B |  938.1 KB/s | binary |   0%
+helper_func.py            |           4 KB |  929.9 KB/s | binary | 100%
+__pycache__               |            0 B |  926.6 KB/s | binary |   0%
+helper_func.cpython-39.pyc |           3 KB |  913.7 KB/s | binary | 100%
+colors.cpython-312.pyc    |           1 KB |  904.2 KB/s | binary | 100%
+colors.cpython-39.pyc     |           1 KB |  888.5 KB/s | binary | 100%
+__init__.cpython-312.pyc  |           6 KB |  874.0 KB/s | binary | 100%
+parameters.cpython-312.pyc |           5 KB |  854.0 KB/s | binary | 100%
+parameters.cpython-39.pyc |           4 KB |  844.6 KB/s | binary | 100%
+__init__.cpython-39.pyc   |           4 KB |  834.0 KB/s | binary | 100%
+helper_func.cpython-312.pyc |           5 KB |  825.1 KB/s | binary | 100%
+parameters.py             |           6 KB |  815.3 KB/s | binary | 100%
+colors.py                 |           1 KB |  809.0 KB/s | binary | 100%
+__init__.py               |           6 KB |  789.6 KB/s | binary | 100%
+template_html             |            0 B |  788.4 KB/s | binary |   0%
+pages                     |            0 B |  785.9 KB/s | binary |   0%
+water_usage.css           |          403 B |  777.6 KB/s | binary | 100%
+production.js             |          12 KB |  780.2 KB/s | binary | 100%
+GHG_emissions.html        |           3 KB |  775.5 KB/s | binary | 100%
+land-use_area.css         |          366 B |  770.4 KB/s | binary | 100%
+land-use_area.html        |           2 KB |  745.1 KB/s | binary | 100%
+spatial_maps.html         |           2 KB |  737.2 KB/s | binary | 100%
+biodiversity.js           |           7 KB |  731.1 KB/s | binary | 100%
+production.html           |           3 KB |  721.4 KB/s | binary | 100%
+spatial_maps.css          |          423 B |  714.9 KB/s | binary | 100%
+land-use_area.js          |           6 KB |  759.0 KB/s | binary | 100%
+GHG_emissions.css         |          144 B |  752.9 KB/s | binary | 100%
+economics.css             |           62 B |  743.2 KB/s | binary | 100%
+GHG_emissions.js          |          16 KB |  733.0 KB/s | binary | 100%
+production.css            |           61 B |  728.5 KB/s | binary | 100%
+biodiversity.html         |           2 KB |  720.9 KB/s | binary | 100%
+water_usage.js            |           5 KB |  713.6 KB/s | binary | 100%
+economics.js              |          36 KB |  709.5 KB/s | binary | 100%
+economics.html            |           7 KB |  705.9 KB/s | binary | 100%
+spatial_maps.js           |           6 KB |  696.0 KB/s | binary | 100%
+water_usage.html          |           2 KB |  735.9 KB/s | binary | 100%
+biodiversity.css          |           62 B |  728.8 KB/s | binary | 100%
+index.js                  |           1 KB |  716.2 KB/s | binary | 100%
+style.css                 |           1 KB |  708.4 KB/s | binary | 100%
+src                       |            0 B |  705.2 KB/s | binary |   0%
+jqueqry.js                |          85 KB |  700.5 KB/s | binary | 100%
+index.css                 |          696 B |  695.3 KB/s | binary | 100%
+index.html                |           1 KB |  685.0 KB/s | binary | 100%
+create_report_data.py     |          75 KB |  685.0 KB/s | binary | 100%
+Assets                    |            0 B |  683.0 KB/s | binary |   0%
+ammap_colors.csv          |          235 B |  727.0 KB/s | binary | 100%
+lumap_colors_grouped.csv  |           1 KB |  722.4 KB/s | binary | 100%
+basemap.tif               |        2063 KB |  910.8 KB/s | binary | 100%
+AUS_adm                   |            0 B |  909.3 KB/s | binary |   0%
+STE11aAust_mercator_simplified.cpg |            5 B |  898.0 KB/s | binary | 100%
+STE11aAust_mercator_simplified.prj |          425 B |  888.5 KB/s | binary | 100%
+STE11aAust_mercator_simplified.sbn |          212 B |  880.4 KB/s | binary | 100%
+STE11aAust_mercator_simplified.shp |         151 KB |  883.0 KB/s | binary | 100%
+STE11aAust_mercator_simplified.dbf |           1 KB |  875.3 KB/s | binary | 100%
+STE11aAust_mercator_simplified.sbx |          132 B |  957.8 KB/s | binary | 100%
+STE11aAust_mercator_simplified.shx |          156 B |  948.6 KB/s | binary | 100%
+lm_colors.csv             |          109 B |  936.4 KB/s | binary | 100%
+lumap_colors.csv          |          949 B |  927.6 KB/s | binary | 100%
+float_img_colors.csv      |           1 KB |  920.5 KB/s | binary | 100%
+.gitignore                |            0 B |  917.5 KB/s | binary |   0%
+lu_group.csv              |           1 KB |  904.9 KB/s | binary | 100%
+NLUM_2010-11_mask.tif     |         336 KB |  922.5 KB/s | binary | 100%
+non_ag_colors.csv         |          694 B |  914.2 KB/s | binary | 100%
+create_static_maps.py     |           3 KB |  905.1 KB/s | binary | 100%
+create_task_runs          |            0 B |  902.4 KB/s | binary |   0%
+__pycache__               |            0 B |  899.6 KB/s | binary |   0%
+parameters.cpython-312.pyc |           1 KB |  804.5 KB/s | binary | 100%
+helpers.cpython-312.pyc   |          17 KB |  790.9 KB/s | binary | 100%
+report_custom_run_data.py |           4 KB |  786.3 KB/s | binary | 100%
+bash_scripts              |            0 B |  783.8 KB/s | binary |   0%
+conver_raw_data.sh        |          219 B |  777.7 KB/s | binary | 100%
+python_script.py          |           1 KB |  770.6 KB/s | binary | 100%
+install_pkg.sh            |          186 B |  758.8 KB/s | binary | 100%
+requirements_conda.txt    |          345 B |  749.7 KB/s | binary | 100%
+create_env.sh             |          438 B |  740.8 KB/s | binary | 100%
+conda_env.yml             |          648 B |  313.3 KB/s | binary | 100%
+requirements_pip.txt      |           55 B |  307.9 KB/s | binary | 100%
+task_cmd.sh               |          682 B |  304.2 KB/s | binary | 100%
+parameters.py             |          197 B |  299.1 KB/s | binary | 100%
+create_running_tasks.py   |           1 KB |  295.2 KB/s | binary | 100%
+helpers.py                |          11 KB |  292.4 KB/s | binary | 100%
+spatializers.py           |           6 KB |  289.6 KB/s | binary | 100%
+__init__.py               |          28 KB |  289.3 KB/s | binary | 100%
+xarray_tools.py           |           6 KB |  307.0 KB/s | binary | 100%
+compmap.py                |           9 KB |  305.0 KB/s | binary | 100%
+settings.py               |           3 KB |  302.0 KB/s | binary | 100%
+settings_bash.py          |           4 KB |  300.1 KB/s | binary | 100%
+memory_test.py            |          215 B |  296.9 KB/s | binary | 100%
+data.py                   |          82 KB |  300.8 KB/s | binary | 100%
+economics                 |            0 B |  299.9 KB/s | binary |   0%
+land_use_culling.py       |           3 KB |  298.9 KB/s | binary | 100%
+__pycache__               |            0 B |  298.0 KB/s | binary |   0%
+land_use_culling.cpython-312.pyc |           3 KB |  295.6 KB/s | binary | 100%
+off_land_commodity        |            0 B |  294.7 KB/s | binary |   0%
+__pycache__               |            0 B |  294.3 KB/s | binary |   0%
+__init__.cpython-312.pyc  |           2 KB |  291.4 KB/s | binary | 100%
+__init__.cpython-39.pyc   |           1 KB |  316.1 KB/s | binary | 100%
+__init__.py               |           1 KB |  312.2 KB/s | binary | 100%
+non_agricultural          |            0 B |  310.8 KB/s | binary |   0%
+cost.py                   |           8 KB |  306.8 KB/s | binary | 100%
+water.py                  |          10 KB |  303.1 KB/s | binary | 100%
+__pycache__               |            0 B |  302.2 KB/s | binary |   0%
+biodiversity.cpython-312.pyc |           6 KB |  298.2 KB/s | binary | 100%
+revenue.cpython-312.pyc   |           9 KB |  296.9 KB/s | binary | 100%
+quantity.cpython-312.pyc  |          12 KB |  294.5 KB/s | binary | 100%
+ghg.cpython-312.pyc       |          11 KB |  292.6 KB/s | binary | 100%
+cost.cpython-312.pyc      |           9 KB |  316.6 KB/s | binary | 100%
+transitions.cpython-312.pyc |          52 KB |  318.4 KB/s | binary | 100%
+water.cpython-312.pyc     |          11 KB |  313.6 KB/s | binary | 100%
+quantity.py               |          10 KB |  310.3 KB/s | binary | 100%
+biodiversity.py           |           5 KB |  307.6 KB/s | binary | 100%
+ghg.py                    |          11 KB |  304.6 KB/s | binary | 100%
+transitions.py            |          48 KB |  329.2 KB/s | binary | 100%
+revenue.py                |           8 KB |  325.8 KB/s | binary | 100%
+agricultural              |            0 B |  324.8 KB/s | binary |   0%
+cost.py                   |          19 KB |  324.2 KB/s | binary | 100%
+water.py                  |          22 KB |  323.4 KB/s | binary | 100%
+__pycache__               |            0 B |  323.0 KB/s | binary |   0%
+biodiversity.cpython-312.pyc |           8 KB |  321.3 KB/s | binary | 100%
+revenue.cpython-312.pyc   |          15 KB |  320.3 KB/s | binary | 100%
+quantity.cpython-312.pyc  |          20 KB |  318.4 KB/s | binary | 100%
+ghg.cpython-312.pyc       |          24 KB |  317.4 KB/s | binary | 100%
+cost.cpython-312.pyc      |          21 KB |  316.6 KB/s | binary | 100%
+transitions.cpython-312.pyc |          15 KB |  315.7 KB/s | binary | 100%
+water.cpython-312.pyc     |          22 KB |  315.6 KB/s | binary | 100%
+quantity.py               |          19 KB |  341.6 KB/s | binary | 100%
+biodiversity.py           |           6 KB |  340.1 KB/s | binary | 100%
+ghg.py                    |          24 KB |  338.3 KB/s | binary | 100%
+transitions.py            |          14 KB |  334.5 KB/s | binary | 100%
+revenue.py                |          16 KB |  333.0 KB/s | binary | 100%
+helpers.py                |           9 KB |  330.5 KB/s | binary | 100%
+tests                     |            0 B |  329.4 KB/s | binary |   0%
+test_land_use_culling.py  |           6 KB |  326.1 KB/s | binary | 100%
+README.md                 |          409 B |  323.2 KB/s | binary | 100%
+COPYING                   |          34 KB |  321.3 KB/s | binary | 100%
+temp_run2.py              |          799 B |  329.9 KB/s | binary | 100%
+0_runs_linux.py           |           2 KB |  326.0 KB/s | binary | 100%
+temp_custom.py            |          173 B |  323.0 KB/s | binary | 100%
+output                    |            0 B |  320.5 KB/s | binary |   0%
+run_2024_12_17__10_20_18_stdout.log |         463 KB |  360.9 KB/s | binary | 100%
+run_2024_12_17__10_20_18_stderr.log |            0 B |  359.8 KB/s | binary |   0%
+2024_12_17__10_20_18_RF10_2010-2050_timeseries |            0 B |  358.2 KB/s | binary |   0%
+out_2013                  |            0 B |  357.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  356.6 KB/s | binary |   0%
+out_2025                  |            0 B |  355.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  354.0 KB/s | binary |   0%
+out_2042                  |            0 B |  352.4 KB/s | binary |   0%
+lucc_separate             |            0 B |  351.9 KB/s | binary |   0%
+out_2036                  |            0 B |  350.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  349.3 KB/s | binary |   0%
+out_2026                  |            0 B |  347.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  347.3 KB/s | binary |   0%
+out_2021                  |            0 B |  345.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  344.8 KB/s | binary |   0%
+out_2046                  |            0 B |  343.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  342.3 KB/s | binary |   0%
+out_2040                  |            0 B |  340.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  339.9 KB/s | binary |   0%
+out_2048                  |            0 B |  338.4 KB/s | binary |   0%
+lucc_separate             |            0 B |  338.0 KB/s | binary |   0%
+out_2012                  |            0 B |  336.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  335.6 KB/s | binary |   0%
+out_2038                  |            0 B |  334.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  333.7 KB/s | binary |   0%
+out_2037                  |            0 B |  332.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  331.4 KB/s | binary |   0%
+out_2050                  |            0 B |  330.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  329.2 KB/s | binary |   0%
+out_2028                  |            0 B |  327.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  327.3 KB/s | binary |   0%
+out_2010                  |            0 B |  326.0 KB/s | binary |   0%
+out_2031                  |            0 B |  324.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  324.3 KB/s | binary |   0%
+begin_end_compare_2010_2050 |            0 B |  322.9 KB/s | binary |   0%
+out_2050                  |            0 B |  322.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  321.2 KB/s | binary |   0%
+out_2010                  |            0 B |  320.3 KB/s | binary |   0%
+out_2019                  |            0 B |  319.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  318.2 KB/s | binary |   0%
+out_2020                  |            0 B |  317.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  315.7 KB/s | binary |   0%
+out_2017                  |            0 B |  314.5 KB/s | binary |   0%
+lucc_separate             |            0 B |  314.1 KB/s | binary |   0%
+out_2039                  |            0 B |  312.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  312.0 KB/s | binary |   0%
+out_2049                  |            0 B |  310.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  310.4 KB/s | binary |   0%
+out_2030                  |            0 B |  308.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  308.4 KB/s | binary |   0%
+out_2045                  |            0 B |  307.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  306.4 KB/s | binary |   0%
+out_2035                  |            0 B |  305.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  304.9 KB/s | binary |   0%
+out_2029                  |            0 B |  303.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  303.0 KB/s | binary |   0%
+out_2041                  |            0 B |  301.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  301.0 KB/s | binary |   0%
+out_2023                  |            0 B |  299.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  299.5 KB/s | binary |   0%
+out_2033                  |            0 B |  298.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  297.3 KB/s | binary |   0%
+out_2014                  |            0 B |  296.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  295.8 KB/s | binary |   0%
+out_2015                  |            0 B |  294.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  294.0 KB/s | binary |   0%
+out_2022                  |            0 B |  292.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  292.6 KB/s | binary |   0%
+out_2024                  |            0 B |  291.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  290.8 KB/s | binary |   0%
+out_2034                  |            0 B |  289.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  289.1 KB/s | binary |   0%
+out_2027                  |            0 B |  288.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  287.7 KB/s | binary |   0%
+out_2018                  |            0 B |  286.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  285.9 KB/s | binary |   0%
+out_2047                  |            0 B |  284.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  284.6 KB/s | binary |   0%
+out_2032                  |            0 B |  283.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  282.9 KB/s | binary |   0%
+out_2044                  |            0 B |  281.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  281.2 KB/s | binary |   0%
+out_2016                  |            0 B |  280.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  279.9 KB/s | binary |   0%
+out_2011                  |            0 B |  279.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  278.3 KB/s | binary |   0%
+out_2043                  |            0 B |  277.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  276.1 KB/s | binary |   0%
+simulation_log.txt        |           75 B |  120.8 KB/s | binary | 100%
+20241217_Run_1_GHG_1_5C_67_BIO_0_test.pbs |           1 KB |  119.8 KB/s | binary | 100%
+130776977.gadi-pbs.log    |          496 B |  118.8 KB/s | binary | 100%
+temp_carbonprice.py       |           1 KB |  117.5 KB/s | binary | 100%
+temp_remove_output.py     |           1 KB |  117.1 KB/s | binary | 100%
+temp_writes.py            |           4 KB |  116.4 KB/s | binary | 100%
+gurobi.log                |         265 KB |  135.3 KB/s | binary | 100%
+temp_test.py              |           2 KB |  134.7 KB/s | binary | 100%
+CITATION.cff              |           1 KB |  133.7 KB/s | binary | 100%
+temp_report.py            |          444 B |  133.0 KB/s | binary | 100%
+temp_clear_ouput.py       |           1 KB |  115.9 KB/s | binary | 100%
+.idea                     |            0 B |  115.6 KB/s | binary |   0%
+material_theme_project_new.xml |          414 B |  115.1 KB/s | binary | 100%
+modules.xml               |          262 B |  113.7 KB/s | binary | 100%
+LUTO2.iml                 |          692 B |  112.4 KB/s | binary | 100%
+jupyter-settings.xml      |           1 KB |  111.4 KB/s | binary | 100%
+.gitignore                |          176 B |  110.0 KB/s | binary | 100%
+vcs.xml                   |          167 B |  108.6 KB/s | binary | 100%
+workspace.xml             |          55 KB |  120.2 KB/s | binary | 100%
+misc.xml                  |          288 B |  119.3 KB/s | binary | 100%
+deployment.xml            |           1 KB |  118.6 KB/s | binary | 100%
+inspectionProfiles        |            0 B |  118.3 KB/s | binary |   0%
+profiles_settings.xml     |          174 B |  117.4 KB/s | binary | 100%
+Project_Default.xml       |           1 KB |  116.4 KB/s | binary | 100%
+0_runs.py                 |           2 KB |  115.8 KB/s | binary | 100%
+.gitignore                |          833 B |  115.3 KB/s | binary | 100%
+temp_check_result.py      |           3 KB |  114.5 KB/s | binary | 100%
+temp_run_local.ipynb      |          12 KB |  114.4 KB/s | binary | 100%
+temp_temp.py              |           2 KB |  114.2 KB/s | binary | 100%
+temp_runs.py              |           2 KB |  113.9 KB/s | binary | 100%
+temp_run_in_nci2.py       |           2 KB |  117.0 KB/s | binary | 100%
+temp_test3.py             |           1 KB |  116.4 KB/s | binary | 100%
+environment.yml           |          16 KB |  116.4 KB/s | binary | 100%
+temp_write.py             |           1 KB |  116.1 KB/s | binary | 100%
+temp_test1.py             |           2 KB |  115.7 KB/s | binary | 100%
+temp_mem.py               |           2 KB |  115.3 KB/s | binary | 100%
+sync.ffs_db               |         175 KB |  128.3 KB/s | binary | 100%
+temp_clear_couput.py      |           1 KB |  127.9 KB/s | binary | 100%
+temp_report1.py           |          472 B |  127.0 KB/s | binary | 100%
+temp_test2.py             |           1 KB |  126.7 KB/s | binary | 100%
+temp_run_in_nci1.py       |           2 KB |  125.5 KB/s | binary | 100%
+sync.ffs_lock             |          109 B |  125.0 KB/s | binary | 100%
+temp_water_limits.txt     |         912 KB |  191.5 KB/s | binary | 100%
+2_writes.py               |           4 KB |  195.1 KB/s | binary | 100%
+run_test.ipynb            |          12 KB |  193.5 KB/s | binary | 100%
+1_write.py                |           1 KB |  192.2 KB/s | binary | 100%
+temp_claer_couput.py      |           1 KB |  191.4 KB/s | binary | 100%
+README.md                 |           4 KB |  189.5 KB/s | binary | 100%
+temp_test.ipynb           |          97 KB |  195.2 KB/s | binary | 100%
+20241216_Run_1_GHG_1_5C_67_BIO_0_test |            0 B |    0.0 KB/s | binary |   0%
+requirements.txt          |          470 B |    0.0 KB/s | binary | 100%
+docs                      |            0 B |    0.0 KB/s | binary |   0%
+luto2-overview.pdf        |         321 KB | 1284.7 KB/s | binary | 100%
+LUTO 2.0 summary and status.docx |          54 KB | 1092.0 KB/s | binary | 100%
+luto2-overview.tex        |          55 KB |  918.3 KB/s | binary | 100%
+landuses_products_commodities.docx |         126 KB |  992.3 KB/s | binary | 100%
+Deploy luto on HPC.docx   |          95 KB |  971.9 KB/s | binary | 100%
+temp_run1.py              |          802 B |  890.9 KB/s | binary | 100%
+temp_run_local.py         |           2 KB |  777.5 KB/s | binary | 100%
+temp_run_in_nci.py        |           2 KB |  714.4 KB/s | binary | 100%
+temp_draw.py              |           3 KB |  662.3 KB/s | binary | 100%
+xinhao_environment.yml    |          24 KB |  619.4 KB/s | binary | 100%
+temp_writes1.py           |           4 KB |  582.4 KB/s | binary | 100%
+temp_temp_1.py            |           2 KB |  548.3 KB/s | binary | 100%
+luto                      |            0 B |  534.8 KB/s | binary |   0%
+simulation.py             |          10 KB |  506.4 KB/s | binary | 100%
+__pycache__               |            0 B |  500.6 KB/s | binary |   0%
+simulation.cpython-312.pyc |          13 KB |  478.4 KB/s | binary | 100%
+data.cpython-312.pyc      |          88 KB |  477.7 KB/s | binary | 100%
+ag_managements.cpython-39.pyc |           1 KB |  461.1 KB/s | binary | 100%
+simulation.cpython-39.pyc |           5 KB |  440.8 KB/s | binary | 100%
+ag_managements.cpython-312.pyc |           1 KB |  420.3 KB/s | binary | 100%
+settings.cpython-39.pyc   |           4 KB |  409.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           4 KB |  393.1 KB/s | binary | 100%
+solvers                   |            0 B |  387.4 KB/s | binary |   0%
+__pycache__               |            0 B |  384.7 KB/s | binary |   0%
+input_data.cpython-312.pyc |          29 KB |  381.9 KB/s | binary | 100%
+solver.cpython-312.pyc    |          58 KB |  389.1 KB/s | binary | 100%
+input_data.py             |          22 KB |  386.0 KB/s | binary | 100%
+solver.py                 |          44 KB |  379.9 KB/s | binary | 100%
+dataprep.py               |          49 KB |  382.8 KB/s | binary | 100%
+ag_managements.py         |           2 KB |  374.9 KB/s | binary | 100%
+tools                     |            0 B |  370.7 KB/s | binary |   0%
+write.py                  |          82 KB |  387.3 KB/s | binary | 100%
+__pycache__               |            0 B |  385.3 KB/s | binary |   0%
+spatializers.cpython-312.pyc |           7 KB |  377.6 KB/s | binary | 100%
+xarray_tools.cpython-312.pyc |           8 KB |  370.7 KB/s | binary | 100%
+__init__.cpython-312.pyc  |          35 KB |  371.0 KB/s | binary | 100%
+compmap.cpython-312.pyc   |          11 KB |  365.4 KB/s | binary | 100%
+write.cpython-312.pyc     |          79 KB |  379.3 KB/s | binary | 100%
+__init__.cpython-39.pyc   |          21 KB |  378.6 KB/s | binary | 100%
+plotmap.py                |           6 KB |  368.7 KB/s | binary | 100%
+Manual_jupyter_books      |            0 B |  367.0 KB/s | binary |   0%
+helpers                   |            0 B |  363.8 KB/s | binary |   0%
+parameters.py             |          483 B |  357.5 KB/s | binary | 100%
+__init__.py               |           6 KB |  344.5 KB/s | binary | 100%
+Add_tags_to_jb.ipynb      |           1 KB |  337.9 KB/s | binary | 100%
+asset                     |            0 B |  335.1 KB/s | binary |   0%
+lvstk_data_description.csv |          684 B |  323.5 KB/s | binary | 100%
+fig_2d_to_1d.png          |          17 KB |  317.8 KB/s | binary | 100%
+crop_data_description.csv |          335 B |  313.2 KB/s | binary | 100%
+sa2_2011_aus              |            0 B |  306.3 KB/s | binary |   0%
+SA2_2011_AUST_continental_simplified.shp.xml |           8 KB |  302.8 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.prj |          145 B |  296.4 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.shp |         884 KB |  468.7 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.sbn |          22 KB |  465.6 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.shx |          17 KB |  460.2 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.dbf |         822 KB |  611.3 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.cpg |            5 B |  601.8 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.sbx |           1 KB |  592.9 KB/s | binary | 100%
+Chap_1_LUTO_overview.ipynb |        4661 KB | 1413.1 KB/s | binary | 100%
+report                    |            0 B | 1405.1 KB/s | binary |   0%
+map_tools                 |            0 B | 1397.2 KB/s | binary |   0%
+__pycache__               |            0 B | 1393.2 KB/s | binary |   0%
+__init__.cpython-312.pyc  |          17 KB | 1373.3 KB/s | binary | 100%
+map_making.cpython-312.pyc |           7 KB | 1352.1 KB/s | binary | 100%
+helper.cpython-39.pyc     |           6 KB | 1335.0 KB/s | binary | 100%
+parameters.cpython-312.pyc |           2 KB | 1317.7 KB/s | binary | 100%
+helper.cpython-312.pyc    |           7 KB | 1298.3 KB/s | binary | 100%
+__init__.cpython-39.pyc   |          11 KB | 1280.2 KB/s | binary | 100%
+helper.py                 |           6 KB | 1265.0 KB/s | binary | 100%
+map_making.py             |           5 KB | 1243.9 KB/s | binary | 100%
+parameters.py             |           4 KB | 1229.1 KB/s | binary | 100%
+__init__.py               |          16 KB | 1216.8 KB/s | binary | 100%
+create_html.py            |           3 KB | 1197.0 KB/s | binary | 100%
+__pycache__               |            0 B | 1191.3 KB/s | binary |   0%
+create_static_maps.cpython-39.pyc |           2 KB | 1177.7 KB/s | binary | 100%
+create_report_data.cpython-39.pyc |          35 KB | 1163.7 KB/s | binary | 100%
+create_static_maps.cpython-312.pyc |           3 KB | 1150.9 KB/s | binary | 100%
+create_report_data.cpython-312.pyc |          79 KB | 1144.4 KB/s | binary | 100%
+create_html.cpython-39.pyc |           2 KB | 1132.0 KB/s | binary | 100%
+create_html.cpython-312.pyc |           3 KB | 1117.4 KB/s | binary | 100%
+data_tools                |            0 B | 1112.6 KB/s | binary |   0%
+helper_func.py            |           4 KB | 1096.3 KB/s | binary | 100%
+__pycache__               |            0 B | 1091.6 KB/s | binary |   0%
+helper_func.cpython-39.pyc |           3 KB | 1080.6 KB/s | binary | 100%
+colors.cpython-312.pyc    |           1 KB | 1064.9 KB/s | binary | 100%
+colors.cpython-39.pyc     |           1 KB | 1052.0 KB/s | binary | 100%
+__init__.cpython-312.pyc  |           6 KB | 1031.4 KB/s | binary | 100%
+parameters.cpython-312.pyc |           5 KB | 1017.7 KB/s | binary | 100%
+parameters.cpython-39.pyc |           4 KB | 1000.2 KB/s | binary | 100%
+__init__.cpython-39.pyc   |           4 KB |  989.2 KB/s | binary | 100%
+helper_func.cpython-312.pyc |           5 KB |  978.5 KB/s | binary | 100%
+parameters.py             |           6 KB |  964.5 KB/s | binary | 100%
+colors.py                 |           1 KB |  955.7 KB/s | binary | 100%
+__init__.py               |           6 KB |  940.5 KB/s | binary | 100%
+template_html             |            0 B |  937.1 KB/s | binary |   0%
+pages                     |            0 B |  935.4 KB/s | binary |   0%
+water_usage.css           |          403 B |  925.3 KB/s | binary | 100%
+production.js             |          12 KB |  907.0 KB/s | binary | 100%
+GHG_emissions.html        |           3 KB |  897.9 KB/s | binary | 100%
+land-use_area.css         |          366 B |  891.7 KB/s | binary | 100%
+land-use_area.html        |           2 KB |  879.8 KB/s | binary | 100%
+spatial_maps.html         |           2 KB |  871.1 KB/s | binary | 100%
+biodiversity.js           |           7 KB |  854.6 KB/s | binary | 100%
+production.html           |           3 KB |  847.8 KB/s | binary | 100%
+spatial_maps.css          |          423 B |  840.9 KB/s | binary | 100%
+land-use_area.js          |           6 KB |  825.5 KB/s | binary | 100%
+GHG_emissions.css         |          144 B |  818.9 KB/s | binary | 100%
+economics.css             |           62 B |  808.6 KB/s | binary | 100%
+GHG_emissions.js          |          16 KB |  784.4 KB/s | binary | 100%
+production.css            |           61 B |  779.6 KB/s | binary | 100%
+biodiversity.html         |           2 KB |  778.1 KB/s | binary | 100%
+water_usage.js            |           5 KB |  772.3 KB/s | binary | 100%
+economics.js              |          36 KB |  762.4 KB/s | binary | 100%
+economics.html            |           7 KB |  754.8 KB/s | binary | 100%
+spatial_maps.js           |           6 KB |  750.6 KB/s | binary | 100%
+water_usage.html          |           2 KB |  745.0 KB/s | binary | 100%
+biodiversity.css          |           62 B |  735.8 KB/s | binary | 100%
+index.js                  |           1 KB |  730.3 KB/s | binary | 100%
+style.css                 |           1 KB |  719.4 KB/s | binary | 100%
+src                       |            0 B |  717.3 KB/s | binary |   0%
+jqueqry.js                |          85 KB |  774.5 KB/s | binary | 100%
+index.css                 |          696 B |  768.3 KB/s | binary | 100%
+index.html                |           1 KB |  762.2 KB/s | binary | 100%
+create_report_data.py     |          75 KB |  757.7 KB/s | binary | 100%
+Assets                    |            0 B |  755.4 KB/s | binary |   0%
+ammap_colors.csv          |          235 B |  749.5 KB/s | binary | 100%
+lumap_colors_grouped.csv  |           1 KB |  741.5 KB/s | binary | 100%
+basemap.tif               |        2063 KB |  922.1 KB/s | binary | 100%
+AUS_adm                   |            0 B |  920.7 KB/s | binary |   0%
+STE11aAust_mercator_simplified.cpg |            5 B |  915.2 KB/s | binary | 100%
+STE11aAust_mercator_simplified.prj |          425 B |  908.5 KB/s | binary | 100%
+STE11aAust_mercator_simplified.sbn |          212 B |  969.8 KB/s | binary | 100%
+STE11aAust_mercator_simplified.shp |         151 KB |  976.2 KB/s | binary | 100%
+STE11aAust_mercator_simplified.dbf |           1 KB |  965.3 KB/s | binary | 100%
+STE11aAust_mercator_simplified.sbx |          132 B |  956.1 KB/s | binary | 100%
+STE11aAust_mercator_simplified.shx |          156 B |  950.1 KB/s | binary | 100%
+lm_colors.csv             |          109 B |  939.7 KB/s | binary | 100%
+lumap_colors.csv          |          949 B |  931.0 KB/s | binary | 100%
+float_img_colors.csv      |           1 KB |  925.3 KB/s | binary | 100%
+.gitignore                |            0 B |  922.5 KB/s | binary |   0%
+lu_group.csv              |           1 KB |  915.6 KB/s | binary | 100%
+NLUM_2010-11_mask.tif     |         336 KB |  937.0 KB/s | binary | 100%
+non_ag_colors.csv         |          694 B |  930.1 KB/s | binary | 100%
+create_static_maps.py     |           3 KB | 1006.4 KB/s | binary | 100%
+create_task_runs          |            0 B | 1001.5 KB/s | binary |   0%
+__pycache__               |            0 B |  998.1 KB/s | binary |   0%
+parameters.cpython-312.pyc |           1 KB |  987.0 KB/s | binary | 100%
+helpers.cpython-312.pyc   |          17 KB |  973.1 KB/s | binary | 100%
+report_custom_run_data.py |           4 KB |  962.8 KB/s | binary | 100%
+bash_scripts              |            0 B |  959.8 KB/s | binary |   0%
+conver_raw_data.sh        |          219 B |  947.9 KB/s | binary | 100%
+python_script.py          |           1 KB |  929.3 KB/s | binary | 100%
+install_pkg.sh            |          186 B |  920.9 KB/s | binary | 100%
+requirements_conda.txt    |          345 B |  820.9 KB/s | binary | 100%
+create_env.sh             |          438 B |  806.4 KB/s | binary | 100%
+conda_env.yml             |          648 B |  794.9 KB/s | binary | 100%
+requirements_pip.txt      |           55 B |  784.9 KB/s | binary | 100%
+task_cmd.sh               |          682 B |  772.9 KB/s | binary | 100%
+parameters.py             |          197 B |  762.3 KB/s | binary | 100%
+create_running_tasks.py   |           1 KB |  753.2 KB/s | binary | 100%
+helpers.py                |          11 KB |  327.7 KB/s | binary | 100%
+spatializers.py           |           6 KB |  325.7 KB/s | binary | 100%
+__init__.py               |          28 KB |  326.0 KB/s | binary | 100%
+xarray_tools.py           |           6 KB |  323.0 KB/s | binary | 100%
+compmap.py                |           9 KB |  321.4 KB/s | binary | 100%
+settings.py               |           3 KB |  318.8 KB/s | binary | 100%
+settings_bash.py          |           4 KB |  315.8 KB/s | binary | 100%
+memory_test.py            |          215 B |  307.1 KB/s | binary | 100%
+data.py                   |          82 KB |  312.3 KB/s | binary | 100%
+economics                 |            0 B |  311.3 KB/s | binary |   0%
+land_use_culling.py       |           3 KB |  329.0 KB/s | binary | 100%
+__pycache__               |            0 B |  326.8 KB/s | binary |   0%
+land_use_culling.cpython-312.pyc |           3 KB |  323.9 KB/s | binary | 100%
+off_land_commodity        |            0 B |  322.3 KB/s | binary |   0%
+__pycache__               |            0 B |  321.8 KB/s | binary |   0%
+__init__.cpython-312.pyc  |           2 KB |  319.4 KB/s | binary | 100%
+__init__.cpython-39.pyc   |           1 KB |  316.5 KB/s | binary | 100%
+__init__.py               |           1 KB |  313.2 KB/s | binary | 100%
+non_agricultural          |            0 B |  312.2 KB/s | binary |   0%
+cost.py                   |           8 KB |  308.2 KB/s | binary | 100%
+water.py                  |          10 KB |  306.3 KB/s | binary | 100%
+__pycache__               |            0 B |  304.9 KB/s | binary |   0%
+biodiversity.cpython-312.pyc |           6 KB |  325.0 KB/s | binary | 100%
+revenue.cpython-312.pyc   |           9 KB |  323.8 KB/s | binary | 100%
+quantity.cpython-312.pyc  |          12 KB |  322.5 KB/s | binary | 100%
+ghg.cpython-312.pyc       |          11 KB |  320.5 KB/s | binary | 100%
+cost.cpython-312.pyc      |           9 KB |  319.0 KB/s | binary | 100%
+transitions.cpython-312.pyc |          52 KB |  321.3 KB/s | binary | 100%
+water.cpython-312.pyc     |          11 KB |  319.4 KB/s | binary | 100%
+quantity.py               |          10 KB |  318.0 KB/s | binary | 100%
+biodiversity.py           |           5 KB |  316.1 KB/s | binary | 100%
+ghg.py                    |          11 KB |  313.9 KB/s | binary | 100%
+transitions.py            |          48 KB |  313.3 KB/s | binary | 100%
+revenue.py                |           8 KB |  340.3 KB/s | binary | 100%
+agricultural              |            0 B |  339.2 KB/s | binary |   0%
+cost.py                   |          19 KB |  338.5 KB/s | binary | 100%
+water.py                  |          22 KB |  337.5 KB/s | binary | 100%
+__pycache__               |            0 B |  337.0 KB/s | binary |   0%
+biodiversity.cpython-312.pyc |           8 KB |  334.6 KB/s | binary | 100%
+revenue.cpython-312.pyc   |          15 KB |  332.5 KB/s | binary | 100%
+quantity.cpython-312.pyc  |          20 KB |  324.8 KB/s | binary | 100%
+ghg.cpython-312.pyc       |          24 KB |  324.2 KB/s | binary | 100%
+cost.cpython-312.pyc      |          21 KB |  323.3 KB/s | binary | 100%
+transitions.cpython-312.pyc |          15 KB |  356.8 KB/s | binary | 100%
+water.cpython-312.pyc     |          22 KB |  355.6 KB/s | binary | 100%
+quantity.py               |          19 KB |  347.4 KB/s | binary | 100%
+biodiversity.py           |           6 KB |  345.9 KB/s | binary | 100%
+ghg.py                    |          24 KB |  346.2 KB/s | binary | 100%
+transitions.py            |          14 KB |  343.3 KB/s | binary | 100%
+revenue.py                |          16 KB |  342.3 KB/s | binary | 100%
+helpers.py                |           9 KB |  338.6 KB/s | binary | 100%
+tests                     |            0 B |  338.1 KB/s | binary |   0%
+test_land_use_culling.py  |           6 KB |  361.1 KB/s | binary | 100%
+README.md                 |          409 B |  357.5 KB/s | binary | 100%
+COPYING                   |          34 KB |  354.7 KB/s | binary | 100%
+temp_run2.py              |          799 B |  353.1 KB/s | binary | 100%
+0_runs_linux.py           |           2 KB |  349.9 KB/s | binary | 100%
+temp_custom.py            |          173 B |  347.7 KB/s | binary | 100%
+output                    |            0 B |  346.6 KB/s | binary |   0%
+20241216_Run_1_GHG_1_5C_67_BIO_0_test.pbs |           1 KB |  343.4 KB/s | binary | 100%
+130774747.gadi-pbs.OU     |          771 B |  340.3 KB/s | binary | 100%
+run_2024_12_17__09_38_41_stdout.log |          99 KB |  343.8 KB/s | binary | 100%
+simulation_log.txt        |           75 B |  341.8 KB/s | binary | 100%
+2024_12_17__09_38_41_RF10_2010-2050_timeseries |            0 B |  340.7 KB/s | binary |   0%
+out_2013                  |            0 B |  340.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  339.2 KB/s | binary |   0%
+out_2025                  |            0 B |  337.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  336.6 KB/s | binary |   0%
+out_2042                  |            0 B |  335.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  334.6 KB/s | binary |   0%
+out_2036                  |            0 B |  333.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  332.2 KB/s | binary |   0%
+out_2026                  |            0 B |  330.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  330.2 KB/s | binary |   0%
+out_2021                  |            0 B |  328.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  327.8 KB/s | binary |   0%
+out_2046                  |            0 B |  326.4 KB/s | binary |   0%
+lucc_separate             |            0 B |  325.4 KB/s | binary |   0%
+out_2040                  |            0 B |  324.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  323.1 KB/s | binary |   0%
+out_2048                  |            0 B |  322.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  321.2 KB/s | binary |   0%
+out_2012                  |            0 B |  319.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  319.0 KB/s | binary |   0%
+out_2038                  |            0 B |  317.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  317.2 KB/s | binary |   0%
+out_2037                  |            0 B |  315.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  315.0 KB/s | binary |   0%
+out_2050                  |            0 B |  313.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  313.2 KB/s | binary |   0%
+out_2028                  |            0 B |  311.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  311.0 KB/s | binary |   0%
+out_2010                  |            0 B |  309.7 KB/s | binary |   0%
+out_2031                  |            0 B |  308.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  308.0 KB/s | binary |   0%
+begin_end_compare_2010_2050 |            0 B |  306.8 KB/s | binary |   0%
+out_2050                  |            0 B |  306.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  305.5 KB/s | binary |   0%
+out_2010                  |            0 B |  304.3 KB/s | binary |   0%
+out_2019                  |            0 B |  303.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  302.2 KB/s | binary |   0%
+out_2020                  |            0 B |  301.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  300.2 KB/s | binary |   0%
+out_2017                  |            0 B |  299.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  297.8 KB/s | binary |   0%
+out_2039                  |            0 B |  296.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  296.3 KB/s | binary |   0%
+out_2049                  |            0 B |  295.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  294.3 KB/s | binary |   0%
+out_2030                  |            0 B |  293.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  292.4 KB/s | binary |   0%
+out_2045                  |            0 B |  291.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  289.8 KB/s | binary |   0%
+out_2035                  |            0 B |  288.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  288.3 KB/s | binary |   0%
+out_2029                  |            0 B |  287.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  286.5 KB/s | binary |   0%
+out_2041                  |            0 B |  285.4 KB/s | binary |   0%
+lucc_separate             |            0 B |  285.0 KB/s | binary |   0%
+out_2023                  |            0 B |  283.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  283.2 KB/s | binary |   0%
+out_2033                  |            0 B |  282.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  281.4 KB/s | binary |   0%
+out_2014                  |            0 B |  280.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  280.0 KB/s | binary |   0%
+out_2015                  |            0 B |  279.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  278.3 KB/s | binary |   0%
+out_2022                  |            0 B |  277.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  276.9 KB/s | binary |   0%
+out_2024                  |            0 B |  275.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  275.2 KB/s | binary |   0%
+out_2034                  |            0 B |  274.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  273.6 KB/s | binary |   0%
+out_2027                  |            0 B |  272.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  272.2 KB/s | binary |   0%
+out_2018                  |            0 B |  270.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  269.9 KB/s | binary |   0%
+out_2047                  |            0 B |  269.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  268.7 KB/s | binary |   0%
+out_2032                  |            0 B |  267.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  267.1 KB/s | binary |   0%
+out_2044                  |            0 B |  266.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  265.5 KB/s | binary |   0%
+out_2016                  |            0 B |  264.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  264.2 KB/s | binary |   0%
+out_2011                  |            0 B |  263.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  262.7 KB/s | binary |   0%
+out_2043                  |            0 B |  261.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  261.5 KB/s | binary |   0%
+run_2024_12_17__09_38_41_stderr.log |            0 B |  105.4 KB/s | binary |   0%
+130774747.gadi-pbs.log    |          496 B |  102.9 KB/s | binary | 100%
+temp_carbonprice.py       |           1 KB |  101.6 KB/s | binary | 100%
+temp_remove_output.py     |           1 KB |  101.0 KB/s | binary | 100%
+temp_writes.py            |           4 KB |  100.4 KB/s | binary | 100%
+gurobi.log                |          55 KB |  103.7 KB/s | binary | 100%
+temp_test.py              |           2 KB |  103.2 KB/s | binary | 100%
+CITATION.cff              |           1 KB |   71.3 KB/s | binary | 100%
+temp_report.py            |          444 B |   70.9 KB/s | binary | 100%
+temp_clear_ouput.py       |           1 KB |   70.6 KB/s | binary | 100%
+.idea                     |            0 B |   70.4 KB/s | binary |   0%
+material_theme_project_new.xml |          414 B |   70.0 KB/s | binary | 100%
+modules.xml               |          262 B |   69.5 KB/s | binary | 100%
+LUTO2.iml                 |          692 B |   69.2 KB/s | binary | 100%
+jupyter-settings.xml      |           1 KB |   68.7 KB/s | binary | 100%
+.gitignore                |          176 B |   67.8 KB/s | binary | 100%
+vcs.xml                   |          167 B |   67.0 KB/s | binary | 100%
+workspace.xml             |          55 KB |   74.5 KB/s | binary | 100%
+misc.xml                  |          288 B |   74.0 KB/s | binary | 100%
+deployment.xml            |           1 KB |   73.7 KB/s | binary | 100%
+inspectionProfiles        |            0 B |   73.5 KB/s | binary |   0%
+profiles_settings.xml     |          174 B |   72.8 KB/s | binary | 100%
+Project_Default.xml       |           1 KB |   72.5 KB/s | binary | 100%
+0_runs.py                 |           2 KB |   72.2 KB/s | binary | 100%
+.gitignore                |          818 B |   71.8 KB/s | binary | 100%
+temp_check_result.py      |           3 KB |   71.4 KB/s | binary | 100%
+temp_run_local.ipynb      |          12 KB |   71.8 KB/s | binary | 100%
+temp_temp.py              |           2 KB |   71.6 KB/s | binary | 100%
+temp_runs.py              |           2 KB |   71.4 KB/s | binary | 100%
+temp_run_in_nci2.py       |           2 KB |   75.6 KB/s | binary | 100%
+temp_test3.py             |           1 KB |   75.2 KB/s | binary | 100%
+environment.yml           |          16 KB |   75.5 KB/s | binary | 100%
+temp_write.py             |           1 KB |   75.0 KB/s | binary | 100%
+temp_test1.py             |           2 KB |   74.7 KB/s | binary | 100%
+temp_mem.py               |           2 KB |   74.4 KB/s | binary | 100%
+sync.ffs_db               |         174 KB |   87.1 KB/s | binary | 100%
+temp_clear_couput.py      |           1 KB |   86.1 KB/s | binary | 100%
+temp_report1.py           |          472 B |   85.7 KB/s | binary | 100%
+temp_test2.py             |           1 KB |   85.1 KB/s | binary | 100%
+temp_run_in_nci1.py       |           2 KB |   79.9 KB/s | binary | 100%
+sync.ffs_lock             |          109 B |   79.4 KB/s | binary | 100%
+temp_water_limits.txt     |         912 KB |  150.0 KB/s | binary | 100%
+2_writes.py               |           4 KB |  149.4 KB/s | binary | 100%
+run_test.ipynb            |          12 KB |  149.3 KB/s | binary | 100%
+1_write.py                |           1 KB |  148.3 KB/s | binary | 100%
+temp_claer_couput.py      |           1 KB |  147.6 KB/s | binary | 100%
+README.md                 |           4 KB |  147.0 KB/s | binary | 100%
+temp_test.ipynb           |          97 KB |  153.0 KB/s | binary | 100%
+Lock acquired successfully.
+2024-12-17 12:21:03: Starting task...
+[INFO] Sync time updated to: 2024-12-17 12:21:03
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+20241217_Run_1_GHG_1_5C_67_BIO_0_test |            0 B |    0.0 KB/s | binary |   0%
+requirements.txt          |          470 B |    0.0 KB/s | binary | 100%
+docs                      |            0 B |    0.0 KB/s | binary |   0%
+luto2-overview.pdf        |         321 KB |  936.3 KB/s | binary | 100%
+LUTO 2.0 summary and status.docx |          54 KB |  829.3 KB/s | binary | 100%
+luto2-overview.tex        |          55 KB |  726.2 KB/s | binary | 100%
+landuses_products_commodities.docx |         126 KB |  728.9 KB/s | binary | 100%
+Deploy luto on HPC.docx   |          95 KB |  746.4 KB/s | binary | 100%
+temp_run1.py              |          802 B |  675.5 KB/s | binary | 100%
+temp_run_local.py         |           2 KB |  636.5 KB/s | binary | 100%
+temp_run_in_nci.py        |           2 KB |  593.9 KB/s | binary | 100%
+temp_draw.py              |           3 KB |  550.5 KB/s | binary | 100%
+xinhao_environment.yml    |          24 KB |  543.1 KB/s | binary | 100%
+temp_writes1.py           |           4 KB |  514.7 KB/s | binary | 100%
+temp_temp_1.py            |           2 KB |  487.8 KB/s | binary | 100%
+luto                      |            0 B |  477.4 KB/s | binary |   0%
+simulation.py             |          10 KB |  455.0 KB/s | binary | 100%
+__pycache__               |            0 B |  446.0 KB/s | binary |   0%
+simulation.cpython-312.pyc |          13 KB |  437.6 KB/s | binary | 100%
+data.cpython-312.pyc      |          88 KB |  437.3 KB/s | binary | 100%
+ag_managements.cpython-39.pyc |           1 KB |  413.2 KB/s | binary | 100%
+simulation.cpython-39.pyc |           5 KB |  397.1 KB/s | binary | 100%
+ag_managements.cpython-312.pyc |           1 KB |  377.6 KB/s | binary | 100%
+settings.cpython-39.pyc   |           4 KB |  363.8 KB/s | binary | 100%
+settings.cpython-312.pyc  |           4 KB |  353.6 KB/s | binary | 100%
+solvers                   |            0 B |  349.0 KB/s | binary |   0%
+__pycache__               |            0 B |  344.4 KB/s | binary |   0%
+input_data.cpython-312.pyc |          29 KB |  341.2 KB/s | binary | 100%
+solver.cpython-312.pyc    |          58 KB |  356.0 KB/s | binary | 100%
+input_data.py             |          22 KB |  354.1 KB/s | binary | 100%
+solver.py                 |          44 KB |  358.2 KB/s | binary | 100%
+dataprep.py               |          49 KB |  361.8 KB/s | binary | 100%
+ag_managements.py         |           2 KB |  349.1 KB/s | binary | 100%
+tools                     |            0 B |  345.5 KB/s | binary |   0%
+write.py                  |          82 KB |  360.0 KB/s | binary | 100%
+__pycache__               |            0 B |  356.3 KB/s | binary |   0%
+spatializers.cpython-312.pyc |           7 KB |  344.9 KB/s | binary | 100%
+xarray_tools.cpython-312.pyc |           8 KB |  334.6 KB/s | binary | 100%
+__init__.cpython-312.pyc  |          35 KB |  334.4 KB/s | binary | 100%
+compmap.cpython-312.pyc   |          11 KB |  330.2 KB/s | binary | 100%
+write.cpython-312.pyc     |          79 KB |  342.1 KB/s | binary | 100%
+__init__.cpython-39.pyc   |          21 KB |  339.4 KB/s | binary | 100%
+plotmap.py                |           6 KB |  332.8 KB/s | binary | 100%
+Manual_jupyter_books      |            0 B |  330.2 KB/s | binary |   0%
+helpers                   |            0 B |  328.8 KB/s | binary |   0%
+parameters.py             |          483 B |  322.5 KB/s | binary | 100%
+__init__.py               |           6 KB |  312.1 KB/s | binary | 100%
+Add_tags_to_jb.ipynb      |           1 KB |  305.5 KB/s | binary | 100%
+asset                     |            0 B |  303.2 KB/s | binary |   0%
+lvstk_data_description.csv |          684 B |  283.6 KB/s | binary | 100%
+fig_2d_to_1d.png          |          17 KB |  277.9 KB/s | binary | 100%
+crop_data_description.csv |          335 B |  273.4 KB/s | binary | 100%
+sa2_2011_aus              |            0 B |  271.6 KB/s | binary |   0%
+SA2_2011_AUST_continental_simplified.shp.xml |           8 KB |  269.0 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.prj |          145 B |  264.0 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.shp |         884 KB |  419.8 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.sbn |          22 KB |  414.2 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.shx |          17 KB |  411.4 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.dbf |         822 KB |  543.5 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.cpg |            5 B |  537.5 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.sbx |           1 KB |  529.0 KB/s | binary | 100%
+Chap_1_LUTO_overview.ipynb |        4661 KB | 1194.8 KB/s | binary | 100%
+report                    |            0 B | 1188.9 KB/s | binary |   0%
+map_tools                 |            0 B | 1186.2 KB/s | binary |   0%
+__pycache__               |            0 B | 1180.4 KB/s | binary |   0%
+__init__.cpython-312.pyc  |          17 KB | 1166.5 KB/s | binary | 100%
+map_making.cpython-312.pyc |           7 KB | 1154.0 KB/s | binary | 100%
+helper.cpython-39.pyc     |           6 KB | 1136.4 KB/s | binary | 100%
+parameters.cpython-312.pyc |           2 KB | 1123.8 KB/s | binary | 100%
+helper.cpython-312.pyc    |           7 KB | 1109.9 KB/s | binary | 100%
+__init__.cpython-39.pyc   |          11 KB | 1089.8 KB/s | binary | 100%
+helper.py                 |           6 KB | 1076.5 KB/s | binary | 100%
+map_making.py             |           5 KB | 1065.7 KB/s | binary | 100%
+parameters.py             |           4 KB | 1046.2 KB/s | binary | 100%
+__init__.py               |          16 KB | 1033.3 KB/s | binary | 100%
+create_html.py            |           3 KB | 1023.2 KB/s | binary | 100%
+__pycache__               |            0 B | 1018.9 KB/s | binary |   0%
+create_static_maps.cpython-39.pyc |           2 KB | 1007.1 KB/s | binary | 100%
+create_report_data.cpython-39.pyc |          35 KB |  995.6 KB/s | binary | 100%
+create_static_maps.cpython-312.pyc |           3 KB |  984.3 KB/s | binary | 100%
+create_report_data.cpython-312.pyc |          79 KB |  984.7 KB/s | binary | 100%
+create_html.cpython-39.pyc |           2 KB |  973.6 KB/s | binary | 100%
+create_html.cpython-312.pyc |           3 KB |  941.5 KB/s | binary | 100%
+data_tools                |            0 B |  938.1 KB/s | binary |   0%
+helper_func.py            |           4 KB |  929.9 KB/s | binary | 100%
+__pycache__               |            0 B |  926.6 KB/s | binary |   0%
+helper_func.cpython-39.pyc |           3 KB |  913.7 KB/s | binary | 100%
+colors.cpython-312.pyc    |           1 KB |  904.2 KB/s | binary | 100%
+colors.cpython-39.pyc     |           1 KB |  888.5 KB/s | binary | 100%
+__init__.cpython-312.pyc  |           6 KB |  874.0 KB/s | binary | 100%
+parameters.cpython-312.pyc |           5 KB |  854.0 KB/s | binary | 100%
+parameters.cpython-39.pyc |           4 KB |  844.6 KB/s | binary | 100%
+__init__.cpython-39.pyc   |           4 KB |  834.0 KB/s | binary | 100%
+helper_func.cpython-312.pyc |           5 KB |  825.1 KB/s | binary | 100%
+parameters.py             |           6 KB |  815.3 KB/s | binary | 100%
+colors.py                 |           1 KB |  809.0 KB/s | binary | 100%
+__init__.py               |           6 KB |  789.6 KB/s | binary | 100%
+template_html             |            0 B |  788.4 KB/s | binary |   0%
+pages                     |            0 B |  785.9 KB/s | binary |   0%
+water_usage.css           |          403 B |  777.6 KB/s | binary | 100%
+production.js             |          12 KB |  780.2 KB/s | binary | 100%
+GHG_emissions.html        |           3 KB |  775.5 KB/s | binary | 100%
+land-use_area.css         |          366 B |  770.4 KB/s | binary | 100%
+land-use_area.html        |           2 KB |  745.1 KB/s | binary | 100%
+spatial_maps.html         |           2 KB |  737.2 KB/s | binary | 100%
+biodiversity.js           |           7 KB |  731.1 KB/s | binary | 100%
+production.html           |           3 KB |  721.4 KB/s | binary | 100%
+spatial_maps.css          |          423 B |  714.9 KB/s | binary | 100%
+land-use_area.js          |           6 KB |  759.0 KB/s | binary | 100%
+GHG_emissions.css         |          144 B |  752.9 KB/s | binary | 100%
+economics.css             |           62 B |  743.2 KB/s | binary | 100%
+GHG_emissions.js          |          16 KB |  733.0 KB/s | binary | 100%
+production.css            |           61 B |  728.5 KB/s | binary | 100%
+biodiversity.html         |           2 KB |  720.9 KB/s | binary | 100%
+water_usage.js            |           5 KB |  713.6 KB/s | binary | 100%
+economics.js              |          36 KB |  709.5 KB/s | binary | 100%
+economics.html            |           7 KB |  705.9 KB/s | binary | 100%
+spatial_maps.js           |           6 KB |  696.0 KB/s | binary | 100%
+water_usage.html          |           2 KB |  735.9 KB/s | binary | 100%
+biodiversity.css          |           62 B |  728.8 KB/s | binary | 100%
+index.js                  |           1 KB |  716.2 KB/s | binary | 100%
+style.css                 |           1 KB |  708.4 KB/s | binary | 100%
+src                       |            0 B |  705.2 KB/s | binary |   0%
+jqueqry.js                |          85 KB |  700.5 KB/s | binary | 100%
+index.css                 |          696 B |  695.3 KB/s | binary | 100%
+index.html                |           1 KB |  685.0 KB/s | binary | 100%
+create_report_data.py     |          75 KB |  685.0 KB/s | binary | 100%
+Assets                    |            0 B |  683.0 KB/s | binary |   0%
+ammap_colors.csv          |          235 B |  727.0 KB/s | binary | 100%
+lumap_colors_grouped.csv  |           1 KB |  722.4 KB/s | binary | 100%
+basemap.tif               |        2063 KB |  910.8 KB/s | binary | 100%
+AUS_adm                   |            0 B |  909.3 KB/s | binary |   0%
+STE11aAust_mercator_simplified.cpg |            5 B |  898.0 KB/s | binary | 100%
+STE11aAust_mercator_simplified.prj |          425 B |  888.5 KB/s | binary | 100%
+STE11aAust_mercator_simplified.sbn |          212 B |  880.4 KB/s | binary | 100%
+STE11aAust_mercator_simplified.shp |         151 KB |  883.0 KB/s | binary | 100%
+STE11aAust_mercator_simplified.dbf |           1 KB |  875.3 KB/s | binary | 100%
+STE11aAust_mercator_simplified.sbx |          132 B |  957.8 KB/s | binary | 100%
+STE11aAust_mercator_simplified.shx |          156 B |  948.6 KB/s | binary | 100%
+lm_colors.csv             |          109 B |  936.4 KB/s | binary | 100%
+lumap_colors.csv          |          949 B |  927.6 KB/s | binary | 100%
+float_img_colors.csv      |           1 KB |  920.5 KB/s | binary | 100%
+.gitignore                |            0 B |  917.5 KB/s | binary |   0%
+lu_group.csv              |           1 KB |  904.9 KB/s | binary | 100%
+NLUM_2010-11_mask.tif     |         336 KB |  922.5 KB/s | binary | 100%
+non_ag_colors.csv         |          694 B |  914.2 KB/s | binary | 100%
+create_static_maps.py     |           3 KB |  905.1 KB/s | binary | 100%
+create_task_runs          |            0 B |  902.4 KB/s | binary |   0%
+__pycache__               |            0 B |  899.6 KB/s | binary |   0%
+parameters.cpython-312.pyc |           1 KB |  804.5 KB/s | binary | 100%
+helpers.cpython-312.pyc   |          17 KB |  790.9 KB/s | binary | 100%
+report_custom_run_data.py |           4 KB |  786.3 KB/s | binary | 100%
+bash_scripts              |            0 B |  783.8 KB/s | binary |   0%
+conver_raw_data.sh        |          219 B |  777.7 KB/s | binary | 100%
+python_script.py          |           1 KB |  770.6 KB/s | binary | 100%
+install_pkg.sh            |          186 B |  758.8 KB/s | binary | 100%
+requirements_conda.txt    |          345 B |  749.7 KB/s | binary | 100%
+create_env.sh             |          438 B |  740.8 KB/s | binary | 100%
+conda_env.yml             |          648 B |  313.3 KB/s | binary | 100%
+requirements_pip.txt      |           55 B |  307.9 KB/s | binary | 100%
+task_cmd.sh               |          682 B |  304.2 KB/s | binary | 100%
+parameters.py             |          197 B |  299.1 KB/s | binary | 100%
+create_running_tasks.py   |           1 KB |  295.2 KB/s | binary | 100%
+helpers.py                |          11 KB |  292.4 KB/s | binary | 100%
+spatializers.py           |           6 KB |  289.6 KB/s | binary | 100%
+__init__.py               |          28 KB |  289.3 KB/s | binary | 100%
+xarray_tools.py           |           6 KB |  307.0 KB/s | binary | 100%
+compmap.py                |           9 KB |  305.0 KB/s | binary | 100%
+settings.py               |           3 KB |  302.0 KB/s | binary | 100%
+settings_bash.py          |           4 KB |  300.1 KB/s | binary | 100%
+memory_test.py            |          215 B |  296.9 KB/s | binary | 100%
+data.py                   |          82 KB |  300.8 KB/s | binary | 100%
+economics                 |            0 B |  299.9 KB/s | binary |   0%
+land_use_culling.py       |           3 KB |  298.9 KB/s | binary | 100%
+__pycache__               |            0 B |  298.0 KB/s | binary |   0%
+land_use_culling.cpython-312.pyc |           3 KB |  295.6 KB/s | binary | 100%
+off_land_commodity        |            0 B |  294.7 KB/s | binary |   0%
+__pycache__               |            0 B |  294.3 KB/s | binary |   0%
+__init__.cpython-312.pyc  |           2 KB |  291.4 KB/s | binary | 100%
+__init__.cpython-39.pyc   |           1 KB |  316.1 KB/s | binary | 100%
+__init__.py               |           1 KB |  312.2 KB/s | binary | 100%
+non_agricultural          |            0 B |  310.8 KB/s | binary |   0%
+cost.py                   |           8 KB |  306.8 KB/s | binary | 100%
+water.py                  |          10 KB |  303.1 KB/s | binary | 100%
+__pycache__               |            0 B |  302.2 KB/s | binary |   0%
+biodiversity.cpython-312.pyc |           6 KB |  298.2 KB/s | binary | 100%
+revenue.cpython-312.pyc   |           9 KB |  296.9 KB/s | binary | 100%
+quantity.cpython-312.pyc  |          12 KB |  294.5 KB/s | binary | 100%
+ghg.cpython-312.pyc       |          11 KB |  292.6 KB/s | binary | 100%
+cost.cpython-312.pyc      |           9 KB |  316.6 KB/s | binary | 100%
+transitions.cpython-312.pyc |          52 KB |  318.4 KB/s | binary | 100%
+water.cpython-312.pyc     |          11 KB |  313.6 KB/s | binary | 100%
+quantity.py               |          10 KB |  310.3 KB/s | binary | 100%
+biodiversity.py           |           5 KB |  307.6 KB/s | binary | 100%
+ghg.py                    |          11 KB |  304.6 KB/s | binary | 100%
+transitions.py            |          48 KB |  329.2 KB/s | binary | 100%
+revenue.py                |           8 KB |  325.8 KB/s | binary | 100%
+agricultural              |            0 B |  324.8 KB/s | binary |   0%
+cost.py                   |          19 KB |  324.2 KB/s | binary | 100%
+water.py                  |          22 KB |  323.4 KB/s | binary | 100%
+__pycache__               |            0 B |  323.0 KB/s | binary |   0%
+biodiversity.cpython-312.pyc |           8 KB |  321.3 KB/s | binary | 100%
+revenue.cpython-312.pyc   |          15 KB |  320.3 KB/s | binary | 100%
+quantity.cpython-312.pyc  |          20 KB |  318.4 KB/s | binary | 100%
+ghg.cpython-312.pyc       |          24 KB |  317.4 KB/s | binary | 100%
+cost.cpython-312.pyc      |          21 KB |  316.6 KB/s | binary | 100%
+transitions.cpython-312.pyc |          15 KB |  315.7 KB/s | binary | 100%
+water.cpython-312.pyc     |          22 KB |  315.6 KB/s | binary | 100%
+quantity.py               |          19 KB |  341.6 KB/s | binary | 100%
+biodiversity.py           |           6 KB |  340.1 KB/s | binary | 100%
+ghg.py                    |          24 KB |  338.3 KB/s | binary | 100%
+transitions.py            |          14 KB |  334.5 KB/s | binary | 100%
+revenue.py                |          16 KB |  333.0 KB/s | binary | 100%
+helpers.py                |           9 KB |  330.5 KB/s | binary | 100%
+tests                     |            0 B |  329.4 KB/s | binary |   0%
+test_land_use_culling.py  |           6 KB |  326.1 KB/s | binary | 100%
+README.md                 |          409 B |  323.2 KB/s | binary | 100%
+COPYING                   |          34 KB |  321.3 KB/s | binary | 100%
+temp_run2.py              |          799 B |  329.9 KB/s | binary | 100%
+0_runs_linux.py           |           2 KB |  326.0 KB/s | binary | 100%
+temp_custom.py            |          173 B |  323.0 KB/s | binary | 100%
+output                    |            0 B |  320.5 KB/s | binary |   0%
+run_2024_12_17__10_20_18_stdout.log |         463 KB |  360.9 KB/s | binary | 100%
+run_2024_12_17__10_20_18_stderr.log |            0 B |  359.8 KB/s | binary |   0%
+2024_12_17__10_20_18_RF10_2010-2050_timeseries |            0 B |  358.2 KB/s | binary |   0%
+out_2013                  |            0 B |  357.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  356.6 KB/s | binary |   0%
+out_2025                  |            0 B |  355.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  354.0 KB/s | binary |   0%
+out_2042                  |            0 B |  352.4 KB/s | binary |   0%
+lucc_separate             |            0 B |  351.9 KB/s | binary |   0%
+out_2036                  |            0 B |  350.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  349.3 KB/s | binary |   0%
+out_2026                  |            0 B |  347.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  347.3 KB/s | binary |   0%
+out_2021                  |            0 B |  345.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  344.8 KB/s | binary |   0%
+out_2046                  |            0 B |  343.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  342.3 KB/s | binary |   0%
+out_2040                  |            0 B |  340.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  339.9 KB/s | binary |   0%
+out_2048                  |            0 B |  338.4 KB/s | binary |   0%
+lucc_separate             |            0 B |  338.0 KB/s | binary |   0%
+out_2012                  |            0 B |  336.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  335.6 KB/s | binary |   0%
+out_2038                  |            0 B |  334.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  333.7 KB/s | binary |   0%
+out_2037                  |            0 B |  332.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  331.4 KB/s | binary |   0%
+out_2050                  |            0 B |  330.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  329.2 KB/s | binary |   0%
+out_2028                  |            0 B |  327.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  327.3 KB/s | binary |   0%
+out_2010                  |            0 B |  326.0 KB/s | binary |   0%
+out_2031                  |            0 B |  324.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  324.3 KB/s | binary |   0%
+begin_end_compare_2010_2050 |            0 B |  322.9 KB/s | binary |   0%
+out_2050                  |            0 B |  322.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  321.2 KB/s | binary |   0%
+out_2010                  |            0 B |  320.3 KB/s | binary |   0%
+out_2019                  |            0 B |  319.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  318.2 KB/s | binary |   0%
+out_2020                  |            0 B |  317.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  315.7 KB/s | binary |   0%
+out_2017                  |            0 B |  314.5 KB/s | binary |   0%
+lucc_separate             |            0 B |  314.1 KB/s | binary |   0%
+out_2039                  |            0 B |  312.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  312.0 KB/s | binary |   0%
+out_2049                  |            0 B |  310.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  310.4 KB/s | binary |   0%
+out_2030                  |            0 B |  308.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  308.4 KB/s | binary |   0%
+out_2045                  |            0 B |  307.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  306.4 KB/s | binary |   0%
+out_2035                  |            0 B |  305.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  304.9 KB/s | binary |   0%
+out_2029                  |            0 B |  303.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  303.0 KB/s | binary |   0%
+out_2041                  |            0 B |  301.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  301.0 KB/s | binary |   0%
+out_2023                  |            0 B |  299.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  299.5 KB/s | binary |   0%
+out_2033                  |            0 B |  298.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  297.3 KB/s | binary |   0%
+out_2014                  |            0 B |  296.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  295.8 KB/s | binary |   0%
+out_2015                  |            0 B |  294.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  294.0 KB/s | binary |   0%
+out_2022                  |            0 B |  292.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  292.6 KB/s | binary |   0%
+out_2024                  |            0 B |  291.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  290.8 KB/s | binary |   0%
+out_2034                  |            0 B |  289.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  289.1 KB/s | binary |   0%
+out_2027                  |            0 B |  288.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  287.7 KB/s | binary |   0%
+out_2018                  |            0 B |  286.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  285.9 KB/s | binary |   0%
+out_2047                  |            0 B |  284.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  284.6 KB/s | binary |   0%
+out_2032                  |            0 B |  283.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  282.9 KB/s | binary |   0%
+out_2044                  |            0 B |  281.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  281.2 KB/s | binary |   0%
+out_2016                  |            0 B |  280.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  279.9 KB/s | binary |   0%
+out_2011                  |            0 B |  279.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  278.3 KB/s | binary |   0%
+out_2043                  |            0 B |  277.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  276.1 KB/s | binary |   0%
+simulation_log.txt        |           75 B |  120.8 KB/s | binary | 100%
+20241217_Run_1_GHG_1_5C_67_BIO_0_test.pbs |           1 KB |  119.8 KB/s | binary | 100%
+130776977.gadi-pbs.log    |          496 B |  118.8 KB/s | binary | 100%
+temp_carbonprice.py       |           1 KB |  117.5 KB/s | binary | 100%
+temp_remove_output.py     |           1 KB |  117.1 KB/s | binary | 100%
+temp_writes.py            |           4 KB |  116.4 KB/s | binary | 100%
+gurobi.log                |         265 KB |  135.3 KB/s | binary | 100%
+temp_test.py              |           2 KB |  134.7 KB/s | binary | 100%
+CITATION.cff              |           1 KB |  133.7 KB/s | binary | 100%
+temp_report.py            |          444 B |  133.0 KB/s | binary | 100%
+temp_clear_ouput.py       |           1 KB |  115.9 KB/s | binary | 100%
+.idea                     |            0 B |  115.6 KB/s | binary |   0%
+material_theme_project_new.xml |          414 B |  115.1 KB/s | binary | 100%
+modules.xml               |          262 B |  113.7 KB/s | binary | 100%
+LUTO2.iml                 |          692 B |  112.4 KB/s | binary | 100%
+jupyter-settings.xml      |           1 KB |  111.4 KB/s | binary | 100%
+.gitignore                |          176 B |  110.0 KB/s | binary | 100%
+vcs.xml                   |          167 B |  108.6 KB/s | binary | 100%
+workspace.xml             |          55 KB |  120.2 KB/s | binary | 100%
+misc.xml                  |          288 B |  119.3 KB/s | binary | 100%
+deployment.xml            |           1 KB |  118.6 KB/s | binary | 100%
+inspectionProfiles        |            0 B |  118.3 KB/s | binary |   0%
+profiles_settings.xml     |          174 B |  117.4 KB/s | binary | 100%
+Project_Default.xml       |           1 KB |  116.4 KB/s | binary | 100%
+0_runs.py                 |           2 KB |  115.8 KB/s | binary | 100%
+.gitignore                |          833 B |  115.3 KB/s | binary | 100%
+temp_check_result.py      |           3 KB |  114.5 KB/s | binary | 100%
+temp_run_local.ipynb      |          12 KB |  114.4 KB/s | binary | 100%
+temp_temp.py              |           2 KB |  114.2 KB/s | binary | 100%
+temp_runs.py              |           2 KB |  113.9 KB/s | binary | 100%
+temp_run_in_nci2.py       |           2 KB |  117.0 KB/s | binary | 100%
+temp_test3.py             |           1 KB |  116.4 KB/s | binary | 100%
+environment.yml           |          16 KB |  116.4 KB/s | binary | 100%
+temp_write.py             |           1 KB |  116.1 KB/s | binary | 100%
+temp_test1.py             |           2 KB |  115.7 KB/s | binary | 100%
+temp_mem.py               |           2 KB |  115.3 KB/s | binary | 100%
+sync.ffs_db               |         175 KB |  128.3 KB/s | binary | 100%
+temp_clear_couput.py      |           1 KB |  127.9 KB/s | binary | 100%
+temp_report1.py           |          472 B |  127.0 KB/s | binary | 100%
+temp_test2.py             |           1 KB |  126.7 KB/s | binary | 100%
+temp_run_in_nci1.py       |           2 KB |  125.5 KB/s | binary | 100%
+sync.ffs_lock             |          109 B |  125.0 KB/s | binary | 100%
+temp_water_limits.txt     |         912 KB |  191.5 KB/s | binary | 100%
+2_writes.py               |           4 KB |  195.1 KB/s | binary | 100%
+run_test.ipynb            |          12 KB |  193.5 KB/s | binary | 100%
+1_write.py                |           1 KB |  192.2 KB/s | binary | 100%
+temp_claer_couput.py      |           1 KB |  191.4 KB/s | binary | 100%
+README.md                 |           4 KB |  189.5 KB/s | binary | 100%
+temp_test.ipynb           |          97 KB |  195.2 KB/s | binary | 100%
+20241216_Run_1_GHG_1_5C_67_BIO_0_test |            0 B |    0.0 KB/s | binary |   0%
+requirements.txt          |          470 B |    0.0 KB/s | binary | 100%
+docs                      |            0 B |    0.0 KB/s | binary |   0%
+luto2-overview.pdf        |         321 KB | 1284.7 KB/s | binary | 100%
+LUTO 2.0 summary and status.docx |          54 KB | 1092.0 KB/s | binary | 100%
+luto2-overview.tex        |          55 KB |  918.3 KB/s | binary | 100%
+landuses_products_commodities.docx |         126 KB |  992.3 KB/s | binary | 100%
+Deploy luto on HPC.docx   |          95 KB |  971.9 KB/s | binary | 100%
+temp_run1.py              |          802 B |  890.9 KB/s | binary | 100%
+temp_run_local.py         |           2 KB |  777.5 KB/s | binary | 100%
+temp_run_in_nci.py        |           2 KB |  714.4 KB/s | binary | 100%
+temp_draw.py              |           3 KB |  662.3 KB/s | binary | 100%
+xinhao_environment.yml    |          24 KB |  619.4 KB/s | binary | 100%
+temp_writes1.py           |           4 KB |  582.4 KB/s | binary | 100%
+temp_temp_1.py            |           2 KB |  548.3 KB/s | binary | 100%
+luto                      |            0 B |  534.8 KB/s | binary |   0%
+simulation.py             |          10 KB |  506.4 KB/s | binary | 100%
+__pycache__               |            0 B |  500.6 KB/s | binary |   0%
+simulation.cpython-312.pyc |          13 KB |  478.4 KB/s | binary | 100%
+data.cpython-312.pyc      |          88 KB |  477.7 KB/s | binary | 100%
+ag_managements.cpython-39.pyc |           1 KB |  461.1 KB/s | binary | 100%
+simulation.cpython-39.pyc |           5 KB |  440.8 KB/s | binary | 100%
+ag_managements.cpython-312.pyc |           1 KB |  420.3 KB/s | binary | 100%
+settings.cpython-39.pyc   |           4 KB |  409.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           4 KB |  393.1 KB/s | binary | 100%
+solvers                   |            0 B |  387.4 KB/s | binary |   0%
+__pycache__               |            0 B |  384.7 KB/s | binary |   0%
+input_data.cpython-312.pyc |          29 KB |  381.9 KB/s | binary | 100%
+solver.cpython-312.pyc    |          58 KB |  389.1 KB/s | binary | 100%
+input_data.py             |          22 KB |  386.0 KB/s | binary | 100%
+solver.py                 |          44 KB |  379.9 KB/s | binary | 100%
+dataprep.py               |          49 KB |  382.8 KB/s | binary | 100%
+ag_managements.py         |           2 KB |  374.9 KB/s | binary | 100%
+tools                     |            0 B |  370.7 KB/s | binary |   0%
+write.py                  |          82 KB |  387.3 KB/s | binary | 100%
+__pycache__               |            0 B |  385.3 KB/s | binary |   0%
+spatializers.cpython-312.pyc |           7 KB |  377.6 KB/s | binary | 100%
+xarray_tools.cpython-312.pyc |           8 KB |  370.7 KB/s | binary | 100%
+__init__.cpython-312.pyc  |          35 KB |  371.0 KB/s | binary | 100%
+compmap.cpython-312.pyc   |          11 KB |  365.4 KB/s | binary | 100%
+write.cpython-312.pyc     |          79 KB |  379.3 KB/s | binary | 100%
+__init__.cpython-39.pyc   |          21 KB |  378.6 KB/s | binary | 100%
+plotmap.py                |           6 KB |  368.7 KB/s | binary | 100%
+Manual_jupyter_books      |            0 B |  367.0 KB/s | binary |   0%
+helpers                   |            0 B |  363.8 KB/s | binary |   0%
+parameters.py             |          483 B |  357.5 KB/s | binary | 100%
+__init__.py               |           6 KB |  344.5 KB/s | binary | 100%
+Add_tags_to_jb.ipynb      |           1 KB |  337.9 KB/s | binary | 100%
+asset                     |            0 B |  335.1 KB/s | binary |   0%
+lvstk_data_description.csv |          684 B |  323.5 KB/s | binary | 100%
+fig_2d_to_1d.png          |          17 KB |  317.8 KB/s | binary | 100%
+crop_data_description.csv |          335 B |  313.2 KB/s | binary | 100%
+sa2_2011_aus              |            0 B |  306.3 KB/s | binary |   0%
+SA2_2011_AUST_continental_simplified.shp.xml |           8 KB |  302.8 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.prj |          145 B |  296.4 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.shp |         884 KB |  468.7 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.sbn |          22 KB |  465.6 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.shx |          17 KB |  460.2 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.dbf |         822 KB |  611.3 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.cpg |            5 B |  601.8 KB/s | binary | 100%
+SA2_2011_AUST_continental_simplified.sbx |           1 KB |  592.9 KB/s | binary | 100%
+Chap_1_LUTO_overview.ipynb |        4661 KB | 1413.1 KB/s | binary | 100%
+report                    |            0 B | 1405.1 KB/s | binary |   0%
+map_tools                 |            0 B | 1397.2 KB/s | binary |   0%
+__pycache__               |            0 B | 1393.2 KB/s | binary |   0%
+__init__.cpython-312.pyc  |          17 KB | 1373.3 KB/s | binary | 100%
+map_making.cpython-312.pyc |           7 KB | 1352.1 KB/s | binary | 100%
+helper.cpython-39.pyc     |           6 KB | 1335.0 KB/s | binary | 100%
+parameters.cpython-312.pyc |           2 KB | 1317.7 KB/s | binary | 100%
+helper.cpython-312.pyc    |           7 KB | 1298.3 KB/s | binary | 100%
+__init__.cpython-39.pyc   |          11 KB | 1280.2 KB/s | binary | 100%
+helper.py                 |           6 KB | 1265.0 KB/s | binary | 100%
+map_making.py             |           5 KB | 1243.9 KB/s | binary | 100%
+parameters.py             |           4 KB | 1229.1 KB/s | binary | 100%
+__init__.py               |          16 KB | 1216.8 KB/s | binary | 100%
+create_html.py            |           3 KB | 1197.0 KB/s | binary | 100%
+__pycache__               |            0 B | 1191.3 KB/s | binary |   0%
+create_static_maps.cpython-39.pyc |           2 KB | 1177.7 KB/s | binary | 100%
+create_report_data.cpython-39.pyc |          35 KB | 1163.7 KB/s | binary | 100%
+create_static_maps.cpython-312.pyc |           3 KB | 1150.9 KB/s | binary | 100%
+create_report_data.cpython-312.pyc |          79 KB | 1144.4 KB/s | binary | 100%
+create_html.cpython-39.pyc |           2 KB | 1132.0 KB/s | binary | 100%
+create_html.cpython-312.pyc |           3 KB | 1117.4 KB/s | binary | 100%
+data_tools                |            0 B | 1112.6 KB/s | binary |   0%
+helper_func.py            |           4 KB | 1096.3 KB/s | binary | 100%
+__pycache__               |            0 B | 1091.6 KB/s | binary |   0%
+helper_func.cpython-39.pyc |           3 KB | 1080.6 KB/s | binary | 100%
+colors.cpython-312.pyc    |           1 KB | 1064.9 KB/s | binary | 100%
+colors.cpython-39.pyc     |           1 KB | 1052.0 KB/s | binary | 100%
+__init__.cpython-312.pyc  |           6 KB | 1031.4 KB/s | binary | 100%
+parameters.cpython-312.pyc |           5 KB | 1017.7 KB/s | binary | 100%
+parameters.cpython-39.pyc |           4 KB | 1000.2 KB/s | binary | 100%
+__init__.cpython-39.pyc   |           4 KB |  989.2 KB/s | binary | 100%
+helper_func.cpython-312.pyc |           5 KB |  978.5 KB/s | binary | 100%
+parameters.py             |           6 KB |  964.5 KB/s | binary | 100%
+colors.py                 |           1 KB |  955.7 KB/s | binary | 100%
+__init__.py               |           6 KB |  940.5 KB/s | binary | 100%
+template_html             |            0 B |  937.1 KB/s | binary |   0%
+pages                     |            0 B |  935.4 KB/s | binary |   0%
+water_usage.css           |          403 B |  925.3 KB/s | binary | 100%
+production.js             |          12 KB |  907.0 KB/s | binary | 100%
+GHG_emissions.html        |           3 KB |  897.9 KB/s | binary | 100%
+land-use_area.css         |          366 B |  891.7 KB/s | binary | 100%
+land-use_area.html        |           2 KB |  879.8 KB/s | binary | 100%
+spatial_maps.html         |           2 KB |  871.1 KB/s | binary | 100%
+biodiversity.js           |           7 KB |  854.6 KB/s | binary | 100%
+production.html           |           3 KB |  847.8 KB/s | binary | 100%
+spatial_maps.css          |          423 B |  840.9 KB/s | binary | 100%
+land-use_area.js          |           6 KB |  825.5 KB/s | binary | 100%
+GHG_emissions.css         |          144 B |  818.9 KB/s | binary | 100%
+economics.css             |           62 B |  808.6 KB/s | binary | 100%
+GHG_emissions.js          |          16 KB |  784.4 KB/s | binary | 100%
+production.css            |           61 B |  779.6 KB/s | binary | 100%
+biodiversity.html         |           2 KB |  778.1 KB/s | binary | 100%
+water_usage.js            |           5 KB |  772.3 KB/s | binary | 100%
+economics.js              |          36 KB |  762.4 KB/s | binary | 100%
+economics.html            |           7 KB |  754.8 KB/s | binary | 100%
+spatial_maps.js           |           6 KB |  750.6 KB/s | binary | 100%
+water_usage.html          |           2 KB |  745.0 KB/s | binary | 100%
+biodiversity.css          |           62 B |  735.8 KB/s | binary | 100%
+index.js                  |           1 KB |  730.3 KB/s | binary | 100%
+style.css                 |           1 KB |  719.4 KB/s | binary | 100%
+src                       |            0 B |  717.3 KB/s | binary |   0%
+jqueqry.js                |          85 KB |  774.5 KB/s | binary | 100%
+index.css                 |          696 B |  768.3 KB/s | binary | 100%
+index.html                |           1 KB |  762.2 KB/s | binary | 100%
+create_report_data.py     |          75 KB |  757.7 KB/s | binary | 100%
+Assets                    |            0 B |  755.4 KB/s | binary |   0%
+ammap_colors.csv          |          235 B |  749.5 KB/s | binary | 100%
+lumap_colors_grouped.csv  |           1 KB |  741.5 KB/s | binary | 100%
+basemap.tif               |        2063 KB |  922.1 KB/s | binary | 100%
+AUS_adm                   |            0 B |  920.7 KB/s | binary |   0%
+STE11aAust_mercator_simplified.cpg |            5 B |  915.2 KB/s | binary | 100%
+STE11aAust_mercator_simplified.prj |          425 B |  908.5 KB/s | binary | 100%
+STE11aAust_mercator_simplified.sbn |          212 B |  969.8 KB/s | binary | 100%
+STE11aAust_mercator_simplified.shp |         151 KB |  976.2 KB/s | binary | 100%
+STE11aAust_mercator_simplified.dbf |           1 KB |  965.3 KB/s | binary | 100%
+STE11aAust_mercator_simplified.sbx |          132 B |  956.1 KB/s | binary | 100%
+STE11aAust_mercator_simplified.shx |          156 B |  950.1 KB/s | binary | 100%
+lm_colors.csv             |          109 B |  939.7 KB/s | binary | 100%
+lumap_colors.csv          |          949 B |  931.0 KB/s | binary | 100%
+float_img_colors.csv      |           1 KB |  925.3 KB/s | binary | 100%
+.gitignore                |            0 B |  922.5 KB/s | binary |   0%
+lu_group.csv              |           1 KB |  915.6 KB/s | binary | 100%
+NLUM_2010-11_mask.tif     |         336 KB |  937.0 KB/s | binary | 100%
+non_ag_colors.csv         |          694 B |  930.1 KB/s | binary | 100%
+create_static_maps.py     |           3 KB | 1006.4 KB/s | binary | 100%
+create_task_runs          |            0 B | 1001.5 KB/s | binary |   0%
+__pycache__               |            0 B |  998.1 KB/s | binary |   0%
+parameters.cpython-312.pyc |           1 KB |  987.0 KB/s | binary | 100%
+helpers.cpython-312.pyc   |          17 KB |  973.1 KB/s | binary | 100%
+report_custom_run_data.py |           4 KB |  962.8 KB/s | binary | 100%
+bash_scripts              |            0 B |  959.8 KB/s | binary |   0%
+conver_raw_data.sh        |          219 B |  947.9 KB/s | binary | 100%
+python_script.py          |           1 KB |  929.3 KB/s | binary | 100%
+install_pkg.sh            |          186 B |  920.9 KB/s | binary | 100%
+requirements_conda.txt    |          345 B |  820.9 KB/s | binary | 100%
+create_env.sh             |          438 B |  806.4 KB/s | binary | 100%
+conda_env.yml             |          648 B |  794.9 KB/s | binary | 100%
+requirements_pip.txt      |           55 B |  784.9 KB/s | binary | 100%
+task_cmd.sh               |          682 B |  772.9 KB/s | binary | 100%
+parameters.py             |          197 B |  762.3 KB/s | binary | 100%
+create_running_tasks.py   |           1 KB |  753.2 KB/s | binary | 100%
+helpers.py                |          11 KB |  327.7 KB/s | binary | 100%
+spatializers.py           |           6 KB |  325.7 KB/s | binary | 100%
+__init__.py               |          28 KB |  326.0 KB/s | binary | 100%
+xarray_tools.py           |           6 KB |  323.0 KB/s | binary | 100%
+compmap.py                |           9 KB |  321.4 KB/s | binary | 100%
+settings.py               |           3 KB |  318.8 KB/s | binary | 100%
+settings_bash.py          |           4 KB |  315.8 KB/s | binary | 100%
+memory_test.py            |          215 B |  307.1 KB/s | binary | 100%
+data.py                   |          82 KB |  312.3 KB/s | binary | 100%
+economics                 |            0 B |  311.3 KB/s | binary |   0%
+land_use_culling.py       |           3 KB |  329.0 KB/s | binary | 100%
+__pycache__               |            0 B |  326.8 KB/s | binary |   0%
+land_use_culling.cpython-312.pyc |           3 KB |  323.9 KB/s | binary | 100%
+off_land_commodity        |            0 B |  322.3 KB/s | binary |   0%
+__pycache__               |            0 B |  321.8 KB/s | binary |   0%
+__init__.cpython-312.pyc  |           2 KB |  319.4 KB/s | binary | 100%
+__init__.cpython-39.pyc   |           1 KB |  316.5 KB/s | binary | 100%
+__init__.py               |           1 KB |  313.2 KB/s | binary | 100%
+non_agricultural          |            0 B |  312.2 KB/s | binary |   0%
+cost.py                   |           8 KB |  308.2 KB/s | binary | 100%
+water.py                  |          10 KB |  306.3 KB/s | binary | 100%
+__pycache__               |            0 B |  304.9 KB/s | binary |   0%
+biodiversity.cpython-312.pyc |           6 KB |  325.0 KB/s | binary | 100%
+revenue.cpython-312.pyc   |           9 KB |  323.8 KB/s | binary | 100%
+quantity.cpython-312.pyc  |          12 KB |  322.5 KB/s | binary | 100%
+ghg.cpython-312.pyc       |          11 KB |  320.5 KB/s | binary | 100%
+cost.cpython-312.pyc      |           9 KB |  319.0 KB/s | binary | 100%
+transitions.cpython-312.pyc |          52 KB |  321.3 KB/s | binary | 100%
+water.cpython-312.pyc     |          11 KB |  319.4 KB/s | binary | 100%
+quantity.py               |          10 KB |  318.0 KB/s | binary | 100%
+biodiversity.py           |           5 KB |  316.1 KB/s | binary | 100%
+ghg.py                    |          11 KB |  313.9 KB/s | binary | 100%
+transitions.py            |          48 KB |  313.3 KB/s | binary | 100%
+revenue.py                |           8 KB |  340.3 KB/s | binary | 100%
+agricultural              |            0 B |  339.2 KB/s | binary |   0%
+cost.py                   |          19 KB |  338.5 KB/s | binary | 100%
+water.py                  |          22 KB |  337.5 KB/s | binary | 100%
+__pycache__               |            0 B |  337.0 KB/s | binary |   0%
+biodiversity.cpython-312.pyc |           8 KB |  334.6 KB/s | binary | 100%
+revenue.cpython-312.pyc   |          15 KB |  332.5 KB/s | binary | 100%
+quantity.cpython-312.pyc  |          20 KB |  324.8 KB/s | binary | 100%
+ghg.cpython-312.pyc       |          24 KB |  324.2 KB/s | binary | 100%
+cost.cpython-312.pyc      |          21 KB |  323.3 KB/s | binary | 100%
+transitions.cpython-312.pyc |          15 KB |  356.8 KB/s | binary | 100%
+water.cpython-312.pyc     |          22 KB |  355.6 KB/s | binary | 100%
+quantity.py               |          19 KB |  347.4 KB/s | binary | 100%
+biodiversity.py           |           6 KB |  345.9 KB/s | binary | 100%
+ghg.py                    |          24 KB |  346.2 KB/s | binary | 100%
+transitions.py            |          14 KB |  343.3 KB/s | binary | 100%
+revenue.py                |          16 KB |  342.3 KB/s | binary | 100%
+helpers.py                |           9 KB |  338.6 KB/s | binary | 100%
+tests                     |            0 B |  338.1 KB/s | binary |   0%
+test_land_use_culling.py  |           6 KB |  361.1 KB/s | binary | 100%
+README.md                 |          409 B |  357.5 KB/s | binary | 100%
+COPYING                   |          34 KB |  354.7 KB/s | binary | 100%
+temp_run2.py              |          799 B |  353.1 KB/s | binary | 100%
+0_runs_linux.py           |           2 KB |  349.9 KB/s | binary | 100%
+temp_custom.py            |          173 B |  347.7 KB/s | binary | 100%
+output                    |            0 B |  346.6 KB/s | binary |   0%
+20241216_Run_1_GHG_1_5C_67_BIO_0_test.pbs |           1 KB |  343.4 KB/s | binary | 100%
+130774747.gadi-pbs.OU     |          771 B |  340.3 KB/s | binary | 100%
+run_2024_12_17__09_38_41_stdout.log |          99 KB |  343.8 KB/s | binary | 100%
+simulation_log.txt        |           75 B |  341.8 KB/s | binary | 100%
+2024_12_17__09_38_41_RF10_2010-2050_timeseries |            0 B |  340.7 KB/s | binary |   0%
+out_2013                  |            0 B |  340.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  339.2 KB/s | binary |   0%
+out_2025                  |            0 B |  337.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  336.6 KB/s | binary |   0%
+out_2042                  |            0 B |  335.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  334.6 KB/s | binary |   0%
+out_2036                  |            0 B |  333.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  332.2 KB/s | binary |   0%
+out_2026                  |            0 B |  330.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  330.2 KB/s | binary |   0%
+out_2021                  |            0 B |  328.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  327.8 KB/s | binary |   0%
+out_2046                  |            0 B |  326.4 KB/s | binary |   0%
+lucc_separate             |            0 B |  325.4 KB/s | binary |   0%
+out_2040                  |            0 B |  324.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  323.1 KB/s | binary |   0%
+out_2048                  |            0 B |  322.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  321.2 KB/s | binary |   0%
+out_2012                  |            0 B |  319.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  319.0 KB/s | binary |   0%
+out_2038                  |            0 B |  317.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  317.2 KB/s | binary |   0%
+out_2037                  |            0 B |  315.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  315.0 KB/s | binary |   0%
+out_2050                  |            0 B |  313.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  313.2 KB/s | binary |   0%
+out_2028                  |            0 B |  311.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  311.0 KB/s | binary |   0%
+out_2010                  |            0 B |  309.7 KB/s | binary |   0%
+out_2031                  |            0 B |  308.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  308.0 KB/s | binary |   0%
+begin_end_compare_2010_2050 |            0 B |  306.8 KB/s | binary |   0%
+out_2050                  |            0 B |  306.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  305.5 KB/s | binary |   0%
+out_2010                  |            0 B |  304.3 KB/s | binary |   0%
+out_2019                  |            0 B |  303.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  302.2 KB/s | binary |   0%
+out_2020                  |            0 B |  301.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  300.2 KB/s | binary |   0%
+out_2017                  |            0 B |  299.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  297.8 KB/s | binary |   0%
+out_2039                  |            0 B |  296.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  296.3 KB/s | binary |   0%
+out_2049                  |            0 B |  295.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  294.3 KB/s | binary |   0%
+out_2030                  |            0 B |  293.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  292.4 KB/s | binary |   0%
+out_2045                  |            0 B |  291.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  289.8 KB/s | binary |   0%
+out_2035                  |            0 B |  288.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  288.3 KB/s | binary |   0%
+out_2029                  |            0 B |  287.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  286.5 KB/s | binary |   0%
+out_2041                  |            0 B |  285.4 KB/s | binary |   0%
+lucc_separate             |            0 B |  285.0 KB/s | binary |   0%
+out_2023                  |            0 B |  283.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  283.2 KB/s | binary |   0%
+out_2033                  |            0 B |  282.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  281.4 KB/s | binary |   0%
+out_2014                  |            0 B |  280.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  280.0 KB/s | binary |   0%
+out_2015                  |            0 B |  279.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  278.3 KB/s | binary |   0%
+out_2022                  |            0 B |  277.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  276.9 KB/s | binary |   0%
+out_2024                  |            0 B |  275.9 KB/s | binary |   0%
+lucc_separate             |            0 B |  275.2 KB/s | binary |   0%
+out_2034                  |            0 B |  274.2 KB/s | binary |   0%
+lucc_separate             |            0 B |  273.6 KB/s | binary |   0%
+out_2027                  |            0 B |  272.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  272.2 KB/s | binary |   0%
+out_2018                  |            0 B |  270.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  269.9 KB/s | binary |   0%
+out_2047                  |            0 B |  269.0 KB/s | binary |   0%
+lucc_separate             |            0 B |  268.7 KB/s | binary |   0%
+out_2032                  |            0 B |  267.7 KB/s | binary |   0%
+lucc_separate             |            0 B |  267.1 KB/s | binary |   0%
+out_2044                  |            0 B |  266.1 KB/s | binary |   0%
+lucc_separate             |            0 B |  265.5 KB/s | binary |   0%
+out_2016                  |            0 B |  264.6 KB/s | binary |   0%
+lucc_separate             |            0 B |  264.2 KB/s | binary |   0%
+out_2011                  |            0 B |  263.3 KB/s | binary |   0%
+lucc_separate             |            0 B |  262.7 KB/s | binary |   0%
+out_2043                  |            0 B |  261.8 KB/s | binary |   0%
+lucc_separate             |            0 B |  261.5 KB/s | binary |   0%
+run_2024_12_17__09_38_41_stderr.log |            0 B |  105.4 KB/s | binary |   0%
+130774747.gadi-pbs.log    |          496 B |  102.9 KB/s | binary | 100%
+temp_carbonprice.py       |           1 KB |  101.6 KB/s | binary | 100%
+temp_remove_output.py     |           1 KB |  101.0 KB/s | binary | 100%
+temp_writes.py            |           4 KB |  100.4 KB/s | binary | 100%
+gurobi.log                |          55 KB |  103.7 KB/s | binary | 100%
+temp_test.py              |           2 KB |  103.2 KB/s | binary | 100%
+CITATION.cff              |           1 KB |   71.3 KB/s | binary | 100%
+temp_report.py            |          444 B |   70.9 KB/s | binary | 100%
+temp_clear_ouput.py       |           1 KB |   70.6 KB/s | binary | 100%
+.idea                     |            0 B |   70.4 KB/s | binary |   0%
+material_theme_project_new.xml |          414 B |   70.0 KB/s | binary | 100%
+modules.xml               |          262 B |   69.5 KB/s | binary | 100%
+LUTO2.iml                 |          692 B |   69.2 KB/s | binary | 100%
+jupyter-settings.xml      |           1 KB |   68.7 KB/s | binary | 100%
+.gitignore                |          176 B |   67.8 KB/s | binary | 100%
+vcs.xml                   |          167 B |   67.0 KB/s | binary | 100%
+workspace.xml             |          55 KB |   74.5 KB/s | binary | 100%
+misc.xml                  |          288 B |   74.0 KB/s | binary | 100%
+deployment.xml            |           1 KB |   73.7 KB/s | binary | 100%
+inspectionProfiles        |            0 B |   73.5 KB/s | binary |   0%
+profiles_settings.xml     |          174 B |   72.8 KB/s | binary | 100%
+Project_Default.xml       |           1 KB |   72.5 KB/s | binary | 100%
+0_runs.py                 |           2 KB |   72.2 KB/s | binary | 100%
+.gitignore                |          818 B |   71.8 KB/s | binary | 100%
+temp_check_result.py      |           3 KB |   71.4 KB/s | binary | 100%
+temp_run_local.ipynb      |          12 KB |   71.8 KB/s | binary | 100%
+temp_temp.py              |           2 KB |   71.6 KB/s | binary | 100%
+temp_runs.py              |           2 KB |   71.4 KB/s | binary | 100%
+temp_run_in_nci2.py       |           2 KB |   75.6 KB/s | binary | 100%
+temp_test3.py             |           1 KB |   75.2 KB/s | binary | 100%
+environment.yml           |          16 KB |   75.5 KB/s | binary | 100%
+temp_write.py             |           1 KB |   75.0 KB/s | binary | 100%
+temp_test1.py             |           2 KB |   74.7 KB/s | binary | 100%
+temp_mem.py               |           2 KB |   74.4 KB/s | binary | 100%
+sync.ffs_db               |         174 KB |   87.1 KB/s | binary | 100%
+temp_clear_couput.py      |           1 KB |   86.1 KB/s | binary | 100%
+temp_report1.py           |          472 B |   85.7 KB/s | binary | 100%
+temp_test2.py             |           1 KB |   85.1 KB/s | binary | 100%
+temp_run_in_nci1.py       |           2 KB |   79.9 KB/s | binary | 100%
+sync.ffs_lock             |          109 B |   79.4 KB/s | binary | 100%
+temp_water_limits.txt     |         912 KB |  150.0 KB/s | binary | 100%
+2_writes.py               |           4 KB |  149.4 KB/s | binary | 100%
+run_test.ipynb            |          12 KB |  149.3 KB/s | binary | 100%
+1_write.py                |           1 KB |  148.3 KB/s | binary | 100%
+temp_claer_couput.py      |           1 KB |  147.6 KB/s | binary | 100%
+README.md                 |           4 KB |  147.0 KB/s | binary | 100%
+temp_test.ipynb           |          97 KB |  153.0 KB/s | binary | 100%
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 12:24:07
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2024-12-17 12:24:07: Starting task...
+[INFO] Sync time updated to: 2024-12-17 12:24:07
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 13:47:51
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2024-12-17 13:47:51: Starting task...
+[INFO] Sync time updated to: 2024-12-17 13:47:51
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 13:50:52
+Lock acquired successfully.
+2024-12-17 13:50:52: Starting task...
+[INFO] Sync time updated to: 2024-12-17 13:50:52
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 13:59:05
+Traceback (most recent call last):
+  File "Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 44, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 99, in create_sync_list
+    for dirpath, dirnames, filenames in sftp.walk(remote_dir):
+                                        ^^^^^^^^^
+AttributeError: 'SFTPClient' object has no attribute 'walk'
+
+Lock acquired successfully.
+2024-12-17 13:59:05: Starting task...
+[INFO] Sync time updated to: 2024-12-17 13:59:05
+Traceback (most recent call last):
+  File "Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 44, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 99, in create_sync_list
+    for dirpath, dirnames, filenames in sftp.walk(remote_dir):
+                                        ^^^^^^^^^
+AttributeError: 'SFTPClient' object has no attribute 'walk'
+
+Task failed: 'SFTPClient' object has no attribute 'walk'
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 14:02:18
+Error accessing /g/data/jk53/LUTO_XH/LUTO2/output: name 'S_ISDIR' is not defined
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2024-12-17 14:02:18: Starting task...
+[INFO] Sync time updated to: 2024-12-17 14:02:18
+Error accessing /g/data/jk53/LUTO_XH/LUTO2/output: name 'S_ISDIR' is not defined
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 14:02:38
+Error accessing /g/data/jk53/LUTO_XH/LUTO2/output: name 'S_ISDIR' is not defined
+Lock acquired successfully.
+2024-12-17 14:02:38: Starting task...
+[INFO] Sync time updated to: 2024-12-17 14:02:38
+Error accessing /g/data/jk53/LUTO_XH/LUTO2/output: name 'S_ISDIR' is not defined
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 14:05:30
+Error accessing /g/data/jk53/LUTO_XH/LUTO2/output\20241217_Run_1_GHG_1_5C_67_BIO_0_test: [Errno 2] No such file
+Error accessing /g/data/jk53/LUTO_XH/LUTO2/output\20241216_Run_1_GHG_1_5C_67_BIO_0_test: [Errno 2] No such file
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2024-12-17 14:05:30: Starting task...
+[INFO] Sync time updated to: 2024-12-17 14:05:30
+Error accessing /g/data/jk53/LUTO_XH/LUTO2/output\20241217_Run_1_GHG_1_5C_67_BIO_0_test: [Errno 2] No such file
+Error accessing /g/data/jk53/LUTO_XH/LUTO2/output\20241216_Run_1_GHG_1_5C_67_BIO_0_test: [Errno 2] No such file
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 14:06:27
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Error: 
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2024-12-17 14:06:26: Starting task...
+[INFO] Sync time updated to: 2024-12-17 14:06:27
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Error: 
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 14:22:10
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 14:26:59
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2024-12-17 14:26:59: Starting task...
+[INFO] Sync time updated to: 2024-12-17 14:26:59
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 14:27:40
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+run_2024_12_17__10_20_18_stdout.log |         768 KB | 11879.1 KB/s | binary | 100%
+130776977.gadi-pbs.OU     |           2 KB |    0.0 KB/s | binary | 100%
+transition_matrix_2010_2050.csv |          40 KB |  530.9 KB/s | binary | 100%
+model_run_settings.txt    |           3 KB |    0.0 KB/s | binary | 100%
+130776977.gadi-pbs.log    |          542 B |    0.0 KB/s | binary | 100%
+write_2024_12_17__10_20_18_stdout.log |           73 B |    0.0 KB/s | binary | 100%
+write_2024_12_17__10_20_18_stderr.log |            0 B |    0.0 KB/s | binary |   0%
+gurobi.log                |         439 KB | 8848.2 KB/s | binary | 100% 
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2024-12-17 14:27:40: Starting task...
+[INFO] Sync time updated to: 2024-12-17 14:27:40
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+run_2024_12_17__10_20_18_stdout.log |         768 KB | 11879.1 KB/s | binary | 100%
+130776977.gadi-pbs.OU     |           2 KB |    0.0 KB/s | binary | 100%
+transition_matrix_2010_2050.csv |          40 KB |  530.9 KB/s | binary | 100%
+model_run_settings.txt    |           3 KB |    0.0 KB/s | binary | 100%
+130776977.gadi-pbs.log    |          542 B |    0.0 KB/s | binary | 100%
+write_2024_12_17__10_20_18_stdout.log |           73 B |    0.0 KB/s | binary | 100%
+write_2024_12_17__10_20_18_stderr.log |            0 B |    0.0 KB/s | binary |   0%
+gurobi.log                |         439 KB | 8848.2 KB/s | binary | 100% 
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 16:32:01
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 17:32:01
 File list saved to 2_sync_list.txt
 WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
 Starting synchronization...
 Synchronization completed successfully.
 Lock acquired successfully.
-2024-12-16 14:38:32: Starting task...
-[INFO] Sync time updated to: 2024-12-16 14:38:32
+2024-12-17 17:32:01: Starting task...
+[INFO] Sync time updated to: 2024-12-17 17:32:01
 File list saved to 2_sync_list.txt
 WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
 Starting synchronization...
@@ -14,14 +1859,14 @@ Synchronization completed successfully.
 Task failed: 'charmap' codec can't encode characters in position 457-462: character maps to <undefined>
 
 Lock acquired successfully.
-[INFO] Sync time updated to: 2024-12-16 15:31:59
+[INFO] Sync time updated to: 2024-12-17 18:32:01
 File list saved to 2_sync_list.txt
 WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
 Starting synchronization...
 Synchronization completed successfully.
 Lock acquired successfully.
-2024-12-16 15:31:59: Starting task...
-[INFO] Sync time updated to: 2024-12-16 15:31:59
+2024-12-17 18:32:01: Starting task...
+[INFO] Sync time updated to: 2024-12-17 18:32:01
 File list saved to 2_sync_list.txt
 WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
 Starting synchronization...
@@ -29,107 +1874,148 @@ Synchronization completed successfully.
 Task failed: 'charmap' codec can't encode characters in position 457-462: character maps to <undefined>
 
 Lock acquired successfully.
-[INFO] Sync time updated to: 2024-12-16 16:31:59
+[INFO] Sync time updated to: 2024-12-17 20:34:16
 File list saved to 2_sync_list.txt
-WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
 Starting synchronization...
 Synchronization completed successfully.
-Lock acquired successfully.
-2024-12-16 16:31:59: Starting task...
-[INFO] Sync time updated to: 2024-12-16 16:31:59
-File list saved to 2_sync_list.txt
-WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
-Starting synchronization...
-Synchronization completed successfully.
-Task failed: 'charmap' codec can't encode characters in position 457-462: character maps to <undefined>
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
 
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
 Lock acquired successfully.
-[INFO] Sync time updated to: 2024-12-16 17:31:59
+2024-12-17 20:34:16: Starting task...
+[INFO] Sync time updated to: 2024-12-17 20:34:16
 File list saved to 2_sync_list.txt
-WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
-Lock acquired successfully.
-[INFO] Sync time updated to: 2024-12-17 09:40:59
-File list saved to 2_sync_list.txt
-WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
 Starting synchronization...
 Synchronization completed successfully.
-Lock acquired successfully.
-2024-12-17 09:40:59: Starting task...
-[INFO] Sync time updated to: 2024-12-17 09:40:59
-File list saved to 2_sync_list.txt
-WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
-Starting synchronization...
-Synchronization completed successfully.
-Task failed: 'charmap' codec can't encode characters in position 457-462: character maps to <undefined>
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
 
-Starting synchronization...
-Synchronization completed successfully.
-Traceback (most recent call last):
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 44, in wrapper
-    return func(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 178, in execute_winscp_script
-    print("Synchronization completed successfully.")
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
-    self.original_stream.write(message)
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
-    self.original_stream.write(message)
-OSError: [WinError 233] No process is on the other end of the pipe
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
 
 Lock acquired successfully.
-2024-12-16 17:31:59: Starting task...
-[INFO] Sync time updated to: 2024-12-16 17:31:59
+[INFO] Sync time updated to: 2024-12-17 20:44:56
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 21:02:58
 File list saved to 2_sync_list.txt
-WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
 Starting synchronization...
 Synchronization completed successfully.
-Traceback (most recent call last):
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 44, in wrapper
-    return func(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 178, in execute_winscp_script
-    print("Synchronization completed successfully.")
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
-    self.original_stream.write(message)
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
-    self.original_stream.write(message)
-OSError: [WinError 233] No process is on the other end of the pipe
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
 
-Task failed: [WinError 233] No process is on the other end of the pipe
-Traceback (most recent call last):
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 44, in wrapper
-    return func(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 178, in execute_winscp_script
-    print("Synchronization completed successfully.")
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
-    self.original_stream.write(message)
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
-    self.original_stream.write(message)
-OSError: [WinError 233] No process is on the other end of the pipe
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2024-12-17 21:02:58: Starting task...
+[INFO] Sync time updated to: 2024-12-17 21:02:58
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
 
-During handling of the above exception, another exception occurred:
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
 
-Traceback (most recent call last):
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 263, in execute_sync_task
-    execute_winscp_script(winscp_path, script_path, log_file)
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 47, in wrapper
-    sys.stderr.write(exc_info + '\n')
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
-    self.original_stream.write(message)
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
-    self.original_stream.write(message)
-OSError: [WinError 233] No process is on the other end of the pipe
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 21:03:31
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
 
-During handling of the above exception, another exception occurred:
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2024-12-17 21:03:31: Starting task...
+[INFO] Sync time updated to: 2024-12-17 21:03:31
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
 
-Traceback (most recent call last):
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 44, in wrapper
-    return func(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 270, in execute_sync_task
-    print(f"Task failed: {e}")
-  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
-    self.original_stream.write(message)
-OSError: [WinError 233] No process is on the other end of the pipe
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
 
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 21:12:35
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 21:12:36
+Lock acquired successfully.
+[INFO] Sync time updated to: 2024-12-17 21:30:47
