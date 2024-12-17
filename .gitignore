@@ -45,6 +45,7 @@ input/
 *.tif
 *.shp
 *.ffs_db
+*.ffs_lock
 myCode/**/Assets/
 /myCode/tasks_run/rsync/rsync_password
 

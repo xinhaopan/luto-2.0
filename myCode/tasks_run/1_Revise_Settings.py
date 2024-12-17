@@ -7,15 +7,15 @@ create_settings_template('Custom_runs')
 
 grid_search = {
     # Computational settings, which are not relevant to LUTO itself
-    'MEM': ['72'],
-    'CPU_PER_TASK': [18],
-    'TIME': ['5:00:00'],
+    'MEM': ['92'],
+    'CPU_PER_TASK': [23],
+    'TIME': ['70:00:00'],
 
     'MODE': [
         # 'snapshot',
         'timeseries'
     ],
-    'RESFACTOR': [10],
+    'RESFACTOR': [3],
 
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis',
