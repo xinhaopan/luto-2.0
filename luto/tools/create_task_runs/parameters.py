@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = '../Snapshoot_mult_scenarios_real_price_exponential_3_5'
+TASK_ROOT_DIR = '../Snapshoot_RES10_20241216/'
 
 EXCLUDE_DIRS = [
     'input', 

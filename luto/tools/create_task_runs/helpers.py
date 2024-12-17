@@ -1,13 +1,16 @@
 import os
 import re
+import time
+import datetime
 import itertools
 import shutil
+import psutil
 import pandas as pd
 
 from joblib import delayed, Parallel
 from luto import settings
-
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, TASK_ROOT_DIR
+from datetime import datetime
 
 
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
@@ -93,7 +96,7 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
     return template_grid_search
 
 
-def create_task_runs(custom_settings:pd.DataFrame):
+def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_workers:int=4):
     
     # Get current working directory
     cwd = os.getcwd()
@@ -123,11 +126,12 @@ def create_task_runs(custom_settings:pd.DataFrame):
         # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        submit_task(cwd, col)
+        submit_task(cwd, col, python_path)
         
-    # Submit the tasks in parallel; Using 4 threads is a safe number because 
-    # we are submitting jobs in the login node, which has limited resources
-    Parallel(n_jobs=4)(delayed(process_col)(col) for col in custom_cols)
+    # Submit the tasks in parallel; Using 4 threads is a safe number to submit
+    # tasks in login node. Or use the specified number of cpus if not in a linux system
+    workers = 4 if os.name == 'posix' else n_workers
+    Parallel(n_jobs=workers)(delayed(process_col)(col) for col in custom_cols)
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -172,58 +176,6 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
             # Write the rest as it is
             else:
                 file.write(f'{k}={v}\n')
-
-
-def update_thread_settings(task_dir: str, settings_dict: dict):
-    # Read existing settings
-    settings_file_path = f'{task_dir}/luto/settings.py'
-    bash_file_path = f'{task_dir}/luto/settings_bash.py'
-
-    # Read current content of settings.py
-    with open(settings_file_path, 'r') as file:
-        content = file.readlines()
-
-    # Update or append THREADS and WRITE_THREADS in settings.py
-    cpu_per_task = settings_dict.get('CPU_PER_TASK', 30)  # Default to 30 if not specified
-    found_threads = False
-    found_write_threads = False
-
-    with open(settings_file_path, 'w') as file:
-        for line in content:
-            if 'THREADS=' in line:
-                file.write(f'THREADS={cpu_per_task}\n')
-                found_threads = True
-            elif 'WRITE_THREADS=' in line:
-                file.write(f'WRITE_THREADS={cpu_per_task}\n')
-                found_write_threads = True
-            else:
-                file.write(line)
-        if not found_threads:
-            file.write(f'THREADS={cpu_per_task}\n')
-        if not found_write_threads:
-            file.write(f'WRITE_THREADS={cpu_per_task}\n')
-
-    # Repeat the process for settings_bash.py
-    with open(bash_file_path, 'r') as bash_file:
-        bash_content = bash_file.readlines()
-
-    found_threads = False  # Reset the flag for the bash file
-    found_write_threads = False  # Reset the flag for WRITE_THREADS
-
-    with open(bash_file_path, 'w') as bash_file:
-        for line in bash_content:
-            if 'THREADS=' in line:
-                bash_file.write(f'THREADS={cpu_per_task}\n')
-                found_threads = True
-            elif 'WRITE_THREADS=' in line:
-                bash_file.write(f'WRITE_THREADS={cpu_per_task}\n')
-                found_write_threads = True
-            else:
-                bash_file.write(line)
-        if not found_threads:
-            bash_file.write(f'THREADS={cpu_per_task}\n')
-        if not found_write_threads:
-            bash_file.write(f'WRITE_THREADS={cpu_per_task}\n')
                 bash_file.write(f'{k}={v}\n')
                 
 
@@ -245,13 +197,16 @@ def update_settings(settings_dict:dict, col:str):
         MEM = "80G"
     else:
         MEM = "40G"
-    
-    # Set the carbon prices field based on the GHG limits field
-    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
-   
+        
     # Update the settings dictionary
     settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
     settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
+    
+    # Set the carbon prices field based on the GHG limits field
+    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
+
+    # Update the threads based on the number of cpus
+    settings_dict['THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
 
@@ -269,14 +224,17 @@ def create_run_folders(col):
 
 
 
-def submit_task(cwd:str, col:str):
+
+def submit_task(cwd:str, col:str, python_path:str=None):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
     
     if os.name == 'nt':         
-        # If the os is windows, do nothing
-        print('This will only create task folders, and NOT submit job to run!')
+        os.chdir(f'{TASK_ROOT_DIR}/{col}')
+        os.system(f'{python_path} python_script.py')
+        os.chdir(cwd)
+        print(f'Task {col} has been submitted!')
     
     # Start the task if the os is linux
     if os.name == 'posix':
@@ -284,3 +242,24 @@ def submit_task(cwd:str, col:str):
         os.system('bash task_cmd.sh')
         os.chdir(cwd)
 
+
+def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
+    '''
+    Log the memory usage of the current process to a file.
+    Parameters:
+        output_dir (str): The directory to save the memory log file.
+        interval (int): The interval in seconds to log the memory usage.
+    '''
+    
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt', mode='a') as file:
+        while True:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            process = psutil.Process(os.getpid())
+            memory_usage = process.memory_info().rss
+            children = process.children(recursive=True)
+            if children:
+                memory_usage += sum(child.memory_info().rss for child in children)
+            memory_usage /= (1024 * 1024 * 1024)
+            file.write(f'{timestamp}\t{memory_usage}\n')
+            file.flush()  # Ensure data is written to the file immediately
+            time.sleep(interval)
