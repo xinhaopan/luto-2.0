@@ -6,6 +6,7 @@ import sys
 import functools
 import traceback
 from filelock import FileLock
+from stat import S_ISDIR
 
 import sys
 import functools
@@ -94,18 +95,29 @@ def create_sync_list(hostname, port, username, private_key_path, remote_dir, syn
     # 创建 SFTP 客户端
     sftp = client.open_sftp()
 
-    # 获取远程目录中的文件列表
-    remote_files = sftp.listdir_attr(remote_dir)
-
-    # 筛选出需要同步的文件
+    # 存储需要同步的文件
     files_to_sync = []
-    for file in remote_files:
-        file_name = file.filename
-        file_mod_time = datetime.fromtimestamp(file.st_mtime)  # 获取文件修改时间
 
-        # 如果文件修改时间在指定的时间之后，则将文件添加到同步列表
-        if file_mod_time > sync_time:
-            files_to_sync.append(file_name)
+    def recursive_list_files(directory):
+        try:
+            # 获取目录下的文件和子目录
+            for entry in sftp.listdir_attr(directory):
+                file_path = f"{directory}/{entry.filename}"
+                # 判断是文件还是目录
+                if S_ISDIR(entry.st_mode):
+                    # 如果是目录，则递归遍历子目录
+                    recursive_list_files(file_path)
+                else:
+                    # 如果是文件，则检查文件修改时间
+                    file_mod_time = datetime.fromtimestamp(entry.st_mtime)  # 获取文件修改时间
+                    if file_mod_time > sync_time:
+                        relative_path = file_path[len(remote_dir) + 1:]  # 去掉remote_dir的路径部分
+                        files_to_sync.append(relative_path)
+        except Exception as e:
+            print(f"Error accessing {directory}: {e}")
+
+    # 调用递归函数
+    recursive_list_files(remote_dir)
 
     # 将文件列表写入到指定的文本文件中
     with open(output_file, 'w') as f:
@@ -121,7 +133,7 @@ def create_sync_list(hostname, port, username, private_key_path, remote_dir, syn
 
 # 生成 WinSCP 脚本来同步文件
 @LogToFile('0_log_file.txt', mode='a')
-def generate_winscp_script(sync_file, winscp_path, script_path, local_dir, remote_dir, private_key_path):
+def generate_winscp_script(sync_file, script_path, local_dir, remote_dir, private_key_path):
     with open(sync_file, 'r') as f:
         files = f.readlines()
 
@@ -257,7 +269,7 @@ def execute_sync_task():
         current_dir = os.getcwd()
         script_path = os.path.join(current_dir, script_path)
         # 生成 WinSCP 脚本
-        generate_winscp_script(output_file, winscp_path, script_path, local_dir, remote_dir, private_key_path)
+        generate_winscp_script(output_file, script_path, local_dir, remote_dir, private_key_path)
 
         # 执行 WinSCP 脚本
         execute_winscp_script(winscp_path, script_path, log_file)

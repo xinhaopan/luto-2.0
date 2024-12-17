@@ -62,3 +62,74 @@ Starting synchronization...
 Synchronization completed successfully.
 Task failed: 'charmap' codec can't encode characters in position 457-462: character maps to <undefined>
 
+Starting synchronization...
+Synchronization completed successfully.
+Traceback (most recent call last):
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 44, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 178, in execute_winscp_script
+    print("Synchronization completed successfully.")
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
+    self.original_stream.write(message)
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
+    self.original_stream.write(message)
+OSError: [WinError 233] No process is on the other end of the pipe
+
+Lock acquired successfully.
+2024-12-16 17:31:59: Starting task...
+[INFO] Sync time updated to: 2024-12-16 17:31:59
+File list saved to 2_sync_list.txt
+WinSCP script saved to F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Traceback (most recent call last):
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 44, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 178, in execute_winscp_script
+    print("Synchronization completed successfully.")
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
+    self.original_stream.write(message)
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
+    self.original_stream.write(message)
+OSError: [WinError 233] No process is on the other end of the pipe
+
+Task failed: [WinError 233] No process is on the other end of the pipe
+Traceback (most recent call last):
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 44, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 178, in execute_winscp_script
+    print("Synchronization completed successfully.")
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
+    self.original_stream.write(message)
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
+    self.original_stream.write(message)
+OSError: [WinError 233] No process is on the other end of the pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 263, in execute_sync_task
+    execute_winscp_script(winscp_path, script_path, log_file)
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 47, in wrapper
+    sys.stderr.write(exc_info + '\n')
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
+    self.original_stream.write(message)
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
+    self.original_stream.write(message)
+OSError: [WinError 233] No process is on the other end of the pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 44, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 270, in execute_sync_task
+    print(f"Task failed: {e}")
+  File "F:\xinhao\Work\LUTO2\myCode\tasks_run\rsync\0_sync_winscp.py", line 27, in write
+    self.original_stream.write(message)
+OSError: [WinError 233] No process is on the other end of the pipe
+
