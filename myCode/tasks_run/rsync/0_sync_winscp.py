@@ -151,7 +151,7 @@ option confirm off
         for file in files:
             file = file.strip()
             remote_path = f"{remote_dir}/{file}"
-            local_path = f"{local_dir}\\{file}"
+            local_path = f"{local_dir}\\{file}".replace("/","\\")
             script_file.write(f'get "{remote_path}" "{local_path}"\n')
 
         script_file.write("# Close connection\nexit\n")
@@ -235,6 +235,21 @@ def remove_lock():
     except Exception as e:
         print(f"Error removing lock file: {str(e)}")
 
+def create_folder(output_file, local_dir):
+    with open(output_file, 'r') as file:
+        # 遍历每一行
+        for line in file:
+            # 去除行首和行尾的空白字符（包括换行符）
+            file_path = line.strip()
+
+            # 获取文件路径中的文件夹部分
+            folder_path = os.path.dirname(file_path)
+            folder_path = os.path.join(local_dir, folder_path)
+
+            # 检查文件夹是否存在，如果不存在则创建
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+
 @LogToFile('0_log_file.txt', mode='a')
 def execute_sync_task():
     datetime_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -270,7 +285,7 @@ def execute_sync_task():
         script_path = os.path.join(current_dir, script_path)
         # 生成 WinSCP 脚本
         generate_winscp_script(output_file, script_path, local_dir, remote_dir, private_key_path)
-
+        create_folder(output_file, local_dir)
         # 执行 WinSCP 脚本
         execute_winscp_script(winscp_path, script_path, log_file)
         clean_large_txt_files(log_file)
