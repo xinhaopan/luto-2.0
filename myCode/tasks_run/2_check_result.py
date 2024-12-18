@@ -157,16 +157,20 @@ def save_failed_columns(csv_path, write_failed_cols, failed_cols):
     failed_columns_data = df[failed_cols]
 
     # 保存 write_failed 数据
-    write_failed_df = pd.concat([first_two_columns, write_failed_data], axis=1)
-    write_failed_csv_path = csv_path.replace('.csv', '_write_failed.csv')
-    write_failed_df.to_csv(write_failed_csv_path, index=False)
-    print(f"写失败的列数据已保存到文件：{write_failed_csv_path}")
+    if len(write_failed_cols) > 0:
+        write_failed_df = pd.concat([first_two_columns, write_failed_data], axis=1)
+        write_failed_csv_path = csv_path.replace('.csv', '_write_failed.csv')
+        write_failed_df.to_csv(write_failed_csv_path, index=False)
+        print(f"写失败的列数据已保存到文件：{write_failed_csv_path}")
 
     # 保存 failed 数据
-    failed_df = pd.concat([first_two_columns, failed_columns_data], axis=1)
-    failed_csv_path = csv_path.replace('.csv', '_failed.csv')
-    failed_df.to_csv(failed_csv_path, index=False)
-    print(f"失败的列数据已保存到文件：{failed_csv_path}")
+    if len(failed_cols) > 0:
+        failed_df = pd.concat([first_two_columns, failed_columns_data], axis=1)
+        failed_csv_path = csv_path.replace('.csv', '_failed.csv')
+        failed_df.to_csv(failed_csv_path, index=False)
+        print(f"失败的列数据已保存到文件：{failed_csv_path}")
+
+    print(" ")
 
 def check_csv(csv_path):
     """
@@ -196,7 +200,7 @@ def check_csv(csv_path):
             delete_except(directory, last_part)
 
 
-csv_path = 'Custom_runs/setting_template_windows_0_test.csv'
+csv_path = 'Custom_runs/setting_template_windows_0.csv'
 check_csv(csv_path)
 
 

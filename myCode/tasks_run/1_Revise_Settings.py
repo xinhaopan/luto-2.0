@@ -2,8 +2,6 @@ import os.path
 
 from tools.helpers import create_settings_template, generate_csv,create_grid_search_template
 
-create_settings_template('Custom_runs')
-# generate_csv(output_csv="Custom_runs/setting_template_windows_test1.csv")
 
 grid_search = {
     # Computational settings, which are not relevant to LUTO itself
@@ -15,7 +13,7 @@ grid_search = {
         # 'snapshot',
         'timeseries'
     ],
-    'RESFACTOR': [3],
+    'RESFACTOR': [10],
 
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis',
@@ -29,14 +27,12 @@ grid_search = {
     ]
 }
 
-map_dict = {
-    'GHG_LIMITS_FIELD': grid_search['GHG_LIMITS_FIELD'],
-    'CARBON_PRICES_FIELD': [
-        ghg[:9].replace('(', '').replace(')', '') for ghg in grid_search['GHG_LIMITS_FIELD']
-    ]
-}
+
+template_df = create_settings_template('Custom_runs')
+# generate_csv(output_csv="Custom_runs/setting_template_windows_test1.csv")
 
 output_file = os.path.join("Custom_runs", "setting_template_windows_0.csv")
-suffix=''
-grid_search_df = create_grid_search_template(grid_search,map_dict,output_file,suffix)
+suffix='_used'
+grid_search_df = create_grid_search_template(template_df, grid_search,output_file,suffix)
+print(f"saved to {output_file}")
 

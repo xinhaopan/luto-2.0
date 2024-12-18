@@ -1,4 +1,4 @@
-Name,Default_run,20241217_Run_1_GHG_1_5C_67_BIO_0_used,20241217_Run_2_GHG_1_5C_67_BIO_3_used,20241217_Run_3_GHG_1_5C_67_BIO_5_used,20241217_Run_4_GHG_1_5C_50_BIO_0_used,20241217_Run_5_GHG_1_5C_50_BIO_3_used,20241217_Run_6_GHG_1_5C_50_BIO_5_used,20241217_Run_7_GHG_1_8C_67_BIO_0_used,20241217_Run_8_GHG_1_8C_67_BIO_3_used,20241217_Run_9_GHG_1_8C_67_BIO_5_used
+Name,Default_run,20241217_Run_1_GHG_1_5C_67_BIO_0,20241217_Run_2_GHG_1_5C_67_BIO_3,20241217_Run_3_GHG_1_5C_67_BIO_5,20241217_Run_4_GHG_1_5C_50_BIO_0,20241217_Run_5_GHG_1_5C_50_BIO_3,20241217_Run_6_GHG_1_5C_50_BIO_5,20241217_Run_7_GHG_1_8C_67_BIO_0,20241217_Run_8_GHG_1_8C_67_BIO_3,20241217_Run_9_GHG_1_8C_67_BIO_5
 VERSION,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3
 INPUT_DIR,input,input,input,input,input,input,input,input,input,input
 OUTPUT_DIR,output,output,output,output,output,output,output,output,output,output
@@ -19,7 +19,7 @@ FIRE_RISK,med,med,med,med,med,med,med,med,med,med
 AMORTISE_UPFRONT_COSTS,False,False,False,False,False,False,False,False,False,False
 DISCOUNT_RATE,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07
 AMORTISATION_PERIOD,30,30,30,30,30,30,30,30,30,30
-RESFACTOR,10,10,10,10,10,10,10,10,10,10
+RESFACTOR,10,3,3,3,3,3,3,3,3,3
 MODE,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries
 OBJECTIVE,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit
 DEMAND_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft

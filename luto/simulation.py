@@ -101,7 +101,7 @@ def run( data: Data, base: int, target: int) -> None:
         raise ValueError(f"Unkown MODE: {settings.MODE}.")
     
     # Save the Data object to disk
-    write_outputs(data)
+    # write_outputs(data)
 
 
 def solve_timeseries(data: Data, steps: int, base: int, target: int):
