@@ -76,9 +76,9 @@ def calculate_total_cost(df):
     df = df.loc[:, ~df.columns.str.startswith('Unnamed')]
 
     # Extract relevant rows for CPU, MEM, and TIME
-    cpu_row = df[df['Name'] == 'CPU_PER_TASK']
-    mem_row = df[df['Name'] == 'MEM']
-    time_row = df[df['Name'] == 'TIME']
+    cpu_row = df[df.index == 'NCPUS']
+    mem_row = df[df.index == 'MEM']
+    time_row = df[df.index == 'TIME']
 
     # Extract values and convert where needed
     cpu_values = cpu_row.iloc[0, 1:].astype(float)  # CPU per task
