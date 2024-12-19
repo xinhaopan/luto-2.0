@@ -55,37 +55,42 @@ water_public_dict = get_dict_sum_data(input_files, 'water_yield_of_climate_chang
 water_dict = concatenate_dicts_by_year([water_all_dict, water_public_dict])
 water_dict,legend_colors = get_colors(water_dict, 'tools/land use colors.xlsx', sheet_name='lu')
 output_png = '../output/09_S3_water.png'
+y_range, y_ticks = calculate_y_axis_range(water_dict)
 plot_Combination_figures(water_dict, output_png, input_files, plot_stacked_bar, legend_colors,
-                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 300),
-                             x_ticks=10, y_ticks=100,
+                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
+                             x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
+
 
 csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)',  'Landuse'
 water_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 water_ag_group_dict = aggregate_by_mapping(water_ag_dict, 'tools/land use group.xlsx', 'desc', 'ag_group')
 water_dict,legend_colors = get_colors(water_ag_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
 output_png = '../output/09_S3_water_ag_group.png'
+y_range, y_ticks = calculate_y_axis_range(water_dict)
 plot_Combination_figures(water_dict, output_png, input_files, plot_stacked_bar, legend_colors,
-                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 120),
-                             x_ticks=10, y_ticks=40,
+                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
+                             x_ticks=10, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)',  'Landuse subtype'
 water_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 water_dict,legend_colors = get_colors(water_am_dict, 'tools/land use colors.xlsx', sheet_name='am')
 output_png = '../output/09_S3_water_am.png'
+y_range, y_ticks = calculate_y_axis_range(water_dict)
 plot_Combination_figures(water_dict, output_png, input_files, plot_stacked_bar, legend_colors,
-                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 4),
-                             x_ticks=10, y_ticks=1,
+                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
+                             x_ticks=10, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)', 'Landuse'
 water_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 water_dict,legend_colors = get_colors(water_am_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
 output_png = '../output/09_S3_water_non-ag.png'
+y_range, y_ticks = calculate_y_axis_range(water_dict)
 plot_Combination_figures(water_dict, output_png, input_files, plot_stacked_bar, legend_colors,
-                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 24),
-                             x_ticks=10, y_ticks=8,
+                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
+                             x_ticks=10, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 

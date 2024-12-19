@@ -15,7 +15,10 @@ def get_first_subfolder_name(output_path="output"):
     """
     try:
         # 获取所有子文件夹
-        subfolders = [f for f in os.listdir(output_path) if os.path.isdir(os.path.join(output_path, f))]
+        # subfolders = [f for f in os.listdir(output_path) if os.path.isdir(os.path.join(output_path, f))]
+        subfolders = [f for f in os.listdir(output_path) if
+                      os.path.isdir(os.path.join(output_path, f)) and '2010-2050' in f]
+
         if not subfolders:
             print(f"No subfolders found in '{output_path}'.")
             return None
