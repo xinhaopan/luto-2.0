@@ -1262,7 +1262,8 @@ class Data:
         
         """
         if settings.RESFACTOR == 1:
-            return lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)
+            ag_l_mrj_no_mask = lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)
+            return np.apply_along_axis(self.get_array_resfactor_applied, 1, ag_l_mrj_no_mask)
 
         # Create a 2D array of IDs for the LUMAP_2D_RESFACTORED
         lumap_2d_id = np.arange(self.LUMAP_2D_RESFACTORED.size).reshape(self.LUMAP_2D_RESFACTORED.shape)

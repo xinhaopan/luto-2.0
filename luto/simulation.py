@@ -74,7 +74,6 @@ def run( data: Data, base: int, target: int) -> None:
     """
     # memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
     # memory_thread.start()
-    
     # Set Data object's path and create output directories
     data.set_path(base, target)
 
