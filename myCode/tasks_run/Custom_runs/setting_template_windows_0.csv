@@ -1,4 +1,4 @@
-Name,Default_run,20241218_Run_1_GHG_1_5C_67_BIO_0,20241218_Run_2_GHG_1_5C_67_BIO_3,20241218_Run_3_GHG_1_5C_67_BIO_5,20241218_Run_4_GHG_1_5C_50_BIO_0,20241218_Run_5_GHG_1_5C_50_BIO_3,20241218_Run_6_GHG_1_5C_50_BIO_5,20241218_Run_7_GHG_1_8C_67_BIO_0,20241218_Run_8_GHG_1_8C_67_BIO_3,20241218_Run_9_GHG_1_8C_67_BIO_5
+Name,Default_run,20241219_Run_1_GHG_1_5C_67_BIO_0_1,20241219_Run_2_GHG_1_5C_67_BIO_3_1,20241219_Run_3_GHG_1_5C_67_BIO_5_1,20241219_Run_4_GHG_1_5C_50_BIO_0_1,20241219_Run_5_GHG_1_5C_50_BIO_3_1,20241219_Run_6_GHG_1_5C_50_BIO_5_1,20241219_Run_7_GHG_1_8C_67_BIO_0_1,20241219_Run_8_GHG_1_8C_67_BIO_3_1,20241219_Run_9_GHG_1_8C_67_BIO_5_1
 VERSION,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3
 INPUT_DIR,input,input,input,input,input,input,input,input,input,input
 OUTPUT_DIR,output,output,output,output,output,output,output,output,output,output
@@ -76,7 +76,8 @@ GHG_LIMITS,"{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 
 GHG_LIMITS_FIELD,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.8C (67%) excl. avoided emis,1.8C (67%) excl. avoided emis,1.8C (67%) excl. avoided emis
 CARBON_PRICES_FIELD,1.5C 67%,1.5C 67%,1.5C 67%,1.5C 67%,1.5C 50%,1.5C 50%,1.5C 50%,1.8C 67%,1.8C 67%,1.8C 67%
 SOC_AMORTISATION,15,15,15,15,15,15,15,15,15,15
-GHG_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft
+GHG_CONSTRAINT_TYPE,hard,hard,hard,hard,hard,hard,hard,hard,hard,hard
+GHG_ALLOW_LB_DELTA_T,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0
 SOLVE_ECONOMY_WEIGHT,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25
 WATER_LIMITS,on,on,on,on,on,on,on,on,on,on
 WATER_REGION_DEF,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division
