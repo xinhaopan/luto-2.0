@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-import os
+import re
 import pandas as pd
 
 def get_path(path_name):
@@ -9,7 +9,8 @@ def get_path(path_name):
     try:
         if os.path.exists(output_path):
             subdirectories = os.listdir(output_path)
-            numeric_starting_subdir = [s for s in subdirectories if s[0].isdigit()][0]
+            # numeric_starting_subdir = [s for s in subdirectories if s[0].isdigit()][0]
+            numeric_starting_subdir = [s for s in subdirectories if "2010-2050" in s][0]
             subdirectory_path = os.path.join(output_path, numeric_starting_subdir)
             return subdirectory_path
         else:
@@ -38,13 +39,18 @@ def get_dict_data(input_files, csv_name, value_column_name, filter_column_name):
     for input_name in input_files:
         # print(f"Processing {input_name}...")
         base_path = get_path(input_name)
+        file_list = os.listdir(base_path)  # 确保从当前路径获取文件列表
 
-        # 创建以年份为索引的 DataFrame
-        temp_results = pd.DataFrame(index=range(2010, 2051))
+        # 提取包含年份的文件名中的数字
+        out_numbers = sorted([int(re.search(r"out_(\d+)", filename).group(1)) for filename in file_list if
+                              "out_" in filename and re.search(r"out_(\d+)", filename)])
+
+        # 创建以提取的年份为索引的 DataFrame
+        temp_results = pd.DataFrame(index=out_numbers)
         temp_results.index.name = 'Year'
 
-        # 遍历2010到2050年的文件
-        for year in range(2010, 2051):
+        # 遍历提取的年份
+        for year in out_numbers:
             file_path = os.path.join(base_path, f'out_{year}', f'{csv_name}_{year}.csv')
 
             # 如果文件存在，进行处理
