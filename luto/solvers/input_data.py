@@ -506,7 +506,8 @@ def get_limits(
     limits['water'] = ag_water.get_water_net_yield_limit_values(data)
 
     if settings.GHG_EMISSIONS_LIMITS == 'on':
-        limits['ghg'] = ag_ghg.get_ghg_limits(data, yr_cal)
+        limits['ghg_ub'] = ag_ghg.get_ghg_limits(data, yr_cal)
+        limits['ghg_lb'] = ag_ghg.get_ghg_limits(data, yr_cal) - settings.GHG_ALLOW_LB_DELTA_T 
 
     # If biodiversity limits are not turned on, set the limit to 0.
     limits['biodiversity'] = (
