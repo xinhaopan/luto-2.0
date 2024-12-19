@@ -4,14 +4,8 @@ import matplotlib.pyplot as plt
 import math
 import re
 
-import pandas as pd
-import re
+from tools.parameters import COLUMN_WIDTH, X_OFFSET
 
-import pandas as pd
-import re
-
-import pandas as pd
-import re
 
 def get_colors(merged_dict, mapping_file, sheet_name=None):
     """
@@ -131,7 +125,7 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
                 ax.spines['bottom'].set_visible(True)  # 显示 x 轴边框
                 ax.xaxis.set_ticks_position('bottom')
                 ax.tick_params(axis='x', labelsize=font_size)
-                ax.set_xlim(x_range[0] - 0.5, x_range[1] + 0.5)
+                ax.set_xlim(x_range[0] - X_OFFSET, x_range[1] + X_OFFSET)
                 ax.set_xticks(np.arange(x_range[0], x_range[1] + 1, x_ticks))
                 ax.set_xticklabels(ax.get_xticks(), rotation=0, fontsize=font_size)
             else:
@@ -200,24 +194,23 @@ def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_
     # 绘制正数的堆积柱状图
     pos_data = np.maximum(data, 0)
     bar_list = []
-    bar_list.append(ax.bar(years, pos_data[0], label=categories[0], color=color_list[0], width=0.8))
+    bar_list.append(ax.bar(years, pos_data[0], label=categories[0], color=color_list[0], width=COLUMN_WIDTH ))
     for i in range(1, len(categories)):
         bar_list.append(
             ax.bar(years, pos_data[i], bottom=pos_data[:i].sum(axis=0), label=categories[i], color=color_list[i],
-                   width=0.8))
+                   width=COLUMN_WIDTH))
 
     # 绘制负数的堆积柱状图
     neg_data = np.minimum(data, 0)
     for i in range(len(categories)):
         bar_list.append(
             ax.bar(years, neg_data[i], bottom=neg_data[:i].sum(axis=0), label=categories[i], color=color_list[i],
-                   width=0.8))
+                   width=COLUMN_WIDTH))
 
     # 绘制 Net emissions 的点线图
     line = ax.plot(years, merged_df[point_data], color='red', marker='o', linewidth=1.5, label=point_data, markersize=3)
 
     # 设置 x 和 y 轴范围
-    # ax.set_xlim(x_range[0] - 0.5, x_range[1] + 0.5)
     ax.set_ylim(y_range[0], y_range[1]+1)
     ax.tick_params(axis='both', direction='in')
     return bar_list, line
@@ -239,24 +232,24 @@ def plot_stacked_bar(ax, merged_dict, input_name, legend_colors, font_size=10,
     # Plot positive stacked bar
     pos_data = np.maximum(data, 0)
     bar_list = []
-    bar_list.append(ax.bar(years, pos_data[0], label=categories[0], color=color_list[0], width=0.8))
+    bar_list.append(ax.bar(years, pos_data[0], label=categories[0], color=color_list[0], width=COLUMN_WIDTH ))
     for i in range(1, len(categories)):
         bar_list.append(
             ax.bar(years, pos_data[i], bottom=pos_data[:i].sum(axis=0), label=categories[i], color=color_list[i],
-                   width=0.8))
+                   width=COLUMN_WIDTH))
 
     # Plot negative stacked bar
     neg_data = np.minimum(data, 0)
     for i in range(len(categories)):
         bar_list.append(
             ax.bar(years, neg_data[i], bottom=neg_data[:i].sum(axis=0), label=categories[i], color=color_list[i],
-                   width=0.8))
+                   width=COLUMN_WIDTH))
 
     # Set tick direction inwards
     ax.tick_params(axis='both', which='both', direction='in', labelsize=font_size)
 
     # Set x-axis limits and ticks
-    ax.set_xlim(x_range[0] - 0.5, x_range[1] + 0.5)
+    ax.set_xlim(x_range[0] - X_OFFSET, x_range[1] + X_OFFSET)
 
     # Set y-axis limits and ticks
     ax.set_ylim(y_range[0], y_range[1])

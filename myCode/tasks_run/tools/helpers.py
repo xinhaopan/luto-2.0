@@ -126,7 +126,7 @@ def submit_task_windows(task_dir, col):
     try:
         # 运行子进程，捕获标准输出和标准错误
         result = subprocess.run(
-            [python_path, f'{task_dir}/0_runs.py'],
+            [python_path, f'{task_dir}/0_runs_years.py'],
             cwd=f'{task_dir}',
             capture_output=True,  # 捕获输出
             text=True  # 将输出转换为文本
@@ -393,6 +393,8 @@ def generate_column_names(new_df, df_revise,suffix='', ghg_name_map=None, bio_na
     # 获取 GHG 和 BIO 对应的行值
     ghg_limits_field = new_df.iloc[new_df[new_df.iloc[:, 0] == "GHG_LIMITS_FIELD"].index[0]]
     biodiv_gbf_target_2_dict = new_df.iloc[new_df[new_df.iloc[:, 0] == "BIODIV_GBF_TARGET_2_DICT"].index[0]]
+    if suffix:
+        suffix_values = new_df.iloc[new_df[new_df.iloc[:, 0] == suffix].index[0]]
 
     # 检查 Name1 是否存在
     name_column = df_revise.columns[0]
@@ -419,9 +421,9 @@ def generate_column_names(new_df, df_revise,suffix='', ghg_name_map=None, bio_na
                 new_name += f"_{name1_value}"
             else:
                 print(f"警告：列 {col} 中 Name1 没有有效值，已跳过添加相关内容。")
-
-        # 添加 GHG 和 BIO 的内容
-        new_name += f"_{ghg_value}_{bio_value}" + suffix
+        new_name += f"_{ghg_value}_{bio_value}"
+        if suffix:
+            new_name += f"_{suffix_values[col]}"
         new_column_names.append(new_name)
 
     return new_column_names

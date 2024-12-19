@@ -37,30 +37,37 @@ def main():
         data, load_data_memory = monitor_memory(sim.load_data)
         write_log(f"Data loaded. Peak memory usage: {load_data_memory:.2f} GB")
 
-        # 监控运行模拟
-        _, simulation_memory = monitor_memory(sim.run, data=data, base=start_year)
-        write_log(f"Simulation completed. Peak memory usage: {simulation_memory:.2f} GB")
+        for target_year in range(2015, 2051, 5):
+            # 监控运行模拟
+            write_log(f"Start simulation for target year {target_year}")
+            _, simulation_memory = monitor_memory(sim.run, data=data, base=start_year, target=target_year)
+            write_log(f"Simulation completed. Peak memory usage: {simulation_memory:.2f} GB")
 
-        # 保存数据
-        pkl_path = f'{data.path}/data_with_solution.pkl'
+            # 保存数据
+            pkl_path = f'{data.path}/data_with_{target_year}_solution.pkl'
 
-        with open(pkl_path, 'wb') as f:
-            dill.dump(data, f)
-        write_log(f"Data with solution saved in {data.path}.")
+            with open(pkl_path, 'wb') as f:
+                dill.dump(data, f)
+            write_log(f"{pkl_path} has been saved.")
 
-        # 监控写输出结果
-        write_log(f"start write_outputs")
-        from luto.tools.write import write_outputs
-        _, write_output_memory = monitor_memory(write_outputs, data)
-        write_log(f"Outputs written. Peak memory usage: {write_output_memory:.2f} GB")
-
+            # 监控写输出结果
+            write_log(f"start write_outputs")
+            from luto.tools.write import write_outputs
+            _, write_output_memory = monitor_memory(write_outputs, data)
+            write_log(f"Outputs written. Peak memory usage: {write_output_memory:.2f} GB")
+            overall_time = time.time()
+            enum_time = (overall_time - overall_start_time) / 3600
+            write_log(f"Total time for {target_year} is {enum_time:.2f} h")
+            write_log(
+                f"Run {target_year} overall peak memory usage: {max(load_data_memory, simulation_memory, write_output_memory):.2f} GB")
+            write_log("---------------------------------------------")
         # 总结束时间
         overall_end_time = time.time()
         total_duration = (overall_end_time - overall_start_time) / 3600  # 总用时
 
         # 记录模拟过程的详细信息
         write_log(f"Total run time: {total_duration:.2f} h")
-        write_log(f"Overall peak memory usage: {max(load_data_memory, simulation_memory, write_output_memory):.2f} GB")
+
 
     except Exception as e:
         # 记录错误到日志文件

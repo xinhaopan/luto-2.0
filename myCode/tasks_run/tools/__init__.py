@@ -74,7 +74,7 @@ def calculate_total_cost(df):
 
     # Remove unnamed columns if present
     df = df.loc[:, ~df.columns.str.startswith('Unnamed')]
-
+    df.index = df['Name']
     # Extract relevant rows for CPU, MEM, and TIME
     cpu_row = df[df.index == 'NCPUS']
     mem_row = df[df.index == 'MEM']
