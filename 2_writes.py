@@ -3,7 +3,7 @@ import subprocess
 import sys
 import shutil
 import pandas as pd
-from multiprocessing import Pool
+from joblib import Parallel, delayed
 
 def delete_path(path):
     """删除单个文件或文件夹"""
@@ -89,25 +89,27 @@ def process_file_dir(file_dir, script_to_run):
         time_file_dirs = [name for name in os.listdir(time_file_path) if os.path.isdir(os.path.join(time_file_path, name))]
 
         for time_file_dir in time_file_dirs:
-            pkl_path = os.path.join(time_file_path, time_file_dir, 'data_with_solution.pkl')
+            if "2010-2050" in time_file_dir:
+                pkl_path = os.path.join(time_file_path, time_file_dir, 'data_with_solution.pkl')
 
-            # 如果 PKL 文件不存在，删除子目录
-            if not os.path.exists(pkl_path):
-                print(f"PKL file does not exist at path: {pkl_path}")
-                sdelete_folder_multiprocessing(os.path.join(time_file_path, time_file_dir))
+                # 如果 PKL 文件不存在，删除子目录
+                if not os.path.exists(pkl_path):
+                    print(f"PKL file does not exist at path: {pkl_path}")
+                    sdelete_folder_multiprocessing(os.path.join(time_file_path, time_file_dir))
 
         # 执行脚本
-        execute_script_in_directory(script_to_run, working_directory)
+                execute_script_in_directory(script_to_run, working_directory)
 
     except Exception as e:
         print(f"Error processing file_dir '{file_dir}': {e}")
 
 if __name__ == "__main__":
-    csv_path = "myCode/tasks_run/Custom_runs/setting_template_windows_4_failed.csv"
+    csv_path = "myCode/tasks_run/Custom_runs/setting_template_windows_0_test.csv"
     df = pd.read_csv(csv_path)
     file_dirs = df.columns[2:]
 
-    with Pool(processes=3) as pool:
-        pool.starmap(process_file_dir, [(file_dir, "1_write.py") for file_dir in file_dirs])
+    results = Parallel(n_jobs=3)(
+        delayed(process_file_dir)(file_dir, "1_write.py") for file_dir in file_dirs
+    )
 
 
