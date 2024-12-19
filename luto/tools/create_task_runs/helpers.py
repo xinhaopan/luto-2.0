@@ -1,7 +1,6 @@
 import os
 import re
 import time
-import datetime
 import itertools
 import shutil
 import psutil
@@ -97,6 +96,14 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
 
 
 def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_workers:int=4):
+    '''
+    Submit the tasks to the cluster using the custom settings.\n
+    Parameters:
+        - custom_settings (pd.DataFrame): The custom settings DataFrame.
+        - Only works in a windows system.
+            - python_path (str): The path to the python executable.
+            - n_workers (int): The number of workers to use for parallel processing.
+    '''
     
     # Get current working directory
     cwd = os.getcwd()
@@ -257,6 +264,7 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
             process = psutil.Process(os.getpid())
             memory_usage = process.memory_info().rss
             children = process.children(recursive=True)
+            # Include the memory usage of the child processes to get accurate memory usage under parallel processing
             if children:
                 memory_usage += sum(child.memory_info().rss for child in children)
             memory_usage /= (1024 * 1024 * 1024)
