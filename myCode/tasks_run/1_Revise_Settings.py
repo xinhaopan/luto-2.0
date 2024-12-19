@@ -11,6 +11,7 @@ grid_search = {
         'snapshot',
         # 'timeseries'
     ],
+    'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [1],
     'GHG_CONSTRAINT_TYPE': ['soft'],
     'GHG_LIMITS_FIELD': [
