@@ -10,6 +10,7 @@ from matplotlib.patches import FancyArrow, Circle
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from PIL import Image
+from filelock import FileLock
 
 # 空间数据处理库
 import rasterio
@@ -84,38 +85,39 @@ def generate_basemap(basemap_geo_tif, basemap_rgb_tif,write_png=False):
     # 创建自定义颜色映射（BFE9FF 到 FFFFFF，使用 CIE LAB 色彩空间）
     colors = ['#BFE9FF', '#FFFFFF']
     cmap = LinearSegmentedColormap.from_list('custom_cmap', colors, N=256)
+    lock_path = basemap_rgb_tif + ".lock"  # 创建一个与文件同名的锁文件
+    with FileLock(lock_path):
+        # 读取地理坐标信息的底图
+        with rasterio.open(basemap_geo_tif) as src:
+            basemap_data = src.read(1)  # 假设底图是单波段的
+            basemap_transform = src.transform  # 获取地理变换信息
+            basemap_crs = src.crs  # 获取坐标参考系统 (CRS)
 
-    # 读取地理坐标信息的底图
-    with rasterio.open(basemap_geo_tif) as src:
-        basemap_data = src.read(1)  # 假设底图是单波段的
-        basemap_transform = src.transform  # 获取地理变换信息
-        basemap_crs = src.crs  # 获取坐标参考系统 (CRS)
+            # 对数据进行渲染
+            norm_data = (basemap_data - basemap_data.min()) / (basemap_data.max() - basemap_data.min())  # 归一化
+            rgba_image = cmap(norm_data)  # 将数据映射为 RGBA 格式
+            rgba_image = (rgba_image[:, :, :3] * 255).astype(np.uint8)  # 转换为 8 位 RGB
 
-        # 对数据进行渲染
-        norm_data = (basemap_data - basemap_data.min()) / (basemap_data.max() - basemap_data.min())  # 归一化
-        rgba_image = cmap(norm_data)  # 将数据映射为 RGBA 格式
-        rgba_image = (rgba_image[:, :, :3] * 255).astype(np.uint8)  # 转换为 8 位 RGB
+            # 获取栅格尺寸
+            height, width = basemap_data.shape
 
-        # 获取栅格尺寸
-        height, width = basemap_data.shape
-
-    # 使用 `rasterio` 保存带有颜色信息的 RGB GeoTIFF
-    with rasterio.open(
-            basemap_rgb_tif,
-            'w',
-            driver='GTiff',
-            height=height,
-            width=width,
-            count=3,  # RGB 三通道
-            dtype=rgba_image.dtype,
-            crs=basemap_crs,
-            transform=basemap_transform
-    ) as dst:
-        # 写入 RGB 通道数据
-        for i in range(3):
-            dst.write(rgba_image[:, :, i], i + 1)
-    if write_png:
-        convert_tif_to_png(basemap_rgb_tif)
+        # 使用 `rasterio` 保存带有颜色信息的 RGB GeoTIFF
+        with rasterio.open(
+                basemap_rgb_tif,
+                'w',
+                driver='GTiff',
+                height=height,
+                width=width,
+                count=3,  # RGB 三通道
+                dtype=rgba_image.dtype,
+                crs=basemap_crs,
+                transform=basemap_transform
+        ) as dst:
+            # 写入 RGB 通道数据
+            for i in range(3):
+                dst.write(rgba_image[:, :, i], i + 1)
+        if write_png:
+            convert_tif_to_png(basemap_rgb_tif)
 
     # print(f"Basemap with coordinates saved to {basemap_rgb_tif}")
 

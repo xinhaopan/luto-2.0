@@ -68,8 +68,6 @@ def get_dict_data(input_files, csv_name, value_column_name, filter_column_name):
 
     return data_dict
 
-import os
-import pandas as pd
 
 def get_dict_sum_data(input_files, csv_name, value_column_name, give_column_name):
     """
@@ -114,6 +112,25 @@ def get_dict_sum_data(input_files, csv_name, value_column_name, give_column_name
         # 将结果 DataFrame 添加到字典
         data_dict[input_name] = temp_results
 
+    return data_dict
+
+def get_dict_from_json(input_files, json_name):
+    data_dict = {}
+
+    # 遍历每个 input_file 进行处理
+    for input_name in input_files:
+        # 获取输入文件的基本路径
+        base_path = get_path(input_name)
+
+        # 创建以年份为索引的 DataFrame
+        file_path = os.path.join(base_path, 'DATA_REPORT','data', f'{json_name}.json')
+        df = pd.read_json(file_path)
+        df_expanded = df.explode('data')
+        df_expanded[['year', 'value']] = pd.DataFrame(df_expanded['data'].tolist(), index=df_expanded.index)
+        df_transformed = df_expanded.pivot(index='year', columns='name', values='value')
+
+        # Display the transformed DataFrame
+        data_dict[input_name] = df_transformed / 1e6
     return data_dict
 
 
