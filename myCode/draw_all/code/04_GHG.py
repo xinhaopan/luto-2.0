@@ -24,12 +24,12 @@ transition_dict = get_dict_data(input_files, 'GHG_emissions_separate_transition_
 
 ghg_dict = concatenate_dicts_by_year([ag_dict, am_dict, non_ag_dict, transition_dict])
 ghg_group_dict = aggregate_by_mapping(ghg_dict, 'tools/land use group.xlsx', 'desc', 'lu_group', summary_col_name='Net emissions')
+point_dict = {key: df[['Net emissions']] for key, df in ghg_group_dict.items()}
 
-font_size = 35
 ghg_group_dict,legend_colors = get_colors(ghg_group_dict, 'tools/land use colors.xlsx', sheet_name='lu')
 output_png = '../output/04_ghg_emissions.png'
 y_range, y_ticks = calculate_y_axis_range(ghg_group_dict)
-plot_Combination_figures(ghg_group_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,
+plot_Combination_figures(ghg_group_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,point_dict=point_dict,
                              point_data='Net emissions', n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=3)

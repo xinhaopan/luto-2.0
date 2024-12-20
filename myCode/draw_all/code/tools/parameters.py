@@ -33,3 +33,4 @@ tasks = [(main_task, sub_task[0], sub_task[1]) for main_task in input_files for 
 
 COLUMN_WIDTH = 3
 X_OFFSET = 2
+font_size = 25

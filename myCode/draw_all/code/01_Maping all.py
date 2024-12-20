@@ -21,7 +21,7 @@ def process_task(INPUT_NAME, source_name, colors_sheet):
     )
 
 # 使用 joblib 的 Parallel 和 delayed 并行化任务
-results = Parallel(n_jobs=-1, backend="loky")(
+results = Parallel(n_jobs=1, backend="loky")(
     delayed(process_task)(INPUT_NAME, source_name, colors_sheet)
     for INPUT_NAME, source_name, colors_sheet in tasks
 )

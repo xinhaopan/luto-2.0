@@ -18,7 +18,6 @@ sys.path.append(os.path.abspath('../../../luto'))
 # 导入 settings.py
 import settings
 
-font_size = 35
 csv_name, value_column_name, filter_column_name = 'area_agricultural_landuse', 'Area (ha)', 'Land-use'
 area_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 ag_dict,legend_colors = get_colors(area_dict, 'tools/land use colors.xlsx', sheet_name='ag')

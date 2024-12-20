@@ -95,7 +95,7 @@ def process_file_dir(file_dir, script_to_run):
                 # 如果 PKL 文件不存在，删除子目录
                 if not os.path.exists(pkl_path):
                     print(f"PKL file does not exist at path: {pkl_path}")
-                    sdelete_folder_multiprocessing(os.path.join(time_file_path, time_file_dir))
+                    # sdelete_folder_multiprocessing(os.path.join(time_file_path, time_file_dir))
 
         # 执行脚本
                 execute_script_in_directory(script_to_run, working_directory)

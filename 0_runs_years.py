@@ -37,7 +37,7 @@ def main():
         data, load_data_memory = monitor_memory(sim.load_data)
         write_log(f"Data loaded. Peak memory usage: {load_data_memory:.2f} GB")
 
-        for target_year in range(2015, 2051, 5):
+        for target_year in range(2050, 2051):
             enum_start_time = time.time()
             # 监控运行模拟
             write_log(f"Start simulation for target year {target_year}")
