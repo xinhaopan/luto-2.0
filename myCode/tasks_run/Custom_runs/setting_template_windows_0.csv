@@ -23,7 +23,7 @@ RESFACTOR,1,1,1,1,1,1,1,1,1,1
 MODE,timeseries,snapshot,snapshot,snapshot,snapshot,snapshot,snapshot,snapshot,snapshot,snapshot
 OBJECTIVE,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit
 DEMAND_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft
-WRITE_OUTPUT_GEOTIFFS,False,False,False,False,False,False,False,False,False,False
+WRITE_OUTPUT_GEOTIFFS,False,True,True,True,True,True,True,True,True,True
 WRITE_FULL_RES_MAPS,False,False,False,False,False,False,False,False,False,False
 PARALLEL_WRITE,True,True,True,True,True,True,True,True,True,True
 WRITE_THREADS,10,10,10,10,10,10,10,10,10,10
@@ -76,7 +76,7 @@ GHG_LIMITS,"{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 
 GHG_LIMITS_FIELD,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.8C (67%) excl. avoided emis,1.8C (67%) excl. avoided emis,1.8C (67%) excl. avoided emis
 CARBON_PRICES_FIELD,1.5C 67%,1.5C 67%,1.5C 67%,1.5C 67%,1.5C 50%,1.5C 50%,1.5C 50%,1.8C 67%,1.8C 67%,1.8C 67%
 SOC_AMORTISATION,15,15,15,15,15,15,15,15,15,15
-GHG_CONSTRAINT_TYPE,hard,hard,hard,hard,hard,hard,hard,hard,hard,hard
+GHG_CONSTRAINT_TYPE,hard,soft,soft,soft,soft,soft,soft,soft,soft,soft
 GHG_ALLOW_LB_DELTA_T,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0,5000000.0
 SOLVE_ECONOMY_WEIGHT,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25
 WATER_LIMITS,on,on,on,on,on,on,on,on,on,on

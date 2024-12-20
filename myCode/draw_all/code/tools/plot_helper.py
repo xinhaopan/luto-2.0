@@ -35,9 +35,50 @@ def get_colors(merged_dict, mapping_file, sheet_name=None):
 
     return data_dict, legend_colors
 
+# def process_single_df(df, mapping_df):
+#     """
+#     对单个 DataFrame 根据映射文件进行处理，返回重命名和排序后的 DataFrame 及 legend_colors。
+#
+#     参数:
+#     df (pd.DataFrame): 需要处理的 DataFrame。
+#     mapping_df (pd.DataFrame): 包含 desc 和 color 列的映射文件 DataFrame。
+#
+#     返回:
+#     tuple: 处理后的 DataFrame 和 legend_colors（仅包含匹配的列）。
+#     """
+#     # 创建映射字典，忽略 desc 中的 `-`
+#     mapping_df['desc_processed'] = mapping_df['desc'].str.replace('-', '').str.lower()
+#     column_mapping = {row['desc_processed']: row['desc'] for _, row in mapping_df.iterrows()}
+#     color_mapping = {row['desc']: row['color'] for _, row in mapping_df.iterrows()}
+#
+#     # 获取并处理 DataFrame 列名，忽略 `-`
+#     original_columns = list(df.columns)
+#     processed_columns = [re.sub(r'-', '', col.lower()) for col in original_columns]
+#     renamed_columns = [column_mapping.get(col, original_columns[i]) for i, col in enumerate(processed_columns)]
+#
+#     # 按映射文件的顺序排列匹配的列，未匹配的列保持原始位置
+#     matched_categories = [col for col in renamed_columns if col in column_mapping.values()]
+#     unmatched_categories = [col for col in renamed_columns if col not in column_mapping.values()]
+#     categories = matched_categories + unmatched_categories
+#
+#     # 筛选 legend_colors 只包含匹配的列
+#     legend_colors = {column_mapping[col]: color_mapping[column_mapping[col]]
+#                      for col in processed_columns if col in column_mapping}
+#
+#     # 重命名和排序 DataFrame
+#     renamed_df = df.rename(columns={orig_col: column_mapping.get(re.sub(r'-', '', orig_col.lower()), orig_col)
+#                                     for orig_col in df.columns})
+#     processed_df = renamed_df.reindex(columns=categories, fill_value=0)
+#     if 'Year' in processed_df.columns:
+#         processed_df = processed_df.set_index('Year')
+#
+#     return processed_df, legend_colors
+
+
+
 def process_single_df(df, mapping_df):
     """
-    对单个 DataFrame 根据映射文件进行处理，返回重命名和排序后的 DataFrame 及 legend_colors。
+    根据映射文件过滤和处理 DataFrame，仅保留能匹配上的列名。
 
     参数:
     df (pd.DataFrame): 需要处理的 DataFrame。
@@ -46,37 +87,39 @@ def process_single_df(df, mapping_df):
     返回:
     tuple: 处理后的 DataFrame 和 legend_colors（仅包含匹配的列）。
     """
-    # 创建映射字典，忽略 desc 中的 `-`
-    mapping_df['desc_processed'] = mapping_df['desc'].str.replace('-', '').str.lower()
+    # 创建映射字典，忽略 desc 中的 `-` 和大小写
+    mapping_df['desc_processed'] = mapping_df['desc'].str.replace('-', '', regex=True).str.lower()
     column_mapping = {row['desc_processed']: row['desc'] for _, row in mapping_df.iterrows()}
     color_mapping = {row['desc']: row['color'] for _, row in mapping_df.iterrows()}
 
-    # 获取并处理 DataFrame 列名，忽略 `-`
+    # 获取并处理 DataFrame 列名，忽略 `-` 和大小写
     original_columns = list(df.columns)
-    processed_columns = [re.sub(r'-', '', col.lower()) for col in original_columns]
-    renamed_columns = [column_mapping.get(col, original_columns[i]) for i, col in enumerate(processed_columns)]
+    processed_columns = [re.sub(r'-', '', col).lower() for col in original_columns]
 
-    # 按映射文件的顺序排列匹配的列，未匹配的列保持原始位置
-    matched_categories = [col for col in renamed_columns if col in column_mapping.values()]
-    unmatched_categories = [col for col in renamed_columns if col not in column_mapping.values()]
-    categories = matched_categories + unmatched_categories
+    # 匹配列名并过滤掉无法匹配的列
+    matched_indices = [i for i, col in enumerate(processed_columns) if col in column_mapping]
+    matched_original_columns = [original_columns[i] for i in matched_indices]
+    matched_renamed_columns = [column_mapping[processed_columns[i]] for i in matched_indices]
+
+    # 检查长度是否一致
+    if len(matched_indices) != len(matched_renamed_columns):
+        raise ValueError("Mismatch between matched indices and renamed columns.")
 
     # 筛选 legend_colors 只包含匹配的列
-    legend_colors = {column_mapping[col]: color_mapping[column_mapping[col]]
-                     for col in processed_columns if col in column_mapping}
+    legend_colors = {column_mapping[processed_columns[i]]: color_mapping[column_mapping[processed_columns[i]]]
+                     for i in matched_indices}
 
-    # 重命名和排序 DataFrame
-    renamed_df = df.rename(columns={orig_col: column_mapping.get(re.sub(r'-', '', orig_col.lower()), orig_col)
-                                    for orig_col in df.columns})
-    processed_df = renamed_df.reindex(columns=categories, fill_value=0)
-    if 'Year' in processed_df.columns:
-        processed_df = processed_df.set_index('Year')
+    # 重命名和筛选 DataFrame
+    filtered_df = df[matched_original_columns].rename(
+        columns={matched_original_columns[i]: matched_renamed_columns[i] for i in range(len(matched_indices))}
+    )
+    if 'Year' in filtered_df.columns:
+        filtered_df = filtered_df.set_index('Year')
 
-    return processed_df, legend_colors
+    return filtered_df, legend_colors
 
 
-
-def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, legend_colors,
+def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, legend_colors,point_dict=None,
                              point_data=None, n_rows=3, n_cols=3, font_size=10, x_range=(2010, 2050), y_range=(-600, 100),
                              x_ticks=5, y_ticks=100, legend_position=(0.5, -0.03), show_legend='last', legend_n_rows=1):
     total_plots = len(input_names)
@@ -137,7 +180,7 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
             ax.spines['right'].set_visible(False)
 
             if point_data is not None:
-                bar_list, line = plot_func(ax, merged_dict=merged_dict, input_name=input_names[i], legend_colors=legend_colors,
+                bar_list, line = plot_func(ax, merged_dict=merged_dict, input_name=input_names[i], legend_colors=legend_colors,point_dict=point_dict,
                                        point_data=point_data, font_size=font_size, x_range=x_range, y_range=y_range,
                                        x_ticks=x_ticks, y_ticks=y_ticks)
             else:
@@ -177,11 +220,14 @@ def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(
     plt.close(fig)  # 关闭图，避免显示在主图上
 
 
-def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_data='Net emissions',
+def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors,point_dict=None, point_data='Net emissions',
                               font_size=10, x_range=(2010, 2050), y_range=(-600, 100), x_ticks=None, y_ticks=None,
                               show_legend=False):
     merged_df = merged_dict[input_name]
     merged_df.index = merged_df.index.astype(int)
+
+    point_df = point_dict[input_name]
+    point_df.index = point_df.index.astype(int)
 
     # 从 legend_colors 中获取 categories 和 color_list
     categories = list(legend_colors.keys())
@@ -208,7 +254,7 @@ def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_
                    width=COLUMN_WIDTH))
 
     # 绘制 Net emissions 的点线图
-    line = ax.plot(years, merged_df[point_data], color='red', marker='o', linewidth=1.5, label=point_data, markersize=3)
+    line = ax.plot(years, point_df[point_data], color='red', marker='o', linewidth=1.5, label=point_data, markersize=3)
 
     # 设置 x 和 y 轴范围
     ax.set_ylim(y_range[0], y_range[1]+1)
@@ -266,13 +312,45 @@ def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3):
     :param divisible_by: 范围除以该值后得到间隔（默认 3）
     :return: Y 轴范围 (最小值, 最大值) 和刻度间隔
     """
-    min_value, max_value = 0, 0
 
-    # 遍历字典中的每个 DataFrame 和行
+    # 初始化值
+    row_positive_max = float('-inf')  # 每行正数的累积最大值
+    row_negative_min = float('inf')  # 每行负数的累积最小值
+    has_negative = False  # 是否存在负数
+    global_min_value = float('inf')  # 初始化全局最小值
+    global_max_value = float('-inf')  # 初始化全局最大值
+
     for df in data_dict.values():
-        row_sums = df.sum(axis=1)  # 每行累积总和
-        min_value = min(min_value, row_sums.min())  # 累积总和的最小值
-        max_value = max(max_value, row_sums.max())  # 累积总和的最大值
+        # 遍历每一行，逐行计算
+        for index, row in df.iterrows():
+            row_cumsum = row.cumsum()  # 计算行的累积和
+
+            # 计算该行的正数累积最大值
+            row_positive_sum = row_cumsum[row_cumsum > 0].max() if (row_cumsum > 0).any() else 0
+            row_positive_max = max(row_positive_max, row_positive_sum)
+
+            # 计算该行的负数累积最小值
+            if row.min() < 0:
+                has_negative = True
+                row_negative_sum = row_cumsum[row_cumsum < 0].min()
+                row_negative_min = min(row_negative_min, row_negative_sum)
+
+            # 更新全局最小值和最大值
+            global_min_value = min(global_min_value, row.min())
+            global_max_value = max(global_max_value, row.max())
+
+    # 如果没有负数，将累积负数最小值设为 0
+    if not has_negative:
+        row_negative_min = 0
+
+    # 最终比较累积值和全局值，得到最终结果
+    max_value = max(global_max_value, row_positive_max)
+    min_value = min(global_min_value, row_negative_min)
+
+    # 如果没有负数，将最小值设置为 0
+    if not has_negative:
+        cumulative_negative_min = 0
+        min_value = 0
 
     # 将最小值向下取整到 multiplier 的倍数
     y_min = np.floor(min_value / multiplier) * multiplier

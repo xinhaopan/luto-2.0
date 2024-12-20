@@ -20,7 +20,6 @@ import settings
 
 csv_name, value_column_name, filter_column_name = 'biodiversity_separate', 'Biodiversity score', 'Landuse type'
 bio_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
-font_size = 35
 bio_dict,legend_colors = get_colors(bio_dict, 'tools/land use colors.xlsx', sheet_name='lu')
 output_png = '../output/05_bio.png'
 plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_bar, legend_colors,
