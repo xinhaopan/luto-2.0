@@ -2948,3 +2948,1359 @@
 . 2024-12-17 21:03:45.527 Session sent command exit status 0
 . 2024-12-17 21:03:45.528 Main session channel closed
 . 2024-12-17 21:03:45.529 All channels closed
+. 2024-12-21 18:19:59.075 --------------------------------------------------------------------------
+. 2024-12-21 18:19:59.077 WinSCP Version 6.3.6 (Build 15073 2024-11-25) (OS 10.0.22631 – Windows 10 Enterprise)
+. 2024-12-21 18:19:59.077 Configuration: HKCU\Software\Martin Prikryl\WinSCP 2\
+. 2024-12-21 18:19:59.078 Log level: Normal
+. 2024-12-21 18:19:59.078 Local account: DESKTOP-JRK700U\Xinhao
+. 2024-12-21 18:19:59.078 Working directory: Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync
+. 2024-12-21 18:19:59.079 Process ID: 12016
+. 2024-12-21 18:19:59.099 Ancestor processes: WinSCP, python, cmd, ...
+. 2024-12-21 18:19:59.101 Command-line: "C:\Program Files (x86)\WinSCP\WinSCP.exe" /console=6.3.6 /consoleinstance=_16080_47 "/script=Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt" "/log=3_sync_log.txt" 
+. 2024-12-21 18:19:59.101 Time zone: Current: GMT+11, Standard: GMT+10 (AUS Eastern Standard Time), DST: GMT+11 (AUS Eastern Summer Time), DST Start: 2024/10/6, DST End: 2024/4/7
+. 2024-12-21 18:19:59.101 Login time: 2024年12月21日 18:19:59
+. 2024-12-21 18:19:59.102 --------------------------------------------------------------------------
+. 2024-12-21 18:19:59.102 Script: Retrospectively logging previous script records:
+> 2024-12-21 18:19:59.102 Script: open scp://xp7241@gadi.nci.org.au/ -privatekey="C:\Users\s222552331\.ssh\id_rsa.ppk"
+. 2024-12-21 18:19:59.102 --------------------------------------------------------------------------
+. 2024-12-21 18:19:59.103 Session name: xp7241@gadi.nci.org.au (Ad-Hoc site)
+. 2024-12-21 18:19:59.103 Host name: gadi.nci.org.au (Port: 22)
+. 2024-12-21 18:19:59.103 User name: xp7241 (Password: No, Key file: Yes, Passphrase: No)
+. 2024-12-21 18:19:59.103 Tunnel: No
+. 2024-12-21 18:19:59.104 Transfer Protocol: SCP
+. 2024-12-21 18:19:59.104 Ping type: Off, Ping interval: 30 sec; Timeout: 15 sec
+. 2024-12-21 18:19:59.104 Disable Nagle: No
+. 2024-12-21 18:19:59.104 Proxy: None
+. 2024-12-21 18:19:59.104 Send buffer: 262144
+. 2024-12-21 18:19:59.106 Compression: No
+. 2024-12-21 18:19:59.106 Bypass authentication: No
+. 2024-12-21 18:19:59.107 Try agent: Yes; Agent forwarding: No; KI: Yes; GSSAPI: Yes
+. 2024-12-21 18:19:59.107 GSSAPI: KEX: No; Forwarding: No; Libs: gssapi32,sspi,custom; Custom: 
+. 2024-12-21 18:19:59.107 Ciphers: aes,chacha20,aesgcm,3des,WARN,des,blowfish,arcfour; Ssh2DES: No
+. 2024-12-21 18:19:59.108 KEX: ntru-curve25519,ecdh,dh-gex-sha1,dh-group18-sha512,dh-group17-sha512,dh-group16-sha512,dh-group15-sha512,dh-group14-sha1,rsa,WARN,dh-group1-sha1
+. 2024-12-21 18:19:59.108 SSH Bugs: Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto
+. 2024-12-21 18:19:59.109 Simple channel: Yes
+. 2024-12-21 18:19:59.109 Return code variable: Autodetect; Lookup user groups: Auto
+. 2024-12-21 18:19:59.109 Shell: default
+. 2024-12-21 18:19:59.110 EOL: LF, UTF: Auto
+. 2024-12-21 18:19:59.110 Clear aliases: Yes, Unset nat.vars: Yes, Resolve symlinks: Yes; Follow directory symlinks: No
+. 2024-12-21 18:19:59.110 LS: ls -la, Ign LS warn: Yes, Scp1 Comp: No; Exit code 1 is error: No
+. 2024-12-21 18:19:59.111 Local directory: default, Remote directory: home, Update: Yes, Cache: Yes
+. 2024-12-21 18:19:59.111 Cache directory changes: Yes, Permanent: Yes
+. 2024-12-21 18:19:59.111 Recycle bin: Delete to: No, Overwritten to: No, Bin path: 
+. 2024-12-21 18:19:59.111 DST mode: Unix;Timezone offset: 0h 0m
+. 2024-12-21 18:19:59.112 --------------------------------------------------------------------------
+< 2024-12-21 18:19:59.112 Script: Searching for host...
+. 2024-12-21 18:19:59.113 Looking up host "gadi.nci.org.au" for SSH connection
+. 2024-12-21 18:19:59.120 Connecting to 203.0.19.85 port 22
+. 2024-12-21 18:19:59.130 Connected to 203.0.19.85
+< 2024-12-21 18:19:59.131 Script: Connecting to host...
+. 2024-12-21 18:19:59.131 We claim version: SSH-2.0-WinSCP_release_6.3.6
+. 2024-12-21 18:19:59.132 Connected to 203.0.19.85
+. 2024-12-21 18:19:59.163 Remote version: SSH-2.0-OpenSSH_8.0
+. 2024-12-21 18:19:59.164 Using SSH protocol version 2
+. 2024-12-21 18:19:59.165 Have a known host key of type ssh-ed25519
+. 2024-12-21 18:19:59.170 Enabling strict key exchange semantics
+. 2024-12-21 18:19:59.171 Doing ECDH key exchange with curve Curve25519, using hash SHA-256
+. 2024-12-21 18:19:59.240 Server also has ecdsa-sha2-nistp256/rsa-sha2-512/rsa-sha2-256/ssh-rsa host keys, but we don't know any of them
+. 2024-12-21 18:19:59.241 Host key fingerprint is:
+. 2024-12-21 18:19:59.242 ssh-ed25519 255 SHA256:4VAftRK1D11TnXKVeWDsb/wonDJXW6p5Bt0J5XH4T+s
+< 2024-12-21 18:19:59.242 Script: Authenticating...
+. 2024-12-21 18:19:59.243 Host key matches cached key
+. 2024-12-21 18:19:59.244 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] outbound encryption
+. 2024-12-21 18:19:59.244 Initialised HMAC-SHA-256 outbound MAC algorithm
+. 2024-12-21 18:19:59.244 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] inbound encryption
+. 2024-12-21 18:19:59.244 Initialised HMAC-SHA-256 inbound MAC algorithm
+. 2024-12-21 18:19:59.254 Reading key file "C:\Users\s222552331\.ssh\id_rsa.ppk"
+! 2024-12-21 18:19:59.257 Using username "xp7241".
+< 2024-12-21 18:19:59.257 Script: Using username "xp7241".
+. 2024-12-21 18:19:59.277 Server offered these authentication methods: publickey,gssapi-keyex,gssapi-with-mic,password,hostbased
+. 2024-12-21 18:19:59.278 Offered public key
+. 2024-12-21 18:19:59.334 Offer of public key accepted
+! 2024-12-21 18:19:59.335 Authenticating with public key "xinhao@DESKTOP-JRK700U"
+< 2024-12-21 18:19:59.335 Script: Authenticating with public key "xinhao@DESKTOP-JRK700U".
+. 2024-12-21 18:19:59.540 Sent public key signature
+. 2024-12-21 18:19:59.563 Access granted
+. 2024-12-21 18:19:59.564 Opening main session channel
+. 2024-12-21 18:19:59.650 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 18:19:59.651 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 18:19:59.651 Opened main channel
+. 2024-12-21 18:19:59.663 Started a shell/command
+< 2024-12-21 18:19:59.664 Script: Authenticated.
+. 2024-12-21 18:19:59.664 --------------------------------------------------------------------------
+. 2024-12-21 18:19:59.664 Using SCP protocol.
+. 2024-12-21 18:19:59.665 Doing startup conversation with host.
+< 2024-12-21 18:19:59.665 Script: Starting the session...
+. 2024-12-21 18:19:59.666 Skipping host startup message (if any).
+> 2024-12-21 18:19:59.666 echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 18:19:59.668 ###############################################################################
+< 2024-12-21 18:19:59.668 #                  Welcome to the NCI National Facility!                      #
+< 2024-12-21 18:19:59.669 #      This service is for authorised clients only. It is a criminal          #
+< 2024-12-21 18:19:59.669 #      offence to:                                                            #
+< 2024-12-21 18:19:59.669 #                - Obtain access to data without permission                   #
+< 2024-12-21 18:19:59.670 #                - Damage, delete, alter or insert data without permission    #
+< 2024-12-21 18:19:59.670 #      Use of this system requires acceptance of the Conditions of Use        #
+< 2024-12-21 18:19:59.670 #      published at http://nci.org.au/users/nci-terms-and-conditions-access   #
+< 2024-12-21 18:19:59.671 ###############################################################################
+< 2024-12-21 18:19:59.671 |         gadi.nci.org.au - 260,760 processor InfiniBand x86_64 cluster       | 
+< 2024-12-21 18:19:59.671 ===============================================================================
+< 2024-12-21 18:19:59.672 Nov 30 ANUMAS Applications Close
+< 2024-12-21 18:19:59.672    The ANUMAS Call for Applications closes on 30th November. Applications
+< 2024-12-21 18:19:59.672    from ANU researchers can be made at https://anumas.nci.org.au/
+< 2024-12-21 18:19:59.672 Dec 25 2024 - 1 Jan 2025 End of Year Closure
+< 2024-12-21 18:19:59.673    NCI systems will operate normally across the Christmas-New Year period
+< 2024-12-21 18:19:59.673    (25 December 2024 鈥?1 January 2025). NCI staff will not work during this
+< 2024-12-21 18:19:59.674    period, which is a mandatory ANU staff holiday. Support requests received
+< 2024-12-21 18:19:59.674    during the holiday period will be addressed as soon as possible after
+< 2024-12-21 18:19:59.674    2 January.
+< 2024-12-21 18:19:59.674 ===============================================================================
+< 2024-12-21 18:20:00.168 WinSCP: this is end-of-file:0
+. 2024-12-21 18:20:00.168 Detecting variable containing return code of last command.
+. 2024-12-21 18:20:00.169 Trying "$status".
+> 2024-12-21 18:20:00.169 echo "$status" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 18:20:00.179 WinSCP: this is end-of-file:0
+. 2024-12-21 18:20:00.180 The response is not numerical exit code
+. 2024-12-21 18:20:00.180 Trying "$?".
+> 2024-12-21 18:20:00.181 echo "$?" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 18:20:00.190 0
+< 2024-12-21 18:20:00.192 WinSCP: this is end-of-file:0
+. 2024-12-21 18:20:00.192 Return code variable "$?" selected.
+> 2024-12-21 18:20:00.193 printenv LANG ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.205 WinSCP: this is end-of-file:1
+. 2024-12-21 18:20:00.206 We will not use UTF-8
+. 2024-12-21 18:20:00.206 Clearing all aliases.
+> 2024-12-21 18:20:00.206 unalias "ls" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.216 -/bin/bash: line 5: unalias: ls: not found
+< 2024-12-21 18:20:00.217 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.218 unalias "echo" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.228 -/bin/bash: line 6: unalias: echo: not found
+< 2024-12-21 18:20:00.228 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.229 unalias "pwd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.238 -/bin/bash: line 7: unalias: pwd: not found
+< 2024-12-21 18:20:00.238 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.238 unalias "cd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.248 -/bin/bash: line 8: unalias: cd: not found
+< 2024-12-21 18:20:00.249 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.249 unalias "groups" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.259 -/bin/bash: line 9: unalias: groups: not found
+< 2024-12-21 18:20:00.260 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.260 unalias "scp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.269 -/bin/bash: line 10: unalias: scp: not found
+< 2024-12-21 18:20:00.270 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.270 unalias "rm" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.280 -/bin/bash: line 11: unalias: rm: not found
+< 2024-12-21 18:20:00.281 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.281 unalias "mv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.290 -/bin/bash: line 12: unalias: mv: not found
+< 2024-12-21 18:20:00.291 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.291 unalias "mkdir" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.301 -/bin/bash: line 13: unalias: mkdir: not found
+< 2024-12-21 18:20:00.302 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.302 unalias "chmod" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.313 -/bin/bash: line 14: unalias: chmod: not found
+< 2024-12-21 18:20:00.313 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.313 unalias "chgrp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.322 -/bin/bash: line 15: unalias: chgrp: not found
+< 2024-12-21 18:20:00.323 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.323 unalias "chown" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.333 -/bin/bash: line 16: unalias: chown: not found
+< 2024-12-21 18:20:00.333 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.334 unalias "unset" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.343 -/bin/bash: line 17: unalias: unset: not found
+< 2024-12-21 18:20:00.343 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.344 unalias "unalias" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.354 -/bin/bash: line 18: unalias: unalias: not found
+< 2024-12-21 18:20:00.354 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.354 unalias "ln" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.364 -/bin/bash: line 19: unalias: ln: not found
+< 2024-12-21 18:20:00.364 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.365 unalias "cp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.374 -/bin/bash: line 20: unalias: cp: not found
+< 2024-12-21 18:20:00.375 WinSCP: this is end-of-file:1
+> 2024-12-21 18:20:00.376 unalias "printenv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 18:20:00.386 -/bin/bash: line 21: unalias: printenv: not found
+< 2024-12-21 18:20:00.386 WinSCP: this is end-of-file:1
+. 2024-12-21 18:20:00.387 Clearing national user variables.
+> 2024-12-21 18:20:00.387 unset "LANG" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.396 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.397 unset "LANGUAGE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.406 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.407 unset "LC_CTYPE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.417 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.418 unset "LC_COLLATE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.428 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.428 unset "LC_MONETARY" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.437 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.438 unset "LC_NUMERIC" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.448 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.448 unset "LC_TIME" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.458 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.459 unset "LC_MESSAGES" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.470 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.470 unset "LC_ALL" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.480 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.481 unset "HUMAN_BLOCKS" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.490 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.490 unset "BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.501 WinSCP: this is end-of-file:0
+> 2024-12-21 18:20:00.501 unset "LS_BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.511 WinSCP: this is end-of-file:0
+. 2024-12-21 18:20:00.511 Looking up groups and users.
+> 2024-12-21 18:20:00.512 groups ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.527 jk53 Deakin
+< 2024-12-21 18:20:00.590 WinSCP: this is end-of-file:0
+. 2024-12-21 18:20:00.590 Following groups found:
+. 2024-12-21 18:20:00.592   "jk53" [0]
+. 2024-12-21 18:20:00.593   "Deakin" [0]
+. 2024-12-21 18:20:00.593 Following membership found:
+. 2024-12-21 18:20:00.593   "jk53" [0]
+. 2024-12-21 18:20:00.594   "Deakin" [0]
+. 2024-12-21 18:20:00.594 No users found.
+. 2024-12-21 18:20:00.594 Getting current directory name.
+> 2024-12-21 18:20:00.594 pwd ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 18:20:00.604 /home/582/xp7241
+< 2024-12-21 18:20:00.666 WinSCP: this is end-of-file:0
+. 2024-12-21 18:20:00.667 Startup conversation with host finished.
+< 2024-12-21 18:20:00.667 Script: Session started.
+< 2024-12-21 18:20:00.667 Script: Active session: [1] xp7241@gadi.nci.org.au
+> 2024-12-21 18:20:00.678 Script: option batch on
+< 2024-12-21 18:20:00.679 Script: batch           on        
+> 2024-12-21 18:20:00.679 Script: option confirm off
+< 2024-12-21 18:20:00.680 Script: confirm         off       
+> 2024-12-21 18:20:00.751 Script: exit
+. 2024-12-21 18:20:00.752 Script: Exit code: 0
+. 2024-12-21 18:20:00.752 Closing connection.
+. 2024-12-21 18:20:00.753 Sending special code: 1
+. 2024-12-21 18:20:00.763 Session sent command exit status 0
+. 2024-12-21 18:20:00.763 Main session channel closed
+. 2024-12-21 18:20:00.764 All channels closed
+. 2024-12-21 19:19:59.649 --------------------------------------------------------------------------
+. 2024-12-21 19:19:59.651 WinSCP Version 6.3.6 (Build 15073 2024-11-25) (OS 10.0.22631 – Windows 10 Enterprise)
+. 2024-12-21 19:19:59.651 Configuration: HKCU\Software\Martin Prikryl\WinSCP 2\
+. 2024-12-21 19:19:59.652 Log level: Normal
+. 2024-12-21 19:19:59.652 Local account: DESKTOP-JRK700U\Xinhao
+. 2024-12-21 19:19:59.652 Working directory: Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync
+. 2024-12-21 19:19:59.653 Process ID: 26292
+. 2024-12-21 19:19:59.670 Ancestor processes: WinSCP, python, cmd, ...
+. 2024-12-21 19:19:59.671 Command-line: "C:\Program Files (x86)\WinSCP\WinSCP.exe" /console=6.3.6 /consoleinstance=_40108_973 "/script=Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt" "/log=3_sync_log.txt" 
+. 2024-12-21 19:19:59.672 Time zone: Current: GMT+11, Standard: GMT+10 (AUS Eastern Standard Time), DST: GMT+11 (AUS Eastern Summer Time), DST Start: 2024/10/6, DST End: 2024/4/7
+. 2024-12-21 19:19:59.672 Login time: 2024年12月21日 19:19:59
+. 2024-12-21 19:19:59.672 --------------------------------------------------------------------------
+. 2024-12-21 19:19:59.673 Script: Retrospectively logging previous script records:
+> 2024-12-21 19:19:59.673 Script: open scp://xp7241@gadi.nci.org.au/ -privatekey="C:\Users\s222552331\.ssh\id_rsa.ppk"
+. 2024-12-21 19:19:59.673 --------------------------------------------------------------------------
+. 2024-12-21 19:19:59.673 Session name: xp7241@gadi.nci.org.au (Ad-Hoc site)
+. 2024-12-21 19:19:59.675 Host name: gadi.nci.org.au (Port: 22)
+. 2024-12-21 19:19:59.675 User name: xp7241 (Password: No, Key file: Yes, Passphrase: No)
+. 2024-12-21 19:19:59.675 Tunnel: No
+. 2024-12-21 19:19:59.675 Transfer Protocol: SCP
+. 2024-12-21 19:19:59.676 Ping type: Off, Ping interval: 30 sec; Timeout: 15 sec
+. 2024-12-21 19:19:59.676 Disable Nagle: No
+. 2024-12-21 19:19:59.676 Proxy: None
+. 2024-12-21 19:19:59.676 Send buffer: 262144
+. 2024-12-21 19:19:59.676 Compression: No
+. 2024-12-21 19:19:59.676 Bypass authentication: No
+. 2024-12-21 19:19:59.676 Try agent: Yes; Agent forwarding: No; KI: Yes; GSSAPI: Yes
+. 2024-12-21 19:19:59.678 GSSAPI: KEX: No; Forwarding: No; Libs: gssapi32,sspi,custom; Custom: 
+. 2024-12-21 19:19:59.678 Ciphers: aes,chacha20,aesgcm,3des,WARN,des,blowfish,arcfour; Ssh2DES: No
+. 2024-12-21 19:19:59.678 KEX: ntru-curve25519,ecdh,dh-gex-sha1,dh-group18-sha512,dh-group17-sha512,dh-group16-sha512,dh-group15-sha512,dh-group14-sha1,rsa,WARN,dh-group1-sha1
+. 2024-12-21 19:19:59.678 SSH Bugs: Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto
+. 2024-12-21 19:19:59.679 Simple channel: Yes
+. 2024-12-21 19:19:59.679 Return code variable: Autodetect; Lookup user groups: Auto
+. 2024-12-21 19:19:59.680 Shell: default
+. 2024-12-21 19:19:59.680 EOL: LF, UTF: Auto
+. 2024-12-21 19:19:59.680 Clear aliases: Yes, Unset nat.vars: Yes, Resolve symlinks: Yes; Follow directory symlinks: No
+. 2024-12-21 19:19:59.680 LS: ls -la, Ign LS warn: Yes, Scp1 Comp: No; Exit code 1 is error: No
+. 2024-12-21 19:19:59.681 Local directory: default, Remote directory: home, Update: Yes, Cache: Yes
+. 2024-12-21 19:19:59.681 Cache directory changes: Yes, Permanent: Yes
+. 2024-12-21 19:19:59.681 Recycle bin: Delete to: No, Overwritten to: No, Bin path: 
+. 2024-12-21 19:19:59.682 DST mode: Unix;Timezone offset: 0h 0m
+. 2024-12-21 19:19:59.682 --------------------------------------------------------------------------
+< 2024-12-21 19:19:59.682 Script: Searching for host...
+. 2024-12-21 19:19:59.683 Looking up host "gadi.nci.org.au" for SSH connection
+. 2024-12-21 19:19:59.690 Connecting to 203.0.19.85 port 22
+. 2024-12-21 19:19:59.700 Connected to 203.0.19.85
+< 2024-12-21 19:19:59.700 Script: Connecting to host...
+. 2024-12-21 19:19:59.701 We claim version: SSH-2.0-WinSCP_release_6.3.6
+. 2024-12-21 19:19:59.701 Connected to 203.0.19.85
+. 2024-12-21 19:19:59.732 Remote version: SSH-2.0-OpenSSH_8.0
+. 2024-12-21 19:19:59.733 Using SSH protocol version 2
+. 2024-12-21 19:19:59.734 Have a known host key of type ssh-ed25519
+. 2024-12-21 19:19:59.739 Enabling strict key exchange semantics
+. 2024-12-21 19:19:59.741 Doing ECDH key exchange with curve Curve25519, using hash SHA-256
+. 2024-12-21 19:19:59.806 Server also has ecdsa-sha2-nistp256/rsa-sha2-512/rsa-sha2-256/ssh-rsa host keys, but we don't know any of them
+. 2024-12-21 19:19:59.808 Host key fingerprint is:
+. 2024-12-21 19:19:59.808 ssh-ed25519 255 SHA256:4VAftRK1D11TnXKVeWDsb/wonDJXW6p5Bt0J5XH4T+s
+< 2024-12-21 19:19:59.809 Script: Authenticating...
+. 2024-12-21 19:19:59.810 Host key matches cached key
+. 2024-12-21 19:19:59.811 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] outbound encryption
+. 2024-12-21 19:19:59.812 Initialised HMAC-SHA-256 outbound MAC algorithm
+. 2024-12-21 19:19:59.812 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] inbound encryption
+. 2024-12-21 19:19:59.812 Initialised HMAC-SHA-256 inbound MAC algorithm
+. 2024-12-21 19:19:59.822 Reading key file "C:\Users\s222552331\.ssh\id_rsa.ppk"
+! 2024-12-21 19:19:59.846 Using username "xp7241".
+< 2024-12-21 19:19:59.846 Script: Using username "xp7241".
+. 2024-12-21 19:19:59.866 Server offered these authentication methods: publickey,gssapi-keyex,gssapi-with-mic,password,hostbased
+. 2024-12-21 19:19:59.866 Offered public key
+. 2024-12-21 19:19:59.903 Offer of public key accepted
+! 2024-12-21 19:19:59.903 Authenticating with public key "xinhao@DESKTOP-JRK700U"
+< 2024-12-21 19:19:59.904 Script: Authenticating with public key "xinhao@DESKTOP-JRK700U".
+. 2024-12-21 19:20:00.109 Sent public key signature
+. 2024-12-21 19:20:00.132 Access granted
+. 2024-12-21 19:20:00.134 Opening main session channel
+. 2024-12-21 19:20:00.213 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 19:20:00.214 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 19:20:00.214 Opened main channel
+. 2024-12-21 19:20:00.226 Started a shell/command
+< 2024-12-21 19:20:00.226 Script: Authenticated.
+. 2024-12-21 19:20:00.227 --------------------------------------------------------------------------
+. 2024-12-21 19:20:00.227 Using SCP protocol.
+. 2024-12-21 19:20:00.228 Doing startup conversation with host.
+< 2024-12-21 19:20:00.228 Script: Starting the session...
+. 2024-12-21 19:20:00.229 Skipping host startup message (if any).
+> 2024-12-21 19:20:00.229 echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 19:20:00.230 ###############################################################################
+< 2024-12-21 19:20:00.230 #                  Welcome to the NCI National Facility!                      #
+< 2024-12-21 19:20:00.230 #      This service is for authorised clients only. It is a criminal          #
+< 2024-12-21 19:20:00.231 #      offence to:                                                            #
+< 2024-12-21 19:20:00.232 #                - Obtain access to data without permission                   #
+< 2024-12-21 19:20:00.232 #                - Damage, delete, alter or insert data without permission    #
+< 2024-12-21 19:20:00.232 #      Use of this system requires acceptance of the Conditions of Use        #
+< 2024-12-21 19:20:00.232 #      published at http://nci.org.au/users/nci-terms-and-conditions-access   #
+< 2024-12-21 19:20:00.233 ###############################################################################
+< 2024-12-21 19:20:00.233 |         gadi.nci.org.au - 260,760 processor InfiniBand x86_64 cluster       | 
+< 2024-12-21 19:20:00.233 ===============================================================================
+< 2024-12-21 19:20:00.234 Nov 30 ANUMAS Applications Close
+< 2024-12-21 19:20:00.234    The ANUMAS Call for Applications closes on 30th November. Applications
+< 2024-12-21 19:20:00.235    from ANU researchers can be made at https://anumas.nci.org.au/
+< 2024-12-21 19:20:00.235 Dec 25 2024 - 1 Jan 2025 End of Year Closure
+< 2024-12-21 19:20:00.235    NCI systems will operate normally across the Christmas-New Year period
+< 2024-12-21 19:20:00.236    (25 December 2024 鈥?1 January 2025). NCI staff will not work during this
+< 2024-12-21 19:20:00.236    period, which is a mandatory ANU staff holiday. Support requests received
+< 2024-12-21 19:20:00.236    during the holiday period will be addressed as soon as possible after
+< 2024-12-21 19:20:00.237    2 January.
+< 2024-12-21 19:20:00.237 ===============================================================================
+< 2024-12-21 19:20:00.705 WinSCP: this is end-of-file:0
+. 2024-12-21 19:20:00.706 Detecting variable containing return code of last command.
+. 2024-12-21 19:20:00.707 Trying "$status".
+> 2024-12-21 19:20:00.707 echo "$status" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 19:20:00.717 WinSCP: this is end-of-file:0
+. 2024-12-21 19:20:00.717 The response is not numerical exit code
+. 2024-12-21 19:20:00.718 Trying "$?".
+> 2024-12-21 19:20:00.719 echo "$?" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 19:20:00.729 0
+< 2024-12-21 19:20:00.729 WinSCP: this is end-of-file:0
+. 2024-12-21 19:20:00.730 Return code variable "$?" selected.
+> 2024-12-21 19:20:00.730 printenv LANG ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:00.742 WinSCP: this is end-of-file:1
+. 2024-12-21 19:20:00.742 We will not use UTF-8
+. 2024-12-21 19:20:00.743 Clearing all aliases.
+> 2024-12-21 19:20:00.743 unalias "ls" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.753 -/bin/bash: line 5: unalias: ls: not found
+< 2024-12-21 19:20:00.753 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.754 unalias "echo" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.763 -/bin/bash: line 6: unalias: echo: not found
+< 2024-12-21 19:20:00.763 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.764 unalias "pwd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.776 -/bin/bash: line 7: unalias: pwd: not found
+< 2024-12-21 19:20:00.776 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.777 unalias "cd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.787 -/bin/bash: line 8: unalias: cd: not found
+< 2024-12-21 19:20:00.787 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.787 unalias "groups" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.797 -/bin/bash: line 9: unalias: groups: not found
+< 2024-12-21 19:20:00.797 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.797 unalias "scp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.808 -/bin/bash: line 10: unalias: scp: not found
+< 2024-12-21 19:20:00.808 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.809 unalias "rm" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.819 -/bin/bash: line 11: unalias: rm: not found
+< 2024-12-21 19:20:00.819 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.822 unalias "mv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.831 -/bin/bash: line 12: unalias: mv: not found
+< 2024-12-21 19:20:00.831 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.832 unalias "mkdir" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.841 -/bin/bash: line 13: unalias: mkdir: not found
+< 2024-12-21 19:20:00.842 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.842 unalias "chmod" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.852 -/bin/bash: line 14: unalias: chmod: not found
+< 2024-12-21 19:20:00.852 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.853 unalias "chgrp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.863 -/bin/bash: line 15: unalias: chgrp: not found
+< 2024-12-21 19:20:00.863 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.864 unalias "chown" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.873 -/bin/bash: line 16: unalias: chown: not found
+< 2024-12-21 19:20:00.874 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.874 unalias "unset" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.883 -/bin/bash: line 17: unalias: unset: not found
+< 2024-12-21 19:20:00.884 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.884 unalias "unalias" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.894 -/bin/bash: line 18: unalias: unalias: not found
+< 2024-12-21 19:20:00.895 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.895 unalias "ln" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.904 -/bin/bash: line 19: unalias: ln: not found
+< 2024-12-21 19:20:00.905 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.905 unalias "cp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.915 -/bin/bash: line 20: unalias: cp: not found
+< 2024-12-21 19:20:00.916 WinSCP: this is end-of-file:1
+> 2024-12-21 19:20:00.916 unalias "printenv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 19:20:00.925 -/bin/bash: line 21: unalias: printenv: not found
+< 2024-12-21 19:20:00.926 WinSCP: this is end-of-file:1
+. 2024-12-21 19:20:00.926 Clearing national user variables.
+> 2024-12-21 19:20:00.926 unset "LANG" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:00.937 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:00.937 unset "LANGUAGE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:00.946 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:00.946 unset "LC_CTYPE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:00.957 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:00.957 unset "LC_COLLATE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:00.966 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:00.966 unset "LC_MONETARY" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:00.977 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:00.977 unset "LC_NUMERIC" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:00.986 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:00.986 unset "LC_TIME" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:00.997 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:00.997 unset "LC_MESSAGES" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:01.006 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:01.006 unset "LC_ALL" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:01.017 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:01.018 unset "HUMAN_BLOCKS" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:01.028 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:01.029 unset "BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:01.038 WinSCP: this is end-of-file:0
+> 2024-12-21 19:20:01.039 unset "LS_BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:01.048 WinSCP: this is end-of-file:0
+. 2024-12-21 19:20:01.049 Looking up groups and users.
+> 2024-12-21 19:20:01.049 groups ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:01.064 jk53 Deakin
+< 2024-12-21 19:20:01.119 WinSCP: this is end-of-file:0
+. 2024-12-21 19:20:01.120 Following groups found:
+. 2024-12-21 19:20:01.120   "jk53" [0]
+. 2024-12-21 19:20:01.120   "Deakin" [0]
+. 2024-12-21 19:20:01.121 Following membership found:
+. 2024-12-21 19:20:01.123   "jk53" [0]
+. 2024-12-21 19:20:01.123   "Deakin" [0]
+. 2024-12-21 19:20:01.123 No users found.
+. 2024-12-21 19:20:01.123 Getting current directory name.
+> 2024-12-21 19:20:01.124 pwd ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 19:20:01.133 /home/582/xp7241
+< 2024-12-21 19:20:01.196 WinSCP: this is end-of-file:0
+. 2024-12-21 19:20:01.197 Startup conversation with host finished.
+< 2024-12-21 19:20:01.197 Script: Session started.
+< 2024-12-21 19:20:01.198 Script: Active session: [1] xp7241@gadi.nci.org.au
+> 2024-12-21 19:20:01.326 Script: option batch on
+< 2024-12-21 19:20:01.327 Script: batch           on        
+> 2024-12-21 19:20:01.357 Script: option confirm off
+< 2024-12-21 19:20:01.358 Script: confirm         off       
+> 2024-12-21 19:20:01.387 Script: exit
+. 2024-12-21 19:20:01.388 Script: Exit code: 0
+. 2024-12-21 19:20:01.388 Closing connection.
+. 2024-12-21 19:20:01.389 Sending special code: 1
+. 2024-12-21 19:20:01.399 Session sent command exit status 0
+. 2024-12-21 19:20:01.400 Main session channel closed
+. 2024-12-21 19:20:01.400 All channels closed
+. 2024-12-21 20:19:55.563 --------------------------------------------------------------------------
+. 2024-12-21 20:19:55.565 WinSCP Version 6.3.6 (Build 15073 2024-11-25) (OS 10.0.22631 – Windows 10 Enterprise)
+. 2024-12-21 20:19:55.566 Configuration: HKCU\Software\Martin Prikryl\WinSCP 2\
+. 2024-12-21 20:19:55.566 Log level: Normal
+. 2024-12-21 20:19:55.566 Local account: DESKTOP-JRK700U\Xinhao
+. 2024-12-21 20:19:55.567 Working directory: Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync
+. 2024-12-21 20:19:55.567 Process ID: 35788
+. 2024-12-21 20:19:55.586 Ancestor processes: WinSCP, python, cmd, ...
+. 2024-12-21 20:19:55.587 Command-line: "C:\Program Files (x86)\WinSCP\WinSCP.exe" /console=6.3.6 /consoleinstance=_21636_115 "/script=Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt" "/log=3_sync_log.txt" 
+. 2024-12-21 20:19:55.587 Time zone: Current: GMT+11, Standard: GMT+10 (AUS Eastern Standard Time), DST: GMT+11 (AUS Eastern Summer Time), DST Start: 2024/10/6, DST End: 2024/4/7
+. 2024-12-21 20:19:55.588 Login time: 2024年12月21日 20:19:55
+. 2024-12-21 20:19:55.589 --------------------------------------------------------------------------
+. 2024-12-21 20:19:55.589 Script: Retrospectively logging previous script records:
+> 2024-12-21 20:19:55.589 Script: open scp://xp7241@gadi.nci.org.au/ -privatekey="C:\Users\s222552331\.ssh\id_rsa.ppk"
+. 2024-12-21 20:19:55.590 --------------------------------------------------------------------------
+. 2024-12-21 20:19:55.591 Session name: xp7241@gadi.nci.org.au (Ad-Hoc site)
+. 2024-12-21 20:19:55.591 Host name: gadi.nci.org.au (Port: 22)
+. 2024-12-21 20:19:55.592 User name: xp7241 (Password: No, Key file: Yes, Passphrase: No)
+. 2024-12-21 20:19:55.592 Tunnel: No
+. 2024-12-21 20:19:55.593 Transfer Protocol: SCP
+. 2024-12-21 20:19:55.593 Ping type: Off, Ping interval: 30 sec; Timeout: 15 sec
+. 2024-12-21 20:19:55.594 Disable Nagle: No
+. 2024-12-21 20:19:55.594 Proxy: None
+. 2024-12-21 20:19:55.595 Send buffer: 262144
+. 2024-12-21 20:19:55.595 Compression: No
+. 2024-12-21 20:19:55.595 Bypass authentication: No
+. 2024-12-21 20:19:55.596 Try agent: Yes; Agent forwarding: No; KI: Yes; GSSAPI: Yes
+. 2024-12-21 20:19:55.596 GSSAPI: KEX: No; Forwarding: No; Libs: gssapi32,sspi,custom; Custom: 
+. 2024-12-21 20:19:55.597 Ciphers: aes,chacha20,aesgcm,3des,WARN,des,blowfish,arcfour; Ssh2DES: No
+. 2024-12-21 20:19:55.597 KEX: ntru-curve25519,ecdh,dh-gex-sha1,dh-group18-sha512,dh-group17-sha512,dh-group16-sha512,dh-group15-sha512,dh-group14-sha1,rsa,WARN,dh-group1-sha1
+. 2024-12-21 20:19:55.598 SSH Bugs: Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto
+. 2024-12-21 20:19:55.598 Simple channel: Yes
+. 2024-12-21 20:19:55.598 Return code variable: Autodetect; Lookup user groups: Auto
+. 2024-12-21 20:19:55.599 Shell: default
+. 2024-12-21 20:19:55.599 EOL: LF, UTF: Auto
+. 2024-12-21 20:19:55.599 Clear aliases: Yes, Unset nat.vars: Yes, Resolve symlinks: Yes; Follow directory symlinks: No
+. 2024-12-21 20:19:55.600 LS: ls -la, Ign LS warn: Yes, Scp1 Comp: No; Exit code 1 is error: No
+. 2024-12-21 20:19:55.600 Local directory: default, Remote directory: home, Update: Yes, Cache: Yes
+. 2024-12-21 20:19:55.600 Cache directory changes: Yes, Permanent: Yes
+. 2024-12-21 20:19:55.601 Recycle bin: Delete to: No, Overwritten to: No, Bin path: 
+. 2024-12-21 20:19:55.601 DST mode: Unix;Timezone offset: 0h 0m
+. 2024-12-21 20:19:55.602 --------------------------------------------------------------------------
+< 2024-12-21 20:19:55.602 Script: Searching for host...
+. 2024-12-21 20:19:55.603 Looking up host "gadi.nci.org.au" for SSH connection
+. 2024-12-21 20:19:55.609 Connecting to 203.0.19.85 port 22
+. 2024-12-21 20:19:55.619 Connected to 203.0.19.85
+< 2024-12-21 20:19:55.619 Script: Connecting to host...
+. 2024-12-21 20:19:55.621 We claim version: SSH-2.0-WinSCP_release_6.3.6
+. 2024-12-21 20:19:55.622 Connected to 203.0.19.85
+. 2024-12-21 20:19:55.647 Remote version: SSH-2.0-OpenSSH_8.0
+. 2024-12-21 20:19:55.648 Using SSH protocol version 2
+. 2024-12-21 20:19:55.649 Have a known host key of type ssh-ed25519
+. 2024-12-21 20:19:55.655 Enabling strict key exchange semantics
+. 2024-12-21 20:19:55.656 Doing ECDH key exchange with curve Curve25519, using hash SHA-256
+. 2024-12-21 20:19:55.720 Server also has ecdsa-sha2-nistp256/rsa-sha2-512/rsa-sha2-256/ssh-rsa host keys, but we don't know any of them
+. 2024-12-21 20:19:55.721 Host key fingerprint is:
+. 2024-12-21 20:19:55.721 ssh-ed25519 255 SHA256:4VAftRK1D11TnXKVeWDsb/wonDJXW6p5Bt0J5XH4T+s
+< 2024-12-21 20:19:55.722 Script: Authenticating...
+. 2024-12-21 20:19:55.722 Host key matches cached key
+. 2024-12-21 20:19:55.723 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] outbound encryption
+. 2024-12-21 20:19:55.723 Initialised HMAC-SHA-256 outbound MAC algorithm
+. 2024-12-21 20:19:55.724 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] inbound encryption
+. 2024-12-21 20:19:55.724 Initialised HMAC-SHA-256 inbound MAC algorithm
+. 2024-12-21 20:19:55.734 Reading key file "C:\Users\s222552331\.ssh\id_rsa.ppk"
+! 2024-12-21 20:19:55.736 Using username "xp7241".
+< 2024-12-21 20:19:55.736 Script: Using username "xp7241".
+. 2024-12-21 20:19:55.755 Server offered these authentication methods: publickey,gssapi-keyex,gssapi-with-mic,password,hostbased
+. 2024-12-21 20:19:55.756 Offered public key
+. 2024-12-21 20:19:55.795 Offer of public key accepted
+! 2024-12-21 20:19:55.795 Authenticating with public key "xinhao@DESKTOP-JRK700U"
+< 2024-12-21 20:19:55.795 Script: Authenticating with public key "xinhao@DESKTOP-JRK700U".
+. 2024-12-21 20:19:55.993 Sent public key signature
+. 2024-12-21 20:19:56.016 Access granted
+. 2024-12-21 20:19:56.018 Opening main session channel
+. 2024-12-21 20:19:56.098 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 20:19:56.098 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 20:19:56.099 Opened main channel
+. 2024-12-21 20:19:56.111 Started a shell/command
+< 2024-12-21 20:19:56.113 Script: Authenticated.
+. 2024-12-21 20:19:56.114 --------------------------------------------------------------------------
+. 2024-12-21 20:19:56.114 Using SCP protocol.
+. 2024-12-21 20:19:56.115 Doing startup conversation with host.
+< 2024-12-21 20:19:56.115 Script: Starting the session...
+. 2024-12-21 20:19:56.116 Skipping host startup message (if any).
+> 2024-12-21 20:19:56.116 echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 20:19:56.117 ###############################################################################
+< 2024-12-21 20:19:56.118 #                  Welcome to the NCI National Facility!                      #
+< 2024-12-21 20:19:56.118 #      This service is for authorised clients only. It is a criminal          #
+< 2024-12-21 20:19:56.119 #      offence to:                                                            #
+< 2024-12-21 20:19:56.119 #                - Obtain access to data without permission                   #
+< 2024-12-21 20:19:56.120 #                - Damage, delete, alter or insert data without permission    #
+< 2024-12-21 20:19:56.121 #      Use of this system requires acceptance of the Conditions of Use        #
+< 2024-12-21 20:19:56.121 #      published at http://nci.org.au/users/nci-terms-and-conditions-access   #
+< 2024-12-21 20:19:56.121 ###############################################################################
+< 2024-12-21 20:19:56.122 |         gadi.nci.org.au - 260,760 processor InfiniBand x86_64 cluster       | 
+< 2024-12-21 20:19:56.122 ===============================================================================
+< 2024-12-21 20:19:56.123 Nov 30 ANUMAS Applications Close
+< 2024-12-21 20:19:56.123    The ANUMAS Call for Applications closes on 30th November. Applications
+< 2024-12-21 20:19:56.124    from ANU researchers can be made at https://anumas.nci.org.au/
+< 2024-12-21 20:19:56.124 Dec 25 2024 - 1 Jan 2025 End of Year Closure
+< 2024-12-21 20:19:56.125    NCI systems will operate normally across the Christmas-New Year period
+< 2024-12-21 20:19:56.125    (25 December 2024 鈥?1 January 2025). NCI staff will not work during this
+< 2024-12-21 20:19:56.126    period, which is a mandatory ANU staff holiday. Support requests received
+< 2024-12-21 20:19:56.126    during the holiday period will be addressed as soon as possible after
+< 2024-12-21 20:19:56.127    2 January.
+< 2024-12-21 20:19:56.127 ===============================================================================
+< 2024-12-21 20:19:56.553 WinSCP: this is end-of-file:0
+. 2024-12-21 20:19:56.554 Detecting variable containing return code of last command.
+. 2024-12-21 20:19:56.555 Trying "$status".
+> 2024-12-21 20:19:56.555 echo "$status" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 20:19:56.565 WinSCP: this is end-of-file:0
+. 2024-12-21 20:19:56.566 The response is not numerical exit code
+. 2024-12-21 20:19:56.567 Trying "$?".
+> 2024-12-21 20:19:56.567 echo "$?" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 20:19:56.577 0
+< 2024-12-21 20:19:56.578 WinSCP: this is end-of-file:0
+. 2024-12-21 20:19:56.578 Return code variable "$?" selected.
+> 2024-12-21 20:19:56.579 printenv LANG ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.591 WinSCP: this is end-of-file:1
+. 2024-12-21 20:19:56.592 We will not use UTF-8
+. 2024-12-21 20:19:56.592 Clearing all aliases.
+> 2024-12-21 20:19:56.593 unalias "ls" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.602 -/bin/bash: line 5: unalias: ls: not found
+< 2024-12-21 20:19:56.603 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.604 unalias "echo" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.614 -/bin/bash: line 6: unalias: echo: not found
+< 2024-12-21 20:19:56.615 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.615 unalias "pwd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.625 -/bin/bash: line 7: unalias: pwd: not found
+< 2024-12-21 20:19:56.626 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.628 unalias "cd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.638 -/bin/bash: line 8: unalias: cd: not found
+< 2024-12-21 20:19:56.639 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.639 unalias "groups" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.648 -/bin/bash: line 9: unalias: groups: not found
+< 2024-12-21 20:19:56.649 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.649 unalias "scp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.660 -/bin/bash: line 10: unalias: scp: not found
+< 2024-12-21 20:19:56.660 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.660 unalias "rm" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.670 -/bin/bash: line 11: unalias: rm: not found
+< 2024-12-21 20:19:56.671 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.671 unalias "mv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.681 -/bin/bash: line 12: unalias: mv: not found
+< 2024-12-21 20:19:56.681 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.681 unalias "mkdir" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.692 -/bin/bash: line 13: unalias: mkdir: not found
+< 2024-12-21 20:19:56.692 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.693 unalias "chmod" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.703 -/bin/bash: line 14: unalias: chmod: not found
+< 2024-12-21 20:19:56.703 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.704 unalias "chgrp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.713 -/bin/bash: line 15: unalias: chgrp: not found
+< 2024-12-21 20:19:56.714 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.714 unalias "chown" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.724 -/bin/bash: line 16: unalias: chown: not found
+< 2024-12-21 20:19:56.725 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.725 unalias "unset" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.735 -/bin/bash: line 17: unalias: unset: not found
+< 2024-12-21 20:19:56.735 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.735 unalias "unalias" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.745 -/bin/bash: line 18: unalias: unalias: not found
+< 2024-12-21 20:19:56.745 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.746 unalias "ln" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.756 -/bin/bash: line 19: unalias: ln: not found
+< 2024-12-21 20:19:56.757 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.757 unalias "cp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.767 -/bin/bash: line 20: unalias: cp: not found
+< 2024-12-21 20:19:56.767 WinSCP: this is end-of-file:1
+> 2024-12-21 20:19:56.768 unalias "printenv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 20:19:56.778 -/bin/bash: line 21: unalias: printenv: not found
+< 2024-12-21 20:19:56.778 WinSCP: this is end-of-file:1
+. 2024-12-21 20:19:56.778 Clearing national user variables.
+> 2024-12-21 20:19:56.779 unset "LANG" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.788 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.788 unset "LANGUAGE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.799 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.799 unset "LC_CTYPE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.808 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.809 unset "LC_COLLATE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.819 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.820 unset "LC_MONETARY" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.829 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.829 unset "LC_NUMERIC" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.839 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.839 unset "LC_TIME" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.849 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.849 unset "LC_MESSAGES" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.859 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.861 unset "LC_ALL" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.870 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.871 unset "HUMAN_BLOCKS" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.880 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.881 unset "BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.892 WinSCP: this is end-of-file:0
+> 2024-12-21 20:19:56.892 unset "LS_BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.902 WinSCP: this is end-of-file:0
+. 2024-12-21 20:19:56.902 Looking up groups and users.
+> 2024-12-21 20:19:56.903 groups ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.917 jk53 Deakin
+< 2024-12-21 20:19:56.980 WinSCP: this is end-of-file:0
+. 2024-12-21 20:19:56.981 Following groups found:
+. 2024-12-21 20:19:56.981   "jk53" [0]
+. 2024-12-21 20:19:56.981   "Deakin" [0]
+. 2024-12-21 20:19:56.982 Following membership found:
+. 2024-12-21 20:19:56.982   "jk53" [0]
+. 2024-12-21 20:19:56.982   "Deakin" [0]
+. 2024-12-21 20:19:56.983 No users found.
+. 2024-12-21 20:19:56.983 Getting current directory name.
+> 2024-12-21 20:19:56.983 pwd ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 20:19:56.992 /home/582/xp7241
+< 2024-12-21 20:19:57.041 WinSCP: this is end-of-file:0
+. 2024-12-21 20:19:57.042 Startup conversation with host finished.
+< 2024-12-21 20:19:57.043 Script: Session started.
+< 2024-12-21 20:19:57.043 Script: Active session: [1] xp7241@gadi.nci.org.au
+> 2024-12-21 20:19:57.044 Script: option batch on
+< 2024-12-21 20:19:57.045 Script: batch           on        
+> 2024-12-21 20:19:57.045 Script: option confirm off
+< 2024-12-21 20:19:57.046 Script: confirm         off       
+> 2024-12-21 20:19:57.046 Script: exit
+. 2024-12-21 20:19:57.047 Script: Exit code: 0
+. 2024-12-21 20:19:57.047 Closing connection.
+. 2024-12-21 20:19:57.047 Sending special code: 1
+. 2024-12-21 20:19:57.057 Session sent command exit status 0
+. 2024-12-21 20:19:57.058 Main session channel closed
+. 2024-12-21 20:19:57.059 All channels closed
+. 2024-12-21 21:19:55.827 --------------------------------------------------------------------------
+. 2024-12-21 21:19:55.829 WinSCP Version 6.3.6 (Build 15073 2024-11-25) (OS 10.0.22631 – Windows 10 Enterprise)
+. 2024-12-21 21:19:55.829 Configuration: HKCU\Software\Martin Prikryl\WinSCP 2\
+. 2024-12-21 21:19:55.830 Log level: Normal
+. 2024-12-21 21:19:55.830 Local account: DESKTOP-JRK700U\Xinhao
+. 2024-12-21 21:19:55.831 Working directory: Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync
+. 2024-12-21 21:19:55.831 Process ID: 28208
+. 2024-12-21 21:19:55.849 Ancestor processes: WinSCP, python, cmd, ...
+. 2024-12-21 21:19:55.850 Command-line: "C:\Program Files (x86)\WinSCP\WinSCP.exe" /console=6.3.6 /consoleinstance=_30288_40 "/script=Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt" "/log=3_sync_log.txt" 
+. 2024-12-21 21:19:55.850 Time zone: Current: GMT+11, Standard: GMT+10 (AUS Eastern Standard Time), DST: GMT+11 (AUS Eastern Summer Time), DST Start: 2024/10/6, DST End: 2024/4/7
+. 2024-12-21 21:19:55.850 Login time: 2024年12月21日 21:19:55
+. 2024-12-21 21:19:55.851 --------------------------------------------------------------------------
+. 2024-12-21 21:19:55.851 Script: Retrospectively logging previous script records:
+> 2024-12-21 21:19:55.851 Script: open scp://xp7241@gadi.nci.org.au/ -privatekey="C:\Users\s222552331\.ssh\id_rsa.ppk"
+. 2024-12-21 21:19:55.853 --------------------------------------------------------------------------
+. 2024-12-21 21:19:55.853 Session name: xp7241@gadi.nci.org.au (Ad-Hoc site)
+. 2024-12-21 21:19:55.854 Host name: gadi.nci.org.au (Port: 22)
+. 2024-12-21 21:19:55.854 User name: xp7241 (Password: No, Key file: Yes, Passphrase: No)
+. 2024-12-21 21:19:55.854 Tunnel: No
+. 2024-12-21 21:19:55.855 Transfer Protocol: SCP
+. 2024-12-21 21:19:55.855 Ping type: Off, Ping interval: 30 sec; Timeout: 15 sec
+. 2024-12-21 21:19:55.855 Disable Nagle: No
+. 2024-12-21 21:19:55.856 Proxy: None
+. 2024-12-21 21:19:55.856 Send buffer: 262144
+. 2024-12-21 21:19:55.856 Compression: No
+. 2024-12-21 21:19:55.857 Bypass authentication: No
+. 2024-12-21 21:19:55.857 Try agent: Yes; Agent forwarding: No; KI: Yes; GSSAPI: Yes
+. 2024-12-21 21:19:55.858 GSSAPI: KEX: No; Forwarding: No; Libs: gssapi32,sspi,custom; Custom: 
+. 2024-12-21 21:19:55.858 Ciphers: aes,chacha20,aesgcm,3des,WARN,des,blowfish,arcfour; Ssh2DES: No
+. 2024-12-21 21:19:55.859 KEX: ntru-curve25519,ecdh,dh-gex-sha1,dh-group18-sha512,dh-group17-sha512,dh-group16-sha512,dh-group15-sha512,dh-group14-sha1,rsa,WARN,dh-group1-sha1
+. 2024-12-21 21:19:55.859 SSH Bugs: Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto
+. 2024-12-21 21:19:55.859 Simple channel: Yes
+. 2024-12-21 21:19:55.860 Return code variable: Autodetect; Lookup user groups: Auto
+. 2024-12-21 21:19:55.860 Shell: default
+. 2024-12-21 21:19:55.861 EOL: LF, UTF: Auto
+. 2024-12-21 21:19:55.861 Clear aliases: Yes, Unset nat.vars: Yes, Resolve symlinks: Yes; Follow directory symlinks: No
+. 2024-12-21 21:19:55.862 LS: ls -la, Ign LS warn: Yes, Scp1 Comp: No; Exit code 1 is error: No
+. 2024-12-21 21:19:55.862 Local directory: default, Remote directory: home, Update: Yes, Cache: Yes
+. 2024-12-21 21:19:55.862 Cache directory changes: Yes, Permanent: Yes
+. 2024-12-21 21:19:55.863 Recycle bin: Delete to: No, Overwritten to: No, Bin path: 
+. 2024-12-21 21:19:55.864 DST mode: Unix;Timezone offset: 0h 0m
+. 2024-12-21 21:19:55.864 --------------------------------------------------------------------------
+< 2024-12-21 21:19:55.864 Script: Searching for host...
+. 2024-12-21 21:19:55.866 Looking up host "gadi.nci.org.au" for SSH connection
+. 2024-12-21 21:19:55.882 Connecting to 203.0.19.85 port 22
+. 2024-12-21 21:19:55.894 Connected to 203.0.19.85
+< 2024-12-21 21:19:55.894 Script: Connecting to host...
+. 2024-12-21 21:19:55.895 We claim version: SSH-2.0-WinSCP_release_6.3.6
+. 2024-12-21 21:19:55.895 Connected to 203.0.19.85
+. 2024-12-21 21:19:55.925 Remote version: SSH-2.0-OpenSSH_8.0
+. 2024-12-21 21:19:55.926 Using SSH protocol version 2
+. 2024-12-21 21:19:55.927 Have a known host key of type ssh-ed25519
+. 2024-12-21 21:19:55.931 Enabling strict key exchange semantics
+. 2024-12-21 21:19:55.934 Doing ECDH key exchange with curve Curve25519, using hash SHA-256
+. 2024-12-21 21:19:56.007 Server also has ecdsa-sha2-nistp256/rsa-sha2-512/rsa-sha2-256/ssh-rsa host keys, but we don't know any of them
+. 2024-12-21 21:19:56.008 Host key fingerprint is:
+. 2024-12-21 21:19:56.008 ssh-ed25519 255 SHA256:4VAftRK1D11TnXKVeWDsb/wonDJXW6p5Bt0J5XH4T+s
+< 2024-12-21 21:19:56.009 Script: Authenticating...
+. 2024-12-21 21:19:56.010 Host key matches cached key
+. 2024-12-21 21:19:56.011 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] outbound encryption
+. 2024-12-21 21:19:56.012 Initialised HMAC-SHA-256 outbound MAC algorithm
+. 2024-12-21 21:19:56.012 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] inbound encryption
+. 2024-12-21 21:19:56.012 Initialised HMAC-SHA-256 inbound MAC algorithm
+. 2024-12-21 21:19:56.022 Reading key file "C:\Users\s222552331\.ssh\id_rsa.ppk"
+! 2024-12-21 21:19:56.024 Using username "xp7241".
+< 2024-12-21 21:19:56.024 Script: Using username "xp7241".
+. 2024-12-21 21:19:56.038 Server offered these authentication methods: publickey,gssapi-keyex,gssapi-with-mic,password,hostbased
+. 2024-12-21 21:19:56.039 Offered public key
+. 2024-12-21 21:19:56.059 Offer of public key accepted
+! 2024-12-21 21:19:56.060 Authenticating with public key "xinhao@DESKTOP-JRK700U"
+< 2024-12-21 21:19:56.060 Script: Authenticating with public key "xinhao@DESKTOP-JRK700U".
+. 2024-12-21 21:19:56.295 Sent public key signature
+. 2024-12-21 21:19:56.317 Access granted
+. 2024-12-21 21:19:56.318 Opening main session channel
+. 2024-12-21 21:19:56.391 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 21:19:56.391 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 21:19:56.393 Opened main channel
+. 2024-12-21 21:19:56.404 Started a shell/command
+< 2024-12-21 21:19:56.405 Script: Authenticated.
+. 2024-12-21 21:19:56.405 --------------------------------------------------------------------------
+. 2024-12-21 21:19:56.406 Using SCP protocol.
+. 2024-12-21 21:19:56.406 Doing startup conversation with host.
+< 2024-12-21 21:19:56.407 Script: Starting the session...
+. 2024-12-21 21:19:56.407 Skipping host startup message (if any).
+> 2024-12-21 21:19:56.408 echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 21:19:56.408 ###############################################################################
+< 2024-12-21 21:19:56.409 #                  Welcome to the NCI National Facility!                      #
+< 2024-12-21 21:19:56.409 #      This service is for authorised clients only. It is a criminal          #
+< 2024-12-21 21:19:56.409 #      offence to:                                                            #
+< 2024-12-21 21:19:56.410 #                - Obtain access to data without permission                   #
+< 2024-12-21 21:19:56.410 #                - Damage, delete, alter or insert data without permission    #
+< 2024-12-21 21:19:56.410 #      Use of this system requires acceptance of the Conditions of Use        #
+< 2024-12-21 21:19:56.411 #      published at http://nci.org.au/users/nci-terms-and-conditions-access   #
+< 2024-12-21 21:19:56.411 ###############################################################################
+< 2024-12-21 21:19:56.412 |         gadi.nci.org.au - 260,760 processor InfiniBand x86_64 cluster       | 
+< 2024-12-21 21:19:56.412 ===============================================================================
+< 2024-12-21 21:19:56.412 Nov 30 ANUMAS Applications Close
+< 2024-12-21 21:19:56.413    The ANUMAS Call for Applications closes on 30th November. Applications
+< 2024-12-21 21:19:56.413    from ANU researchers can be made at https://anumas.nci.org.au/
+< 2024-12-21 21:19:56.413 Dec 25 2024 - 1 Jan 2025 End of Year Closure
+< 2024-12-21 21:19:56.414    NCI systems will operate normally across the Christmas-New Year period
+< 2024-12-21 21:19:56.414    (25 December 2024 鈥?1 January 2025). NCI staff will not work during this
+< 2024-12-21 21:19:56.414    period, which is a mandatory ANU staff holiday. Support requests received
+< 2024-12-21 21:19:56.415    during the holiday period will be addressed as soon as possible after
+< 2024-12-21 21:19:56.415    2 January.
+< 2024-12-21 21:19:56.415 ===============================================================================
+< 2024-12-21 21:19:56.803 WinSCP: this is end-of-file:0
+. 2024-12-21 21:19:56.804 Detecting variable containing return code of last command.
+. 2024-12-21 21:19:56.804 Trying "$status".
+> 2024-12-21 21:19:56.805 echo "$status" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 21:19:56.815 WinSCP: this is end-of-file:0
+. 2024-12-21 21:19:56.815 The response is not numerical exit code
+. 2024-12-21 21:19:56.816 Trying "$?".
+> 2024-12-21 21:19:56.816 echo "$?" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 21:19:56.825 0
+< 2024-12-21 21:19:56.826 WinSCP: this is end-of-file:0
+. 2024-12-21 21:19:56.826 Return code variable "$?" selected.
+> 2024-12-21 21:19:56.827 printenv LANG ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:56.839 WinSCP: this is end-of-file:1
+. 2024-12-21 21:19:56.840 We will not use UTF-8
+. 2024-12-21 21:19:56.840 Clearing all aliases.
+> 2024-12-21 21:19:56.841 unalias "ls" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.850 -/bin/bash: line 5: unalias: ls: not found
+< 2024-12-21 21:19:56.850 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.851 unalias "echo" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.861 -/bin/bash: line 6: unalias: echo: not found
+< 2024-12-21 21:19:56.861 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.862 unalias "pwd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.871 -/bin/bash: line 7: unalias: pwd: not found
+< 2024-12-21 21:19:56.871 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.871 unalias "cd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.882 -/bin/bash: line 8: unalias: cd: not found
+< 2024-12-21 21:19:56.883 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.884 unalias "groups" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.893 -/bin/bash: line 9: unalias: groups: not found
+< 2024-12-21 21:19:56.894 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.894 unalias "scp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.904 -/bin/bash: line 10: unalias: scp: not found
+< 2024-12-21 21:19:56.905 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.905 unalias "rm" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.914 -/bin/bash: line 11: unalias: rm: not found
+< 2024-12-21 21:19:56.915 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.915 unalias "mv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.925 -/bin/bash: line 12: unalias: mv: not found
+< 2024-12-21 21:19:56.926 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.926 unalias "mkdir" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.936 -/bin/bash: line 13: unalias: mkdir: not found
+< 2024-12-21 21:19:56.936 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.937 unalias "chmod" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.947 -/bin/bash: line 14: unalias: chmod: not found
+< 2024-12-21 21:19:56.947 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.948 unalias "chgrp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.958 -/bin/bash: line 15: unalias: chgrp: not found
+< 2024-12-21 21:19:56.958 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.961 unalias "chown" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.970 -/bin/bash: line 16: unalias: chown: not found
+< 2024-12-21 21:19:56.970 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.971 unalias "unset" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.981 -/bin/bash: line 17: unalias: unset: not found
+< 2024-12-21 21:19:56.981 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.982 unalias "unalias" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:56.991 -/bin/bash: line 18: unalias: unalias: not found
+< 2024-12-21 21:19:56.992 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:56.992 unalias "ln" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:57.002 -/bin/bash: line 19: unalias: ln: not found
+< 2024-12-21 21:19:57.003 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:57.003 unalias "cp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:57.013 -/bin/bash: line 20: unalias: cp: not found
+< 2024-12-21 21:19:57.014 WinSCP: this is end-of-file:1
+> 2024-12-21 21:19:57.014 unalias "printenv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 21:19:57.024 -/bin/bash: line 21: unalias: printenv: not found
+< 2024-12-21 21:19:57.025 WinSCP: this is end-of-file:1
+. 2024-12-21 21:19:57.025 Clearing national user variables.
+> 2024-12-21 21:19:57.026 unset "LANG" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.035 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.036 unset "LANGUAGE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.046 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.047 unset "LC_CTYPE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.056 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.056 unset "LC_COLLATE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.067 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.067 unset "LC_MONETARY" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.076 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.077 unset "LC_NUMERIC" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.087 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.087 unset "LC_TIME" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.097 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.097 unset "LC_MESSAGES" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.107 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.107 unset "LC_ALL" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.117 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.118 unset "HUMAN_BLOCKS" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.127 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.128 unset "BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.137 WinSCP: this is end-of-file:0
+> 2024-12-21 21:19:57.138 unset "LS_BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.148 WinSCP: this is end-of-file:0
+. 2024-12-21 21:19:57.148 Looking up groups and users.
+> 2024-12-21 21:19:57.149 groups ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.163 jk53 Deakin
+< 2024-12-21 21:19:57.220 WinSCP: this is end-of-file:0
+. 2024-12-21 21:19:57.220 Following groups found:
+. 2024-12-21 21:19:57.221   "jk53" [0]
+. 2024-12-21 21:19:57.221   "Deakin" [0]
+. 2024-12-21 21:19:57.221 Following membership found:
+. 2024-12-21 21:19:57.221   "jk53" [0]
+. 2024-12-21 21:19:57.221   "Deakin" [0]
+. 2024-12-21 21:19:57.223 No users found.
+. 2024-12-21 21:19:57.223 Getting current directory name.
+> 2024-12-21 21:19:57.223 pwd ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 21:19:57.233 /home/582/xp7241
+< 2024-12-21 21:19:57.282 WinSCP: this is end-of-file:0
+. 2024-12-21 21:19:57.282 Startup conversation with host finished.
+< 2024-12-21 21:19:57.283 Script: Session started.
+< 2024-12-21 21:19:57.283 Script: Active session: [1] xp7241@gadi.nci.org.au
+> 2024-12-21 21:19:57.286 Script: option batch on
+< 2024-12-21 21:19:57.286 Script: batch           on        
+> 2024-12-21 21:19:57.287 Script: option confirm off
+< 2024-12-21 21:19:57.287 Script: confirm         off       
+> 2024-12-21 21:19:57.290 Script: exit
+. 2024-12-21 21:19:57.291 Script: Exit code: 0
+. 2024-12-21 21:19:57.291 Closing connection.
+. 2024-12-21 21:19:57.291 Sending special code: 1
+. 2024-12-21 21:19:57.301 Session sent command exit status 0
+. 2024-12-21 21:19:57.301 Main session channel closed
+. 2024-12-21 21:19:57.303 All channels closed
+. 2024-12-21 22:19:57.720 --------------------------------------------------------------------------
+. 2024-12-21 22:19:57.721 WinSCP Version 6.3.6 (Build 15073 2024-11-25) (OS 10.0.22631 – Windows 10 Enterprise)
+. 2024-12-21 22:19:57.721 Configuration: HKCU\Software\Martin Prikryl\WinSCP 2\
+. 2024-12-21 22:19:57.722 Log level: Normal
+. 2024-12-21 22:19:57.722 Local account: DESKTOP-JRK700U\Xinhao
+. 2024-12-21 22:19:57.723 Working directory: Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync
+. 2024-12-21 22:19:57.723 Process ID: 13032
+. 2024-12-21 22:19:57.741 Ancestor processes: WinSCP, python, cmd, ...
+. 2024-12-21 22:19:57.742 Command-line: "C:\Program Files (x86)\WinSCP\WinSCP.exe" /console=6.3.6 /consoleinstance=_11056_821 "/script=Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt" "/log=3_sync_log.txt" 
+. 2024-12-21 22:19:57.743 Time zone: Current: GMT+11, Standard: GMT+10 (AUS Eastern Standard Time), DST: GMT+11 (AUS Eastern Summer Time), DST Start: 2024/10/6, DST End: 2024/4/7
+. 2024-12-21 22:19:57.743 Login time: 2024年12月21日 22:19:57
+. 2024-12-21 22:19:57.744 --------------------------------------------------------------------------
+. 2024-12-21 22:19:57.744 Script: Retrospectively logging previous script records:
+> 2024-12-21 22:19:57.745 Script: open scp://xp7241@gadi.nci.org.au/ -privatekey="C:\Users\s222552331\.ssh\id_rsa.ppk"
+. 2024-12-21 22:19:57.746 --------------------------------------------------------------------------
+. 2024-12-21 22:19:57.746 Session name: xp7241@gadi.nci.org.au (Ad-Hoc site)
+. 2024-12-21 22:19:57.746 Host name: gadi.nci.org.au (Port: 22)
+. 2024-12-21 22:19:57.747 User name: xp7241 (Password: No, Key file: Yes, Passphrase: No)
+. 2024-12-21 22:19:57.747 Tunnel: No
+. 2024-12-21 22:19:57.748 Transfer Protocol: SCP
+. 2024-12-21 22:19:57.748 Ping type: Off, Ping interval: 30 sec; Timeout: 15 sec
+. 2024-12-21 22:19:57.748 Disable Nagle: No
+. 2024-12-21 22:19:57.748 Proxy: None
+. 2024-12-21 22:19:57.749 Send buffer: 262144
+. 2024-12-21 22:19:57.749 Compression: No
+. 2024-12-21 22:19:57.750 Bypass authentication: No
+. 2024-12-21 22:19:57.750 Try agent: Yes; Agent forwarding: No; KI: Yes; GSSAPI: Yes
+. 2024-12-21 22:19:57.750 GSSAPI: KEX: No; Forwarding: No; Libs: gssapi32,sspi,custom; Custom: 
+. 2024-12-21 22:19:57.751 Ciphers: aes,chacha20,aesgcm,3des,WARN,des,blowfish,arcfour; Ssh2DES: No
+. 2024-12-21 22:19:57.751 KEX: ntru-curve25519,ecdh,dh-gex-sha1,dh-group18-sha512,dh-group17-sha512,dh-group16-sha512,dh-group15-sha512,dh-group14-sha1,rsa,WARN,dh-group1-sha1
+. 2024-12-21 22:19:57.751 SSH Bugs: Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto
+. 2024-12-21 22:19:57.752 Simple channel: Yes
+. 2024-12-21 22:19:57.752 Return code variable: Autodetect; Lookup user groups: Auto
+. 2024-12-21 22:19:57.752 Shell: default
+. 2024-12-21 22:19:57.753 EOL: LF, UTF: Auto
+. 2024-12-21 22:19:57.753 Clear aliases: Yes, Unset nat.vars: Yes, Resolve symlinks: Yes; Follow directory symlinks: No
+. 2024-12-21 22:19:57.753 LS: ls -la, Ign LS warn: Yes, Scp1 Comp: No; Exit code 1 is error: No
+. 2024-12-21 22:19:57.754 Local directory: default, Remote directory: home, Update: Yes, Cache: Yes
+. 2024-12-21 22:19:57.754 Cache directory changes: Yes, Permanent: Yes
+. 2024-12-21 22:19:57.754 Recycle bin: Delete to: No, Overwritten to: No, Bin path: 
+. 2024-12-21 22:19:57.754 DST mode: Unix;Timezone offset: 0h 0m
+. 2024-12-21 22:19:57.754 --------------------------------------------------------------------------
+< 2024-12-21 22:19:57.755 Script: Searching for host...
+. 2024-12-21 22:19:57.756 Looking up host "gadi.nci.org.au" for SSH connection
+. 2024-12-21 22:19:57.764 Connecting to 203.0.19.85 port 22
+. 2024-12-21 22:19:57.774 Connected to 203.0.19.85
+< 2024-12-21 22:19:57.774 Script: Connecting to host...
+. 2024-12-21 22:19:57.774 We claim version: SSH-2.0-WinSCP_release_6.3.6
+. 2024-12-21 22:19:57.776 Connected to 203.0.19.85
+. 2024-12-21 22:19:57.805 Remote version: SSH-2.0-OpenSSH_8.0
+. 2024-12-21 22:19:57.806 Using SSH protocol version 2
+. 2024-12-21 22:19:57.807 Have a known host key of type ssh-ed25519
+. 2024-12-21 22:19:57.812 Enabling strict key exchange semantics
+. 2024-12-21 22:19:57.813 Doing ECDH key exchange with curve Curve25519, using hash SHA-256
+. 2024-12-21 22:19:57.884 Server also has ecdsa-sha2-nistp256/rsa-sha2-512/rsa-sha2-256/ssh-rsa host keys, but we don't know any of them
+. 2024-12-21 22:19:57.887 Host key fingerprint is:
+. 2024-12-21 22:19:57.887 ssh-ed25519 255 SHA256:4VAftRK1D11TnXKVeWDsb/wonDJXW6p5Bt0J5XH4T+s
+< 2024-12-21 22:19:57.888 Script: Authenticating...
+. 2024-12-21 22:19:57.889 Host key matches cached key
+. 2024-12-21 22:19:57.890 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] outbound encryption
+. 2024-12-21 22:19:57.890 Initialised HMAC-SHA-256 outbound MAC algorithm
+. 2024-12-21 22:19:57.890 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] inbound encryption
+. 2024-12-21 22:19:57.891 Initialised HMAC-SHA-256 inbound MAC algorithm
+. 2024-12-21 22:19:57.900 Reading key file "C:\Users\s222552331\.ssh\id_rsa.ppk"
+! 2024-12-21 22:19:57.902 Using username "xp7241".
+< 2024-12-21 22:19:57.903 Script: Using username "xp7241".
+. 2024-12-21 22:19:57.922 Server offered these authentication methods: publickey,gssapi-keyex,gssapi-with-mic,password,hostbased
+. 2024-12-21 22:19:57.922 Offered public key
+. 2024-12-21 22:19:57.974 Offer of public key accepted
+! 2024-12-21 22:19:57.974 Authenticating with public key "xinhao@DESKTOP-JRK700U"
+< 2024-12-21 22:19:57.976 Script: Authenticating with public key "xinhao@DESKTOP-JRK700U".
+. 2024-12-21 22:19:58.189 Sent public key signature
+. 2024-12-21 22:19:58.228 Access granted
+. 2024-12-21 22:19:58.229 Opening main session channel
+. 2024-12-21 22:19:58.609 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 22:19:58.610 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 22:19:58.610 Opened main channel
+. 2024-12-21 22:19:58.622 Started a shell/command
+< 2024-12-21 22:19:58.622 Script: Authenticated.
+. 2024-12-21 22:19:58.622 --------------------------------------------------------------------------
+. 2024-12-21 22:19:58.623 Using SCP protocol.
+. 2024-12-21 22:19:58.623 Doing startup conversation with host.
+< 2024-12-21 22:19:58.624 Script: Starting the session...
+. 2024-12-21 22:19:58.624 Skipping host startup message (if any).
+> 2024-12-21 22:19:58.624 echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 22:19:58.624 ###############################################################################
+< 2024-12-21 22:19:58.626 #                  Welcome to the NCI National Facility!                      #
+< 2024-12-21 22:19:58.626 #      This service is for authorised clients only. It is a criminal          #
+< 2024-12-21 22:19:58.626 #      offence to:                                                            #
+< 2024-12-21 22:19:58.627 #                - Obtain access to data without permission                   #
+< 2024-12-21 22:19:58.627 #                - Damage, delete, alter or insert data without permission    #
+< 2024-12-21 22:19:58.627 #      Use of this system requires acceptance of the Conditions of Use        #
+< 2024-12-21 22:19:58.628 #      published at http://nci.org.au/users/nci-terms-and-conditions-access   #
+< 2024-12-21 22:19:58.628 ###############################################################################
+< 2024-12-21 22:19:58.629 |         gadi.nci.org.au - 260,760 processor InfiniBand x86_64 cluster       | 
+< 2024-12-21 22:19:58.629 ===============================================================================
+< 2024-12-21 22:19:58.630 Nov 30 ANUMAS Applications Close
+< 2024-12-21 22:19:58.630    The ANUMAS Call for Applications closes on 30th November. Applications
+< 2024-12-21 22:19:58.630    from ANU researchers can be made at https://anumas.nci.org.au/
+< 2024-12-21 22:19:58.631 Dec 25 2024 - 1 Jan 2025 End of Year Closure
+< 2024-12-21 22:19:58.631    NCI systems will operate normally across the Christmas-New Year period
+< 2024-12-21 22:19:58.631    (25 December 2024 鈥?1 January 2025). NCI staff will not work during this
+< 2024-12-21 22:19:58.632    period, which is a mandatory ANU staff holiday. Support requests received
+< 2024-12-21 22:19:58.632    during the holiday period will be addressed as soon as possible after
+< 2024-12-21 22:19:58.632    2 January.
+< 2024-12-21 22:19:58.632 ===============================================================================
+< 2024-12-21 22:19:59.089 WinSCP: this is end-of-file:0
+. 2024-12-21 22:19:59.089 Detecting variable containing return code of last command.
+. 2024-12-21 22:19:59.090 Trying "$status".
+> 2024-12-21 22:19:59.090 echo "$status" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 22:19:59.100 WinSCP: this is end-of-file:0
+. 2024-12-21 22:19:59.101 The response is not numerical exit code
+. 2024-12-21 22:19:59.101 Trying "$?".
+> 2024-12-21 22:19:59.102 echo "$?" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 22:19:59.111 0
+< 2024-12-21 22:19:59.112 WinSCP: this is end-of-file:0
+. 2024-12-21 22:19:59.112 Return code variable "$?" selected.
+> 2024-12-21 22:19:59.112 printenv LANG ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.144 WinSCP: this is end-of-file:1
+. 2024-12-21 22:19:59.144 We will not use UTF-8
+. 2024-12-21 22:19:59.146 Clearing all aliases.
+> 2024-12-21 22:19:59.146 unalias "ls" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.156 -/bin/bash: line 5: unalias: ls: not found
+< 2024-12-21 22:19:59.157 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.157 unalias "echo" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.166 -/bin/bash: line 6: unalias: echo: not found
+< 2024-12-21 22:19:59.167 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.167 unalias "pwd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.177 -/bin/bash: line 7: unalias: pwd: not found
+< 2024-12-21 22:19:59.177 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.178 unalias "cd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.188 -/bin/bash: line 8: unalias: cd: not found
+< 2024-12-21 22:19:59.189 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.189 unalias "groups" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.198 -/bin/bash: line 9: unalias: groups: not found
+< 2024-12-21 22:19:59.198 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.199 unalias "scp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.209 -/bin/bash: line 10: unalias: scp: not found
+< 2024-12-21 22:19:59.265 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.266 unalias "rm" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.276 -/bin/bash: line 11: unalias: rm: not found
+< 2024-12-21 22:19:59.326 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.327 unalias "mv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.337 -/bin/bash: line 12: unalias: mv: not found
+< 2024-12-21 22:19:59.338 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.338 unalias "mkdir" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.347 -/bin/bash: line 13: unalias: mkdir: not found
+< 2024-12-21 22:19:59.348 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.348 unalias "chmod" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.358 -/bin/bash: line 14: unalias: chmod: not found
+< 2024-12-21 22:19:59.359 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.359 unalias "chgrp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.368 -/bin/bash: line 15: unalias: chgrp: not found
+< 2024-12-21 22:19:59.369 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.369 unalias "chown" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.379 -/bin/bash: line 16: unalias: chown: not found
+< 2024-12-21 22:19:59.434 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.434 unalias "unset" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.445 -/bin/bash: line 17: unalias: unset: not found
+< 2024-12-21 22:19:59.446 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.446 unalias "unalias" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.455 -/bin/bash: line 18: unalias: unalias: not found
+< 2024-12-21 22:19:59.511 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.511 unalias "ln" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.522 -/bin/bash: line 19: unalias: ln: not found
+< 2024-12-21 22:19:59.523 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.523 unalias "cp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.532 -/bin/bash: line 20: unalias: cp: not found
+< 2024-12-21 22:19:59.587 WinSCP: this is end-of-file:1
+> 2024-12-21 22:19:59.587 unalias "printenv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 22:19:59.597 -/bin/bash: line 21: unalias: printenv: not found
+< 2024-12-21 22:19:59.598 WinSCP: this is end-of-file:1
+. 2024-12-21 22:19:59.598 Clearing national user variables.
+> 2024-12-21 22:19:59.598 unset "LANG" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.608 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.609 unset "LANGUAGE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.618 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.618 unset "LC_CTYPE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.627 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.627 unset "LC_COLLATE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.637 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.638 unset "LC_MONETARY" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.648 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.649 unset "LC_NUMERIC" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.658 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.658 unset "LC_TIME" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.668 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.669 unset "LC_MESSAGES" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.679 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.679 unset "LC_ALL" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.688 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.689 unset "HUMAN_BLOCKS" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.699 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.699 unset "BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.709 WinSCP: this is end-of-file:0
+> 2024-12-21 22:19:59.710 unset "LS_BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.719 WinSCP: this is end-of-file:0
+. 2024-12-21 22:19:59.720 Looking up groups and users.
+> 2024-12-21 22:19:59.720 groups ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.736 jk53 Deakin
+< 2024-12-21 22:19:59.787 WinSCP: this is end-of-file:0
+. 2024-12-21 22:19:59.787 Following groups found:
+. 2024-12-21 22:19:59.788   "jk53" [0]
+. 2024-12-21 22:19:59.788   "Deakin" [0]
+. 2024-12-21 22:19:59.789 Following membership found:
+. 2024-12-21 22:19:59.789   "jk53" [0]
+. 2024-12-21 22:19:59.789   "Deakin" [0]
+. 2024-12-21 22:19:59.790 No users found.
+. 2024-12-21 22:19:59.790 Getting current directory name.
+> 2024-12-21 22:19:59.791 pwd ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 22:19:59.800 /home/582/xp7241
+< 2024-12-21 22:19:59.864 WinSCP: this is end-of-file:0
+. 2024-12-21 22:19:59.865 Startup conversation with host finished.
+< 2024-12-21 22:19:59.865 Script: Session started.
+< 2024-12-21 22:19:59.866 Script: Active session: [1] xp7241@gadi.nci.org.au
+> 2024-12-21 22:19:59.905 Script: option batch on
+< 2024-12-21 22:19:59.906 Script: batch           on        
+> 2024-12-21 22:19:59.916 Script: option confirm off
+< 2024-12-21 22:19:59.916 Script: confirm         off       
+> 2024-12-21 22:19:59.966 Script: exit
+. 2024-12-21 22:19:59.966 Script: Exit code: 0
+. 2024-12-21 22:19:59.966 Closing connection.
+. 2024-12-21 22:19:59.966 Sending special code: 1
+. 2024-12-21 22:19:59.977 Session sent command exit status 0
+. 2024-12-21 22:19:59.977 Main session channel closed
+. 2024-12-21 22:19:59.977 All channels closed
+. 2024-12-21 23:19:56.361 --------------------------------------------------------------------------
+. 2024-12-21 23:19:56.362 WinSCP Version 6.3.6 (Build 15073 2024-11-25) (OS 10.0.22631 – Windows 10 Enterprise)
+. 2024-12-21 23:19:56.362 Configuration: HKCU\Software\Martin Prikryl\WinSCP 2\
+. 2024-12-21 23:19:56.363 Log level: Normal
+. 2024-12-21 23:19:56.363 Local account: DESKTOP-JRK700U\Xinhao
+. 2024-12-21 23:19:56.364 Working directory: Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync
+. 2024-12-21 23:19:56.364 Process ID: 43804
+. 2024-12-21 23:19:56.382 Ancestor processes: WinSCP, python, cmd, ...
+. 2024-12-21 23:19:56.383 Command-line: "C:\Program Files (x86)\WinSCP\WinSCP.exe" /console=6.3.6 /consoleinstance=_37228_818 "/script=Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt" "/log=3_sync_log.txt" 
+. 2024-12-21 23:19:56.383 Time zone: Current: GMT+11, Standard: GMT+10 (AUS Eastern Standard Time), DST: GMT+11 (AUS Eastern Summer Time), DST Start: 2024/10/6, DST End: 2024/4/7
+. 2024-12-21 23:19:56.384 Login time: 2024年12月21日 23:19:56
+. 2024-12-21 23:19:56.384 --------------------------------------------------------------------------
+. 2024-12-21 23:19:56.384 Script: Retrospectively logging previous script records:
+> 2024-12-21 23:19:56.385 Script: open scp://xp7241@gadi.nci.org.au/ -privatekey="C:\Users\s222552331\.ssh\id_rsa.ppk"
+. 2024-12-21 23:19:56.385 --------------------------------------------------------------------------
+. 2024-12-21 23:19:56.385 Session name: xp7241@gadi.nci.org.au (Ad-Hoc site)
+. 2024-12-21 23:19:56.386 Host name: gadi.nci.org.au (Port: 22)
+. 2024-12-21 23:19:56.386 User name: xp7241 (Password: No, Key file: Yes, Passphrase: No)
+. 2024-12-21 23:19:56.387 Tunnel: No
+. 2024-12-21 23:19:56.387 Transfer Protocol: SCP
+. 2024-12-21 23:19:56.388 Ping type: Off, Ping interval: 30 sec; Timeout: 15 sec
+. 2024-12-21 23:19:56.388 Disable Nagle: No
+. 2024-12-21 23:19:56.388 Proxy: None
+. 2024-12-21 23:19:56.388 Send buffer: 262144
+. 2024-12-21 23:19:56.389 Compression: No
+. 2024-12-21 23:19:56.389 Bypass authentication: No
+. 2024-12-21 23:19:56.389 Try agent: Yes; Agent forwarding: No; KI: Yes; GSSAPI: Yes
+. 2024-12-21 23:19:56.390 GSSAPI: KEX: No; Forwarding: No; Libs: gssapi32,sspi,custom; Custom: 
+. 2024-12-21 23:19:56.390 Ciphers: aes,chacha20,aesgcm,3des,WARN,des,blowfish,arcfour; Ssh2DES: No
+. 2024-12-21 23:19:56.390 KEX: ntru-curve25519,ecdh,dh-gex-sha1,dh-group18-sha512,dh-group17-sha512,dh-group16-sha512,dh-group15-sha512,dh-group14-sha1,rsa,WARN,dh-group1-sha1
+. 2024-12-21 23:19:56.391 SSH Bugs: Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto
+. 2024-12-21 23:19:56.391 Simple channel: Yes
+. 2024-12-21 23:19:56.391 Return code variable: Autodetect; Lookup user groups: Auto
+. 2024-12-21 23:19:56.392 Shell: default
+. 2024-12-21 23:19:56.392 EOL: LF, UTF: Auto
+. 2024-12-21 23:19:56.392 Clear aliases: Yes, Unset nat.vars: Yes, Resolve symlinks: Yes; Follow directory symlinks: No
+. 2024-12-21 23:19:56.392 LS: ls -la, Ign LS warn: Yes, Scp1 Comp: No; Exit code 1 is error: No
+. 2024-12-21 23:19:56.393 Local directory: default, Remote directory: home, Update: Yes, Cache: Yes
+. 2024-12-21 23:19:56.393 Cache directory changes: Yes, Permanent: Yes
+. 2024-12-21 23:19:56.393 Recycle bin: Delete to: No, Overwritten to: No, Bin path: 
+. 2024-12-21 23:19:56.394 DST mode: Unix;Timezone offset: 0h 0m
+. 2024-12-21 23:19:56.394 --------------------------------------------------------------------------
+< 2024-12-21 23:19:56.394 Script: Searching for host...
+. 2024-12-21 23:19:56.395 Looking up host "gadi.nci.org.au" for SSH connection
+. 2024-12-21 23:19:56.406 Connecting to 203.0.19.85 port 22
+. 2024-12-21 23:19:56.416 Connected to 203.0.19.85
+< 2024-12-21 23:19:56.417 Script: Connecting to host...
+. 2024-12-21 23:19:56.418 We claim version: SSH-2.0-WinSCP_release_6.3.6
+. 2024-12-21 23:19:56.418 Connected to 203.0.19.85
+. 2024-12-21 23:19:56.449 Remote version: SSH-2.0-OpenSSH_8.0
+. 2024-12-21 23:19:56.449 Using SSH protocol version 2
+. 2024-12-21 23:19:56.450 Have a known host key of type ssh-ed25519
+. 2024-12-21 23:19:56.455 Enabling strict key exchange semantics
+. 2024-12-21 23:19:56.457 Doing ECDH key exchange with curve Curve25519, using hash SHA-256
+. 2024-12-21 23:19:56.535 Server also has ecdsa-sha2-nistp256/rsa-sha2-512/rsa-sha2-256/ssh-rsa host keys, but we don't know any of them
+. 2024-12-21 23:19:56.536 Host key fingerprint is:
+. 2024-12-21 23:19:56.537 ssh-ed25519 255 SHA256:4VAftRK1D11TnXKVeWDsb/wonDJXW6p5Bt0J5XH4T+s
+< 2024-12-21 23:19:56.540 Script: Authenticating...
+. 2024-12-21 23:19:56.542 Host key matches cached key
+. 2024-12-21 23:19:56.543 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] outbound encryption
+. 2024-12-21 23:19:56.543 Initialised HMAC-SHA-256 outbound MAC algorithm
+. 2024-12-21 23:19:56.544 Initialised AES-256 SDCTR (AES-NI accelerated) [aes256-ctr] inbound encryption
+. 2024-12-21 23:19:56.544 Initialised HMAC-SHA-256 inbound MAC algorithm
+. 2024-12-21 23:19:56.553 Reading key file "C:\Users\s222552331\.ssh\id_rsa.ppk"
+! 2024-12-21 23:19:56.557 Using username "xp7241".
+< 2024-12-21 23:19:56.558 Script: Using username "xp7241".
+. 2024-12-21 23:19:56.575 Server offered these authentication methods: publickey,gssapi-keyex,gssapi-with-mic,password,hostbased
+. 2024-12-21 23:19:56.575 Offered public key
+. 2024-12-21 23:19:56.610 Offer of public key accepted
+! 2024-12-21 23:19:56.611 Authenticating with public key "xinhao@DESKTOP-JRK700U"
+< 2024-12-21 23:19:56.612 Script: Authenticating with public key "xinhao@DESKTOP-JRK700U".
+. 2024-12-21 23:19:56.840 Sent public key signature
+. 2024-12-21 23:19:56.877 Access granted
+. 2024-12-21 23:19:56.879 Opening main session channel
+. 2024-12-21 23:19:57.298 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 23:19:57.299 Remote debug message: /home/582/xp7241/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+. 2024-12-21 23:19:57.300 Opened main channel
+. 2024-12-21 23:19:57.312 Started a shell/command
+< 2024-12-21 23:19:57.314 Script: Authenticated.
+. 2024-12-21 23:19:57.314 --------------------------------------------------------------------------
+. 2024-12-21 23:19:57.315 Using SCP protocol.
+. 2024-12-21 23:19:57.315 Doing startup conversation with host.
+< 2024-12-21 23:19:57.316 Script: Starting the session...
+. 2024-12-21 23:19:57.316 Skipping host startup message (if any).
+> 2024-12-21 23:19:57.317 echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 23:19:57.317 ###############################################################################
+< 2024-12-21 23:19:57.317 #                  Welcome to the NCI National Facility!                      #
+< 2024-12-21 23:19:57.318 #      This service is for authorised clients only. It is a criminal          #
+< 2024-12-21 23:19:57.318 #      offence to:                                                            #
+< 2024-12-21 23:19:57.319 #                - Obtain access to data without permission                   #
+< 2024-12-21 23:19:57.319 #                - Damage, delete, alter or insert data without permission    #
+< 2024-12-21 23:19:57.320 #      Use of this system requires acceptance of the Conditions of Use        #
+< 2024-12-21 23:19:57.320 #      published at http://nci.org.au/users/nci-terms-and-conditions-access   #
+< 2024-12-21 23:19:57.321 ###############################################################################
+< 2024-12-21 23:19:57.321 |         gadi.nci.org.au - 260,760 processor InfiniBand x86_64 cluster       | 
+< 2024-12-21 23:19:57.322 ===============================================================================
+< 2024-12-21 23:19:57.322 Nov 30 ANUMAS Applications Close
+< 2024-12-21 23:19:57.322    The ANUMAS Call for Applications closes on 30th November. Applications
+< 2024-12-21 23:19:57.323    from ANU researchers can be made at https://anumas.nci.org.au/
+< 2024-12-21 23:19:57.323 Dec 25 2024 - 1 Jan 2025 End of Year Closure
+< 2024-12-21 23:19:57.324    NCI systems will operate normally across the Christmas-New Year period
+< 2024-12-21 23:19:57.324    (25 December 2024 鈥?1 January 2025). NCI staff will not work during this
+< 2024-12-21 23:19:57.324    period, which is a mandatory ANU staff holiday. Support requests received
+< 2024-12-21 23:19:57.325    during the holiday period will be addressed as soon as possible after
+< 2024-12-21 23:19:57.325    2 January.
+< 2024-12-21 23:19:57.325 ===============================================================================
+< 2024-12-21 23:19:57.792 WinSCP: this is end-of-file:0
+. 2024-12-21 23:19:57.793 Detecting variable containing return code of last command.
+. 2024-12-21 23:19:57.793 Trying "$status".
+> 2024-12-21 23:19:57.793 echo "$status" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 23:19:57.803 WinSCP: this is end-of-file:0
+. 2024-12-21 23:19:57.803 The response is not numerical exit code
+. 2024-12-21 23:19:57.804 Trying "$?".
+> 2024-12-21 23:19:57.804 echo "$?" ; echo "WinSCP: this is end-of-file:0"
+< 2024-12-21 23:19:57.814 0
+< 2024-12-21 23:19:57.815 WinSCP: this is end-of-file:0
+. 2024-12-21 23:19:57.815 Return code variable "$?" selected.
+> 2024-12-21 23:19:57.815 printenv LANG ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:57.827 WinSCP: this is end-of-file:1
+. 2024-12-21 23:19:57.828 We will not use UTF-8
+. 2024-12-21 23:19:57.829 Clearing all aliases.
+> 2024-12-21 23:19:57.834 unalias "ls" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.844 -/bin/bash: line 5: unalias: ls: not found
+< 2024-12-21 23:19:57.844 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.845 unalias "echo" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.854 -/bin/bash: line 6: unalias: echo: not found
+< 2024-12-21 23:19:57.854 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.855 unalias "pwd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.865 -/bin/bash: line 7: unalias: pwd: not found
+< 2024-12-21 23:19:57.865 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.865 unalias "cd" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.874 -/bin/bash: line 8: unalias: cd: not found
+< 2024-12-21 23:19:57.875 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.875 unalias "groups" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.885 -/bin/bash: line 9: unalias: groups: not found
+< 2024-12-21 23:19:57.885 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.885 unalias "scp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.895 -/bin/bash: line 10: unalias: scp: not found
+< 2024-12-21 23:19:57.896 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.896 unalias "rm" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.905 -/bin/bash: line 11: unalias: rm: not found
+< 2024-12-21 23:19:57.905 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.906 unalias "mv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.916 -/bin/bash: line 12: unalias: mv: not found
+< 2024-12-21 23:19:57.916 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.916 unalias "mkdir" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.926 -/bin/bash: line 13: unalias: mkdir: not found
+< 2024-12-21 23:19:57.927 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.927 unalias "chmod" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.936 -/bin/bash: line 14: unalias: chmod: not found
+< 2024-12-21 23:19:57.936 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.937 unalias "chgrp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.947 -/bin/bash: line 15: unalias: chgrp: not found
+< 2024-12-21 23:19:57.947 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.947 unalias "chown" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.957 -/bin/bash: line 16: unalias: chown: not found
+< 2024-12-21 23:19:57.957 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.958 unalias "unset" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.971 -/bin/bash: line 17: unalias: unset: not found
+< 2024-12-21 23:19:57.974 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.975 unalias "unalias" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.985 -/bin/bash: line 18: unalias: unalias: not found
+< 2024-12-21 23:19:57.987 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:57.987 unalias "ln" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:57.999 -/bin/bash: line 19: unalias: ln: not found
+< 2024-12-21 23:19:58.000 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:58.000 unalias "cp" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:58.011 -/bin/bash: line 20: unalias: cp: not found
+< 2024-12-21 23:19:58.011 WinSCP: this is end-of-file:1
+> 2024-12-21 23:19:58.012 unalias "printenv" ; echo "WinSCP: this is end-of-file:$?"
+! 2024-12-21 23:19:58.022 -/bin/bash: line 21: unalias: printenv: not found
+< 2024-12-21 23:19:58.023 WinSCP: this is end-of-file:1
+. 2024-12-21 23:19:58.023 Clearing national user variables.
+> 2024-12-21 23:19:58.024 unset "LANG" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.034 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.034 unset "LANGUAGE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.044 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.044 unset "LC_CTYPE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.054 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.055 unset "LC_COLLATE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.064 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.065 unset "LC_MONETARY" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.075 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.075 unset "LC_NUMERIC" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.085 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.086 unset "LC_TIME" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.096 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.096 unset "LC_MESSAGES" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.107 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.107 unset "LC_ALL" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.116 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.117 unset "HUMAN_BLOCKS" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.127 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.127 unset "BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.137 WinSCP: this is end-of-file:0
+> 2024-12-21 23:19:58.137 unset "LS_BLOCK_SIZE" ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.147 WinSCP: this is end-of-file:0
+. 2024-12-21 23:19:58.147 Looking up groups and users.
+> 2024-12-21 23:19:58.148 groups ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.164 jk53 Deakin
+< 2024-12-21 23:19:58.216 WinSCP: this is end-of-file:0
+. 2024-12-21 23:19:58.217 Following groups found:
+. 2024-12-21 23:19:58.217   "jk53" [0]
+. 2024-12-21 23:19:58.218   "Deakin" [0]
+. 2024-12-21 23:19:58.218 Following membership found:
+. 2024-12-21 23:19:58.218   "jk53" [0]
+. 2024-12-21 23:19:58.219   "Deakin" [0]
+. 2024-12-21 23:19:58.219 No users found.
+. 2024-12-21 23:19:58.220 Getting current directory name.
+> 2024-12-21 23:19:58.220 pwd ; echo "WinSCP: this is end-of-file:$?"
+< 2024-12-21 23:19:58.230 /home/582/xp7241
+< 2024-12-21 23:19:58.293 WinSCP: this is end-of-file:0
+. 2024-12-21 23:19:58.294 Startup conversation with host finished.
+< 2024-12-21 23:19:58.295 Script: Session started.
+< 2024-12-21 23:19:58.295 Script: Active session: [1] xp7241@gadi.nci.org.au
+> 2024-12-21 23:19:58.296 Script: option batch on
+< 2024-12-21 23:19:58.297 Script: batch           on        
+> 2024-12-21 23:19:58.298 Script: option confirm off
+< 2024-12-21 23:19:58.298 Script: confirm         off       
+> 2024-12-21 23:19:58.299 Script: exit
+. 2024-12-21 23:19:58.300 Script: Exit code: 0
+. 2024-12-21 23:19:58.300 Closing connection.
+. 2024-12-21 23:19:58.300 Sending special code: 1
+. 2024-12-21 23:19:58.311 Session sent command exit status 0
+. 2024-12-21 23:19:58.311 Main session channel closed
+. 2024-12-21 23:19:58.312 All channels closed
