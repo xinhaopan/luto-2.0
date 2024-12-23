@@ -5,19 +5,20 @@ from luto.tools.create_task_runs.helpers import create_grid_search_template, cre
 
 grid_search = {
     ###############################################################
-    # Computational settings for submitting the job to the cluster
+    # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['120GB'],
-    'NCPUS':[30],
-    'TIME': ['20:00:00'],
+    'MEM': ['400GB'],
+    'NCPUS':[100],
+    'TIME': ['30:00:00'],
+    'QUEUE': ['normalsr'],
     
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
+    'MODE': ['snapshot'],                # 'snapshot' or 'timeseries'
     'RESFACTOR': [1],
     'WRITE_THREADS': [10],
-    'WRITE_OUTPUT_GEOTIFFS': [False],
+    'WRITE_OUTPUT_GEOTIFFS': [True],
     # 'NON_AG_LAND_USES_REVERSIBLE' : ['''{
     #     'Environmental Plantings': True,
     #     'Riparian Plantings': True,
@@ -31,8 +32,8 @@ grid_search = {
     ###############################################################
     # Model run settings
     ###############################################################
-    'GHG_CONSTRAINT_TYPE': ['soft'],       # 'hard' or 'soft'
-    'BIODIVERSITY_LIMITS': ['on'],
+    'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
+    'BIODIVERSITY_LIMITS': ['on'],           # 'on' or 'off'
 
     ###############################################################
     # Scenario settings for the model run

@@ -4,9 +4,9 @@ from tools.helpers import create_settings_template, generate_csv,create_grid_sea
 
 grid_search = {
     # Computational settings, which are not relevant to LUTO itself
-    'MEM': ['92'],
-    'CPU_PER_TASK': [23],
-    'TIME': ['70:00:00'],
+    'MEM': ['252'],
+    'CPU_PER_TASK': [43],
+    'TIME': ['20:00:00'],
     'MODE': [
         'snapshot',
         # 'timeseries'
@@ -30,7 +30,7 @@ grid_search = {
 template_df = create_settings_template('Custom_runs')
 # generate_csv(output_csv="Custom_runs/setting_template_windows_test1.csv")
 
-output_file = os.path.join("Custom_runs", "setting_template_windows_0.csv")
+output_file = os.path.join("Custom_runs", "setting_template_linux_0.csv")
 suffix='RESFACTOR'
 create_grid_search_template(template_df, grid_search,output_file,suffix)
 print(f"saved to {output_file}")
