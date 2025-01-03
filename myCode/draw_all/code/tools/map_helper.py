@@ -11,6 +11,7 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from PIL import Image
 from filelock import FileLock
+from collections import defaultdict
 
 # 空间数据处理库
 import rasterio
@@ -28,6 +29,8 @@ from shapely.geometry import box
 # 投影和坐标转换库
 import pyproj
 from pyproj import CRS
+
+from tools.parameters import *
 
 
 def show_image(image_path):
@@ -670,10 +673,6 @@ def add_north_arrow_to_png(png_path, output_png, arrow_image_path, location=(0.9
 
     # print(f"Image with north arrow saved to {output_png}")
 
-from PIL import Image
-from collections import defaultdict
-import os
-from tools.parameters import *
 
 def concatenate_images(image_files, output_image, rows=3, cols=3):
     """
