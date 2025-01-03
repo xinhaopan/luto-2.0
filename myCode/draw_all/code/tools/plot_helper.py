@@ -304,6 +304,55 @@ def plot_stacked_bar(ax, merged_dict, input_name, legend_colors, font_size=10,
 
     return bar_list
 
+
+def plot_line_chart(ax, merged_dict, input_name, legend_colors, font_size=10,
+                    x_range=(2010, 2050), y_range=(-600, 100), x_ticks=None, y_ticks=None,
+                    show_legend=False):
+    """
+    绘制点线图，每列数据对应一条线。
+
+    Parameters:
+        ax: matplotlib.axes.Axes, 绘图的坐标轴。
+        merged_dict: dict, 包含多个 DataFrame 的字典。
+        input_name: str, 要绘制的 DataFrame 的键名。
+        legend_colors: dict, 每条线的颜色，键为列名，值为颜色。
+        font_size: int, 字体大小。
+        x_range: tuple, x 轴范围。
+        y_range: tuple, y 轴范围。
+        x_ticks: list, 自定义的 x 轴刻度。
+        y_ticks: list, 自定义的 y 轴刻度。
+        show_legend: bool, 是否显示图例。
+    """
+    merged_df = merged_dict[input_name]
+    merged_df.index = merged_df.index.astype(int)
+
+    # Extract categories and color_list from legend_colors
+    categories = list(legend_colors.keys())
+    color_list = list(legend_colors.values())
+
+    # Prepare data
+    years = merged_df.index
+
+    # Plot each line
+    for i, category in enumerate(categories):
+        ax.plot(years, merged_df[category], label=category, color=color_list[i], marker='o')
+
+    # Set tick direction inwards
+    ax.tick_params(axis='both', which='both', direction='in', labelsize=font_size)
+
+    # Set x-axis limits and ticks
+    ax.set_xlim(x_range[0], x_range[1])
+
+    # Set y-axis limits and ticks
+    ax.set_ylim(y_range[0], y_range[1])
+
+    # Optionally show legend
+    if show_legend:
+        ax.legend(fontsize=font_size)
+
+    return ax
+
+
 def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3):
     """
     计算累积柱状图的 Y 轴范围和刻度
