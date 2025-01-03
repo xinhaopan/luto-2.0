@@ -169,7 +169,7 @@ def submit_task_linux(task_dir, config):
     walltime = config.get("TIME", "05:00:00")
     ncpus = config.get("NCPUS", "10")
     mem = config.get("MEM", "40") + "GB"
-    queue = config.get("queue", "normal")
+    queue = config.get("QUEUE", "normal")
     script_content = config.get("script_content",
                                 f"/home/582/xp7241/apps/miniforge3/envs/luto/bin/python 0_runs_linux.py")
 
@@ -294,7 +294,7 @@ def update_settings(settings_dict: dict, col: str):
 
         # Update the threads based on the number of cpus
         settings_dict['THREADS'] = settings_dict['NCPUS']
-        settings_dict['WRITE_THREADS'] = settings_dict['NCPUS']
+        # settings_dict['WRITE_THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
 
