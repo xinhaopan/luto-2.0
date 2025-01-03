@@ -1,17 +1,17 @@
 INPUT_DIR = '../../../input'
 
-time = '20241218'
+time = '20250101'
 middle = ''
-suffix = '10'
+suffix = '3'
 senerios = [
     'Run_7_GHG_1_8C_67_BIO_0',
     'Run_4_GHG_1_5C_50_BIO_0',
     'Run_1_GHG_1_5C_67_BIO_0',
-    'Run_5_GHG_1_5C_50_BIO_3',
     'Run_8_GHG_1_8C_67_BIO_3',
+    'Run_5_GHG_1_5C_50_BIO_3',
     'Run_2_GHG_1_5C_67_BIO_3',
-    'Run_6_GHG_1_5C_50_BIO_5',
     'Run_9_GHG_1_8C_67_BIO_5',
+    'Run_6_GHG_1_5C_50_BIO_5',
     'Run_3_GHG_1_5C_67_BIO_5',
 ]
 
