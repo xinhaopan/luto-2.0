@@ -3,16 +3,25 @@ import numpy as np
 from tools.helpers import create_settings_template, generate_csv,create_grid_search_template
 
 grid_search = {
-    # Computational settings, which are not relevant to LUTO itself
-    'MEM': ['252'],
-    'CPU_PER_TASK': [43],
+    ###############################################################
+    # Task run settings for submitting the job to the cluster
+    ###############################################################
+    'MEM': ['300'],
+    'NCPUS': [75],
     'TIME': ['20:00:00'],
-    'MODE': [
-        'snapshot',
-        # 'timeseries'
-    ],
-    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'QUEUE': ['normalsr'],
+
+    ###############################################################
+    # Working settings for the model run
+    ###############################################################
+    'MODE': ['snapshot'],                # 'snapshot' or 'timeseries'
     'RESFACTOR': [1],
+    'WRITE_THREADS': [10],
+    'WRITE_OUTPUT_GEOTIFFS': [True],
+    ###############################################################
+    # Scenario settings for the model run
+    ###############################################################
+    'SOLVE_ECONOMY_WEIGHT': [0.25],
     'GHG_CONSTRAINT_TYPE': ['soft'],
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis',
