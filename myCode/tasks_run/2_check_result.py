@@ -200,7 +200,7 @@ def check_csv(csv_path):
             delete_except(directory, last_part)
 
 
-csv_path = 'Custom_runs/setting_template_windows_0.csv'
+csv_path = 'Custom_runs/setting_template_linux_0.csv'
 check_csv(csv_path)
 
 
