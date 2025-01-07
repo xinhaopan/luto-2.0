@@ -12,7 +12,7 @@ grid_search = {
         # 'timeseries'
     ],
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [3],
+    'RESFACTOR': [1],
     'GHG_CONSTRAINT_TYPE': ['soft'],
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis',
