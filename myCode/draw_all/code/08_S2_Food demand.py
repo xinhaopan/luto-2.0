@@ -18,12 +18,19 @@ sys.path.append(os.path.abspath('../../../luto'))
 # 导入 settings.py
 import settings
 
-font_size = 15
+font_size = 25
+
+Objective_demand_dict = get_dict_sum_data(input_files, "quantity_comparison", 'Demand (tonnes, KL)', 'Objectives')
+Product_demand_dict = get_dict_sum_data(input_files, "quantity_comparison", 'Prod_targ_year (tonnes, KL)', 'Production')
+point_dict = concatenate_dicts_by_year([Objective_demand_dict, Product_demand_dict])
+point_colors = ['red','black']
+
 csv_name, value_column_name, filter_column_name = 'quantity_comparison', 'Prod_targ_year (tonnes, KL)', 'Commodity'
-area_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
-area_ag_group_dict,legend_colors = get_colors(area_dict, 'tools/land use colors.xlsx', sheet_name='food')
+demand_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
+demand_ag_group_dict,legend_colors = get_colors(demand_dict, 'tools/land use colors.xlsx', sheet_name='food')
 output_png = '../output/08_S2_food.png'
-plot_Combination_figures(area_ag_group_dict, output_png, input_files, plot_stacked_bar, legend_colors,
-                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 200),
+plot_Combination_figures(demand_ag_group_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,point_dict=point_dict,point_colors=point_colors,
+                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2015, 2050), y_range=(0, 200),
                              x_ticks=10, y_ticks=50,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=7)
+
