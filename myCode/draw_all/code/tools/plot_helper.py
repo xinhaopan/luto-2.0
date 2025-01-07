@@ -119,8 +119,8 @@ def process_single_df(df, mapping_df):
     return filtered_df, legend_colors
 
 
-def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, legend_colors,point_dict=None,
-                             point_data=None, n_rows=3, n_cols=3, font_size=10, x_range=(2010, 2050), y_range=(-600, 100),
+def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, legend_colors,point_dict=None,point_colors=None,
+                            n_rows=3, n_cols=3, font_size=10, x_range=(2010, 2050), y_range=(-600, 100),
                              x_ticks=5, y_ticks=100, legend_position=(0.5, -0.03), show_legend='last', legend_n_rows=1):
     total_plots = len(input_names)
     fig_width = 12
@@ -179,9 +179,9 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
 
-            if point_data is not None:
-                bar_list, line = plot_func(ax, merged_dict=merged_dict, input_name=input_names[i], legend_colors=legend_colors,point_dict=point_dict,
-                                       point_data=point_data, font_size=font_size, x_range=x_range, y_range=y_range,
+            if point_dict is not None:
+                bar_list, lines = plot_func(ax, merged_dict=merged_dict, input_name=input_names[i], legend_colors=legend_colors,point_dict=point_dict,point_colors=point_colors,
+                                        font_size=font_size, x_range=x_range, y_range=y_range,
                                        x_ticks=x_ticks, y_ticks=y_ticks)
             else:
                 bar_list = plot_func(ax, merged_dict=merged_dict, input_name=input_names[i],  legend_colors=legend_colors,
@@ -190,14 +190,14 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
             # 只在最后一个图获取图例句柄和标签
             if i == total_plots - 1:
                 handles, labels_legend = ax.get_legend_handles_labels()
-                if point_data is not None:
-                    all_handles.extend(handles[:len(legend_colors)+1])
-                    all_labels.extend(labels_legend[:len(legend_colors)+1])
+                if point_dict is not None:
+                    all_handles.extend(handles[:len(legend_colors)+len(point_colors)])
+                    all_labels.extend(labels_legend[:len(legend_colors)+len(point_colors)])
                 else:
                     all_handles.extend(handles[:len(legend_colors)])
                     all_labels.extend(labels_legend[:len(legend_colors)])
 
-    ncol = math.ceil(len(legend_colors) / legend_n_rows)
+    ncol = math.ceil(len(all_labels) / legend_n_rows)
     output_file = output_png.replace(".png", "_legend.png")
     save_legend_as_image(all_handles, all_labels, output_file, ncol, font_size=10)
     # 调整布局
@@ -220,14 +220,35 @@ def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(
     plt.close(fig)  # 关闭图，避免显示在主图上
 
 
-def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors,point_dict=None, point_data='Net emissions',
-                              font_size=10, x_range=(2010, 2050), y_range=(-600, 100), x_ticks=None, y_ticks=None,
-                              show_legend=False):
+def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_dict=None, point_colors=None,
+                              font_size=10, x_range=(2010, 2050), y_range=(-600, 100),
+                              x_ticks=None, y_ticks=None, show_legend=False):
+    """
+    绘制堆积柱状图和多条点线图。
+
+    Parameters:
+        ax: matplotlib Axes 对象。
+        merged_dict (dict): 包含堆积柱状图数据的字典。
+        input_name (str): 数据键名。
+        legend_colors (dict): 包含类别和颜色的字典。
+        point_dict (dict): 包含点线图数据的字典。
+        point_colors (list): 每条点线图的颜色列表。
+        font_size (int): 字体大小。
+        x_range (tuple): X 轴范围。
+        y_range (tuple): Y 轴范围。
+        x_ticks (list): X 轴刻度。
+        y_ticks (list): Y 轴刻度。
+        show_legend (bool): 是否显示图例。
+
+    Returns:
+        bar_list, line_list: 堆积柱状图和点线图的绘图对象。
+    """
     merged_df = merged_dict[input_name]
     merged_df.index = merged_df.index.astype(int)
 
-    point_df = point_dict[input_name]
-    point_df.index = point_df.index.astype(int)
+    if point_dict is not None:
+        point_df = point_dict[input_name]
+        point_df.index = point_df.index.astype(int)
 
     # 从 legend_colors 中获取 categories 和 color_list
     categories = list(legend_colors.keys())
@@ -240,7 +261,7 @@ def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors,point_d
     # 绘制正数的堆积柱状图
     pos_data = np.maximum(data, 0)
     bar_list = []
-    bar_list.append(ax.bar(years, pos_data[0], label=categories[0], color=color_list[0], width=COLUMN_WIDTH ))
+    bar_list.append(ax.bar(years, pos_data[0], label=categories[0], color=color_list[0], width=COLUMN_WIDTH))
     for i in range(1, len(categories)):
         bar_list.append(
             ax.bar(years, pos_data[i], bottom=pos_data[:i].sum(axis=0), label=categories[i], color=color_list[i],
@@ -253,13 +274,28 @@ def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors,point_d
             ax.bar(years, neg_data[i], bottom=neg_data[:i].sum(axis=0), label=categories[i], color=color_list[i],
                    width=COLUMN_WIDTH))
 
-    # 绘制 Net emissions 的点线图
-    line = ax.plot(years, point_df[point_data], color='red', marker='o', linewidth=1.5, label=point_data, markersize=3)
+    # 绘制点线图
+    line_list = []
+    if point_dict is not None:
+        for idx, column in enumerate(point_df.columns):
+            color = point_colors[idx] if point_colors and idx < len(point_colors) else 'black'  # 指定颜色或默认黑色
+            line = ax.plot(years, point_df[column], marker='o', linewidth=1.5, label=column, markersize=3, color=color)
+            line_list.append(line)
 
-    # 设置 x 和 y 轴范围
-    ax.set_ylim(y_range[0], y_range[1]+1)
+    # Set x-axis limits and ticks
+    ax.set_xlim(x_range[0] - X_OFFSET, x_range[1] + X_OFFSET)
+
+    # Set y-axis limits and ticks
+    ax.set_ylim(y_range[0], y_range[1])
     ax.tick_params(axis='both', direction='in')
-    return bar_list, line
+
+    # 设置图例
+    if show_legend:
+        ax.legend(fontsize=font_size)
+
+    return bar_list, line_list
+
+
 
 def plot_stacked_bar(ax, merged_dict, input_name, legend_colors, font_size=10,
                      x_range=(2010, 2050), y_range=(-600, 100), x_ticks=None, y_ticks=None,

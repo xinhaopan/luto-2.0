@@ -20,6 +20,36 @@ def get_path(path_name):
         print(f"Current directory content for {output_path}: {os.listdir(output_path) if os.path.exists(output_path) else 'Directory not found'}")
 
 
+def rename_and_filter_columns(data_dict, columns_to_keep, new_column_names=None):
+    """
+    从字典中的每个 DataFrame 中保留指定列，并可选择性地将列名重命名。
+
+    Parameters:
+        data_dict (dict): 包含 DataFrame 的字典。
+        columns_to_keep (list): 需要保留的列名列表。
+        new_column_names (list, optional): 重命名后的列名列表。如果未提供，则不修改列名。
+
+    Returns:
+        dict: 处理后的 DataFrame 的新字典。
+    """
+    if new_column_names and len(columns_to_keep) != len(new_column_names):
+        raise ValueError("The lengths of `columns_to_keep` and `new_column_names` must match.")
+
+    new_data_dict = {}
+    for key, df in data_dict.items():
+        # 筛选指定列
+        filtered_df = df[columns_to_keep]
+
+        # 重命名列（如果提供新名字）
+        if new_column_names:
+            filtered_df.columns = new_column_names
+
+        # 存入新字典
+        new_data_dict[key] = filtered_df
+
+    return new_data_dict
+
+
 def get_dict_data(input_files, csv_name, value_column_name, filter_column_name):
     """
     从多个文件中读取数据并按指定列分组求和。
@@ -86,15 +116,20 @@ def get_dict_sum_data(input_files, csv_name, value_column_name, give_column_name
 
     # 遍历每个 input_file 进行处理
     for input_name in input_files:
-        # 获取输入文件的基本路径
+        # print(f"Processing {input_name}...")
         base_path = get_path(input_name)
+        file_list = os.listdir(base_path)  # 确保从当前路径获取文件列表
 
-        # 创建以年份为索引的 DataFrame
-        temp_results = pd.DataFrame(index=range(2010, 2051))
+        # 提取包含年份的文件名中的数字
+        out_numbers = sorted([int(re.search(r"out_(\d+)", filename).group(1)) for filename in file_list if
+                              "out_" in filename and re.search(r"out_(\d+)", filename)])
+
+        # 创建以提取的年份为索引的 DataFrame
+        temp_results = pd.DataFrame(index=out_numbers)
         temp_results.index.name = 'Year'
 
-        # 遍历2010到2050年的文件
-        for year in range(2010, 2051):
+        # 遍历提取的年份
+        for year in out_numbers:
             file_path = os.path.join(base_path, f'out_{year}', f'{csv_name}_{year}.csv')
 
             # 如果文件存在，进行处理
@@ -123,11 +158,11 @@ def get_dict_from_json(input_files, json_name):
         base_path = get_path(input_name)
 
         # 创建以年份为索引的 DataFrame
-        file_path = os.path.join(base_path, 'DATA_REPORT','data', f'{json_name}.json')
+        file_path = os.path.join(base_path, 'DATA_REPORT', 'data', f'{json_name}.json')
         df = pd.read_json(file_path)
         df_expanded = df.explode('data')
-        df_expanded[['year', 'value']] = pd.DataFrame(df_expanded['data'].tolist(), index=df_expanded.index)
-        df_transformed = df_expanded.pivot(index='year', columns='name', values='value')
+        df_expanded[['Year', 'value']] = pd.DataFrame(df_expanded['data'].tolist(), index=df_expanded.index)
+        df_transformed = df_expanded.pivot(index='Year', columns='name', values='value')
 
         # Display the transformed DataFrame
         data_dict[input_name] = df_transformed / 1e6
@@ -223,9 +258,78 @@ def concatenate_dicts_by_year(data_dicts):
         concatenated_df = pd.concat(dfs, axis=1)
 
         # 将拼接结果存入新字典
-        concatenated_dict[key] = concatenated_df.reset_index()
+        concatenated_dict[key] = concatenated_df
 
     return concatenated_dict
+
+
+# 提取列信息并重新排序
+def parse_column_name(col):
+    try:
+        temp = col.split('_GHG_')[1].split('_BIO_')[0]  # 提取温度目标
+        bio = int(col.split('_BIO_')[1].split('_')[0]) * 10  # 提取 BIO 百分比
+        return f"{temp}", f"{bio}%"  # 返回多级索引 (温度目标, BIO 百分比)
+    except IndexError:
+        raise ValueError(f"Invalid column format: {col}")
+
+
+def sort_columns_by_priority(df):
+    """
+    按照温度目标和 BIO 百分比对 DataFrame 的列进行排序。
+
+    Parameters:
+        df (pd.DataFrame): 输入的 DataFrame，列名应为解析后格式的元组。
+
+    Returns:
+        pd.DataFrame: 排列好列名的 DataFrame。
+    """
+    # 解析列名
+    parsed_columns = [parse_column_name(col) for col in df.columns]
+    priority = {'1_8C_67': 0, '1_5C_50': 1, '1_5C_67': 2}
+
+    # 对列按温度目标和百分比排序
+    sorted_columns = sorted(parsed_columns, key=lambda x: (priority[x[0]], int(x[1].strip('%'))))
+
+    # 根据排序结果重新排列列
+    sorted_indices = [df.columns[list(parsed_columns).index(col)] for col in sorted_columns]
+    sorted_df = df[sorted_indices]
+
+    # 设置多级索引
+    sorted_df.columns = pd.MultiIndex.from_tuples(sorted_columns, names=["GHG Target", "BIO Percentage"])
+
+    return sorted_df
+
+def merge_transposed_dict(data_dict):
+    """
+    将字典中的 DataFrame 转置，提取 2050 列，并合并为一个新的 DataFrame，用原来的字典键作为列名。
+
+    Parameters:
+        data_dict (dict): 包含 DataFrame 的字典。
+
+    Returns:
+        pd.DataFrame: 合并后的 DataFrame，带多级列索引。
+    """
+    # 提取 2050 列并转置
+    transposed_dfs = {}
+    missing_keys = []
+    for key, df in data_dict.items():
+        if 2050 in df.index:
+            transposed_dfs[key] = df.loc[2050].T
+        else:
+            missing_keys.append(key)
+
+    if missing_keys:
+        print(f"Warning: The following keys are missing 2050: {missing_keys}")
+
+    # 合并所有 DataFrame
+    merged_df = pd.concat(transposed_dfs.values(), axis=1)
+    merged_df.columns = transposed_dfs.keys()  # 设置列名为字典的键
+
+    # 调用排序函数
+    sorted_df = sort_columns_by_priority(merged_df)
+
+    return sorted_df
+
 
 
 
