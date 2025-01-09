@@ -74,16 +74,17 @@ def calculate_total_cost(df):
 
     # Remove unnamed columns if present
     df = df.loc[:, ~df.columns.str.startswith('Unnamed')]
-    df.index = df['Name']
+    if 'Name' in df.columns:
+        df = df.set_index('Name')
     # Extract relevant rows for CPU, MEM, and TIME
     cpu_row = df[df.index == 'NCPUS']
     mem_row = df[df.index == 'MEM']
     time_row = df[df.index == 'TIME']
 
     # Extract values and convert where needed
-    cpu_values = cpu_row.iloc[0, 1:].astype(float)  # CPU per task
-    mem_values = mem_row.iloc[0, 1:].astype(float)  # Memory in GB
-    time_values = time_row.iloc[0, 1:].apply(convert_time_to_hours).astype(float)  # Time in hours
+    cpu_values = cpu_row.iloc[0, 0:].astype(float)  # CPU per task
+    mem_values = mem_row.iloc[0, 0:].astype(float)  # Memory in GB
+    time_values = time_row.iloc[0, 0:].apply(convert_time_to_hours).astype(float)  # Time in hours
 
     # Calculate memory proportion (memory-based CPUs)
     memory_cpu_values = np.ceil(mem_values / 4)   # 每核 4GB 内存，向上取整
