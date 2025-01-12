@@ -71,6 +71,7 @@ def execute_script_in_directory(script_name, working_directory):
         print(f"Failed '{working_directory}': {e}")
 
 def process_file_dir(file_dir, script_to_run):
+    copy_folders(file_dir)
     """
     处理单个 file_dir，包括检查 PKL 文件和执行脚本
     :param file_dir: 要处理的文件夹路径
@@ -103,8 +104,37 @@ def process_file_dir(file_dir, script_to_run):
     except Exception as e:
         print(f"Error processing file_dir '{file_dir}': {e}")
 
+def copy_folder_custom(source, destination, ignore_dirs=None):
+    ignore_dirs = set() if ignore_dirs is None else set(ignore_dirs)
+
+    jobs = []
+    os.makedirs(destination, exist_ok=True)
+    for item in os.listdir(source):
+
+        if item in ignore_dirs: continue
+
+        s = os.path.join(source, item)
+        d = os.path.join(destination, item)
+        jobs += copy_folder_custom(s, d) if os.path.isdir(s) else [(s, d)]
+
+    return jobs
+def copy_folders(col,worker=3):
+    SOURCE_DIR=os.getcwd()
+    # Copy codes to the each custom run folder, excluding {EXCLUDE_DIRS} directories
+    EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code', 'myCode','luto/settings.py']
+    from_to_files = copy_folder_custom(SOURCE_DIR, f'{SOURCE_DIR}/output/{col}', EXCLUDE_DIRS)
+    for s, d in from_to_files:
+        if not os.path.exists(s):
+            print(f"Source file not found: {s}")
+        if not os.path.exists(os.path.dirname(d)):
+            print(f"Destination directory does not exist: {os.path.dirname(d)}")
+
+    Parallel(n_jobs=worker, backend="threading")(delayed(shutil.copy2)(s, d) for s, d in from_to_files)
+    # Create an output folder for the task
+    os.makedirs(f'{SOURCE_DIR}/output/{col}/output', exist_ok=True)
+
 if __name__ == "__main__":
-    csv_path = "myCode/tasks_run/Custom_runs/setting_template_windows_0_test.csv"
+    csv_path = "myCode/tasks_run/Custom_runs/setting_template_windows_100125.csv"
     df = pd.read_csv(csv_path)
     file_dirs = df.columns[2:]
 
