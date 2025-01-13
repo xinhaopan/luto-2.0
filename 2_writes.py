@@ -88,40 +88,57 @@ def process_file_dir(file_dir, script_to_run):
 
         # 获取 time_file_dirs
         time_file_dirs = [name for name in os.listdir(time_file_path) if os.path.isdir(os.path.join(time_file_path, name))]
+        if not time_file_dirs:
+            print(f"{file_dir} without {time_file_path}")
+            return
+        else:
+            for time_file_dir in time_file_dirs:
+                if "2010-2050" in time_file_dir:
+                    pkl_path = os.path.join(time_file_path, time_file_dir, 'data_with_solution.pkl')
 
-        for time_file_dir in time_file_dirs:
-            if "2010-2050" in time_file_dir:
-                pkl_path = os.path.join(time_file_path, time_file_dir, 'data_with_solution.pkl')
+                    # 如果 PKL 文件不存在，删除子目录
+                    if not os.path.exists(pkl_path):
+                        print(f"PKL file does not exist at path: {pkl_path}")
+                        # delete_folder_multiprocessing(os.path.join(time_file_path, time_file_dir))
 
-                # 如果 PKL 文件不存在，删除子目录
-                if not os.path.exists(pkl_path):
-                    print(f"PKL file does not exist at path: {pkl_path}")
-                    # sdelete_folder_multiprocessing(os.path.join(time_file_path, time_file_dir))
-
-        # 执行脚本
-                execute_script_in_directory(script_to_run, working_directory)
+                    # 执行脚本
+                    execute_script_in_directory(script_to_run, working_directory)
+                else:
+                    print(f"{file_dir} without {time_file_dir}")
 
     except Exception as e:
         print(f"Error processing file_dir '{file_dir}': {e}")
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
     ignore_dirs = set() if ignore_dirs is None else set(ignore_dirs)
-
     jobs = []
     os.makedirs(destination, exist_ok=True)
-    for item in os.listdir(source):
 
-        if item in ignore_dirs: continue
+    # 初始化栈，用于存储待处理的目录
+    stack = [(source, destination)]
 
-        s = os.path.join(source, item)
-        d = os.path.join(destination, item)
-        jobs += copy_folder_custom(s, d) if os.path.isdir(s) else [(s, d)]
+    while stack:
+        current_source, current_destination = stack.pop()
+        for item in os.listdir(current_source):
+            if item in ignore_dirs:
+                continue  # 忽略指定目录
+
+            s = os.path.join(current_source, item)
+            d = os.path.join(current_destination, item)
+
+            if os.path.isdir(s):
+                # 如果是目录，将其压入栈中等待处理
+                os.makedirs(d, exist_ok=True)
+                stack.append((s, d))
+            else:
+                # 如果是文件，添加到任务列表
+                jobs.append((s, d))
 
     return jobs
 def copy_folders(col,worker=3):
     SOURCE_DIR=os.getcwd()
     # Copy codes to the each custom run folder, excluding {EXCLUDE_DIRS} directories
-    EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code', 'myCode','luto/settings.py']
+    EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code', 'myCode','settings.py']
     from_to_files = copy_folder_custom(SOURCE_DIR, f'{SOURCE_DIR}/output/{col}', EXCLUDE_DIRS)
     for s, d in from_to_files:
         if not os.path.exists(s):
@@ -134,7 +151,7 @@ def copy_folders(col,worker=3):
     os.makedirs(f'{SOURCE_DIR}/output/{col}/output', exist_ok=True)
 
 if __name__ == "__main__":
-    csv_path = "myCode/tasks_run/Custom_runs/setting_template_windows_100125.csv"
+    csv_path = "myCode/tasks_run/Custom_runs/setting_template_windows_05.csv"
     df = pd.read_csv(csv_path)
     file_dirs = df.columns[2:]
 
