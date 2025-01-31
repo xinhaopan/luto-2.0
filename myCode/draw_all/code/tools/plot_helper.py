@@ -451,38 +451,21 @@ def plot_line_chart(ax, merged_dict, input_name, legend_colors, font_size=10,
 #
 #     return (y_min, y_max), interval
 
+
+def get_max_min(df):
+    cumsum_df = df.cumsum(axis=1)
+    cumsum_max = cumsum_df.max().max()
+    cumsum_min = cumsum_df.min().min()
+    value_min = df.min().min()
+    value_max = df.max().max()
+
+    return max(cumsum_max, value_max), min(cumsum_min, value_min)
+
 def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3, use_multithreading=False):
-    row_positive_max = float('-inf')
-    row_negative_min = float('inf')
-    has_negative = False
-
-    # 并行处理 DataFrame
-    from joblib import Parallel, delayed
-
-    def process_df(df):
-        cumsum_df = df.cumsum(axis=1)
-        positive_max = cumsum_df[cumsum_df > 0].max().max()
-        negative_min = cumsum_df[cumsum_df < 0].min().min()
-        global_min = df.min().min()
-        global_max = df.max().max()
-        return positive_max, negative_min, global_min, global_max
-
-    if use_multithreading:
-        results = Parallel(n_jobs=-1)(delayed(process_df)(df) for df in data_dict.values())
-    else:
-        results = [process_df(df) for df in data_dict.values()]
-
-    for r in results:
-        row_positive_max = max(row_positive_max, r[0])
-        row_negative_min = min(row_negative_min, r[1])
-        if r[1] < 0:
-            has_negative = True
-
-    if not has_negative:
-        row_negative_min = 0
-
-    max_value = row_positive_max
-    min_value = row_negative_min
+    max_value, min_value = (
+        max(get_max_min(df)[0] for df in data_dict.values()),
+        min(get_max_min(df)[1] for df in data_dict.values())
+    )
 
     # 如果 multiplier 小于 1，放大数据和 multiplier
     scale_factor = 1
@@ -495,7 +478,6 @@ def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3, use_multith
     y_min = np.floor(min_value / multiplier) * multiplier
     y_max = np.ceil(max_value / multiplier) * multiplier
 
-    # 确保 (y_max - y_min) 是 divisible_by 的倍数
     while (y_max - y_min) % divisible_by != 0:
         y_max += multiplier
 
@@ -508,4 +490,5 @@ def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3, use_multith
         interval /= scale_factor
 
     return (y_min, y_max), interval
+
 
