@@ -72,7 +72,6 @@ def execute_script_in_directory(script_name, working_directory):
 
 def process_file_dir(file_dir, script_to_run):
     copy_folders(file_dir)
-    time_period = "2010-2050"
     """
     处理单个 file_dir，包括检查 PKL 文件和执行脚本
     :param file_dir: 要处理的文件夹路径
@@ -94,18 +93,18 @@ def process_file_dir(file_dir, script_to_run):
             return
         else:
             for time_file_dir in time_file_dirs:
-                if time_period in time_file_dir:
+                if "2010-2050" in time_file_dir:
                     pkl_path = os.path.join(time_file_path, time_file_dir, 'data_with_solution.pkl')
 
                     # 如果 PKL 文件不存在，删除子目录
                     if not os.path.exists(pkl_path):
                         print(f"PKL file does not exist at path: {pkl_path}")
-                        # sdelete_folder_multiprocessing(os.path.join(time_file_path, time_file_dir))
+                        # delete_folder_multiprocessing(os.path.join(time_file_path, time_file_dir))
 
                     # 执行脚本
                     execute_script_in_directory(script_to_run, working_directory)
                 else:
-                    print(f"{file_dir}/{time_file_dir} without {time_period}")
+                    print(f"{file_dir} without {time_file_dir}")
 
     except Exception as e:
         print(f"Error processing file_dir '{file_dir}': {e}")
@@ -139,7 +138,7 @@ def copy_folder_custom(source, destination, ignore_dirs=None):
 def copy_folders(col,worker=3):
     SOURCE_DIR=os.getcwd()
     # Copy codes to the each custom run folder, excluding {EXCLUDE_DIRS} directories
-    EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code', 'myCode','settings.py']
+    EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code', 'myCode','luto/settings.py']
     from_to_files = copy_folder_custom(SOURCE_DIR, f'{SOURCE_DIR}/output/{col}', EXCLUDE_DIRS)
     for s, d in from_to_files:
         if not os.path.exists(s):
@@ -152,7 +151,7 @@ def copy_folders(col,worker=3):
     os.makedirs(f'{SOURCE_DIR}/output/{col}/output', exist_ok=True)
 
 if __name__ == "__main__":
-    csv_path = "myCode/tasks_run/Custom_runs/setting_test.csv"
+    csv_path = "myCode/tasks_run/Custom_runs/setting_template_windows_05.csv"
     df = pd.read_csv(csv_path)
     file_dirs = df.columns[2:]
 
