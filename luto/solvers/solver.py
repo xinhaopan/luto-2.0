@@ -128,12 +128,12 @@ class LutoSolver:
         self._setup_deviation_penalties()
 
     def _setup_constraints(self):
-        self._add_cell_usage_constraints()
-        self._add_agricultural_management_constraints()
-        self._add_agricultural_management_adoption_limit_constraints()
-        self._add_demand_penalty_constraints()
+        self._add_cell_usage_constraints()                              
+        self._add_agricultural_management_constraints()                 
+        self._add_agricultural_management_adoption_limit_constraints()  
+        self._add_demand_penalty_constraints()                          
         self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water usage constraints ...')
-        self._add_ghg_emissions_limit_constraints()
+        self._add_ghg_emissions_limit_constraints()                     
         self._add_biodiversity_limit_constraints()
 
 
@@ -220,6 +220,7 @@ class LutoSolver:
                         lb=irr_x_lb, ub=1, name=irr_var_name,
                     )
 
+
     def _setup_deviation_penalties(self):
         """
         Decision variables, V and E, for soft constraints.
@@ -228,11 +229,11 @@ class LutoSolver:
         """
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.V = self.gurobi_model.addMVar(self.ncms, name="V")
-
+            
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.E = self.gurobi_model.addVar(name="E")
 
-
+        
 
     def _setup_objective(self):
         """
@@ -268,7 +269,7 @@ class LutoSolver:
             @ self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
             for k in range(self._input_data.n_non_ag_lus)
         )
-
+        
         # Get the objective values for each sector
         self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.economic_base_sum
         self.obj_demand = self.V * self._input_data.economic_BASE_YR_prices         if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
@@ -276,13 +277,13 @@ class LutoSolver:
 
         # Set the objective function
         sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE
-
+        
         objective = self.obj_economy *  settings.SOLVE_ECONOMY_WEIGHT \
-            - (gp.quicksum(self.obj_demand) +  self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
-
-        self.gurobi_model.setObjective(objective, sense)
-
-
+            - (gp.quicksum(self.obj_demand) +  self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)  
+                 
+        self.gurobi_model.setObjective(objective, sense)  
+        
+        
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
         Constraint that all of every cell is used for some land use.
@@ -487,7 +488,7 @@ class LutoSolver:
                 'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
             )
 
-
+        
 
     def _add_water_usage_limit_constraints(self):
         """
@@ -497,8 +498,6 @@ class LutoSolver:
         """
 
         print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
-
-        min_var = lambda var, prev_var: var if prev_var.x > 1e-3 else prev_var.x
 
         # Ensure water use remains below limit for each region
         for region, (reg_name, limit_hist_level, ind) in self._input_data.limits["water"].items():
@@ -538,20 +537,20 @@ class LutoSolver:
 
             # Sum of all water yield contributions
             w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr
-
+            
             # Under River Regions, we need to update the water constraint when the wny_hist_level < wny_BASE_YR_level
             if settings.WATER_REGION_DEF == 'Drainage Division':
-                water_yield_constraint =limit_hist_level
+                water_yield_constraint = limit_hist_level
             elif settings.WATER_REGION_DEF == 'River Region':
                 wny_BASE_YR_level = self._input_data.water_yield_RR_BASE_YR[region]
                 water_yield_constraint = min(limit_hist_level, wny_BASE_YR_level)
             else:
                 raise ValueError(f"Unknown choice for `WATER_REGION_DEF` setting: must be either 'River Region' or 'Drainage Division'")
-
+        
             # Add the constraint that the water yield in the region must be greater than the limit
             constr = self.gurobi_model.addConstr(w_net_yield_region >= water_yield_constraint)
             self.water_limit_constraints.append(constr)
-
+            
             # Report on the water yield in the region
             if settings.VERBOSE == 1:
                 print(f"    ...net water yield in {reg_name} >= {limit_hist_level:.2f} ML")
@@ -605,11 +604,11 @@ class LutoSolver:
         if settings.GHG_EMISSIONS_LIMITS != "on":
             print('...GHG emissions constraints TURNED OFF ...')
             return
-
+        
         ghg_limit_ub = self._input_data.limits["ghg_ub"]
         ghg_limit_lb = self._input_data.limits["ghg_lb"]
         self.ghg_emissions_expr = self._get_total_ghg_emissions_expr()
-
+        
         if settings.GHG_CONSTRAINT_TYPE == 'hard':
             print(f"...GHG emissions reduction target")
             print(f'    ...GHG emissions reduction target UB: {ghg_limit_ub:,.0f} tCO2e')
@@ -866,18 +865,18 @@ class LutoSolver:
         if self.ghg_emissions_limit_constraint_ub is not None:
             self.gurobi_model.remove(self.ghg_emissions_limit_constraint_ub)
             self.ghg_emissions_limit_constraint_ub = None
-
+            
         if self.ghg_emissions_limit_constraint_lb is not None:
             self.gurobi_model.remove(self.ghg_emissions_limit_constraint_lb)
             self.ghg_emissions_limit_constraint_lb = None
 
-        self._add_cell_usage_constraints(updated_cells)
-        self._add_agricultural_management_constraints(updated_cells)
-        self._add_agricultural_management_adoption_limit_constraints()
-        self._add_demand_penalty_constraints()
+        self._add_cell_usage_constraints(updated_cells)                 
+        self._add_agricultural_management_constraints(updated_cells)    
+        self._add_agricultural_management_adoption_limit_constraints()  
+        self._add_demand_penalty_constraints()                          
         self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water constraints...')
-        self._add_ghg_emissions_limit_constraints()
-        self._add_biodiversity_limit_constraints()
+        self._add_ghg_emissions_limit_constraints()                    
+        self._add_biodiversity_limit_constraints()                      
 
     def solve(self) -> SolverSolution:
         print("Starting solve...\n")

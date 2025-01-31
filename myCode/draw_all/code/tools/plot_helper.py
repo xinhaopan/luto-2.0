@@ -389,64 +389,106 @@ def plot_line_chart(ax, merged_dict, input_name, legend_colors, font_size=10,
     return ax
 
 
-def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3):
-    """
-    计算累积柱状图的 Y 轴范围和刻度
-    :param data_dict: 包含多个 DataFrame 的字典，每行代表一个柱状图的柱子
-    :param multiplier: 范围是该值的倍数（默认 10）
-    :param divisible_by: 范围除以该值后得到间隔（默认 3）
-    :return: Y 轴范围 (最小值, 最大值) 和刻度间隔
-    """
+# def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3):
+#     """
+#     计算累积柱状图的 Y 轴范围和刻度
+#     :param data_dict: 包含多个 DataFrame 的字典，每行代表一个柱状图的柱子
+#     :param multiplier: 范围是该值的倍数（默认 10）
+#     :param divisible_by: 范围除以该值后得到间隔（默认 3）
+#     :return: Y 轴范围 (最小值, 最大值) 和刻度间隔
+#     """
+#
+#     # 初始化值
+#     row_positive_max = float('-inf')  # 每行正数的累积最大值
+#     row_negative_min = float('inf')  # 每行负数的累积最小值
+#     has_negative = False  # 是否存在负数
+#     global_min_value = float('inf')  # 初始化全局最小值
+#     global_max_value = float('-inf')  # 初始化全局最大值
+#
+#     for df in data_dict.values():
+#         # 遍历每一行，逐行计算
+#         for index, row in df.iterrows():
+#             row_cumsum = row.cumsum()  # 计算行的累积和
+#
+#             # 计算该行的正数累积最大值
+#             row_positive_sum = row_cumsum[row_cumsum > 0].max() if (row_cumsum > 0).any() else 0
+#             row_positive_max = max(row_positive_max, row_positive_sum)
+#
+#             # 计算该行的负数累积最小值
+#             if row.min() < 0:
+#                 has_negative = True
+#                 row_negative_sum = row_cumsum[row_cumsum < 0].min()
+#                 row_negative_min = min(row_negative_min, row_negative_sum)
+#
+#             # 更新全局最小值和最大值
+#             global_min_value = min(global_min_value, row.min())
+#             global_max_value = max(global_max_value, row.max())
+#
+#     # 如果没有负数，将累积负数最小值设为 0
+#     if not has_negative:
+#         row_negative_min = 0
+#
+#     # 最终比较累积值和全局值，得到最终结果
+#     max_value = max(global_max_value, row_positive_max)
+#     min_value = min(global_min_value, row_negative_min)
+#
+#     # 如果没有负数，将最小值设置为 0
+#     if not has_negative:
+#         cumulative_negative_min = 0
+#         min_value = 0
+#
+#     # 将最小值向下取整到 multiplier 的倍数
+#     y_min = np.floor(min_value / multiplier) * multiplier
+#
+#     # 将最大值向上取整到 multiplier 的倍数
+#     y_max = np.ceil(max_value / multiplier) * multiplier
+#
+#     # 确保 (y_max - y_min) 可以整除 divisible_by
+#     while (y_max - y_min) % divisible_by != 0:
+#         y_max += multiplier
+#
+#     interval = (y_max - y_min) // divisible_by
+#
+#     return (y_min, y_max), interval
 
-    # 初始化值
-    row_positive_max = float('-inf')  # 每行正数的累积最大值
-    row_negative_min = float('inf')  # 每行负数的累积最小值
-    has_negative = False  # 是否存在负数
-    global_min_value = float('inf')  # 初始化全局最小值
-    global_max_value = float('-inf')  # 初始化全局最大值
 
-    for df in data_dict.values():
-        # 遍历每一行，逐行计算
-        for index, row in df.iterrows():
-            row_cumsum = row.cumsum()  # 计算行的累积和
+def get_max_min(df):
+    cumsum_df = df.cumsum(axis=1)
+    cumsum_max = cumsum_df.max().max()
+    cumsum_min = cumsum_df.min().min()
+    value_min = df.min().min()
+    value_max = df.max().max()
 
-            # 计算该行的正数累积最大值
-            row_positive_sum = row_cumsum[row_cumsum > 0].max() if (row_cumsum > 0).any() else 0
-            row_positive_max = max(row_positive_max, row_positive_sum)
+    return max(cumsum_max, value_max), min(cumsum_min, value_min)
 
-            # 计算该行的负数累积最小值
-            if row.min() < 0:
-                has_negative = True
-                row_negative_sum = row_cumsum[row_cumsum < 0].min()
-                row_negative_min = min(row_negative_min, row_negative_sum)
+def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3, use_multithreading=False):
+    max_value, min_value = (
+        max(get_max_min(df)[0] for df in data_dict.values()),
+        min(get_max_min(df)[1] for df in data_dict.values())
+    )
 
-            # 更新全局最小值和最大值
-            global_min_value = min(global_min_value, row.min())
-            global_max_value = max(global_max_value, row.max())
+    # 如果 multiplier 小于 1，放大数据和 multiplier
+    scale_factor = 1
+    if multiplier < 1:
+        scale_factor = int(1 / multiplier) * 10
+        max_value *= scale_factor
+        min_value *= scale_factor
+        multiplier = 1
 
-    # 如果没有负数，将累积负数最小值设为 0
-    if not has_negative:
-        row_negative_min = 0
-
-    # 最终比较累积值和全局值，得到最终结果
-    max_value = max(global_max_value, row_positive_max)
-    min_value = min(global_min_value, row_negative_min)
-
-    # 如果没有负数，将最小值设置为 0
-    if not has_negative:
-        cumulative_negative_min = 0
-        min_value = 0
-
-    # 将最小值向下取整到 multiplier 的倍数
     y_min = np.floor(min_value / multiplier) * multiplier
-
-    # 将最大值向上取整到 multiplier 的倍数
     y_max = np.ceil(max_value / multiplier) * multiplier
 
-    # 确保 (y_max - y_min) 可以整除 divisible_by
     while (y_max - y_min) % divisible_by != 0:
         y_max += multiplier
 
     interval = (y_max - y_min) // divisible_by
 
+    # 缩小结果回原比例
+    if scale_factor != 1:
+        y_min /= scale_factor
+        y_max /= scale_factor
+        interval /= scale_factor
+
     return (y_min, y_max), interval
+
+
