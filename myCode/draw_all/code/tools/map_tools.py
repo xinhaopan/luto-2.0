@@ -53,7 +53,7 @@ def draw_maps(overlay_geo_tif, colors_sheet, output_png, legend_png_name, cfg):
         for file in intermediate_files:
             if os.path.exists(file):
                 os.remove(file)
-            png_file = os.path.splitext(file)[0] + ".png"
+            png_file = os.path.splitext(file)[0] + ".svg"
             if os.path.exists(png_file):
                 os.remove(png_file)
 
