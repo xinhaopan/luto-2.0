@@ -90,9 +90,9 @@ def draw_coloum(data, legend_colors, output_file, fontsize=22, y_range=(0, 200),
     # 关闭当前图形
     plt.close()
 
-    save_legend(ax, f'{output_file[:-4]}_legend.png',fontsize=fontsize)
+    save_legend(ax, f'{output_file[:-4]}_legend.svg',fontsize=fontsize)
 
-def save_legend(ax, output_legend_file='../output/03_Food_legend.png',fontsize=20):
+def save_legend(ax, output_legend_file='../output/03_Food_legend.svg',fontsize=20):
     # 创建一个新的图形来存放图例，调整图形尺寸为小正方形
     fig_legend = plt.figure(figsize=(10, 10))  # 调整尺寸为小正方形
 
@@ -253,7 +253,7 @@ df_filtered = df.loc[2010:2050,
 df_filtered = df_filtered / 1e6
 df_filtered.columns = ['1.5°C (67%)', '1.5°C (50%)', '1.8°C (67%)']
 colors = ['#E74C3C', '#3498DB', '#2ECC71']  # 根据数据列数调整颜色列表
-draw_plot_lines(df_filtered, colors, ' ', (-300, 100), 100, "../output/03_GHG_limit.png", font_size=font_size)
+draw_plot_lines(df_filtered, colors, ' ', (-300, 100), 100, "../output/03_GHG_limit.svg", font_size=font_size)
 
 
 # Food demand
@@ -275,7 +275,7 @@ demand_data = demand_data.drop(columns=['aquaculture', 'chicken', 'eggs', 'pork'
 
 mapping_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='food')
 demand_data, legend_colors = process_single_df(demand_data, mapping_df)
-draw_coloum(demand_data, legend_colors, '../output/03_Food_demand.png', fontsize=font_size, y_range=(0, 200), y_tick_interval=50, ylabel=' ')
+draw_coloum(demand_data, legend_colors, '../output/03_Food_demand.svg', fontsize=font_size, y_range=(0, 200), y_tick_interval=50, ylabel=' ')
 
 # Biodiversity
 BIODIV_GBF_TARGET_2_DICTs = [
@@ -288,7 +288,7 @@ BIODIV_GBF_TARGET_2_DICTs = [
 
 df = get_biodiversity_target(INPUT_DIR, BIODIV_GBF_TARGET_2_DICTs ) / 1e6
 colors = ['#E74C3C', '#3498DB', '#2ECC71']  # 根据数据列数调整颜色列表
-draw_plot_lines(df, colors, ' ', (0, 120), 40, "../output/03_biodiversity_limit.png", font_size=font_size)
+draw_plot_lines(df, colors, ' ', (0, 120), 40, "../output/03_biodiversity_limit.svg", font_size=font_size)
 
 
 # water
@@ -302,7 +302,7 @@ dd_yield_df = pd.DataFrame(index=years)
 
 # 构建最终的 dd_yield_df
 for name, value in zip(dd['HR_DRAINDIV_NAME'], dd['WATER_YIELD_HIST_BASELINE_ML']):
-    dd_yield_df[name] = value * settings.WATER_YIELD_TARGET_AG_SHARE / 1e6
+    dd_yield_df[name] = value * (1 - settings.WATER_STRESS * settings.AG_SHARE_OF_WATER_USE) / 1e6
 
 dd_outside_luto = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'))
 water_yield_natural_land = dd_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]] / 1e6
@@ -320,5 +320,5 @@ dd_water_limit_df = dd_yield_df + water_cci_delta
 
 mapping_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='water')
 dd_water_limit_df, legend_colors = process_single_df(dd_water_limit_df, mapping_df)
-draw_coloum(dd_water_limit_df, legend_colors, '../output/03_water_limit.png', fontsize=font_size, y_range=(0, 300), y_tick_interval=100, ylabel=' ')
+draw_coloum(dd_water_limit_df, legend_colors, '../output/03_water_limit.svg', fontsize=font_size, y_range=(0, 300), y_tick_interval=100, ylabel=' ')
 
