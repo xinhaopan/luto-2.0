@@ -1,18 +1,23 @@
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J.,
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S.,
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
-# This file is part of LUTO 2.0.
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
 #
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# LUTO2 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+
 
 """ LUTO model settings. """
 
@@ -45,6 +50,7 @@ OUTPUT_DIR = 'output'
 DATA_DIR = 'input'
 RAW_DATA = '../raw_data'
 
+
 # ---------------------------------------------------------------------------- #
 # Scenario parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
@@ -68,7 +74,6 @@ CO2_FERT = 'off'   # or 'off'
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
-
 """ Mean FIRE_RISK cell values (%)
     FD_RISK_PERC_5TH    80.3967
     FD_RISK_MEDIAN      89.2485
@@ -109,8 +114,8 @@ MODE = 'snapshot'   # Runs for target year only
 # MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
-# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+# OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand for agricultural commodity production should be met in the solver
 # DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
@@ -160,14 +165,6 @@ THREADS = 50
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
-
-"""
-The dictionary below is the master list of all of the non agricultural land uses
-and whether they are currently enabled in the solver (True/False).
-
-To disable a non-agricultural land use, change the correpsonding value of the
-NON_AG_LAND_USES dictionary to false.
-"""
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
@@ -178,7 +175,23 @@ NON_AG_LAND_USES = {
     'Beef Carbon Plantings (Belt)': True,
     'BECCS': True,
 }
+"""
+The dictionary below is the master list of all of the non agricultural land uses
+and whether they are currently enabled in the solver (True/False).
 
+To disable a non-agricultural land use, change the correpsonding value of the
+NON_AG_LAND_USES dictionary to false.
+"""
+NON_AG_LAND_USES_REVERSIBLE = {
+    'Environmental Plantings': False,
+    'Riparian Plantings': False,
+    'Sheep Agroforestry': False,
+    'Beef Agroforestry': False,
+    'Carbon Plantings (Block)': False,
+    'Sheep Carbon Plantings (Belt)': False,
+    'Beef Carbon Plantings (Belt)': False,
+    'BECCS': False,
+}
 """
 If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon non-agr.
 land uses on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Environmental Plantings'
@@ -191,16 +204,6 @@ GHG and biodiversity targets. This pushes the catchment close to the net yield c
 water yield and if non-ag land uses are not reversible then a catchment may not be able to meet the net yield constraint.
 This is expected behaviour and the user must choose how to deal with it.
 """
-NON_AG_LAND_USES_REVERSIBLE = {
-    'Environmental Plantings': False,
-    'Riparian Plantings': False,
-    'Sheep Agroforestry': False,
-    'Beef Agroforestry': False,
-    'Carbon Plantings (Block)': False,
-    'Sheep Carbon Plantings (Belt)': False,
-    'Beef Carbon Plantings (Belt)': False,
-    'BECCS': False,
-}
 
 # Cost of fencing per linear metre
 FENCING_COST_PER_M = 10
@@ -246,13 +249,6 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
 # ---------------------------------------------------------------------------- #
-
-"""
-The dictionary below contains a master list of all agricultural management options and
-which land uses they correspond to.
-
-To disable an ag-mangement option, change the corresponding value in the AG_MANAGEMENTS dictionary to False.
-"""
 AG_MANAGEMENTS = {
     'Asparagopsis taxiformis': True,
     'Precision Agriculture': True,
@@ -261,7 +257,21 @@ AG_MANAGEMENTS = {
     'AgTech EI': True,
     'Biochar': True,
 }
+"""
+The dictionary below contains a master list of all agricultural management options and
+which land uses they correspond to.
 
+To disable an ag-mangement option, change the corresponding value in the AG_MANAGEMENTS dictionary to False.
+"""
+
+AG_MANAGEMENTS_REVERSIBLE = {
+    'Asparagopsis taxiformis': True,
+    'Precision Agriculture': True,
+    'Ecological Grazing': True,
+    'Savanna Burning': True,
+    'AgTech EI': True,
+    'Biochar': True,
+}
 """
 If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon agricultural
 management options on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Asparagopsis taxiformis',
@@ -271,14 +281,6 @@ and agricultural management combination in all subsequent years.
 WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for
 the rest of the simulation. This may be an unintended side effect.
 """
-AG_MANAGEMENTS_REVERSIBLE = {
-    'Asparagopsis taxiformis': True,
-    'Precision Agriculture': True,
-    'Ecological Grazing': True,
-    'Savanna Burning': True,
-    'AgTech EI': True,
-    'Biochar': True,
-}
 
 # The cost for removing and establishing irrigation infrastructure ($ per hectare)
 REMOVE_IRRIG_COST = 5000
@@ -334,14 +336,18 @@ GHG_ALLOW_LB_DELTA_T = 1e6    # The amount of GHG emissions that can be lowered 
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_ECONOMY_WEIGHT = 0.02
+SOLVE_ECONOMY_WEIGHT = 0.05
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
+# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+
+WATER_PENALTY = 1
+
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
-
 """
     Water net yield targets: the value represents the proportion of the historical water yields
     that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
@@ -373,7 +379,7 @@ AG_SHARE_OF_WATER_USE = 0.7 # Ag share is 70% across all catchments, could be up
 LIVESTOCK_DRINKING_WATER = 1
 
 # Consider water license costs (0 [off] or 1 [on]) of land-use transition ***** If on then there is a noticeable water sell-off by irrigators in the MDB when maximising profit
-INCLUDE_WATER_LICENSE_COSTS = 1
+INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 
@@ -382,7 +388,14 @@ INCLUDE_WATER_LICENSE_COSTS = 1
 
 # ------------------- Agricultural biodiversity parameters -------------------
 
+# Biodiversity contribution reporting
+BIODIVERSTIY_TARGET_GBF_2 = 'on'                 # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.
+BIO_CALC_LEVEL = 'group'                    # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
+
+
 # Connectivity source source
+CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
 '''
     The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
     This score is normalised between 0 (fartherst) and 1 (closest).
@@ -392,18 +405,15 @@ INCLUDE_WATER_LICENSE_COSTS = 1
           by the National Land Use Map of Australia.
         - if 'NONE' is selected, the connectivity score is not used in the biodiversity calculation.
 '''
-CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
-
 
 # Connectivity score importance
+connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
+CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
 '''
     !!!!!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   !!!!!
     The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
     I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
 '''
-connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
-CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
-
 
 
 # Habitat condition data source
@@ -415,6 +425,7 @@ HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
 
 
 # HCAS percentile for each land-use type
+HCAS_PERCENTILE = 50
 ''' Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
     suitability for wild animals ranging between 0-1) for each land-use type.
 
@@ -424,45 +435,69 @@ HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
     For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land has 22% biodiversity score compared
     to undisturbed natural land.
 '''
-HCAS_PERCENTILE = 50
 
 # Biodiversity value under default late dry season savanna fire regime
+LDS_BIODIVERSITY_VALUE = 0.8
 ''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value
     (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value (i.e., 1.0).
 '''
-LDS_BIODIVERSITY_VALUE = 0.8
-
 
 # Non-agricultural biodiversity parameters
-''' The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
-    For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
-    will be 0.6 * 0.8 = 0.48.
-'''
 ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8
 CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
 CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
 RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
 AGROFORESTRY_BIODIV_BENEFIT = 0.75
 BECCS_BIODIVERSITY_BENEFIT = 0
-
+''' The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
+    For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
+    will be 0.6 * 0.8 = 0.48.
+'''
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
-    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
-"""
 BIODIV_GBF_TARGET_2_DICT = {
               2010: 0,    # Proportion of degraded land restored in year 2010
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
               2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
               2100: 0.3   # Stays at 2050 level
              }            # (can add more years/targets)\
+""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
+    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+"""
 
 
-# Biodiversity contribution reporting
-BIODIVERSITY_LIMITS = 'on'                 # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will urn off reprojecting decision variables to xarray so speed up the model run.
-BIO_CALC_LEVEL = 'group'                    # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
+
+
+
+
+
+# ---------------------- Vegetation parameters ----------------------
+
+BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
+'''
+    Target 3 of the Kunming-Montreal Global Biodiversity Framework:
+    protect and manage 30% of the world's land, water, and coastal areas by 2030.
+'''
+
+NVIS_SPATIAL_DETAIL = 'HIGH'                 # 'LOW' or 'HIGH'
+'''
+- If 'LOW' is selected, the primary group layers will be used to represent the vegetation type. 
+- If 'HIGH' is selected, the sub group layers will be used to represent the vegetation type.
+'''
+
+
+NVIS_CLASS_DETAIL  = 'MVG'                  # 'MVG' or 'MVS'
+'''
+The National Vegetation Information System (NVIS) provides the 100m resolution information on
+the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
+
+- If 'MVG' is selected, the NVIS input layers will be be resampled to 1km resolution, 
+  and each layer representing the percentage of a vegetation group's coverage.
+    
+- If 'MVS' is selected, the NVIS input layers will be be resampled to a single 1km resolution layer,
+  and each cell has a group index who covers the most area within this cell.
+'''
 
 
 
