@@ -52,7 +52,7 @@ def calculate_transition_matrix(land_use_data_path, mapping_data_path, area_colu
 
     return transition_matrix
 
-def plot_all_transition_matrices(matrices, labels_list, label_mapping, output_path="transition_matrix_all.png", font_size=15):
+def plot_all_transition_matrices(matrices, labels_list, label_mapping, output_path="transition_matrix_all.svg", font_size=15):
     """
     Plots multiple transition matrices with shorthand labels on a grid layout.
 
@@ -140,4 +140,4 @@ label_mapping = {
     'Unallocated - natural land': 'UN',
     'Non-agricultural land-use': 'NA'
 }
-plot_all_transition_matrices(matrices, labels,label_mapping, output_path="../output/06_transition_matrix_all.png")
+plot_all_transition_matrices(matrices, labels,label_mapping, output_path="../output/06_transition_matrix_all.svg")
