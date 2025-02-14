@@ -126,7 +126,7 @@ def submit_task_windows(task_dir, col):
     try:
         # 运行子进程，捕获标准输出和标准错误
         result = subprocess.run(
-            [python_path, f'{task_dir}/0_runs_years.py'],
+            [python_path, f'{task_dir}/0_runs.py'],
             cwd=f'{task_dir}',
             capture_output=True,  # 捕获输出
             text=True  # 将输出转换为文本
