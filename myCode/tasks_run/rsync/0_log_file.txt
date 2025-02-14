@@ -56689,3 +56689,25 @@ File 2_sync_list.txt is under the size limit. No cleaning required.
 File 1_last_sync_time.txt is under the size limit. No cleaning required.
 File 0_log_file.txt is under the size limit. No cleaning required.
 
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-02-14 13:19:53
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Error: 
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-02-14 13:19:53: Starting task...
+[INFO] Sync time updated to: 2025-02-14 13:19:53
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Error: 
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
