@@ -30,7 +30,7 @@ grid_search = {
 template_df = create_settings_template('Custom_runs')
 # generate_csv(output_csv="Custom_runs/setting_template_windows_test1.csv")
 
-output_file = os.path.join("Custom_runs", "setting_template_windows_0131.csv")
+output_file = os.path.join("Custom_runs", "setting_template_windows_0214.csv")
 suffix='RESFACTOR'
 create_grid_search_template(template_df, grid_search,output_file,suffix)
 print(f"saved to {output_file}")
