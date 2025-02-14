@@ -26,7 +26,7 @@ bio_target_dict = get_dict_data(input_files, "biodiversity", 'Score', 'Variable'
 point_dict = rename_and_filter_columns(bio_target_dict, ['Biodiversity score limit','Solve biodiversity score'], ['Constraints','Score'])
 point_colors = ['black','red']
 
-output_png = '../output/05_bio.png'
+output_png = '../output/05_bio.svg'
 plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,point_dict=point_dict,point_colors=point_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 105),
                              x_ticks=20, y_ticks=35,
@@ -38,7 +38,7 @@ bio_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_col
 bio_ag_group_dict = aggregate_by_mapping(bio_ag_dict, 'tools/land use group.xlsx', 'desc', 'ag_group')
 bio_ag_group_dict,legend_colors = get_colors(bio_ag_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
 
-output_png = '../output/05_bio_ag_group.png'
+output_png = '../output/05_bio_ag_group.svg'
 plot_Combination_figures(bio_ag_group_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 105),
                              x_ticks=20, y_ticks=35,
@@ -47,7 +47,7 @@ plot_Combination_figures(bio_ag_group_dict, output_png, input_files, plot_stacke
 csv_name, value_column_name, filter_column_name = 'biodiversity_separate', 'Biodiversity score', 'Landuse subtype'
 bio_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 bio_am_dict,legend_colors = get_colors(bio_am_dict, 'tools/land use colors.xlsx', sheet_name='am')
-output_png = '../output/05_bio_am.png'
+output_png = '../output/05_bio_am.svg'
 plot_Combination_figures(bio_am_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 3),
                              x_ticks=20, y_ticks=1,
@@ -56,7 +56,7 @@ plot_Combination_figures(bio_am_dict, output_png, input_files, plot_stacked_bar,
 csv_name, value_column_name, filter_column_name = 'biodiversity_separate', 'Biodiversity score', 'Landuse'
 bio_non_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 bio_non_ag_dict,legend_colors = get_colors(bio_non_ag_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
-output_png = '../output/05_bio_non-ag.png'
+output_png = '../output/05_bio_non-ag.svg'
 plot_Combination_figures(bio_non_ag_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 16),
                              x_ticks=20, y_ticks=4,
