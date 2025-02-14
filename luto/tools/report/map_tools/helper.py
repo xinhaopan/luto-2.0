@@ -25,7 +25,7 @@ def download_basemap(bounds_mercator: list[str]):
     """
 
     base_map, extent = ctx.bounds2raster(*bounds_mercator, 
-                                        path='luto/ools/report/Assets/basemap.tif',
+                                        path='luto/tools/report/Assets/basemap.tif',
                                         source=ctx.providers.OpenStreetMap.Mapnik,
                                         zoom=7,
                                         n_connections=16,

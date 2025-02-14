@@ -1,4 +1,4 @@
-Name,Default_run,20250131_Run_1_GHG_1_5C_67_BIO_0_5,20250131_Run_2_GHG_1_5C_67_BIO_3_5,20250131_Run_3_GHG_1_5C_67_BIO_5_5,20250131_Run_4_GHG_1_5C_50_BIO_0_5,20250131_Run_5_GHG_1_5C_50_BIO_3_5,20250131_Run_6_GHG_1_5C_50_BIO_5_5,20250131_Run_7_GHG_1_8C_67_BIO_0_5,20250131_Run_8_GHG_1_8C_67_BIO_3_5,20250131_Run_9_GHG_1_8C_67_BIO_5_5
+Name,Default_run,20250201_Run_1_GHG_1_5C_67_BIO_0_5,20250201_Run_2_GHG_1_5C_67_BIO_3_5,20250201_Run_3_GHG_1_5C_67_BIO_5_5,20250201_Run_4_GHG_1_5C_50_BIO_0_5,20250201_Run_5_GHG_1_5C_50_BIO_3_5,20250201_Run_6_GHG_1_5C_50_BIO_5_5,20250201_Run_7_GHG_1_8C_67_BIO_0_5,20250201_Run_8_GHG_1_8C_67_BIO_3_5,20250201_Run_9_GHG_1_8C_67_BIO_5_5
 VERSION,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3
 INPUT_DIR,input,input,input,input,input,input,input,input,input,input
 OUTPUT_DIR,output,output,output,output,output,output,output,output,output,output
@@ -21,7 +21,7 @@ DISCOUNT_RATE,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07
 AMORTISATION_PERIOD,30,30,30,30,30,30,30,30,30,30
 DEFORESTATION_LEGISLATION,on,on,on,on,on,on,on,on,on,on
 NATURAL_TO_MODIFIED_LAND_PENALTY,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0
-RESFACTOR,20,5,5,5,5,5,5,5,5,5
+RESFACTOR,30,5,5,5,5,5,5,5,5,5
 MODE,snapshot,snapshot,snapshot,snapshot,snapshot,snapshot,snapshot,snapshot,snapshot,snapshot
 OBJECTIVE,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit
 DEMAND_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft
