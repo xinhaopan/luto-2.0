@@ -4,6 +4,15 @@ import matplotlib.pyplot as plt
 import math
 import re
 
+import matplotlib
+import matplotlib.pyplot as plt
+
+plt.rcParams['svg.fonttype'] = 'none'  # 让字体保持文本格式，而不是转换为路径
+plt.rcParams['text.usetex'] = False  # 确保不使用 LaTeX 渲染
+plt.rcParams['font.family'] = 'Arial'
+plt.rcParams['pdf.fonttype'] = 42  # 保证 AI 里文字可编辑
+
+
 from tools.parameters import COLUMN_WIDTH, X_OFFSET
 
 
@@ -198,12 +207,38 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
                     all_labels.extend(labels_legend[:len(legend_colors)])
 
     ncol = math.ceil(len(all_labels) / legend_n_rows)
-    output_file = output_png.replace(".png", "_legend.png")
-    save_legend_as_image(all_handles, all_labels, output_file, ncol, font_size=10)
+    legend_file = f"{output_png}" + "_legend.svg"
+    save_legend_as_image(all_handles, all_labels, legend_file, ncol, font_size=10)
     # 调整布局
     plt.tight_layout()
     plt.savefig(output_png, bbox_inches='tight', dpi=300, transparent=True)
     plt.show()
+
+
+def save_figure(fig, output_svg, output_png):
+    """
+    保存图表为SVG格式，并创建去掉所有文字的PNG格式
+
+    参数:
+    - fig: Matplotlib Figure 对象
+    - output_svg: SVG 文件的保存路径
+    - output_png: PNG 文件的保存路径
+    """
+    # 保存 SVG 格式
+    fig.savefig(output_svg, bbox_inches='tight', dpi=300, transparent=True, format='svg')
+
+    # 去掉所有文本
+    for ax in fig.get_axes():
+        ax.set_title("")
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.legend().set_visible(False)  # 隐藏图例
+
+    # 保存 PNG 格式（背景不透明）
+    fig.savefig(output_png, bbox_inches='tight', dpi=300, transparent=False, format='png')
+
 
 def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(0.5, -0.03), font_size=10):
     # 创建单独的图，用于保存图例

@@ -1,6 +1,6 @@
 INPUT_DIR = '../../../input'
 
-time = '20250110'
+time = '20250201'
 middle = ''
 suffix = '5'
 senerios = [

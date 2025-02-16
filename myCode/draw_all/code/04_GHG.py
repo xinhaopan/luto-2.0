@@ -30,7 +30,7 @@ ghg_group_dict = concatenate_dicts_by_year([ghg_group_dict, ghg_target_dict])
 point_dict = {key: df[['Net emissions','Objectives']] for key, df in ghg_group_dict.items()}
 
 ghg_group_dict,legend_colors = get_colors(ghg_group_dict, 'tools/land use colors.xlsx', sheet_name='lu')
-output_png = '../output/04_ghg_emissions.svg'
+output_png = '../output/04_ghg_emissions.png'
 y_range, y_ticks = calculate_y_axis_range(ghg_group_dict)
 point_colors = ['black','red']
 plot_Combination_figures(ghg_group_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,point_dict=point_dict,point_colors=point_colors,
@@ -38,7 +38,7 @@ plot_Combination_figures(ghg_group_dict, output_png, input_files, plot_stacked_b
                              x_ticks=20, y_ticks=y_ticks, legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 draw_dict,legend_colors = get_colors(ag_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
-output_png = '../output/04_ghg_ag_emissions.svg'
+output_png = '../output/04_ghg_ag_emissions.png'
 y_range, y_ticks = calculate_y_axis_range(draw_dict)
 plot_Combination_figures(draw_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
@@ -46,7 +46,7 @@ plot_Combination_figures(draw_dict, output_png, input_files, plot_stacked_bar, l
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 draw_dict,legend_colors = get_colors(am_dict, 'tools/land use colors.xlsx', sheet_name='am')
-output_png = '../output/04_ghg_am_emissions.svg'
+output_png = '../output/04_ghg_am_emissions.png'
 y_range, y_ticks = calculate_y_axis_range(draw_dict)
 plot_Combination_figures(draw_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
@@ -54,7 +54,7 @@ plot_Combination_figures(draw_dict, output_png, input_files, plot_stacked_bar, l
                              legend_position=(0.5, -0.3), show_legend='last', legend_n_rows=3)
 
 draw_dict,legend_colors = get_colors(non_ag_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
-output_png = '../output/04_ghg_non_ag_emissions.svg'
+output_png = '../output/04_ghg_non_ag_emissions.png'
 y_range, y_ticks = calculate_y_axis_range(draw_dict)
 plot_Combination_figures(draw_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,

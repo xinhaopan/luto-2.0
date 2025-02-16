@@ -20,7 +20,7 @@ import settings
 plt.rcParams['font.family'] = 'Arial'
 
 
-def plot_line_charts(result_dict, save_name="line_charts.svg", font_size=14):
+def plot_line_charts(result_dict, save_name="line_charts.png", font_size=14):
     """
     为 result_dict 中的每个 DataFrame 绘制点线图。
     每个 DataFrame 的每列数据绘制为一条线。
@@ -94,7 +94,7 @@ def plot_line_charts(result_dict, save_name="line_charts.svg", font_size=14):
     ax_legend.axis("off")
     fig_legend.tight_layout()
     # 保存图例为透明背景
-    fig_legend.savefig(save_name[:-4] + "_legend.svg", dpi=300, transparent=True)
+    fig_legend.savefig(save_name[:-4] + "_legend.png", dpi=300, transparent=True)
 
 
 def make_data(data_dict, figure_keys, GHG_TARGETS):
@@ -176,4 +176,4 @@ GHG_TARGETS = pd.read_excel(
                 os.path.join(INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
             )
 result_dict = make_data(point_dict, figure_keys, GHG_TARGETS)
-plot_line_charts(result_dict, save_name="../output/04_GHG_target.svg", font_size=25)
+plot_line_charts(result_dict, save_name="../output/04_GHG_target.png", font_size=25)

@@ -28,7 +28,7 @@ point_colors = ['red','black']
 csv_name, value_column_name, filter_column_name = 'quantity_comparison', 'Prod_targ_year (tonnes, KL)', 'Commodity'
 demand_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 demand_ag_group_dict,legend_colors = get_colors(demand_dict, 'tools/land use colors.xlsx', sheet_name='food')
-output_png = '../output/08_S2_food.svg'
+output_png = '../output/08_S2_food.png'
 plot_Combination_figures(demand_ag_group_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,point_dict=point_dict,point_colors=point_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2015, 2050), y_range=(0, 200),
                              x_ticks=10, y_ticks=50,
