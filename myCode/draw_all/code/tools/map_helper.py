@@ -67,7 +67,7 @@ def convert_tif_to_png(tif_path,output_png=None):
 
         # 保存为 PNG 文件
         if output_png is None:
-            output_png = tif_path.replace('.tif', '.svg')
+            output_png = tif_path.replace('.tif', '.png')
         pil_image.save(output_png)
 
     # 显示图像
@@ -186,7 +186,7 @@ def reproject_overlay(overlay_tif, basemap_tif, output_tif, background_value=-99
     # 7. 显示重投影后的叠加图
     if write_png:
         plt.imshow(reprojected_image, cmap='jet')
-        plt.savefig(output_tif.replace('.tif', '.svg'), dpi=300)
+        plt.savefig(output_tif.replace('.tif', '.png'), dpi=300)
         plt.show()
         print(f"Reprojected overlay saved to {output_tif}")
 
@@ -532,7 +532,7 @@ def add_scalebar(tif_path, output_tif, dpi=300, unit='km', length=500, location=
     plt.savefig(tiff_output, dpi=dpi, bbox_inches='tight', pad_inches=0, transparent=True)
 
     # 保存为 PNG 文件（带比例尺）如果 write_png 为 True
-    png_output = output_tif.replace('.tif', '.svg')
+    png_output = output_tif.replace('.tif', '.png')
     plt.savefig(png_output, dpi=dpi, bbox_inches='tight', pad_inches=0, transparent=True)
     # print(f"PNG image saved to {png_output}")
     # 关闭图像
@@ -540,7 +540,7 @@ def add_scalebar(tif_path, output_tif, dpi=300, unit='km', length=500, location=
     plt.close(fig)
 
 
-def create_legend(colors_sheet, legend_png_name = "legend_png.svg", legend_title="Legend", legend_fontsize=8,
+def create_legend(colors_sheet, legend_png_name = "legend_png.png", legend_title="Legend", legend_fontsize=8,
                   legend_title_fontsize=10, legend_ncol=1, legend_figsize=(4, 4)):
     """
     创建图例并单独保存为 PNG 文件，背景为透明。
