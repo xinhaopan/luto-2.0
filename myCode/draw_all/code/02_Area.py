@@ -1,14 +1,12 @@
-import numpy as np
 import sys
-import os
-import pandas as pd
-from scipy.interpolate import interp1d
-import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw, ImageFont
 
 from tools.data_helper import *
 from tools.plot_helper import *
 from tools.parameters import *
+
+import matplotlib
+# 让文本在 SVG 中保持可编辑
+matplotlib.rcParams['svg.fonttype'] = 'none'
 
 plt.rcParams['font.family'] = 'Arial'
 

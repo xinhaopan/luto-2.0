@@ -24,6 +24,7 @@ def monitor_memory(func, *args, **kwargs):
 def main():
     # 设置参数
     start_year = 2010
+    target_year = 2050
 
     try:
         # 确保日志目录存在
@@ -38,7 +39,7 @@ def main():
         write_log(f"Data loaded. Peak memory usage: {load_data_memory:.2f} GB")
 
         # 监控运行模拟
-        _, simulation_memory = monitor_memory(sim.run, data=data, base=start_year)
+        _, simulation_memory = monitor_memory(sim.run, data=data, base=start_year, target=target_year)
         write_log(f"Simulation completed. Peak memory usage: {simulation_memory:.2f} GB")
 
         # 保存数据
