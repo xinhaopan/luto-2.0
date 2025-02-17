@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import re
+import cairosvg
+from lxml import etree
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -125,6 +127,15 @@ def process_single_df(df, mapping_df):
     if 'Year' in filtered_df.columns:
         filtered_df = filtered_df.set_index('Year')
 
+    # 检查是否有 'desc_new' 列
+    if 'desc_new' in mapping_df.columns:
+        # 创建映射字典 {旧列名: 新列名}
+        rename_dict = dict(zip(mapping_df['desc'], mapping_df['desc_new']))
+        # 仅重命名 filtered_df 中存在的列
+        filtered_df = filtered_df.rename(
+            columns={col: rename_dict[col] for col in filtered_df.columns if col in rename_dict})
+        legend_colors = {rename_dict.get(key, key): value for key, value in legend_colors.items()}
+
     return filtered_df, legend_colors
 
 
@@ -211,36 +222,45 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
     save_legend_as_image(all_handles, all_labels, legend_file, ncol, font_size=10)
     # 调整布局
     plt.tight_layout()
-    plt.savefig(output_png, bbox_inches='tight', dpi=300, transparent=True)
+    save_figure(fig, output_png)
     plt.show()
 
 
-def save_figure(fig, output_svg, output_png):
+def save_figure(fig, output_prefix):
     """
-    保存图表为SVG格式，并创建去掉所有文字的PNG格式
+    先保存SVG格式，再基于SVG删除文本，直接生成无文字的PDF格式，保证尺寸一致，不保存中间SVG文件。
 
     参数:
     - fig: Matplotlib Figure 对象
-    - output_svg: SVG 文件的保存路径
-    - output_png: PNG 文件的保存路径
+    - output_prefix: 文件保存的前缀（不包含扩展名）
     """
-    # 保存 SVG 格式
-    fig.savefig(output_svg, bbox_inches='tight', dpi=300, transparent=True, format='svg')
+    svg_path = f"{output_prefix}.svg"
+    pdf_path = f"{output_prefix}.pdf"
 
-    # 去掉所有文本
-    for ax in fig.get_axes():
-        ax.set_title("")
-        ax.set_xlabel("")
-        ax.set_ylabel("")
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
-        ax.legend().set_visible(False)  # 隐藏图例
+    # Step 1: 保存 SVG 格式（带完整文字）
+    fig.savefig(svg_path, bbox_inches='tight', dpi=300, transparent=True, format='svg')
 
-    # 保存 PNG 格式（背景不透明）
-    fig.savefig(output_png, bbox_inches='tight', dpi=300, transparent=False, format='png')
+    # Step 2: 解析 SVG 并删除所有文本元素
+    with open(svg_path, "r", encoding="utf-8") as f:
+        svg_content = f.read()
+
+    # 使用 lxml 解析 SVG
+    parser = etree.XMLParser(remove_blank_text=True)
+    tree = etree.fromstring(svg_content.encode("utf-8"), parser)
+
+    # 删除所有 <text> 元素（保留布局）
+    for text_element in tree.xpath("//svg:text", namespaces={"svg": "http://www.w3.org/2000/svg"}):
+        text_element.getparent().remove(text_element)
+
+    # Step 3: 直接转换无文字的 SVG 数据为 PDF
+    svg_no_text = etree.tostring(tree, encoding="utf-8")  # 生成无文字的 SVG 字符串
+    cairosvg.svg2pdf(bytestring=svg_no_text, write_to=pdf_path, dpi=300)
+
+    # 显示原始图（带文字）
+    plt.show()
 
 
-def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(0.5, -0.03), font_size=10):
+def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(0.5, -0.03), font_size=10,format='svg'):
     # 创建单独的图，用于保存图例
     fig, ax = plt.subplots(figsize=(6, 1))  # 设置图例的大小
     ax.axis('off')  # 关闭坐标轴
@@ -251,7 +271,7 @@ def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(
                         labelspacing=0.4, columnspacing=0.5, frameon=False)
 
     # 保存图例为单独的文件
-    plt.savefig(output_file, bbox_inches='tight', pad_inches=0, dpi=300, transparent=True)
+    plt.savefig(output_file, bbox_inches='tight', pad_inches=0, dpi=300, transparent=True, format=format)
     plt.close(fig)  # 关闭图，避免显示在主图上
 
 
