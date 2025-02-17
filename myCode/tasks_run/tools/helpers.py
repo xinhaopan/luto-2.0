@@ -69,7 +69,7 @@ def create_settings_template(to_path: str = 'Custom_runs'):
 
 
 
-def process_column(col, custom_settings):
+def process_column(col, custom_settings, script_name):
     """并行处理单个列的任务"""
     with open('Custom_runs/non_str_val.txt', 'r') as file:
         eval_vars = file.read().splitlines()
@@ -84,12 +84,12 @@ def process_column(col, custom_settings):
     write_custom_settings(task_dir, custom_dict)
 
     if os.name == 'nt':
-        submit_task_windows(task_dir, col)  # 执行任务
+        submit_task_windows(task_dir, col, script_name)  # 执行任务
     elif os.name == 'posix':
         submit_task_linux(task_dir, custom_dict)  # 执行任务
 
 
-def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 3):
+def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 3, script_name='0_runs'):
     """读取设置模板文件并并行运行任务"""
     # 读取自定义设置文件
     custom_settings = pd.read_csv(csv_path, index_col=0)
@@ -110,23 +110,23 @@ def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 
 
     if use_multithreading:
         Parallel(n_jobs=num_workers)(
-            delayed(process_column)(col, custom_settings) for col in custom_cols
+            delayed(process_column)(col, custom_settings, script_name) for col in custom_cols
         )
     else:
         for col in custom_cols:
-            process_column(col, custom_settings)
+            process_column(col, custom_settings, script_name)
 
 
-def submit_task_windows(task_dir, col):
+def submit_task_windows(task_dir, col,script_name):
     print_with_time(f"{task_dir}: running task for column...")
     start_time = time.time()  # 记录任务开始时间
-    log_file = f'{task_dir}/output/error_log.txt'  # 定义日志文件路径
+    log_file = f'{task_dir}/output/{script_name}_error_log.txt'  # 定义日志文件路径
 
     python_path = r'F:\xinhao\miniforge\envs\luto\python.exe'
     try:
         # 运行子进程，捕获标准输出和标准错误
         result = subprocess.run(
-            [python_path, f'{task_dir}/0_runs.py'],
+            [python_path, f'{task_dir}/{script_name}.py'],
             cwd=f'{task_dir}',
             capture_output=True,  # 捕获输出
             text=True  # 将输出转换为文本

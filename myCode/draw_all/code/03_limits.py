@@ -7,7 +7,7 @@ import sys
 from scipy.interpolate import interp1d
 from tools.parameters import *
 
-from tools.plot_helper import process_single_df
+from tools.plot_helper import *
 
 # 获取到文件的绝对路径，并将其父目录添加到 sys.path
 sys.path.append(os.path.abspath('../../../luto'))
@@ -34,8 +34,8 @@ def draw_plot_lines(df, colors, ylabel, y_range, y_tick_interval, output_file, f
 
     # 设置 x 轴刻度为年份，旋转 90 度
     ax.set_xlim(2010, 2050)
-    ax.set_xticks(range(2010, 2051, 20))  # 假设 df 的索引是年份
-    ax.set_xlabel('Year', fontsize=font_size)
+    ax.set_xticks(range(2010, 2051, 10))  # 假设 df 的索引是年份
+    # ax.set_xlabel('Year', fontsize=font_size)
     ax.tick_params(axis='x', labelsize=font_size, pad=10)
 
     # 设置 y 轴范围和间隔，传入的范围参数和间隔
@@ -44,12 +44,19 @@ def draw_plot_lines(df, colors, ylabel, y_range, y_tick_interval, output_file, f
     ax.set_ylabel(ylabel, fontsize=font_size)
     ax.tick_params(axis='y', labelsize=font_size, pad=10)
 
-    # 设置图例，并去掉框
-    ax.legend(fontsize=font_size, frameon=False,loc='lower left')
-
-    # 显示图形并保存
+    # # 设置图例，并去掉框
+    # ax.legend(fontsize=font_size, frameon=False,loc='lower left')
+    #
+    # # 显示图形并保存
+    # plt.tight_layout()
+    # plt.savefig(output_file, bbox_inches='tight', transparent=True, dpi=300)
+    # plt.show()
+    handles, labels = ax.get_legend_handles_labels()
+    legend_file = f"{output_file}" + "_legend.pdf"
+    save_legend_as_image(handles, labels, legend_file,ncol=1, font_size=10,format='pdf')
+    # 调整布局
     plt.tight_layout()
-    plt.savefig(output_file, bbox_inches='tight', transparent=True, dpi=300)
+    save_figure(fig, output_file)
     plt.show()
 
 def draw_coloum(data, legend_colors, output_file, fontsize=22, y_range=(0, 200), y_tick_interval=50, ylabel='Food Demand (million tonnes/kilolitres [milk])'):
@@ -66,58 +73,26 @@ def draw_coloum(data, legend_colors, output_file, fontsize=22, y_range=(0, 200),
     ax.set_yticks(np.arange(y_range[0], y_range[1] + 1, y_tick_interval))
 
     # 添加标题和标签
-    ax.set_xlabel('Year', fontsize=fontsize)  # x轴标签字体大小
     ax.yaxis.set_label_coords(-0.06, -1)  # 调整 y 轴标签位置
     ax.set_ylabel(ylabel, fontsize=fontsize)  # y轴标签字体大小
 
     ax.set_xlim(2009.5, 2050.5)
-    ax.set_xticks(range(2010, 2051, 20))  # 假设 df 的索引是年份
-    ax.set_xlabel('Year', fontsize=font_size)
+    ax.set_xticks(range(2010, 2051, 10))  # 假设 df 的索引是年份
+    # ax.set_xlabel('Year', fontsize=font_size)
     ax.tick_params(axis='x', labelsize=font_size, pad=10)
 
     # 设置刻度朝内
     ax.tick_params(axis='y', direction='in', labelsize=fontsize, pad=10)  # y轴刻度字体大小
     ax.tick_params(axis='x', direction='in', labelsize=fontsize, pad=10)  # x轴刻度字体大小
 
+    handles, labels = ax.get_legend_handles_labels()
+    legend_file = f"{output_file}" + "_legend.svg"
+    save_legend_as_image(handles, labels, legend_file,ncol=2, font_size=10)
     # 调整布局
     plt.tight_layout()
-
-    # 保存图表（不含图例）
-
-    plt.savefig(output_file, dpi=300, transparent=True)
+    save_figure(fig, output_file)
     plt.show()
 
-    # 关闭当前图形
-    plt.close()
-
-    save_legend(ax, f'{output_file[:-4]}_legend.png',fontsize=fontsize)
-
-def save_legend(ax, output_legend_file='../output/03_Food_legend.png',fontsize=20):
-    # 创建一个新的图形来存放图例，调整图形尺寸为小正方形
-    fig_legend = plt.figure(figsize=(10, 10))  # 调整尺寸为小正方形
-
-    # 获取图例句柄和标签
-    handles, labels = ax.get_legend_handles_labels()
-
-    # 设置图例的列数为3列，自动计算需要的行数
-    num_plots = len(labels)
-    nrows = 6
-    ncols = 2
-
-    # 创建图例，并调整图例形状
-    legend = fig_legend.legend(handles, labels, loc='center', frameon=False,
-                               handlelength=1,  # 设置图例项的宽度，较短接近正方形
-                               handleheight=1,  # 设置图例项的高度，确保接近正方形
-                               ncol=ncols)  # 设置图例为 3 列布局
-
-    # 设置图例文本大小，不改变字体大小
-    plt.setp(legend.get_texts(), fontsize=fontsize)  # 根据需要调整字体大小
-
-    # 保存图例为图片，确保边界不会截掉
-    fig_legend.savefig(output_legend_file, dpi=300, bbox_inches='tight', transparent=True)
-
-    # 关闭图例窗口，释放资源
-    plt.close(fig_legend)
 
 # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
 def get_biodiversity_target(INPUT_DIR, BIODIV_GBF_TARGET_2_DICTs):
@@ -317,6 +292,7 @@ for col_name, col_data in water_yield_natural_land.items():
 water_cci_delta.columns = dd_yield_df.columns
 # 对两个 DataFrame 逐列相加
 dd_water_limit_df = dd_yield_df + water_cci_delta
+# dd_water_limit_df = dd_yield_df
 
 mapping_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='water')
 dd_water_limit_df, legend_colors = process_single_df(dd_water_limit_df, mapping_df)

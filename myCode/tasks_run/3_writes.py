@@ -6,7 +6,7 @@ import pandas as pd
 from joblib import Parallel, delayed
 import re
 
-from myCode.tasks_run.tools.helpers import create_task_runs
+from tools.helpers import create_task_runs
 
 def delete_path(path):
     """删除单个文件或文件夹"""
@@ -49,7 +49,7 @@ def check_from_csv(csv_filename):
         file_dirs = [col for col in df.columns if col not in ['Default_run']]
 
         for file_dir in file_dirs:
-            working_directory = os.path.join("output", file_dir)
+            working_directory = os.path.join("../../output", file_dir)
 
             # 确保工作目录存在
             time_file_path = os.path.join(working_directory, 'output')
@@ -80,9 +80,8 @@ def check_from_csv(csv_filename):
         print(f"Error processing CSV file '{csv_filename}': {e}")
 
 if __name__ == "__main__":
-    os.chdir("myCode/tasks_run")
-    csv_path = "myCode/tasks_run/Custom_runs/setting_template_windows_0216_1.csv"
+    csv_path = "Custom_runs/setting_template_windows_0216.csv"
     check_from_csv(csv_path)
-    create_task_runs(csv_path, use_multithreading=False, num_workers=5, script_name="1_write.py")
+    create_task_runs(csv_path, use_multithreading=False, num_workers=5, script_name="1_write")
 
 
