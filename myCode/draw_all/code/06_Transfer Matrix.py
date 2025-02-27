@@ -7,6 +7,7 @@ import pandas as pd
 
 from tools.parameters import *
 from tools.data_helper import *
+from tools.plot_helper import *
 
 
 
@@ -120,8 +121,7 @@ def plot_all_transition_matrices(matrices, labels_list, label_mapping, output_pa
     cbar.ax.tick_params(labelsize=font_size + 5)
 
     # Save the plot
-    plt.savefig(output_path, dpi=300, bbox_inches='tight', transparent=True)
-    plt.show()
+    save_figure(fig, output_path)
 
 mapping_data_path = 'tools/land use group.xlsx'
 matrices = []
@@ -140,4 +140,4 @@ label_mapping = {
     'Unallocated - natural land': 'UN',
     'Non-agricultural land-use': 'NA'
 }
-plot_all_transition_matrices(matrices, labels,label_mapping, output_path="../output/06_transition_matrix_all.png")
+plot_all_transition_matrices(matrices, labels,label_mapping, output_path="../output/06_transition_matrix_all")
