@@ -80,8 +80,8 @@ def check_from_csv(csv_filename):
         print(f"Error processing CSV file '{csv_filename}': {e}")
 
 if __name__ == "__main__":
-    csv_path = "Custom_runs/setting_template_windows_0216.csv"
+    csv_path = "Custom_runs/setting_template_windows_0216_1.csv"
     check_from_csv(csv_path)
-    create_task_runs(csv_path, use_multithreading=False, num_workers=5, script_name="1_write")
+    create_task_runs(csv_path, use_multithreading=True, num_workers=5, script_name="1_write")
 
 

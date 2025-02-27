@@ -1,6 +1,6 @@
 INPUT_DIR = '../../../input'
 
-time = '20250201'
+time = '20250216'
 middle = ''
 suffix = '5'
 senerios = [
@@ -31,6 +31,7 @@ sub_tasks = [
 # 生成任务列表
 tasks = [(main_task, sub_task[0], sub_task[1]) for main_task in input_files for sub_task in sub_tasks]
 
-COLUMN_WIDTH = 3
+COLUMN_WIDTH = 0.8
 X_OFFSET = 2
 font_size = 25
+axis_linewidth = 2

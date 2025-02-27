@@ -15,7 +15,7 @@ plt.rcParams['font.family'] = 'Arial'
 plt.rcParams['pdf.fonttype'] = 42  # 保证 AI 里文字可编辑
 
 
-from tools.parameters import COLUMN_WIDTH, X_OFFSET
+from tools.parameters import COLUMN_WIDTH, X_OFFSET, axis_linewidth
 
 
 def get_colors(merged_dict, mapping_file, sheet_name=None):
@@ -164,7 +164,7 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
             ax.set_ylim(y_range[0], y_range[1])
 
             # 显示所有图的水平网格线
-            ax.grid(True, axis='y', linestyle='--', linewidth=0.5)
+            ax.grid(True, axis='y', linestyle='--', linewidth=1.5)
             # 仅隐藏刻度标签，保留刻度和网格线
             # 仅隐藏刻度和刻度标签，保留水平网格线
             if not is_left_col:
@@ -174,18 +174,20 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
             else:
                 # 如果是左侧列的子图
                 ax.spines['left'].set_visible(True)  # 显示左边框
+                ax.spines['left'].set_linewidth(axis_linewidth)
                 ax.yaxis.set_ticks_position('left')  # y 轴刻度在左侧
                 # ax.set_ylim(y_range[0], y_range[1])  # 设置 y 轴范围
 
-                # 如果是底部行的子图，移除最底部的刻度值
-                if is_bottom_row:
-                    yticks = yticks[1:]  # 从第二个刻度值开始
-
-                ax.set_yticks(yticks)  # 更新刻度
-                ax.tick_params(axis='y', labelsize=font_size)  # 设置刻度标签字体大小
+                # # 如果是底部行的子图，移除最底部的刻度值
+                # if is_bottom_row:
+                #     yticks = yticks[1:]  # 从第二个刻度值开始
+                #
+                # ax.set_yticks(yticks)  # 更新刻度
+                ax.tick_params(axis='y', labelsize=font_size, pad=5)  # 设置刻度标签字体大小
 
             if is_bottom_row:
                 ax.spines['bottom'].set_visible(True)  # 显示 x 轴边框
+                ax.spines['bottom'].set_linewidth(axis_linewidth)
                 ax.xaxis.set_ticks_position('bottom')
                 ax.tick_params(axis='x', labelsize=font_size)
                 ax.set_xlim(x_range[0] - X_OFFSET, x_range[1] + X_OFFSET)
@@ -226,38 +228,58 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
     plt.show()
 
 
+
 def save_figure(fig, output_prefix):
     """
-    先保存SVG格式，再基于SVG删除文本，直接生成无文字的PDF格式，保证尺寸一致，不保存中间SVG文件。
+    生成以下三种文件：
+    1. `output.svg` - 完整的 SVG（包含所有内容）。
+    2. `output_no_text.pdf` - 无文字的 PDF（仅保留图案）。
+    3. `output_no_plot.svg` - 仅保留边框、坐标轴、文字（删除折线、散点、柱状图）。
 
     参数:
     - fig: Matplotlib Figure 对象
     - output_prefix: 文件保存的前缀（不包含扩展名）
     """
     svg_path = f"{output_prefix}.svg"
-    pdf_path = f"{output_prefix}.pdf"
+    pdf_path = f"{output_prefix}_no_text.pdf"
+    svg_no_plot_path = f"{output_prefix}_no_plot.svg"
 
-    # Step 1: 保存 SVG 格式（带完整文字）
+    # Step 1: 保存完整的 SVG（带文字和图案）
     fig.savefig(svg_path, bbox_inches='tight', dpi=300, transparent=True, format='svg')
 
-    # Step 2: 解析 SVG 并删除所有文本元素
+    # Step 2: 解析 SVG
     with open(svg_path, "r", encoding="utf-8") as f:
         svg_content = f.read()
 
-    # 使用 lxml 解析 SVG
     parser = etree.XMLParser(remove_blank_text=True)
     tree = etree.fromstring(svg_content.encode("utf-8"), parser)
 
-    # 删除所有 <text> 元素（保留布局）
-    for text_element in tree.xpath("//svg:text", namespaces={"svg": "http://www.w3.org/2000/svg"}):
+    # Step 3: 生成无文字的 PDF
+    tree_no_text = etree.fromstring(svg_content.encode("utf-8"), parser)
+
+    # 删除所有 <text> 元素（生成无文字版本）
+    for text_element in tree_no_text.xpath("//svg:text", namespaces={"svg": "http://www.w3.org/2000/svg"}):
         text_element.getparent().remove(text_element)
 
-    # Step 3: 直接转换无文字的 SVG 数据为 PDF
-    svg_no_text = etree.tostring(tree, encoding="utf-8")  # 生成无文字的 SVG 字符串
+    # 直接转换无文字的 SVG 数据为 PDF
+    svg_no_text = etree.tostring(tree_no_text, encoding="utf-8")
     cairosvg.svg2pdf(bytestring=svg_no_text, write_to=pdf_path, dpi=300)
+
+    # Step 4: 生成仅保留坐标轴、边框、文字的 SVG（去掉折线、散点、柱状图）
+    tree_no_plot = etree.fromstring(svg_content.encode("utf-8"), parser)
+
+    # 仅删除绘图数据（path, polygon, circle）
+    for element in tree_no_plot.xpath("//svg:path | //svg:polygon | //svg:circle",
+                                      namespaces={"svg": "http://www.w3.org/2000/svg"}):
+        element.getparent().remove(element)
+
+    # 保存仅有坐标轴和文字的 SVG
+    with open(svg_no_plot_path, "wb") as f:
+        f.write(etree.tostring(tree_no_plot, pretty_print=True, encoding="utf-8"))
 
     # 显示原始图（带文字）
     plt.show()
+
 
 
 def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(0.5, -0.03), font_size=10,format='svg'):
@@ -272,6 +294,7 @@ def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(
 
     # 保存图例为单独的文件
     plt.savefig(output_file, bbox_inches='tight', pad_inches=0, dpi=300, transparent=True, format=format)
+    plt.show()
     plt.close(fig)  # 关闭图，避免显示在主图上
 
 
@@ -320,7 +343,7 @@ def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_
     for i in range(1, len(categories)):
         bar_list.append(
             ax.bar(years, pos_data[i], bottom=pos_data[:i].sum(axis=0), label=categories[i], color=color_list[i],
-                   width=COLUMN_WIDTH))
+                   width=COLUMN_WIDTH,zorder=2))
 
     # 绘制负数的堆积柱状图
     neg_data = np.minimum(data, 0)
@@ -334,7 +357,7 @@ def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_
     if point_dict is not None:
         for idx, column in enumerate(point_df.columns):
             color = point_colors[idx] if point_colors and idx < len(point_colors) else 'black'  # 指定颜色或默认黑色
-            line = ax.plot(years, point_df[column], marker='o', linewidth=1.5, label=column, markersize=3, color=color)
+            line = ax.plot(years, point_df[column], marker='o', linewidth=1.5, label=column, markersize=3, color=color,zorder=3)
             line_list.append(line)
 
     # Set x-axis limits and ticks
@@ -507,14 +530,27 @@ def plot_line_chart(ax, merged_dict, input_name, legend_colors, font_size=10,
 #     return (y_min, y_max), interval
 
 
+
 def get_max_min(df):
-    cumsum_df = df.cumsum(axis=1)
-    cumsum_max = cumsum_df.max().max()
-    cumsum_min = cumsum_df.min().min()
+    # 计算正数累积和
+    pos_cumsum = df.where(df > 0, 0).cumsum(axis=1)
+    pos_max = pos_cumsum.max().max()
+
+    # 计算负数累积和
+    neg_cumsum = df.where(df < 0, 0).cumsum(axis=1)
+    neg_min = neg_cumsum.min().min()
+
+    # 计算单个值的最值
     value_min = df.min().min()
     value_max = df.max().max()
 
-    return max(cumsum_max, value_max), min(cumsum_min, value_min)
+    # 计算最终最大值（正数部分）
+    max_value = max(pos_max, value_max)
+
+    # 计算最终最小值（负数部分）
+    min_value = min(neg_min, value_min)
+
+    return max_value, min_value
 
 def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3, use_multithreading=False):
     max_value, min_value = (

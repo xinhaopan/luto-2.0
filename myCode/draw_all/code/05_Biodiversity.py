@@ -25,11 +25,11 @@ bio_dict,legend_colors = get_colors(bio_dict, 'tools/land use colors.xlsx', shee
 bio_target_dict = get_dict_data(input_files, "biodiversity", 'Score', 'Variable')
 point_dict = rename_and_filter_columns(bio_target_dict, ['Biodiversity score limit','Solve biodiversity score'], ['Constraints','Score'])
 point_colors = ['black','red']
-
+y_range, y_ticks = calculate_y_axis_range(bio_dict)
 output_png = '../output/05_bio.png'
 plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,point_dict=point_dict,point_colors=point_colors,
-                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 105),
-                             x_ticks=20, y_ticks=35,
+                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
+                             x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 

@@ -718,6 +718,59 @@ def concatenate_images(image_files, output_image, rows=3, cols=3):
     # 保存拼接后的图片
     new_img.save(output_image)
 
+def assign_color_by_area_ratio(overlay_reproject_geo_tif, overlay_reproject_rgb_tif, color_hex='#FF0000',
+                               background_value=-9999, write_png=False):
+    """
+    根据像元的面积占比值映射指定颜色强度，并保存为带坐标的 GeoTIFF 文件。
 
+    参数:
+    - overlay_reproject_geo_tif: str, 输入的 GeoTIFF 文件路径。
+    - overlay_reproject_rgb_tif: str, 输出带颜色的 GeoTIFF 文件路径。
+    - color_hex: str, 十六进制颜色 (如 '#FF0000' 表示红色)。
+    - background_value: int or float, 背景值，像元为此值时设为黑色。
+    - write_png: bool, 是否将 GeoTIFF 转换为 PNG 文件。
+    """
+    # 读取栅格数据
+    with rasterio.open(overlay_reproject_geo_tif) as overlay_src:
+        overlay_data = overlay_src.read(1)
+        overlay_transform = overlay_src.transform
+        overlay_crs = overlay_src.crs
 
+    # 处理无效值 (背景值设为 NaN)
+    valid_mask = overlay_data != background_value
+    overlay_data = np.where(valid_mask, overlay_data, np.nan)
 
+    # 标准化面积占比值到 [0, 1]
+    min_val, max_val = np.nanmin(overlay_data), np.nanmax(overlay_data)
+    normalized = np.zeros_like(overlay_data, dtype=float)
+    normalized[valid_mask] = (overlay_data[valid_mask] - min_val) / (max_val - min_val)
+
+    # 解析输入颜色 (HEX → RGB 0-255)
+    base_color_rgb = np.array([int(color_hex[i:i + 2], 16) for i in (1, 3, 5)])
+
+    # 创建 RGB 图像并应用面积占比权重
+    rgb_image = np.zeros((overlay_data.shape[0], overlay_data.shape[1], 3), dtype=np.uint8)
+    for i in range(3):
+        channel = (base_color_rgb[i] * normalized).astype(np.uint8)
+        rgb_image[:, :, i] = np.where(valid_mask, channel, 0)  # 无效值设为黑色
+
+    # 保存为带颜色和坐标的 GeoTIFF 文件
+    with rasterio.open(
+        overlay_reproject_rgb_tif, 'w',
+        driver='GTiff',
+        height=rgb_image.shape[0],
+        width=rgb_image.shape[1],
+        count=3,
+        dtype='uint8',
+        crs=overlay_crs,
+        transform=overlay_transform
+    ) as dst:
+        dst.write(rgb_image[:, :, 0], 1)  # R
+        dst.write(rgb_image[:, :, 1], 2)  # G
+        dst.write(rgb_image[:, :, 2], 3)  # B
+
+    print(f"✅ 带颜色映射面积占比图已保存到: {overlay_reproject_rgb_tif}")
+
+    # 可选: 转换为 PNG
+    if write_png:
+        convert_tif_to_png(overlay_reproject_rgb_tif)
