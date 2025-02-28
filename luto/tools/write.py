@@ -67,9 +67,6 @@ from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
-from luto.tools.xarray_tools import calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, calc_bio_score_by_yr
-
-
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 def write_outputs(data: Data):
@@ -183,8 +180,8 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
     write_biodiversity_contribution(data, yr_cal, path_yr)
+    write_major_vegetation_groups(data, yr_cal, path_yr)
     # write_npy(data, yr_cal, path_yr)
-
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
 
@@ -1165,42 +1162,49 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
 
 
 def write_biodiversity_contribution(data: Data, yr_cal, path):
-    
-    # Do nothing if no need to calculate biodiversity contribution
-    if not settings.CALC_BIODIVERSITY_CONTRIBUTION:
-        return
 
     print(f'Writing biodiversity contribution score for {yr_cal}')
+    
+    # # Get dvars for the year
+    # ag_dvar_mrj = data.ag_dvars[yr_cal]
+    # non_ag_dvar_rk = data.non_ag_dvars[yr_cal]
+    # am_dvar_mrj = xr.DataArray(
+    #     np.zeros((len(AG_MANAGEMENTS_TO_LAND_USES), data.NCELLS, data.N_AG_LUS)),
+    #     dims=['ag_management', 'cell', 'ag_landuse'],
+    #     coords={'ag_management':list(AG_MANAGEMENTS_TO_LAND_USES.keys()),
+    #             'cell':np.arange(data.NCELLS),
+    #             'ag_landuse':np.arange(data.N_AG_LUS)})
 
-    # Get the decision variables for the year and convert them to xarray
-    ag_dvar_reprj_to_bio = data.ag_dvars_2D_reproj_match[yr_cal]
-    am_dvar_reprj_to_bio = data.ag_man_dvars_2D_reproj_match[yr_cal]
-    non_ag_dvar_reprj_to_bio = data.non_ag_dvars_2D_reproj_match[yr_cal]
 
-    # Calculate the biodiversity contribution scores
-    if settings.BIO_CALC_LEVEL == 'group':
-        bio_score_group = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc', chunks='auto')
-        bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})  # Calculate the mean score of all species
-        bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']       # Combine the mean score with the original score
-        bio_contribution_shards = [bio_score_group.sel(year=yr_cal, group=group) for group in bio_score_group['group'].values]
-    elif settings.BIO_CALC_LEVEL == 'species':
-        bio_raw_path = f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc'
-        bio_his_score_sum = calc_bio_hist_sum(bio_raw_path)
-        bio_contribution_species = calc_bio_score_species(bio_raw_path, bio_his_score_sum)
-        bio_contribution_shards = interp_bio_species_to_shards(bio_contribution_species, yr_cal)
+
+    # # Write the biodiversity contribution to csv
+    # bio_df = None
+    # bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
+
+
+def write_major_vegetation_groups(data: Data, yr_cal: int, path) -> None:
+    if not settings.BIODIVERSTIY_TARGET_GBF_3 == "on":
+        return
+    
+    print(f"Writing NVIS vegetation classes' scores for {yr_cal}")
+    
+    mvg_df = pd.DataFrame(index=list(data.NVIS_ID2DESC.values()), columns=["Target", "Actual"])
+
+    if yr_cal == data.YR_CAL_BASE:
+        mvg_mrj_dict = ag_biodiversity.get_major_vegetation_matrices(data)
+        mvg_prod_data = tools.calc_major_vegetation_group_ag_area_for_year(
+            mvg_mrj_dict, data.AG_L_MRJ
+        )
     else:
-        raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
+        mvg_prod_data = data.prod_data[yr_cal]["Major Vegetation Groups"]
 
-    # Write the biodiversity contribution to csv
-    bio_df = calc_bio_score_by_yr(
-        ag_dvar_reprj_to_bio,
-        am_dvar_reprj_to_bio,
-        non_ag_dvar_reprj_to_bio,
-        bio_contribution_shards)
+    mvg_targets = ag_biodiversity.get_major_vegetation_group_limits(data, yr_cal)[0]
 
-    bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
+    for v, name in data.NVIS_ID2DESC.items():
+        mvg_df.loc[name, "Target"] = mvg_targets[v]
+        mvg_df.loc[name, "Actual"] = mvg_prod_data[v]
 
-
+    mvg_df.to_csv(os.path.join(path, f'vegetation_groups_{yr_cal}.csv'), index=True)
 
 
 def write_ghg_separate(data: Data, yr_cal, path):

@@ -50,45 +50,54 @@ import luto.economics.non_agricultural.revenue as non_ag_revenue
 class SolverInputData:
     """
     An object that collects and stores all relevant data for solver.py.
-    """   
-    base_year: int                          # The base year of this solving process
-    target_year: int                        # The target year of this solving process
+    """
+    base_year: int  # The base year of this solving process
+    target_year: int  # The target year of this solving process
 
-    ag_g_mrj: np.ndarray                    # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray                    # Agricultural water requirements matrices.
-    ag_b_mrj: np.ndarray                    # Agricultural biodiversity matrices.
-    ag_x_mrj: np.ndarray                    # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray                    # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray                # GHG emissions released during transitions between agricultural land uses.
+    ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
+    ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
+    ag_b_mrj: np.ndarray  # Agricultural biodiversity matrices.
+    ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
+    ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
+    ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
+    ag_mvg_mrj: dict[int, np.ndarray]  # Agricultural major vegetation groups data: dict indexed by vegetation class (v)
 
-    non_ag_g_rk: np.ndarray                 # Non-agricultural greenhouse gas emissions matrix.
-    non_ag_w_rk: np.ndarray                 # Non-agricultural water requirements matrix.
-    non_ag_b_rk: np.ndarray                 # Non-agricultural biodiversity matrix.
-    non_ag_x_rk: np.ndarray                 # Non-agricultural exclude matrices.
-    non_ag_q_crk: np.ndarray                # Non-agricultural yield matrix.
-    non_ag_lb_rk: np.ndarray                # Non-agricultural lower bound matrices.
+    non_ag_g_rk: np.ndarray  # Non-agricultural greenhouse gas emissions matrix.
+    non_ag_w_rk: np.ndarray  # Non-agricultural water requirements matrix.
+    non_ag_b_rk: np.ndarray  # Non-agricultural biodiversity matrix.
+    non_ag_x_rk: np.ndarray  # Non-agricultural exclude matrices.
+    non_ag_q_crk: np.ndarray  # Non-agricultural yield matrix.
+    non_ag_lb_rk: np.ndarray  # Non-agricultural lower bound matrices.
+    non_ag_mvg_rk: dict[
+        int, np.ndarray]  # Non-agricultural major vegetation groups data: dict indexed by vegetation class (v)
 
-    ag_man_g_mrj: dict                      # Agricultural management options' GHG emission effects.
-    ag_man_q_mrp: dict                      # Agricultural management options' quantity effects.
-    ag_man_w_mrj: dict                      # Agricultural management options' water requirement effects.
-    ag_man_b_mrj: dict                      # Agricultural management options' biodiversity effects.
-    ag_man_limits: dict                     # Agricultural management options' adoption limits.
-    ag_man_lb_mrj: dict                     # Agricultural management options' lower bounds.
+    ag_man_g_mrj: dict  # Agricultural management options' GHG emission effects.
+    ag_man_q_mrp: dict  # Agricultural management options' quantity effects.
+    ag_man_w_mrj: dict  # Agricultural management options' water requirement effects.
+    ag_man_b_mrj: dict  # Agricultural management options' biodiversity effects.
+    ag_man_limits: dict  # Agricultural management options' adoption limits.
+    ag_man_lb_mrj: dict  # Agricultural management options' lower bounds.
+    ag_man_mvg_mrj: dict[str, dict[int, np.ndarray]]  # Agricultural management options' major vegetation group effects
 
-    water_yield_RR_BASE_YR: dict                           # Water yield for the BASE_YR based on historical water yield layers .
-    water_yield_outside_study_area: dict[int, float]       # Water yield from outside LUTO study area -> dict. Keys: year, region.
-    
-    economic_contr_mrj: float               # base year economic contribution matrix.
-    economic_BASE_YR_prices: np.ndarray     # base year commodity prices.
+    water_yield_RR_BASE_YR: dict  # Water yield for the BASE_YR based on historical water yield layers .
+    water_yield_outside_study_area: dict[int, float]  # Water yield from outside LUTO study area -> dict. Key: region.
+
+    savanna_eligible_r: np.ndarray  # Cells that are not eligible for savanna land use.
+
+    economic_contr_mrj: float  # base year economic contribution matrix.
+    economic_BASE_YR_prices: np.ndarray  # base year commodity prices.
     economic_target_yr_carbon_price: float  # target year carbon price.
 
-    offland_ghg: np.ndarray                 # GHG emissions from off-land commodities.
+    offland_ghg: np.ndarray  # GHG emissions from off-land commodities.
 
-    lu2pr_pj: np.ndarray                    # Conversion matrix: land-use to product(s).
-    pr2cm_cp: np.ndarray                    # Conversion matrix: product(s) to commodity.
-    limits: dict                            # Targets to use.
-    desc2aglu: dict                         # Map of agricultural land use descriptions to codes.
-    resmult: float                          # Resolution factor multiplier from data.RESMULT
+    mvg_contr_outside_study_area: dict[
+        int, float]  # Contributions of land outside LUTO study area to each major veg. group (keys: major groups)
+
+    lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
+    pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.
+    limits: dict  # Targets to use.
+    desc2aglu: dict  # Map of agricultural land use descriptions to codes.
+    resmult: float  # Resolution factor multiplier from data.RESMULT
 
     @property
     def n_ag_lms(self):
@@ -155,7 +164,7 @@ class SolverInputData:
         cells2ag_lu = defaultdict(list)
         for (m, j), j_cells in ag_lu2cells.items():
             for r in j_cells:
-                cells2ag_lu[r].append((m,j))
+                cells2ag_lu[r].append((m, j))
 
         return dict(cells2ag_lu)
 
@@ -173,107 +182,119 @@ class SolverInputData:
 
         return dict(cells2non_ag_lu)
 
+
 def get_ag_c_mrj(data: Data, target_index):
-    print('Getting agricultural cost matrices...', flush = True)
+    print('Getting agricultural cost matrices...', flush=True)
     output = ag_cost.get_cost_matrices(data, target_index)
     return output.astype(np.float32)
 
 
 def get_non_ag_c_rk(data: Data, ag_c_mrj: np.ndarray, lumap: np.ndarray, target_year):
-    print('Getting non-agricultural cost matrices...', flush = True)
+    print('Getting non-agricultural cost matrices...', flush=True)
     output = non_ag_cost.get_cost_matrix(data, ag_c_mrj, lumap, target_year)
     return output.astype(np.float32)
 
 
 def get_ag_r_mrj(data: Data, target_index):
-    print('Getting agricultural revenue matrices...', flush = True)
+    print('Getting agricultural revenue matrices...', flush=True)
     output = ag_revenue.get_rev_matrices(data, target_index)
     return output.astype(np.float32)
 
 
 def get_non_ag_r_rk(data: Data, ag_r_mrj: np.ndarray, base_year: int, target_year: int):
-    print('Getting non-agricultural revenue matrices...', flush = True)
+    print('Getting non-agricultural revenue matrices...', flush=True)
     output = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
 def get_ag_g_mrj(data: Data, target_index):
-    print('Getting agricultural GHG emissions matrices...', flush = True)
+    print('Getting agricultural GHG emissions matrices...', flush=True)
     output = ag_ghg.get_ghg_matrices(data, target_index)
     return output.astype(np.float32)
 
 
 def get_non_ag_g_rk(data: Data, ag_g_mrj, base_year):
-    print('Getting non-agricultural GHG emissions matrices...', flush = True)
+    print('Getting non-agricultural GHG emissions matrices...', flush=True)
     output = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
-def get_ag_w_mrj(data: Data, target_index, water_dr_yield: Optional[np.ndarray] = None, water_sr_yield: Optional[np.ndarray] = None):
-    print('Getting agricultural water net yield matrices based on historical water yield layers ...', flush = True)
+def get_ag_w_mrj(data: Data, target_index, water_dr_yield: Optional[np.ndarray] = None,
+                 water_sr_yield: Optional[np.ndarray] = None):
+    print('Getting agricultural water net yield matrices based on historical water yield layers ...', flush=True)
     output = ag_water.get_water_net_yield_matrices(data, target_index, water_dr_yield, water_sr_yield)
     return output.astype(np.float32)
 
 
 def get_w_outside_luto(data: Data, yr_cal: int):
-    print('Getting water yield from outside LUTO study area...', flush = True)
+    print('Getting water yield from outside LUTO study area...', flush=True)
     return ag_water.get_water_outside_luto_study_area_from_hist_level(data)
 
+
 def get_w_RR_BASE_YR(data: Data):
-    print('Getting water yield for the BASE_YR based on historical water yield layers...', flush = True)
+    print('Getting water yield for the BASE_YR based on historical water yield layers...', flush=True)
     return ag_water.calc_water_net_yield_BASE_YR(data)
 
 
 def get_ag_b_mrj(data: Data):
-    print('Getting agricultural biodiversity requirement matrices...', flush = True)
+    print('Getting agricultural biodiversity requirement matrices...', flush=True)
     output = ag_biodiversity.get_breq_matrices(data)
     return output.astype(np.float32)
 
 
+def get_ag_mvg_mrj(data: Data):
+    if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
+        return np.empty(0)
+    print('Getting agricultural major vegetation groups matrices...', flush=True)
+    output = ag_biodiversity.get_major_vegetation_matrices(data)
+    return output
+
+
 def get_non_ag_w_rk(
-    data: Data, 
-    ag_w_mrj: np.ndarray, 
-    base_year, 
-    target_year, 
-    water_dr_yield: Optional[np.ndarray] = None, 
-    water_sr_yield: Optional[np.ndarray] = None
-    ):
-    print('Getting non-agricultural water requirement matrices...', flush = True)
+        data: Data,
+        ag_w_mrj: np.ndarray,
+        base_year,
+        target_year,
+        water_dr_yield: Optional[np.ndarray] = None,
+        water_sr_yield: Optional[np.ndarray] = None
+):
+    print('Getting non-agricultural water requirement matrices...', flush=True)
     yr_idx = target_year - data.YR_CAL_BASE
-    output = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[base_year], yr_idx, water_dr_yield, water_sr_yield)
+    output = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[base_year], yr_idx, water_dr_yield,
+                                                 water_sr_yield)
     return output.astype(np.float32)
 
 
 def get_non_ag_b_rk(data: Data, ag_b_mrj: np.ndarray, base_year):
-    print('Getting non-agricultural biodiversity requirement matrices...', flush = True)
+    print('Getting non-agricultural biodiversity requirement matrices...', flush=True)
     output = non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
 def get_ag_q_mrp(data: Data, target_index):
-    print('Getting agricultural production quantity matrices...', flush = True)
+    print('Getting agricultural production quantity matrices...', flush=True)
     output = ag_quantity.get_quantity_matrices(data, target_index)
     return output.astype(np.float32)
 
 
 def get_non_ag_q_crk(data: Data, ag_q_mrp: np.ndarray, base_year: int):
-    print('Getting non-agricultural production quantity matrices...', flush = True)
+    print('Getting non-agricultural production quantity matrices...', flush=True)
     output = non_ag_quantity.get_quantity_matrix(data, ag_q_mrp, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
 def get_ag_ghg_t_mrj(data: Data, base_year):
-    print('Getting agricultural transitions GHG emissions...', flush = True)
+    print('Getting agricultural transitions GHG emissions...', flush=True)
     output = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
 def get_ag_t_mrj(data: Data, target_index, base_year):
-    print('Getting agricultural transition cost matrices...', flush = True)
-    
+    print('Getting agricultural transition cost matrices...', flush=True)
+
     ag_t_mrj = ag_transition.get_transition_matrices(
-        data, 
-        target_index, 
+        data,
+        target_index,
         base_year
     ).astype(np.float32)
     # Transition costs occures if the base year is not the target year
@@ -281,123 +302,140 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
 
 
 def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year):
-    print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
-    non_ag_t_mrj = non_ag_transition.get_from_ag_transition_matrix( 
-        data, 
-        target_index, 
-        base_year, 
-        data.lumaps[base_year], 
+    print('Getting agricultural to non-agricultural transition cost matrices...', flush=True)
+    non_ag_t_mrj = non_ag_transition.get_from_ag_transition_matrix(
+        data,
+        target_index,
+        base_year,
+        data.lumaps[base_year],
         data.lmmaps[base_year]).astype(np.float32)
     # Transition costs occures if the base year is not the target year
     return non_ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_t_mrj)
 
 
-def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
-    print('Getting non-agricultural to agricultural transition cost matrices...', flush = True)
-    
+def get_non_ag_to_ag_t_mrj(data: Data, base_year: int, target_index: int):
+    print('Getting non-agricultural to agricultural transition cost matrices...', flush=True)
+
     non_ag_to_ag_mrj = non_ag_transition.get_to_ag_transition_matrix(
-        data, 
-        target_index, 
-        data.lumaps[base_year], 
+        data,
+        target_index,
+        data.lumaps[base_year],
         data.lmmaps[base_year]).astype(np.float32)
     # Transition costs occures if the base year is not the target year
     return non_ag_to_ag_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_to_ag_mrj)
 
 
 def get_non_ag_t_rk(data: Data, base_year):
-    print('Getting non-agricultural transition cost matrices...', flush = True)
+    print('Getting non-agricultural transition cost matrices...', flush=True)
     output = non_ag_transition.get_non_ag_transition_matrix(data)
     return output.astype(np.float32)
 
 
 def get_ag_x_mrj(data: Data, base_year):
-    print('Getting agricultural exclude matrices...', flush = True)
+    print('Getting agricultural exclude matrices...', flush=True)
     output = ag_transition.get_exclude_matrices(data, data.lumaps[base_year])
     return output
 
 
 def get_non_ag_x_rk(data: Data, ag_x_mrj, base_year):
-    print('Getting non-agricultural exclude matrices...', flush = True)
+    print('Getting non-agricultural exclude matrices...', flush=True)
     output = non_ag_transition.get_exclude_matrices(data, ag_x_mrj, data.lumaps[base_year])
     return output
 
 
 def get_ag_man_lb_mrj(data: Data, base_year):
-    print('Getting agricultural lower bound matrices...', flush = True)
+    print('Getting agricultural lower bound matrices...', flush=True)
     output = ag_transition.get_lower_bound_agricultural_management_matrices(data, base_year)
     return output
 
 
+def get_ag_man_mvg_mrj(data: Data, target_index: int, ag_mvg_mrj: np.ndarray):
+    print('Getting agricultural management options\' major vegetation group effects...', flush=True)
+    output = ag_biodiversity.get_agricultural_management_major_veg_group_matrices(
+        data, ag_mvg_mrj, target_index
+    )
+    return output
+
+
 def get_non_ag_lb_rk(data: Data, base_year):
-    print('Getting non-agricultural lower bound matrices...', flush = True)
+    print('Getting non-agricultural lower bound matrices...', flush=True)
     output = non_ag_transition.get_lower_bound_non_agricultural_matrices(data, base_year)
     return output
 
 
+def get_non_ag_mvg_rk(data: Data, ag_mvg_mrj: dict[int, np.ndarray], base_year: int):
+    if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
+        return {}
+    print('Getting non-agricultural major vegetation groups matrices...', flush=True)
+    output = non_ag_biodiversity.get_major_vegetation_matrices(
+        data, ag_mvg_mrj, data.lumaps[base_year],
+    )
+    return output
+
+
 def get_ag_man_c_mrj(data: Data, target_index, ag_c_mrj: np.ndarray):
-    print('Getting agricultural management options\' cost effects...', flush = True)
+    print('Getting agricultural management options\' cost effects...', flush=True)
     output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
     return output
 
 
-def get_ag_man_g_mrj(data: Data, target_index, ag_g_mrj):
-    print('Getting agricultural management options\' GHG emission effects...', flush = True)
+def get_ag_man_g_mrj(data: Data, target_index, ag_g_mrj: np.ndarray):
+    print('Getting agricultural management options\' GHG emission effects...', flush=True)
     output = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, target_index)
     return output
 
 
-def get_ag_man_q_mrj(data: Data, target_index, ag_q_mrp):
-    print('Getting agricultural management options\' quantity effects...', flush = True)
+def get_ag_man_q_mrj(data: Data, target_index, ag_q_mrp: np.ndarray):
+    print('Getting agricultural management options\' quantity effects...', flush=True)
     output = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, target_index)
     return output
 
 
-def get_ag_man_r_mrj(data: Data, target_index, ag_r_mrj):
-    print('Getting agricultural management options\' revenue effects...', flush = True)
+def get_ag_man_r_mrj(data: Data, target_index, ag_r_mrj: np.ndarray):
+    print('Getting agricultural management options\' revenue effects...', flush=True)
     output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
     return output
 
 
-def get_ag_man_t_mrj(data: Data, target_index, ag_t_mrj):
-    print('Getting agricultural management options\' transition cost effects...', flush = True)
+def get_ag_man_t_mrj(data: Data, target_index, ag_t_mrj: np.ndarray):
+    print('Getting agricultural management options\' transition cost effects...', flush=True)
     output = ag_transition.get_agricultural_management_transition_matrices(data, ag_t_mrj, target_index)
     return output
 
 
 def get_ag_man_w_mrj(data: Data, target_index):
-    print('Getting agricultural management options\' water requirement effects...', flush = True)
+    print('Getting agricultural management options\' water requirement effects...', flush=True)
     output = ag_water.get_agricultural_management_water_matrices(data, target_index)
     return output
 
 
-def get_ag_man_b_mrj(data: Data, target_index, ag_b_mrj):
-    print('Getting agricultural management options\' biodiversity effects...', flush = True)
+def get_ag_man_b_mrj(data: Data, target_index, ag_b_mrj: np.ndarray):
+    print('Getting agricultural management options\' biodiversity effects...', flush=True)
     output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj, target_index)
     return output
 
 
 def get_ag_man_limits(data: Data, target_index):
-    print('Getting agricultural management options\' adoption limits...', flush = True)
+    print('Getting agricultural management options\' adoption limits...', flush=True)
     output = ag_transition.get_agricultural_management_adoption_limits(data, target_index)
     return output
 
 
 def get_economic_mrj(
-    ag_c_mrj: np.ndarray,
-    ag_r_mrj: np.ndarray,
-    ag_t_mrj: np.ndarray,
-    ag_to_non_ag_t_rk: np.ndarray,
-    non_ag_c_rk: np.ndarray,
-    non_ag_r_rk: np.ndarray,
-    non_ag_t_rk: np.ndarray,
-    non_ag_to_ag_t_mrj: np.ndarray,
-    ag_man_c_mrj: dict[str, np.ndarray],
-    ag_man_r_mrj: dict[str, np.ndarray],
-    ag_man_t_mrj: dict[str, np.ndarray],
-    ) -> dict[str, np.ndarray|dict[str, np.ndarray]]:
-    
-    print('Getting base year economic matrix...', flush = True)
-    
+        ag_c_mrj: np.ndarray,
+        ag_r_mrj: np.ndarray,
+        ag_t_mrj: np.ndarray,
+        ag_to_non_ag_t_rk: np.ndarray,
+        non_ag_c_rk: np.ndarray,
+        non_ag_r_rk: np.ndarray,
+        non_ag_t_rk: np.ndarray,
+        non_ag_to_ag_t_mrj: np.ndarray,
+        ag_man_c_mrj: dict[str, np.ndarray],
+        ag_man_r_mrj: dict[str, np.ndarray],
+        ag_man_t_mrj: dict[str, np.ndarray],
+) -> dict[str, np.ndarray | dict[str, np.ndarray]]:
+    print('Getting base year economic matrix...', flush=True)
+
     if settings.OBJECTIVE == "maxprofit":
         # Pre-calculate profit (revenue minus cost) for each land use
         ag_obj_mrj = ag_r_mrj - (ag_c_mrj + ag_t_mrj + non_ag_to_ag_t_mrj)
@@ -405,7 +443,7 @@ def get_economic_mrj(
 
         # Get effects of alternative agr. management options (stored in a dict)
         ag_man_objs = {
-            am: ag_man_r_mrj[am] - (ag_man_c_mrj[am] + ag_man_t_mrj[am]) 
+            am: ag_man_r_mrj[am] - (ag_man_c_mrj[am] + ag_man_t_mrj[am])
             for am in AG_MANAGEMENTS_TO_LAND_USES
         }
 
@@ -416,7 +454,7 @@ def get_economic_mrj(
 
         # Store calculations for each agricultural management option in a dict
         ag_man_objs = {
-            am: (ag_man_c_mrj[am] + ag_man_t_mrj[am])      
+            am: (ag_man_c_mrj[am] + ag_man_t_mrj[am])
             for am in AG_MANAGEMENTS_TO_LAND_USES
         }
 
@@ -430,20 +468,19 @@ def get_economic_mrj(
     return [ag_obj_mrj, non_ag_obj_rk, ag_man_objs]
 
 
-
 def get_commodity_prices(data: Data) -> np.ndarray:
     '''
     Get the prices of commodities in the base year. These prices will be used as multiplier
     to weight deviatios of commodity production from the target.
     '''
-    
+
     commodity_lookup = {
-        ('P1','BEEF'): 'beef meat',
-        ('P3','BEEF'): 'beef lexp',
-        ('P1','SHEEP'): 'sheep meat',
-        ('P2','SHEEP'): 'sheep wool',
-        ('P3','SHEEP'): 'sheep lexp',
-        ('P1','DAIRY'): 'dairy',
+        ('P1', 'BEEF'): 'beef meat',
+        ('P3', 'BEEF'): 'beef lexp',
+        ('P1', 'SHEEP'): 'sheep meat',
+        ('P2', 'SHEEP'): 'sheep wool',
+        ('P3', 'SHEEP'): 'sheep lexp',
+        ('P1', 'DAIRY'): 'dairy',
     }
 
     commodity_prices = {}
@@ -451,22 +488,26 @@ def get_commodity_prices(data: Data) -> np.ndarray:
     # Get the median price of each commodity
     for names, commodity in commodity_lookup.items():
         prices = np.nanpercentile(data.AGEC_LVSTK[names[0], names[1]], 50)
-        prices = prices * 1000 if commodity == 'dairy' else prices # convert to per tonne for dairy
+        prices = prices * 1000 if commodity == 'dairy' else prices  # convert to per tonne for dairy
         commodity_prices[commodity] = prices
 
     # Get the median price of each crop; here need to use 'irr' because dry-Rice does exist in the data
-    for name, col in data.AGEC_CROPS['P1','irr'].items():
+    for name, col in data.AGEC_CROPS['P1', 'irr'].items():
         commodity_prices[name.lower()] = np.nanpercentile(col, 50)
 
     return np.array([commodity_prices[k] for k in data.COMMODITIES])
-    
-    
+
+
 def get_target_yr_carbon_price(data: Data, target_year: int) -> float:
     return data.CARBON_PRICES[target_year]
 
 
+def get_savanna_eligible_r(data: Data) -> np.ndarray:
+    return np.where(data.SAVBURN_ELIGIBLE == 1)[0]
+
+
 def get_limits(
-    data: Data, yr_cal: int,
+        data: Data, yr_cal: int,
 ) -> dict[str, Any]:
     """
     Gets the following limits for the solve:
@@ -474,7 +515,7 @@ def get_limits(
     - GHG limits
     - Biodiversity limits
     """
-    print('Getting environmental limits...', flush = True)
+    print('Getting environmental limits...', flush=True)
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
 
@@ -482,12 +523,18 @@ def get_limits(
 
     if settings.GHG_EMISSIONS_LIMITS == 'on':
         limits['ghg_ub'] = ag_ghg.get_ghg_limits(data, yr_cal)
-        limits['ghg_lb'] = ag_ghg.get_ghg_limits(data, yr_cal) - settings.GHG_ALLOW_LB_DELTA_T 
+        limits['ghg_lb'] = ag_ghg.get_ghg_limits(data, yr_cal) - settings.GHG_ALLOW_LB_DELTA_T
 
-    # If biodiversity limits are not turned on, set the limit to 0.
+        # If biodiversity limits are not turned on, set the limit to 0.
     limits['biodiversity'] = (
         ag_biodiversity.get_biodiversity_limits(data, yr_cal)
         if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on'
+        else 0
+    )
+
+    limits["major_vegetation_groups"] = (
+        ag_biodiversity.get_major_vegetation_group_limits(data, yr_cal)
+        if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on'
         else 0
     )
 
@@ -500,22 +547,22 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     """
 
     target_index = target_year - data.YR_CAL_BASE
-    
+
     ag_c_mrj = get_ag_c_mrj(data, target_index)
     ag_r_mrj = get_ag_r_mrj(data, target_index)
     ag_t_mrj = get_ag_t_mrj(data, target_index, base_year)
     ag_to_non_ag_t_rk = get_ag_to_non_ag_t_rk(data, target_index, base_year)
-    
+
     non_ag_c_rk = get_non_ag_c_rk(data, ag_c_mrj, data.lumaps[base_year], target_year)
     non_ag_r_rk = get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year)
     non_ag_t_rk = get_non_ag_t_rk(data, base_year)
     non_ag_to_ag_t_mrj = get_non_ag_to_ag_t_mrj(data, base_year, target_index)
-    
+
     ag_man_c_mrj = get_ag_man_c_mrj(data, target_index, ag_c_mrj)
     ag_man_r_mrj = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
     ag_man_t_mrj = get_ag_man_t_mrj(data, target_index, ag_t_mrj)
-    
-    ag_obj_mrj, non_ag_obj_rk,  ag_man_objs=get_economic_mrj(
+
+    ag_obj_mrj, non_ag_obj_rk, ag_man_objs = get_economic_mrj(
         ag_c_mrj,
         ag_r_mrj,
         ag_t_mrj,
@@ -528,12 +575,14 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_r_mrj,
         ag_man_t_mrj
     )
-    
+
     ag_g_mrj = get_ag_g_mrj(data, target_index)
     ag_q_mrp = get_ag_q_mrp(data, target_index)
-    ag_w_mrj = get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)     # Calculate water net yield matrices based on historical water yield layers
+    ag_w_mrj = get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR,
+                            data.WATER_YIELD_HIST_SR)  # Calculate water net yield matrices based on historical water yield layers
     ag_b_mrj = get_ag_b_mrj(data)
     ag_x_mrj = get_ag_x_mrj(data, base_year)
+    ag_mvg_mrj = get_ag_mvg_mrj(data)
 
     land_use_culling.apply_agricultural_land_use_culling(
         ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj
@@ -548,30 +597,42 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_b_mrj=ag_b_mrj,
         ag_x_mrj=ag_x_mrj,
         ag_q_mrp=ag_q_mrp,
-
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(data, base_year),
+        ag_mvg_mrj=ag_mvg_mrj,
+
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
-        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR),  # Calculate non-ag water requirement matrices based on historical water yield layers
+        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR,
+                                    data.WATER_YIELD_HIST_SR),
+        # Calculate non-ag water requirement matrices based on historical water yield layers
         non_ag_b_rk=get_non_ag_b_rk(data, ag_b_mrj, base_year),
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
+        non_ag_mvg_rk=get_non_ag_mvg_rk(data, ag_mvg_mrj, base_year),
 
         ag_man_g_mrj=get_ag_man_g_mrj(data, target_index, ag_g_mrj),
         ag_man_q_mrp=get_ag_man_q_mrj(data, target_index, ag_q_mrp),
         ag_man_w_mrj=get_ag_man_w_mrj(data, target_index),
         ag_man_b_mrj=get_ag_man_b_mrj(data, target_index, ag_b_mrj),
-        ag_man_limits=get_ag_man_limits(data, target_index),                            
+        ag_man_limits=get_ag_man_limits(data, target_index),
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
+        ag_man_mvg_mrj=get_ag_man_mvg_mrj(data, target_index, ag_mvg_mrj),
 
-        water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
-        water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
-        
-        economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs),
+        water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),
+        # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
+        water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),
+        # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
+
+        savanna_eligible_r=get_savanna_eligible_r(data),
+
+        economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk, ag_man_objs),
         economic_BASE_YR_prices=get_commodity_prices(data),
-        economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year), 
-        
+        economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year),
+
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
+
+        mvg_contr_outside_study_area=data.NVIS_OUTSIDE_LUTO_AREA_HA,
+
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
         limits=get_limits(data, target_year),

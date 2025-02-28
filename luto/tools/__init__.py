@@ -200,6 +200,18 @@ def get_ag_natural_lu_cells(data, lumap) -> np.ndarray:
     """
     return np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
 
+def get_unallocated_natural_cells(data, lumap) -> np.ndarray:
+    """
+    Gets all cells being used for unallocated natural land uses.
+    """
+    return np.nonzero(np.isin(lumap, data.DESC2AGLU["Unallocated - natural land"]))[0]
+
+def get_lvstk_natural_lu_cells(data, lumap) -> np.ndarray:
+    """
+    Gets all cells being used for livestock natural land uses.
+    """
+    return np.nonzero(np.isin(lumap, data.LU_LVSTK))[0]
+
 
 def get_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
     """
@@ -680,6 +692,15 @@ def calc_water(
     return pd.concat([ag_df, non_ag_df, AM_df])
 
 # import portalocker  # 新增引入文件锁库
+
+def calc_major_vegetation_group_ag_area_for_year(
+    mvg_mrj_dict: dict[int, np.ndarray], ag_l_mrj: np.ndarray
+) -> dict[int, float]:
+    prod_data = {}
+    for v, mvg_mrj in mvg_mrj_dict.items():
+        prod_data[v] = np.tensordot(mvg_mrj, ag_l_mrj, 3)
+    return prod_data
+
 
 class LogToFile:
     def __init__(self, log_path, mode:str='w'):
