@@ -107,7 +107,7 @@ else:
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 30        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 20       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
 MODE = 'snapshot'   # Runs for target year only
@@ -162,9 +162,38 @@ BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At t
 THREADS = 50
 
 
+
+# ---------------------------------------------------------------------------- #
+# No-Go areas; Regional adoption constraints
+# ---------------------------------------------------------------------------- #
+
+NO_GO_VECTORS = {
+    'Winter cereals':           'input/no_go_areas/no_go_Winter_cereals.shp',
+    'Environmental Plantings':  'input/no_go_areas/no_go_Enviornmental_Plantings.shp'
+}
+'''
+Land-use and vector file pairs to exclude land-use from being utilised in that area. 
+ - The key is the land-use name. 
+ - The value is the path to the ESRI shapefile.
+'''
+
+REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS' # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+'''
+The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
+The options are:
+  - 'ABARES_AAGIS': Australian Bureau of Agricultural and Resource Economics and Sciences (ABARES) Agricultural and Agribusiness Geographic Information System (AAGIS) regions.
+  - 'LGA_CODE': Local Government Area code.
+  - 'NRM_CODE': Natural Resource Management code.
+  - 'IBRA_ID': Interim Biogeographic Regionalisation of Australia (IBRA) region code.
+  - 'SLA_5DIGIT': Statistical Local Area (SLA) 5-digit code.
+'''
+
+
+
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
+
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
@@ -176,12 +205,14 @@ NON_AG_LAND_USES = {
     'BECCS': True,
 }
 """
-The dictionary below is the master list of all of the non agricultural land uses
+The dictionary here is the master list of all of the non agricultural land uses
 and whether they are currently enabled in the solver (True/False).
 
 To disable a non-agricultural land use, change the correpsonding value of the
 NON_AG_LAND_USES dictionary to false.
 """
+
+
 NON_AG_LAND_USES_REVERSIBLE = {
     'Environmental Plantings': False,
     'Riparian Plantings': False,
@@ -387,12 +418,30 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # ------------------- Agricultural biodiversity parameters -------------------
+# Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
 
-# Biodiversity contribution reporting
-BIODIVERSTIY_TARGET_GBF_2 = 'on'                 # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.
-BIO_CALC_LEVEL = 'group'                    # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+BIODIV_GBF_TARGET_2_DICT = {
+              2010: 0,    # Proportion of degraded land restored in year 2010
+              2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
+              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.3   # Stays at 2050 level
+             }            # (can add more years/targets)\
+""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
+    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+"""
 
+
+
+# Global Biodiversity Framework Target 4: Halt Species Extinction, Protect Genetic Diversity, and Manage Human-Wildlife Conflicts
+CALC_BIODIVERSITY_CONTRIBUTION = False              # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.
+
+# BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+
+BIODIV_PENALTY = 1e4
 
 # Connectivity source source
 CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
@@ -410,7 +459,7 @@ CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
 connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
 CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
 '''
-    !!!!!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   !!!!!
+    !   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   ! \n
     The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
     I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
 '''
@@ -454,21 +503,6 @@ BECCS_BIODIVERSITY_BENEFIT = 0
     will be 0.6 * 0.8 = 0.48.
 '''
 
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIV_GBF_TARGET_2_DICT = {
-              2010: 0,    # Proportion of degraded land restored in year 2010
-              2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.3   # Stays at 2050 level
-             }            # (can add more years/targets)\
-""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
-    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
-"""
-
-
-
-
 
 
 
@@ -479,6 +513,8 @@ BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
     Target 3 of the Kunming-Montreal Global Biodiversity Framework:
     protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
+
+BIODIVERSITY_GBF_3_TARGET_YEAR = 2030
 
 NVIS_SPATIAL_DETAIL = 'HIGH'                 # 'LOW' or 'HIGH'
 '''
@@ -517,7 +553,7 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
 NON_AGRICULTURAL_LU_BASE_CODE = 100
 
 # Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
-LB_ROUND_DECMIALS = 6
+ROUND_DECMIALS = 6
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
