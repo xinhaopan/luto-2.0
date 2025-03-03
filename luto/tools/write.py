@@ -70,9 +70,10 @@ from luto.tools.report.create_static_maps import TIF2MAP
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 def write_outputs(data: Data):
-
-    # memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
-    # memory_thread.start()
+    """Write model outputs to file"""
+    
+    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    memory_thread.start()
 
     # Write the model outputs to file
     write_data(data)
@@ -1306,26 +1307,34 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
     yr_idx_sim = simulated_year_list.index(yr_cal)
 
+
+    # Get the transition types; Note, the order matters
+    transition_types =[
+        'Livestock natural to unallocated natural',
+        'Unallocated natural to livestock natural',
+        'Livestock natural to modified',
+        'Unallocated natural to modified'
+    ]
+
+
     # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
     if yr_cal == data.YR_CAL_BASE:
-        ghg_t = np.zeros(data.ag_dvars[yr_cal].shape, dtype=np.bool_)
+        ghg_t = np.zeros([len(transition_types)] + list(data.ag_dvars[yr_cal].shape), dtype=np.bool_)   
     else:
         yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
-        ghg_t = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[yr_cal_sim_pre])
+        ghg_t = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[yr_cal_sim_pre], separate=True)
 
 
     # Get the GHG emissions from lucc-convertion compared to the previous year
-    ghg_t_mj = np.einsum('mrj,mrj -> mj', data.ag_dvars[yr_cal], ghg_t)
+    ghg_t_smj = np.einsum('mrj,smrj->smj', data.ag_dvars[yr_cal], ghg_t)
 
     # Summarize the array as a df
-    ghg_t_df = pd.DataFrame(ghg_t_mj.flatten(), index=pd.MultiIndex.from_product((data.LANDMANS, data.AGRICULTURAL_LANDUSES))).reset_index()
-    ghg_t_df.columns = ['Water_supply', 'Land-use', 'Value (t CO2e)']
-    ghg_t_df['Type'] = 'Deforestation'
+    ghg_t_df = pd.DataFrame(ghg_t_smj.flatten(), index=pd.MultiIndex.from_product((transition_types, data.LANDMANS, data.AGRICULTURAL_LANDUSES))).reset_index()
+    ghg_t_df.columns = ['Type','Water_supply', 'Land-use', 'Value (t CO2e)']
     ghg_t_df = ghg_t_df.replace({'dry': 'Dryland', 'irr':'Irrigated'})
     ghg_t_df['Year'] = yr_cal
-
+    
     # Save table to disk
-    ghg_t_df['Year'] = yr_cal
     ghg_t_df.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'), index=False)
 
 

@@ -252,7 +252,7 @@ class LutoSolver:
 
     def _setup_deviation_penalties(self):
         """
-        Decision variables, V, E and W, for soft constraints.
+        Decision variables, V, E and W, and B for soft constraints.
         1) [V] Penalty vector for demand, each one corespondes a commodity, that minimises the deviations from demand.
         2) [E] A single penalty scalar for GHG emissions, minimises its deviation from the target.
         3) [W] Penalty vector for water usage, each one corespondes a region, that minimises the deviations from the target.
@@ -314,7 +314,7 @@ class LutoSolver:
             else 0
         )
         self.obj_biodiv = (
-            self.B * settings.BIODIV_PENALTY
+            self.B * settings.GBF2_PENALTY
             if settings.BIODIV_CONSTRAINT_TYPE == "soft"
             else 0
         )
@@ -865,7 +865,7 @@ class LutoSolver:
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
         biodiversity_limits = self._input_data.limits["biodiversity"]
 
-        # Bound the self.W variables to the difference between the desired and actual net yields
+        # Bound the self.B variables to the difference between the desired and actual net yields
         constr = self.gurobi_model.addConstr(biodiversity_limits - self.biodiversity_expr <= self.B)
         self.biodiversity_limit_soft_constraints.append(constr)
 
@@ -1382,9 +1382,20 @@ class LutoSolver:
                     if settings.GHG_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
+                'Biodiversity': (
+                    self.obj_biodiv.getValue()
+                    if settings.BIODIV_CONSTRAINT_TYPE == "soft"
+                    else 0
+                ),
+                'Water': (
+                    self.obj_water.getValue()
+                    if settings.WATER_CONSTRAINT_TYPE == "soft"
+                    else 0
+                ),
             },
         )
 
     @property
     def ncms(self):
         return self.d_c.shape[0]  # Number of commodities.
+
