@@ -21,6 +21,7 @@
 
 """ LUTO model settings. """
 
+import os
 import pandas as pd
 
 
@@ -110,8 +111,8 @@ else:
 RESFACTOR = 20       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -168,8 +169,8 @@ THREADS = 50
 # ---------------------------------------------------------------------------- #
 
 NO_GO_VECTORS = {
-    'Winter cereals':           'input/no_go_areas/no_go_Winter_cereals.shp',
-    'Environmental Plantings':  'input/no_go_areas/no_go_Enviornmental_Plantings.shp'
+    'Winter cereals':           f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Winter_cereals.shp',
+    'Environmental Plantings':  f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Enviornmental_Plantings.shp'
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 
@@ -372,8 +373,8 @@ SOLVE_ECONOMY_WEIGHT = 0.05
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 WATER_PENALTY = 1
 
@@ -441,7 +442,7 @@ CALC_BIODIVERSITY_CONTRIBUTION = False              # True or False, calculate/r
 # BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
 BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 
-BIODIV_PENALTY = 1e4
+GBF2_PENALTY = 1e4
 
 # Connectivity source source
 CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
@@ -508,7 +509,7 @@ BECCS_BIODIVERSITY_BENEFIT = 0
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
 '''
     Target 3 of the Kunming-Montreal Global Biodiversity Framework:
     protect and manage 30% of the world's land, water, and coastal areas by 2030.
