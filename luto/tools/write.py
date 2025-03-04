@@ -182,7 +182,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_species(data, yr_cal, path_yr)
-    # write_npy(data, yr_cal, path_yr)
+    write_npy(data, yr_cal, path_yr)
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
 
