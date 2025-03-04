@@ -123,13 +123,16 @@ def submit_task_windows(task_dir, col,script_name):
     log_file = f'{task_dir}/output/{script_name}_error_log.txt'  # 定义日志文件路径
 
     python_path = r'F:\xinhao\miniforge\envs\luto\python.exe'
+    task_dir = os.path.abspath(task_dir)
+
     try:
         # 运行子进程，捕获标准输出和标准错误
         result = subprocess.run(
             [python_path, f'{task_dir}/{script_name}.py'],
             cwd=f'{task_dir}',
             capture_output=True,  # 捕获输出
-            text=True  # 将输出转换为文本
+            text=True,  # 将输出转换为文本
+            encoding="utf-8"
         )
 
         end_time = time.time()  # 记录任务结束时间
@@ -138,13 +141,13 @@ def submit_task_windows(task_dir, col,script_name):
         # 检查子进程的返回码和错误输出
         if result.returncode == 0 and not result.stderr:
             # 如果成功运行，记录成功信息
-            with open(log_file, 'a') as f:
+            with open(log_file, 'a', encoding="utf-8") as f:
                 f.write(f"Success running temp_runs.py for {col}:\n")
                 f.write(f"stdout:\n{result.stdout}\n")
             print_with_time(f"{col}: successfully completed. Elapsed time: {elapsed_time:.2f} h")
         else:
             # 如果运行失败，记录错误信息
-            with open(log_file, 'a') as f:
+            with open(log_file, 'a', encoding="utf-8") as f:
                 f.write(f"Error running temp_runs.py for {col}:\n")
                 f.write(f"stdout:\n{result.stdout}\n")
                 f.write(f"stderr:\n{result.stderr}\n")
@@ -152,7 +155,7 @@ def submit_task_windows(task_dir, col,script_name):
 
     except Exception as e:
         # 捕获 Python 异常，并将其写入日志文件
-        with open(log_file, 'a') as f:
+        with open(log_file, 'a', encoding="utf-8") as f:
             f.write(f"Exception occurred while running temp_runs.py for {col}:\n")
             f.write(f"{str(e)}\n")
         print_with_time(f"{col}: exception occurred during execution, see {log_file} for details.")
@@ -274,7 +277,10 @@ def update_settings(settings_dict: dict, col: str):
     settings_dict['INPUT_DIR'] = os.path.join(SOURCE_DIR, settings_dict['INPUT_DIR']).replace('\\', '/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
     settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(', '')
-
+    settings_dict['NO_GO_VECTORS'] = {
+        'Winter cereals': f'{os.path.abspath('../../input')}/no_go_areas/no_go_Winter_cereals.shp',
+        'Environmental Plantings': f'{os.path.abspath('../../input')}/no_go_areas/no_go_Enviornmental_Plantings.shp'
+    }
     if os.name == 'posix':
         # Set the memory and time based on the resolution factor
         # if int(settings_dict['RESFACTOR']) == 1:

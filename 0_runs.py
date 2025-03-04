@@ -12,7 +12,7 @@ error_log_file = 'output/error_log.txt'  # 错误日志路径
 def write_log(message, file=log_file):
     """写入日志并附加时间戳"""
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    with open(file, 'a') as log:
+    with open(file, 'a', encoding="utf-8") as log:
         log.write(f"[{timestamp}] {message}\n")
 
 def monitor_memory(func, *args, **kwargs):

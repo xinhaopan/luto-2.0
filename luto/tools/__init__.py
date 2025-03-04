@@ -527,7 +527,7 @@ class LogToFile:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             # Open files for writing here, ensuring they're only created upon function call
-            with open(self.log_path_stdout, self.mode) as file_stdout, open(self.log_path_stderr, self.mode) as file_stderr:
+            with open(self.log_path_stdout, self.mode, encoding="utf-8") as file_stdout, open(self.log_path_stderr, self.mode, encoding="utf-8") as file_stderr:
                 original_stdout = sys.stdout
                 original_stderr = sys.stderr
                 try:
