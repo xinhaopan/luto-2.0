@@ -22,8 +22,8 @@ AMORTISATION_PERIOD,30,30,30,30,30,30,30,30,30,30
 DEFORESTATION_LEGISLATION,on,on,on,on,on,on,on,on,on,on
 NATURAL_TO_MODIFIED_LAND_PENALTY,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0
 RESFACTOR,20,5,5,5,5,5,5,5,5,5
-MODE,snapshot,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries
-OBJECTIVE,mincost,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit
+MODE,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries
+OBJECTIVE,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit
 DEMAND_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft
 WRITE_OUTPUT_GEOTIFFS,False,True,True,True,True,True,True,True,True,True
 WRITE_FULL_RES_MAPS,False,False,False,False,False,False,False,False,False,False
@@ -78,9 +78,9 @@ GHG_EMISSIONS_LIMITS,on,on,on,on,on,on,on,on,on,on
 GHG_LIMITS_TYPE,file,file,file,file,file,file,file,file,file,file
 GHG_LIMITS,"{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}"
 GHG_LIMITS_FIELD,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.8C (67%) excl. avoided emis,1.8C (67%) excl. avoided emis,1.8C (67%) excl. avoided emis
-CARBON_PRICES_FIELD,1.5C 67%,1.5C 67%,1.5C 67%,1.5C 67%,1.5C 50%,1.5C 50%,1.5C 50%,1.8C 67%,1.8C 67%,1.8C 67%
+CARBON_PRICES_FIELD,0,0,0,0,0,0,0,0,0,0
 SOC_AMORTISATION,15,15,15,15,15,15,15,15,15,15
-GHG_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft
+GHG_CONSTRAINT_TYPE,hard,hard,hard,hard,hard,hard,hard,hard,hard,hard
 GHG_ALLOW_LB_DELTA_T,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0
 SOLVE_ECONOMY_WEIGHT,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05
 WATER_LIMITS,on,on,on,on,on,on,on,on,on,on
@@ -106,7 +106,7 @@ CARBON_PLANTING_BELT_BIODIV_BENEFIT,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
 RIPARIAN_PLANTING_BIODIV_BENEFIT,1,1,1,1,1,1,1,1,1,1
 AGROFORESTRY_BIODIV_BENEFIT,0.75,0.75,0.75,0.75,0.75,0.75,0.75,0.75,0.75,0.75
 BECCS_BIODIVERSITY_BENEFIT,0,0,0,0,0,0,0,0,0,0
-BIODIVERSTIY_TARGET_GBF_3,off,off,off,off,off,off,off,off,off,off
+BIODIVERSTIY_TARGET_GBF_3,on,on,on,on,on,on,on,on,on,on
 BIODIVERSITY_GBF_3_TARGET_YEAR,2030,2030,2030,2030,2030,2030,2030,2030,2030,2030
 NVIS_SPATIAL_DETAIL,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH
 NVIS_CLASS_DETAIL,MVG,MVG,MVG,MVG,MVG,MVG,MVG,MVG,MVG,MVG

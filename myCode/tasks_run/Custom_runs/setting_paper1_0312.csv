@@ -1,0 +1,123 @@
+Name,Default_run,20250312_Run_1_GHG_1_5C_67_BIO_0_5,20250312_Run_2_GHG_1_5C_67_BIO_3_5,20250312_Run_3_GHG_1_5C_67_BIO_5_5,20250312_Run_4_GHG_1_5C_50_BIO_0_5,20250312_Run_5_GHG_1_5C_50_BIO_3_5,20250312_Run_6_GHG_1_5C_50_BIO_5_5,20250312_Run_7_GHG_1_8C_67_BIO_0_5,20250312_Run_8_GHG_1_8C_67_BIO_3_5,20250312_Run_9_GHG_1_8C_67_BIO_5_5
+VERSION,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3
+INPUT_DIR,input,input,input,input,input,input,input,input,input,input
+OUTPUT_DIR,output,output,output,output,output,output,output,output,output,output
+DATA_DIR,input,input,input,input,input,input,input,input,input,input
+RAW_DATA,../raw_data,../raw_data,../raw_data,../raw_data,../raw_data,../raw_data,../raw_data,../raw_data,../raw_data,../raw_data
+SSP,245,245,245,245,245,245,245,245,245,245
+RCP,rcp4p5,rcp4p5,rcp4p5,rcp4p5,rcp4p5,rcp4p5,rcp4p5,rcp4p5,rcp4p5,rcp4p5
+SCENARIO,SSP2,SSP2,SSP2,SSP2,SSP2,SSP2,SSP2,SSP2,SSP2,SSP2
+DIET_DOM,BAU,BAU,BAU,BAU,BAU,BAU,BAU,BAU,BAU,BAU
+DIET_GLOB,BAU,BAU,BAU,BAU,BAU,BAU,BAU,BAU,BAU,BAU
+CONVERGENCE,2050,2050,2050,2050,2050,2050,2050,2050,2050,2050
+IMPORT_TREND,Static,Static,Static,Static,Static,Static,Static,Static,Static,Static
+WASTE,1,1,1,1,1,1,1,1,1,1
+FEED_EFFICIENCY,BAU,BAU,BAU,BAU,BAU,BAU,BAU,BAU,BAU,BAU
+CO2_FERT,off,off,off,off,off,off,off,off,off,off
+RISK_OF_REVERSAL,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05
+FIRE_RISK,med,med,med,med,med,med,med,med,med,med
+AMORTISE_UPFRONT_COSTS,False,False,False,False,False,False,False,False,False,False
+DISCOUNT_RATE,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07
+AMORTISATION_PERIOD,30,30,30,30,30,30,30,30,30,30
+DEFORESTATION_LEGISLATION,on,on,on,on,on,on,on,on,on,on
+NATURAL_TO_MODIFIED_LAND_PENALTY,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0,1000000000.0
+RESFACTOR,20,5,5,5,5,5,5,5,5,5
+MODE,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries
+OBJECTIVE,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit
+DEMAND_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft
+WRITE_OUTPUT_GEOTIFFS,False,True,True,True,True,True,True,True,True,True
+WRITE_FULL_RES_MAPS,False,False,False,False,False,False,False,False,False,False
+PARALLEL_WRITE,True,True,True,True,True,True,True,True,True,True
+WRITE_THREADS,10,10,10,10,10,10,10,10,10,10
+SOLVE_METHOD,2,2,2,2,2,2,2,2,2,2
+PRESOLVE,0,0,0,0,0,0,0,0,0,0
+AGGREGATE,0,0,0,0,0,0,0,0,0,0
+VERBOSE,1,1,1,1,1,1,1,1,1,1
+FEASIBILITY_TOLERANCE,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01
+OPTIMALITY_TOLERANCE,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01
+BARRIER_CONVERGENCE_TOLERANCE,1e-05,1e-05,1e-05,1e-05,1e-05,1e-05,1e-05,1e-05,1e-05,1e-05
+CROSSOVER,0,0,0,0,0,0,0,0,0,0
+SCALE_FLAG,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+NUMERIC_FOCUS,0,0,0,0,0,0,0,0,0,0
+BARHOMOGENOUS,1,1,1,1,1,1,1,1,1,1
+THREADS,50,50,50,50,50,50,50,50,50,50
+NO_GO_VECTORS,"{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}"
+REGIONAL_ADOPTION_ZONE,ABARES_AAGIS,ABARES_AAGIS,ABARES_AAGIS,ABARES_AAGIS,ABARES_AAGIS,ABARES_AAGIS,ABARES_AAGIS,ABARES_AAGIS,ABARES_AAGIS,ABARES_AAGIS
+NON_AG_LAND_USES,"{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}"
+NON_AG_LAND_USES_REVERSIBLE,"{'Environmental Plantings': False, 'Riparian Plantings': False, 'Sheep Agroforestry': False, 'Beef Agroforestry': False, 'Carbon Plantings (Block)': False, 'Sheep Carbon Plantings (Belt)': False, 'Beef Carbon Plantings (Belt)': False, 'BECCS': False}","{'Environmental Plantings': False, 'Riparian Plantings': False, 'Sheep Agroforestry': False, 'Beef Agroforestry': False, 'Carbon Plantings (Block)': False, 'Sheep Carbon Plantings (Belt)': False, 'Beef Carbon Plantings (Belt)': False, 'BECCS': False}","{'Environmental Plantings': False, 'Riparian Plantings': False, 'Sheep Agroforestry': False, 'Beef Agroforestry': False, 'Carbon Plantings (Block)': False, 'Sheep Carbon Plantings (Belt)': False, 'Beef Carbon Plantings (Belt)': False, 'BECCS': False}","{'Environmental Plantings': False, 'Riparian Plantings': False, 'Sheep Agroforestry': False, 'Beef Agroforestry': False, 'Carbon Plantings (Block)': False, 'Sheep Carbon Plantings (Belt)': False, 'Beef Carbon Plantings (Belt)': False, 'BECCS': False}","{'Environmental Plantings': False, 'Riparian Plantings': False, 'Sheep Agroforestry': False, 'Beef Agroforestry': False, 'Carbon Plantings (Block)': False, 'Sheep Carbon Plantings (Belt)': False, 'Beef Carbon Plantings (Belt)': False, 'BECCS': False}","{'Environmental Plantings': False, 'Riparian Plantings': False, 'Sheep Agroforestry': False, 'Beef Agroforestry': False, 'Carbon Plantings (Block)': False, 'Sheep Carbon Plantings (Belt)': False, 'Beef Carbon Plantings (Belt)': False, 'BECCS': False}","{'Environmental Plantings': False, 'Riparian Plantings': False, 'Sheep Agroforestry': False, 'Beef Agroforestry': False, 'Carbon Plantings (Block)': False, 'Sheep Carbon Plantings (Belt)': False, 'Beef Carbon Plantings (Belt)': False, 'BECCS': False}","{'Environmental Plantings': False, 'Riparian Plantings': False, 'Sheep Agroforestry': False, 'Beef Agroforestry': False, 'Carbon Plantings (Block)': False, 'Sheep Carbon Plantings (Belt)': False, 'Beef Carbon Plantings (Belt)': False, 'BECCS': False}","{'Environmental Plantings': False, 'Riparian Plantings': False, 'Sheep Agroforestry': False, 'Beef Agroforestry': False, 'Carbon Plantings (Block)': False, 'Sheep Carbon Plantings (Belt)': False, 'Beef Carbon Plantings (Belt)': False, 'BECCS': False}","{'Environmental Plantings': False, 'Riparian Plantings': False, 'Sheep Agroforestry': False, 'Beef Agroforestry': False, 'Carbon Plantings (Block)': False, 'Sheep Carbon Plantings (Belt)': False, 'Beef Carbon Plantings (Belt)': False, 'BECCS': False}"
+FENCING_COST_PER_M,10,10,10,10,10,10,10,10,10,10
+EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR,100,100,100,100,100,100,100,100,100,100
+EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR,0,0,0,0,0,0,0,0,0,0
+CP_BLOCK_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR,100,100,100,100,100,100,100,100,100,100
+CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR,0,0,0,0,0,0,0,0,0,0
+CP_BELT_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR,100,100,100,100,100,100,100,100,100,100
+CP_BELT_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR,0,0,0,0,0,0,0,0,0,0
+CP_BELT_ROW_WIDTH,20,20,20,20,20,20,20,20,20,20
+CP_BELT_ROW_SPACING,40,40,40,40,40,40,40,40,40,40
+CP_BELT_PROPORTION,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333
+CP_BELT_FENCING_LENGTH,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337
+RP_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR,100,100,100,100,100,100,100,100,100,100
+RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR,0,0,0,0,0,0,0,0,0,0
+RIPARIAN_PLANTING_BUFFER_WIDTH,30,30,30,30,30,30,30,30,30,30
+RIPARIAN_PLANTING_TORTUOSITY_FACTOR,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5
+AF_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR,100,100,100,100,100,100,100,100,100,100
+AF_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR,0,0,0,0,0,0,0,0,0,0
+AGROFORESTRY_ROW_WIDTH,20,20,20,20,20,20,20,20,20,20
+AGROFORESTRY_ROW_SPACING,40,40,40,40,40,40,40,40,40,40
+AF_PROPORTION,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.3333333333333333
+AF_FENCING_LENGTH,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337,333.33333333333337
+AG_MANAGEMENTS,"{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}"
+AG_MANAGEMENTS_REVERSIBLE,"{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}","{'Asparagopsis taxiformis': True, 'Precision Agriculture': True, 'Ecological Grazing': True, 'Savanna Burning': True, 'AgTech EI': True, 'Biochar': True}"
+REMOVE_IRRIG_COST,5000,5000,5000,5000,5000,5000,5000,5000,5000,5000
+NEW_IRRIG_COST,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000
+SAVBURN_COST_HA_YR,100,100,100,100,100,100,100,100,100,100
+AGRICULTURAL_MANAGEMENT_USE_THRESHOLD,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
+OFF_LAND_COMMODITIES,"['pork', 'chicken', 'eggs', 'aquaculture']","['pork', 'chicken', 'eggs', 'aquaculture']","['pork', 'chicken', 'eggs', 'aquaculture']","['pork', 'chicken', 'eggs', 'aquaculture']","['pork', 'chicken', 'eggs', 'aquaculture']","['pork', 'chicken', 'eggs', 'aquaculture']","['pork', 'chicken', 'eggs', 'aquaculture']","['pork', 'chicken', 'eggs', 'aquaculture']","['pork', 'chicken', 'eggs', 'aquaculture']","['pork', 'chicken', 'eggs', 'aquaculture']"
+EGGS_AVG_WEIGHT,60,60,60,60,60,60,60,60,60,60
+GHG_EMISSIONS_LIMITS,on,on,on,on,on,on,on,on,on,on
+GHG_LIMITS_TYPE,file,file,file,file,file,file,file,file,file,file
+GHG_LIMITS,"{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}","{2010: 90000000.0, 2050: -100000000.0, 2100: -100000000.0}"
+GHG_LIMITS_FIELD,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (67%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.5C (50%) excl. avoided emis,1.8C (67%) excl. avoided emis,1.8C (67%) excl. avoided emis,1.8C (67%) excl. avoided emis
+CARBON_PRICES_FIELD,1.5C 67%,1.5C 67%,1.5C 67%,1.5C 67%,1.5C 50%,1.5C 50%,1.5C 50%,1.8C 67%,1.8C 67%,1.8C 67%
+SOC_AMORTISATION,15,15,15,15,15,15,15,15,15,15
+GHG_CONSTRAINT_TYPE,hard,soft,soft,soft,soft,soft,soft,soft,soft,soft
+GHG_ALLOW_LB_DELTA_T,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0,1000000.0
+SOLVE_ECONOMY_WEIGHT,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05
+WATER_LIMITS,on,on,on,on,on,on,on,on,on,on
+WATER_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft
+WATER_PENALTY,1,1,1,1,1,1,1,1,1,1
+WATER_REGION_DEF,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division,Drainage Division
+WATER_STRESS,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4
+AG_SHARE_OF_WATER_USE,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7
+LIVESTOCK_DRINKING_WATER,1,1,1,1,1,1,1,1,1,1
+INCLUDE_WATER_LICENSE_COSTS,0,0,0,0,0,0,0,0,0,0
+BIODIVERSTIY_TARGET_GBF_2,on,on,on,on,on,on,on,on,on,on
+BIODIV_GBF_TARGET_2_DICT,"{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}","{2010: 0, 2030: 0, 2050: 0, 2100: 0}","{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}","{2010: 0, 2030: 0, 2050: 0, 2100: 0}","{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}","{2010: 0, 2030: 0, 2050: 0, 2100: 0}","{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}"
+BIODIV_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft
+GBF2_PENALTY,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0
+CONNECTIVITY_SOURCE,NCI,NCI,NCI,NCI,NCI,NCI,NCI,NCI,NCI,NCI
+CONNECTIVITY_LB,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7
+HABITAT_CONDITION,HCAS,HCAS,HCAS,HCAS,HCAS,HCAS,HCAS,HCAS,HCAS,HCAS
+HCAS_PERCENTILE,50,50,50,50,50,50,50,50,50,50
+LDS_BIODIVERSITY_VALUE,0.8,0.8,0.8,0.8,0.8,0.8,0.8,0.8,0.8,0.8
+ENV_PLANTING_BIODIVERSITY_BENEFIT,0.8,0.8,0.8,0.8,0.8,0.8,0.8,0.8,0.8,0.8
+CARBON_PLANTING_BLOCK_BIODIV_BENEFIT,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
+CARBON_PLANTING_BELT_BIODIV_BENEFIT,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1
+RIPARIAN_PLANTING_BIODIV_BENEFIT,1,1,1,1,1,1,1,1,1,1
+AGROFORESTRY_BIODIV_BENEFIT,0.75,0.75,0.75,0.75,0.75,0.75,0.75,0.75,0.75,0.75
+BECCS_BIODIVERSITY_BENEFIT,0,0,0,0,0,0,0,0,0,0
+BIODIVERSTIY_TARGET_GBF_3,off,off,off,off,off,off,off,off,off,off
+BIODIVERSITY_GBF_3_TARGET_YEAR,2030,2030,2030,2030,2030,2030,2030,2030,2030,2030
+NVIS_SPATIAL_DETAIL,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH
+NVIS_CLASS_DETAIL,MVG,MVG,MVG,MVG,MVG,MVG,MVG,MVG,MVG,MVG
+BIODIVERSTIY_TARGET_GBF_4,on,on,on,on,on,on,on,on,on,on
+CULL_MODE,absolute,absolute,absolute,absolute,absolute,absolute,absolute,absolute,absolute,absolute
+MAX_LAND_USES_PER_CELL,12,12,12,12,12,12,12,12,12,12
+LAND_USAGE_CULL_PERCENTAGE,Not used,Not used,Not used,Not used,Not used,Not used,Not used,Not used,Not used,Not used
+NON_AGRICULTURAL_LU_BASE_CODE,100,100,100,100,100,100,100,100,100,100
+ROUND_DECMIALS,6,6,6,6,6,6,6,6,6,6
+JOB_NAME,auto,auto,auto,auto,auto,auto,auto,auto,auto,auto
+MEM,auto,252,252,252,252,252,252,252,252,252
+QUEUE,normal,normal,normal,normal,normal,normal,normal,normal,normal,normal
+NCPUS,48,48,48,48,48,48,48,48,48,48
+TIME,10:00:00,20:00:00,20:00:00,20:00:00,20:00:00,20:00:00,20:00:00,20:00:00,20:00:00,20:00:00
