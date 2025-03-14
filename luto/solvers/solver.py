@@ -1180,8 +1180,8 @@ class LutoSolver:
 
         # Magic.
         self.gurobi_model.optimize()
-
-        print("Completed solve, collecting results...\n", flush=True)
+        # https://docs.gurobi.com/projects/optimizer/en/current/reference/numericcodes/statuscodes.html
+        print(f"Completed solve,status is {self.gurobi_model.status}, collecting results...\n", flush=True)
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
 

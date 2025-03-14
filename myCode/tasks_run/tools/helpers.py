@@ -69,7 +69,8 @@ def create_settings_template(to_path: str = 'Custom_runs'):
 
 
 
-def process_column(col, custom_settings, script_name):
+def process_column(col, custom_settings, script_name, delay):
+    time.sleep(delay * 60)  # 让每个任务启动前等待固定时间
     """并行处理单个列的任务"""
     with open('Custom_runs/non_str_val.txt', 'r') as file:
         eval_vars = file.read().splitlines()
@@ -89,7 +90,7 @@ def process_column(col, custom_settings, script_name):
         submit_task_linux(task_dir, custom_dict)  # 执行任务
 
 
-def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 3, script_name='0_runs'):
+def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 3, script_name='0_runs', delay=1.5):
     """读取设置模板文件并并行运行任务"""
     # 读取自定义设置文件
     custom_settings = pd.read_csv(csv_path, index_col=0)
@@ -109,12 +110,15 @@ def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 
         raise ValueError('No custom settings found in the settings_template.csv file!')
 
     if use_multithreading:
-        Parallel(n_jobs=num_workers)(
-            delayed(process_column)(col, custom_settings, script_name) for col in custom_cols
+        Parallel(n_jobs=num_workers, batch_size=1)(
+            delayed(process_column)(col, custom_settings, script_name, i * delay)
+            for i, col in enumerate(custom_cols)
         )
+
     else:
+        delay = 0
         for col in custom_cols:
-            process_column(col, custom_settings, script_name)
+            process_column(col, custom_settings, script_name, delay)
 
 
 def submit_task_windows(task_dir, col,script_name):
@@ -144,7 +148,7 @@ def submit_task_windows(task_dir, col,script_name):
             with open(log_file, 'a', encoding="utf-8") as f:
                 f.write(f"Success running temp_runs.py for {col}:\n")
                 f.write(f"stdout:\n{result.stdout}\n")
-            print_with_time(f"{col}: successfully completed. Elapsed time: {elapsed_time:.2f} h")
+            print_with_time(f"{col} {script_name}: successfully completed. Elapsed time: {elapsed_time:.2f} h")
         else:
             # 如果运行失败，记录错误信息
             with open(log_file, 'a', encoding="utf-8") as f:
@@ -276,10 +280,11 @@ def update_settings(settings_dict: dict, col: str):
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.join(SOURCE_DIR, settings_dict['INPUT_DIR']).replace('\\', '/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
-    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(', '')
+    # if settings_dict['CARBON_PRICES_FIELD'] != 'c0':
+    #     settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(', '')
     settings_dict['NO_GO_VECTORS'] = {
-        'Winter cereals': f'{os.path.abspath('../../input')}/no_go_areas/no_go_Winter_cereals.shp',
-        'Environmental Plantings': f'{os.path.abspath('../../input')}/no_go_areas/no_go_Enviornmental_Plantings.shp'
+        'Winter cereals': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Winter_cereals.shp',
+        'Environmental Plantings': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Enviornmental_Plantings.shp'
     }
     if os.name == 'posix':
         # Set the memory and time based on the resolution factor
@@ -523,13 +528,14 @@ def create_grid_search_template(template_df, grid_dict, output_file,suffix="") -
         template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]}')], axis=1)
 
     # Save the grid search template to the root task folder
-    template_grid_search.to_csv(output_file, index=False)
+    # template_grid_search.to_csv(output_file, index=False)
 
     ghg_row = template_grid_search.loc[template_grid_search['Name'] == 'GHG_LIMITS_FIELD']
 
     for col in template_grid_search.columns[1:]:  # 跳过 'Name' 列
         ghg_value = ghg_row[col].values[0]  # 获取当前列 GHG_LIMITS_FIELD 的值
-        template_grid_search.loc[template_grid_search['Name'] == 'CARBON_PRICES_FIELD', col] = ghg_value[:9].replace('(', '')
+        if ghg_value != 'c0':
+            template_grid_search.loc[template_grid_search['Name'] == 'CARBON_PRICES_FIELD', col] = ghg_value[:9].replace('(', '')
 
     # Save the grid search template to the root task folder
 

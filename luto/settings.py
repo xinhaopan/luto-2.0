@@ -111,12 +111,12 @@ else:
 RESFACTOR = 20       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
-# OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
-OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
+# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand for agricultural commodity production should be met in the solver
 # DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
@@ -354,6 +354,7 @@ GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
 
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or None.
 # Setting to None falls back to the 'Default' scenario.
+# CARBON_PRICES_FIELD = 'c0'
 CARBON_PRICES_FIELD = 'AS_GHG'
 if CARBON_PRICES_FIELD == 'AS_GHG':
     CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
@@ -362,8 +363,8 @@ if CARBON_PRICES_FIELD == 'AS_GHG':
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15
 
-# GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
-GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
+GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
+# GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 GHG_ALLOW_LB_DELTA_T = 1e6    # The amount of GHG emissions that can be lowered than the target in the objective function (in tonnes CO2e)
 
 # Weight for the GHG/Demand deviation in the objective function
@@ -373,8 +374,8 @@ SOLVE_ECONOMY_WEIGHT = 0.05
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 WATER_PENALTY = 1
 
@@ -426,8 +427,8 @@ BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiv
 BIODIV_GBF_TARGET_2_DICT = {
               2010: 0,    # Proportion of degraded land restored in year 2010
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.3   # Stays at 2050 level
+              2050: 0.5,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.5   # Stays at 2050 level
              }            # (can add more years/targets)\
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -435,8 +436,8 @@ BIODIV_GBF_TARGET_2_DICT = {
 """
 
 
-BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-# BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+# BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 
 GBF2_PENALTY = 1e4
 

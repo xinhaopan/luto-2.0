@@ -183,13 +183,13 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
                 #     yticks = yticks[1:]  # 从第二个刻度值开始
                 #
                 # ax.set_yticks(yticks)  # 更新刻度
-                ax.tick_params(axis='y', labelsize=font_size, pad=5)  # 设置刻度标签字体大小
+                ax.tick_params(axis='y', labelsize=font_size, pad=5, direction='out')  # 设置刻度标签字体大小
 
             if is_bottom_row:
                 ax.spines['bottom'].set_visible(True)  # 显示 x 轴边框
                 ax.spines['bottom'].set_linewidth(axis_linewidth)
                 ax.xaxis.set_ticks_position('bottom')
-                ax.tick_params(axis='x', labelsize=font_size)
+                ax.tick_params(axis='x', labelsize=font_size, direction='out')
                 ax.set_xlim(x_range[0] - X_OFFSET, x_range[1] + X_OFFSET)
                 ax.set_xticks(np.arange(x_range[0], x_range[1] + 1, x_ticks))
                 ax.set_xticklabels(ax.get_xticks(), rotation=0, fontsize=font_size)
@@ -252,6 +252,7 @@ def save_figure(fig, output_prefix):
         svg_content = f.read()
 
     parser = etree.XMLParser(remove_blank_text=True)
+    # parser = etree.XMLParser(huge_tree=True)
     tree = etree.fromstring(svg_content.encode("utf-8"), parser)
 
     # Step 3: 生成无文字的 PDF
