@@ -1,6 +1,6 @@
-# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
-# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
-# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J.,
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S.,
 # Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
 # This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
@@ -103,8 +103,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 20       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -360,7 +360,7 @@ GHG_ALLOW_LB_DELTA_T = 1e6    # The amount of GHG emissions that can be lowered 
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_ECONOMY_WEIGHT = 0.05  
+SOLVE_ECONOMY_WEIGHT = 0.05
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -483,7 +483,7 @@ LDS_BIODIVERSITY_VALUE = 0.8
     (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value (i.e., 1.0).
 '''
 
-# Non-agricultural biodiversity parameters 
+# Non-agricultural biodiversity parameters
 ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8
 CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
 CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
@@ -501,7 +501,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.

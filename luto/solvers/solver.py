@@ -1470,7 +1470,3 @@ class LutoSolver:
             },
         )
 
-    @property
-    def ncms(self):
-        return self.d_c.shape[0]  # Number of commodities.
-
