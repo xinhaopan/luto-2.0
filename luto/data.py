@@ -448,7 +448,6 @@ class Data:
                     out_shape=(src_meta['height'], src_meta['width']),
                     transform=src_meta['transform'],
                     fill=0,
-                   #  dtype=np.int8
                     dtype=np.int16
                 )
                 # Add the no-go area to the list
@@ -687,11 +686,7 @@ class Data:
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
         
-        # Apply penalty if a transition was occur from natural to modified land.
-        for i,j in product(range(self.N_AG_LUS), range(self.N_AG_LUS)):
-            if (not i in self.LU_MODIFIED_LAND) and (j in self.LU_MODIFIED_LAND):
-                self.AG_TMATRIX[i,j] += settings.NATURAL_TO_MODIFIED_LAND_PENALTY
-        
+
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix
@@ -874,7 +869,7 @@ class Data:
         
         # Read the data into memory with [...], so that it can be pickled.
         self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][...][:, self.MASK]
-        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][...][:, self.MASK]
+        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][...][:, self.MASK] 
         
 
         # Water yield from outside LUTO study area.
@@ -1143,11 +1138,11 @@ class Data:
         The degradation scores are float values range between 0-1 indicating the discount of biodiversity value for each cell.
         E.g., 0.8 means the biodiversity value of the cell is 80% of the original raw biodiversity value.
         '''
-        biodiv_degrade_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                                                # Get the biodiversity degradation score for LDS burning (1D numpy array)
+        self.BIODIV_DEGRADE_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                                           # Get the biodiversity degradation score for LDS burning (1D numpy array)
         biodiv_degrade_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)              # Get the biodiversity degradation score for each cell (1D numpy array)
 
-        # Get the biodiversity damage under LDS burning (0-1) for each cell 
-        biodiv_degradation_raw_weighted_LDS = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_LDS)                                         # Biodiversity damage under LDS burning (1D numpy array)
+        # Get the biodiversity damage under LDS burning (0-1) for each cell
+        biodiv_degradation_raw_weighted_LDS = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - self.BIODIV_DEGRADE_LDS)                                    # Biodiversity damage under LDS burning (1D numpy array)
         biodiv_degradation_raw_weighted_habitat = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_habitat)                                 # Biodiversity damage under under HCAS (1D numpy array)
 
         # Get the biodiversity value at the beginning of the simulation                 
@@ -1157,8 +1152,11 @@ class Data:
         self.BIODIV_BASE_YR_VAL_EACH_LU = np.bincount(                                                                                          # Sum the biodiversity value within each land-use type
             self.LUMAP_NO_RESFACTOR[self.LUMASK], 
             weights=biodiv_base_yr_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK]
-        )                  
+        )
         
+        # Apply the resfactor to the biodiversity degradation scores
+        self.BIODIV_DEGRADE_LDS = self.get_array_resfactor_applied(self.BIODIV_DEGRADE_LDS)
+
 
         # Biodiversity values need to be restored under the GBF Target 2                    
         '''                 
@@ -1185,28 +1183,45 @@ class Data:
         print("\tLoading vegetation data...", flush=True)
         
         # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
-        NVIS_area_and_target = pd.read_csv(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.csv')
+        self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = pd.read_excel(
+            INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
+            sheet_name = f'NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL'
+        )
+
+        for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
+            if not all([
+                row['USER_DEFINED_TARGET_PERCENT_2030'] >= 0,
+                row['USER_DEFINED_TARGET_PERCENT_2050'] >= 0,
+                row['USER_DEFINED_TARGET_PERCENT_2100'] >= 0]
+            ):
+                raise ValueError(f"NVIS class {row['group']} has no user-defined targets for all years.")
         
-        self.NVIS_ID2DESC = dict(enumerate(NVIS_area_and_target['group']))
-        self.NVIS_TOTAL_AREA_HA = NVIS_area_and_target['TOTAL_AREA_HA'].to_numpy()
-        self.NVIS_OUTSIDE_LUTO_AREA_HA = NVIS_area_and_target['OUTSIDE_LUTO_AREA_HA'].to_numpy()
-        self.N_NVIS_CLASSES = self.NVIS_TOTAL_AREA_HA.shape[0]
+        self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['group']))
+        self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
+        self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
+        self.BIO_GBF3_N_CLASSES = self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA.shape[0]
+
 
         # Read in vegetation layer data
         NVIS_pre_xr = xr.load_dataarray(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.nc').values
 
         # Apply mask
         if NVIS_SPATIAL_DETAIL == 'LOW':
+            # 1D vector, each cell is an index of the NVIS class
             self.NVIS_PRE_GR = NVIS_pre_xr[self.MASK]
+            # Conver to 2D array, n_class * n_cell, each cell is 1 if the cell is the coresponding NVIS class, 0 otherwise
+            self.NVIS_PRE_GR = np.array([(self.NVIS_PRE_GR == i) for i in self.BIO_GBF3_ID2DESC.keys()]).astype(np.bool_)
         else:
-            self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK]
+            # 2D array, n_class * n_cell, each cell is the area percentage of the coresponding NVIS class
+            self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK] / 100  # divide by 100 to convert percentage to proportion
 
-        # To be computed during economic calculations
-        self.NVIS_LIMITS: dict[int, np.ndarray] = {}
+        # Apply Savanna Burning penalties
+        veg_degradation_raw_weighted_LDS = self.NVIS_PRE_GR * (1 - self.BIODIV_DEGRADE_LDS)   # Savburn damages
+        self.NVIS_PRE_GR_LDS = self.NVIS_PRE_GR - veg_degradation_raw_weighted_LDS
 
         # Container storing which cells apply to each major vegetation group
         epsilon = 1e-5
-        self.NVIS_INDECES = {
+        self.MAJOR_VEG_INDECES = {
             v: np.where(self.NVIS_PRE_GR[v] > epsilon)[0]
             for v in range(self.NVIS_PRE_GR.shape[0])
         }
@@ -1239,7 +1254,8 @@ class Data:
         self.BIO_GBF4A_SPECIES_LAYER = BIO_GBF4A_SPECIES_raw.sel(species=self.BIO_GBF4A_SEL_SPECIES).compute()
         self.BIO_GBF4A_GROUPS_LAYER = xr.load_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit_group.nc')['data']
         
-        
+        self.N_SPECIES = len(self.BIO_GBF4A_SEL_SPECIES)
+
         # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4B)
         BIO_GBF4B_SNES_score = pd.read_csv(INPUT_DIR + '/bio_DCCEEW_SNES_target.csv')
         BIO_GBF4B_ECNES_score = pd.read_csv(INPUT_DIR + '/bio_DCCEEW_ECNES_target.csv')
@@ -1414,7 +1430,7 @@ class Data:
         calculate the exact value of each land-use cell based from lumap to create dvars.
         
         E.g., given a resfactor of 5, then each resfactored dvar cell will cover a 5x5 area.
-        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25.
+        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25. 
         
         """
         if settings.RESFACTOR == 1:
@@ -1455,6 +1471,29 @@ class Data:
                 lumap_resample_avg[idx_w, :, idx_lu] = cell_avg_1d
                 
         return lumap_resample_avg
+
+
+
+    def get_GBF3_target_scores_by_year(self, yr:int):
+        '''
+        Interpolate the user-defined targets to get target at the given year
+        '''
+
+        GBF3_target_percents = []
+        for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
+            f = interp1d(
+                [2010, 2030, 2050, 2100],
+                [min(row['BASE_YR_PERCENT'],row['USER_DEFINED_TARGET_PERCENT_2030']),
+                 row['USER_DEFINED_TARGET_PERCENT_2030'],
+                 row['USER_DEFINED_TARGET_PERCENT_2050'],
+                 row['USER_DEFINED_TARGET_PERCENT_2100']
+                ],
+                kind="linear",
+                fill_value="extrapolate",
+            )
+            GBF3_target_percents.append(f(yr).item())
+
+        return self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA * GBF3_target_percents / 100  # Convert the percentage to proportion
 
     
     def get_GBF4A_bio_layers_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
@@ -1726,7 +1765,7 @@ class Data:
             yr_all = list(range(base_year, target_year + 1))
 
         # Create path name
-        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp_sim}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
+        self.path = f"{OUTPUT_DIR}/{self.timestamp_sim}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
 
         # Get all paths
         paths = (
@@ -1751,7 +1790,7 @@ class Data:
         # Create all paths
         for p in paths:
             if not os.path.exists(p):
-                os.makedirs(p)
+                os.mkdir(p)
 
         return self.path
 
