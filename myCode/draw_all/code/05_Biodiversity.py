@@ -22,7 +22,7 @@ csv_name, value_column_name, filter_column_name = 'biodiversity_separate', 'Biod
 bio_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 bio_dict,legend_colors = get_colors(bio_dict, 'tools/land use colors.xlsx', sheet_name='lu')
 
-bio_target_dict = get_dict_data(input_files, "biodiversity", 'Score', 'Variable')
+bio_target_dict = get_dict_data(input_files, "biodiversity_targets", 'Score', 'Variable')
 point_dict = rename_and_filter_columns(bio_target_dict, ['Biodiversity score limit','Solve biodiversity score'], ['Constraints','Score'])
 point_colors = ['black','red']
 y_range, y_ticks = calculate_y_axis_range(bio_dict)

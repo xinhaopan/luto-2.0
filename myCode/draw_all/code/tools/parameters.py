@@ -1,8 +1,8 @@
 INPUT_DIR = '../../../input'
 
-time = '20250216'
+time = '20250316'
 middle = ''
-suffix = '5'
+suffix = '20_soft'
 senerios = [
     'Run_7_GHG_1_8C_67_BIO_0',
     'Run_4_GHG_1_5C_50_BIO_0',

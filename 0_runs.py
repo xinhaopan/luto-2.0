@@ -43,10 +43,11 @@ def main():
         write_log(f"Simulation completed. Peak memory usage: {simulation_memory:.2f} GB")
 
         # 保存数据
-        pkl_path = f'{data.path}/data_with_solution.pkl'
+        pkl_path = f'{data.path}/data_with_solution.gz'
 
-        with open(pkl_path, 'wb') as f:
-            dill.dump(data, f)
+        sim.save_data_to_disk(data,pkl_path)
+        # with open(pkl_path, 'wb') as f:
+        #     dill.dump(data, f)
         write_log(f"Data with solution saved in {data.path}.")
 
         # 监控写输出结果

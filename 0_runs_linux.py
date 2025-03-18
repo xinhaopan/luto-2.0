@@ -32,12 +32,9 @@ def main(start_year, end_year):
         write_log("Simulation completed")
 
         # 保存数据
-        pkl_path = f'{data.path}/data_with_solution.pkl'
+        pkl_path = f'{data.path}/data_with_solution.gz'
 
-        with open(pkl_path, 'wb') as f:
-            dill.dump(data, f)
-            f.flush()  # 刷新文件缓冲区
-            os.fsync(f.fileno())  # 同步到磁盘
+        sim.save_data_to_disk(data,pkl_path)
         write_log(f"Data with solution saved in {data.path}.")
 
         # 写输出结果

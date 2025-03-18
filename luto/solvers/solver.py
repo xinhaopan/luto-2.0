@@ -1435,6 +1435,11 @@ class LutoSolver:
             prod_data["Major Vegetation Groups"] = {
                 v: expr.getValue() for v, expr in self.major_vegetation_exprs.items()
             }
+        if self.species_conservation_exprs:
+            prod_data["Species Conservation"] = {
+                s: expr.getValue() for s, expr in self.species_conservation_exprs.items()
+            }
+
 
         return SolverSolution(
             lumap=lumap,
@@ -1457,9 +1462,9 @@ class LutoSolver:
                     if settings.GHG_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
-                'Biodiversity': (
+                'Biodiversity GBF2': (
                     self.obj_biodiv.getValue()
-                    if settings.BIODIV_CONSTRAINT_TYPE == "soft"
+                    if settings.GBF2_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
                 'Water': (
