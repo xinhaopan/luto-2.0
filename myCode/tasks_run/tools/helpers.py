@@ -373,7 +373,7 @@ def check_null_values(df):
         raise ValueError("DataFrame 中存在空值，请处理后再继续执行！")
 
 
-def generate_column_names(new_df, df_revise,suffix='', ghg_name_map=None, bio_name_map=None):
+def generate_column_names(new_df, df_revise,suffixs='', ghg_name_map=None, bio_name_map=None):
     """
     Generate new column names based on mappings and input data.
 
@@ -404,8 +404,20 @@ def generate_column_names(new_df, df_revise,suffix='', ghg_name_map=None, bio_na
     # 获取 GHG 和 BIO 对应的行值
     ghg_limits_field = new_df.iloc[new_df[new_df.iloc[:, 0] == "GHG_LIMITS_FIELD"].index[0]]
     biodiv_gbf_target_2_dict = new_df.iloc[new_df[new_df.iloc[:, 0] == "BIODIV_GBF_TARGET_2_DICT"].index[0]]
-    if suffix:
-        suffix_values = new_df.iloc[new_df[new_df.iloc[:, 0] == suffix].index[0]]
+    if len(suffixs) > 0:
+        # 选取匹配 suffix 列表的所有行
+        selected_rows = new_df[new_df.iloc[:, 0].isin(suffixs)]
+
+        if not selected_rows.empty:
+            # 去掉第一列，只保留数据部分
+            selected_values = selected_rows.iloc[:, 1:].astype(str)
+
+            # 构造按列存储的 suffix 替换映射
+            suffix_values_dict = {
+                col: '_'.join(selected_values[col].values) for col in selected_values.columns
+            }
+        else:
+            suffix_values_dict = {}
 
     # 检查 Name1 是否存在
     name_column = df_revise.columns[0]
@@ -433,8 +445,9 @@ def generate_column_names(new_df, df_revise,suffix='', ghg_name_map=None, bio_na
             else:
                 print(f"警告：列 {col} 中 Name1 没有有效值，已跳过添加相关内容。")
         new_name += f"_{ghg_value}_{bio_value}"
-        if suffix:
-            new_name += f"_{suffix_values[col]}"
+        if len(suffixs) > 0 and col in suffix_values_dict:
+            new_name += f"_{suffix_values_dict[col]}"
+
         new_column_names.append(new_name)
 
     return new_column_names
@@ -495,7 +508,7 @@ def generate_csv(
     recommend_resources(df_revise)
 
 
-def create_grid_search_template(template_df, grid_dict, output_file,suffix="") -> pd.DataFrame:
+def create_grid_search_template(template_df, grid_dict, output_file,suffixs="") -> pd.DataFrame:
     # Collect new columns in a list
     template_grid_search = template_df.copy()
 
@@ -539,7 +552,7 @@ def create_grid_search_template(template_df, grid_dict, output_file,suffix="") -
 
     # Save the grid search template to the root task folder
 
-    template_grid_search.columns = template_grid_search.columns[:2].tolist() + generate_column_names(template_grid_search, template_grid_search, suffix)
+    template_grid_search.columns = template_grid_search.columns[:2].tolist() + generate_column_names(template_grid_search, template_grid_search, suffixs)
     template_grid_search.to_csv(output_file, index=False)
     total_cost = calculate_total_cost(template_grid_search)
     print(f"Job Cost: {total_cost}k")

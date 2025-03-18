@@ -1,4 +1,5 @@
 import dill
+import gzip
 import os
 from datetime import datetime
 from luto.tools.write import write_outputs
@@ -22,7 +23,8 @@ def get_first_subfolder_name(output_path="output"):
         # subfolders = [f for f in os.listdir(output_path) if os.path.isdir(os.path.join(output_path, f))]
         subfolders = [f for f in os.listdir(output_path) if
                       os.path.isdir(os.path.join(output_path, f)) and '2010-2050' in f]
-        html_path = os.path.join(output_path, subfolders[0],"DATA_REPORT","REPORT_HTML","pages","production.html")
+        # html_path = os.path.join(output_path, subfolders[0],"DATA_REPORT","REPORT_HTML","pages","production.html")
+        html_path = os.path.join(output_path, subfolders[0], "out_2050", "quantity_production_kt_separate_2050.csv")
         if not subfolders:
             print(f"No subfolders found in '{output_path}'.")
             return None
@@ -31,7 +33,8 @@ def get_first_subfolder_name(output_path="output"):
             return 1
         # 返回拼接后的路径
         else:
-            return os.path.join(output_path, subfolders[0], 'data_with_solution.pkl')
+            # return os.path.join(output_path, subfolders[0], 'data_with_solution.pkl')
+            return os.path.join(output_path, subfolders[0], 'data_with_solution.gz')
     except FileNotFoundError:
         print(f"Error: Directory '{output_path}' does not exist.")
         return None
@@ -49,9 +52,15 @@ elif pkl_path == 1:
     print_with_time("Data already processed.")
 else:
     # 如果文件存在，则加载并处理数据
-    print_with_time("f{pkl_path} Loading...")
-    with open(pkl_path, 'rb') as f:
+    print_with_time(f"{pkl_path} Loading...")
+    # with open(pkl_path, 'rb') as f:
+    #     data = dill.load(f)
+
+    with gzip.open(pkl_path, 'rb') as f:
         data = dill.load(f)
+
+    # Update the timestamp
+    data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
     print_with_time("Writing outputs...")
     write_outputs(data)

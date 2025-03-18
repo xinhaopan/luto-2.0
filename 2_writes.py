@@ -74,7 +74,7 @@ def check_from_csv(csv_filename):
             for time_file_dir in time_file_dirs:
                 if "2010-2050" in time_file_dir:
                     has_2010_2050 = True
-                    pkl_path = os.path.join(time_file_path, time_file_dir, 'data_with_solution.pkl')
+                    pkl_path = os.path.join(time_file_path, time_file_dir, 'data_with_solution.gz')
 
                     # 检查 PKL 文件是否存在
                     if os.path.exists(pkl_path):
@@ -101,10 +101,10 @@ def check_from_csv(csv_filename):
 
 if __name__ == "__main__":
     run_path = "myCode/tasks_run"
-    csv_path = "Custom_runs/setting_template_windows_0311.csv"
+    csv_path = "Custom_runs/setting_0316.csv"
     new_csv_filename = check_from_csv(os.path.join(run_path, csv_path))
     os.chdir(run_path)
     # create_task_runs("/".join(Path(new_csv_filename).parts[-2:]) , use_multithreading=True, num_workers=3, script_name="1_write")
-    create_task_runs(csv_path, use_multithreading=False, num_workers=3,script_name="1_write")
+    create_task_runs(csv_path, use_multithreading=True, num_workers=3,script_name="1_write")
 
 

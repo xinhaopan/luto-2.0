@@ -5,6 +5,7 @@ import math
 import re
 import cairosvg
 from lxml import etree
+from joblib import Parallel, delayed
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -45,46 +46,6 @@ def get_colors(merged_dict, mapping_file, sheet_name=None):
         legend_colors.update(color_dict)  # 合并每个表的颜色映射
 
     return data_dict, legend_colors
-
-# def process_single_df(df, mapping_df):
-#     """
-#     对单个 DataFrame 根据映射文件进行处理，返回重命名和排序后的 DataFrame 及 legend_colors。
-#
-#     参数:
-#     df (pd.DataFrame): 需要处理的 DataFrame。
-#     mapping_df (pd.DataFrame): 包含 desc 和 color 列的映射文件 DataFrame。
-#
-#     返回:
-#     tuple: 处理后的 DataFrame 和 legend_colors（仅包含匹配的列）。
-#     """
-#     # 创建映射字典，忽略 desc 中的 `-`
-#     mapping_df['desc_processed'] = mapping_df['desc'].str.replace('-', '').str.lower()
-#     column_mapping = {row['desc_processed']: row['desc'] for _, row in mapping_df.iterrows()}
-#     color_mapping = {row['desc']: row['color'] for _, row in mapping_df.iterrows()}
-#
-#     # 获取并处理 DataFrame 列名，忽略 `-`
-#     original_columns = list(df.columns)
-#     processed_columns = [re.sub(r'-', '', col.lower()) for col in original_columns]
-#     renamed_columns = [column_mapping.get(col, original_columns[i]) for i, col in enumerate(processed_columns)]
-#
-#     # 按映射文件的顺序排列匹配的列，未匹配的列保持原始位置
-#     matched_categories = [col for col in renamed_columns if col in column_mapping.values()]
-#     unmatched_categories = [col for col in renamed_columns if col not in column_mapping.values()]
-#     categories = matched_categories + unmatched_categories
-#
-#     # 筛选 legend_colors 只包含匹配的列
-#     legend_colors = {column_mapping[col]: color_mapping[column_mapping[col]]
-#                      for col in processed_columns if col in column_mapping}
-#
-#     # 重命名和排序 DataFrame
-#     renamed_df = df.rename(columns={orig_col: column_mapping.get(re.sub(r'-', '', orig_col.lower()), orig_col)
-#                                     for orig_col in df.columns})
-#     processed_df = renamed_df.reindex(columns=categories, fill_value=0)
-#     if 'Year' in processed_df.columns:
-#         processed_df = processed_df.set_index('Year')
-#
-#     return processed_df, legend_colors
-
 
 
 def process_single_df(df, mapping_df):
@@ -366,7 +327,7 @@ def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_
 
     # Set y-axis limits and ticks
     ax.set_ylim(y_range[0], y_range[1])
-    ax.tick_params(axis='both', direction='in')
+    ax.tick_params(axis='both', direction='out')
 
     # 设置图例
     if show_legend:
@@ -407,7 +368,7 @@ def plot_stacked_bar(ax, merged_dict, input_name, legend_colors, font_size=10,
                    width=COLUMN_WIDTH))
 
     # Set tick direction inwards
-    ax.tick_params(axis='both', which='both', direction='in', labelsize=font_size)
+    ax.tick_params(axis='both', which='both', direction='out', labelsize=font_size)
 
     # Set x-axis limits and ticks
     ax.set_xlim(x_range[0] - X_OFFSET, x_range[1] + X_OFFSET)
@@ -453,7 +414,7 @@ def plot_line_chart(ax, merged_dict, input_name, legend_colors, font_size=10,
         ax.plot(years, merged_df[category], label=category, color=color_list[i], marker='o')
 
     # Set tick direction inwards
-    ax.tick_params(axis='both', which='both', direction='in', labelsize=font_size)
+    ax.tick_params(axis='both', which='both', direction='out', labelsize=font_size)
 
     # Set x-axis limits and ticks
     ax.set_xlim(x_range[0], x_range[1])
@@ -468,119 +429,223 @@ def plot_line_chart(ax, merged_dict, input_name, legend_colors, font_size=10,
     return ax
 
 
-# def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3):
-#     """
-#     计算累积柱状图的 Y 轴范围和刻度
-#     :param data_dict: 包含多个 DataFrame 的字典，每行代表一个柱状图的柱子
-#     :param multiplier: 范围是该值的倍数（默认 10）
-#     :param divisible_by: 范围除以该值后得到间隔（默认 3）
-#     :return: Y 轴范围 (最小值, 最大值) 和刻度间隔
-#     """
+# def get_max_min(df):
+#     # 计算正数累积和
+#     pos_cumsum = df.where(df > 0, 0).cumsum(axis=1)
+#     pos_max = pos_cumsum.max().max()
 #
-#     # 初始化值
-#     row_positive_max = float('-inf')  # 每行正数的累积最大值
-#     row_negative_min = float('inf')  # 每行负数的累积最小值
-#     has_negative = False  # 是否存在负数
-#     global_min_value = float('inf')  # 初始化全局最小值
-#     global_max_value = float('-inf')  # 初始化全局最大值
+#     # 计算负数累积和
+#     neg_cumsum = df.where(df < 0, 0).cumsum(axis=1)
+#     neg_min = neg_cumsum.min().min()
 #
-#     for df in data_dict.values():
-#         # 遍历每一行，逐行计算
-#         for index, row in df.iterrows():
-#             row_cumsum = row.cumsum()  # 计算行的累积和
+#     # 计算单个值的最值
+#     value_min = df.min().min()
+#     value_max = df.max().max()
 #
-#             # 计算该行的正数累积最大值
-#             row_positive_sum = row_cumsum[row_cumsum > 0].max() if (row_cumsum > 0).any() else 0
-#             row_positive_max = max(row_positive_max, row_positive_sum)
+#     # 计算最终最大值（正数部分）
+#     max_value = max(pos_max, value_max)
 #
-#             # 计算该行的负数累积最小值
-#             if row.min() < 0:
-#                 has_negative = True
-#                 row_negative_sum = row_cumsum[row_cumsum < 0].min()
-#                 row_negative_min = min(row_negative_min, row_negative_sum)
+#     # 计算最终最小值（负数部分）
+#     min_value = min(neg_min, value_min)
 #
-#             # 更新全局最小值和最大值
-#             global_min_value = min(global_min_value, row.min())
-#             global_max_value = max(global_max_value, row.max())
+#     return max_value, min_value
 #
-#     # 如果没有负数，将累积负数最小值设为 0
-#     if not has_negative:
-#         row_negative_min = 0
+# def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3, use_multithreading=False):
+#     max_value, min_value = (
+#         max(get_max_min(df)[0] for df in data_dict.values()),
+#         min(get_max_min(df)[1] for df in data_dict.values())
+#     )
 #
-#     # 最终比较累积值和全局值，得到最终结果
-#     max_value = max(global_max_value, row_positive_max)
-#     min_value = min(global_min_value, row_negative_min)
+#     # 如果 multiplier 小于 1，放大数据和 multiplier
+#     scale_factor = 1
+#     if multiplier < 1:
+#         scale_factor = int(1 / multiplier) * 10
+#         max_value *= scale_factor
+#         min_value *= scale_factor
+#         multiplier = 1
 #
-#     # 如果没有负数，将最小值设置为 0
-#     if not has_negative:
-#         cumulative_negative_min = 0
-#         min_value = 0
-#
-#     # 将最小值向下取整到 multiplier 的倍数
 #     y_min = np.floor(min_value / multiplier) * multiplier
-#
-#     # 将最大值向上取整到 multiplier 的倍数
 #     y_max = np.ceil(max_value / multiplier) * multiplier
 #
-#     # 确保 (y_max - y_min) 可以整除 divisible_by
 #     while (y_max - y_min) % divisible_by != 0:
 #         y_max += multiplier
 #
 #     interval = (y_max - y_min) // divisible_by
 #
+#     # 缩小结果回原比例
+#     if scale_factor != 1:
+#         y_min /= scale_factor
+#         y_max /= scale_factor
+#         interval /= scale_factor
+#
 #     return (y_min, y_max), interval
 
 
 
+
 def get_max_min(df):
-    # 计算正数累积和
-    pos_cumsum = df.where(df > 0, 0).cumsum(axis=1)
-    pos_max = pos_cumsum.max().max()
+    """
+    高效计算 df 的最大最小值：
+    - 避免逐行 `cumsum(axis=1)`，直接计算正数最大累积和 & 负数最小累积和
+    - 直接转换为 NumPy 数组，加速运算
+    """
+    arr = df.to_numpy()  # 直接转换为 NumPy 数组，加快计算速度
 
-    # 计算负数累积和
-    neg_cumsum = df.where(df < 0, 0).cumsum(axis=1)
-    neg_min = neg_cumsum.min().min()
+    # 计算每行正数累积和的最大值（优化版）
+    pos_cumsum = np.where(arr > 0, arr, 0).cumsum(axis=1)
+    pos_max = np.max(pos_cumsum, axis=1)  # 仅计算每行最大值
+    overall_pos_max = np.max(pos_max)  # 取整个 df 的最大正数累积值
 
-    # 计算单个值的最值
-    value_min = df.min().min()
-    value_max = df.max().max()
+    # 计算每行负数累积和的最小值（优化版）
+    neg_cumsum = np.where(arr < 0, arr, 0).cumsum(axis=1)
+    neg_min = np.min(neg_cumsum, axis=1)  # 仅计算每行最小值
+    overall_neg_min = np.min(neg_min)  # 取整个 df 的最小负数累积值
 
-    # 计算最终最大值（正数部分）
-    max_value = max(pos_max, value_max)
+    # 计算单个值的最大最小值
+    overall_min = np.min(arr)
+    overall_max = np.max(arr)
 
-    # 计算最终最小值（负数部分）
-    min_value = min(neg_min, value_min)
+    return max(overall_pos_max, overall_max), min(overall_neg_min, overall_min)
 
-    return max_value, min_value
+# def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3, n_jobs=-1):
+#     """
+#     并行计算所有 DataFrame 的 (max, min) 值
+#     """
+#     results = Parallel(n_jobs=n_jobs, prefer="threads")(delayed(get_max_min)(df) for df in data_dict.values())
+#
+#     # 获取所有 DataFrame 的全局最大最小值
+#     max_value = max(res[0] for res in results)
+#     min_value = min(res[1] for res in results)
+#
+#     # 如果 multiplier 小于 1，放大数据和 multiplier
+#     scale_factor = 1
+#     if multiplier < 1:
+#         scale_factor = int(1 / multiplier) * 10
+#         max_value *= scale_factor
+#         min_value *= scale_factor
+#         multiplier = 1
+#
+#     y_min = np.floor(min_value / multiplier) * multiplier
+#     y_max = np.ceil(max_value / multiplier) * multiplier
+#
+#     while (y_max - y_min) % divisible_by != 0:
+#         y_max += multiplier
+#
+#     interval = (y_max - y_min) // divisible_by
+#
+#     # 缩小结果回原比例
+#     if scale_factor != 1:
+#         y_min /= scale_factor
+#         y_max /= scale_factor
+#         interval /= scale_factor
+#
+#     return (y_min, y_max), interval
 
-def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3, use_multithreading=False):
-    max_value, min_value = (
-        max(get_max_min(df)[0] for df in data_dict.values()),
-        min(get_max_min(df)[1] for df in data_dict.values())
-    )
 
-    # 如果 multiplier 小于 1，放大数据和 multiplier
-    scale_factor = 1
-    if multiplier < 1:
-        scale_factor = int(1 / multiplier) * 10
-        max_value *= scale_factor
-        min_value *= scale_factor
-        multiplier = 1
+import numpy as np
+import pandas as pd
+from joblib import Parallel, delayed
 
-    y_min = np.floor(min_value / multiplier) * multiplier
-    y_max = np.ceil(max_value / multiplier) * multiplier
-
-    while (y_max - y_min) % divisible_by != 0:
-        y_max += multiplier
-
-    interval = (y_max - y_min) // divisible_by
-
-    # 缩小结果回原比例
-    if scale_factor != 1:
-        y_min /= scale_factor
-        y_max /= scale_factor
-        interval /= scale_factor
-
-    return (y_min, y_max), interval
+import numpy as np
 
 
+def calculate_y_axis_range(data_dict, multiplier=10):
+    """
+    计算 y 轴范围和间隔：
+    - 确保0是刻度中的一个。
+    - 当数据范围绝对值≥100时，确保间隔和刻度标签的个位数为0。
+    - 刻度数量在4到6之间。
+
+    参数:
+        min_value: 数据最小值
+        max_value: 数据最大值
+        multiplier: 调整时的间隔基数（默认为10）
+
+    返回:
+        ((y_min, y_max), interval): y 轴范围和间隔
+    """
+    # 并行计算所有 DataFrame 的最大值和最小值
+    results = Parallel(n_jobs=-1, prefer="threads")(delayed(get_max_min)(df) for df in data_dict.values())
+    # 获取全局最大值和最小值
+    max_value = max(res[0] for res in results)
+    min_value = min(res[1] for res in results)
+    adjust_to_ten = min_value <= -100 or max_value >= 100
+
+    # 确保包含0的原始范围
+    original_min, original_max = min_value, max_value
+    if min_value > 0:
+        min_value = 0
+    elif max_value < 0:
+        max_value = 0
+    data_range = max_value - min_value
+
+    best_candidate = None
+    min_expansion = float('inf')
+
+    # 尝试不同刻度数寻找最优解
+    for n in [4, 5, 6]:
+        if data_range == 0:  # 全零特例处理
+            y_min, y_max = (-multiplier, multiplier) if adjust_to_ten else (-1, 1)
+            interval = multiplier if adjust_to_ten else 1
+            return ((y_min, y_max), interval)
+
+        # 计算初始间隔
+        if adjust_to_ten:
+            interval = multiplier * max(1, np.ceil(data_range / (multiplier * (n - 1))))
+        else:
+            interval = max(1, np.ceil(data_range / (n - 1)))
+            interval = int(interval)
+
+        # 计算范围边界
+        y_min = np.floor(min_value / interval) * interval
+        y_max = np.ceil(max_value / interval) * interval
+
+        # 确保包含0
+        if y_min > 0:
+            y_min = 0
+        if y_max < 0:
+            y_max = 0
+
+        # 验证刻度数
+        tick_count = int((y_max - y_min) / interval) + 1
+        if not 4 <= tick_count <= 6:
+            continue
+
+        # 计算范围扩展量
+        expansion = (y_max - original_max) + (original_min - y_min)
+        if expansion < min_expansion:
+            min_expansion = expansion
+            best_candidate = (y_min, y_max, interval)
+
+    # 回退逻辑（找不到合适解时）
+    if not best_candidate:
+        if adjust_to_ten:
+            y_min = np.floor(original_min / multiplier) * multiplier
+            y_max = np.ceil(original_max / multiplier) * multiplier
+            interval = multiplier
+        else:
+            y_min = np.floor(original_min)
+            y_max = np.ceil(original_max)
+            interval = max(1, (y_max - y_min) // 5)
+        # 确保包含0
+        if y_min > 0:
+            y_min = 0
+        if y_max < 0:
+            y_max = 0
+        best_candidate = (y_min, y_max, interval)
+
+    y_min, y_max, interval = best_candidate
+
+    # 百位数以上强制对齐10的倍数
+    if adjust_to_ten:
+        y_min = np.floor(y_min / multiplier) * multiplier
+        y_max = np.ceil(y_max / multiplier) * multiplier
+        interval = multiplier * np.ceil(interval / multiplier)
+        # 重新计算刻度数并调整间隔
+        tick_count = int((y_max - y_min) / interval) + 1
+        if tick_count < 4:
+            interval = (y_max - y_min) / 3
+        elif tick_count > 6:
+            interval = (y_max - y_min) / 5
+
+    return ((y_min, y_max), interval)

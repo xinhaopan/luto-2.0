@@ -172,7 +172,7 @@ def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_
 
     # Set y-axis limits and ticks
     ax.set_ylim(y_range[0], y_range[1])
-    ax.tick_params(axis='both', direction='in')
+    ax.tick_params(axis='both', direction='out')
 
     # 设置图例
     if show_legend:

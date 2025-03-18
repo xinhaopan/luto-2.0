@@ -170,6 +170,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_files_separate(data, yr_cal, path_yr) if settings.WRITE_OUTPUT_GEOTIFFS else None
     write_dvar_area(data, yr_cal, path_yr)
     write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
+    write_quantity_separate(data, yr_cal, path_yr)
     write_revenue_cost_ag(data, yr_cal, path_yr)
     write_revenue_cost_ag_management(data, yr_cal, path_yr)
     write_revenue_cost_non_ag(data, yr_cal, path_yr)
@@ -178,6 +179,8 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg(data, yr_cal, path_yr)
     write_ghg_separate(data, yr_cal, path_yr)
     write_ghg_offland_commodity(data, yr_cal, path_yr)
+    write_biodiversity(data, yr_cal, path_yr)
+    write_biodiversity_separate(data, yr_cal, path_yr)
     write_biodiversity_GBF2_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
@@ -1016,8 +1019,111 @@ def write_water(data: Data, yr_cal, path):
     )
     df_water_seperate['Water_supply'] = df_water_seperate['Water_supply'].replace({'dry':'Dryland', 'irr':'Irrigated'})
     df_water_seperate.to_csv( os.path.join(path, f'water_yield_separate_{yr_cal}.csv'), index=False)
-    
 
+def write_biodiversity_separate(data: Data, yr_cal, path):
+
+    # Do nothing if biodiversity limits are off and no need to report
+    if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
+        return
+
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    print(f'Writing biodiversity_separate outputs for {yr_cal}')
+
+    # Get the biodiversity scores b_mrj
+    ag_b_mrj = ag_biodiversity.get_breq_matrices(data)
+    ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(data)
+    am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj, yr_idx)
+    non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, data.lumaps[yr_cal])
+
+    # Get the decision variables for the year
+    ag_dvar_mrj = data.ag_dvars[yr_cal]
+    ag_mam_dvar_mrj =  data.ag_man_dvars[yr_cal]
+    non_ag_dvar_rk = data.non_ag_dvars[yr_cal]
+
+    # Multiply the decision variables with the biodiversity scores
+    ag_biodiv_jm = np.einsum('mrj,mrj -> jm', ag_biodiv_mrj, ag_dvar_mrj)
+    non_ag_biodiv_k = np.einsum('rk,rk -> k', non_ag_biodiv_rk, non_ag_dvar_rk)
+
+    # Get the biodiversity scores for agricultural landuse
+    AG_df = pd.DataFrame(ag_biodiv_jm.reshape(-1),
+                        index=pd.MultiIndex.from_product([['Agricultural Landuse'],
+                                                        ['Agricultural Landuse'],
+                                                        data.AGRICULTURAL_LANDUSES,
+                                                        data.LANDMANS,
+                                                        ])).reset_index()
+
+    # Get the biodiversity scores for non-agricultural landuse
+    NON_AG_df = pd.DataFrame(non_ag_biodiv_k.reshape(-1),
+                            index=pd.MultiIndex.from_product([['Non-Agricultural Landuse'],
+                                                            ['Non-Agricultural Landuse'],
+                                                            NON_AG_LAND_USES.keys(),
+                                                            ['dry'],
+                                                            ])).reset_index()
+
+    # Get the biodiversity scores for agricultural management
+    AM_dfs = []
+    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
+
+        # Slice the arrays with the agricultural management land uses
+        am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
+        am_dvar = ag_mam_dvar_mrj[am][:,:,am_j]
+        am_biodiv = am_biodiv_mrj[am]
+
+        # Biodiversity score for each agricultural management in array format
+        am_jm = np.einsum('mrj,mrj -> jm', am_dvar, am_biodiv)
+
+        # water yields for each agricultural management in long dataframe format
+        df_am = pd.DataFrame(am_jm.reshape(-1),
+                            index=pd.MultiIndex.from_product([['Agricultural Management'],
+                                                            [am],
+                                                            am_lus,
+                                                            data.LANDMANS
+                                                            ])).reset_index()
+
+        # Add to list of dataframes
+        AM_dfs.append(df_am)
+
+    # Combine all AM dataframes
+    AM_df = pd.concat(AM_dfs)
+
+    # Combine all dataframes
+    biodiv_df = pd.concat([AG_df, NON_AG_df, AM_df])
+    biodiv_df.columns = ['Landuse type','Landuse subtype', 'Landuse', 'Land management', 'Biodiversity score']
+    biodiv_df.insert(0, 'Year', yr_cal)
+
+    # Write to file
+    biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False)
+
+def write_biodiversity(data: Data, yr_cal, path):
+    """
+    Write biodiversity info for a given year ('yr_cal'), simulation ('sim')
+    and output path ('path').
+    """
+    if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
+        return
+
+    # Check biodiversity limits and report
+    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal)
+
+    print(f'Writing biodiversity outputs for {yr_cal}')
+
+    # Get biodiversity score from model
+    if yr_cal >= data.YR_CAL_BASE + 1:
+        biodiv_score = data.prod_data[yr_cal]['Biodiversity']
+    else:
+        # Return the base year biodiversity score
+        biodiv_score = data.BIODIV_GBF_TARGET_2[data.YR_CAL_BASE]
+
+    # Add to dataframe
+    df = pd.DataFrame({
+            'Variable':['Biodiversity score limit',
+                        'Solve biodiversity score'],
+            'Score':[biodiv_limit, biodiv_score]
+            })
+
+    # Save to file
+    df['Year'] = yr_cal
+    df.to_csv(os.path.join(path, f'biodiversity_targets_{yr_cal}.csv'), index = False)
 
 def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
