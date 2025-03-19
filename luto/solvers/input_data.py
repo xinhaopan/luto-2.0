@@ -78,6 +78,8 @@ class SolverInputData:
     water_yield_RR_BASE_YR: dict                            # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]        # Water yield from outside LUTO study area -> dict. Key: region.
 
+    bio_priority_r: np.ndarray                              # Biodiversity priority area wieghted scores.
+
     ag_biodiv_degr_j: dict[int, float]                      # Biodiversity degredation factor for each ag LU.
     non_ag_biodiv_impact_k: dict[int, float]                # Biodiversity benefits for each non-ag LU.
     ag_man_biodiv_impacts: dict[str, dict[int, np.ndarray]] # Biodiversity benefits for each AM option.
@@ -243,6 +245,9 @@ def get_ag_biodiv_degr_j(data: Data) -> dict[int, float]:
     print('Getting biodiversity degredation data for agricultural land uses...', flush = True)
     return data.BIODIV_HABITAT_DEGRADE_LOOK_UP
 
+def get_biodiv_priority_area_wieghted_scores(data: Data) -> np.ndarray:
+    print('Getting biodiversity priority area wieghted scores...', flush = True)
+    return data.BIO_DISTANCE_WEIGHTED * data.REAL_AREA
 
 def get_non_ag_biodiv_impact_k(data: Data) -> dict[int, float]:
     print('Getting biodiversity benefits data for non-agricultural land uses...', flush = True)
@@ -607,7 +612,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
-
+        
         ag_man_g_mrj=get_ag_man_g_mrj(data, target_index, ag_g_mrj),
         ag_man_q_mrp=get_ag_man_q_mrj(data, target_index, ag_q_mrp),
         ag_man_w_mrj=get_ag_man_w_mrj(data, target_index),
@@ -617,6 +622,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_BASE_YR(data),                                     # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
+
+        bio_priority_r=get_biodiv_priority_area_wieghted_scores(data),
 
         ag_biodiv_degr_j=get_ag_biodiv_degr_j(data),
         non_ag_biodiv_impact_k=get_non_ag_biodiv_impact_k(data),

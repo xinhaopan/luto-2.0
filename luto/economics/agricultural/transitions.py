@@ -63,12 +63,20 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
     # Boolean exclusion matrix based on SA2/NLUM agricultural land-use data (in mrj structure).
     # Effectively, this ensures that in any SA2 region the only combinations of land-use and land management
     # that can occur in the future are those that occur in 2010 (i.e., YR_CAL_BASE)
-    x_mrj = data.EXCLUDE
+    x_mrj = data.EXCLUDE.copy()
 
     # Raw transition-cost matrix is in $/ha and lexicographically ordered by land-use (shape = 28 x 28).
     t_ij = data.AG_TMATRIX
 
     lumap_2010 = data.LUMAP
+    
+    if settings.EXCLUDE_NO_GO_LU:
+        no_go_regions = data.NO_GO_REGION_AG
+        no_go_j = [data.DESC2AGLU.get(desc) for desc in data.NO_GO_LANDUSE_AG]
+
+        for count, j in enumerate(no_go_j):
+            x_mrj[0, :, j] *= no_go_regions[count]
+            x_mrj[1, :, j] *= no_go_regions[count]
 
     # Get all agricultural and non-agricultural cells
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
