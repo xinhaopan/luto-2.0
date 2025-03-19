@@ -1,0 +1,21 @@
+#!/bin/bash
+#PBS -N test_gurobi
+#PBS -l ncpus=1
+#PBS -l mem=2GB
+#PBS -l walltime=00:05:00
+#PBS -l wd
+#PBS -j oe
+#PBS -o output/test_gurobi.log
+#PBS -q normal
+#PBS -l storage=gdata/jk53+scratch/jk53
+
+# 确保 output 目录存在
+mkdir -p output
+
+# 加载 Gurobi 许可证
+export GRB_LICENSE_FILE=/g/data/jk53/config/gurobi_cfg.txt
+export GRB_TOKEN_SERVER=gurobi.licensing.its.deakin.edu.au
+export GRB_TOKEN_PORT=41954
+
+# 直接使用 Conda 里的 Python 解释器
+/home/582/xp7241/apps/miniforge3/envs/luto/bin/python -c "import gurobipy as gp; m = gp.Model(); print('Gurobi is working!')" >> output/test_gurobi.log 2>&1

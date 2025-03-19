@@ -205,6 +205,12 @@ def submit_task_linux(task_dir, config):
     LOG_DIR=output
     mkdir -p $LOG_DIR
 
+    # 加载 Gurobi 许可证
+    source ~/.bashrc
+    export GRB_LICENSE_FILE=/g/data/jk53/config/gurobi_cfg.txt
+    export GRB_TOKEN_SERVER=gurobi.licensing.its.deakin.edu.au
+    export GRB_TOKEN_PORT=41954
+    
     # 输出作业开始时间到日志
     echo "Job started at $(date)" >> $LOG_DIR/$PBS_JOBID.log
     echo "Current directory: $(pwd)" >> $LOG_DIR/$PBS_JOBID.log
@@ -352,7 +358,7 @@ def recommend_resources(df):
     for task, cpu, mem, rec_cpu, rec_mem in zip(cpu_values.index, cpu_values, mem_values, recommended_cpus, recommended_mem):
         print(f"Task {task}:")
         print(f"  - Current CPU: {cpu}, Recommended MEM: {rec_mem} GB")
-        print(f"  - Current MEM: {mem} GB, Recommended MEM for CPU {rec_cpu} GB")
+        print(f"  - Current MEM: {mem} GB, Recommended CPU {rec_cpu}")
         break
 
 def check_null_values(df):

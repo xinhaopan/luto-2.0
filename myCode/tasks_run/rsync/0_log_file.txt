@@ -88835,3 +88835,1037 @@ File 2_sync_list.txt is under the size limit. No cleaning required.
 File 1_last_sync_time.txt is under the size limit. No cleaning required.
 File 0_log_file.txt is under the size limit. No cleaning required.
 
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-18 17:19:54
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-18 17:19:54: Starting task...
+[INFO] Sync time updated to: 2025-03-18 17:19:54
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-18 18:19:56
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-18 18:19:56: Starting task...
+[INFO] Sync time updated to: 2025-03-18 18:19:56
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-18 19:19:55
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+run_2025_03_18__19_05_38_stdout.log |          289 B |    0.0 KB/s | binary | 100%
+run_2025_03_18__19_05_38_stderr.log |            0 B |    0.0 KB/s | binary |   0%
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-18 19:19:55: Starting task...
+[INFO] Sync time updated to: 2025-03-18 19:19:55
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+run_2025_03_18__19_05_38_stdout.log |          289 B |    0.0 KB/s | binary | 100%
+run_2025_03_18__19_05_38_stderr.log |            0 B |    0.0 KB/s | binary |   0%
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-18 20:19:54
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+run_2025_03_18__20_01_07_stdout.log |          205 B |    0.0 KB/s | binary | 100%
+simulation_log.txt        |           41 B |    0.0 KB/s | binary | 100%
+run_2025_03_18__20_01_07_stderr.log |            0 B |    0.0 KB/s | binary |   0%
+run_2025_03_18__19_50_24_stderr.log |            0 B |    0.0 KB/s | binary |   0%
+run_2025_03_18__19_50_24_stdout.log |          205 B |    0.0 KB/s | binary | 100%
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-18 20:19:54: Starting task...
+[INFO] Sync time updated to: 2025-03-18 20:19:54
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+run_2025_03_18__20_01_07_stdout.log |          205 B |    0.0 KB/s | binary | 100%
+simulation_log.txt        |           41 B |    0.0 KB/s | binary | 100%
+run_2025_03_18__20_01_07_stderr.log |            0 B |    0.0 KB/s | binary |   0%
+run_2025_03_18__19_50_24_stderr.log |            0 B |    0.0 KB/s | binary |   0%
+run_2025_03_18__19_50_24_stdout.log |          205 B |    0.0 KB/s | binary | 100%
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-18 21:19:55
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190245.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+20250318_Run_4_GHG_1_5C_50_BIO_0_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+137190245.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5230.5 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2782.2 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190247.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+20250318_Run_1_GHG_1_5C_67_BIO_0_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+137190247.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 10461.0 KB/s | binary | 100%
+workspace.xml             |          73 KB | 2608.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190246.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+20250318_Run_9_GHG_1_8C_67_BIO_5_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+137190246.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5399.2 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2608.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190243.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+137190243.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+20250318_Run_8_GHG_1_8C_67_BIO_3_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5399.2 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2608.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190244.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+137190244.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+20250318_Run_6_GHG_1_5C_50_BIO_5_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5230.5 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2782.2 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190242.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+20250318_Run_7_GHG_1_8C_67_BIO_0_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+137190242.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 10461.0 KB/s | binary | 100%
+workspace.xml             |          73 KB | 1346.2 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+20250318_Run_2_GHG_1_5C_67_BIO_3_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+137190241.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+137190241.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5399.2 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2608.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190248.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+137190248.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+20250318_Run_5_GHG_1_5C_50_BIO_3_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5399.2 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2608.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190249.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+137190249.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+20250318_Run_3_GHG_1_5C_67_BIO_5_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5399.2 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2782.2 KB/s | binary | 100%
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-18 21:19:55: Starting task...
+[INFO] Sync time updated to: 2025-03-18 21:19:55
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190245.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+20250318_Run_4_GHG_1_5C_50_BIO_0_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+137190245.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5230.5 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2782.2 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190247.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+20250318_Run_1_GHG_1_5C_67_BIO_0_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+137190247.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 10461.0 KB/s | binary | 100%
+workspace.xml             |          73 KB | 2608.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190246.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+20250318_Run_9_GHG_1_8C_67_BIO_5_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+137190246.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5399.2 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2608.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190243.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+137190243.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+20250318_Run_8_GHG_1_8C_67_BIO_3_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5399.2 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2608.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190244.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+137190244.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+20250318_Run_6_GHG_1_5C_50_BIO_5_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5230.5 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2782.2 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190242.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+20250318_Run_7_GHG_1_8C_67_BIO_0_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+137190242.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 10461.0 KB/s | binary | 100%
+workspace.xml             |          73 KB | 1346.2 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+20250318_Run_2_GHG_1_5C_67_BIO_3_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+137190241.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+137190241.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5399.2 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2608.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190248.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+137190248.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+20250318_Run_5_GHG_1_5C_50_BIO_3_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5399.2 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2608.3 KB/s | binary | 100%
+settings.cpython-312.pyc  |           5 KB |    0.0 KB/s | binary | 100%
+settings.py               |           4 KB |    0.0 KB/s | binary | 100%
+settings_bash.py          |           3 KB |    0.0 KB/s | binary | 100%
+137190249.gadi-pbs.OU     |          730 B |    0.0 KB/s | binary | 100%
+137190249.gadi-pbs.log    |           1 KB |    0.0 KB/s | binary | 100%
+20250318_Run_3_GHG_1_5C_67_BIO_5_5.pbs |           1 KB |    0.0 KB/s | binary | 100%
+gurobi.log                |         199 KB | 5399.2 KB/s | binary | 100% 
+workspace.xml             |          73 KB | 2782.2 KB/s | binary | 100%
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-18 22:19:56
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+test_gurobi.log           |          730 B |    0.0 KB/s | binary | 100%
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-18 22:19:56: Starting task...
+[INFO] Sync time updated to: 2025-03-18 22:19:56
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+test_gurobi.log           |          730 B |    0.0 KB/s | binary | 100%
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-18 23:19:55
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-18 23:19:54: Starting task...
+[INFO] Sync time updated to: 2025-03-18 23:19:55
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 00:19:55
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 00:19:55: Starting task...
+[INFO] Sync time updated to: 2025-03-19 00:19:55
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 01:19:55
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 01:19:55: Starting task...
+[INFO] Sync time updated to: 2025-03-19 01:19:55
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 02:19:53
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 02:19:53: Starting task...
+[INFO] Sync time updated to: 2025-03-19 02:19:53
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 03:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 03:19:52: Starting task...
+[INFO] Sync time updated to: 2025-03-19 03:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 04:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 04:19:52: Starting task...
+[INFO] Sync time updated to: 2025-03-19 04:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 05:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 05:19:52: Starting task...
+[INFO] Sync time updated to: 2025-03-19 05:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 06:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 06:19:52: Starting task...
+[INFO] Sync time updated to: 2025-03-19 06:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 07:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 07:19:52: Starting task...
+[INFO] Sync time updated to: 2025-03-19 07:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 08:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 08:19:52: Starting task...
+[INFO] Sync time updated to: 2025-03-19 08:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 09:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 09:19:52: Starting task...
+[INFO] Sync time updated to: 2025-03-19 09:19:52
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 10:19:53
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 10:19:52: Starting task...
+[INFO] Sync time updated to: 2025-03-19 10:19:53
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
+Lock acquired successfully.
+[INFO] Sync time updated to: 2025-03-19 11:19:53
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+Lock acquired successfully.
+2025-03-19 11:19:53: Starting task...
+[INFO] Sync time updated to: 2025-03-19 11:19:53
+File list saved to 2_sync_list.txt
+WinSCP script saved to Z:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\winscp_script.txt
+Starting synchronization...
+Synchronization completed successfully.
+Output: Searching for host...
+Connecting to host...
+Authenticating...
+Using username "xp7241".
+Authenticating with public key "xinhao@DESKTOP-JRK700U".
+Authenticated.
+Starting the session...
+Session started.
+Active session: [1] xp7241@gadi.nci.org.au
+batch           on        
+confirm         off       
+
+File 3_sync_log.txt is under the size limit. No cleaning required.
+File 2_sync_list.txt is under the size limit. No cleaning required.
+File 1_last_sync_time.txt is under the size limit. No cleaning required.
+File 0_log_file.txt is under the size limit. No cleaning required.
+
