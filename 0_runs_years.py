@@ -42,7 +42,7 @@ def main():
             enum_start_time = time.time()
             # 监控运行模拟
             write_log(f"Start simulation for target year {target_year}")
-            _, simulation_memory = monitor_memory(sim.run, data=data, base=start_year, target=target_year)
+            _, simulation_memory = monitor_memory(sim.run, data=data, base_year=start_year, target_year=target_year)
             write_log(f"Simulation completed. Peak memory usage: {simulation_memory:.2f} GB")
 
             # 保存数据

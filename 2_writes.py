@@ -101,7 +101,7 @@ def check_from_csv(csv_filename):
 
 if __name__ == "__main__":
     run_path = "myCode/tasks_run"
-    csv_path = "Custom_runs/setting_0316.csv"
+    csv_path = "Custom_runs/setting_0319_20_soft.csv"
     new_csv_filename = check_from_csv(os.path.join(run_path, csv_path))
     os.chdir(run_path)
     # create_task_runs("/".join(Path(new_csv_filename).parts[-2:]) , use_multithreading=True, num_workers=3, script_name="1_write")

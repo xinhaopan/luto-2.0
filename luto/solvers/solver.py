@@ -356,7 +356,7 @@ class LutoSolver:
 
         # Get the objective values for each sector
         self.obj_economy = economy_ag_contr + economy_ag_man_contr + economy_non_ag_contr
-        self.obj_biodiv = (bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr) * settings.GBF2_SOLVE_WEIGHT
+        # self.obj_biodiv = (bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr) * settings.GBF2_SOLVE_WEIGHT
         self.obj_ghg = (
             self.E * self._input_data.economic_target_yr_carbon_price
             if settings.GHG_CONSTRAINT_TYPE == "soft"

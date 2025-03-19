@@ -1078,7 +1078,6 @@ class Data:
 
         if settings.CONNECTIVITY_SOURCE == 'NCI':
             connectivity_score = biodiv_priorities['DCCEEW_NCI'].to_numpy(dtype = np.float32)
-            connectivity_score = np.where(self.MASK, connectivity_score, 1)               # Set the connectivity score to 1 for cells outside the LUMASK
             connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (settings.CONNECTIVITY_LB, 1)).astype('float32')
         elif settings.CONNECTIVITY_SOURCE == 'DWI':
             connectivity_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
@@ -1729,14 +1728,14 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def set_path(self, base_year, target_year) -> str:
+    def set_path(self, base_year, target_year, step_size, years) -> str:
         """Create a folder for storing outputs and return folder name."""
 
         # Get the years to write
         if settings.MODE == "snapshot":
             yr_all = [base_year, target_year]
         elif settings.MODE == "timeseries":
-            yr_all = list(range(base_year, target_year + 1))
+            yr_all = list(range(base_year, target_year + 1, step_size))
 
         # Create path name
         self.path = f"{OUTPUT_DIR}/{self.timestamp_sim}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
@@ -1750,14 +1749,14 @@ class Data:
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
         if settings.MODE == "timeseries":
-            path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
+            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
             paths = (
                 paths
-                + [path_begin_end_compare]
+                + [self.path_begin_end_compare]
                 + [
-                    f"{path_begin_end_compare}/out_{yr_all[0]}",
-                    f"{path_begin_end_compare}/out_{yr_all[-1]}",
-                    f"{path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate",
+                    f"{self.path_begin_end_compare}/out_{yr_all[0]}",
+                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}",
+                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate",
                 ]
             )
 
