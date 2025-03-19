@@ -4,17 +4,17 @@ from tools.helpers import create_settings_template, generate_csv,create_grid_sea
 
 grid_search = {
     # Computational settings, which are not relevant to LUTO itself
-    'MEM': ['252'],
-    'CPU_PER_TASK': [43],
-    'TIME': ['20:00:00'],
+    'MEM': ['40'],
+    'CPU_PER_TASK': [10],
+    'TIME': ['09:00:00'],
     'MODE': [
         # 'snapshot',
         'timeseries'
     ],
     'OBJECTIVE': ['maxprofit'],
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'RESFACTOR': [20,5],
-    'GBF2_CONSTRAINT_TYPE': ['soft','hard'],
+    'RESFACTOR': [5],
+    'GBF2_CONSTRAINT_TYPE': ['soft'],
     # GHG settings
     'GHG_CONSTRAINT_TYPE': ['soft'],
     'GHG_LIMITS_FIELD': [
@@ -42,7 +42,7 @@ grid_search = {
 template_df = create_settings_template('Custom_runs')
 # generate_csv(output_csv="Custom_runs/setting_template_windows_test1.csv")
 
-output_file = os.path.join("Custom_runs", "setting_0316.csv")
+output_file = os.path.join("Custom_runs", "setting_0318_linux.csv")
 suffixs = ['RESFACTOR','GBF2_CONSTRAINT_TYPE']
 create_grid_search_template(template_df, grid_search,output_file,suffixs)
 print(f"saved to {output_file}")
