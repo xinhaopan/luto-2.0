@@ -13,8 +13,8 @@ grid_search = {
     ],
     'OBJECTIVE': ['maxprofit'],
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'RESFACTOR': [5],
-    'GBF2_CONSTRAINT_TYPE': ['soft'],
+    'RESFACTOR': [20],
+
     # GHG settings
     'GHG_CONSTRAINT_TYPE': ['soft'],
     'GHG_LIMITS_FIELD': [
@@ -26,7 +26,8 @@ grid_search = {
     # Water settings
     'WATER_CONSTRAINT_TYPE': ['soft'],
     # Biodiversity settings
-
+    'BIODIVERSTIY_TARGET_GBF_2': ['on'],
+    'GBF2_CONSTRAINT_TYPE': ['hard'],
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0, 2050: 0, 2100: 0 },
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 },
@@ -36,14 +37,15 @@ grid_search = {
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4': ['off'],
     'INCLUDE_WATER_LICENSE_COSTS ': [1],
+    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [20],
 }
 
-
+suffixs = ['GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE','GBF2_CONSTRAINT_TYPE','Run_name']
 template_df = create_settings_template('Custom_runs')
+col_suffix=''
 # generate_csv(output_csv="Custom_runs/setting_template_windows_test1.csv")
 
-output_file = os.path.join("Custom_runs", "setting_0318_linux.csv")
-suffixs = ['RESFACTOR','GBF2_CONSTRAINT_TYPE']
-create_grid_search_template(template_df, grid_search,output_file,suffixs)
+output_file = os.path.join("Custom_runs", "setting_0319_20_hard.csv")
+create_grid_search_template(template_df, grid_search,output_file,suffixs,col_suffix)
 print(f"saved to {output_file}")
 

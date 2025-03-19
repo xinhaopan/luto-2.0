@@ -90,7 +90,7 @@ def process_column(col, custom_settings, script_name, delay):
         submit_task_linux(task_dir, custom_dict)  # 执行任务
 
 
-def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 3, script_name='0_runs', delay=1.5):
+def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 3, script_name='0_runs', delay=0):
     """读取设置模板文件并并行运行任务"""
     # 读取自定义设置文件
     custom_settings = pd.read_csv(csv_path, index_col=0)
@@ -514,7 +514,7 @@ def generate_csv(
     recommend_resources(df_revise)
 
 
-def create_grid_search_template(template_df, grid_dict, output_file,suffixs="") -> pd.DataFrame:
+def create_grid_search_template(template_df, grid_dict, output_file,suffixs="",col_suffix="") -> pd.DataFrame:
     # Collect new columns in a list
     template_grid_search = template_df.copy()
 
@@ -559,6 +559,10 @@ def create_grid_search_template(template_df, grid_dict, output_file,suffixs="") 
     # Save the grid search template to the root task folder
 
     template_grid_search.columns = template_grid_search.columns[:2].tolist() + generate_column_names(template_grid_search, template_grid_search, suffixs)
+    template_grid_search.columns = (
+            [template_grid_search.columns[0], template_grid_search.columns[1]]  # 保留前两列
+            + [col + col_suffix for col in template_grid_search.columns[2:]]  # 从第三列开始加后缀
+    )
     template_grid_search.to_csv(output_file, index=False)
     total_cost = calculate_total_cost(template_grid_search)
     print(f"Job Cost: {total_cost}k")

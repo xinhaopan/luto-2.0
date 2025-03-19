@@ -1,4 +1,4 @@
-Name,Default_run,20250315_Run_1_GHG_1_5C_67_BIO_0_5,20250315_Run_2_GHG_1_5C_67_BIO_3_5,20250315_Run_3_GHG_1_5C_67_BIO_5_5,20250315_Run_4_GHG_1_5C_50_BIO_0_5,20250315_Run_5_GHG_1_5C_50_BIO_3_5,20250315_Run_6_GHG_1_5C_50_BIO_5_5,20250315_Run_7_GHG_1_8C_67_BIO_0_5,20250315_Run_8_GHG_1_8C_67_BIO_3_5,20250315_Run_9_GHG_1_8C_67_BIO_5_5
+Name,Default_run,20250319_Run_1_GHG_1_5C_67_BIO_0_hard_20,20250319_Run_2_GHG_1_5C_67_BIO_3_hard_20,20250319_Run_3_GHG_1_5C_67_BIO_5_hard_20,20250319_Run_4_GHG_1_5C_50_BIO_0_hard_20,20250319_Run_5_GHG_1_5C_50_BIO_3_hard_20,20250319_Run_6_GHG_1_5C_50_BIO_5_hard_20,20250319_Run_7_GHG_1_8C_67_BIO_0_hard_20,20250319_Run_8_GHG_1_8C_67_BIO_3_hard_20,20250319_Run_9_GHG_1_8C_67_BIO_5_hard_20
 VERSION,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3,2.3
 INPUT_DIR,input,input,input,input,input,input,input,input,input,input
 OUTPUT_DIR,output,output,output,output,output,output,output,output,output,output
@@ -19,9 +19,10 @@ FIRE_RISK,med,med,med,med,med,med,med,med,med,med
 AMORTISE_UPFRONT_COSTS,False,False,False,False,False,False,False,False,False,False
 DISCOUNT_RATE,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07
 AMORTISATION_PERIOD,30,30,30,30,30,30,30,30,30,30
-RESFACTOR,20,5,5,5,5,5,5,5,5,5
+RESFACTOR,10,20,20,20,20,20,20,20,20,20
+STEP_SIZE,1,1,1,1,1,1,1,1,1,1
 MODE,snapshot,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries,timeseries
-OBJECTIVE,mincost,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit
+OBJECTIVE,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit,maxprofit
 DEMAND_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft
 WRITE_OUTPUT_GEOTIFFS,False,False,False,False,False,False,False,False,False,False
 WRITE_FULL_RES_MAPS,False,False,False,False,False,False,False,False,False,False
@@ -39,6 +40,7 @@ SCALE_FLAG,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
 NUMERIC_FOCUS,0,0,0,0,0,0,0,0,0,0
 BARHOMOGENOUS,1,1,1,1,1,1,1,1,1,1
 THREADS,32,32,32,32,32,32,32,32,32,32
+EXCLUDE_NO_GO_LU,True,True,True,True,True,True,True,True,True,True
 NO_GO_VECTORS,"{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}","{'Winter cereals': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Winter_cereals.shp', 'Environmental Plantings': 'N:\\LUF-Modelling\\LUTO2_XH\\LUTO2\\myCode\\tasks_run\\input/no_go_areas/no_go_Enviornmental_Plantings.shp'}"
 REGIONAL_ADOPTION_ZONE,LGA_CODE,LGA_CODE,LGA_CODE,LGA_CODE,LGA_CODE,LGA_CODE,LGA_CODE,LGA_CODE,LGA_CODE,LGA_CODE
 NON_AG_LAND_USES,"{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}","{'Environmental Plantings': True, 'Riparian Plantings': True, 'Sheep Agroforestry': True, 'Beef Agroforestry': True, 'Carbon Plantings (Block)': True, 'Sheep Carbon Plantings (Belt)': True, 'Beef Carbon Plantings (Belt)': True, 'BECCS': True}"
@@ -90,9 +92,11 @@ AG_SHARE_OF_WATER_USE,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7
 LIVESTOCK_DRINKING_WATER,1,1,1,1,1,1,1,1,1,1
 INCLUDE_WATER_LICENSE_COSTS,0,0,0,0,0,0,0,0,0,0
 BIODIVERSTIY_TARGET_GBF_2,on,on,on,on,on,on,on,on,on,on
-BIODIV_GBF_TARGET_2_DICT,"{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0, 2050: 0, 2100: 0}","{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}","{2010: 0, 2030: 0, 2050: 0, 2100: 0}","{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}","{2010: 0, 2030: 0, 2050: 0, 2100: 0}","{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}"
-GBF2_CONSTRAINT_TYPE,soft,soft,soft,soft,soft,soft,soft,soft,soft,soft
+BIODIV_GBF_TARGET_2_DICT,"{2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0, 2050: 0, 2100: 0}","{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}","{2010: 0, 2030: 0, 2050: 0, 2100: 0}","{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}","{2010: 0, 2030: 0, 2050: 0, 2100: 0}","{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}","{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}"
+GBF2_CONSTRAINT_TYPE,hard,hard,hard,hard,hard,hard,hard,hard,hard,hard
+GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE,20,20,20,20,20,20,20,20,20,20
 GBF2_PENALTY,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0
+GBF2_SOLVE_WEIGHT,10,10,10,10,10,10,10,10,10,10
 CONNECTIVITY_SOURCE,NCI,NCI,NCI,NCI,NCI,NCI,NCI,NCI,NCI,NCI
 CONNECTIVITY_LB,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7,0.7
 HABITAT_CONDITION,HCAS,HCAS,HCAS,HCAS,HCAS,HCAS,HCAS,HCAS,HCAS,HCAS
@@ -107,7 +111,7 @@ BECCS_BIODIVERSITY_BENEFIT,0,0,0,0,0,0,0,0,0,0
 BIODIVERSTIY_TARGET_GBF_3,off,off,off,off,off,off,off,off,off,off
 NVIS_SPATIAL_DETAIL,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH,HIGH
 NVIS_CLASS_DETAIL,MVG,MVG,MVG,MVG,MVG,MVG,MVG,MVG,MVG,MVG
-BIODIVERSTIY_TARGET_GBF_4,on,off,off,off,off,off,off,off,off,off
+BIODIVERSTIY_TARGET_GBF_4,off,off,off,off,off,off,off,off,off,off
 CULL_MODE,absolute,absolute,absolute,absolute,absolute,absolute,absolute,absolute,absolute,absolute
 MAX_LAND_USES_PER_CELL,12,12,12,12,12,12,12,12,12,12
 LAND_USAGE_CULL_PERCENTAGE,Not used,Not used,Not used,Not used,Not used,Not used,Not used,Not used,Not used,Not used
@@ -115,7 +119,7 @@ NON_AGRICULTURAL_LU_BASE_CODE,100,100,100,100,100,100,100,100,100,100
 ROUND_DECMIALS,6,6,6,6,6,6,6,6,6,6
 SPECIES_CONSERVATION_DIV_CONSTANT,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0
 JOB_NAME,auto,auto,auto,auto,auto,auto,auto,auto,auto,auto
-MEM,auto,252,252,252,252,252,252,252,252,252
+MEM,auto,40,40,40,40,40,40,40,40,40
 QUEUE,normal,normal,normal,normal,normal,normal,normal,normal,normal,normal
 NCPUS,32,32,32,32,32,32,32,32,32,32
-TIME,10:00:00,20:00:00,20:00:00,20:00:00,20:00:00,20:00:00,20:00:00,20:00:00,20:00:00,20:00:00
+TIME,10:00:00,09:00:00,09:00:00,09:00:00,09:00:00,09:00:00,09:00:00,09:00:00,09:00:00,09:00:00

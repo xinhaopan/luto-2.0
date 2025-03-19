@@ -1,20 +1,34 @@
 INPUT_DIR = '../../../input'
 
-time = '20250318'
+time = '20250319'
 middle = ''
-suffix = '5_soft'
-senerios = [
-    'Run_16_GHG_1_8C_67_BIO_0',
-    'Run_13_GHG_1_5C_50_BIO_0',
-    'Run_10_GHG_1_5C_67_BIO_0',
-    'Run_17_GHG_1_8C_67_BIO_3',
-    'Run_14_GHG_1_5C_50_BIO_3',
-    'Run_11_GHG_1_5C_67_BIO_3',
-    'Run_18_GHG_1_8C_67_BIO_5',
-    'Run_15_GHG_1_5C_50_BIO_5',
-    'Run_12_GHG_1_5C_67_BIO_5',
-]
+suffix = 'soft_100'
+# senerios = [
+#     'Run_16_GHG_1_8C_67_BIO_0',
+#     'Run_13_GHG_1_5C_50_BIO_0',
+#     'Run_10_GHG_1_5C_67_BIO_0',
+#     'Run_17_GHG_1_8C_67_BIO_3',
+#     'Run_14_GHG_1_5C_50_BIO_3',
+#     'Run_11_GHG_1_5C_67_BIO_3',
+#     'Run_18_GHG_1_8C_67_BIO_5',
+#     'Run_15_GHG_1_5C_50_BIO_5',
+#     'Run_12_GHG_1_5C_67_BIO_5',
+# ]
 
+run_number = [7,4,1,8,5,2,9,6,3]
+# run_number = [2 * num - 1 for num in run_number_origin]
+senerios_origin = [
+    'GHG_1_8C_67_BIO_0',
+    'GHG_1_5C_50_BIO_0',
+    'GHG_1_5C_67_BIO_0',
+    'GHG_1_8C_67_BIO_3',
+    'GHG_1_5C_50_BIO_3',
+    'GHG_1_5C_67_BIO_3',
+    'GHG_1_8C_67_BIO_5',
+    'GHG_1_5C_50_BIO_5',
+    'GHG_1_5C_67_BIO_5',
+]
+senerios = [f"Run_{num}_{senerio}" for num, senerio in zip(run_number, senerios_origin)]
 input_files = [
     f"{time}_{middle}_{senerio}_{suffix}".strip('_').replace('__', '_')
     for senerio in senerios
