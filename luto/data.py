@@ -694,8 +694,8 @@ class Data:
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
-        
-  
+
+
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix
@@ -1098,7 +1098,7 @@ class Data:
         self.BIODIV_HABITAT_DEGRADE_LOOK_UP = pd.read_csv(os.path.join(INPUT_DIR, 'BIODIV_HABITAT_DEGRADE_LOOK_UP.csv')
             ).set_index('lu'
             )['RETAIN_RATION_AFTER_DEGRADATE'].to_dict()
-        
+
         self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {         # Round degradation figures to avoid numerical issues in Gurobi
             j: round(x, settings.ROUND_DECMIALS) 
             for j, x in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()}

@@ -353,7 +353,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
+GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis'
 
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or None.
 # Setting to None falls back to the 'Default' scenario.
@@ -376,8 +376,8 @@ SOLVE_ECONOMY_WEIGHT = 0.05
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 WATER_PENALTY = 1
 
@@ -432,8 +432,8 @@ BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiv
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIV_GBF_TARGET_2_DICT = {
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.3   # Stays at 2050 level
+              2050: 0.5,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.5   # Stays at 2050 level
              }            # (can add more years/targets)\
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -441,15 +441,15 @@ BIODIV_GBF_TARGET_2_DICT = {
 """
 
 
-GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+# GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 The constraint type for the biodiversity target.
 - 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
 - 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 
-GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE = 20
+GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE = 100
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 

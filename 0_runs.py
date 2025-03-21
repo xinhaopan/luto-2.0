@@ -31,8 +31,8 @@ def main():
         os.makedirs('output', exist_ok=True)
 
         # 记录模拟开始的时间
-        overall_start_time = time.time()
         write_log("Simulation started")
+        overall_start_time = time.time()
 
         # 监控加载数据
         data, load_data_memory = monitor_memory(sim.load_data)
@@ -58,10 +58,13 @@ def main():
 
         # 总结束时间
         overall_end_time = time.time()
-        total_duration = (overall_end_time - overall_start_time) / 3600  # 总用时
+        total_duration = verall_end_time - overall_start_time
 
-        # 记录模拟过程的详细信息
-        write_log(f"Total run time: {total_duration:.2f} h")
+        # 转换为 hh:mm:ss 格式
+        formatted_duration = time.strftime("%H:%M:%S", time.gmtime(total_duration_seconds))
+
+        # 记录日志
+        write_log(f"Total run time: {formatted_duration}")
         write_log(f"Overall peak memory usage: {max(load_data_memory, simulation_memory, write_output_memory):.2f} GB")
 
     except Exception as e:

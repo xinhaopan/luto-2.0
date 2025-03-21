@@ -3,6 +3,10 @@ import matplotlib.pyplot as plt
 import matplotlib
 import matplotlib as mpl
 
+import numpy as np
+import os
+
+
 from tools.plot_helper import *
 
 # Set SVG output to embed fonts as text
@@ -11,8 +15,28 @@ mpl.rcParams['svg.fonttype'] = 'none'
 # Set global font to Arial
 matplotlib.rcParams['font.family'] = 'Arial'
 
-# Load CSV data
-df = pd.read_csv('tools/transition.csv', index_col=0)
+
+AG_TMATRIX = np.load(os.path.join('../../../input', "ag_tmatrix.npy"))
+n_rows, n_cols = AG_TMATRIX.shape
+# 创建扩展后的数组
+extended_array = np.full((n_rows + 8, n_cols + 8), np.nan)  # 默认填充 NaN
+
+# 复制原始数据到新数组
+extended_array[:n_rows, :n_cols] = AG_TMATRIX
+
+# 设置新增的 8 列的值为 1
+extended_array[:n_rows, n_cols:] = 1
+
+# 设置新增的8列值为NaN（保持原状，不需要修改）
+
+# 设置交接部分（右下角8x8）为1
+extended_array[n_rows:, n_cols:] = 1
+ # 转换规则：非 NaN 变 1，NaN 变 0
+binary_array = np.where(np.isnan(extended_array), 0, 1)
+
+# 转换为 DataFrame
+df = pd.DataFrame(binary_array)
+
 
 # Define colors for cells
 colors = {1: "#C1DDB2", 0: "#FBD5D5"}  # Green and Red
