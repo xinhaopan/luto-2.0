@@ -480,7 +480,7 @@ class Data:
         self.REGIONAL_ADOPTION_ZONES = pd.read_hdf(
             os.path.join(INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
         )[REGIONAL_ADOPTION_ZONE].to_numpy()
-
+    
         
         regional_adoption_targets = pd.read_excel(os.path.join(INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=REGIONAL_ADOPTION_ZONE)
         self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
@@ -589,8 +589,8 @@ class Data:
 
         # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
         self.SOIL_CARBON_AVG_T_CO2_HA = (
-            pd.read_hdf(os.path.join(INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
-            * (44 / 12)
+            pd.read_hdf(os.path.join(INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
+            * (44 / 12) 
             / settings.SOC_AMORTISATION
         )
 
@@ -646,13 +646,13 @@ class Data:
 
 
         ###############################################################
-        # Calculate base year production
+        # Calculate base year production 
         ###############################################################
 
         self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
-        print(f"\tCalculating year productivity...", flush=True)
+        print(f"\tCalculating base year productivity...", flush=True)
         yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
 
@@ -815,11 +815,11 @@ class Data:
         self.WATER_DELIVERY_PRICE = np.nan_to_num(
                 pd.read_hdf(os.path.join(INPUT_DIR, "water_delivery_price.h5"), where=self.MASK).to_numpy()
             )
-
+       
 
         # River regions.
         self.RIVREG_ID = pd.read_hdf(os.path.join(INPUT_DIR, "rivreg_id.h5"), where=self.MASK).to_numpy()  # River region ID mapped.
-
+ 
         rr = pd.read_hdf(os.path.join(INPUT_DIR, "rivreg_lut.h5"))
         self.RIVREG_DICT = dict(
             zip(rr.HR_RIVREG_ID, rr.HR_RIVREG_NAME)
@@ -930,7 +930,7 @@ class Data:
         print("\tLoading demand data...", flush=True)
 
         # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
-        dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
+        dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5'))
 
         # Select the demand data under the running scenariobbryan-January
         self.DEMAND_DATA = dd.loc[(settings.SCENARIO,
@@ -1039,7 +1039,7 @@ class Data:
         savburn_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5'), where=self.MASK)
 
         # Load the columns as numpy arrays
-        self.SAVBURN_ELIGIBLE =  savburn_df.ELIGIBLE_AREA.to_numpy()              # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible
+        self.SAVBURN_ELIGIBLE =  savburn_df.ELIGIBLE_AREA.to_numpy()                    # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible
         self.SAVBURN_TOTAL_TCO2E_HA = savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()
         
         # # Avoided emissions from savanna burning
@@ -1087,12 +1087,12 @@ class Data:
         else:
             raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
 
-        # Get the raw biodiversity rank score; 1) weight by distance score; 2) mask by priority conservation areas
+        # Get the raw biodiversity rank score; 1) weight by distance score; 2) mask by priority conservation areas 
         biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
 
         self.BIO_DISTANCE_WEIGHTED = biodiv_score_raw * connectivity_score
         self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION = self.BIO_DISTANCE_WEIGHTED * bio_priority_conservation_mask
-
+        
         
         # Calculate the biodiversity socre under 1) Savana Burning and 2) HCAS impact
         self.BIODIV_HABITAT_DEGRADE_LOOK_UP = pd.read_csv(os.path.join(INPUT_DIR, 'BIODIV_HABITAT_DEGRADE_LOOK_UP.csv')
@@ -1102,53 +1102,53 @@ class Data:
         self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {         # Round degradation figures to avoid numerical issues in Gurobi
             j: round(x, settings.ROUND_DECMIALS) 
             for j, x in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()}
+        
+        self.BIO_BASE_YR_RETAIN_FRACTION_HABITAT = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get, otypes=[float])(self.LUMAP).astype(np.float32)
+        self.BIO_RETAIN_FRACTION_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)          
 
-        bio_retain_fraction_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get, otypes=[float])(self.LUMAP).astype(np.float32)
-        self.BIO_RETAIN_FRACTION_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
-
-        bio_damage_LDS = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - self.BIO_RETAIN_FRACTION_LDS)
-        bio_damage_habitat = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - bio_retain_fraction_habitat)
+        bio_damage_LDS = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - self.BIO_RETAIN_FRACTION_LDS)           
+        bio_damage_habitat = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - self.BIO_BASE_YR_RETAIN_FRACTION_HABITAT)
 
 
         # Get the biodiversity value after LDS and habitat impact for the beginning year (BASE YR = 2010)
-        self.BIO_BASE_YR_AFTER_LDS = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION - bio_damage_LDS
-        bio_base_yr_after_LDS_habitat = self.BIO_BASE_YR_AFTER_LDS - bio_damage_habitat
-
+        self.BIO_BASE_YR_AFTER_LDS = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION - bio_damage_LDS                    
+        bio_base_yr_after_LDS_habitat = self.BIO_BASE_YR_AFTER_LDS - bio_damage_habitat                            
+        
         
         # Get the retain value after degradation at the beginning of the simulation
         bio_baseline_area_weighted_sum = (self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * self.REAL_AREA).sum()
         bio_base_yr_after_LDS_habitat_area_weighted_sum = (bio_base_yr_after_LDS_habitat * self.REAL_AREA).sum()
         bio_base_yr_after_LDS_habitat_percent2baseline = bio_base_yr_after_LDS_habitat_area_weighted_sum / bio_baseline_area_weighted_sum
-
+        
         self.BIO_BASE_YR_AREA_WEIGHTED_SUM_EACH_LU = np.bincount(
-            self.LUMAP,
+            self.LUMAP, 
             weights=bio_base_yr_after_LDS_habitat * self.REAL_AREA,
             minlength=self.N_AG_LUS
         ) 
         
         self.BIO_BASE_YR_LOSS = bio_baseline_area_weighted_sum * (1 - bio_base_yr_after_LDS_habitat_percent2baseline)
-
-
+        
+   
         # Calculate the biodiversity conservation target for each year
         bio_base_yr_loss_percent = 1 - bio_base_yr_after_LDS_habitat_percent2baseline
-        bio_target_years_percent = [bio_base_yr_after_LDS_habitat_percent2baseline + (bio_base_yr_loss_percent * i)
+        bio_target_years_percent = [bio_base_yr_after_LDS_habitat_percent2baseline + (bio_base_yr_loss_percent * i) 
                                     for i in settings.BIODIV_GBF_TARGET_2_DICT.values()]
         bio_all_years_percent = {
-            self.YR_CAL_BASE: bio_base_yr_after_LDS_habitat_percent2baseline,
+            self.YR_CAL_BASE: bio_base_yr_after_LDS_habitat_percent2baseline, 
             **dict(zip(settings.BIODIV_GBF_TARGET_2_DICT.keys(), bio_target_years_percent))
         }
-
+                
         f = interp1d(
             list(bio_all_years_percent.keys()),
             list(bio_all_years_percent.values()),
             kind = "linear",
             fill_value = "extrapolate",
         )
+        
+        self.BIO_GBF2_TARGET_PERCENT = {yr: f(yr).item() for yr in range(2010, 2101)}
 
-        biodiv_GBF_target_2_proportions_2010_2100 = {yr: f(yr).item() for yr in range(2010, 2101)}
-
-        self.BIODIV_GBF_TARGET_2 = {
-            yr: bio_baseline_area_weighted_sum * biodiv_GBF_target_2_proportions_2010_2100[yr]
+        self.BIO_GBF2_TARGET_SCORES = {
+            yr: bio_baseline_area_weighted_sum * self.BIO_GBF2_TARGET_PERCENT[yr]
             for yr in range(2010, 2101)
         }
         
@@ -1263,16 +1263,16 @@ class Data:
         
         likely_maybe_union = set(self.BIO_GBF_4B_SNES_LIKELY_SEL) & set(self.BIO_GBF_4B_SNES_LIKELY_AND_MAYBE_SEL)
         if len(likely_maybe_union) > 0:
-            print(f"WARNING: {len(likely_maybe_union)} species are found in both 'LIKELY' and 'LIKELY_MAYBE' layers!")
-            print(' LUTO will only use "LIKELY" layer to set target for SNES targets:')
-            [print(f"    {i}") for i in likely_maybe_union]
+            print(f"\tWARNING: {len(likely_maybe_union)} duplicate SNE species targets are found, will only use 'LIKELY' target for them!")
+            for idx, name in enumerate(likely_maybe_union):
+                print(f"    {idx+1}) {name}")
             self.BIO_GBF_4B_SNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF_4B_SNES_LIKELY_AND_MAYBE_SEL) - set(self.BIO_GBF_4B_SNES_LIKELY_SEL))
             
         likely_maybe_union = set(self.BIO_GBF4B_ECNES_LIKELY_SEL) & set(self.BIO_GBF4B_ECNES_LIKELY_AND_MAYBE_SEL)
         if len(likely_maybe_union) > 0:
-            print(f"WARNING: {len(likely_maybe_union)} communities are found in both 'LIKELY' and 'LIKELY_MAYBE' layers!")
-            print('LUTO will only use "LIKELY" layer to set target for ECNES targets:')
-            [print(f"    {i}") for i in likely_maybe_union]
+            print(f"\tWARNING: {len(likely_maybe_union)} duplicate ECNES species targets are found, will only use 'LIKELY' target for them!")
+            for idx, name in enumerate(likely_maybe_union):
+                print(f"    {idx+1}) {name}")
             self.BIO_GBF4B_ECNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4B_ECNES_LIKELY_AND_MAYBE_SEL) - set(self.BIO_GBF4B_ECNES_LIKELY_SEL))
             
 
@@ -1319,7 +1319,7 @@ class Data:
         self.FENCE_COST_MULTS = pd.read_excel(cost_mult_excel, "Fencing cost multiplier", index_col="Year")["Fencing_cost_multiplier"].to_dict()
 
 
-        print("Data loading complete\n")
+        print("Data loading complete\n")        
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """

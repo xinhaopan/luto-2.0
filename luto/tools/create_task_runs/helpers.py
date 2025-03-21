@@ -31,7 +31,8 @@ from datetime import datetime
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
 
     # Save the settings template to the root task folder
-    None if os.path.exists(to_path) else os.makedirs(to_path)
+    if not os.path.exists(to_path):
+        os.makedirs(to_path, exist_ok=True)
     
     # Check if the settings_template.csv already exists
     if os.path.exists(f'{to_path}/settings_template.csv'):
@@ -55,9 +56,9 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             settings_dict['JOB_NAME'] = 'auto'
             settings_dict['MEM'] = 'auto'
             settings_dict['QUEUE'] = 'normal'
-            settings_dict['WRITE_THREADS'] = 10     # 10 threads for writing is a safe number to avoid out-of-memory issues
+            settings_dict['WRITE_THREADS'] = 10                     # 10 threads for writing is a safe number to avoid out-of-memory issues
             settings_dict['KEEP_OUTPUTS'] = True
-            settings_dict['NCPUS'] = settings_dict['THREADS']//4*4 # Round down to the nearest multiple of 4
+            settings_dict['NCPUS'] = settings_dict['THREADS']//4*4  # Round down to the nearest multiple of 4
             settings_dict['TIME'] = '10:00:00'
 
             # Write the non-string values to a file
@@ -250,7 +251,7 @@ def update_settings(settings_dict:dict, col:str):
     settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
 
     # Update the threads based on the number of cpus
-    settings_dict['THREADS'] = settings_dict['NCPUS']
+    settings_dict['THREADS'] = int(settings_dict['NCPUS'] * 1.5) # 1.5 times the number of cpus to increase CPU utilization
 
     return settings_dict
 
