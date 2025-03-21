@@ -1095,6 +1095,37 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     # Write to file
     biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False)
 
+def write_biodiversity(data: Data, yr_cal, path):
+    """
+    Write biodiversity info for a given year ('yr_cal'), simulation ('sim')
+    and output path ('path').
+    """
+    if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
+        return
+
+    # Check biodiversity limits and report
+    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal)
+
+    print(f'Writing biodiversity outputs for {yr_cal}')
+
+    # Get biodiversity score from model
+    if yr_cal >= data.YR_CAL_BASE + 1:
+        biodiv_score = data.prod_data[yr_cal]['Biodiversity']
+    else:
+        # Return the base year biodiversity score
+        biodiv_score = data.BIO_GBF2_TARGET_SCORES[data.YR_CAL_BASE]
+
+    # Add to dataframe
+    df = pd.DataFrame({
+            'Variable':['Biodiversity score limit',
+                        'Solve biodiversity score'],
+            'Score':[biodiv_limit, biodiv_score]
+            })
+
+    # Save to file
+    df['Year'] = yr_cal
+    df.to_csv(os.path.join(path, f'biodiversity_targets_{yr_cal}.csv'), index = False)
+
 def write_biodiversity_priority_scores(data: Data, yr_cal, path):
 
     yr_idx = yr_cal - data.YR_CAL_BASE

@@ -20,8 +20,8 @@ def main(start_year, end_year):
         os.makedirs('output', exist_ok=True)
 
         # 记录模拟开始的时间
-        overall_start_time = time.time()
         write_log("Simulation started")
+        overall_start_time = time.time()
 
         # 加载数据
         data = sim.load_data()
@@ -45,10 +45,13 @@ def main(start_year, end_year):
 
         # 总结束时间
         overall_end_time = time.time()
-        total_duration = (overall_end_time - overall_start_time) / 3600  # 总用时
+        total_duration = overall_end_time - overall_start_time
 
-        # 记录模拟过程的详细信息
-        write_log(f"Total run time: {total_duration:.2f} h")
+        # 转换为 hh:mm:ss 格式
+        formatted_duration = time.strftime("%H:%M:%S", time.gmtime(total_duration_seconds))
+
+        # 记录日志
+        write_log(f"Total run time: {formatted_duration}")
 
     except Exception as e:
         # 记录错误到日志文件

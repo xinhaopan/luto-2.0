@@ -52,7 +52,8 @@ def create_settings_template(to_path: str = 'Custom_runs'):
             settings_dict['MEM'] = 'auto'
             settings_dict['QUEUE'] = 'normal'
             settings_dict['WRITE_THREADS'] = 10  # 10 threads for writing is a safe number to avoid out-of-memory issues
-            settings_dict['NCPUS'] = min(settings_dict['THREADS'] // 4 * 4, 48)  # max 48 cores
+            # settings_dict['NCPUS'] = min(settings_dict['THREADS'] // 4 * 4, 48)  # max 48 cores
+            settings_dict['NCPUS'] = 'auto'
             settings_dict['TIME'] = '10:00:00'
 
             # Write the non-string values to a file
@@ -308,10 +309,11 @@ def update_settings(settings_dict: dict, col: str):
         # Update the settings dictionary
         settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
         settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
+        settings_dict['NCPUS'] = settings_dict['NCPUS'] if settings_dict['NCPUS'] != 'auto' else NCPUS
 
         # Update the threads based on the number of cpus
         settings_dict['THREADS'] = settings_dict['NCPUS']
-        # settings_dict['WRITE_THREADS'] = settings_dict['NCPUS']
+        settings_dict['WRITE_THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
 

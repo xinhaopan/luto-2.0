@@ -4,9 +4,9 @@ from tools.helpers import create_settings_template, generate_csv,create_grid_sea
 
 grid_search = {
     # Computational settings, which are not relevant to LUTO itself
-    'MEM': ['40'],
-    'CPU_PER_TASK': [10],
-    'TIME': ['09:00:00'],
+    'MEM': ['4'],
+    'NCPUS': [1],
+    'TIME': ['01:00:00'],
     'MODE': [
         # 'snapshot',
         'timeseries'
@@ -27,7 +27,8 @@ grid_search = {
     'WATER_CONSTRAINT_TYPE': ['soft'],
     # Biodiversity settings
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],
-    'GBF2_CONSTRAINT_TYPE': ['hard'],
+    'GBF2_CONSTRAINT_TYPE': ['soft'],
+    'HCAS_PERCENTILE': [50],
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0, 2050: 0, 2100: 0 },
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 },
@@ -37,15 +38,15 @@ grid_search = {
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4': ['off'],
     'INCLUDE_WATER_LICENSE_COSTS ': [1],
-    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [20],
+    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [53],
 }
 
-suffixs = ['GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE','GBF2_CONSTRAINT_TYPE','Run_name']
+suffixs = ['RESFACTOR']
 template_df = create_settings_template('Custom_runs')
 col_suffix=''
 # generate_csv(output_csv="Custom_runs/setting_template_windows_test1.csv")
 
-output_file = os.path.join("Custom_runs", "setting_0319_20_hard.csv")
+output_file = os.path.join("Custom_runs", "setting_0321_linux.csv")
 create_grid_search_template(template_df, grid_search,output_file,suffixs,col_suffix)
 print(f"saved to {output_file}")
 

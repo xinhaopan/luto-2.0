@@ -1,5 +1,0 @@
-20250319_Run_9_GHG_1_8C_67_BIO_5_soft_100/luto/__pycache__/settings.cpython-312.pyc
-20250319_Run_9_GHG_1_8C_67_BIO_5_soft_100/luto/settings.py
-20250319_Run_9_GHG_1_8C_67_BIO_5_soft_100/luto/settings_bash.py
-20250319_Run_9_GHG_1_8C_67_BIO_5_soft_100/output/20250319_Run_9_GHG_1_8C_67_BIO_5_soft_100.pbs
-20250319_Run_9_GHG_1_8C_67_BIO_5_soft_100/2_writes.py
