@@ -30,8 +30,8 @@ y_range, y_ticks = calculate_y_axis_range(demand_dict)
 
 output_png = '../output/08_food.png'
 plot_Combination_figures(demand_ag_group_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,point_dict=point_dict,point_colors=point_colors,
-                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(0, 200),
-                             x_ticks=20, y_ticks=50,
+                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
+                             x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=7)
 
 csv_name, value_column_name, filter_column_name = "quantity_production_kt_separate", 'Production (tonnes, KL)', 'Landuse'
@@ -49,10 +49,10 @@ csv_name, value_column_name, filter_column_name = "quantity_production_kt_separa
 food_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 food_am_dict,legend_colors = get_colors(food_am_dict, 'tools/land use colors.xlsx', sheet_name='am')
 output_png = '../output/09_food_am_group'
-y_range, y_ticks = calculate_y_axis_range(food_am_dict)
+y_range, y_ticks = (-1,50),[0,10,20,30,40,50]
 plot_Combination_figures(food_am_dict, output_png, input_files, plot_stacked_bar, legend_colors,
-                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=(-2,43),
-                             x_ticks=20, y_ticks=15,
+                            n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
+                             x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = "quantity_production_kt_separate", 'Production (tonnes, KL)', 'Landuse'

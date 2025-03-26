@@ -5,16 +5,16 @@ from tools.helpers import create_settings_template, generate_csv,create_grid_sea
 grid_search = {
     # Computational settings, which are not relevant to LUTO itself
     'MEM': ['4'],
-    'NCPUS': [1],
+    'NCPUS': ['1'],
     'TIME': ['01:00:00'],
     'MODE': [
         # 'snapshot',
         'timeseries'
     ],
     'OBJECTIVE': ['maxprofit'],
-    'WRITE_OUTPUT_GEOTIFFS': [False],
-    'RESFACTOR': [20],
-
+    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'RESFACTOR': [5],
+    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [20],
     # GHG settings
     'GHG_CONSTRAINT_TYPE': ['soft'],
     'GHG_LIMITS_FIELD': [
@@ -38,7 +38,7 @@ grid_search = {
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4': ['off'],
     'INCLUDE_WATER_LICENSE_COSTS ': [1],
-    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [53],
+
 }
 
 suffixs = ['RESFACTOR']
@@ -46,7 +46,7 @@ template_df = create_settings_template('Custom_runs')
 col_suffix=''
 # generate_csv(output_csv="Custom_runs/setting_template_windows_test1.csv")
 
-output_file = os.path.join("Custom_runs", "setting_0321_linux.csv")
+output_file = os.path.join("Custom_runs", "setting_0324.csv")
 create_grid_search_template(template_df, grid_search,output_file,suffixs,col_suffix)
 print(f"saved to {output_file}")
 

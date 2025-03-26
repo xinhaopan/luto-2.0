@@ -31,8 +31,8 @@ point_dict = {key: df[['Net emissions','Objectives']] for key, df in ghg_group_d
 
 ghg_group_dict,legend_colors = get_colors(ghg_group_dict, 'tools/land use colors.xlsx', sheet_name='lu')
 output_png = '../output/04_ghg_emissions'
-y_range, y_ticks = calculate_y_axis_range(ghg_group_dict)
-# y_range, y_ticks = (-400,100),100
+y_range, y_ticks = calculate_y_axis_range(ghg_group_dict,5)
+y_range, y_ticks = (-400,100),100
 point_colors = ['black','red']
 plot_Combination_figures(ghg_group_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,point_dict=point_dict,point_colors=point_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
