@@ -20,6 +20,7 @@
 
 
 
+from datetime import datetime
 import os
 import h5py
 import xarray as xr
@@ -41,10 +42,10 @@ from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.tools.spatializers import upsample_array
 from luto.settings import (
-    INPUT_DIR, 
+    AG_MANAGEMENTS_TO_LAND_USES,
+    INPUT_DIR,
     NO_GO_VECTORS, 
     NVIS_CLASS_DETAIL , 
     NVIS_SPATIAL_DETAIL, 
@@ -126,7 +127,7 @@ class Data:
     Contains all data required for the LUTO model to run. Loads all data upon initialisation.
     """
 
-    def __init__(self, timestamp: str) -> None:
+    def __init__(self) -> None:
         """
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
         for resfactor.
@@ -134,9 +135,10 @@ class Data:
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
         self.path_begin_end_compare = None
-        # Timestamp of simulation to which this object belongs - will be updated each time a simulation
-        # is run using this Data object.
-        self.timestamp_sim = timestamp
+
+        # Timestamp of simulation to which this object belongs.
+        with open(os.path.join(settings.OUTPUT_DIR, '.timestamp'), 'r') as f:
+            self.timestamp = f.read().strip()
 
         # Setup output containers
         self.lumaps = {}
@@ -694,8 +696,8 @@ class Data:
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
-
-
+        
+  
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix
@@ -1039,7 +1041,7 @@ class Data:
         savburn_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5'), where=self.MASK)
 
         # Load the columns as numpy arrays
-        self.SAVBURN_ELIGIBLE =  savburn_df.ELIGIBLE_AREA.to_numpy()                    # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible
+        self.SAVBURN_ELIGIBLE =  savburn_df.ELIGIBLE_AREA.to_numpy()                    # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible          
         self.SAVBURN_TOTAL_TCO2E_HA = savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()
         
         # # Avoided emissions from savanna burning
@@ -1098,7 +1100,7 @@ class Data:
         self.BIODIV_HABITAT_DEGRADE_LOOK_UP = pd.read_csv(os.path.join(INPUT_DIR, 'BIODIV_HABITAT_DEGRADE_LOOK_UP.csv')
             ).set_index('lu'
             )['RETAIN_RATION_AFTER_DEGRADATE'].to_dict()
-
+        
         self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {         # Round degradation figures to avoid numerical issues in Gurobi
             j: round(x, settings.ROUND_DECMIALS) 
             for j, x in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()}
@@ -1107,7 +1109,7 @@ class Data:
         self.BIO_RETAIN_FRACTION_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)          
 
         bio_damage_LDS = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - self.BIO_RETAIN_FRACTION_LDS)           
-        bio_damage_habitat = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - self.BIO_BASE_YR_RETAIN_FRACTION_HABITAT)
+        bio_damage_habitat = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - self.BIO_BASE_YR_RETAIN_FRACTION_HABITAT)         
 
 
         # Get the biodiversity value after LDS and habitat impact for the beginning year (BASE YR = 2010)
@@ -1738,7 +1740,7 @@ class Data:
             yr_all = list(range(base_year, target_year + 1, step_size))
 
         # Create path name
-        self.path = f"{OUTPUT_DIR}/{self.timestamp_sim}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
+        self.path = f"{OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
 
         # Get all paths
         paths = (
