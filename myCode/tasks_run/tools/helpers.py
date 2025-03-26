@@ -8,6 +8,7 @@ import subprocess
 import datetime
 import time
 import numpy as np
+import ast
 
 from joblib import delayed, Parallel
 
@@ -79,6 +80,8 @@ def process_column(col, custom_settings, script_name, delay):
     custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(eval)
     # Update the settings dictionary
     custom_dict = update_settings(custom_settings[col].to_dict(), col)
+    for key in eval_vars:
+        custom_dict[key] = ast.literal_eval(custom_dict[key]) if isinstance(custom_dict[key], str) else custom_dict[key]
 
     # Submit the task
     create_run_folders(col)

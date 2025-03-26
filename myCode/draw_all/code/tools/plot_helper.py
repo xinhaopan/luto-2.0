@@ -102,7 +102,7 @@ def process_single_df(df, mapping_df):
 
 def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, legend_colors,point_dict=None,point_colors=None,
                             n_rows=3, n_cols=3, font_size=10, x_range=(2010, 2050), y_range=(-600, 100),
-                             x_ticks=5, y_ticks=100, legend_position=(0.5, -0.03), show_legend='last', legend_n_rows=1):
+                             x_ticks=5, y_ticks=[-200,0,200], legend_position=(0.5, -0.03), show_legend='last', legend_n_rows=1):
     total_plots = len(input_names)
     fig_width = 12
     fig_height = 8
@@ -120,8 +120,7 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
             is_bottom_row = (i >= (n_rows - 1) * n_cols)
 
             # 生成 y 轴刻度
-            yticks = np.arange(y_range[0], y_range[1] + y_ticks, y_ticks)
-            ax.set_yticks(yticks)  # 更新刻度
+            ax.set_yticks(y_ticks)  # 更新刻度
             ax.set_ylim(y_range[0], y_range[1])
 
             # 显示所有图的水平网格线
@@ -507,145 +506,197 @@ def get_max_min(df):
 
     return max(overall_pos_max, overall_max), min(overall_neg_min, overall_min)
 
-# def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3, n_jobs=-1):
-#     """
-#     并行计算所有 DataFrame 的 (max, min) 值
-#     """
-#     results = Parallel(n_jobs=n_jobs, prefer="threads")(delayed(get_max_min)(df) for df in data_dict.values())
-#
-#     # 获取所有 DataFrame 的全局最大最小值
-#     max_value = max(res[0] for res in results)
-#     min_value = min(res[1] for res in results)
-#
-#     # 如果 multiplier 小于 1，放大数据和 multiplier
-#     scale_factor = 1
-#     if multiplier < 1:
-#         scale_factor = int(1 / multiplier) * 10
-#         max_value *= scale_factor
-#         min_value *= scale_factor
-#         multiplier = 1
-#
-#     y_min = np.floor(min_value / multiplier) * multiplier
-#     y_max = np.ceil(max_value / multiplier) * multiplier
-#
-#     while (y_max - y_min) % divisible_by != 0:
-#         y_max += multiplier
-#
-#     interval = (y_max - y_min) // divisible_by
-#
-#     # 缩小结果回原比例
-#     if scale_factor != 1:
-#         y_min /= scale_factor
-#         y_max /= scale_factor
-#         interval /= scale_factor
-#
-#     return (y_min, y_max), interval
+    range_value = max_value - min_value
+    ideal_interval = range_value / (desired_ticks - 1)
+
+    e = math.floor(math.log10(ideal_interval))
+    nice_numbers = [1, 2, 5, 10]
+    nice_numbers_scaled = [n * (10 ** e) for n in nice_numbers]
+    interval = min(nice_numbers_scaled, key=lambda x: abs(x - ideal_interval))
+
+    if min_value < 0 and min_value >= -1:
+        min_tick = 0
+        max_tick = math.ceil(max_value / interval) * interval
+        ticks = list(np.arange(min_tick, max_tick + interval, interval))
+        print("Space left below 0 for small negative values like -1.")
+    else:
+        min_tick = math.floor(min_value / interval) * interval
+        max_tick = math.ceil(max_value / interval) * interval
+        ticks = list(np.arange(min_tick, max_tick + interval, interval))
+        if 0 not in ticks and min_value < 0 < max_value:
+            ticks.append(0)
+            ticks.sort()
+
+    return interval, ticks
+
+def get_y_axis_ticks(min_value, max_value, desired_ticks=4):
+    range_value = max_value - min_value
+    if range_value <= 0:
+        return 0, 1, [0, 0.5, 1]
+
+    ideal_interval = range_value / (desired_ticks - 1)
+    e = math.floor(math.log10(ideal_interval))
+    nice_numbers = [1, 2, 5, 10]
+    nice_numbers_scaled = [n * (10 ** e) for n in nice_numbers]
+    interval = min(nice_numbers_scaled, key=lambda x: abs(x - ideal_interval))
+
+    # 统一逻辑：从 min_value 向下取整（不是硬设为 0）
+    min_tick = math.floor(min_value / interval) * interval
+    max_tick = math.ceil(max_value / interval) * interval
+
+    ticks = list(np.arange(min_tick, max_tick + interval, interval))
+
+    # 可选：强制包含 0
+    if 0 not in ticks and min_value < 0 < max_value:
+        ticks.append(0)
+        ticks = sorted(set(ticks))
+
+    # 统一逻辑：从 min_value 向下取整（不是硬设为 0）
+    if abs(min_value) < interval:
+        min_v = math.floor(min_value)
+    else:
+        min_v = math.floor(min_value / interval) * interval
+    max_v = math.ceil(max_value / interval) * interval
+
+    return min_v, max_v, ticks
 
 
-import numpy as np
-import pandas as pd
-from joblib import Parallel, delayed
 
-import numpy as np
-
-
-def calculate_y_axis_range(data_dict, multiplier=10):
+def calculate_y_axis_range(data_dict, desired_ticks=4,use_parallel=True, n_jobs=-1):
     """
-    计算 y 轴范围和间隔：
-    - 确保0是刻度中的一个。
-    - 当数据范围绝对值≥100时，确保间隔和刻度标签的个位数为0。
-    - 刻度数量在4到6之间。
-
-    参数:
-        min_value: 数据最小值
-        max_value: 数据最大值
-        multiplier: 调整时的间隔基数（默认为10）
-
-    返回:
-        ((y_min, y_max), interval): y 轴范围和间隔
+    并行计算所有 DataFrame 的 (max, min) 值，并计算 y 轴范围和间隔
     """
-    # 并行计算所有 DataFrame 的最大值和最小值
-    results = Parallel(n_jobs=-1, prefer="threads")(delayed(get_max_min)(df) for df in data_dict.values())
-    # 获取全局最大值和最小值
+    # 并行计算每个 DataFrame 的最大最小值
+    if use_parallel:
+        results = Parallel(n_jobs=n_jobs, prefer="threads")(delayed(get_max_min)(df) for df in data_dict.values())
+    else:
+        results = [get_max_min(df) for df in data_dict.values()]
+
+    # 获取所有 DataFrame 的全局最大最小值
     max_value = max(res[0] for res in results)
     min_value = min(res[1] for res in results)
-    adjust_to_ten = min_value <= -100 or max_value >= 100
 
-    # 确保包含0的原始范围
-    original_min, original_max = min_value, max_value
-    if min_value > 0:
-        min_value = 0
-    elif max_value < 0:
-        max_value = 0
-    data_range = max_value - min_value
+    range_value = max_value - min_value
+    scale_factor = 1
 
-    best_candidate = None
-    min_expansion = float('inf')
+    if range_value > -1 and range_value < 1:
+        scale_exponent = int(abs(math.floor(math.log10(range_value))))
+        scale_factor = 10 ** scale_exponent
+        max_value *= scale_factor
+        min_value *= scale_factor
 
-    # 尝试不同刻度数寻找最优解
-    for n in [4, 5, 6]:
-        if data_range == 0:  # 全零特例处理
-            y_min, y_max = (-multiplier, multiplier) if adjust_to_ten else (-1, 1)
-            interval = multiplier if adjust_to_ten else 1
-            return ((y_min, y_max), interval)
+    min_v, max_v, ticks = get_y_axis_ticks(min_value, max_value, desired_ticks=desired_ticks)
 
-        # 计算初始间隔
-        if adjust_to_ten:
-            interval = multiplier * max(1, np.ceil(data_range / (multiplier * (n - 1))))
-        else:
-            interval = max(1, np.ceil(data_range / (n - 1)))
-            interval = int(interval)
+    # 缩小结果回原比例
+    if scale_factor != 1:
+        min_v /= scale_factor
+        max_v /= scale_factor
+        ticks = [t / scale_factor for t in ticks]
 
-        # 计算范围边界
-        y_min = np.floor(min_value / interval) * interval
-        y_max = np.ceil(max_value / interval) * interval
+    if ticks==[0,20,40,60,80,100]:
+        ticks=[0,25,50,75,100]
+    return ((min_v, max_v), ticks)
 
-        # 确保包含0
-        if y_min > 0:
-            y_min = 0
-        if y_max < 0:
-            y_max = 0
 
-        # 验证刻度数
-        tick_count = int((y_max - y_min) / interval) + 1
-        if not 4 <= tick_count <= 6:
-            continue
+# def calculate_y_axis_range(data_dict, multiplier=10):
+#     """
+#     计算 y 轴范围和间隔：
+#     - 确保0是刻度中的一个。
+#     - 当数据范围绝对值≥100时，确保间隔和刻度标签的个位数为0。
+#     - 刻度数量在4到6之间。
+#
+#     参数:
+#         min_value: 数据最小值
+#         max_value: 数据最大值
+#         multiplier: 调整时的间隔基数（默认为10）
+#
+#     返回:
+#         ((y_min, y_max), interval): y 轴范围和间隔
+#     """
+#     # 并行计算所有 DataFrame 的最大值和最小值
+#     results = Parallel(n_jobs=-1, prefer="threads")(delayed(get_max_min)(df) for df in data_dict.values())
+#     # 获取全局最大值和最小值
+#     max_value = max(res[0] for res in results)
+#     min_value = min(res[1] for res in results)
+#     adjust_to_ten = min_value <= -100 or max_value >= 100
+#
+#     # 确保包含0的原始范围
+#     original_min, original_max = min_value, max_value
+#     if min_value > 0:
+#         min_value = 0
+#     elif max_value < 0:
+#         max_value = 0
+#     data_range = max_value - min_value
+#
+#     best_candidate = None
+#     min_expansion = float('inf')
+#
+#     # 尝试不同刻度数寻找最优解
+#     for n in [4, 5, 6]:
+#         if data_range == 0:  # 全零特例处理
+#             y_min, y_max = (-multiplier, multiplier) if adjust_to_ten else (-1, 1)
+#             interval = multiplier if adjust_to_ten else 1
+#             return ((y_min, y_max), interval)
+#
+#         # 计算初始间隔
+#         if adjust_to_ten:
+#             interval = multiplier * max(1, np.ceil(data_range / (multiplier * (n - 1))))
+#         else:
+#             interval = max(1, np.ceil(data_range / (n - 1)))
+#             interval = int(interval)
+#
+#         # 计算范围边界
+#         y_min = np.floor(min_value / interval) * interval
+#         y_max = np.ceil(max_value / interval) * interval
+#
+#         # 确保包含0
+#         if y_min > 0:
+#             y_min = 0
+#         if y_max < 0:
+#             y_max = 0
+#
+#         # 验证刻度数
+#         tick_count = int((y_max - y_min) / interval) + 1
+#         if not 4 <= tick_count <= 6:
+#             continue
+#
+#         # 计算范围扩展量
+#         expansion = (y_max - original_max) + (original_min - y_min)
+#         if expansion < min_expansion:
+#             min_expansion = expansion
+#             best_candidate = (y_min, y_max, interval)
+#
+#     # 回退逻辑（找不到合适解时）
+#     if not best_candidate:
+#         if adjust_to_ten:
+#             y_min = np.floor(original_min / multiplier) * multiplier
+#             y_max = np.ceil(original_max / multiplier) * multiplier
+#             interval = multiplier
+#         else:
+#             y_min = np.floor(original_min)
+#             y_max = np.ceil(original_max)
+#             interval = max(1, (y_max - y_min) // 5)
+#         # 确保包含0
+#         if y_min > 0:
+#             y_min = 0
+#         if y_max < 0:
+#             y_max = 0
+#         best_candidate = (y_min, y_max, interval)
+#
+#     y_min, y_max, interval = best_candidate
+#
+#     # 百位数以上强制对齐10的倍数
+#     if adjust_to_ten:
+#         y_min = np.floor(y_min / multiplier) * multiplier
+#         y_max = np.ceil(y_max / multiplier) * multiplier
+#         interval = multiplier * np.ceil(interval / multiplier)
+#         # 重新计算刻度数并调整间隔
+#         tick_count = int((y_max - y_min) / interval) + 1
+#         if tick_count < 4:
+#             interval = (y_max - y_min) / 3
+#         elif tick_count > 6:
+#             interval = (y_max - y_min) / 5
+#
+#     return ((y_min, y_max), interval)
 
-        # 计算范围扩展量
-        expansion = (y_max - original_max) + (original_min - y_min)
-        if expansion < min_expansion:
-            min_expansion = expansion
-            best_candidate = (y_min, y_max, interval)
 
-    # 回退逻辑（找不到合适解时）
-    if not best_candidate:
-        if adjust_to_ten:
-            y_min = np.floor(original_min / multiplier) * multiplier
-            y_max = np.ceil(original_max / multiplier) * multiplier
-            interval = multiplier
-        else:
-            y_min = np.floor(original_min)
-            y_max = np.ceil(original_max)
-            interval = max(1, (y_max - y_min) // 5)
-        # 确保包含0
-        if y_min > 0:
-            y_min = 0
-        if y_max < 0:
-            y_max = 0
-        best_candidate = (y_min, y_max, interval)
-
-    y_min, y_max, interval = best_candidate
-
-    # 百位数以上强制对齐10的倍数
-    if adjust_to_ten:
-        y_min = np.floor(y_min / multiplier) * multiplier
-        y_max = np.ceil(y_max / multiplier) * multiplier
-        interval = multiplier * np.ceil(interval / multiplier)
-        # 重新计算刻度数并调整间隔
-        tick_count = int((y_max - y_min) / interval) + 1
-        if tick_count < 4:
-            interval = (y_max - y_min) / 3
-        elif tick_count > 6:
-            interval = (y_max - y_min) / 5
-
-    return ((y_min, y_max), interval)

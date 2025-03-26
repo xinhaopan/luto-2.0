@@ -23,8 +23,8 @@ def get_first_subfolder_name(output_path="output"):
         # subfolders = [f for f in os.listdir(output_path) if os.path.isdir(os.path.join(output_path, f))]
         subfolders = [f for f in os.listdir(output_path) if
                       os.path.isdir(os.path.join(output_path, f)) and '2010-2050' in f]
-        # html_path = os.path.join(output_path, subfolders[0],"DATA_REPORT","REPORT_HTML","pages","production.html")
-        html_path = os.path.join(output_path, subfolders[0], "out_2050", "quantity_production_kt_separate_2050.csv")
+        html_path = os.path.join(output_path, subfolders[0],"DATA_REPORT","REPORT_HTML","pages","production.html")
+        # html_path = os.path.join(output_path, subfolders[0], "out_2050", "quantity_production_kt_separate_2050.csv")
         if not subfolders:
             print(f"No subfolders found in '{output_path}'.")
             return None

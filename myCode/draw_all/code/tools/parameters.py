@@ -1,8 +1,8 @@
 INPUT_DIR = '../../../input'
 
-time = '20250319'
+time = '20250324'
 middle = ''
-suffix = 'soft_100'
+suffix = '5'
 # senerios = [
 #     'Run_16_GHG_1_8C_67_BIO_0',
 #     'Run_13_GHG_1_5C_50_BIO_0',
@@ -15,8 +15,8 @@ suffix = 'soft_100'
 #     'Run_12_GHG_1_5C_67_BIO_5',
 # ]
 
-run_number = [7,4,1,8,5,2,9,6,3]
-# run_number = [2 * num - 1 for num in run_number_origin]
+run_number_origin = [7,4,1,8,5,2,9,6,3]
+run_number = [num for num in run_number_origin]
 senerios_origin = [
     'GHG_1_8C_67_BIO_0',
     'GHG_1_5C_50_BIO_0',

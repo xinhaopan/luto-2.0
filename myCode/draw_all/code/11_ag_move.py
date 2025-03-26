@@ -30,10 +30,12 @@ def get_lon_lat(tif_path):
 
     weighted_lon = np.sum(lon * values) / np.sum(values)
     weighted_lat = np.sum(lat * values) / np.sum(values)
+    # print(tif_path, weighted_lon, weighted_lat)
     return weighted_lon, weighted_lat
 
 
 path = get_path(input_files[4])
+use_parallel = True
 pattern = re.compile(r'(?<!Non-)Ag_LU.*\.tif{1,2}$', re.IGNORECASE)
 # ----------------------- 提取土地利用类型与文件 -----------------------
 folder_path_2050 = os.path.join(path, "out_2050", "lucc_separate")
@@ -49,11 +51,16 @@ df = pd.DataFrame(index=range(2010, 2051), columns=columns)
 for year in range(2010, 2051):
     folder_path = os.path.join(path, f"out_{year}", "lucc_separate")
     files = [f for f in os.listdir(folder_path) if pattern.match(f)]
-    results = Parallel(n_jobs=-1)(delayed(get_lon_lat)(os.path.join(folder_path, f)) for f in files)
+    files = [item for item in files if "mercator" not in item]
+    if use_parallel:
+        results = Parallel(n_jobs=-1)(delayed(get_lon_lat)(os.path.join(folder_path, f)) for f in files)
+    else:
+        results = [get_lon_lat(os.path.join(folder_path, f)) for f in files]
 
     for name, (weighted_lon, weighted_lat) in zip(names, results):
         df.loc[year, (name, 'Lon')] = weighted_lon
         df.loc[year, (name, 'Lat')] = weighted_lat
+df.to_excel("../output/10_land_use_center.xlsx")
 
 # ----------------------- 坐标转换与偏移计算 -----------------------
 with rasterio.open(os.path.join(path, "out_2050", "lucc_separate", files[0])) as dataset:
@@ -85,6 +92,8 @@ for land_use in names:
 output_path = "../output/10_land_use_movement_multilevel.xlsx"
 result_df.to_excel(output_path)
 
+result_df = pd.read_excel("../output/10_land_use_movement_multilevel.xlsx", header=[0, 1], index_col=0)
+
 # ----------------------- 绘制极坐标图 -----------------------
 color_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='ag')
 color_mapping = dict(zip(color_df['desc'], color_df['color']))
@@ -96,20 +105,45 @@ for land_use in names:
     distances = result_df[(land_use, 'Distance (km)')].values.astype(float)
     angles_rad = np.radians(result_df[(land_use, 'Angle (degrees)')].values.astype(float))
     color = color_mapping.get(land_use, '#C8C8C8')
-    ax.plot(angles_rad, distances, marker='o', label=land_use, color=color)
+    ax.plot(angles_rad, distances, marker='o', label=land_use, color=color,markersize=2)
+
+# 设置字体统一为 Arial，字号为 10
+plt.rcParams.update({'font.size': 10, 'font.family': 'Arial'})
+
+# 设置极坐标标签位置和样式
+ax.set_theta_zero_location('N')
+ax.set_theta_direction(-1)
+
+
+# 原始设置
+angles_deg = np.arange(0, 360, 45)
+labels = ['North (km)', 'Northeast', 'East', 'Southeast',
+          'South', 'Southwest', 'West', 'Northwest']
+
+# 需要偏移的角度
+offset_angles = [45, 135, 225, 315]
+
+# 设置 xticks 和清空这几个方向的标签（用空字符串占位）
+masked_labels = [label if angle not in offset_angles else "" for angle, label in zip(angles_deg, labels)]
 
 ax.set_theta_zero_location('N')
 ax.set_theta_direction(-1)
-ax.set_xticks(np.radians(np.arange(0, 360, 45)))
-ax.set_xticklabels(['North', 'Northeast', 'East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest'])
-ax.set_rlabel_position(0)
-ax.tick_params(axis='x', labelsize=10)
-ax.tick_params(axis='y', labelsize=10)
-ax.grid(True, linestyle='--', alpha=0.7)
+ax.set_xticks(np.radians(angles_deg))
+ax.set_xticklabels(masked_labels, fontname='Arial', fontsize=10)
 
+# 添加偏移后的四个方向标签
+for angle_deg in offset_angles:
+    angle_rad = np.radians(angle_deg)
+    label = labels[angles_deg.tolist().index(angle_deg)]
+    ax.text(angle_rad, ax.get_rmax() * 1.12, label,
+            ha='center', va='center', fontsize=10, fontname='Arial')
+
+ax.set_rlabel_position(0)
 # 保存图像
 output_file = "../output/10_land_use_movement_polar"
-fig.savefig(f"{output_file}.png", dpi=300, bbox_inches='tight')
+fig.savefig(f"{output_file}.svg", dpi=300, bbox_inches='tight')
+plt.show()
+
 
 # ----------------------- 保存图例 -----------------------
 handles = [
@@ -123,7 +157,7 @@ ax_legend.legend(handles, labels, loc='center', fontsize=10, ncol=2, frameon=Fal
 fig_legend.savefig(f"{output_file}_legend.svg", dpi=300, bbox_inches='tight', transparent=True)
 
 # 提取 2050 年的 Distance (km) 数据
-distance_2050 = df.xs('Distance (km)', axis=1, level='Metric').loc[2050]
+distance_2050 = result_df.xs('Distance (km)', axis=1, level='Metric').loc[2050]
 
 # 找到 2050 年偏移量最大的三个土地利用类型
 top_3_land_uses_2050 = distance_2050.nlargest(3)
