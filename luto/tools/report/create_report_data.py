@@ -38,11 +38,9 @@ from luto.tools.report.data_tools.parameters import (
     GHG_CATEGORY, 
     GHG_NAMES,
     LANDUSE_ALL_RENAMED,
-    LU_CROPS, 
-    LU_NATURAL,
+    LU_CROPS,
     LVSTK_MODIFIED, 
-    LVSTK_NATURAL, 
-    NON_AG_LANDUSE_RAW, 
+    LVSTK_NATURAL,
     RENAME_NON_AG,
     RENAME_AM_NON_AG
 )
@@ -712,7 +710,7 @@ def save_report_data(raw_data_dir:str):
     
     # Plot_3-8: Transition cost for Ag to Ag (million $)
     keep_cols = ['Year', 'Value (million)','Cost ($)']
-    loop_cols = cost_transition_ag2ag_df.columns.difference(keep_cols)
+    loop_cols = ['Type', 'From land-use', 'To land-use']
     
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
@@ -748,7 +746,7 @@ def save_report_data(raw_data_dir:str):
     cost_transition_ag2ag_trans_mat_json = {'categories': AG_LANDUSE,
                                             'series': json.loads(cost_transition_ag2ag_trans_mat_data.to_json(orient='records'))}
     
-    with open(f'{SAVE_DIR}/economics_8_transition_ag2ag_cost_6_transition_matrix.json', 'w') as outfile:
+    with open(f'{SAVE_DIR}/economics_8_transition_ag2ag_cost_4_transition_matrix.json', 'w') as outfile:
         outfile.write(json.dumps(cost_transition_ag2ag_trans_mat_json))
                                     
                                     
@@ -757,7 +755,7 @@ def save_report_data(raw_data_dir:str):
                                 
     # Plot_3-9: Transition cost for Ag to Non-Ag (million $)
     keep_cols = ['Year', 'Value (million)','Cost ($)']
-    loop_cols = cost_transition_ag2non_ag_df.columns.difference(keep_cols)
+    loop_cols = ['Cost type', 'From land-use', 'To land-use']
     
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
@@ -800,14 +798,14 @@ def save_report_data(raw_data_dir:str):
                                                 'series': json.loads(cost_transition_ag2non_ag_trans_mat_data.to_json(orient='records'))}
     
     
-    with open(f'{SAVE_DIR}/economics_9_transition_ag2non_cost_6_transition_matrix.json', 'w') as outfile:
+    with open(f'{SAVE_DIR}/economics_9_transition_ag2non_cost_4_transition_matrix.json', 'w') as outfile:
         outfile.write(json.dumps(cost_transition_ag2non_ag_trans_mat_json))
     
 
         
     # Plot_3-10: Transition cost for Non-Ag to Ag (Billion $)
     keep_cols = ['Year', 'Value (million)','Cost ($)']
-    loop_cols = cost_transition_non_ag2ag_df.columns.difference(keep_cols)
+    loop_cols = ['Cost type', 'From land-use', 'To land-use']
     
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
@@ -848,7 +846,7 @@ def save_report_data(raw_data_dir:str):
         'categories_to': AG_LANDUSE,
         'series': json.loads(cost_transition_non_ag2ag_trans_mat_data.to_json(orient='records'))}  
     
-    with open(f'{SAVE_DIR}/economics_10_transition_non_ag2ag_cost_6_transition_matrix.json', 'w') as outfile:
+    with open(f'{SAVE_DIR}/economics_10_transition_non_ag2ag_cost_4_transition_matrix.json', 'w') as outfile:
         outfile.write(json.dumps(cost_transition_non_ag2ag_trans_mat_json))                                              
                                                 
 
@@ -1399,65 +1397,65 @@ def save_report_data(raw_data_dir:str):
         and year_types == "single_year"
         and base_name == "biodiversity_priority_scores"
     '''.strip().replace('\n','')
-
+    
     bio_paths = files.query(filter_str).reset_index(drop=True)
     bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
     bio_df = bio_df.replace(RENAME_AM_NON_AG)
-
+    
     # Plot_BIO_priority_1: Biodiversity total score by Type
     bio_df_type = bio_df.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
     bio_df_type = bio_df_type\
         .groupby('Type')[['Year','Contribution Relative to Base Year Level (%)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Base Year Level (%)']))))\
         .reset_index()
-
+        
     bio_df_type.columns = ['name','data']
     bio_df_type['type'] = 'column'
     bio_df_type.to_json(f'{SAVE_DIR}/biodiversity_priority_1_total_score_by_type.json', orient='records')
-
-
+    
+    
     # Plot_BIO_priority_2: Biodiversity total score by landuse
     bio_df_landuse = bio_df.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
     bio_df_landuse = bio_df_landuse\
         .groupby('Landuse')[['Year','Contribution Relative to Base Year Level (%)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Base Year Level (%)']))))\
         .reset_index()
-
+        
     bio_df_landuse.columns = ['name','data']
     bio_df_landuse['type'] = 'column'
     bio_df_landuse = bio_df_landuse.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
     bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_priority_2_total_score_by_landuse.json', orient='records')
-
-
+    
+    
     # Plot_BIO_priority_3: Biodiversity total score by Agricultural Management
     bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
     bio_df_am = bio_df_am.groupby(['Year','Agri-Management']).sum(numeric_only=True).reset_index()
-
+    
     bio_df_am = bio_df_am\
         .groupby('Agri-Management')[['Year','Contribution Relative to Base Year Level (%)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Base Year Level (%)']))))\
         .reset_index()
-
+        
     bio_df_am.columns = ['name','data']
     bio_df_am['type'] = 'column'
     bio_df_am.to_json(f'{SAVE_DIR}/biodiversity_priority_3_total_score_by_agri_management.json', orient='records')
-
-
+    
+    
     # Plot_BIO_priority_4: Biodiversity total score by Non-Agricultural Land-use
     bio_df_non_ag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
     bio_df_non_ag = bio_df_non_ag.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
-
+    
     bio_df_non_ag = bio_df_non_ag\
         .groupby('Landuse')[['Year','Contribution Relative to Base Year Level (%)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Base Year Level (%)']))))\
         .reset_index()
-
+        
     bio_df_non_ag.columns = ['name','data']
     bio_df_non_ag['type'] = 'column'
     bio_df_non_ag.to_json(f'{SAVE_DIR}/biodiversity_priority_4_total_score_by_non_agri_landuse.json', orient='records')
-
-
-
+    
+    
+        
     # ---------------- (GBF2) Biodiversity priority score  ----------------
     if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
         
