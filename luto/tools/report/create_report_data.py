@@ -38,9 +38,9 @@ from luto.tools.report.data_tools.parameters import (
     GHG_CATEGORY, 
     GHG_NAMES,
     LANDUSE_ALL_RENAMED,
-    LU_CROPS,
+    LU_CROPS, 
     LVSTK_MODIFIED, 
-    LVSTK_NATURAL,
+    LVSTK_NATURAL, 
     RENAME_NON_AG,
     RENAME_AM_NON_AG
 )
@@ -529,13 +529,13 @@ def save_report_data(raw_data_dir:str):
     cost_non_ag_sum.insert(1,'Type','Non-agricultural land-use (cost)')
     
     cost_transition_ag2ag_sum = cost_transition_ag2ag_df.groupby(['Year']).sum(numeric_only=True).reset_index()
-    cost_transition_ag2ag_sum.insert(1,'Type','Transition cost')
+    cost_transition_ag2ag_sum.insert(1,'Type','Transition cost (Ag2Ag)')
     
     cost_transition_ag2non_sum = cost_transition_ag2non_ag_df.groupby(['Year']).sum(numeric_only=True).reset_index()
-    cost_transition_ag2non_sum.insert(1,'Type','Transition cost')
+    cost_transition_ag2non_sum.insert(1,'Type','Transition cost (Ag2Non-Ag)')
     
     cost_transition_non_ag2ag_sum = cost_transition_non_ag2ag_df.groupby(['Year']).sum(numeric_only=True).reset_index()
-    cost_transition_non_ag2ag_sum.insert(1,'Type','Transition cost')
+    cost_transition_non_ag2ag_sum.insert(1,'Type','Transition cost (Non-Ag2Ag)')
     
     
     rev_cost_all = pd.concat([revenue_ag_sum,revenue_am_sum,revenue_non_ag_sum,
