@@ -568,6 +568,7 @@ def create_grid_search_template(template_df, grid_dict, output_file,suffixs="",c
             [template_grid_search.columns[0], template_grid_search.columns[1]]  # 保留前两列
             + [col + col_suffix for col in template_grid_search.columns[2:]]  # 从第三列开始加后缀
     )
+    print(template_grid_search.columns)
     template_grid_search.to_csv(output_file, index=False)
     total_cost = calculate_total_cost(template_grid_search)
     print(f"Job Cost: {total_cost}k")

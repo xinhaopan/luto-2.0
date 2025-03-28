@@ -138,7 +138,7 @@ for angle_deg in offset_angles:
     ax.text(angle_rad, ax.get_rmax() * 1.12, label,
             ha='center', va='center', fontsize=10, fontname='Arial')
 
-ax.set_rlabel_position(0)
+ax.set_rlabel_position(180) # y 轴的标签（即径向标签）移动
 # 保存图像
 output_file = "../output/10_land_use_movement_polar"
 fig.savefig(f"{output_file}.svg", dpi=300, bbox_inches='tight')

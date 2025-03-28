@@ -37,9 +37,6 @@ import luto.settings as settings
 from typing import Tuple
 from datetime import datetime
 
-import luto.economics.agricultural.water as ag_water
-import luto.economics.non_agricultural.water as non_ag_water
-
 
 def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
@@ -304,7 +301,8 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
      
      
     """
-    
+    import luto.economics.agricultural.water as ag_water
+    import luto.economics.non_agricultural.water as non_ag_water
     yr_cal = data.YR_CAL_BASE + yr_idx
     l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     non_ag_cells = get_non_ag_cells(lumap)
