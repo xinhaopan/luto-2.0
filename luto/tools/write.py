@@ -172,7 +172,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_species(data, yr_cal, path_yr)
-    write_npy(data, yr_cal, path_yr)
+    # write_npy(data, yr_cal, path_yr)
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
 
@@ -1907,7 +1907,7 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             cost_dfs.append(arr)
     summed_array_r = np.sum(cost_dfs, axis=0)
     save_map_to_npy(data, summed_array_r, f'cost_transition_ag2ag', yr_cal, path)
-    cost_dfs = []
+
 
     # ---------------------------------------------------------------------
     #              Agricultural management transition costs
@@ -1922,26 +1922,36 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
-        non_ag_transitions_cost_mat = {k: {'Transition cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
-                                       for k in data.NON_AGRICULTURAL_LANDUSES}
+        non_ag_transitions_cost_mat = {
+            k: {'Transition cost': np.zeros(data.NCELLS).astype(np.float32)}
+            for k in NON_AG_LAND_USES.keys()
+        }
     else:
-        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(data,
-                                                                                       yr_idx,
-                                                                                       yr_cal_sim_pre,
-                                                                                       data.lumaps[yr_cal],
-                                                                                       data.lmmaps[yr_cal],
-                                                                                       separate=True)
+        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
+            data, yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
+        )
+    cost_dfs = []
+    for from_lu in data.AGRICULTURAL_LANDUSES:
+        for from_lm in data.LANDMANS:
+            for to_lu in NON_AG_LAND_USES.keys():
+                for cost_type in non_ag_transitions_cost_mat[to_lu].keys():
 
-    for idx, non_ag_type in enumerate(non_ag_transitions_cost_mat):
-        for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
-            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]  # Get the transition cost matrix
-            arr = np.einsum('mrj,r->r', np.nan_to_num(arr, nan=0.0), np.nan_to_num(non_ag_dvar[:,
-                                                                                   idx],
-                                                                                   nan=0.0))  # Multiply the transition cost matrix by the cost of non-agricultural land-use
-            cost_dfs.append(arr)
+                    from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]].astype(
+                        np.bool_)  # Get the land-use index of the from land-use (r*)
+                    arr_trans = non_ag_transitions_cost_mat[to_lu][cost_type][
+                        from_lu_idx]  # Get the transition cost matrix of from land-use (r*)
+                    arr_dvar = non_ag_dvar[from_lu_idx, data.NON_AGRICULTURAL_LANDUSES.index(
+                        to_lu)]  # Get the decision variable of the from land-use (r*)
+
+                    if arr_dvar.size == 0:
+                        continue
+
+                    cost_arr = np.einsum('r,r->r', arr_trans, arr_dvar)
+                    cost_dfs.append(cost_arr)
+
     summed_array_r = np.sum(cost_dfs, axis=0)
     save_map_to_npy(data, summed_array_r, f'cost_transition_ag2non_ag', yr_cal, path)
-    cost_dfs = []
+
     # --------------------------------------------------------------------
     #              Non-agricultural land-use transition costs (from non-ag to ag)
     # --------------------------------------------------------------------
@@ -1956,6 +1966,7 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                                                                      data.lumaps[yr_cal],
                                                                                      data.lmmaps[yr_cal],
                                                                                      separate=True)
+    cost_dfs = []
     for non_ag_type in non_ag_transitions_cost_mat:
         for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
             arr = np.nan_to_num(non_ag_transitions_cost_mat[non_ag_type][cost_type])  # Get the transition cost matrix
