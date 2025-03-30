@@ -27,14 +27,17 @@ and Brett Bryan, Deakin University
 
 
 # Load libraries
+
 import numpy as np
 import pandas as pd
-import xarray as xr
 import shutil, os, time, h5py
+import rasterio
+import xarray as xr
 
-from glob import glob
+from itertools import product
 from joblib import Parallel, delayed
-from luto.settings import INPUT_DIR, RAW_DATA
+from luto.settings import INPUT_DIR, RAW_DATA, HABITAT_CONDITION, HCAS_PERCENTILE
+from luto.tools.spatializers import upsample_array
 
 
 
@@ -58,7 +61,9 @@ def create_new_dataset():
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
-    bio_contributions_inpath = 'N:/Data-Master/Biodiversity/Processing_as_LUTO_input/biodiversity_contribution_Species_Occurrence_Records/data/'
+    bio_GBF2_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
+    bio_GBF_4a_inpath = bio_GBF2_inpath
+    bio_GBF_4b_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_GEOTIFF/To_NetCDF/'
     bio_NVIS_inpath = 'N:/Data-Master/NVIS/'
     bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
 
@@ -99,13 +104,14 @@ def create_new_dataset():
 
     shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
+    shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 
     shutil.copyfile(luto_1D_inpath + 'GHG_targets_20240421.xlsx', outpath + 'GHG_targets.xlsx')
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
     shutil.copyfile(luto_1D_inpath + 'cost_multipliers_20240612.xlsx', outpath + 'cost_multipliers.xlsx')
 
-    shutil.copyfile(luto_2D_inpath + 'cell_savanna_burning.h5', outpath + 'cell_savanna_burning.h5')
+    pd.read_hdf(luto_2D_inpath + 'cell_savanna_burning.h5').to_hdf(outpath + 'cell_savanna_burning.h5', key='cell_savanna_burning', mode='w', format='table', index=False, complevel=9)
 
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_dr_ml_ha.h5')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_sr_ml_ha.h5')
@@ -122,34 +128,49 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
-
-    # Copy biodiversity suitability contribution files
-    shutil.copyfile(bio_contributions_inpath + 'bio_id_map.nc', outpath + 'bio_id_map.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_mask.nc', outpath + 'bio_mask.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp126_Condition_group.nc', outpath + 'bio_ssp126_Condition_group.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_ssp126_EnviroSuit.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp245_Condition_group.nc', outpath + 'bio_ssp245_Condition_group.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp245_EnviroSuit.nc', outpath + 'bio_ssp245_EnviroSuit.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp370_Condition_group.nc', outpath + 'bio_ssp370_Condition_group.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp370_EnviroSuit.nc', outpath + 'bio_ssp370_EnviroSuit.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp585_Condition_group.nc', outpath + 'bio_ssp585_Condition_group.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_ssp585_EnviroSuit.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_xr_hist_sum_species.nc', outpath + 'bio_xr_hist_sum_species.nc')
     
-    # Copy biodiversity HACS data from DCCEEW
-    shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
+    # Copy biodiversity GBF-2 files
+    shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_priority.nc', outpath + 'GBF2_conserve_priority.nc')
+    shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_performance.xlsx', outpath + 'GBF2_conserve_performance.xlsx')
     
     
-    # Copy biodiversity NVIS data
+    # Copy biodiversity GBF-3 data
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVS_HIGH_SPATIAL_DETAIL.nc')
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVS_LOW_SPATIAL_DETAIL.nc')
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_HIGH_SPATIAL_DETAIL.nc')
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_LOW_SPATIAL_DETAIL.nc')
     
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVG_HIGH_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVG_HIGH_SPATIAL_DETAIL.csv')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVG_LOW_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVG_LOW_SPATIAL_DETAIL.csv')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVS_HIGH_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVS_HIGH_SPATIAL_DETAIL.csv')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVS_LOW_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVS_LOW_SPATIAL_DETAIL.csv')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx')
+
+
+    # Copy biodiversity GBF-4A files
+    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_SCORES.csv', outpath + 'BIODIVERSITY_GBF4A_SCORES.csv')
+    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_TARGET.csv', outpath + 'BIODIVERSITY_GBF4A_TARGET.csv')
+    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_SCORES_group.csv', outpath + 'BIODIVERSITY_GBF4A_SCORES_group.csv')
+    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_TARGET_group.csv', outpath + 'BIODIVERSITY_GBF4A_TARGET_group.csv')
+    
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_ssp126_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_EnviroSuit.nc', outpath + 'bio_ssp245_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_EnviroSuit.nc', outpath + 'bio_ssp370_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_ssp585_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_EnviroSuit_group.nc', outpath + 'bio_ssp126_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_EnviroSuit_group.nc', outpath + 'bio_ssp245_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_EnviroSuit_group.nc', outpath + 'bio_ssp370_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_EnviroSuit_group.nc', outpath + 'bio_ssp585_EnviroSuit_group.nc')
+    
+    
+    # Copy biodiversity GBF-4B files
+    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'bio_DCCEEW_ECNES_target.csv')
+    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_SNES_target.csv', outpath + 'bio_DCCEEW_SNES_target.csv')
+    
+    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_DCCEEW_ECNES.nc')
+    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_DCCEEW_SNES.nc')
+    
+    
+    # Copy biodiversity HACS data from DCCEEW
+    shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
+    
+    
     
 
     ############### Read data
@@ -224,39 +245,30 @@ def create_new_dataset():
 
     ############### Create landuses -- lexicographically ordered list of land-uses (strings)
 
-    # Lexicographically ordered list of land-uses
-    ag_landuses = sorted(lmap['LU_DESC'].unique().tolist())
-    ag_landuses.remove('Non-agricultural land')
-
-    # Save to file
-    pd.DataFrame(ag_landuses).to_csv(outpath + 'ag_landuses.csv', index = False, header = False)
+    # Read in ag-landuse, which is a lexicographically ordered list
+    ag_landuses = pd.read_csv(outpath + 'ag_landuses.csv', header = None)[0].to_list()
+    ag_desc2lu = dict(zip(ag_landuses, range(len(ag_landuses))))
 
     # Create a non-agricultural landuses file
     # Do not sort the whole list alphabetically when adding new landuses to the model.
     non_ag_landuses = ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry', 'Carbon Plantings (Block)', 'Carbon Plantings (Belt)', 'BECCS']
 
-    # Save to file
-    pd.DataFrame(non_ag_landuses).to_csv(outpath + 'non_ag_landuses.csv', index = False, header = False)
-
-
 
     ############### Create lumap -- 2010 land-use mapping.
 
-    # Map land-uses by lexicographical index on the map. Use -1 for anything _not_ in the land-use list.
-    lucode = [-1 if (r not in ag_landuses) else ag_landuses.index(r) for r in lmap['LU_DESC']]
+    # Read in the 2010 land-use mapping, -1 indicates cells outside the LUTO study area
+    lumap = lmap['LU_ID_LUTO']
 
-    # Convert to series and downcast to int8
-    lumap = pd.to_numeric( pd.Series(lucode), downcast = 'integer')
+    # Save to file (int8)
+    lumap.to_hdf(outpath + 'lumap.h5', key='lumap', mode='w', format='table', index=False, complevel=9)
     
-    # Get the index indicating the cells outside the LUTO study area
-    idx_out_LUTO = (lumap == -1).values                                             # shape=6956407, sum=2737674
+    # Get the index indicating the cells inside/outside LUTO study area
+    natural_cells = np.logical_not(bioph['NATURAL_AREA_INC_WATER'].values)          # 0 is natural, 1 is non-natural; so we flip the values to make 1 natural
     idx_inside_LUTO = (lumap != -1).values                                          # shape=6956407, sum=4218733
-
-    # Save to file. HDF5 takes up way less disk space
-    lumap.to_hdf(outpath + 'lumap.h5', key = 'lumap', mode = 'w', format = 'fixed', index = False, complevel = 9)
-
-
-
+    idx_outside_LUTO = (lumap == -1).values                                         # shape=6956407, sum=2737674
+    idx_inside_LUTO_natural = np.logical_and(idx_inside_LUTO, natural_cells)        # shape=6956407, sum=3267523
+    idx_outside_LUTO_natural = np.logical_and(idx_outside_LUTO, natural_cells)      # shape=6956407, sum=2677065
+    
 
     ############### Create lmmap -- present (2010) land management mapping.
 
@@ -264,9 +276,59 @@ def create_new_dataset():
     # lmmap = lmap['IRRIGATION'].to_numpy()
 
     # Save to file (int8)
-    lmap['IRRIGATION'].to_hdf(outpath + 'lmmap.h5', key = 'lmmap', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    lmap['IRRIGATION'].to_hdf(outpath + 'lmmap.h5', key='lmmap', mode='w', format='table', index=False, complevel=9)
+    
+    
+
+    ################# Regional adoption constraints
+    
+    # Get the code-name mapping for the regional adoption zones
+    code2name = {
+        'ABARES_AAGIS':['ABARES_AAGIS'], 
+        'LGA_CODE': ['LGA_NAME10'], 
+        'NRM_CODE': ['NRM_NAME'], 
+        'IBRA_ID': ['IBRA_SUB_CODE_7', 'IBRA_SUB_NAME_7', 'IBRA_REG_CODE_7', 'IBRA_REG_NAME_7'], 
+        'SLA_5DIGIT': ['SLA_NAME10'],
+    }
+    
+    
+    # Get the codes for regional adoption zones 
+    regional_adoption_zones = zones[code2name.keys()]
+    regional_adoption_zones.to_hdf(outpath + 'regional_adoption_zones.h5', key='regional_adoption_zones', mode='w', format='table', index=False, complevel=9)
 
 
+    # Get the regional adoption zone names
+    regional_adoption_sheets = {}
+    for code,names in code2name.items():
+        
+        # Get the unique attributes for each regional adoption zones
+        agg_names = zones.groupby(code).first().reset_index()[sorted(list(set([code] + names)))]
+        agg_names.insert(1, 'ADOPTION_PERCENTAGE_2100', np.nan)
+        agg_names.insert(1, 'ADOPTION_PERCENTAGE_2050', np.nan)
+        agg_names.insert(1, 'ADOPTION_PERCENTAGE_2030', np.nan)
+        agg_names.insert(1, 'TARGET_LANDUSE', [ag_landuses + non_ag_landuses] * len(agg_names))
+        agg_names = agg_names.explode('TARGET_LANDUSE')
+        agg_names.insert(1, 'BASE_LANDUSE_AREA_PERCENT', np.zeros(len(agg_names), dtype=np.float32))
+        
+        
+        # Calculate each land-use's area percentage in each zone
+        zone_area = zones.groupby(code)['CELL_HA'].sum().reset_index()
+        for lu_code in np.unique(lumap):
+            if lu_code == -1: continue  # Skip cells outside the LUTO study area (flagged as -1)
+            lu_arr = (lumap == lu_code)
+            lu_area = zones['CELL_HA'].loc[lu_arr].groupby(zones[code]).sum().reset_index()
+            lu_percentage = lu_area.merge(zone_area, on=code, how='left').eval('percent = CELL_HA_x / CELL_HA_y * 100')
+            # Save the land-use area percentage in each zone
+            agg_names.loc[(agg_names[code].isin(lu_percentage[code]) & (agg_names['TARGET_LANDUSE'] == ag_landuses[lu_code])), 'BASE_LANDUSE_AREA_PERCENT'] = lu_percentage['percent'].values
+
+        # Save the regional adoption zones to a dictionary
+        regional_adoption_sheets[code] = agg_names
+        
+        
+    # Save to Excel
+    with pd.ExcelWriter(outpath + 'regional_adoption_zones.xlsx') as writer:
+        for code, sheet in regional_adoption_sheets.items():
+            sheet.to_excel(writer, sheet_name=code, index=False)
 
 
     ############### Create real_area -- hectares per cell, corrected for geographic map projection.
@@ -275,8 +337,7 @@ def create_new_dataset():
     # real_area = zones['CELL_HA'].to_numpy()
 
     # Save to file
-    zones['CELL_HA'].to_hdf(outpath + 'real_area.h5', key = 'real_area', mode = 'w', format = 'fixed', index = False, complevel = 9)
-
+    zones['CELL_HA'].to_hdf(outpath + 'real_area.h5', key='real_area', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -289,7 +350,7 @@ def create_new_dataset():
     indices = [(lu1, lu2) for lu1 in ag_landuses for lu2 in ag_landuses]
 
     # Prepare the DataFrame.
-    t = pd.DataFrame(index = ag_landuses, columns = ag_landuses, dtype = np.float32)
+    t = pd.DataFrame(index=ag_landuses, columns = ag_landuses, dtype = np.float32)
 
     # Fill the DataFrame.
     for i in indices: t.loc[i] = tmcat.loc[l2c[i[0]], l2c[i[1]]]
@@ -325,17 +386,17 @@ def create_new_dataset():
     ############### Livestock spatial data
 
     # Save out feed requirement
-    lvstk['FEED_REQ'].to_hdf(outpath + 'feed_req.h5', key = 'feed_req', mode = 'w', format = 'fixed', index = False, complevel = 9) ############### Check - just for mapped livestock
+    lvstk['FEED_REQ'].to_hdf(outpath + 'feed_req.h5', key='feed_req', mode='w', format='table', index=False, complevel=9) ############### Check - just for mapped livestock
 
     # Round off and save out pasture productivity
     pasture_kg = lvstk['PASTURE_KG_DM_HA'].round(0).astype(np.int16)
-    pasture_kg.to_hdf(outpath + 'pasture_kg_dm_ha.h5', key = 'pasture_kg_dm_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    pasture_kg.to_hdf(outpath + 'pasture_kg_dm_ha.h5', key='pasture_kg_dm_ha', mode='w', format='table', index=False, complevel=9)
 
     # Save out safe pasture utilisation rate - natural land
-    lvstk['SAFE_PUR_NATL'].to_hdf(outpath + 'safe_pur_natl.h5', key = 'safe_pur_natl', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    lvstk['SAFE_PUR_NATL'].to_hdf(outpath + 'safe_pur_natl.h5', key='safe_pur_natl', mode='w', format='table', index=False, complevel=9)
 
     # Save out safe pasture utilisation rate - modified land
-    lvstk['SAFE_PUR_MODL'].to_hdf(outpath + 'safe_pur_modl.h5', key = 'safe_pur_modl', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    lvstk['SAFE_PUR_MODL'].to_hdf(outpath + 'safe_pur_modl.h5', key='safe_pur_modl', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -343,11 +404,11 @@ def create_new_dataset():
     ############### Water delivery and license price data
 
     # Get water delivery price from the livestock data (crops is same) and save to file
-    lvstk['WP'].to_hdf(outpath + 'water_delivery_price.h5', key = 'water_delivery_price', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    lvstk['WP'].to_hdf(outpath + 'water_delivery_price.h5', key='water_delivery_price', mode='w', format='table', index=False, complevel=9)
 
     # Get water license price and save to file
-    # bioph['WATER_PRICE_ML_BOM'].to_hdf(outpath + 'water_licence_price.h5', key = 'water_licence_price', mode = 'w', format = 'fixed', index = False, complevel = 9)
-    bioph['WATER_PRICE_ML_ABARES'].to_hdf(outpath + 'water_licence_price.h5', key = 'water_licence_price', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    # bioph['WATER_PRICE_ML_BOM'].to_hdf(outpath + 'water_licence_price.h5', key='water_licence_price', mode='w', format='table', index=False, complevel=9)
+    bioph['WATER_PRICE_ML_ABARES'].to_hdf(outpath + 'water_licence_price.h5', key='water_licence_price', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -355,7 +416,7 @@ def create_new_dataset():
     ############### Soil organic carbon data
 
     # Get soil organic carbon data and save to file
-    bioph['SOC_T_HA_TOP_30CM'].to_hdf(outpath + 'soil_carbon_t_ha.h5', key = 'soil_carbon_t_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    bioph['SOC_T_HA_TOP_30CM'].to_hdf(outpath + 'soil_carbon_t_ha.h5', key='soil_carbon_t_ha', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -363,7 +424,7 @@ def create_new_dataset():
     ############### Calculate exclusion matrix -- x_mrj
 
     # Turn it into a pivot table. Non-NaN entries are permitted land-uses in the SA2.
-    ut_ptable = ut.pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_DESC'], observed = False)['LU_ID']
+    ut_ptable = ut.pivot_table(index='SA2_ID', columns = ['IRRIGATION', 'LU_DESC'], observed = False)['LU_ID']
     x_dry = concordance.merge(ut_ptable[0].reset_index(), on = 'SA2_ID', how = 'left')
     x_irr = concordance.merge(ut_ptable[1].reset_index(), on = 'SA2_ID', how = 'left')
     x_dry = x_dry.drop(columns = ['CELL_ID', 'SA2_ID'])
@@ -421,7 +482,7 @@ def create_new_dataset():
     water_yield_baselines = bioph[['WATER_YIELD_HIST_SR_ML_HA', 'WATER_YIELD_HIST_DR_ML_HA', 'DEEP_ROOTED_PROPORTION']]
 
     # Save to file
-    water_yield_baselines.to_hdf(outpath + 'water_yield_baselines.h5', key = 'water_yield_baselines', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    water_yield_baselines.to_hdf(outpath + 'water_yield_baselines.h5', key='water_yield_baselines', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -436,10 +497,10 @@ def create_new_dataset():
                            WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
 
     # Save to HDF5 file.
-    rivreg_lut.to_hdf(outpath + 'rivreg_lut.h5', key = 'rivreg_lut', mode = 'w', format = 'table', index = False, complevel = 9)
+    rivreg_lut.to_hdf(outpath + 'rivreg_lut.h5', key='rivreg_lut', mode='w', format='table', index=False, complevel=9)
 
     # Save river region ID map to file
-    zones['HR_RIVREG_ID'].to_hdf(outpath + 'rivreg_id.h5', key = 'rivreg_id', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    zones['HR_RIVREG_ID'].to_hdf(outpath + 'rivreg_id.h5', key='rivreg_id', mode='w', format='table', index=False, complevel=9)
 
 
     # Create a LUT of drainage division ID, name, and historical baseline water yield.
@@ -448,10 +509,10 @@ def create_new_dataset():
              WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
 
 
-    draindiv_lut.to_hdf(outpath + 'draindiv_lut.h5', key = 'draindiv_lut', mode = 'w', format = 'table', index = False, complevel = 9)
+    draindiv_lut.to_hdf(outpath + 'draindiv_lut.h5', key='draindiv_lut', mode='w', format='table', index=False, complevel=9)
 
     # Save drainage division ID map to file
-    zones['HR_DRAINDIV_ID'].to_hdf(outpath + 'draindiv_id.h5', key = 'draindiv_id', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    zones['HR_DRAINDIV_ID'].to_hdf(outpath + 'draindiv_id.h5', key='draindiv_id', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -501,7 +562,7 @@ def create_new_dataset():
         delayed(calculate_water_yield)(ssp, idx, zone)
         for ssp in ['126', '245', '370', '585']
         for (idx, zone) in [
-            (idx_out_LUTO, 'outside_LUTO_study_area'), 
+            (idx_outside_LUTO, 'outside_LUTO_study_area'), 
             (lmap['CELL_ID'], 'all_AUS_lands')
         ]
     ]
@@ -532,10 +593,10 @@ def create_new_dataset():
     ).to_numpy(dtype = np.float32)
     
     water_yield_hist_baseline_ml = water_yield_hist_baseline_ml_ha * zones['CELL_HA'].to_numpy(dtype = np.float32)
-    water_yield_hist_baseline_ml_outside_LUTO = water_yield_hist_baseline_ml[idx_out_LUTO]
+    water_yield_hist_baseline_ml_outside_LUTO = water_yield_hist_baseline_ml[idx_outside_LUTO]
 
-    dd_id_outside_LUTO = zones[idx_out_LUTO]['HR_DRAINDIV_ID'].values
-    rr_id_outside_LUTO = zones[idx_out_LUTO]['HR_RIVREG_ID'].values
+    dd_id_outside_LUTO = zones[idx_outside_LUTO]['HR_DRAINDIV_ID'].values
+    rr_id_outside_LUTO = zones[idx_outside_LUTO]['HR_RIVREG_ID'].values
     water_yield_outside_LUTO_hist_dd = dict(enumerate(np.bincount(dd_id_outside_LUTO, water_yield_hist_baseline_ml_outside_LUTO)))
     water_yield_outside_LUTO_hist_rr = dict(enumerate(np.bincount(rr_id_outside_LUTO, water_yield_hist_baseline_ml_outside_LUTO)))
     
@@ -568,10 +629,46 @@ def create_new_dataset():
         'DCCEEW_NCI']].copy()
 
     # Save to file
-    biodiv_priorities.to_hdf(outpath + 'biodiv_priorities.h5', key = 'biodiv_priorities', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    biodiv_priorities.to_hdf(outpath + 'biodiv_priorities.h5', key='biodiv_priorities', mode='w', format='table', index=False, complevel=9)
 
+    
+    # Precalculate the degradation score
+    
+    # 1) Get habitat degradation scale for each agricultural land-use
+    biodiv_degrade_df = pd.read_csv(os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))                                                               # Load the HCAS percentile data (pd.DataFrame)
 
-
+    if HABITAT_CONDITION == 'HCAS':
+        '''
+        The degradation weight score of "HCAS" are float values range between 0-1 indicating the suitability for wild animals survival.
+        Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentiles of the average score under each land-use type.
+        '''
+        bio_HCAS_degrade_lookup = biodiv_degrade_df[['lu', f'PERCENTILE_{HCAS_PERCENTILE}']]                                # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+        bio_HCAS_degrade_lookup = {int(k):v for k,v in dict(bio_HCAS_degrade_lookup.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+        unalloc_nat_land_bio_score = bio_HCAS_degrade_lookup[ag_desc2lu['Unallocated - natural land']]                      # Get the biodiversity degradation score for unallocated natural land (float)
+        bio_HCAS_degrade_lookup = {k:v*(1/unalloc_nat_land_bio_score) for k,v in bio_HCAS_degrade_lookup.items()}           # Normalise the biodiversity degradation score to the unallocated natural land score
+    elif HABITAT_CONDITION == 'USER_DEFINED':
+        bio_HCAS_degrade_lookup = biodiv_degrade_df[['lu', 'USER_DEFINED']]
+        bio_HCAS_degrade_lookup = {int(k):v for k,v in dict(bio_HCAS_degrade_lookup.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+    else:
+        raise ValueError(f"Invalid habitat condition source: {HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
+    
+    # Save to file; 
+    pd.DataFrame({'lu':bio_HCAS_degrade_lookup.keys(), 'RETAIN_RATION_AFTER_DEGRADATE':bio_HCAS_degrade_lookup.values()}).to_csv(os.path.join(outpath, 'BIODIV_HABITAT_DEGRADE_LOOK_UP.csv'), index=False)                 
+    
+    # 2) Convert look-up to layer
+    bio_HCAS_degrade_lookup[-1] = 0                          # Fill cells outside the LUTO study area (cells of -1) to 0
+    biodiv_degrade_habitat = np.vectorize(bio_HCAS_degrade_lookup.get, otypes=[float])(lumap).astype(np.float32)
+    biodiv_degrade_habitat[idx_outside_LUTO_natural] = 1.0   # Fill cells outside the LUTO study area and natural land to 1.0
+    
+    
+    # 3) Calculate the area-weighted degradation score
+    priority_area_weighted_baseline_user_pro_zone = np.ones_like(biodiv_degrade_habitat) * zones['CELL_HA'].values
+    priority_area_weighted_baseline_user_pro_inside_LUTO = (biodiv_degrade_habitat * zones['CELL_HA'].values)[idx_inside_LUTO]
+    priority_area_weighted_baseline_user_pro_outside_LUTO = (biodiv_degrade_habitat * zones['CELL_HA'].values)[idx_outside_LUTO]
+    
+    
+    
+    
 
     ############### Get stream length
 
@@ -579,7 +676,7 @@ def create_new_dataset():
     stream_length_m_cell = bioph['RIP_LENGTH_M_CELL'].copy()
 
     # Save to file
-    stream_length_m_cell.to_hdf(outpath + 'stream_length_m_cell.h5', key = 'stream_length_m_cell', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    stream_length_m_cell.to_hdf(outpath + 'stream_length_m_cell.h5', key='stream_length_m_cell', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -587,46 +684,62 @@ def create_new_dataset():
 
     ############### Forest and reforestation data
 
-    # Carbon stock in mature forest on natural land and save to file
-    s = pd.DataFrame(columns=['REMNANT_VEG_T_CO2_HA'])
-    s['REMNANT_VEG_T_CO2_HA'] = bioph['REMNANT_VEG_T_CO2_HA']
-    s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key = 'natural_land_t_co2_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    # # Carbon stock in mature forest on natural land and save to file
+    # s = pd.DataFrame(columns=['REMNANT_VEG_T_CO2_HA'])
+    # s['REMNANT_VEG_T_CO2_HA'] = bioph['REMNANT_VEG_T_CO2_HA']
+    # s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key='natural_land_t_co2_ha', mode='w', format='table', index=False, complevel=9)
+    
+    s = pd.DataFrame(columns=['NATURAL_LAND_AGB_TCO2_HA', 'NATURAL_LAND_AGB_DEBRIS_TCO2_HA', 'NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'])
+    s['NATURAL_LAND_AGB_TCO2_HA'] = bioph['NATURAL_LAND_AGB_TCO2_HA']
+    s['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] = bioph['NATURAL_LAND_AGB_DEBRIS_TCO2_HA']
+    s['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] = bioph['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA']
+    s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key='natural_land_t_co2_ha', mode='w', format='table', index=False, complevel=9)
 
     # Average annual carbon sequestration by Environmental Plantings (block plantings) and save to file
     s = pd.DataFrame(columns=['EP_BLOCK_AG_AVG_T_CO2_HA_YR', 'EP_BLOCK_BG_AVG_T_CO2_HA_YR'])
     s['EP_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_BLOCK_TREES_AVG_T_CO2_HA_YR + EP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')
     s['EP_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['EP_BLOCK_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'ep_block_avg_t_co2_ha_yr.h5', key = 'ep_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    s.to_hdf(outpath + 'ep_block_avg_t_co2_ha_yr.h5', key='ep_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
 
     # Average annual carbon sequestration by Environmental Plantings (belt plantings) and save to file
     s = pd.DataFrame(columns=['EP_BELT_AG_AVG_T_CO2_HA_YR', 'EP_BELT_BG_AVG_T_CO2_HA_YR'])
     s['EP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_BELT_TREES_AVG_T_CO2_HA_YR + EP_BELT_DEBRIS_AVG_T_CO2_HA_YR')
     s['EP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['EP_BELT_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'ep_belt_avg_t_co2_ha_yr.h5', key = 'ep_belt_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    s.to_hdf(outpath + 'ep_belt_avg_t_co2_ha_yr.h5', key='ep_belt_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
 
     # Average annual carbon sequestration by Environmental Plantings (riparian plantings) and save to file
     s = pd.DataFrame(columns=['EP_RIP_AG_AVG_T_CO2_HA_YR', 'EP_RIP_BG_AVG_T_CO2_HA_YR'])
     s['EP_RIP_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_RIP_TREES_AVG_T_CO2_HA_YR + EP_RIP_DEBRIS_AVG_T_CO2_HA_YR')
     s['EP_RIP_BG_AVG_T_CO2_HA_YR'] = bioph['EP_RIP_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'ep_rip_avg_t_co2_ha_yr.h5', key = 'ep_rip_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    s.to_hdf(outpath + 'ep_rip_avg_t_co2_ha_yr.h5', key='ep_rip_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
 
 
     # Average annual carbon sequestration by Hardwood Plantings (block plantings) and save to file
     s = pd.DataFrame(columns=['CP_BLOCK_AG_AVG_T_CO2_HA_YR', 'CP_BLOCK_BG_AVG_T_CO2_HA_YR'])
     s['CP_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BLOCK_TREES_AVG_T_CO2_HA_YR + CP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')
     s['CP_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BLOCK_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'cp_block_avg_t_co2_ha_yr.h5', key = 'cp_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    s.to_hdf(outpath + 'cp_block_avg_t_co2_ha_yr.h5', key='cp_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
 
     # Average annual carbon sequestration by Hardwood Plantings (belt plantings) and save to file
     s = pd.DataFrame(columns=['CP_BELT_AG_AVG_T_CO2_HA_YR', 'CP_BELT_BG_AVG_T_CO2_HA_YR'])
     s['CP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BELT_TREES_AVG_T_CO2_HA_YR + CP_BELT_DEBRIS_AVG_T_CO2_HA_YR')
     s['CP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BELT_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'cp_belt_avg_t_co2_ha_yr.h5', key = 'cp_belt_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    s.to_hdf(outpath + 'cp_belt_avg_t_co2_ha_yr.h5', key='cp_belt_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
+    
+    # Average annual carbon sequestration by Human Induced Regrowth (block plantings) and save to file
+    s = pd.DataFrame(columns=['HIR_BLOCK_AG_AVG_T_CO2_HA_YR', 'HIR_BLOCK_BG_AVG_T_CO2_HA_YR'])
+    s['HIR_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('HIR_BLOCK_TREES_AVG_T_CO2_HA_YR + HIR_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')
+    s['HIR_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['HIR_BLOCK_SOIL_AVG_T_CO2_HA_YR']
+    s.to_hdf(outpath + 'hir_block_avg_t_co2_ha_yr.h5', key='hir_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
+    
 
+    # MASK for Human Induced Regrowth; only allow planting where average annual precipitation is less than 300mm
+    hir_mask = bioph['AVG_AN_PREC_MM_YR'] <= 300
+    np.save(outpath + 'hir_mask.npy', hir_mask.values)  # shape: (6956407,)
 
     # Fire risk low, medium, and high and save to file
     s = bioph[['FD_RISK_PERC_5TH', 'FD_RISK_MEDIAN', 'FD_RISK_PERC_95TH']].copy()
-    s.to_hdf(outpath + 'fire_risk.h5', key = 'fire_risk', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    s.to_hdf(outpath + 'fire_risk.h5', key='fire_risk', mode='w', format='table', index=False, complevel=9)
 
 
     # Adjust the establishment costs using CPI; Source https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia/latest-release
@@ -635,10 +748,10 @@ def create_new_dataset():
     bioph['CP_EST_COST_HA_CPI_ADJ'] = bioph['CP_EST_COST_HA'] * 99.2 / 118.8
 
     # Average establishment costs for Environmental Plantings ($/ha) and save to file
-    bioph['EP_EST_COST_HA_CPI_ADJ'].to_hdf(outpath + 'ep_est_cost_ha.h5', key = 'ep_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    bioph['EP_EST_COST_HA_CPI_ADJ'].to_hdf(outpath + 'ep_est_cost_ha.h5', key='ep_est_cost_ha', mode='w', format='table', index=False, complevel=9)
 
     # Average establishment costs for Carbon Plantings ($/ha) and save to file
-    bioph['CP_EST_COST_HA_CPI_ADJ'].to_hdf(outpath + 'cp_est_cost_ha.h5', key = 'cp_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    bioph['CP_EST_COST_HA_CPI_ADJ'].to_hdf(outpath + 'cp_est_cost_ha.h5', key='cp_est_cost_ha', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -673,7 +786,7 @@ def create_new_dataset():
         cci['LU_ID'] = cci['LU_ID'].astype('Int64')
 
         # Create the MultiIndex structure
-        cci = cci.pivot( index = 'CELL_ID',
+        cci = cci.pivot( index='CELL_ID',
                         columns = ['IRRIGATION', 'LU_ID'],
                         values = ['YR_2020', 'YR_2050', 'YR_2080']
                     ).dropna( axis = 'columns', how = 'all')
@@ -694,7 +807,7 @@ def create_new_dataset():
         # Write to HDF5 file.
         fname = outpath + 'climate_change_impacts_' + rcp + '_' + co2_on_off + '.h5'
         kname = 'climate_change_impacts_' + rcp
-        cci.to_hdf(fname, key = kname, mode = 'w', format = 'fixed', index = False, complevel = 9)
+        cci.to_hdf(fname, key=kname, mode='w', format='table', index=False, complevel=9)
 
     # Parallelise the process
     jobs = ([delayed(process_climate_impacts)(on_off, rcp, cci_raw, concordance, luid_desc, outpath ) for on_off in CO2F_dict for rcp in rcps])
@@ -707,7 +820,7 @@ def create_new_dataset():
     ############### Agricultural economics - crops
 
     # Produce a multi-indexed version of the crops data.
-    # crops_ptable = crops.pivot_table(index = 'SA2_ID', columns = ['Irrigation', 'LU_DESC'])
+    # crops_ptable = crops.pivot_table(index='SA2_ID', columns = ['Irrigation', 'LU_DESC'])
     crops_ptable = crops.drop(['LU_DESC', 'Irrigation', 'Area', 'Prod'], axis = 1)
 
     # Merge to create a cell-based table.
@@ -721,7 +834,7 @@ def create_new_dataset():
     agec_crops['LU_ID'] = agec_crops['LU_ID'].astype('Int64')
 
     # Create the MultiIndex structure
-    agec_crops = agec_crops.pivot( index = 'CELL_ID',
+    agec_crops = agec_crops.pivot( index='CELL_ID',
                                    columns = ['IRRIGATION', 'LU_ID'],
                                    values = ['Yield', 'P1', 'AC', 'QC', 'FDC', 'FLC', 'FOC', 'WR', 'WP']
                                  ).dropna( axis = 'columns', how = 'all')
@@ -735,7 +848,7 @@ def create_new_dataset():
     agec_crops.sort_index(axis = 1, inplace = True)
 
     # Save to HDF5
-    agec_crops.to_hdf(outpath + 'agec_crops.h5', key = 'agec_crops', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    agec_crops.to_hdf(outpath + 'agec_crops.h5', key='agec_crops', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -755,7 +868,7 @@ def create_new_dataset():
     agec_lvstk.columns = pd.MultiIndex.from_tuples(cols)
 
     # Save to HDF5
-    agec_lvstk.to_hdf(outpath + 'agec_lvstk.h5', key = 'agec_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    agec_lvstk.to_hdf(outpath + 'agec_lvstk.h5', key='agec_lvstk', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -777,7 +890,7 @@ def create_new_dataset():
 
     # Create the MultiIndex structure
     GHG_sources_crops = ['CO2E_KG_HA_FERT_PROD', 'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_IRRIG', 'CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_CULTIV', 'CO2E_KG_HA_HARVEST', 'CO2E_KG_HA_SOWING', 'CO2E_KG_HA_SOIL']
-    agGHG_crops = agGHG_crops.pivot( index = 'CELL_ID',
+    agGHG_crops = agGHG_crops.pivot( index='CELL_ID',
                                      columns = ['IRRIGATION', 'LU_ID'],
                                      values = GHG_sources_crops
                                    ).dropna( axis = 'columns', how = 'all' )
@@ -790,7 +903,7 @@ def create_new_dataset():
     agGHG_crops.sort_index(axis = 1, inplace = True)
 
     # Save to HDF5
-    agGHG_crops.to_hdf(outpath + 'agGHG_crops.h5', key = 'agGHG_crops', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    agGHG_crops.to_hdf(outpath + 'agGHG_crops.h5', key='agGHG_crops', mode='w', format='table', index=False, complevel=9)
 
 
 
@@ -850,7 +963,7 @@ def create_new_dataset():
     agGHG_lvstk = agGHG_lvstk.drop(['SA2_ID'], axis = 1)
 
     # Create the MultiIndex structure
-    agGHG_lvstk = agGHG_lvstk.pivot( index = 'CELL_ID',
+    agGHG_lvstk = agGHG_lvstk.pivot( index='CELL_ID',
                                      columns = ['Livestock type'],
                                      values = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ELEC', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_FODDER', 'CO2E_KG_HEAD_FUEL', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT', 'CO2E_KG_HEAD_SEED']
                                    ).dropna( axis = 'columns', how = 'all')
@@ -865,13 +978,13 @@ def create_new_dataset():
     agGHG_lvstk.sort_index(axis = 1, inplace = True)
 
     # Save to HDF5
-    agGHG_lvstk.to_hdf(outpath + 'agGHG_lvstk.h5', key = 'agGHG_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    agGHG_lvstk.to_hdf(outpath + 'agGHG_lvstk.h5', key='agGHG_lvstk', mode='w', format='table', index=False, complevel=9)
 
     # Copy over irrigated pasture emissions
     agGHG_irrpast = concordance.merge( irrpastGHG, on = 'SA2_ID', how = 'left' )
 
     # Save to HDF5
-    agGHG_irrpast.to_hdf(outpath + 'agGHG_irrpast.h5', key = 'agGHG_irrpast', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    agGHG_irrpast.to_hdf(outpath + 'agGHG_irrpast.h5', key='agGHG_irrpast', mode='w', format='table', index=False, complevel=9)
 
 
     # CODE to Check total livestock GHG emissions - see N:\Data-Master\LUTO_2.0_input_data\Scripts\2_assemble_agricultural_data.py
@@ -921,7 +1034,7 @@ def create_new_dataset():
     agGHG_lvstk_off_land = agGHG_lvstk_off_land.query("COMMODITY in ['pork', 'chicken', 'eggs', 'aquaculture']")
 
     # Save to the input data folder
-    agGHG_lvstk_off_land.to_csv(outpath + 'agGHG_lvstk_off_land.csv', index = False)
+    agGHG_lvstk_off_land.to_csv(outpath + 'agGHG_lvstk_off_land.csv', index=False)
 
 
 
@@ -947,7 +1060,7 @@ def create_new_dataset():
                                       'All_demand': 'PRODUCTION'})
 
     # Create the MultiIndex structure
-    demand = demand.pivot( index = ['SCENARIO', 'DIET_DOM', 'DIET_GLOB', 'CONVERGENCE', 'IMPORT_TREND', 'WASTE', 'FEED_EFFICIENCY', 'COMMODITY'],
+    demand = demand.pivot( index=['SCENARIO', 'DIET_DOM', 'DIET_GLOB', 'CONVERGENCE', 'IMPORT_TREND', 'WASTE', 'FEED_EFFICIENCY', 'COMMODITY'],
                          columns = ['YEAR'],
                           values = ['DOMESTIC', 'EXPORTS', 'IMPORTS', 'FEED', 'PRODUCTION'])
 
@@ -1003,12 +1116,7 @@ def create_new_dataset():
     cell_xy = cell_xy.drop(columns = ['X', 'Y', 'CELL_HA'])
 
     # Save to HDF5 file
-    cell_xy.to_hdf(outpath + 'cell_BECCS_df.h5', key = 'cell_BECCS_df', mode = 'w', format = 'fixed', index = False, complevel = 9)
-
-
-
-
-
+    cell_xy.to_hdf(outpath + 'cell_BECCS_df.h5', key='cell_BECCS_df', mode='w', format='table', index=False, complevel=9)
 
 
     # Complete processing and report back

@@ -1,5 +1,6 @@
 import numpy as np
 import os
+from joblib import Parallel, delayed
 
 import re
 import pandas as pd
@@ -50,53 +51,71 @@ def rename_and_filter_columns(data_dict, columns_to_keep, new_column_names=None)
     return new_data_dict
 
 
-def get_dict_data(input_files, csv_name, value_column_name, filter_column_name):
+def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
+                   condition_column_name=None, condition_value=None, use_parallel=True, n_jobs=-1):
     """
-    从多个文件中读取数据并按指定列分组求和。
+    从多个文件中读取数据并按指定列分组求和，并可根据条件列进行筛选。
 
     参数:
     - input_files (list): 输入文件的列表。
     - csv_name (str): 目标 CSV 文件的名称前缀（不含年份）。
     - value_column_name (str): 要求和的列名。
     - filter_column_name (str): 过滤列名，根据此列的唯一值进行分组求和。
+    - condition_column_name (str or list, optional): 一个或多个筛选列名。
+    - condition_value (any or list, optional): 对应的一个或多个筛选值。
+    - use_parallel (bool): 是否启用并行处理，默认启用。
+    - n_jobs (int): 并行作业数，默认使用所有可用核心。
 
     返回:
     - dict: 每个输入文件的汇总数据字典，每个文件对应一个 DataFrame。
     """
-    data_dict = {}
 
-    # 遍历每个 input_file 进行处理
-    for input_name in input_files:
-        # print(f"Processing {input_name}...")
+    def process_single_file(input_name):
         base_path = get_path(input_name)
-        file_list = os.listdir(base_path)  # 确保从当前路径获取文件列表
+        file_list = os.listdir(base_path)
 
-        # 提取包含年份的文件名中的数字
-        out_numbers = sorted([int(re.search(r"out_(\d+)", filename).group(1)) for filename in file_list if
-                              "out_" in filename and re.search(r"out_(\d+)", filename)])
+        out_numbers = sorted([
+            int(re.search(r"out_(\d+)", filename).group(1))
+            for filename in file_list
+            if "out_" in filename and re.search(r"out_(\d+)", filename)
+        ])
 
-        # 创建以提取的年份为索引的 DataFrame
         temp_results = pd.DataFrame(index=out_numbers)
         temp_results.index.name = 'Year'
 
-        # 遍历提取的年份
         for year in out_numbers:
             file_path = os.path.join(base_path, f'out_{year}', f'{csv_name}_{year}.csv')
 
-            # 如果文件存在，进行处理
             if os.path.exists(file_path):
                 df = pd.read_csv(file_path)
 
-                # 按 `filter_column_name` 中的唯一值进行分组求和
+                # 多列筛选支持
+                if condition_column_name and condition_value is not None:
+                    if isinstance(condition_column_name, list) and isinstance(condition_value, list):
+                        for col, val in zip(condition_column_name, condition_value):
+                            df = df[df[col] == val]
+                    else:
+                        df = df[df[condition_column_name] == condition_value]
+
                 unique_values = df[filter_column_name].unique()
                 for value in unique_values:
                     total_value = df[df[filter_column_name] == value][value_column_name].sum() / 1e6
-                    temp_results.loc[year, value] = total_value  # 将结果填入年份索引中
+                    temp_results.loc[year, value] = total_value
 
-        # 将结果 DataFrame 添加到字典
-        data_dict[input_name] = temp_results
+        return input_name, temp_results
 
-    return data_dict
+    if use_parallel:
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(process_single_file)(input_name) for input_name in input_files
+        )
+    else:
+        results = [process_single_file(input_name) for input_name in input_files]
+
+    return dict(results)
+
+
+
+
 
 
 def get_dict_sum_data(input_files, csv_name, value_column_name, give_column_name):

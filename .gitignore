@@ -62,3 +62,4 @@ myCode/clear_output.txt
 /docs/manual/*
 
 *.tmp
+**/*.7z

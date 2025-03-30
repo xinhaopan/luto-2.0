@@ -53,7 +53,7 @@ def calculate_transition_matrix(land_use_data_path, mapping_data_path, area_colu
 
     return transition_matrix
 
-def plot_all_transition_matrices(matrices, labels_list, label_mapping, output_path="transition_matrix_all.png", font_size=15):
+def plot_all_transition_matrices(matrices, labels_list, label_mapping, output_path="transition_matrix_all.png", font_size=20):
     """
     Plots multiple transition matrices with shorthand labels on a grid layout.
 
@@ -64,6 +64,8 @@ def plot_all_transition_matrices(matrices, labels_list, label_mapping, output_pa
     - output_path: str, path to save the output image.
     - font_size: int, font size for labels and tick marks.
     """
+    plt.rcParams.update({'font.size': font_size, 'font.family': 'Arial'})
+
     fig, axes = plt.subplots(3, 3, figsize=(18, 18))
     fig.subplots_adjust(hspace=0.15, wspace=0.15)
 
@@ -115,12 +117,13 @@ def plot_all_transition_matrices(matrices, labels_list, label_mapping, output_pa
     cbar.set_ticklabels(['0%', '25%', '50%', '75%', '100%'])  # 设置对应的刻度标签
 
     # 设置颜色条标签
-    cbar.set_label('Proportion of Transition', fontsize=font_size + 5)
+    cbar.set_label('Proportion of Transition', fontsize=font_size)
 
     # 设置颜色条刻度字体大小
-    cbar.ax.tick_params(labelsize=font_size + 5)
+    cbar.ax.tick_params(labelsize=font_size)
 
     # Save the plot
+    plt.savefig(f'{output_path}.png', bbox_inches='tight', dpi=300)
     save_figure(fig, output_path)
 
 mapping_data_path = 'tools/land use group.xlsx'

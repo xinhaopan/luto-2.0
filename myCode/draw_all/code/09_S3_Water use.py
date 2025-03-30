@@ -49,13 +49,25 @@ sys.path.append(os.path.abspath('../../../luto'))
 import settings
 
 csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)', 'Landuse Type'
-water_dict = get_dict_from_json(input_files, 'water_1_water_net_use_by_broader_category')
+water_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Climate Change existence'],
+                           condition_value=['Without CCI'])
+water_limit_dict = get_dict_data(input_files, 'water_yield_limits_and_public_land',
+                                 'Value (ML)', 'Type' ,condition_column_name=['CCI Existence'],
+                           condition_value=['HIST (ML)'])
+water_dict = {
+    k: pd.merge(
+        v,
+        water_limit_dict[k][['WNY Pubulic']].rename(columns={'WNY Pubulic': 'Public land'}),
+        left_index=True,
+        right_index=True,
+        how='left'
+    )
+    for k, v in water_dict.items()
+}
 water_dict,legend_colors = get_colors(water_dict, 'tools/land use colors.xlsx', sheet_name='lu')
-
-water_limit_dict = get_dict_data(input_files, 'water_yield_limits_and_public_land', 'Value (ML)', 'Type')
 water_yeild_dict ={key: df.assign(**{'Yield': df.sum(axis=1)}) for key, df in water_dict.items()}
 water_point_dict = concatenate_dicts_by_year([water_limit_dict, water_yeild_dict])
-water_point_dict = rename_and_filter_columns(water_point_dict, ['WNY LIMIT','Yield'], ['Constarints','Yield'])
+water_point_dict = rename_and_filter_columns(water_point_dict, ['WNY LIMIT','Yield'], ['Targets','Yield'])
 point_colors = ['red','black']
 
 output_png = '../output/09_S3_water'
@@ -67,7 +79,7 @@ plot_Combination_figures(water_dict, output_png, input_files, plot_stacked_bar_a
 
 
 csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)',  'Landuse'
-water_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
+water_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Climate Change existence'], condition_value=['Without CCI'])
 water_ag_group_dict = aggregate_by_mapping(water_ag_dict, 'tools/land use group.xlsx', 'desc', 'ag_group')
 water_ag_group_dict,legend_colors = get_colors(water_ag_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
 output_png = '../output/09_S3_water_ag_group'
@@ -78,17 +90,17 @@ plot_Combination_figures(water_ag_group_dict, output_png, input_files, plot_stac
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)',  'Landuse subtype'
-water_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
+water_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Climate Change existence'], condition_value=['Without CCI'])
 water_am_dict,legend_colors = get_colors(water_am_dict, 'tools/land use colors.xlsx', sheet_name='am')
 output_png = '../output/09_S3_water_am'
-y_range, y_ticks = calculate_y_axis_range(water_am_dict,  multiplier=1)
+y_range, y_ticks = calculate_y_axis_range(water_am_dict)
 plot_Combination_figures(water_am_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)', 'Landuse'
-water_non_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
+water_non_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Climate Change existence'], condition_value=['Without CCI'])
 water_non_ag_dict,legend_colors = get_colors(water_non_ag_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
 output_png = '../output/09_S3_water_non-ag'
 y_range, y_ticks = calculate_y_axis_range(water_non_ag_dict)

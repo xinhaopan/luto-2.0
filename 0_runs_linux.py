@@ -20,24 +20,21 @@ def main(start_year, end_year):
         os.makedirs('output', exist_ok=True)
 
         # 记录模拟开始的时间
-        overall_start_time = time.time()
         write_log("Simulation started")
+        overall_start_time = time.time()
 
         # 加载数据
         data = sim.load_data()
         write_log("Data loaded")
 
         # 运行模拟
-        sim.run(data=data, base=start_year, target=end_year)
+        sim.run(data=data, base_year=start_year, target_year=end_year)
         write_log("Simulation completed")
 
         # 保存数据
-        pkl_path = f'{data.path}/data_with_solution.pkl'
+        pkl_path = f'{data.path}/data_with_solution.gz'
 
-        with open(pkl_path, 'wb') as f:
-            dill.dump(data, f)
-            f.flush()  # 刷新文件缓冲区
-            os.fsync(f.fileno())  # 同步到磁盘
+        sim.save_data_to_disk(data,pkl_path)
         write_log(f"Data with solution saved in {data.path}.")
 
         # 写输出结果
@@ -48,10 +45,13 @@ def main(start_year, end_year):
 
         # 总结束时间
         overall_end_time = time.time()
-        total_duration = (overall_end_time - overall_start_time) / 3600  # 总用时
+        total_duration = overall_end_time - overall_start_time
 
-        # 记录模拟过程的详细信息
-        write_log(f"Total run time: {total_duration:.2f} h")
+        # 转换为 hh:mm:ss 格式
+        formatted_duration = time.strftime("%H:%M:%S", time.gmtime(total_duration))
+
+        # 记录日志
+        write_log(f"Total run time: {formatted_duration}")
 
     except Exception as e:
         # 记录错误到日志文件

@@ -27,8 +27,7 @@ import numpy as np
 from typing import Dict
 
 from luto.data import Data, lumap2ag_l_mrj
-from luto.settings import AG_MANAGEMENTS
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.water import get_wreq_matrices
 import luto.economics.agricultural.ghg as ag_ghg
 from luto import settings
@@ -63,18 +62,26 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
     # Boolean exclusion matrix based on SA2/NLUM agricultural land-use data (in mrj structure).
     # Effectively, this ensures that in any SA2 region the only combinations of land-use and land management
     # that can occur in the future are those that occur in 2010 (i.e., YR_CAL_BASE)
-    x_mrj = data.EXCLUDE
+    x_mrj = data.EXCLUDE.copy()
 
     # Raw transition-cost matrix is in $/ha and lexicographically ordered by land-use (shape = 28 x 28).
     t_ij = data.AG_TMATRIX
 
     lumap_2010 = data.LUMAP
+    
+    if settings.EXCLUDE_NO_GO_LU:
+        no_go_regions = data.NO_GO_REGION_AG
+        no_go_j = [data.DESC2AGLU.get(desc) for desc in data.NO_GO_LANDUSE_AG]
+
+        for count, j in enumerate(no_go_j):
+            x_mrj[0, :, j] *= no_go_regions[count]
+            x_mrj[1, :, j] *= no_go_regions[count]
 
     # Get all agricultural and non-agricultural cells
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
 
     # Transition costs from current land-use to all other land-uses j using current land-use map (in $/ha).
-    t_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
+    t_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES))).astype(np.float32)
     t_rj[ag_cells, :] = t_ij[lumap[ag_cells]]
 
     # For non-agricultural cells, use the original 2010 solve's LUs to determine what LUs are possible for a cell
@@ -124,7 +131,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, separate=False):
 
     # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
     # Only consider for cells currently being used for agriculture.
-    e_rj = np.zeros((ncells, n_ag_lus))
+    e_rj = np.zeros((ncells, n_ag_lus)).astype(np.float32)
     e_rj[ag_cells, :] = t_ij[lumap[ag_cells]]
 
     # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
@@ -134,33 +141,46 @@ def get_transition_matrices(data: Data, yr_idx, base_year, separate=False):
     e_mrj = np.stack([e_rj, e_rj], axis=0)
 
     # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
-    e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)
+    e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not).astype(np.float32)
+    e_mrj = np.nan_to_num(e_mrj)
 
     # -------------------------------------------------------------- #
     # Water license cost (upfront, amortised to annual, per cell).   #
     # -------------------------------------------------------------- #
 
     w_mrj = get_wreq_matrices(data, yr_idx)                                     # <unit: ML/cell>
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
-    w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)
+    w_delta_mrj = tools.get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
+    w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not).astype(np.float32)
 
     # -------------------------------------------------------------- #
     # Carbon costs of transitioning cells.                           #
     # -------------------------------------------------------------- #
 
     # Apply the cost of carbon released by transitioning natural land to modified land
-    ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)               # <unit: t/ha>
-    ghg_t_mrj = tools.amortise(ghg_t_mrj * data.get_carbon_price_by_yr_idx(yr_idx))
-    ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj, x_mrj, l_mrj_not)
+    ghg_transition = ag_ghg.get_ghg_transition_penalties(data, lumap, separate=True)        # <unit: t/ha>
+    
+    ghg_transition = {
+        k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)             # No GHG penalty for cells that remain the same, or are prohibited from transitioning
+        for k, v in ghg_transition.items()
+    }
+    
+    ghg_transition = {
+    k:tools.amortise(v * data.get_carbon_price_by_yr_idx(yr_idx))                       # Amortise the GHG penalties
+    for k,v in ghg_transition.items()
+    }
+    
+    ghg_t_types = ghg_transition.keys()
+    ghg_t_smrj = np.stack([ghg_transition[t] for t in ghg_t_types], axis=0)                 # s: ghg_t_types, m: land management, r: cell, j: land use
+    ghg_t_mrj = np.einsum('smrj->mrj', ghg_t_smrj)
 
     # -------------------------------------------------------------- #
     # Total costs.                                                   #
     # -------------------------------------------------------------- #
 
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}
+        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, **ghg_transition}
     else:
-        return e_mrj + w_delta_mrj + ghg_t_mrj_cost
+        return e_mrj + w_delta_mrj + ghg_t_mrj
 
 
 def get_asparagopsis_effect_t_mrj(data: Data):
@@ -353,8 +373,8 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> D
 
     return {
         am: np.divide(
-            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.LB_ROUND_DECMIALS)
-            , 10 ** settings.LB_ROUND_DECMIALS
+            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.ROUND_DECMIALS)
+            , 10 ** settings.ROUND_DECMIALS
         )
         for am in AG_MANAGEMENTS_TO_LAND_USES
     }

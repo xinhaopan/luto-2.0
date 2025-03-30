@@ -17,21 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
-#
-# This file is part of LUTO 2.0.
-# 
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-# 
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
-# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>. 
+
 
 """
 Pure functions to calculate costs of commodities and alt. land uses.
@@ -44,10 +30,9 @@ import numpy as np
 import pandas as pd
 
 import luto.settings as settings
-from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
-from luto.settings import AG_MANAGEMENTS
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
 
 
@@ -428,15 +413,8 @@ def get_savanna_burning_effect_c_mrj(data: Data, yr_idx: int):
         * data.REAL_AREA
     )
 
-    big_number = 999999999999
-    savburn_ineligible_cells = np.where(data.SAVBURN_ELIGIBLE == 0)[0]
-
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
         new_c_mrj[m, :, j] = sav_burning_effect
-
-        # TODO: build in hard constraints (ub for variables) instead of this temorary measure
-        # to block certain cells from using Savanna Burning
-        new_c_mrj[m, savburn_ineligible_cells, j] = big_number
 
     return new_c_mrj
 

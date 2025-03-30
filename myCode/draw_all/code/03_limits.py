@@ -18,6 +18,7 @@ import settings
 plt.rcParams['font.family'] = 'Arial'
 
 font_size = 20
+axis_linewidth = 1
 # 生成颜色函数
 def draw_plot_lines(df, colors, ylabel, y_range, y_tick_interval, output_file, font_size=12):
     """绘制 GHG Emissions 点线图."""
@@ -25,24 +26,29 @@ def draw_plot_lines(df, colors, ylabel, y_range, y_tick_interval, output_file, f
     # 创建图形和轴对象
     fig, ax = plt.subplots(figsize=(10, 8))
 
+    ax.spines['left'].set_linewidth(axis_linewidth)  # 左边框
+    ax.spines['bottom'].set_linewidth(axis_linewidth)  # 底边框
+    ax.spines['right'].set_linewidth(axis_linewidth)  # 右边框
+    ax.spines['top'].set_linewidth(axis_linewidth)  # 顶边框
+
     # 遍历 df 的列名和颜色列表，绘制每条线
     for i, column in enumerate(df.columns):
         ax.plot(df.index, df[column], marker='o', color=colors[i], linewidth=2.5, label=column)
 
     # 设置刻度朝内
-    ax.tick_params(axis='both', which='both', direction='in', labelsize=font_size, pad=10)
+    ax.tick_params(axis='both', which='both', labelsize=font_size, pad=10, direction='out')
 
     # 设置 x 轴刻度为年份，旋转 90 度
     ax.set_xlim(2010, 2050)
     ax.set_xticks(range(2010, 2051, 10))  # 假设 df 的索引是年份
     # ax.set_xlabel('Year', fontsize=font_size)
-    ax.tick_params(axis='x', labelsize=font_size, pad=10)
+    ax.tick_params(axis='x', labelsize=font_size, pad=10, direction='out')
 
     # 设置 y 轴范围和间隔，传入的范围参数和间隔
     ax.set_ylim(y_range[0], y_range[1])
     ax.set_yticks(range(y_range[0], y_range[1] + 1, y_tick_interval))  # 以传入的间隔为步长
     ax.set_ylabel(ylabel, fontsize=font_size)
-    ax.tick_params(axis='y', labelsize=font_size, pad=10)
+    ax.tick_params(axis='y', labelsize=font_size, pad=10, direction='out')
 
     # # 设置图例，并去掉框
     # ax.legend(fontsize=font_size, frameon=False,loc='lower left')
@@ -62,6 +68,11 @@ def draw_plot_lines(df, colors, ylabel, y_range, y_tick_interval, output_file, f
 def draw_coloum(data, legend_colors, output_file, fontsize=22, y_range=(0, 200), y_tick_interval=50, ylabel='Food Demand (million tonnes/kilolitres [milk])'):
     # 创建新的图形
     fig, ax = plt.subplots(figsize=(10, 8))
+    ax.spines['left'].set_linewidth(axis_linewidth)  # 左边框
+    ax.spines['bottom'].set_linewidth(axis_linewidth)  # 底边框
+    ax.spines['right'].set_linewidth(axis_linewidth)  # 右边框
+    ax.spines['top'].set_linewidth(axis_linewidth)  # 顶边框
+
     bottom = np.zeros(len(data))  # 初始位置
 
     for column, color in legend_colors.items():
@@ -79,11 +90,11 @@ def draw_coloum(data, legend_colors, output_file, fontsize=22, y_range=(0, 200),
     ax.set_xlim(2009.5, 2050.5)
     ax.set_xticks(range(2010, 2051, 10))  # 假设 df 的索引是年份
     # ax.set_xlabel('Year', fontsize=font_size)
-    ax.tick_params(axis='x', labelsize=font_size, pad=10)
+    ax.tick_params(axis='x', labelsize=font_size, pad=10, direction='out')
 
     # 设置刻度朝内
-    ax.tick_params(axis='y', direction='in', labelsize=fontsize, pad=10)  # y轴刻度字体大小
-    ax.tick_params(axis='x', direction='in', labelsize=fontsize, pad=10)  # x轴刻度字体大小
+    ax.tick_params(axis='y', labelsize=fontsize, pad=10, direction='out')  # y轴刻度字体大小
+    ax.tick_params(axis='x', labelsize=fontsize, pad=10, direction='out')  # x轴刻度字体大小
 
     handles, labels = ax.get_legend_handles_labels()
     legend_file = f"{output_file}" + "_legend.svg"
@@ -96,6 +107,12 @@ def draw_coloum(data, legend_colors, output_file, fontsize=22, y_range=(0, 200),
 
 # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
 def get_biodiversity_target(INPUT_DIR, BIODIV_GBF_TARGET_2_DICTs):
+    import os
+    import numpy as np
+    import pandas as pd
+    from scipy.interpolate import interp1d
+    import luto.settings as settings
+
     BIODIV_GBF_TARGET = []
     for i in range(3):
         BIODIV_GBF_TARGET_2_DICT = BIODIV_GBF_TARGET_2_DICTs[i]
@@ -107,113 +124,79 @@ def get_biodiversity_target(INPUT_DIR, BIODIV_GBF_TARGET_2_DICTs):
         )
         biodiv_GBF_target_2_proportions_2010_2100 = {yr: f(yr).item() for yr in range(2010, 2101)}
 
-        # Get the connectivity score between 0 and 1, where 1 is the highest connectivity
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5'))
         LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()
         MASK_LU_CODE = -1
         LUMASK = LUMAP_NO_RESFACTOR != MASK_LU_CODE
+
         if settings.CONNECTIVITY_SOURCE == 'NCI':
             connectivity_score = biodiv_priorities['DCCEEW_NCI'].to_numpy(dtype=np.float32)
-            connectivity_score = np.where(LUMASK, connectivity_score,
-                                          1)  # Set the connectivity score to 1 for cells outside the LUMASK
-            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()),
-                                           (settings.CONNECTIVITY_LB, 1)).astype('float32')
+            connectivity_score = np.where(LUMASK, connectivity_score, 1)
+            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (settings.CONNECTIVITY_LB, 1)).astype('float32')
         elif settings.CONNECTIVITY_SOURCE == 'DWI':
             connectivity_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype=np.float32)
-            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()),
-                                           (1, settings.CONNECTIVITY_LB)).astype('float32')
+            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (1, settings.CONNECTIVITY_LB)).astype('float32')
         elif settings.CONNECTIVITY_SOURCE == 'NONE':
             connectivity_score = 1
         else:
-            raise ValueError(
-                f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
+            raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}")
 
-        # Get the Zonation output score between 0 and 1. biodiv_score_raw.sum() = 153 million
         biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype=np.float32)
-        # Weight the biodiversity score by the connectivity score
         BIODIV_SCORE_RAW_WEIGHTED = biodiv_score_raw * connectivity_score
 
-        # Habitat degradation scale for agricultural land-use
-        biodiv_degrade_df = pd.read_csv(
-            os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))  # Load the HCAS percentile data (pd.DataFrame)
+        # Apply GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE threshold
+        conserve_performance = pd.read_excel(
+            os.path.join(INPUT_DIR, 'GBF2_conserve_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
+        ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
 
-        AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header=None)[0].to_list()
+        threshold_rank = conserve_performance[settings.GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE]
+        priority_mask = biodiv_score_raw >= threshold_rank
+        BIODIV_SCORE_RAW_WEIGHTED *= priority_mask
+
+        biodiv_degrade_df = pd.read_csv(os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))
+        AGRICULTURAL_LANDUSES = pd.read_csv(os.path.join(INPUT_DIR, 'ag_landuses.csv'), header=None)[0].to_list()
         AGLU2DESC = {i: lu for i, lu in enumerate(AGRICULTURAL_LANDUSES)}
-        DESC2AGLU = {value: key for key, value in AGLU2DESC.items()}
+        DESC2AGLU = {v: k for k, v in AGLU2DESC.items()}
 
         if settings.HABITAT_CONDITION == 'HCAS':
-            ''' 
-            The degradation weight score of "HCAS" are float values range between 0-1 indicating the suitability for wild animals survival. 
-            Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentiles of the average score under each land-use type. 
-            '''
-            BIODIV_HABITAT_DEGRADE_LOOK_UP = biodiv_degrade_df[['lu',
-                                                                f'PERCENTILE_{settings.HCAS_PERCENTILE}']]  # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
-            BIODIV_HABITAT_DEGRADE_LOOK_UP = {int(k): v for k, v in dict(
-                BIODIV_HABITAT_DEGRADE_LOOK_UP.values).items()}  # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
-            unalloc_nat_land_bio_score = BIODIV_HABITAT_DEGRADE_LOOK_UP[DESC2AGLU[
-                'Unallocated - natural land']]  # Get the biodiversity degradation score for unallocated natural land (float)
-            BIODIV_HABITAT_DEGRADE_LOOK_UP = {k: v * (1 / unalloc_nat_land_bio_score) for k, v in
-                                              BIODIV_HABITAT_DEGRADE_LOOK_UP.items()}  # Normalise the biodiversity degradation score to the unallocated natural land score
-
+            degrade_lookup_df = biodiv_degrade_df[['lu', f'PERCENTILE_{settings.HCAS_PERCENTILE}']]
+            degrade_lookup = {int(k): v for k, v in dict(degrade_lookup_df.values).items()}
+            unalloc_nat_score = degrade_lookup[DESC2AGLU['Unallocated - natural land']]
+            degrade_lookup = {k: v / unalloc_nat_score for k, v in degrade_lookup.items()}
         elif settings.HABITAT_CONDITION == 'USER_DEFINED':
-            BIODIV_HABITAT_DEGRADE_LOOK_UP = biodiv_degrade_df[['lu', 'USER_DEFINED']]
-            BIODIV_HABITAT_DEGRADE_LOOK_UP = {int(k): v for k, v in dict(
-                BIODIV_HABITAT_DEGRADE_LOOK_UP.values).items()}  # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
-
+            degrade_lookup_df = biodiv_degrade_df[['lu', 'USER_DEFINED']]
+            degrade_lookup = {int(k): v for k, v in dict(degrade_lookup_df.values).items()}
         else:
-            raise ValueError(
-                f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
+            raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}")
 
-        # Get the biodiversity degradation score (0-1) for each cell
-        '''
-        The degradation scores are float values range between 0-1 indicating the discount of biodiversity value for each cell.
-        E.g., 0.8 means the biodiversity value of the cell is 80% of the original raw biodiversity value.
-        '''
         savburn_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5'))
         SAVBURN_ELIGIBLE = savburn_df.ELIGIBLE_AREA.to_numpy()
-        biodiv_degrade_LDS = np.where(SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE,
-                                      1)  # Get the biodiversity degradation score for LDS burning (1D numpy array)
-        biodiv_degrade_habitat = np.vectorize(BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(LUMAP_NO_RESFACTOR).astype(
-            np.float32)  # Get the biodiversity degradation score for each cell (1D numpy array)
+        degrade_LDS = np.where(SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
+        degrade_habitat = np.vectorize(degrade_lookup.get)(LUMAP_NO_RESFACTOR).astype(np.float32)
 
-        # Get the biodiversity damage under LDS burning (0-1) for each cell
-        biodiv_degradation_raw_weighted_LDS = BIODIV_SCORE_RAW_WEIGHTED * (
-                    1 - biodiv_degrade_LDS)  # Biodiversity damage under LDS burning (1D numpy array)
-        biodiv_degradation_raw_weighted_habitat = BIODIV_SCORE_RAW_WEIGHTED * (
-                    1 - biodiv_degrade_habitat)  # Biodiversity damage under under HCAS (1D numpy array)
+        degradation_LDS = BIODIV_SCORE_RAW_WEIGHTED * (1 - degrade_LDS)
+        degradation_habitat = BIODIV_SCORE_RAW_WEIGHTED * (1 - degrade_habitat)
+        BIODIV_RAW_WEIGHTED_LDS = BIODIV_SCORE_RAW_WEIGHTED - degradation_LDS
 
-        # Get the biodiversity value at the beginning of the simulation
-        BIODIV_RAW_WEIGHTED_LDS = BIODIV_SCORE_RAW_WEIGHTED - biodiv_degradation_raw_weighted_LDS  # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
         REAL_AREA = pd.read_hdf(os.path.join(INPUT_DIR, "real_area.h5")).to_numpy()
         REAL_AREA_NO_RESFACTOR = REAL_AREA.copy()
-        biodiv_current_val = BIODIV_RAW_WEIGHTED_LDS - biodiv_degradation_raw_weighted_habitat  # Biodiversity value at the beginning year (1D numpy array)
-        biodiv_current_val = np.nansum(biodiv_current_val[LUMASK] * REAL_AREA_NO_RESFACTOR[
-            LUMASK])  # Sum the biodiversity value within the LUMASK
+        biodiv_current_val = np.nansum((BIODIV_RAW_WEIGHTED_LDS - degradation_habitat)[LUMASK] * REAL_AREA_NO_RESFACTOR[LUMASK])
 
-        # Biodiversity values need to be restored under the GBF Target 2
-        '''
-        The biodiversity value to be restored is calculated as the difference between the 'Unallocated - natural land' 
-        and 'current land-use' regarding their biodiversity degradation scale.
-        '''
-        biodiv_degradation_val = (
-                biodiv_degradation_raw_weighted_LDS +  # Biodiversity degradation from HCAS
-                biodiv_degradation_raw_weighted_habitat  # Biodiversity degradation from LDS burning
-        )
+        total_degradation = degradation_LDS + degradation_habitat
+        total_degradation_val = np.nansum(total_degradation[LUMASK] * REAL_AREA_NO_RESFACTOR[LUMASK])
 
-        biodiv_degradation_val = np.nansum(biodiv_degradation_val[LUMASK] * REAL_AREA_NO_RESFACTOR[
-            LUMASK])  # Sum the biodiversity degradation value within the LUMASK
-
-        # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
         BIODIV_GBF_TARGET_2 = {
-            yr: biodiv_current_val + biodiv_degradation_val * biodiv_GBF_target_2_proportions_2010_2100[yr]
+            yr: biodiv_current_val + total_degradation_val * biodiv_GBF_target_2_proportions_2010_2100[yr]
             for yr in range(2010, 2101)
         }
         BIODIV_GBF_TARGET.append(BIODIV_GBF_TARGET_2)
+
     df = pd.DataFrame(BIODIV_GBF_TARGET)
     df_biodiversity = df.T.loc[2010:2050]
     df_biodiversity.index.name = 'Year'
     df_biodiversity.columns = ['0%', '30%', '50%']
     return df_biodiversity
+
 
 font_size = 25
 # GHG
@@ -262,8 +245,9 @@ BIODIV_GBF_TARGET_2_DICTs = [
 
 
 df = get_biodiversity_target(INPUT_DIR, BIODIV_GBF_TARGET_2_DICTs ) / 1e6
+interval, ticks = get_y_axis_ticks(df.min().min(), df.max().max(), desired_ticks=4)
 colors = ['#E74C3C', '#3498DB', '#2ECC71']  # 根据数据列数调整颜色列表
-draw_plot_lines(df, colors, ' ', (0, 120), 40, "../output/03_biodiversity_limit.png", font_size=font_size)
+draw_plot_lines(df, colors, ' ', (0, ticks[-1]), 10, "../output/03_biodiversity_limit.png", font_size=font_size)
 
 
 # water

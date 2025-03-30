@@ -8,6 +8,7 @@ import subprocess
 import datetime
 import time
 import numpy as np
+import ast
 
 from joblib import delayed, Parallel
 
@@ -52,7 +53,8 @@ def create_settings_template(to_path: str = 'Custom_runs'):
             settings_dict['MEM'] = 'auto'
             settings_dict['QUEUE'] = 'normal'
             settings_dict['WRITE_THREADS'] = 10  # 10 threads for writing is a safe number to avoid out-of-memory issues
-            settings_dict['NCPUS'] = min(settings_dict['THREADS'] // 4 * 4, 48)  # max 48 cores
+            # settings_dict['NCPUS'] = min(settings_dict['THREADS'] // 4 * 4, 48)  # max 48 cores
+            settings_dict['NCPUS'] = 'auto'
             settings_dict['TIME'] = '10:00:00'
 
             # Write the non-string values to a file
@@ -69,7 +71,8 @@ def create_settings_template(to_path: str = 'Custom_runs'):
 
 
 
-def process_column(col, custom_settings, script_name):
+def process_column(col, custom_settings, script_name, delay):
+    time.sleep(delay * 60)  # 让每个任务启动前等待固定时间
     """并行处理单个列的任务"""
     with open('Custom_runs/non_str_val.txt', 'r') as file:
         eval_vars = file.read().splitlines()
@@ -77,6 +80,8 @@ def process_column(col, custom_settings, script_name):
     custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(eval)
     # Update the settings dictionary
     custom_dict = update_settings(custom_settings[col].to_dict(), col)
+    for key in eval_vars:
+        custom_dict[key] = ast.literal_eval(custom_dict[key]) if isinstance(custom_dict[key], str) else custom_dict[key]
 
     # Submit the task
     create_run_folders(col)
@@ -89,7 +94,7 @@ def process_column(col, custom_settings, script_name):
         submit_task_linux(task_dir, custom_dict)  # 执行任务
 
 
-def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 3, script_name='0_runs'):
+def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 3, script_name='0_runs', delay=0):
     """读取设置模板文件并并行运行任务"""
     # 读取自定义设置文件
     custom_settings = pd.read_csv(csv_path, index_col=0)
@@ -109,12 +114,15 @@ def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 
         raise ValueError('No custom settings found in the settings_template.csv file!')
 
     if use_multithreading:
-        Parallel(n_jobs=num_workers)(
-            delayed(process_column)(col, custom_settings, script_name) for col in custom_cols
+        Parallel(n_jobs=num_workers, batch_size=1)(
+            delayed(process_column)(col, custom_settings, script_name, i * delay)
+            for i, col in enumerate(custom_cols)
         )
+
     else:
+        delay = 0
         for col in custom_cols:
-            process_column(col, custom_settings, script_name)
+            process_column(col, custom_settings, script_name, delay)
 
 
 def submit_task_windows(task_dir, col,script_name):
@@ -123,13 +131,16 @@ def submit_task_windows(task_dir, col,script_name):
     log_file = f'{task_dir}/output/{script_name}_error_log.txt'  # 定义日志文件路径
 
     python_path = r'F:\xinhao\miniforge\envs\luto\python.exe'
+    task_dir = os.path.abspath(task_dir)
+
     try:
         # 运行子进程，捕获标准输出和标准错误
         result = subprocess.run(
             [python_path, f'{task_dir}/{script_name}.py'],
             cwd=f'{task_dir}',
             capture_output=True,  # 捕获输出
-            text=True  # 将输出转换为文本
+            text=True,  # 将输出转换为文本
+            encoding="utf-8"
         )
 
         end_time = time.time()  # 记录任务结束时间
@@ -138,13 +149,13 @@ def submit_task_windows(task_dir, col,script_name):
         # 检查子进程的返回码和错误输出
         if result.returncode == 0 and not result.stderr:
             # 如果成功运行，记录成功信息
-            with open(log_file, 'a') as f:
+            with open(log_file, 'a', encoding="utf-8") as f:
                 f.write(f"Success running temp_runs.py for {col}:\n")
                 f.write(f"stdout:\n{result.stdout}\n")
-            print_with_time(f"{col}: successfully completed. Elapsed time: {elapsed_time:.2f} h")
+            print_with_time(f"{col} {script_name}: successfully completed. Elapsed time: {elapsed_time:.2f} h")
         else:
             # 如果运行失败，记录错误信息
-            with open(log_file, 'a') as f:
+            with open(log_file, 'a', encoding="utf-8") as f:
                 f.write(f"Error running temp_runs.py for {col}:\n")
                 f.write(f"stdout:\n{result.stdout}\n")
                 f.write(f"stderr:\n{result.stderr}\n")
@@ -152,7 +163,7 @@ def submit_task_windows(task_dir, col,script_name):
 
     except Exception as e:
         # 捕获 Python 异常，并将其写入日志文件
-        with open(log_file, 'a') as f:
+        with open(log_file, 'a', encoding="utf-8") as f:
             f.write(f"Exception occurred while running temp_runs.py for {col}:\n")
             f.write(f"{str(e)}\n")
         print_with_time(f"{col}: exception occurred during execution, see {log_file} for details.")
@@ -198,6 +209,12 @@ def submit_task_linux(task_dir, config):
     LOG_DIR=output
     mkdir -p $LOG_DIR
 
+    # 加载 Gurobi 许可证
+    source ~/.bashrc
+    export GRB_LICENSE_FILE=/g/data/jk53/config/gurobi_cfg.txt
+    export GRB_TOKEN_SERVER=gurobi.licensing.its.deakin.edu.au
+    export GRB_TOKEN_PORT=41954
+    
     # 输出作业开始时间到日志
     echo "Job started at $(date)" >> $LOG_DIR/$PBS_JOBID.log
     echo "Current directory: $(pwd)" >> $LOG_DIR/$PBS_JOBID.log
@@ -273,8 +290,12 @@ def update_settings(settings_dict: dict, col: str):
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.join(SOURCE_DIR, settings_dict['INPUT_DIR']).replace('\\', '/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
-    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(', '')
-
+    # if settings_dict['CARBON_PRICES_FIELD'] != 'c0':
+    #     settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(', '')
+    settings_dict['NO_GO_VECTORS'] = {
+        'Winter cereals': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Winter_cereals.shp',
+        'Environmental Plantings': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Enviornmental_Plantings.shp'
+    }
     if os.name == 'posix':
         # Set the memory and time based on the resolution factor
         # if int(settings_dict['RESFACTOR']) == 1:
@@ -291,10 +312,11 @@ def update_settings(settings_dict: dict, col: str):
         # Update the settings dictionary
         settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
         settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
+        settings_dict['NCPUS'] = settings_dict['NCPUS'] if settings_dict['NCPUS'] != 'auto' else NCPUS
 
         # Update the threads based on the number of cpus
         settings_dict['THREADS'] = settings_dict['NCPUS']
-        # settings_dict['WRITE_THREADS'] = settings_dict['NCPUS']
+        settings_dict['WRITE_THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
 
@@ -341,7 +363,7 @@ def recommend_resources(df):
     for task, cpu, mem, rec_cpu, rec_mem in zip(cpu_values.index, cpu_values, mem_values, recommended_cpus, recommended_mem):
         print(f"Task {task}:")
         print(f"  - Current CPU: {cpu}, Recommended MEM: {rec_mem} GB")
-        print(f"  - Current MEM: {mem} GB, Recommended MEM for CPU {rec_cpu} GB")
+        print(f"  - Current MEM: {mem} GB, Recommended CPU {rec_cpu}")
         break
 
 def check_null_values(df):
@@ -362,7 +384,7 @@ def check_null_values(df):
         raise ValueError("DataFrame 中存在空值，请处理后再继续执行！")
 
 
-def generate_column_names(new_df, df_revise,suffix='', ghg_name_map=None, bio_name_map=None):
+def generate_column_names(new_df, df_revise,suffixs='', ghg_name_map=None, bio_name_map=None):
     """
     Generate new column names based on mappings and input data.
 
@@ -393,8 +415,20 @@ def generate_column_names(new_df, df_revise,suffix='', ghg_name_map=None, bio_na
     # 获取 GHG 和 BIO 对应的行值
     ghg_limits_field = new_df.iloc[new_df[new_df.iloc[:, 0] == "GHG_LIMITS_FIELD"].index[0]]
     biodiv_gbf_target_2_dict = new_df.iloc[new_df[new_df.iloc[:, 0] == "BIODIV_GBF_TARGET_2_DICT"].index[0]]
-    if suffix:
-        suffix_values = new_df.iloc[new_df[new_df.iloc[:, 0] == suffix].index[0]]
+    if len(suffixs) > 0:
+        # 选取匹配 suffix 列表的所有行
+        selected_rows = new_df[new_df.iloc[:, 0].isin(suffixs)]
+
+        if not selected_rows.empty:
+            # 去掉第一列，只保留数据部分
+            selected_values = selected_rows.iloc[:, 1:].astype(str)
+
+            # 构造按列存储的 suffix 替换映射
+            suffix_values_dict = {
+                col: '_'.join(selected_values[col].values) for col in selected_values.columns
+            }
+        else:
+            suffix_values_dict = {}
 
     # 检查 Name1 是否存在
     name_column = df_revise.columns[0]
@@ -422,8 +456,9 @@ def generate_column_names(new_df, df_revise,suffix='', ghg_name_map=None, bio_na
             else:
                 print(f"警告：列 {col} 中 Name1 没有有效值，已跳过添加相关内容。")
         new_name += f"_{ghg_value}_{bio_value}"
-        if suffix:
-            new_name += f"_{suffix_values[col]}"
+        if len(suffixs) > 0 and col in suffix_values_dict:
+            new_name += f"_{suffix_values_dict[col]}"
+
         new_column_names.append(new_name)
 
     return new_column_names
@@ -484,7 +519,7 @@ def generate_csv(
     recommend_resources(df_revise)
 
 
-def create_grid_search_template(template_df, grid_dict, output_file,suffix="") -> pd.DataFrame:
+def create_grid_search_template(template_df, grid_dict, output_file,suffixs="",col_suffix="") -> pd.DataFrame:
     # Collect new columns in a list
     template_grid_search = template_df.copy()
 
@@ -517,17 +552,23 @@ def create_grid_search_template(template_df, grid_dict, output_file,suffix="") -
         template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]}')], axis=1)
 
     # Save the grid search template to the root task folder
-    template_grid_search.to_csv(output_file, index=False)
+    # template_grid_search.to_csv(output_file, index=False)
 
     ghg_row = template_grid_search.loc[template_grid_search['Name'] == 'GHG_LIMITS_FIELD']
 
     for col in template_grid_search.columns[1:]:  # 跳过 'Name' 列
         ghg_value = ghg_row[col].values[0]  # 获取当前列 GHG_LIMITS_FIELD 的值
-        template_grid_search.loc[template_grid_search['Name'] == 'CARBON_PRICES_FIELD', col] = ghg_value[:9].replace('(', '')
+        if ghg_value != 'c0':
+            template_grid_search.loc[template_grid_search['Name'] == 'CARBON_PRICES_FIELD', col] = ghg_value[:9].replace('(', '')
 
     # Save the grid search template to the root task folder
 
-    template_grid_search.columns = template_grid_search.columns[:2].tolist() + generate_column_names(template_grid_search, template_grid_search, suffix)
+    template_grid_search.columns = template_grid_search.columns[:2].tolist() + generate_column_names(template_grid_search, template_grid_search, suffixs)
+    template_grid_search.columns = (
+            [template_grid_search.columns[0], template_grid_search.columns[1]]  # 保留前两列
+            + [col + col_suffix for col in template_grid_search.columns[2:]]  # 从第三列开始加后缀
+    )
+    print(template_grid_search.columns)
     template_grid_search.to_csv(output_file, index=False)
     total_cost = calculate_total_cost(template_grid_search)
     print(f"Job Cost: {total_cost}k")

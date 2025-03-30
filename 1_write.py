@@ -1,7 +1,12 @@
 import dill
+import gzip
 import os
+from datetime import datetime
 from luto.tools.write import write_outputs
 
+def print_with_time(message):
+    """打印带有时间戳的信息"""
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
 
 def get_first_subfolder_name(output_path="output"):
     """
@@ -18,12 +23,18 @@ def get_first_subfolder_name(output_path="output"):
         # subfolders = [f for f in os.listdir(output_path) if os.path.isdir(os.path.join(output_path, f))]
         subfolders = [f for f in os.listdir(output_path) if
                       os.path.isdir(os.path.join(output_path, f)) and '2010-2050' in f]
-
+        html_path = os.path.join(output_path, subfolders[0],"DATA_REPORT","REPORT_HTML","pages","production.html")
+        # html_path = os.path.join(output_path, subfolders[0], "out_2050", "quantity_production_kt_separate_2050.csv")
         if not subfolders:
             print(f"No subfolders found in '{output_path}'.")
             return None
+        elif os.path.exists(html_path):
+            print(f"{html_path} exists.")
+            return 1
         # 返回拼接后的路径
-        return os.path.join(output_path, subfolders[0], 'data_with_solution.pkl')
+        else:
+            # return os.path.join(output_path, subfolders[0], 'data_with_solution.pkl')
+            return os.path.join(output_path, subfolders[0], 'data_with_solution.gz')
     except FileNotFoundError:
         print(f"Error: Directory '{output_path}' does not exist.")
         return None
@@ -34,11 +45,24 @@ def get_first_subfolder_name(output_path="output"):
 
 # 调用函数并加载数据
 pkl_path = get_first_subfolder_name("output")
-print(f"PKL file path: {pkl_path}")
-if pkl_path and os.path.exists(pkl_path):
-    with open(pkl_path, 'rb') as f:
-        data = dill.load(f)
-    write_outputs(data)
-    print("Data processed successfully.")
+# pkl_path = 'output/2025_03_26__17_18_36_RF15_2010-2050_snapshot/data_with_solution.gz'
+print_with_time(f"PKL file path: {pkl_path}")
+if not pkl_path or not os.path.exists(pkl_path):
+    raise FileNotFoundError(f"PKL file does not exist at path: {pkl_path}")
+elif pkl_path == 1:
+    print_with_time("Data already processed.")
 else:
-    print(f"PKL file does not exist at path: {pkl_path}")
+    # 如果文件存在，则加载并处理数据
+    print_with_time(f"{pkl_path} Loading...")
+    # with open(pkl_path, 'rb') as f:
+    #     data = dill.load(f)
+
+    with gzip.open(pkl_path, 'rb') as f:
+        data = dill.load(f)
+
+    # Update the timestamp
+    data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
+
+    print_with_time("Writing outputs...")
+    write_outputs(data)
+    print_with_time("Data processed successfully.")

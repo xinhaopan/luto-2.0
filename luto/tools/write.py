@@ -26,15 +26,10 @@ Writes model output and statistics to files.
 import os, re
 import shutil
 import threading
-import time
 import numpy as np
 import pandas as pd
-import psutil
 import xarray as xr
-import geopandas as gpd
 
-from itertools import product
-from datetime import datetime
 from joblib import Parallel, delayed
 
 from luto import settings
@@ -60,30 +55,29 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
-from luto.settings import AG_MANAGEMENTS, NON_AG_LAND_USES
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, NON_AG_LAND_USES, AG_MANAGEMENTS_TO_LAND_USES
 
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
-from luto.tools.xarray_tools import calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, calc_bio_score_by_yr
 
-
-timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
-
+# Global timestamp for the run
+timestamp = tools.write_timestamp()
+          
 def write_outputs(data: Data):
-
-    # memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
-    # memory_thread.start()
-
+    """Write model outputs to file"""
+    
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
+    memory_thread.start()
+    
     # Write the model outputs to file
     write_data(data)
     # Move the log files to the output directory
-    write_logs(data)
+    move_logs(data)
 
 
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp_write}")
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp}")
 def write_data(data: Data):
 
     # Write model run settings
@@ -108,25 +102,14 @@ def write_data(data: Data):
 
     # Write outputs for each year
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
-
-    # Check if the simulation is complete by comparing the last year in the simulation with the target year
-    complete_simulation = max([int(i[-4:]) for i in os.listdir(data.path) if 'out_' in i]) == max(years)
-    
-    # Write the area/quantity comparison between base-year and target-year for the timeseries mode
-    if complete_simulation:
-        begin_end_path = f"{data.path}/begin_end_compare_{years[0]}_{years[-1]}"
-        jobs += [delayed(write_output_single_year)(data, years[-1], f"{begin_end_path}/out_{years[-1]}", years[0])] if settings.MODE == 'timeseries' else []
-    else:
-        print(f'''The target year is not the last year in the simulation!
-                  Only Writing the avaliable outputs ({years[0]}-{years[-1]}) to output directory.\n''')
+    jobs += [delayed(write_output_single_year)(data, years[-1], f"{data.path_begin_end_compare}/out_{years[-1]}", years[0])] if settings.MODE == 'timeseries' else []
 
     # Parallel write the outputs for each year
     num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between jobs_num and threads for parallel writing
     Parallel(n_jobs=num_jobs)(jobs)
 
     # Copy the base-year outputs to the path_begin_end_compare
-    if complete_simulation:
-        shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
+    shutil.copytree(f"{data.path}/out_{years[0]}", f"{data.path_begin_end_compare}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
     
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
@@ -135,13 +118,14 @@ def write_data(data: Data):
 
 
 
-def write_logs(data: Data):
+def move_logs(data: Data):
     # Move the log files to the output directory
-    logs = [f"{settings.OUTPUT_DIR}/run_{data.timestamp_sim}_stdout.log",
-            f"{settings.OUTPUT_DIR}/run_{data.timestamp_sim}_stderr.log",
-            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stdout.log",
-            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log",
-            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt']
+    logs = [f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log",
+            f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log",
+            f"{settings.OUTPUT_DIR}/write_{timestamp}_stdout.log",
+            f"{settings.OUTPUT_DIR}/write_{timestamp}_stderr.log",
+            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt',
+            f'{settings.OUTPUT_DIR}/.timestamp']
 
     for log in logs:
         try:
@@ -180,11 +164,15 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg(data, yr_cal, path_yr)
     write_ghg_separate(data, yr_cal, path_yr)
     write_ghg_offland_commodity(data, yr_cal, path_yr)
+    # write_biodiversity_priority_scores(data, yr_cal, path_yr)
     write_biodiversity(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
-    write_biodiversity_contribution(data, yr_cal, path_yr)
+    write_biodiversity_priority_scores(data, yr_cal, path_yr)
+    write_biodiversity_GBF2_scores(data, yr_cal, path_yr)
+    write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
+    write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
+    write_biodiversity_GBF4A_scores_species(data, yr_cal, path_yr)
     # write_npy(data, yr_cal, path_yr)
-
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
 
@@ -204,8 +192,8 @@ def get_settings(setting_path:str):
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
 
         # Set unused variables to None
-        settings_dict['GHG_LIMITS_FIELD'] = 'None'              if settings.GHG_LIMITS_TYPE == 'dict' else settings_dict['GHG_LIMITS_FIELD']
-        settings_dict['GHG_LIMITS'] = 'None'                    if settings.GHG_LIMITS_TYPE == 'file' else settings_dict['GHG_LIMITS']
+        settings_dict['GHG_LIMITS_FIELD'] = 'None'         if settings.GHG_LIMITS_TYPE == 'dict' else settings_dict['GHG_LIMITS_FIELD']
+        settings_dict['GHG_LIMITS'] = 'None'               if settings.GHG_LIMITS_TYPE == 'file' else settings_dict['GHG_LIMITS']
 
     return settings_dict
 
@@ -564,6 +552,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     simulated_year_list = sorted(list(data.lumaps.keys()))
     # Get index of yr_cal in timeseries (e.g., if yr_cal is 2050 then yr_idx = 40)
     yr_idx = yr_cal - data.YR_CAL_BASE
+    
     # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
     yr_idx_sim = simulated_year_list.index(yr_cal)
     # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
@@ -582,32 +571,37 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get the transition cost matrices for agricultural land-use
     if yr_idx == 0:
-        base_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
-        ag_transitions_cost_mat = {k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+        base_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)
+        ag_transitions_cost_mat = {k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)
                                 for k in ['Establishment cost', 'Water license cost', 'GHG emissions cost']}
     else:
         # Get the base_year mrj matirx
         base_mrj = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])
         # Get the transition cost matrices for agricultural land-use
-        ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data, yr_idx, yr_cal_sim_pre, separate = True)
+        ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data, yr_idx, yr_cal_sim_pre, separate=True)
 
     cost_dfs = []
     # Convert the transition cost matrices to a DataFrame
-    for lu_desc, lu_idx in data.DESC2AGLU.items():
-        for cost_type in ag_transitions_cost_mat.keys():
+    for from_lu in data.AGRICULTURAL_LANDUSES:
+        for from_lm in data.LANDMANS:
+            for cost_type in ag_transitions_cost_mat.keys():
+                            
+                from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]].astype(np.bool_)    # Get the cells of 'from' land-use in the base year (r)
+                arr_trans = np.nan_to_num(ag_transitions_cost_mat[cost_type])[:,from_lu_idx,:]                       # Get the transition cost matrix                    (m,r*,j)
+                arr_dvar = ag_dvar[:,from_lu_idx,:]                                                                  # Get the decision variables                        (m,r*,j)                          
+                        
+                cost_arr = np.einsum('mrj,mrj->mj', arr_trans, arr_dvar)                                             # Multiply by decision variables
 
-            base_lu_arr = base_mrj[:, :, lu_idx]                                      # Get the base land-use array                       (m,r)
-            arr = np.nan_to_num(ag_transitions_cost_mat[cost_type])                   # Get the transition cost matrix                    (m,r,j)
-            arr = np.einsum('mr,mrj,mrj->mj', base_lu_arr, arr, ag_dvar)              # Multiply by decision variables
-
-            arr_df = pd.DataFrame(arr.flatten(),
-                            index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],
-                            names=['Water Supply', 'To land-use']),
-                            columns=['Cost ($)']).reset_index()
-            arr_df.insert(0, 'Type', cost_type)
-            arr_df.insert(1, 'Year', yr_cal)
-            arr_df.insert(2, 'From land-use', lu_desc)
-            cost_dfs.append(arr_df)
+                arr_df = pd.DataFrame(
+                    cost_arr.flatten(),
+                    index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],
+                    names=['To water-upply', 'To land-use']),
+                    columns=['Cost ($)']).reset_index()
+                arr_df.insert(0, 'Type', cost_type)
+                arr_df.insert(1, 'Year', yr_cal)
+                arr_df.insert(2, 'From land-use', from_lu)
+                arr_df.insert(3, 'From water-supply', from_lm)
+                cost_dfs.append(arr_df)
 
     # Save the cost DataFrames
     cost_df = pd.concat(cost_dfs, axis=0)
@@ -622,7 +616,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     #---------------------------------------------------------------------
 
     # The agricultural management transition cost are all zeros, so skip the calculation here
-    # am_cost = ag_transitions.get_agricultural_management_transition_matrices(sim.data)
+    # am_cost = ag_transitions.get_agricultural_management_transition_matrices(data)
 
 
 
@@ -633,36 +627,48 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
-        non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
-                                   for k in NON_AG_LAND_USES.keys()}
+        non_ag_transitions_cost_mat = {
+            k:{'Transition cost':np.zeros(data.NCELLS).astype(np.float32)}
+            for k in NON_AG_LAND_USES.keys()
+        }
     else:
-        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(data,
-                                                                                       yr_idx,
-                                                                                       yr_cal_sim_pre,
-                                                                                       data.lumaps[yr_cal],
-                                                                                       data.lmmaps[yr_cal],
-                                                                                       separate=True)
+        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
+            data,yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
+        )
 
     cost_dfs = []
-    for idx,non_ag_type in enumerate(non_ag_transitions_cost_mat):
-        for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
-            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix
-            arr = np.einsum('mrj,r->mj', arr, non_ag_dvar[:,idx])              # Multiply the transition cost matrix by the cost of non-agricultural land-use
-
-
-            arr_df = pd.DataFrame(arr.flatten(),
-                                index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],names=['Water supply', 'From land-use']),
-                                columns=['Cost ($)']).reset_index()
-            arr_df.insert(0, 'To land-use', non_ag_type)
-            arr_df.insert(1, 'Cost type', cost_type)
-            arr_df.insert(2, 'Year', yr_cal)
-            cost_dfs.append(arr_df)
+    for from_lu in data.AGRICULTURAL_LANDUSES:
+        for from_lm in data.LANDMANS:
+            for to_lu in NON_AG_LAND_USES.keys():
+                for cost_type in non_ag_transitions_cost_mat[to_lu].keys():
+                    
+                    from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]].astype(np.bool_)  # Get the land-use index of the from land-use (r*)
+                    arr_trans = non_ag_transitions_cost_mat[to_lu][cost_type][from_lu_idx]                             # Get the transition cost matrix of from land-use (r*)
+                    arr_dvar = non_ag_dvar[from_lu_idx, data.NON_AGRICULTURAL_LANDUSES.index(to_lu)]                   # Get the decision variable of the from land-use (r*)
+                    
+                    if arr_dvar.size == 0:
+                        continue
+                    
+                    cost_arr = np.einsum('r,r->', arr_trans, arr_dvar)                                # Calculate the cost array
+                    arr_df = pd.DataFrame([{
+                        'From land-use': from_lu,
+                        'From water-supply': from_lm,
+                        'To land-use': to_lu,
+                        'Cost type': cost_type,
+                        'Cost ($)': cost_arr,
+                        'Year': yr_cal
+                    }])
+                    cost_dfs.append(arr_df)
 
     # Save the cost DataFrames
-    cost_df = pd.concat(cost_dfs, axis=0)
-    cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
+    if len(cost_dfs) == 0:
+        # This is to avoid an error when concatenating an empty list
+        cost_df = pd.DataFrame(columns=['From land-use', 'From water-supply', 'To land-use', 'Cost type', 'Cost ($)', 'Year'])
+        cost_df.loc[0,'Year'] = yr_cal
+    else:
+        cost_df = pd.concat(cost_dfs, axis=0)
+        cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
     cost_df.to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{yr_cal}.csv'), index=False)
-
 
 
 
@@ -672,7 +678,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
-        non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
+        non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
                                         for k in NON_AG_LAND_USES.keys()}
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_to_ag_transition_matrix(data,
@@ -1018,79 +1024,8 @@ def write_water(data: Data, yr_cal, path):
     )
     df_water_seperate['Water_supply'] = df_water_seperate['Water_supply'].replace({'dry':'Dryland', 'irr':'Irrigated'})
     df_water_seperate.to_csv( os.path.join(path, f'water_yield_separate_{yr_cal}.csv'), index=False)
-    
-
-
-
-def write_ghg(data: Data, yr_cal, path):
-    """Calculate total GHG emissions from on-land agricultural sector.
-        Takes a simulation object, a target calendar year (e.g., 2030),
-        and an output path as input."""
-
-    if not settings.GHG_EMISSIONS_LIMITS == 'on':
-        return
-
-    print(f'Writing GHG outputs for {yr_cal}')
-
-    yr_idx = yr_cal - data.YR_CAL_BASE
-
-    # Get GHG emissions limits used as constraints in model
-    ghg_limits = ag_ghg.get_ghg_limits(data, yr_cal)
-
-    # Get GHG emissions from model
-    if yr_cal >= data.YR_CAL_BASE + 1:
-        ghg_emissions = data.prod_data[yr_cal]['GHG Emissions']
-    else:
-        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[data.YR_CAL_BASE]).sum()
-
-    # Save GHG emissions to file
-    df = pd.DataFrame({
-        'Variable':['GHG_EMISSIONS_LIMIT_TCO2e','GHG_EMISSIONS_TCO2e'],
-        'Emissions (t CO2e)':[ghg_limits, ghg_emissions]
-        })
-    df['Year'] = yr_cal
-    df.to_csv(os.path.join(path, f'GHG_emissions_{yr_cal}.csv'), index=False)
-
-
-
-
-
-def write_biodiversity(data: Data, yr_cal, path):
-    """
-    Write biodiversity info for a given year ('yr_cal'), simulation ('sim')
-    and output path ('path').
-    """
-    if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
-        return
-
-    # Check biodiversity limits and report
-    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal)
-
-    print(f'Writing biodiversity outputs for {yr_cal}')
-
-    # Get biodiversity score from model
-    if yr_cal >= data.YR_CAL_BASE + 1:
-        biodiv_score = data.prod_data[yr_cal]['Biodiversity']
-    else:
-        # Return the base year biodiversity score
-        biodiv_score = data.BIODIV_GBF_TARGET_2[data.YR_CAL_BASE]
-
-    # Add to dataframe
-    df = pd.DataFrame({
-            'Variable':['Biodiversity score limit',
-                        'Solve biodiversity score'],
-            'Score':[biodiv_limit, biodiv_score]
-            })
-
-    # Save to file
-    df['Year'] = yr_cal
-    df.to_csv(os.path.join(path, f'biodiversity_{yr_cal}.csv'), index = False)
-
-
-
 
 def write_biodiversity_separate(data: Data, yr_cal, path):
-
     # Do nothing if biodiversity limits are off and no need to report
     if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
         return
@@ -1163,44 +1098,474 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     # Write to file
     biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False)
 
-
-def write_biodiversity_contribution(data: Data, yr_cal, path):
-    
-    # Do nothing if no need to calculate biodiversity contribution
-    if not settings.CALC_BIODIVERSITY_CONTRIBUTION:
+def write_biodiversity(data: Data, yr_cal, path):
+    """
+    Write biodiversity info for a given year ('yr_cal'), simulation ('sim')
+    and output path ('path').
+    """
+    if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
         return
 
-    print(f'Writing biodiversity contribution score for {yr_cal}')
+    # Check biodiversity limits and report
+    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal)
 
-    # Get the decision variables for the year and convert them to xarray
-    ag_dvar_reprj_to_bio = data.ag_dvars_2D_reproj_match[yr_cal]
-    am_dvar_reprj_to_bio = data.ag_man_dvars_2D_reproj_match[yr_cal]
-    non_ag_dvar_reprj_to_bio = data.non_ag_dvars_2D_reproj_match[yr_cal]
+    print(f'Writing biodiversity outputs for {yr_cal}')
 
-    # Calculate the biodiversity contribution scores
-    if settings.BIO_CALC_LEVEL == 'group':
-        bio_score_group = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc', chunks='auto')
-        bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})  # Calculate the mean score of all species
-        bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']       # Combine the mean score with the original score
-        bio_contribution_shards = [bio_score_group.sel(year=yr_cal, group=group) for group in bio_score_group['group'].values]
-    elif settings.BIO_CALC_LEVEL == 'species':
-        bio_raw_path = f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc'
-        bio_his_score_sum = calc_bio_hist_sum(bio_raw_path)
-        bio_contribution_species = calc_bio_score_species(bio_raw_path, bio_his_score_sum)
-        bio_contribution_shards = interp_bio_species_to_shards(bio_contribution_species, yr_cal)
+    # Get biodiversity score from model
+    if yr_cal >= data.YR_CAL_BASE + 1:
+        biodiv_score = data.prod_data[yr_cal]['Biodiversity']
     else:
-        raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
+        # Return the base year biodiversity score
+        biodiv_score = data.BIO_GBF2_TARGET_SCORES[data.YR_CAL_BASE]
 
-    # Write the biodiversity contribution to csv
-    bio_df = calc_bio_score_by_yr(
-        ag_dvar_reprj_to_bio,
-        am_dvar_reprj_to_bio,
-        non_ag_dvar_reprj_to_bio,
-        bio_contribution_shards)
+    # Add to dataframe
+    df = pd.DataFrame({
+            'Variable':['Biodiversity score limit',
+                        'Solve biodiversity score'],
+            'Score':[biodiv_limit, biodiv_score]
+            })
 
-    bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
+    # Save to file
+    df['Year'] = yr_cal
+    df.to_csv(os.path.join(path, f'biodiversity_targets_{yr_cal}.csv'), index = False)
+
+def write_biodiversity_priority_scores(data: Data, yr_cal, path):
+    
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    print(f'Writing biodiversity priority scores for {yr_cal}')
+
+    # Get the biodiversity scores b_mrj
+    bio_priority_scores = xr.DataArray(
+        data.BIO_DISTANCE_WEIGHTED * data.REAL_AREA,
+        dims=['cell'],
+        coords={'cell':range(data.NCELLS)}
+    )
+
+    # Get the decision variables for the year
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    ag_mam_dvar_mrj =  tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
 
 
+    # Apply habitat degradation impact
+    for lu in data.AGRICULTURAL_LANDUSES:
+        ag_dvar_mrj = ag_dvar_mrj.copy()                    # Copy because the array is used as a view when feed to multiprocess
+        ag_dvar_mrj.loc[{'lu':lu}] = ag_dvar_mrj.loc[{'lu':lu}] * data.BIODIV_HABITAT_DEGRADE_LOOK_UP[data.DESC2AGLU[lu]]
+        
+    am_impacts = ag_biodiversity.get_ag_management_biodiversity_impacts(data, yr_cal)
+    for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items():
+        for idx,lu in enumerate(lus):
+            ag_mam_dvar_mrj = ag_mam_dvar_mrj.copy()        # Copy because the array is used as a view when feed to multiprocess
+            ag_mam_dvar_mrj.loc[{'am':am, 'lu':lu}] = ag_mam_dvar_mrj.loc[{'am':am, 'lu':lu}] * am_impacts[am][idx]
+            
+    non_ag_impacts = non_ag_biodiversity.get_non_ag_lu_biodiv_impacts(data)
+    for idx,lu in enumerate(NON_AG_LAND_USES.keys()):
+        non_ag_dvar_rk = non_ag_dvar_rk.copy()              # Copy because the array is used as a view when feed to multiprocess
+        non_ag_dvar_rk.loc[{'lu':lu}] = non_ag_dvar_rk.loc[{'lu':lu}] * non_ag_impacts[idx]
+
+
+    # Calculate the biodiversity scores, Divide by total area-weighted biodiversity degradation in base year to get the relative contribution
+    base_yr_score = (data.BIO_DISTANCE_WEIGHTED * data.BIO_BASE_YR_RETAIN_FRACTION_HABITAT * data.REAL_AREA).sum()
+
+    priority_ag = (ag_dvar_mrj * bio_priority_scores
+    ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
+        Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] / base_yr_score) * 100)
+    )
+
+    priority_non_ag = (non_ag_dvar_rk * bio_priority_scores
+    ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
+        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / base_yr_score * 100)
+    )
+
+    priority_am = (ag_mam_dvar_mrj * bio_priority_scores
+    ).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
+        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / base_yr_score * 100)
+    ).dropna()
+
+    # Insert the Type/Year column, rename the water supply column
+    priority_ag = priority_ag.assign(Type='Agricultural Landuse', Year=yr_cal)
+    priority_non_ag = priority_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal)
+    priority_am = priority_am.assign(Type='Agricultural Management', Year=yr_cal)
+
+    # Save the biodiversity scores
+    df = pd.concat([ priority_ag, priority_non_ag, priority_am], axis=0
+    ).rename(columns={
+        'lu':'Landuse',
+        'am':'Agri-Management',
+        'Relative_Contribution_Percentage':'Contribution Relative to Base Year Level (%)'
+    }).reset_index(
+        drop=True
+    ).to_csv(
+        os.path.join(path, f'biodiversity_priority_scores_{yr_cal}.csv'), index=False
+    )
+    
+
+
+def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
+
+    # Do nothing if biodiversity limits are off and no need to report
+    if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
+        return
+
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    print(f'Writing biodiversity GBF2 scores (PRIORITY) for {yr_cal}')
+
+    # Get the biodiversity scores b_mrj
+    ag_biodiv_mrj = tools.ag_mrj_to_xr(data, ag_biodiversity.get_breq_matrices(data))
+    am_biodiv_mrj = tools.am_mrj_to_xr(data, ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_biodiv_mrj.values, yr_idx))
+    non_ag_biodiv_rk = tools.non_ag_rk_to_xr(data, non_ag_biodiversity.get_breq_matrix(data, ag_biodiv_mrj.values, data.lumaps[yr_cal]))
+
+    # Get the decision variables for the year
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    ag_mam_dvar_mrj =  tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+
+
+    # Calculate the biodiversity scores; Divide by total biodiversity degradation in base year to get the relative contribution
+    GBF2_ag = (ag_dvar_mrj * ag_biodiv_mrj
+    ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
+        Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] / (data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA).sum()) * 100)
+    )
+
+    GBF2_non_ag = (non_ag_dvar_rk * non_ag_biodiv_rk 
+    ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
+        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / (data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA).sum() * 100)
+    )
+
+    GBF2_am = (ag_mam_dvar_mrj * am_biodiv_mrj
+    ).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
+        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / (data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA).sum() * 100)
+    ).dropna()
+
+
+    # Insert the Type/Year column, rename the water supply column
+    GBF2_ag = GBF2_ag.assign(Type='Agricultural Landuse', Year=yr_cal)
+    GBF2_non_ag = GBF2_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal)
+    GBF2_am = GBF2_am.assign(Type='Agricultural Management', Year=yr_cal)
+    
+    # Save the biodiversity scores
+    pd.concat([ GBF2_ag, GBF2_non_ag, GBF2_am], axis=0
+    ).assign(Priority_Target=data.BIO_GBF2_TARGET_PERCENT[yr_cal] * 100
+    ).rename(columns={
+        'lu':'Landuse',
+        'am':'Agri-Management',
+        'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)',
+        'Priority_Target':'Priority Target (%)'
+    }).reset_index(
+        drop=True
+    ).to_csv(
+        os.path.join(path, f'biodiversity_GBF2_priority_scores_{yr_cal}.csv'), index=False
+    )
+    
+    
+    
+def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
+        
+    # Do nothing if biodiversity limits are off and no need to report
+    if not settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
+        return
+    
+    veg_base_score_score = pd.DataFrame({
+        'vg': data.BIO_GBF3_ID2DESC.values(), 
+        'BASE_OUTSIDE_SCORE': data.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO, 
+        'BASE_TOTAL_SCORE': data.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA
+    })
+
+    # Get vegetation matrices for the year
+    vg_vr = xr.DataArray(
+        ag_biodiversity.get_major_vegetation_matrices(data), 
+        dims=['vg','cell'], 
+        coords={'vg':list(data.BIO_GBF3_ID2DESC.values()),  'cell':range(data.NCELLS)}
+    )
+
+    # Get the impacts of each ag/non-ag/am to vegetation matrices
+    ag_impact_j = xr.DataArray(
+        list(data.BIODIV_HABITAT_DEGRADE_LOOK_UP.values()),
+        dims=['lu'],
+        coords={'lu':data.AGRICULTURAL_LANDUSES}
+    )
+
+    non_ag_impact_k = xr.DataArray(
+        list(non_ag_biodiversity.get_non_ag_lu_biodiv_impacts(data).values()),
+        dims=['lu'],
+        coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
+    )
+
+    am_lu_unpacke = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+
+    am_impact_ir = xr.DataArray(
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_impacts(data, yr_cal).items() for arr in v.values()]), 
+        dims=['idx', 'cell'], 
+        coords={
+            'idx': range(len(am_lu_unpacke)),
+            'cell': range(data.NCELLS)}
+    )
+
+    # Get decision variables for the year
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
+    am_dvar_kmrj = am_dvar_kmrj.sel(idx=am_dvar_kmrj['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpacke))).drop_vars(['idx'])
+
+    # Get the base year biodiversity scores
+    GBF3_score_ag = (vg_vr * ag_impact_j * ag_dvar_mrj
+        ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index(
+        ).merge(veg_base_score_score
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
+
+    GBF3_score_am = (vg_vr * am_impact_ir * am_dvar_kmrj
+        ).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)').reset_index(
+        ).merge(veg_base_score_score,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
+        ).assign(
+            am = lambda x: x['idx'].apply(lambda idx: dict(enumerate(am_lu_unpacke))[idx][0]),
+            lu = lambda x: x['idx'].apply(lambda idx: dict(enumerate(am_lu_unpacke))[idx][1])
+        ).drop(columns=['idx'])
+        
+    GBF3_score_non_ag = (vg_vr * non_ag_impact_k * non_ag_dvar_rk).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index(
+        ).merge(veg_base_score_score,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
+
+
+    # Insert the Type/Year column, rename the water supply column
+    GBF3_score_ag = GBF3_score_ag.assign(Type='Agricultural Landuse', Year=yr_cal)
+    GBF3_score_non_ag = GBF3_score_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal)
+    GBF3_score_am = GBF3_score_am.assign(Type='Agricultural Management', Year=yr_cal)
+
+    # Calculate the relative contribution percentage for the outside LUTO area
+    veg_base_score_score = veg_base_score_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area'
+        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
+
+    # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
+    pd.concat([
+        GBF3_score_ag, 
+        GBF3_score_am, 
+        GBF3_score_non_ag,
+        veg_base_score_score
+    ],axis=0).rename(columns={
+        'lu':'Landuse',
+        'am':'Agri-Management',
+        'vg':'Vegetation Group',
+        'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'
+    }).reset_index(
+        drop=True
+    ).to_csv(
+        os.path.join(path, f'biodiversity_GBF3_scores_{yr_cal}.csv'), index=False
+    )
+    
+
+
+def write_biodiversity_GBF4A_scores_groups(data: Data, yr_cal, path):
+    
+    # Do nothing if biodiversity limits are off and no need to report
+    if not settings.BIODIVERSTIY_TARGET_GBF_4 == 'on':
+        return
+
+    print(f'Writing biodiversity GBF4 scores (GROUPS) for {yr_cal}')
+    
+    lumap = data.lumaps[yr_cal]
+    lumap_degradation = xr.DataArray(
+        np.vectorize(data.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(lumap).astype(np.float32),
+        dims=['cell'],
+        coords={'cell':np.arange(data.NCELLS)}
+    )
+
+    # Convert dvars to xarray DataArrays
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+
+    # Get biodiversity scores; s : species/groups, r : cells
+    ag_biodiv_groups_sr = xr.DataArray(
+        data.get_GBF4A_bio_layers_by_yr(yr_cal, 'group'), 
+        dims=['group', 'cell'], 
+        coords={'group':data.BIO_GBF4A_GROUPS_LAYER.group.values, 'cell':np.arange(data.NCELLS)}
+    )
+
+    # Get the GBF4A scores for the year
+    GBF4A_scores_groups_ag = (ag_dvar_mrj * lumap_degradation * ag_biodiv_groups_sr
+        ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
+            data.BIO_GBF4A_BASELINE_SCORE_GROUPS,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+    GBF4A_scores_groups_non_ag = (non_ag_dvar_rk * ag_biodiv_groups_sr
+        ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
+            data.BIO_GBF4A_BASELINE_SCORE_GROUPS,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+    GBF4A_scores_groups_am = (am_dvar_kmrj * lumap_degradation * ag_biodiv_groups_sr
+        ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
+            data.BIO_GBF4A_BASELINE_SCORE_GROUPS,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+
+
+    # Insert the type column
+    GBF4A_scores_groups_ag = GBF4A_scores_groups_ag.assign( Type='Agricultural Landuse', Year=yr_cal, Level='Group').replace({'dry':'Dryland', 'irr':'Irrigated'})
+    GBF4A_scores_groups_non_ag = GBF4A_scores_groups_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Group')
+    GBF4A_scores_groups_am = GBF4A_scores_groups_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Group').replace({'dry':'Dryland', 'irr':'Irrigated'})
+
+    # Get the outside LUTO study area score
+    outside_LUTO_score = data.BIO_GBF4A_BASELINE_SCORE_GROUPS.copy(
+        ).assign(Year=yr_cal, lu='Outside LUTO study area', Type='Outside LUTO study area', Level='Group'
+        ).eval('Relative_Contribution_Percentage = HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+
+    # Save to disk
+    pd.concat([
+        GBF4A_scores_groups_ag,
+        GBF4A_scores_groups_non_ag,
+        GBF4A_scores_groups_am,
+        outside_LUTO_score
+    ], axis=0).rename(columns={
+        'group':'Name',
+        'lm':'Water Supply',
+        'lu':'Landuse',
+        'am':'Agri-Management',
+        'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'
+    }).assign(
+        Name=lambda df: df['Name'].str.capitalize()
+    ).reset_index(
+        drop=True
+    ).to_csv(
+        os.path.join(path, f'biodiversity_GBF4A_groups_scores_{yr_cal}.csv'), index=False
+    )
+
+
+def write_biodiversity_GBF4A_scores_species(data: Data, yr_cal, path):
+    # Caculate the biodiversity scores for species, if user selected any species
+    if (not settings.BIODIVERSTIY_TARGET_GBF_4 == 'on') or (len(data.BIO_GBF4A_SEL_SPECIES) == 0):
+        return
+    
+    print(f'Writing biodiversity GBF4 scores (SPECIES) for {yr_cal}')
+    
+    lumap = data.lumaps[yr_cal]
+    lumap_degradation = xr.DataArray(
+        np.vectorize(data.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(lumap).astype(np.float32),
+        dims=['cell'],
+        coords={'cell':np.arange(data.NCELLS)}
+    )
+
+    # Convert dvars to xarray DataArrays
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    
+    # Get biodiversity scores; s : species/groups, r : cells
+    ag_biodiv_species_sr = xr.DataArray(
+        data.get_GBF4A_bio_layers_by_yr(yr_cal, 'species'), 
+        dims=['species', 'cell'], 
+        coords={'species':data.BIO_GBF4A_SPECIES_LAYER.species.values, 'cell':np.arange(data.NCELLS)}
+    )
+
+    # Get the GBF4A scores for the year; Merge with pre-1750 bioscore for all Australia; divide by pre-1750 score to get the relative contribution (%)
+    GBF4A_scores_species_ag = (ag_dvar_mrj * lumap_degradation * ag_biodiv_species_sr
+        ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
+            data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+
+    GBF4A_scores_species_non_ag = ( non_ag_dvar_rk * ag_biodiv_species_sr
+        ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
+            data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+
+    GBF4A_scores_species_am = (am_dvar_kmrj * lumap_degradation * ag_biodiv_species_sr
+        ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
+            data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+
+    # Insert the type column
+    GBF4A_scores_species_ag = GBF4A_scores_species_ag.assign(Type='Agricultural Landuse', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
+    GBF4A_scores_species_non_ag = GBF4A_scores_species_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Species')
+    GBF4A_scores_species_am = GBF4A_scores_species_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
+
+    # Get the outside LUTO study area score
+    outside_LUTO_score = data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.copy(
+        ).assign(Year=yr_cal, lu='Outside LUTO study area', Type='Outside LUTO study area', Level='Species'
+        ).eval('Relative_Contribution_Percentage = (HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO + HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO) / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+
+    # Save to disk
+    pd.concat([
+        GBF4A_scores_species_ag,
+        GBF4A_scores_species_non_ag,
+        GBF4A_scores_species_am,
+        outside_LUTO_score
+    ], axis=0).rename(columns={
+        'species':'Name',
+        'lm':'Water Supply',
+        'lu':'Landuse',
+        'am':'Agri-Management',
+        'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'
+    }).assign(
+        Name=lambda df: df['Name'].str.replace('_', ' ')
+    ).reset_index(
+        drop=True
+    ).to_csv(
+        os.path.join(path, f'biodiversity_GBF4A_species_scores_{yr_cal}.csv'), index=False
+    )
+        
+
+
+
+def write_ghg(data: Data, yr_cal, path):
+    """Calculate total GHG emissions from on-land agricultural sector.
+        Takes a simulation object, a target calendar year (e.g., 2030),
+        and an output path as input."""
+
+    if not settings.GHG_EMISSIONS_LIMITS == 'on':
+        return
+
+    print(f'Writing GHG outputs for {yr_cal}')
+
+    yr_idx = yr_cal - data.YR_CAL_BASE
+
+    # Get GHG emissions limits used as constraints in model
+    ghg_limits = ag_ghg.get_ghg_limits(data, yr_cal)
+
+    # Get GHG emissions from model
+    if yr_cal >= data.YR_CAL_BASE + 1:
+        ghg_emissions = data.prod_data[yr_cal]['GHG Emissions']
+    else:
+        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[data.YR_CAL_BASE]).sum()
+
+    # Save GHG emissions to file
+    df = pd.DataFrame({
+        'Variable':['GHG_EMISSIONS_LIMIT_TCO2e','GHG_EMISSIONS_TCO2e'],
+        'Emissions (t CO2e)':[ghg_limits, ghg_emissions]
+        })
+    df['Year'] = yr_cal
+    df.to_csv(os.path.join(path, f'GHG_emissions_{yr_cal}.csv'), index=False)
+    
+
+
+def write_species_conservation(data: Data, yr_cal: int, path) -> None:
+    if not settings.BIODIVERSTIY_TARGET_GBF_4 == "on":
+        return
+    
+    print(f"Writing species conservation scores for {yr_cal}")
+    
+    sc_df = pd.DataFrame(index=data.BIO_GBF4A_SEL_SPECIES, columns=["Target", "Actual"])
+
+    if yr_cal == data.YR_CAL_BASE:
+        sc_sr = ag_biodiversity.get_species_conservation_matrix(data, yr_cal)
+        ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
+        sc_prod_data = tools.calc_species_ag_area_for_year(
+            sc_sr, data.LUMAP, ag_biodiv_degr_j
+        )
+    else:
+        sc_prod_data = data.prod_data[yr_cal]["Species Conservation"]
+
+    sc_targets, species_names, _ = ag_biodiversity.get_species_conservation_limits(data, yr_cal)
+
+    for s, name in species_names.items():
+        sc_df.loc[name, "Target"] = sc_targets[s]
+        sc_df.loc[name, "Actual"] = sc_prod_data[s] * settings.SPECIES_CONSERVATION_DIV_CONSTANT
+
+    sc_df.to_csv(os.path.join(path, f'species_conservation_{yr_cal}.csv'), index=True)
 
 
 def write_ghg_separate(data: Data, yr_cal, path):
@@ -1304,25 +1669,25 @@ def write_ghg_separate(data: Data, yr_cal, path):
 
     # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
     if yr_cal == data.YR_CAL_BASE:
-        ghg_t = np.zeros(data.ag_dvars[yr_cal].shape, dtype=np.bool_)
+        pass
     else:
         yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
-        ghg_t = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[yr_cal_sim_pre])
+        ghg_t_dict = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[yr_cal_sim_pre], separate=True)
+        transition_types = ghg_t_dict.keys()
+        ghg_t = np.stack([ghg_t_dict[tt] for tt in transition_types], axis=0)
 
 
-    # Get the GHG emissions from lucc-convertion compared to the previous year
-    ghg_t_mj = np.einsum('mrj,mrj -> mj', data.ag_dvars[yr_cal], ghg_t)
+        # Get the GHG emissions from lucc-convertion compared to the previous year
+        ghg_t_smj = np.einsum('mrj,smrj->smj', data.ag_dvars[yr_cal], ghg_t)
 
-    # Summarize the array as a df
-    ghg_t_df = pd.DataFrame(ghg_t_mj.flatten(), index=pd.MultiIndex.from_product((data.LANDMANS, data.AGRICULTURAL_LANDUSES))).reset_index()
-    ghg_t_df.columns = ['Water_supply', 'Land-use', 'Value (t CO2e)']
-    ghg_t_df['Type'] = 'Deforestation'
-    ghg_t_df = ghg_t_df.replace({'dry': 'Dryland', 'irr':'Irrigated'})
-    ghg_t_df['Year'] = yr_cal
-
-    # Save table to disk
-    ghg_t_df['Year'] = yr_cal
-    ghg_t_df.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'), index=False)
+        # Summarize the array as a df
+        ghg_t_df = pd.DataFrame(ghg_t_smj.flatten(), index=pd.MultiIndex.from_product((transition_types, data.LANDMANS, data.AGRICULTURAL_LANDUSES))).reset_index()
+        ghg_t_df.columns = ['Type','Water_supply', 'Land-use', 'Value (t CO2e)']
+        ghg_t_df = ghg_t_df.replace({'dry': 'Dryland', 'irr':'Irrigated'})
+        ghg_t_df['Year'] = yr_cal
+        
+        # Save table to disk
+        ghg_t_df.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'), index=False)
 
 
 
@@ -1542,7 +1907,7 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             cost_dfs.append(arr)
     summed_array_r = np.sum(cost_dfs, axis=0)
     save_map_to_npy(data, summed_array_r, f'cost_transition_ag2ag', yr_cal, path)
-    cost_dfs = []
+
 
     # ---------------------------------------------------------------------
     #              Agricultural management transition costs
@@ -1557,26 +1922,36 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
-        non_ag_transitions_cost_mat = {k: {'Transition cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
-                                       for k in data.NON_AGRICULTURAL_LANDUSES}
+        non_ag_transitions_cost_mat = {
+            k: {'Transition cost': np.zeros(data.NCELLS).astype(np.float32)}
+            for k in NON_AG_LAND_USES.keys()
+        }
     else:
-        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(data,
-                                                                                       yr_idx,
-                                                                                       yr_cal_sim_pre,
-                                                                                       data.lumaps[yr_cal],
-                                                                                       data.lmmaps[yr_cal],
-                                                                                       separate=True)
+        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
+            data, yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
+        )
+    cost_dfs = []
+    for from_lu in data.AGRICULTURAL_LANDUSES:
+        for from_lm in data.LANDMANS:
+            for to_lu in NON_AG_LAND_USES.keys():
+                for cost_type in non_ag_transitions_cost_mat[to_lu].keys():
 
-    for idx, non_ag_type in enumerate(non_ag_transitions_cost_mat):
-        for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
-            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]  # Get the transition cost matrix
-            arr = np.einsum('mrj,r->r', np.nan_to_num(arr, nan=0.0), np.nan_to_num(non_ag_dvar[:,
-                                                                                   idx],
-                                                                                   nan=0.0))  # Multiply the transition cost matrix by the cost of non-agricultural land-use
-            cost_dfs.append(arr)
+                    from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]].astype(
+                        np.bool_)  # Get the land-use index of the from land-use (r*)
+                    arr_trans = non_ag_transitions_cost_mat[to_lu][cost_type][
+                        from_lu_idx]  # Get the transition cost matrix of from land-use (r*)
+                    arr_dvar = non_ag_dvar[from_lu_idx, data.NON_AGRICULTURAL_LANDUSES.index(
+                        to_lu)]  # Get the decision variable of the from land-use (r*)
+
+                    if arr_dvar.size == 0:
+                        continue
+
+                    cost_arr = np.einsum('r,r->r', arr_trans, arr_dvar)
+                    cost_dfs.append(cost_arr)
+
     summed_array_r = np.sum(cost_dfs, axis=0)
     save_map_to_npy(data, summed_array_r, f'cost_transition_ag2non_ag', yr_cal, path)
-    cost_dfs = []
+
     # --------------------------------------------------------------------
     #              Non-agricultural land-use transition costs (from non-ag to ag)
     # --------------------------------------------------------------------
@@ -1591,6 +1966,7 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                                                                      data.lumaps[yr_cal],
                                                                                      data.lmmaps[yr_cal],
                                                                                      separate=True)
+    cost_dfs = []
     for non_ag_type in non_ag_transitions_cost_mat:
         for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
             arr = np.nan_to_num(non_ag_transitions_cost_mat[non_ag_type][cost_type])  # Get the transition cost matrix
