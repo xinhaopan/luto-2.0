@@ -39,7 +39,7 @@ from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
 from luto.tools.create_task_runs.helpers import log_memory_usage
 from luto.tools.write import write_outputs
-from luto.economics.agricultural.biodiversity import get_major_vegetation_matrices
+from luto.economics.agricultural.biodiversity import get_GBF3_major_vegetation_matrices_vr
 
 import luto.settings as settings
 import luto.economics.agricultural.ghg as ag_ghg
@@ -82,7 +82,7 @@ def run(
     """
     Run the simulation.
 
-    Parameters:
+    Parameters
         - data: is a Data object which is previously loaded using load_data(),
         - base_year: optional argument base year for the simulation,
         - target_year: optional target year for the simulation,
@@ -132,13 +132,13 @@ def run(
         raise ValueError(f"Unkown MODE: {settings.MODE}.")
     
     # Save the Data object to disk
-    # write_outputs(data)
+    write_outputs(data)
 
 
 def validate_simulation_years_settings(
     data_yr_cal_base: int,
-    base_year: int | None = None,
-    target_year: int | None = None,
+    base_year: int | None = None, 
+    target_year: int | None = None, 
     step_size: int | None = None,
     years: list[int] | None = None,
 ) -> None:
@@ -146,7 +146,7 @@ def validate_simulation_years_settings(
     Validates the years settings given to run a simulation.
     Raises errors or warnings if the settings don't adhere to the following rules:
     - if 'years' list is provided, it must have at least two years in it (the first year is the solve's base year)
-    - if 'years' list is provided, all other years settings should not be specified
+    - if 'years' list is provided, all other years settings should not be specified 
     - if 'years' list is provided, it must be in ascending order
     - the 'years' list cannot be specified for snapshot solves
     - 'step_size' argument will be ignored for snapshot solves
@@ -158,10 +158,10 @@ def validate_simulation_years_settings(
 
         if step_size or base_year or target_year:
             raise ValueError("'years' cannot be specified with step_size, base_year or target_year.")
-
+        
         if years != sorted(years):
             raise ValueError("'years' must be in ascending order.")
-
+        
         if settings.MODE == 'snapshot':
             raise ValueError("'years' cannot be specified for snapshot solves.")
 
@@ -198,21 +198,21 @@ def populate_containers_dynamic_base_year(
     # Populate production containers
     if year_before_base_year == data.YR_CAL_BASE:
         ghg_emission_data = (
-            ag_ghg.get_ghg_matrices(data, 0, aggregate=True)
+            ag_ghg.get_ghg_matrices(data, 0, aggregate=True) 
             * data.ag_dvars[data.YR_CAL_BASE]
         ).sum()
-        biodiversity_data = (ag_biodiversity.get_breq_matrices(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
+        biodiversity_data = (ag_biodiversity.get_bio_priority_score_matrices_mrj(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
         major_vegetation_data = calc_major_vegetation_group_ag_area_for_year(
-            get_major_vegetation_matrices(data),
+            get_GBF3_major_vegetation_matrices_vr(data),
             data.lumaps[data.YR_CAL_BASE],
-            data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
+            data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
         species_conservation_data = calc_species_ag_area_for_year(
-            ag_biodiversity.get_species_conservation_matrix(data, data.YR_CAL_BASE),
+            ag_biodiversity.get_GBF4A_species_conservation_matrix_sr(data, data.YR_CAL_BASE),
             data.lumaps[year_before_base_year],
-            data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
+            data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
-
+        
     else:
         ghg_emission_data = data.prod_data[year_before_base_year]["GHG Emissions"]
         biodiversity_data = data.prod_data[year_before_base_year]["Biodiversity"]
@@ -223,7 +223,7 @@ def populate_containers_dynamic_base_year(
     data.add_production_data(base_year, "GHG Emissions", ghg_emission_data)
     data.add_production_data(base_year, "Biodiversity", biodiversity_data)
     data.add_production_data(base_year, "Major Vegetation Groups", major_vegetation_data)
-    data.add_production_data(base_year, "Species Conservation", species_conservation_data)
+    data.add_production_data(base_year, "Species Conservation", species_conservation_data)    
 
 
 def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
@@ -338,7 +338,7 @@ def load_data_from_disk(path: str) -> Data:
     Raises:
         ValueError: if the resolution factor from the data object does not match the settings.RESFACTOR.
 
-    Returns:
+    Returns
         Data: `Data` object.
     """
     # Load the data object with gzip compression
