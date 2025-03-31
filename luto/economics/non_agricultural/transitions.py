@@ -40,20 +40,24 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, w_license_cost_
         w_rm_irrig_cost_r (np.ndarray): The costs of removing irrigation.
         separate (bool, optional): Whether to return separate costs or the total cost. Defaults to False.
 
-    Returns:
+    Returns
         np.ndarray|dict: The transition costs as either a numpy array or a dictionary, depending on the value of `separate`.
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Establishment costs
     est_costs_r = tools.amortise(data.EP_EST_COST_HA * data.REAL_AREA * data.EST_COST_MULTS[yr_cal]).astype(np.float32)
+    est_costs_r[tools.get_env_plantings_cells(lumap)] = 0.0
     
     # Transition costs
     base_ag_to_ep_t_r = np.vectorize(dict(enumerate(data.AG2EP_TRANSITION_COSTS_HA)).get, otypes=['float32'])(lumap)
     base_ag_to_ep_t_r = tools.amortise(base_ag_to_ep_t_r * data.REAL_AREA)
     base_ag_to_ep_t_r = np.nan_to_num(base_ag_to_ep_t_r)
+    base_ag_to_ep_t_r[tools.get_env_plantings_cells(lumap)] = 0.0
     
     # Waster costs; Assume EP is dryland, and no 'REMOVE_IRRIG_COST' for EP
+    w_license_cost_r[tools.get_env_plantings_cells(lumap)] = 0.0
+    w_rm_irrig_cost_r[tools.get_env_plantings_cells(lumap)] = 0.0
     w_cost_r = w_license_cost_r + w_rm_irrig_cost_r
 
     if separate:
@@ -199,13 +203,17 @@ def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, w_license_cost
 
     # Establishment costs for each cell
     est_costs_r = tools.amortise(data.CP_EST_COST_HA * data.REAL_AREA * data.EST_COST_MULTS[yr_cal] ).astype(np.float32)
+    est_costs_r[tools.get_carbon_plantings_block_cells(lumap)] = 0.0
     
     # Transition costs
     base_ag_to_cp_t_j = np.vectorize(dict(enumerate(data.AG2EP_TRANSITION_COSTS_HA)).get, otypes=['float32'])(lumap).astype(np.float32)
     base_ag_to_cp_t_j = tools.amortise(base_ag_to_cp_t_j * data.REAL_AREA).copy()
     base_ag_to_cp_t_j = np.nan_to_num(base_ag_to_cp_t_j)
+    base_ag_to_cp_t_j[tools.get_carbon_plantings_block_cells(lumap)] = 0.0
 
     # Water costs (pre-amortised)
+    w_license_cost_r[tools.get_carbon_plantings_block_cells(lumap)] = 0.0
+    w_rm_irrig_cost_r[tools.get_carbon_plantings_block_cells(lumap)] = 0.0
     w_cost_r = w_license_cost_r + w_rm_irrig_cost_r
 
     if separate:
@@ -363,17 +371,20 @@ def get_from_ag_transition_matrix(data: Data, yr_idx, base_year, lumap, lmmap, s
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
     w_license_cost_r, w_rm_irrig_cost_r = tools.get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)
     
-    env_plant_transitions_from_ag = get_env_plant_transitions_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)   # Base transition from ag to tree planting
-    rip_plant_transitions_from_ag = get_rip_plant_transitions_from_ag(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)         # Base transition plus RF fencing costs
-    agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)            # Base transition plus AF fencing costs
-    cp_belt_costs = get_carbon_plantings_belt_from_ag_base(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)                    # Base transition plus CP fencing costs
-
-    sheep_agroforestry_transitions_from_ag = get_sheep_agroforestry_transitions_from_ag(data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate)
-    beef_agroforestry_transitions_from_ag = get_beef_agroforestry_transitions_from_ag( data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate)
-    carbon_plantings_block_transitions_from_ag = get_carbon_plantings_block_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)
-    sheep_carbon_plantings_belt_transitions_from_ag = get_sheep_carbon_plantings_belt_from_ag(data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)
-    beef_carbon_plantings_belt_transitions_from_ag = get_beef_carbon_plantings_belt_from_ag( data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)
-    beccs_transitions_from_ag = get_beccs_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)
+    env_plant_transitions_from_ag = get_env_plant_transitions_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)                           # Base EP transition 
+    rip_plant_transitions_from_ag = get_rip_plant_transitions_from_ag(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)                                 # Base EP transition plus RF fencing costs
+    agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)                                    # Base EP transition plus AF fencing costs
+    
+    sheep_agroforestry_transitions_from_ag = get_sheep_agroforestry_transitions_from_ag(data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate)    # Base EP transition plus RF fencing costs + sheep grazing
+    beef_agroforestry_transitions_from_ag = get_beef_agroforestry_transitions_from_ag( data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate)     # Base EP transition plus RF fencing costs + beef grazing
+    
+    carbon_plantings_block_transitions_from_ag = get_carbon_plantings_block_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)             # Base CP transition 
+    cp_belt_costs = get_carbon_plantings_belt_from_ag_base(data, carbon_plantings_block_transitions_from_ag, yr_idx, lumap, separate)                               # Base CP transition plus CP fencing costs
+    
+    sheep_carbon_plantings_belt_transitions_from_ag = get_sheep_carbon_plantings_belt_from_ag(data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)        # Base CP transition plus CP fencing costs + sheep grazing
+    beef_carbon_plantings_belt_transitions_from_ag = get_beef_carbon_plantings_belt_from_ag( data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)         # Base CP transition plus CP fencing costs + beef grazing
+    
+    beccs_transitions_from_ag = get_beccs_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)                                               # Base EP transition (the same)
 
     if separate:
         # IMPORTANT: The order of the keys in the dictionary must match the order of the non-agricultural land uses
@@ -886,10 +897,10 @@ def get_non_ag_transition_matrix(data: Data) -> np.ndarray:
     Get the matrix that contains transition costs for non-agricultural land uses. 
     There are no transition costs for non-agricultural land uses, therefore the matrix is filled with zeros.
     
-    Parameters:
+    Parameters
         data (object): The data object containing information about the model.
     
-    Returns:
+    Returns
         np.ndarray: The transition cost matrix, filled with zeros.
     """
     return np.zeros((data.NCELLS, data.N_NON_AG_LUS)).astype(np.float32)
@@ -899,11 +910,11 @@ def get_exclusions_environmental_plantings(data: Data, lumap) -> np.ndarray:
     """
     Get the exclusion array for the environmental plantings land use.
 
-    Parameters:
+    Parameters
     - data: The data object containing information about land use transitions.
     - lumap: The land use map.
 
-    Returns:
+    Returns
     - exclude: The exclusion array where 0 represents excluded land uses and 1 represents allowed land uses.
     """
     # Get (agricultural) land uses that cannot transition to environmental plantings
@@ -927,11 +938,11 @@ def get_exclusions_riparian_plantings(data: Data, lumap) -> np.ndarray:
     
     This function calculates and returns a 1-D array indexed by r that represents how much Riparian Plantings (RP) land use can be utilized.
     
-    Parameters:
+    Parameters
         data (DataFrame): The data containing information about the land use.
         lumap (array-like): The land use map.
         
-    Returns:
+    Returns
         np.ndarray: The exclusion array for Riparian Plantings land use.
     """
     exclude = (data.RP_PROPORTION).astype(np.float32)
@@ -959,7 +970,7 @@ def get_exclusions_sheep_agroforestry(
         ag_x_mrj (np.ndarray): The agroforestry land use matrix.
         lumap (np.ndarray): The land use map.
 
-    Returns:
+    Returns
         np.ndarray: An array of exclusions indicating which cells cannot utilize both agroforestry and sheep.
 
     """
@@ -986,7 +997,7 @@ def get_exclusions_beef_agroforestry(
         ag_x_mrj (np.ndarray): The ag_x_mrj array.
         lumap (np.ndarray): The lumap array.
 
-    Returns:
+    Returns
         np.ndarray: An array of exclusions, where 1 represents cells that cannot utilize both agroforestry and beef.
     """
     beef_j = tools.get_beef_code(data)
@@ -1006,11 +1017,11 @@ def get_exclusions_carbon_plantings_block(data, lumap) -> np.ndarray:
     Return a 1-D array indexed by r that represents how much carbon plantings (block) can possibly 
     be done at each cell.
 
-    Parameters:
+    Parameters
     - data: The data object containing information about the cells.
     - lumap: The land use map.
 
-    Returns:
+    Returns
     - exclude: A 1-D numpy array
     """
     exclude = np.ones(data.NCELLS)
@@ -1033,7 +1044,7 @@ def get_exclusions_sheep_carbon_plantings_belt(
         ag_x_mrj (np.ndarray): The ag_x_mrj array.
         lumap (np.ndarray): The lumap array.
 
-    Returns:
+    Returns
         np.ndarray: The exclusions array.
 
     """
@@ -1055,12 +1066,12 @@ def get_exclusions_beef_carbon_plantings_belt(
     """
     Calculate exclusions for cells that cannot utilize both agroforestry and beef.
 
-    Parameters:
+    Parameters
         data (Data): The data object containing necessary information.
         ag_x_mrj (np.ndarray): The agroforestry matrix.
         lumap (np.ndarray): The land use map.
 
-    Returns:
+    Returns
         np.ndarray: An array of exclusions, where 1 represents cells that cannot utilize both agroforestry and beef.
     """
     beef_j = tools.get_beef_code(data)
@@ -1080,11 +1091,11 @@ def get_exclusions_beccs(data, lumap) -> np.ndarray:
     Return a 1-D array indexed by r that represents how much BECCS can possibly 
     be done at each cell.
 
-    Parameters:
+    Parameters
     - data: The data object containing BECCS costs and other relevant information.
     - lumap: The land use map object.
 
-    Returns:
+    Returns
     - exclude: A 1-D array
     """
     exclude = np.zeros(data.NCELLS).astype(np.float32)
