@@ -52,7 +52,7 @@ def rename_and_filter_columns(data_dict, columns_to_keep, new_column_names=None)
 
 
 def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
-                   condition_column_name=None, condition_value=None, use_parallel=True, n_jobs=-1):
+                   condition_column_name=None, condition_value=None, use_parallel=False, n_jobs=-1):
     """
     从多个文件中读取数据并按指定列分组求和，并可根据条件列进行筛选。
 
@@ -349,7 +349,60 @@ def merge_transposed_dict(data_dict):
 
     return sorted_df
 
+def plot_land_use_shift(input_file, cal_excel=True):
+    path = get_path(input_file)
+    pattern = re.compile(r'(?<!Non-)Ag_LU.*\.tif{1,2}$', re.IGNORECASE)
+    color_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='ag')
+    color_mapping = dict(zip(color_df['desc'], color_df['color']))
 
+    # 初始化
+    names, result_df, tuples, years = None, None, None, range(2010, 2051, 5)
+
+    if cal_excel:
+        use_parallel = True
+        folder_path_2050 = os.path.join(path, "out_2050", "lucc_separate")
+        files = [f for f in os.listdir(folder_path_2050) if pattern.match(f)]
+        names = [f.split("_")[3] for f in files]
+
+        # 经纬度数据框
+        tuples = [(name, coord) for name in names for coord in ['Lon', 'Lat']]
+        columns = pd.MultiIndex.from_tuples(tuples, names=["Land Use", "Coordinate"])
+        df = pd.DataFrame(index=range(2010, 2051), columns=columns)
+
+        for year in range(2010, 2051):
+            folder_path = os.path.join(path, f"out_{year}", "lucc_separate")
+            files = [f for f in os.listdir(folder_path) if pattern.match(f) and "mercator" not in f]
+            if use_parallel:
+                results = Parallel(n_jobs=-1)(delayed(get_lon_lat)(os.path.join(folder_path, f)) for f in files)
+            else:
+                results = [get_lon_lat(os.path.join(folder_path, f)) for f in files]
+            for name, (weighted_lon, weighted_lat) in zip(names, results):
+                df.loc[year, (name, 'Lon')] = weighted_lon
+                df.loc[year, (name, 'Lat')] = weighted_lat
+
+        # 坐标转换
+        with rasterio.open(os.path.join(folder_path_2050, files[0])) as dataset:
+            crs_from = dataset.crs
+        crs_to = CRS.from_epsg(3577)
+        transformer = Transformer.from_crs(crs_from, crs_to, always_xy=True)
+
+        # 计算距离和角度
+        tuples = [(land_use, metric) for land_use in names for metric in ['Distance (km)', 'Angle (degrees)']]
+        result_df = pd.DataFrame(index=years, columns=pd.MultiIndex.from_tuples(tuples, names=["Land Use", "Metric"]))
+
+        for land_use in names:
+            origin_lon, origin_lat = df.loc[2010, (land_use, 'Lon')], df.loc[2010, (land_use, 'Lat')]
+            origin_x, origin_y = transformer.transform(origin_lon, origin_lat)
+            for year in years:
+                curr_lon, curr_lat = df.loc[year, (land_use, 'Lon')], df.loc[year, (land_use, 'Lat')]
+                curr_x, curr_y = transformer.transform(curr_lon, curr_lat)
+                distance = np.sqrt((curr_x - origin_x)**2 + (curr_y - origin_y)**2) / 1000.0
+                angle_deg = (np.degrees(np.arctan2(curr_x - origin_x, curr_y - origin_y)) + 360) % 360
+                result_df.loc[year, (land_use, 'Distance (km)')] = round(distance, 3)
+                result_df.loc[year, (land_use, 'Angle (degrees)')] = round(angle_deg, 2)
+
+        excel_path = "../output/12_land_use_movement_all.xlsx"
+        save_result_to_excel(result_df, excel_path, input_file)
 
 
 
