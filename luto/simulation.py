@@ -64,8 +64,8 @@ def load_data() -> Data:
     memory_thread.start()
     
     # Remove previous log files
-    for f in glob(f'{settings.OUTPUT_DIR}/*.log'):
-        os.remove(f)
+    # for f in glob(f'{settings.OUTPUT_DIR}/*.log'):
+    #     os.remove(f)
 
     return Data()
 

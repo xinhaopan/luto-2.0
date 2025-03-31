@@ -148,31 +148,30 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     # The area here was calculated from lumap/lmmap, which {are not accurate !!!}
     # compared to the area calculated from dvars
-    write_crosstab(data, yr_cal, path_yr, yr_cal_sim_pre)
-
-    # Write the reset outputs
-    write_files(data, yr_cal, path_yr)
-    write_files_separate(data, yr_cal, path_yr) if settings.WRITE_OUTPUT_GEOTIFFS else None
-    write_dvar_area(data, yr_cal, path_yr)
-    write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
-    write_quantity_separate(data, yr_cal, path_yr)
-    write_revenue_cost_ag(data, yr_cal, path_yr)
-    write_revenue_cost_ag_management(data, yr_cal, path_yr)
-    write_revenue_cost_non_ag(data, yr_cal, path_yr)
-    write_cost_transition(data, yr_cal, path_yr)
-    write_water(data, yr_cal, path_yr)
-    write_ghg(data, yr_cal, path_yr)
-    write_ghg_separate(data, yr_cal, path_yr)
-    write_ghg_offland_commodity(data, yr_cal, path_yr)
+    # write_crosstab(data, yr_cal, path_yr, yr_cal_sim_pre)
+    #
+    # # Write the reset outputs
+    # write_files(data, yr_cal, path_yr)
+    # write_files_separate(data, yr_cal, path_yr) if settings.WRITE_OUTPUT_GEOTIFFS else None
+    # write_dvar_area(data, yr_cal, path_yr)
+    # write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
+    # write_quantity_separate(data, yr_cal, path_yr)
+    # write_revenue_cost_ag(data, yr_cal, path_yr)
+    # write_revenue_cost_ag_management(data, yr_cal, path_yr)
+    # write_revenue_cost_non_ag(data, yr_cal, path_yr)
+    # write_cost_transition(data, yr_cal, path_yr)
+    # write_water(data, yr_cal, path_yr)
+    # write_ghg(data, yr_cal, path_yr)
+    # write_ghg_separate(data, yr_cal, path_yr)
+    # write_ghg_offland_commodity(data, yr_cal, path_yr)
+    # write_biodiversity(data, yr_cal, path_yr)
+    # write_biodiversity_separate(data, yr_cal, path_yr)
     # write_biodiversity_priority_scores(data, yr_cal, path_yr)
-    write_biodiversity(data, yr_cal, path_yr)
-    write_biodiversity_separate(data, yr_cal, path_yr)
-    write_biodiversity_priority_scores(data, yr_cal, path_yr)
-    write_biodiversity_GBF2_scores(data, yr_cal, path_yr)
-    write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
-    write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
-    write_biodiversity_GBF4A_scores_species(data, yr_cal, path_yr)
-    # write_npy(data, yr_cal, path_yr)
+    # write_biodiversity_GBF2_scores(data, yr_cal, path_yr)
+    # write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
+    # write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
+    # write_biodiversity_GBF4A_scores_species(data, yr_cal, path_yr)
+    write_npy(data, yr_cal, path_yr)
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
 

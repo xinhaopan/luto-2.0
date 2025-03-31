@@ -366,161 +366,10 @@ def recommend_resources(df):
         print(f"  - Current MEM: {mem} GB, Recommended CPU {rec_cpu}")
         break
 
-def check_null_values(df):
-    """
-    Check for null values in the DataFrame and print their locations.
 
-    Args:
-        df (pd.DataFrame): DataFrame to check for null values.
-
-    Returns:
-        None: Raises a ValueError if null values are found.
-    """
-    if df.isnull().values.any():
-        null_positions = df[df.isnull().any(axis=1)]
-        for index, row in null_positions.iterrows():
-            null_columns = row[row.isnull()].index.tolist()
-            print(f"行 {index} 的以下列存在空值：{null_columns}")
-        raise ValueError("DataFrame 中存在空值，请处理后再继续执行！")
-
-
-def generate_column_names(new_df, df_revise,suffixs='', ghg_name_map=None, bio_name_map=None):
-    """
-    Generate new column names based on mappings and input data.
-
-    Args:
-        new_df (pd.DataFrame): DataFrame to update column names.
-        df_revise (pd.DataFrame): DataFrame with revision information.
-        ghg_name_map (dict): Mapping for GHG names.
-        bio_name_map (dict): Mapping for BIO names.
-
-    Returns:
-        list: List of new column names.
-    """
-    if ghg_name_map is None:
-        ghg_name_map = {
-            "1.8C (67%) excl. avoided emis": "GHG_1_8C_67",
-            "1.5C (50%) excl. avoided emis": "GHG_1_5C_50",
-            "1.5C (67%) excl. avoided emis": "GHG_1_5C_67"
-        }
-
-    if bio_name_map is None:
-        bio_name_map = {
-            "{2010: 0, 2030: 0, 2050: 0, 2100: 0}": "BIO_0",
-            "{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}": "BIO_3",
-            "{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}": "BIO_5"
-        }
-    current_time = datetime.datetime.now().strftime("%Y%m%d")
-
-    # 获取 GHG 和 BIO 对应的行值
-    ghg_limits_field = new_df.iloc[new_df[new_df.iloc[:, 0] == "GHG_LIMITS_FIELD"].index[0]]
-    biodiv_gbf_target_2_dict = new_df.iloc[new_df[new_df.iloc[:, 0] == "BIODIV_GBF_TARGET_2_DICT"].index[0]]
-    if len(suffixs) > 0:
-        # 选取匹配 suffix 列表的所有行
-        selected_rows = new_df[new_df.iloc[:, 0].isin(suffixs)]
-
-        if not selected_rows.empty:
-            # 去掉第一列，只保留数据部分
-            selected_values = selected_rows.iloc[:, 1:].astype(str)
-
-            # 构造按列存储的 suffix 替换映射
-            suffix_values_dict = {
-                col: '_'.join(selected_values[col].values) for col in selected_values.columns
-            }
-        else:
-            suffix_values_dict = {}
-
-    # 检查 Name1 是否存在
-    name_column = df_revise.columns[0]
-    if "Name1" not in df_revise[name_column].values:
-        print("警告：Name1 不存在于修订模板中，相关内容将被省略。")
-        name1_row = None
-    else:
-        name1_row = df_revise[df_revise[name_column] == "Name1"].iloc[0]
-
-    new_column_names = []
-    for col in new_df.columns[2:]:  # 跳过前两列
-        # 获取 GHG 和 BIO 的映射值
-        ghg_value = ghg_name_map.get(ghg_limits_field[col], "Unknown_GHG")
-        bio_value = bio_name_map.get(biodiv_gbf_target_2_dict[col], "Unknown_BIO")
-
-        # 初始化列名部分
-        col = str(col).split('.')[0]
-        new_name = f"{current_time}_{col}"
-
-        # 如果 Name1 存在并且有值，则添加到列名中
-        if name1_row is not None:
-            name1_value = name1_row.get(col, "")
-            if not pd.isna(name1_value) and name1_value != "":
-                new_name += f"_{name1_value}"
-            else:
-                print(f"警告：列 {col} 中 Name1 没有有效值，已跳过添加相关内容。")
-        new_name += f"_{ghg_value}_{bio_value}"
-        if len(suffixs) > 0 and col in suffix_values_dict:
-            new_name += f"_{suffix_values_dict[col]}"
-
-        new_column_names.append(new_name)
-
-    return new_column_names
-
-
-def generate_csv(
-    input_csv="Custom_runs/settings_template.csv",
-    revise_excel="Custom_runs/Revise_settings_template.xlsx",
-    output_csv="Custom_runs/setting_template_windows.csv",
-    ghg_name_map=None,
-    bio_name_map=None
-):
-    """
-    Process input CSV and Revise Excel, generate new CSV file with updated settings.
-
-    Args:
-        input_csv (str): Path to the input CSV file. Default: "Custom_runs/settings_template.csv".
-        revise_excel (str): Path to the revise Excel file. Default: "Custom_runs/Revise_settings_template.xlsx".
-        output_csv (str): Path for the output CSV file. Must be specified.
-        ghg_name_map (dict): Mapping for GHG names. Default: provided example map.
-        bio_name_map (dict): Mapping for BIO names. Default: provided example map.
-
-    Returns:
-        None
-    """
-
-    df = pd.read_csv(input_csv)
-    df_revise = pd.read_excel(revise_excel, sheet_name="using")
-    df_revise.columns = df_revise.columns.astype(str)
-    df_revise = df_revise.loc[:, ~df_revise.columns.str.startswith('Unnamed')]
-
-    check_null_values(df_revise)
-
-    new_df = pd.DataFrame(df.iloc[:, :2])
-    new_df.columns = df.columns[:2]
-
-    for col_name in df_revise.columns[1:]:
-        new_df[col_name] = df["Default_run"]
-
-    for idx, row in df_revise.iterrows():
-        match_value = row[df_revise.columns[0]]
-        matching_condition = new_df.iloc[:, 0] == match_value
-        if matching_condition.any():
-            for col_name in df_revise.columns[1:]:
-                new_df.loc[matching_condition, col_name] = row[col_name]
-
-    new_column_names = generate_column_names(new_df, df_revise,suffix, ghg_name_map, bio_name_map)
-    new_df.columns = new_df.columns[:2].tolist() + new_column_names
-
-    if os.path.exists(output_csv):
-        print(f"文件 '{output_csv}' 已经存在，未覆盖保存。")
-    else:
-        new_df.to_csv(output_csv, index=False)
-        print(f"新的DataFrame已生成，并保存为 '{output_csv}'")
-
-    total_cost = calculate_total_cost(df_revise)
-    print(f"Job Cost: {total_cost}k")
-    recommend_resources(df_revise)
-
-
-def create_grid_search_template(template_df, grid_dict, output_file,suffixs="",col_suffix="") -> pd.DataFrame:
+def create_grid_search_template(grid_dict, output_file,suffixs=['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT'], run_time=None) -> pd.DataFrame:
     # Collect new columns in a list
+    template_df = create_settings_template('Custom_runs')
     template_grid_search = template_df.copy()
 
     # Convert all values in the grid_dict to string representations
@@ -551,26 +400,63 @@ def create_grid_search_template(template_df, grid_dict, output_file,suffixs="",c
         new_column.name = f'Run_{row["run_idx"]}'
         template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]}')], axis=1)
 
-    # Save the grid search template to the root task folder
-    # template_grid_search.to_csv(output_file, index=False)
+    # Modify column names using the new function
+    template_grid_search = modify_column_name(template_grid_search, suffixs, run_time)
 
-    ghg_row = template_grid_search.loc[template_grid_search['Name'] == 'GHG_LIMITS_FIELD']
-
-    for col in template_grid_search.columns[1:]:  # 跳过 'Name' 列
-        ghg_value = ghg_row[col].values[0]  # 获取当前列 GHG_LIMITS_FIELD 的值
-        if ghg_value != 'c0':
-            template_grid_search.loc[template_grid_search['Name'] == 'CARBON_PRICES_FIELD', col] = ghg_value[:9].replace('(', '')
-
-    # Save the grid search template to the root task folder
-
-    template_grid_search.columns = template_grid_search.columns[:2].tolist() + generate_column_names(template_grid_search, template_grid_search, suffixs)
-    template_grid_search.columns = (
-            [template_grid_search.columns[0], template_grid_search.columns[1]]  # 保留前两列
-            + [col + col_suffix for col in template_grid_search.columns[2:]]  # 从第三列开始加后缀
-    )
     print(template_grid_search.columns)
     template_grid_search.to_csv(output_file, index=False)
     total_cost = calculate_total_cost(template_grid_search)
     print(f"Job Cost: {total_cost}k")
     recommend_resources(template_grid_search)
+    return template_grid_search
+
+def modify_column_name(template_grid_search, suffixs=['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT'], run_time=None):
+    """
+    Modify column names in the template grid search DataFrame based on the provided suffixes.
+
+    Args:
+        template_grid_search (pd.DataFrame): DataFrame containing the template settings.
+        suffixs (list): List of suffixes to append to column names.
+        run_time (str): Custom timestamp to use in column names. If None, uses current time.
+
+    Returns:
+        pd.DataFrame: DataFrame with modified column names.
+    """
+    if run_time is None:
+        run_time = datetime.datetime.now().strftime("%Y%m%d")
+
+    # Default GHG and BIO mappings
+    ghg_name_map = {
+        "1.8C (67%) excl. avoided emis": "GHG_1_8C_67",
+        "1.5C (50%) excl. avoided emis": "GHG_1_5C_50",
+        "1.5C (67%) excl. avoided emis": "GHG_1_5C_67"
+    }
+    bio_name_map = {
+        "{2010: 0, 2030: 0, 2050: 0, 2100: 0}": "BIO_0",
+        "{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}": "BIO_3",
+        "{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}": "BIO_5"
+    }
+
+    # Initialize new column names list
+    new_column_names = []
+
+    for col in template_grid_search.columns[2:]:  # Skip the first two columns
+        new_name = f"{run_time}_{col.split('.')[0]}"
+        for suffix in suffixs:
+            if suffix == 'GHG_LIMITS_FIELD' or suffix == 'BIODIV_GBF_TARGET_2_DICT':
+                if suffix == 'GHG_LIMITS_FIELD':
+                    ghg_value = template_grid_search.loc[template_grid_search['Name'] == 'GHG_LIMITS_FIELD', col].values[0]
+                    new_name += f"_{ghg_name_map.get(ghg_value, 'Unknown_GHG')}"
+                elif suffix == 'BIODIV_GBF_TARGET_2_DICT':
+                    bio_value = template_grid_search.loc[template_grid_search['Name'] == 'BIODIV_GBF_TARGET_2_DICT', col].values[0]
+                    new_name += f"_{bio_name_map.get(bio_value, 'Unknown_BIO')}"
+                else:
+                    # Use suffix as an index to get the corresponding value from template_grid_search
+                    suffix_value = template_grid_search.loc[template_grid_search['Name'] == suffix, col].values[0]
+                    new_name += f"_{suffix_value}"
+        new_column_names.append(new_name)
+
+    # Update the column names of the DataFrame
+    template_grid_search.columns = template_grid_search.columns[:2].tolist() + new_column_names
+
     return template_grid_search
