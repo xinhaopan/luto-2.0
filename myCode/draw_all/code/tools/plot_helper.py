@@ -428,58 +428,6 @@ def plot_line_chart(ax, merged_dict, input_name, legend_colors, font_size=10,
     return ax
 
 
-# def get_max_min(df):
-#     # 计算正数累积和
-#     pos_cumsum = df.where(df > 0, 0).cumsum(axis=1)
-#     pos_max = pos_cumsum.max().max()
-#
-#     # 计算负数累积和
-#     neg_cumsum = df.where(df < 0, 0).cumsum(axis=1)
-#     neg_min = neg_cumsum.min().min()
-#
-#     # 计算单个值的最值
-#     value_min = df.min().min()
-#     value_max = df.max().max()
-#
-#     # 计算最终最大值（正数部分）
-#     max_value = max(pos_max, value_max)
-#
-#     # 计算最终最小值（负数部分）
-#     min_value = min(neg_min, value_min)
-#
-#     return max_value, min_value
-#
-# def calculate_y_axis_range(data_dict, multiplier=10, divisible_by=3, use_multithreading=False):
-#     max_value, min_value = (
-#         max(get_max_min(df)[0] for df in data_dict.values()),
-#         min(get_max_min(df)[1] for df in data_dict.values())
-#     )
-#
-#     # 如果 multiplier 小于 1，放大数据和 multiplier
-#     scale_factor = 1
-#     if multiplier < 1:
-#         scale_factor = int(1 / multiplier) * 10
-#         max_value *= scale_factor
-#         min_value *= scale_factor
-#         multiplier = 1
-#
-#     y_min = np.floor(min_value / multiplier) * multiplier
-#     y_max = np.ceil(max_value / multiplier) * multiplier
-#
-#     while (y_max - y_min) % divisible_by != 0:
-#         y_max += multiplier
-#
-#     interval = (y_max - y_min) // divisible_by
-#
-#     # 缩小结果回原比例
-#     if scale_factor != 1:
-#         y_min /= scale_factor
-#         y_max /= scale_factor
-#         interval /= scale_factor
-#
-#     return (y_min, y_max), interval
-
-
 
 
 def get_max_min(df):
@@ -598,105 +546,77 @@ def calculate_y_axis_range(data_dict, desired_ticks=4,use_parallel=True, n_jobs=
     return ((min_v, max_v), ticks)
 
 
-# def calculate_y_axis_range(data_dict, multiplier=10):
-#     """
-#     计算 y 轴范围和间隔：
-#     - 确保0是刻度中的一个。
-#     - 当数据范围绝对值≥100时，确保间隔和刻度标签的个位数为0。
-#     - 刻度数量在4到6之间。
-#
-#     参数:
-#         min_value: 数据最小值
-#         max_value: 数据最大值
-#         multiplier: 调整时的间隔基数（默认为10）
-#
-#     返回:
-#         ((y_min, y_max), interval): y 轴范围和间隔
-#     """
-#     # 并行计算所有 DataFrame 的最大值和最小值
-#     results = Parallel(n_jobs=-1, prefer="threads")(delayed(get_max_min)(df) for df in data_dict.values())
-#     # 获取全局最大值和最小值
-#     max_value = max(res[0] for res in results)
-#     min_value = min(res[1] for res in results)
-#     adjust_to_ten = min_value <= -100 or max_value >= 100
-#
-#     # 确保包含0的原始范围
-#     original_min, original_max = min_value, max_value
-#     if min_value > 0:
-#         min_value = 0
-#     elif max_value < 0:
-#         max_value = 0
-#     data_range = max_value - min_value
-#
-#     best_candidate = None
-#     min_expansion = float('inf')
-#
-#     # 尝试不同刻度数寻找最优解
-#     for n in [4, 5, 6]:
-#         if data_range == 0:  # 全零特例处理
-#             y_min, y_max = (-multiplier, multiplier) if adjust_to_ten else (-1, 1)
-#             interval = multiplier if adjust_to_ten else 1
-#             return ((y_min, y_max), interval)
-#
-#         # 计算初始间隔
-#         if adjust_to_ten:
-#             interval = multiplier * max(1, np.ceil(data_range / (multiplier * (n - 1))))
-#         else:
-#             interval = max(1, np.ceil(data_range / (n - 1)))
-#             interval = int(interval)
-#
-#         # 计算范围边界
-#         y_min = np.floor(min_value / interval) * interval
-#         y_max = np.ceil(max_value / interval) * interval
-#
-#         # 确保包含0
-#         if y_min > 0:
-#             y_min = 0
-#         if y_max < 0:
-#             y_max = 0
-#
-#         # 验证刻度数
-#         tick_count = int((y_max - y_min) / interval) + 1
-#         if not 4 <= tick_count <= 6:
-#             continue
-#
-#         # 计算范围扩展量
-#         expansion = (y_max - original_max) + (original_min - y_min)
-#         if expansion < min_expansion:
-#             min_expansion = expansion
-#             best_candidate = (y_min, y_max, interval)
-#
-#     # 回退逻辑（找不到合适解时）
-#     if not best_candidate:
-#         if adjust_to_ten:
-#             y_min = np.floor(original_min / multiplier) * multiplier
-#             y_max = np.ceil(original_max / multiplier) * multiplier
-#             interval = multiplier
-#         else:
-#             y_min = np.floor(original_min)
-#             y_max = np.ceil(original_max)
-#             interval = max(1, (y_max - y_min) // 5)
-#         # 确保包含0
-#         if y_min > 0:
-#             y_min = 0
-#         if y_max < 0:
-#             y_max = 0
-#         best_candidate = (y_min, y_max, interval)
-#
-#     y_min, y_max, interval = best_candidate
-#
-#     # 百位数以上强制对齐10的倍数
-#     if adjust_to_ten:
-#         y_min = np.floor(y_min / multiplier) * multiplier
-#         y_max = np.ceil(y_max / multiplier) * multiplier
-#         interval = multiplier * np.ceil(interval / multiplier)
-#         # 重新计算刻度数并调整间隔
-#         tick_count = int((y_max - y_min) / interval) + 1
-#         if tick_count < 4:
-#             interval = (y_max - y_min) / 3
-#         elif tick_count > 6:
-#             interval = (y_max - y_min) / 5
-#
-#     return ((y_min, y_max), interval)
+def plot_land_use_polar(input_file, result_file="../output/12_land_use_movement_all.xlsx", yticks=None):
+    """
+    绘制土地利用变化的极坐标图。
 
+    参数：
+      input_file: 用于生成输出文件名的字符串（例如 "mydata"）。
+      result_file: 包含土地利用变化数据的 Excel 文件名，默认 "../output/12_land_use_movement_all.xlsx"。
+                   Excel 文件中要求列为 MultiIndex，第一层为地类名称，第二层包含 "Distance (km)" 和 "Angle (degrees)" 等指标。
+      yticks: y 轴（径向轴）的刻度列表。如果为 None，则根据数据自动计算。
+    """
+    # 读取 Excel 文件，注意设置 header=[0,1] 以加载 MultiIndex 列，index_col=0 作为索引
+    result_df = pd.read_excel(result_file,sheet_name=input_file, header=[0, 1], index_col=0)
 
+    # 自动提取地类名称：取第一层列索引的唯一值
+    names = list(result_df.columns.get_level_values(0).unique())
+
+    color_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='ag')
+    color_mapping = dict(zip(color_df['desc'], color_df['color']))
+
+    # 更新绘图字体设置
+    plt.rcParams.update({'font.size': 10, 'font.family': 'Arial'})
+
+    # 创建极坐标图
+    fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={'projection': 'polar'})
+
+    # 绘制每个 land_use 的移动轨迹
+    for land_use in names:
+        # 取得对应的距离（km）和角度（degrees）
+        distances = result_df[(land_use, 'Area×Distance')].astype(float).values
+        angles_deg = result_df[(land_use, 'Angle (degrees)')].astype(float).values
+        angles_rad = np.radians(angles_deg)
+        color = color_mapping.get(land_use, '#C8C8C8')
+        ax.plot(angles_rad, distances, marker='o', label=land_use, color=color, markersize=2)
+
+    # 设置极坐标的角度刻度与标签
+    angles_deg_fixed = np.arange(0, 360, 45)
+    labels = ['North', 'Northeast', 'East', 'Southeast',
+              'South', 'Southwest', 'West', 'Northwest']
+    offset_angles = [45, 135, 225, 315]
+    # 对于 offset_angles 的位置先不显示标签，后续用 ax.text 标注
+    masked_labels = [label if angle not in offset_angles else "" for angle, label in zip(angles_deg_fixed, labels)]
+
+    ax.set_theta_zero_location('N')
+    ax.set_theta_direction(-1)
+    ax.set_xticks(np.radians(angles_deg_fixed))
+    ax.set_xticklabels(masked_labels, fontname='Arial', fontsize=10)
+
+    # 如果未提供 yticks，则根据所有“Distance (km)”值自动计算
+    if yticks is None:
+        # 提取所有地类的 "Distance (km)" 数据（合并所有列）
+        distance_data = result_df.xs('Area×Distance', level=1, axis=1)
+        min_v, max_v, ticks = get_y_axis_ticks(0, distance_data.max().max())
+    else:
+        min_v = yticks[0]
+        max_v = yticks[-1]
+    ax.set_yticks(ticks)
+    ax.set_ylim(min_v, max_v)
+
+    # 在指定 offset 角度处添加完整标签
+    for angle_deg in offset_angles:
+        angle_rad = np.radians(angle_deg)
+        # 查找对应的标签
+        label = labels[angles_deg_fixed.tolist().index(angle_deg)]
+        ax.text(angle_rad, ax.get_rmax() * 1.12, label, ha='center', va='center', fontsize=10, fontname='Arial')
+
+    ax.set_rlabel_position(180)  # 将径向标签移动至180度方向
+    ax.grid(True, linestyle='--', alpha=0.7)
+
+    # 保存图像，构造输出文件名
+    output_file = f"../output/12_{input_file}_move"
+    fig.savefig(f'{output_file}.pdf', dpi=300, bbox_inches='tight')
+    save_figure(fig, output_file)
+
+    plt.show()

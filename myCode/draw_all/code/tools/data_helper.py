@@ -1,9 +1,12 @@
-import numpy as np
 import os
+import re
+import numpy as np
+import pandas as pd
+import rasterio
+from rasterio.transform import xy
+from pyproj import CRS, Transformer
 from joblib import Parallel, delayed
 
-import re
-import pandas as pd
 
 def get_path(path_name):
     output_path = f"../../../output/{path_name}/output"
@@ -350,6 +353,132 @@ def merge_transposed_dict(data_dict):
     return sorted_df
 
 
+def get_lon_lat(tif_path):
+    """
+    计算面积加权经纬度，并返回重心经纬度。
+    这里使用每个像元的值作为权重，对经纬度取加权平均。
+    """
+    with rasterio.open(tif_path) as dataset:
+        data = dataset.read(1)
+        transform = dataset.transform
 
+    valid_mask = data > 0
+    values = data[valid_mask]
+    rows, cols = np.where(valid_mask)
+    lon, lat = rasterio.transform.xy(transform, rows, cols)
+    lon = np.array(lon)
+    lat = np.array(lat)
+    centroid_lon = np.sum(lon * values) / np.sum(values)
+    centroid_lat = np.sum(lat * values) / np.sum(values)
+    return centroid_lon, centroid_lat
 
+def compute_land_use_change_metrics(input_file, use_parallel=True):
+    """
+    计算土地利用变化指标，包括：
+      - 重心移动距离（km）
+      - 移动角度（degrees）
+      - 面积（单位：ha，根据 CSV 文件中各 Water_supply 的面积求和）
+      - 面积×距离
+    """
+    path = get_path(input_file)
+    pattern = re.compile(r'(?<!Non-)Ag_LU.*\.tif{1,2}$', re.IGNORECASE)
+    years = list(range(2010, 2051, 5))
 
+    # 获取2050年文件夹中的文件，提取所有 land_use 名称
+    folder_path_2050 = os.path.join(path, "out_2050", "lucc_separate")
+    sample_files = [f for f in os.listdir(folder_path_2050) if pattern.match(f)]
+    names = [f.split("_")[3] for f in sample_files]
+
+    # 初始化存储各年份重心坐标的 DataFrame，列使用 MultiIndex（Land Use, Coordinate）
+    coord_columns = pd.MultiIndex.from_product([names, ['Centroid Lon', 'Centroid Lat']],
+                                               names=["Land Use", "Coordinate"])
+    coord_df = pd.DataFrame(index=years, columns=coord_columns)
+
+    # 遍历每年，计算每个 land_use 的重心经纬度
+    for year in years:
+        folder_path = os.path.join(path, f"out_{year}", "lucc_separate")
+        # 仅处理非 mercator 的 tif 文件
+        year_files = [f for f in os.listdir(folder_path) if pattern.match(f) and "mercator" not in f]
+        file_paths = [os.path.join(folder_path, f) for f in year_files]
+        if use_parallel:
+            centroid_results = Parallel(n_jobs=30)(delayed(get_lon_lat)(fp) for fp in file_paths)
+        else:
+            centroid_results = [get_lon_lat(fp) for fp in file_paths]
+        # 构造字典：land_use -> (centroid_lon, centroid_lat)
+        year_land_use = {f.split("_")[3]: centroid for f, centroid in zip(year_files, centroid_results)}
+        for land_use in names:
+            if land_use in year_land_use:
+                c_lon, c_lat = year_land_use[land_use]
+                coord_df.loc[year, (land_use, 'Centroid Lon')] = c_lon
+                coord_df.loc[year, (land_use, 'Centroid Lat')] = c_lat
+            else:
+                coord_df.loc[year, (land_use, 'Centroid Lon')] = np.nan
+                coord_df.loc[year, (land_use, 'Centroid Lat')] = np.nan
+
+    # 构造坐标转换器（假设各年份投影一致，以2050年的文件为例）
+    with rasterio.open(os.path.join(folder_path_2050, sample_files[0])) as dataset:
+        crs_from = dataset.crs
+    crs_to = CRS.from_epsg(3577)
+    transformer = Transformer.from_crs(crs_from, crs_to, always_xy=True)
+
+    # 定义结果 DataFrame，多级索引列包含 "Distance (km)"、"Angle (degrees)"、"Area" 和 "Area×Distance"
+    metric_columns = pd.MultiIndex.from_product([names, ['Distance (km)', 'Angle (degrees)', 'Area', 'Area×Distance']],
+                                                names=["Land Use", "Metric"])
+    result_df = pd.DataFrame(index=years, columns=metric_columns)
+
+    # 针对每个年份，从 CSV 文件中获取面积数据（单位：ha）
+    for year in years:
+        folder_path = os.path.join(path, f"out_{year}", "lucc_separate")
+        area_file = os.path.join(path, f"out_{year}", f"area_agricultural_landuse_{year}.csv")
+        if os.path.exists(area_file):
+            df_area = pd.read_csv(area_file)
+            # 按照 "Land-use" 分组，计算各地类所有 Water_supply 的面积之和
+            area_group = df_area.groupby("Land-use")["Area (ha)"].sum()
+            area_dict = area_group.to_dict()
+        else:
+            area_dict = {}
+
+        # 对每个 land_use 计算重心移动距离、角度及新增指标“Area×Distance”
+        for land_use in names:
+            # 获取基准年 2010 的重心
+            origin_lon = coord_df.loc[2010, (land_use, 'Centroid Lon')]
+            origin_lat = coord_df.loc[2010, (land_use, 'Centroid Lat')]
+            if pd.isna(origin_lon) or pd.isna(origin_lat):
+                origin_x, origin_y = np.nan, np.nan
+            else:
+                origin_x, origin_y = transformer.transform(origin_lon, origin_lat)
+            # 获取当前年份的重心
+            curr_lon = coord_df.loc[year, (land_use, 'Centroid Lon')]
+            curr_lat = coord_df.loc[year, (land_use, 'Centroid Lat')]
+            if pd.isna(curr_lon) or pd.isna(curr_lat):
+                curr_x, curr_y = np.nan, np.nan
+            else:
+                curr_x, curr_y = transformer.transform(curr_lon, curr_lat)
+            # 计算移动距离与角度（当坐标有效时）
+            if not (pd.isna(origin_x) or pd.isna(curr_x)):
+                distance = np.sqrt((curr_x - origin_x) ** 2 + (curr_y - origin_y) ** 2) / 1000.0
+                angle_deg = (np.degrees(np.arctan2(curr_x - origin_x, curr_y - origin_y)) + 360) % 360
+            else:
+                distance = np.nan
+                angle_deg = np.nan
+
+            # 获取面积：单位为 ha，从 CSV 中读取后转换为 Mkm²（1 ha = 1e-8 Mkm²）
+            area_val = area_dict.get(land_use, np.nan)
+            # 转换面积单位
+            area_conv = area_val / 1e8 if not pd.isna(area_val) else np.nan
+
+            # 计算面积×距离（基于转换后的面积和距离）
+            area_distance = area_conv * distance if not (pd.isna(area_conv) or pd.isna(distance)) else np.nan
+
+            result_df.loc[year, (land_use, 'Distance (km)')] = round(distance, 3) if not pd.isna(distance) else np.nan
+            result_df.loc[year, (land_use, 'Angle (degrees)')] = round(angle_deg, 2) if not pd.isna(
+                angle_deg) else np.nan
+            result_df.loc[year, (land_use, 'Area (km2)')] = round(area_conv, 3) if not pd.isna(area_conv) else np.nan
+            result_df.loc[year, (land_use, 'Area×Distance')] = round(area_distance, 3) if not pd.isna(
+                area_distance) else np.nan
+
+    # 保存结果到 Excel 文件
+    excel_path = os.path.join("..", "output", "12_land_use_movement_all.xlsx")
+    # 使用 openpyxl 引擎，如果该文件已存在，则以追加模式写入
+    with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+        result_df.to_excel(writer, sheet_name=input_file)

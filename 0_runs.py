@@ -58,7 +58,7 @@ def main():
 
         # 总结束时间
         overall_end_time = time.time()
-        total_duration = verall_end_time - overall_start_time
+        total_duration = overall_end_time - overall_start_time
 
         # 转换为 hh:mm:ss 格式
         formatted_duration = time.strftime("%H:%M:%S", time.gmtime(total_duration_seconds))
