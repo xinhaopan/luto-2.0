@@ -128,7 +128,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or False
+WRITE_OUTPUT_GEOTIFFS = True   # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
