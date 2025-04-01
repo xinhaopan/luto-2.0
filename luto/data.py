@@ -1051,9 +1051,9 @@ class Data:
         biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'biodiv_priorities.h5'), where=self.MASK)
         biodiv_contribution_loopup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'HABITAT_CONDITION.csv'))                              # TODO: rename: degrade -> AG_BIO_CONTRIBUTION
         
-
+        
         # ------------- Biodiversity priority scores for maximising overall biodiversity conservation in Australia ----------------------------
-
+        
         # Get connectivity score
         match settings.CONNECTIVITY_SOURCE:
             case 'NCI':
@@ -1081,34 +1081,34 @@ class Data:
                 raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}             # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
-
         
-        # Get the biodiversity contribution score
+        
+        # Get the biodiversity contribution score 
         bio_contribution_raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values
-
-        self.BIO_CONNECTIVITY_RAW = bio_contribution_raw * connectivity_score
-        self.BIO_CONNECTIVITY_LDS = np.where(
-            self.SAVBURN_ELIGIBLE,
-            self.BIO_CONNECTIVITY_RAW * settings.BIO_CONTRIBUTION_LDS,
+        
+        self.BIO_CONNECTIVITY_RAW = bio_contribution_raw * connectivity_score                                          
+        self.BIO_CONNECTIVITY_LDS = np.where(                                                                     
+            self.SAVBURN_ELIGIBLE, 
+            self.BIO_CONNECTIVITY_RAW * settings.BIO_CONTRIBUTION_LDS, 
             self.BIO_CONNECTIVITY_RAW
         )
+        
 
-
-
+        
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
         
         # Get the mask of 'priority degraded areas' for habitat conservation
         conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'GBF2_conserve_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
         ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
-
+        
         self.BIO_PRIORITY_DEGRADED_AREAS_MASK = (
             bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
         )
         
         self.BIO_PRIORITY_DEGRADED_AREAS_LY_BASE_YR = np.vectorize(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.get, otypes=[np.float32])(self.LUMAP) * self.BIO_PRIORITY_DEGRADED_AREAS_MASK
+        
 
-
-
+        
         ###############################################################
         # Vegetation data.
         ###############################################################
@@ -1407,23 +1407,23 @@ class Data:
                 
         return lumap_resample_avg
     
-
+        
     # Get the habitat condition score within priority degraded areas for base year (2010)
     def get_GBF2_target_for_yr_cal(self, yr_cal:int) -> float:
         """
         Get the target score for priority degrade areas conservation.
-
+        
         Parameters
         ----------
         yr_cal : int
             The year for which to get the habitat condition score.
-
+            
         Returns
         -------
         float
             The priority degrade areas conservation target for the given year.
         """
-
+ 
         bio_habitat_score_baseline_sum = (self.BIO_PRIORITY_DEGRADED_AREAS_MASK * self.REAL_AREA).sum()
         bio_habitat_score_base_yr_sum = (self.BIO_PRIORITY_DEGRADED_AREAS_LY_BASE_YR * self.REAL_AREA).sum()
         bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
@@ -1434,7 +1434,7 @@ class Data:
         ]
 
         targets_key_years = {
-            self.YR_CAL_BASE: bio_habitat_score_base_yr_sum,
+            self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
             **dict(zip(settings.BIODIV_GBF_TARGET_2_DICT.keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
         }
 
@@ -1446,7 +1446,7 @@ class Data:
         )
 
         return f(yr_cal).item()  # Convert the interpolated value to a scalar
-
+    
     
     def get_GBF3_limit_score_inside_natural_LUTO_by_yr(self, yr:int):
         '''
@@ -1466,9 +1466,9 @@ class Data:
                 fill_value="extrapolate",
             )
             GBF3_target_percents.append(f(yr).item())
-
+        
         limit_score_all_AUS = self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA * (np.array(GBF3_target_percents) / 100)  # Convert the percentage to proportion
-
+            
         return limit_score_all_AUS - self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO
 
     
@@ -1485,14 +1485,14 @@ class Data:
         
         The suitability score is then weighted by the area (ha) of each cell. The area weighting is necessary 
         to ensure that the biodiversity suitability score will not be affected by different RESFACTOR (i.e., cell size) values.
-
+        
         Parameters
         ----------
         yr : int
             The year for which to get the biodiversity suitability score.
         level : str, optional
             The level of the biodiversity suitability score, either 'species' or 'group'. The default is 'species'.
-
+            
         Returns
         -------
         np.ndarray
@@ -1517,7 +1517,7 @@ class Data:
             current_species_val * settings.BIO_CONTRIBUTION_LDS,
             current_species_val
         )
-
+        
         return current_species_val.astype(np.float32)
     
     
@@ -1537,7 +1537,7 @@ class Data:
             target_pct.append(f(yr).item()) 
             
         # Calculate the target biodiversity suitability score for each species at the given year for all Australia
-        target_scores_all_AUS = self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES['HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA'] * np.array(target_pct)
+        target_scores_all_AUS = self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES['HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA'] * (np.array(target_pct) / 100) # Convert the percentage to proportion
         return target_scores_all_AUS
     
     
