@@ -76,15 +76,15 @@ class SolverInputData:
 
     water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Key: region.
-
+    
         
     biodiv_contr_ag_rj: np.ndarray                                      # Biodiversity contribution scale from agricultural land uses.
     biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
     biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale from agricultural management options.
-
+    
     GBF2_raw_priority_degrade_area_r: np.ndarray                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
-    GBF3_raw_MVG_area_vr: np.ndarray                                     # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
-    GBF4_raw_species_area_sr: np.ndarray                                 # Raw areas (GBF4A) Species data - indexed by species (s) and cell (r).
+    GBF3_raw_MVG_area_vr: np.ndarray                                    # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
+    GBF4_raw_species_area_sr: np.ndarray                                # Raw areas (GBF4A) Species data - indexed by species (s) and cell (r).
 
     savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
 
@@ -540,7 +540,7 @@ def get_limits(
         else 0
     )
 
-    limits["GBF_3+major_vegetation_groups"] = (
+    limits["GBF_3_major_vegetation_groups"] = (
         ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)
         if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on'
         else 0
@@ -623,7 +623,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_BASE_YR(data),                                     # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
-
+        
         biodiv_contr_ag_rj=get_ag_biodiv_contr_rj(data),
         biodiv_contr_non_ag_k=get_non_ag_biodiv_impact_k(data),
         biodiv_contr_ag_man=get_ag_man_biodiv_impacts(data, target_year),

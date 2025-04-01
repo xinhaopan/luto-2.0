@@ -64,17 +64,20 @@ def load_data() -> Data:
     memory_thread.start()
     
     # Remove previous log files
-    # for f in glob(f'{settings.OUTPUT_DIR}/*.log'):
-    #     os.remove(f)
+    for f in glob(f'{settings.OUTPUT_DIR}/*.log') + glob(f'{settings.OUTPUT_DIR}/*.txt'):
+        try:
+            os.remove(f)
+        except [PermissionError, FileNotFoundError] as e:
+            print(f"Error removing file {f}: {e}")
 
     return Data()
 
 
 @LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
 def run(
-    data: Data,
-    base_year: int | None = None,
-    target_year: int | None = None,
+    data: Data, 
+    base_year: int | None = None, 
+    target_year: int | None = None, 
     *,
     step_size: int | None = None,
     years: list[int] | None = None,
@@ -203,7 +206,7 @@ def populate_containers_dynamic_base_year(
         ).sum()
         biodiversity_data = (ag_biodiversity.get_bio_priority_score_matrices_mrj(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
         major_vegetation_data = calc_major_vegetation_group_ag_area_for_year(
-            get_GBF3_major_vegetation_matrices_vr(data),
+            get_GBF3_major_vegetation_matrices_vr(data), 
             data.lumaps[data.YR_CAL_BASE],
             data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
