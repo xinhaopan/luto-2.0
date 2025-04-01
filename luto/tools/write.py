@@ -169,6 +169,10 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_species(data, yr_cal, path_yr)
+
+    write_quantity_separate(data, yr_cal, path_yr)
+    write_biodiversity(data, yr_cal, path_yr)
+    # write_biodiversity_separate(data, yr_cal, path_yr)
     # write_npy(data, yr_cal, path_yr)
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
@@ -575,7 +579,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     else:
         # Get the transition cost matrices for agricultural land-use
         ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data, yr_idx, yr_cal_sim_pre, separate=True)
-    
+
     # Convert the transition cost matrices to a DataFrame
     cost_dfs = []
     for from_lu_desc,from_lu_idx in data.DESC2AGLU.items():
@@ -634,10 +638,10 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
             data,yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
         )
-             
+
     # Get all land use decision variables
     desc2lu_all = {**data.DESC2AGLU, **data.DESC2NONAGLU}
-    
+
     cost_dfs = []
     for from_lu in desc2lu_all.keys():
         for from_lm in data.LANDMANS:
@@ -647,10 +651,10 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                     lu_idx = data.lumaps[yr_cal_sim_pre] == desc2lu_all[from_lu]                          # Get the land-use index of the from land-use (r)
                     lm_idx = data.lmmaps[yr_cal_sim_pre] == data.LANDMANS.index(from_lm)                  # Get the land-management index of the from land-management (r)
                     from_lu_idx = lu_idx & lm_idx                                                         # Get the land-use index of the from land-use (r*)
-                    
-                    arr_dvar = non_ag_dvar[from_lu_idx, data.NON_AGRICULTURAL_LANDUSES.index(to_lu)]      # Get the decision variable of the from land-use (r*) 
-                    arr_trans = non_ag_transitions_cost_mat[to_lu][cost_type][from_lu_idx]                # Get the transition cost matrix of the unchanged land-use (r) 
-            
+
+                    arr_dvar = non_ag_dvar[from_lu_idx, data.NON_AGRICULTURAL_LANDUSES.index(to_lu)]      # Get the decision variable of the from land-use (r*)
+                    arr_trans = non_ag_transitions_cost_mat[to_lu][cost_type][from_lu_idx]                # Get the transition cost matrix of the unchanged land-use (r)
+
                     if arr_dvar.size == 0:
                         continue
                     
@@ -663,7 +667,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                         'Cost ($)': cost_arr,
                         'Year': yr_cal
                     }])
-                    
+
                     cost_dfs.append(arr_df)
 
     # Save the cost DataFrames
@@ -1122,7 +1126,7 @@ def write_biodiversity(data: Data, yr_cal, path):
         biodiv_score = data.prod_data[yr_cal]['Biodiversity']
     else:
         # Return the base year biodiversity score
-        biodiv_score = data.BIO_GBF2_TARGET_SCORES[data.YR_CAL_BASE]
+        biodiv_score = data.get_GBF2_target_for_yr_cal(data.YR_CAL_BASE)
 
     # Add to dataframe
     df = pd.DataFrame({

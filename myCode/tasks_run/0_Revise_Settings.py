@@ -4,18 +4,17 @@ from tools.helpers import create_grid_search_template
 
 grid_search = {
     # Computational settings, which are not relevant to LUTO itself
-    'MEM': ['4'],
-    'NCPUS': ['1'],
-    'TIME': ['01:00:00'],
+    'MEM': ['20'],
+    'NCPUS': ['4'],
+    'TIME': ['12:00:00'],
     'MODE': [
         # 'snapshot',
         'timeseries'
     ],
     'OBJECTIVE': ['maxprofit'],
-    'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [20],
-    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [55],
-    # 'SOLVE_BIODIV_PRIORITY_WEIGHT': [0],
+    'WRITE_OUTPUT_GEOTIFFS': [False],
+    'RESFACTOR': [5],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
     # GHG settings
     'GHG_CONSTRAINT_TYPE': ['soft'],
     'GHG_LIMITS_FIELD': [
@@ -39,12 +38,12 @@ grid_search = {
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4': ['off'],
     'INCLUDE_WATER_LICENSE_COSTS ': [1],
-
+    'SOLVE_BIODIV_PRIORITY_WEIGHT': [0],
 }
 
-suffixs = ['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT','RESFACTOR','GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE']
+suffixs = ['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT']
 
-output_file = os.path.join("Custom_runs", "setting_0331_test.csv")
-create_grid_search_template( grid_search,output_file,suffixs)
+output_file = os.path.join("Custom_runs", "setting_0401_linux.csv")
+create_grid_search_template( grid_search,output_file,suffixs,run_time="20250403")
 print(f"saved to {output_file}")
 

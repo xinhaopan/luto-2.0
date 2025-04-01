@@ -443,17 +443,20 @@ def modify_column_name(template_grid_search, suffixs=['GHG_LIMITS_FIELD', 'BIODI
     for col in template_grid_search.columns[2:]:  # Skip the first two columns
         new_name = f"{run_time}_{col.split('.')[0]}"
         for suffix in suffixs:
-            if suffix == 'GHG_LIMITS_FIELD' or suffix == 'BIODIV_GBF_TARGET_2_DICT':
-                if suffix == 'GHG_LIMITS_FIELD':
-                    ghg_value = template_grid_search.loc[template_grid_search['Name'] == 'GHG_LIMITS_FIELD', col].values[0]
-                    new_name += f"_{ghg_name_map.get(ghg_value, 'Unknown_GHG')}"
-                elif suffix == 'BIODIV_GBF_TARGET_2_DICT':
-                    bio_value = template_grid_search.loc[template_grid_search['Name'] == 'BIODIV_GBF_TARGET_2_DICT', col].values[0]
-                    new_name += f"_{bio_name_map.get(bio_value, 'Unknown_BIO')}"
+            try:
+                if suffix == 'GHG_LIMITS_FIELD' or suffix == 'BIODIV_GBF_TARGET_2_DICT':
+                    if suffix == 'GHG_LIMITS_FIELD':
+                        ghg_value = template_grid_search.loc[template_grid_search['Name'] == 'GHG_LIMITS_FIELD', col].values[0]
+                        new_name += f"_{ghg_name_map.get(ghg_value, 'Unknown_GHG')}"
+                    elif suffix == 'BIODIV_GBF_TARGET_2_DICT':
+                        bio_value = template_grid_search.loc[template_grid_search['Name'] == 'BIODIV_GBF_TARGET_2_DICT', col].values[0]
+                        new_name += f"_{bio_name_map.get(bio_value, 'Unknown_BIO')}"
                 else:
                     # Use suffix as an index to get the corresponding value from template_grid_search
                     suffix_value = template_grid_search.loc[template_grid_search['Name'] == suffix, col].values[0]
                     new_name += f"_{suffix_value}"
+            except Exception as e:
+                print(f'Error processing suffix {suffix} for column {col}: {e}')
         new_column_names.append(new_name)
 
     # Update the column names of the DataFrame
