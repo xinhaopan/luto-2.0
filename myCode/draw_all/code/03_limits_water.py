@@ -90,25 +90,25 @@ INPUT_DIR = "../../../input"
 
 df_colors = pd.read_excel('tools/land use colors.xlsx', sheet_name='water')
 shapefile_path = '../../../../Map/Data/shp/Drainage Division/ADD_2016_AUST.shp'
-# plot_shapefile_map(shapefile_path, 'ADD_NAME16', df_colors, output_file='../output/03_drainage divisions')
+# plot_shapefile_map(shapefile_path, 'ADD_NAME16', df_colors, output_file='../output/03_drainage divisions.pdf')
 
-# # 存储带text标注的地图
-# plot_shapefile_map(
-#     shapefile_path,
-#     'ADD_NAME16',
-#     df_colors,
-#     output_file='../output/03_drainage divisions.pdf',
-#     add_labels=False
-# )
-#
-# # 存储不带text标注的地图
-# plot_shapefile_map(
-#     shapefile_path,
-#     'ADD_NAME16',
-#     df_colors,
-#     output_file='../output/03_drainage divisions_with_text.pdf',
-#     add_labels=True
-# )
+# 存储带text标注的地图
+plot_shapefile_map(
+    shapefile_path,
+    'ADD_NAME16',
+    df_colors,
+    output_file='../output/03_drainage divisions.pdf',
+    add_labels=False
+)
+
+# 存储不带text标注的地图
+plot_shapefile_map(
+    shapefile_path,
+    'ADD_NAME16',
+    df_colors,
+    output_file='../output/03_drainage divisions_with_text.pdf',
+    add_labels=True
+)
 
 # water
 dd = pd.read_hdf(os.path.join(INPUT_DIR, "draindiv_lut.h5"), index_col='HR_DRAINDIV_ID')

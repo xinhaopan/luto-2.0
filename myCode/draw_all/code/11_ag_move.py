@@ -14,5 +14,5 @@ from tools.parameters import *
 
 
 # ----------------------- 函数定义 -----------------------
-compute_land_use_change_metrics(input_files[4])
-plot_land_use_polar(input_files[4])
+# compute_land_use_change_metrics(input_files[4],use_parallel=False)
+plot_land_use_polar(f"{input_files[4]}", f"12_{input_files[4]}",fontsize=30,x_offset=1.35)

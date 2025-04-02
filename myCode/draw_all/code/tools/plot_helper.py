@@ -477,37 +477,109 @@ def get_max_min(df):
 
     return interval, ticks
 
+# def get_y_axis_ticks(min_value, max_value, desired_ticks=4):
+#     range_value = max_value - min_value
+#     if range_value <= 0:
+#         return 0, 1, [0, 0.5, 1]
+#
+#     ideal_interval = range_value / (desired_ticks - 1)
+#     e = math.floor(math.log10(ideal_interval))
+#     nice_numbers = [1, 2, 5, 10]
+#     nice_numbers_scaled = [n * (10 ** e) for n in nice_numbers]
+#     interval = min(nice_numbers_scaled, key=lambda x: abs(x - ideal_interval))
+#
+#     # 统一逻辑：从 min_value 向下取整（不是硬设为 0）
+#     min_tick = math.floor(min_value / interval) * interval
+#     max_tick = math.ceil(max_value / interval) * interval
+#
+#     ticks = list(np.arange(min_tick, max_tick + interval, interval))
+#
+#     # 可选：强制包含 0
+#     if 0 not in ticks and min_value < 0 < max_value:
+#         ticks.append(0)
+#         ticks = sorted(set(ticks))
+#
+#     # 统一逻辑：从 min_value 向下取整（不是硬设为 0）
+#     if abs(min_value) < interval:
+#         min_v = math.floor(min_value)
+#     else:
+#         min_v = math.floor(min_value / interval) * interval
+#     max_v = math.ceil(max_value / interval) * interval
+#
+#     return min_v, max_v, ticks
+
 def get_y_axis_ticks(min_value, max_value, desired_ticks=4):
+    """
+    生成Y轴刻度，根据数据范围智能调整刻度间隔和范围。
+    优化版本，提高运行速度，并处理0-100特殊情况。
+    """
+    # 1. 快速处理特殊情况
+    if min_value > 0 and max_value > 0:
+        min_value = 0
+    elif min_value < 0 and max_value < 0:
+        max_value = 0
+
     range_value = max_value - min_value
     if range_value <= 0:
-        return 0, 1, [0, 0.5, 1]
+        return 0, 1, np.array([0, 0.5, 1])  # 使用numpy数组替代列表
 
+    # 2. 一次性计算间隔
     ideal_interval = range_value / (desired_ticks - 1)
     e = math.floor(math.log10(ideal_interval))
-    nice_numbers = [1, 2, 5, 10]
-    nice_numbers_scaled = [n * (10 ** e) for n in nice_numbers]
-    interval = min(nice_numbers_scaled, key=lambda x: abs(x - ideal_interval))
+    base = 10 ** e
 
-    # 统一逻辑：从 min_value 向下取整（不是硬设为 0）
+    # 使用查表法替代计算
+    if ideal_interval / base <= 1:
+        interval = base
+    elif ideal_interval / base <= 2:
+        interval = 2 * base
+    elif ideal_interval / base <= 5:
+        interval = 5 * base
+    else:
+        interval = 10 * base
+
+    # 3. 整合计算，减少中间变量
     min_tick = math.floor(min_value / interval) * interval
     max_tick = math.ceil(max_value / interval) * interval
 
-    ticks = list(np.arange(min_tick, max_tick + interval, interval))
+    # 4. 使用numpy直接生成数组，避免Python列表操作
+    tick_count = int((max_tick - min_tick) / interval) + 1
+    ticks = np.linspace(min_tick, max_tick, tick_count)
 
-    # 可选：强制包含 0
-    if 0 not in ticks and min_value < 0 < max_value:
-        ticks.append(0)
-        ticks = sorted(set(ticks))
+    # 5. 高效处理0的插入
+    if min_value < 0 < max_value and 0 not in ticks:
+        # numpy的searchsorted比Python的排序更高效
+        zero_idx = np.searchsorted(ticks, 0)
+        ticks = np.insert(ticks, zero_idx, 0)
 
-    # 统一逻辑：从 min_value 向下取整（不是硬设为 0）
-    if abs(min_value) < interval:
-        min_v = math.floor(min_value)
-    else:
-        min_v = math.floor(min_value / interval) * interval
-    max_v = math.ceil(max_value / interval) * interval
+    # 6. 预计算共享变量，避免重复计算
+    close_threshold = 0.3 * interval
 
-    return min_v, max_v, ticks
+    # 7. 简化逻辑，减少条件分支
+    max_v = max_tick
+    min_v = min_tick
 
+    # 处理刻度和范围调整（仅当有足够刻度且最值不是0时）
+    if len(ticks) >= 2:
+        # 处理最大值
+        if ticks[-1] != 0 and (max_value - ticks[-2]) < close_threshold and (ticks[-1] - max_value) > close_threshold:
+            ticks = ticks[:-1]  # 移除最后一个刻度
+            max_v = max_value + 0.1 * interval
+
+        # 处理最小值
+        if ticks[0] != 0 and (ticks[1] - min_value) < close_threshold and (min_value - ticks[0]) > close_threshold:
+            ticks = ticks[1:]  # 移除第一个刻度
+            min_v = min_value - 0.1 * interval
+        elif abs(min_value) < interval:
+            min_v = math.floor(min_value)
+
+    # 8. 特殊情况：当刻度范围是0到100时，使用规则的25间隔
+    if (abs(ticks[0]) < 1e-10 and abs(ticks[-1] - 100) < 1e-10) or (min_tick == 0 and max_tick == 100):
+        ticks = np.array([0, 25, 50, 75, 100])
+        min_v = 0
+        max_v = 100
+
+    return min_v, max_v, ticks.tolist()  # 根据需要转回列表
 
 
 def calculate_y_axis_range(data_dict, desired_ticks=4,use_parallel=True, n_jobs=-1):
@@ -546,21 +618,36 @@ def calculate_y_axis_range(data_dict, desired_ticks=4,use_parallel=True, n_jobs=
     return ((min_v, max_v), ticks)
 
 
-def plot_land_use_polar(input_file, result_file="../output/12_land_use_movement_all.xlsx", yticks=None):
+def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_land_use_movement_all.xlsx", yticks=None, fontsize=30,x_offset=1.3):
     """
     绘制土地利用变化的极坐标图。
 
     参数：
       input_file: 用于生成输出文件名的字符串（例如 "mydata"）。
       result_file: 包含土地利用变化数据的 Excel 文件名，默认 "../output/12_land_use_movement_all.xlsx"。
-                   Excel 文件中要求列为 MultiIndex，第一层为地类名称，第二层包含 "Distance (km)" 和 "Angle (degrees)" 等指标。
+                   Excel 文件中地类是第一列，列为 MultiIndex(年份,指标)。
       yticks: y 轴（径向轴）的刻度列表。如果为 None，则根据数据自动计算。
     """
-    # 读取 Excel 文件，注意设置 header=[0,1] 以加载 MultiIndex 列，index_col=0 作为索引
-    result_df = pd.read_excel(result_file,sheet_name=input_file, header=[0, 1], index_col=0)
+    # 读取 Excel 文件，地类是第一列
+    df = pd.read_excel(result_file, sheet_name=input_file, header=[0, 1])
 
-    # 自动提取地类名称：取第一层列索引的唯一值
-    names = list(result_df.columns.get_level_values(0).unique())
+    # 确保列是多级索引
+    if not isinstance(df.columns, pd.MultiIndex):
+        raise ValueError("Excel文件的列必须是多级索引，第一级为年份，第二级为指标")
+
+    # 假设地类列是第一列，获取其列名
+    land_use_col = df.columns[0]
+    # 排除指定的地类
+    excluded_land_uses = [
+        "Unallocated - modified land",
+        "Unallocated - natural land"
+    ]
+    # 提取地类名称列表
+    names = df[land_use_col].unique().tolist()
+    names = [land_use for land_use in names if land_use not in excluded_land_uses]
+
+    # 自动提取年份（列索引第一级，从第二列开始）
+    years = list(df.columns.levels[0])  # 使用levels获取第一级唯一值
 
     color_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='ag')
     color_mapping = dict(zip(color_df['desc'], color_df['color']))
@@ -573,49 +660,119 @@ def plot_land_use_polar(input_file, result_file="../output/12_land_use_movement_
 
     # 绘制每个 land_use 的移动轨迹
     for land_use in names:
-        # 取得对应的距离（km）和角度（degrees）
-        distances = result_df[(land_use, 'Area×Distance')].astype(float).values
-        angles_deg = result_df[(land_use, 'Angle (degrees)')].astype(float).values
+        # 筛选当前地类的数据
+        land_use_data = df[df[land_use_col] == land_use]
+
+        # 提取距离和角度数据
+        distances = []
+        angles_deg = []
+
+        for year in years:
+            try:
+                distance = land_use_data.loc[:, (year, 'Area×Distance')].values[0]
+                angle = land_use_data.loc[:, (year, 'Angle (degrees)')].values[0]
+
+                distances.append(distance)
+                angles_deg.append(angle)
+            except (KeyError, IndexError):
+                # 如果某年份数据缺失，跳过
+                continue
+
+        if not distances:  # 如果没有数据，跳过该地类
+            continue
+
         angles_rad = np.radians(angles_deg)
         color = color_mapping.get(land_use, '#C8C8C8')
-        ax.plot(angles_rad, distances, marker='o', label=land_use, color=color, markersize=2)
+        # 设置线条的粗细和标记点的大小
+        ax.plot(angles_rad, distances, marker='o', label=land_use, color=color, linewidth=5, markersize=10)
 
     # 设置极坐标的角度刻度与标签
     angles_deg_fixed = np.arange(0, 360, 45)
     labels = ['North', 'Northeast', 'East', 'Southeast',
               'South', 'Southwest', 'West', 'Northwest']
-    offset_angles = [45, 135, 225, 315]
+    offset_angles = [45, 90, 135, 225, 270, 315]
     # 对于 offset_angles 的位置先不显示标签，后续用 ax.text 标注
     masked_labels = [label if angle not in offset_angles else "" for angle, label in zip(angles_deg_fixed, labels)]
 
     ax.set_theta_zero_location('N')
     ax.set_theta_direction(-1)
     ax.set_xticks(np.radians(angles_deg_fixed))
-    ax.set_xticklabels(masked_labels, fontname='Arial', fontsize=10)
+    ax.set_xticklabels(masked_labels, fontname='Arial', fontsize=fontsize)
 
-    # 如果未提供 yticks，则根据所有“Distance (km)”值自动计算
+    # 计算所有距离的最大值，用于设置y轴刻度
+    all_distances = []
+    for land_use in names:
+        land_use_data = df[df[land_use_col] == land_use]
+        for year in years:
+            try:
+                distance = land_use_data.loc[:, (year, 'Area×Distance')].values[0]
+                if not pd.isna(distance):
+                    all_distances.append(distance)
+            except (KeyError, IndexError):
+                continue
+
+    # 如果未提供 yticks，则根据所有距离值自动计算
     if yticks is None:
-        # 提取所有地类的 "Distance (km)" 数据（合并所有列）
-        distance_data = result_df.xs('Area×Distance', level=1, axis=1)
-        min_v, max_v, ticks = get_y_axis_ticks(0, distance_data.max().max())
+        if all_distances:
+            max_distance = max(all_distances)
+            min_v, max_v, yticks = get_y_axis_ticks(0, max_distance)
+        else:
+            min_v, max_v, yticks = 0, 1, [0, 0.25, 0.5, 0.75, 1]
     else:
         min_v = yticks[0]
         max_v = yticks[-1]
-    ax.set_yticks(ticks)
-    ax.set_ylim(min_v, max_v)
 
-    # 在指定 offset 角度处添加完整标签
+    ax.set_yticks(yticks)
+    ax.set_ylim(min_v, max_v)
+    # 如果你还想更改字体，可以使用：
+    labels_y = ax.get_yticklabels()
+    ax.set_yticklabels(labels_y, fontname='Arial', fontsize=fontsize)
+
+    # 在指定角度处添加完整标签
+    # 定义不同方向的偏移乘数
+    cardinal_offset = 1.0  # 控制四个主方向（东南西北）的偏移
+    east_west_offset = 0.92  # 控制东西方向的额外偏移
+
+    # 在指定角度处添加完整标签
     for angle_deg in offset_angles:
         angle_rad = np.radians(angle_deg)
         # 查找对应的标签
         label = labels[angles_deg_fixed.tolist().index(angle_deg)]
-        ax.text(angle_rad, ax.get_rmax() * 1.12, label, ha='center', va='center', fontsize=10, fontname='Arial')
+
+        # 设置基础偏移量
+        current_offset = x_offset * cardinal_offset
+
+        # 为东西方向设置额外偏移
+        if angle_deg == 90 or angle_deg == 270:  # 东西方向
+            current_offset = x_offset * east_west_offset
+
+        # 添加标签
+        ax.text(angle_rad,
+                ax.get_rmax() * current_offset,
+                label,
+                ha='center',
+                va='center',
+                fontsize=fontsize,
+                fontname='Arial')
+
+        # 调试信息，确保正确的偏移量
+        # print(f'angle_deg: {angle_deg}, current_offset: {current_offset}, label: {label}')
 
     ax.set_rlabel_position(180)  # 将径向标签移动至180度方向
-    ax.grid(True, linestyle='--', alpha=0.7)
+    # 设置网格线的样式和粗细
+    ax.grid(True, linestyle='--', linewidth=2, alpha=0.99)
+
+    # 设置径向网格线的粗细
+    ax.xaxis.set_tick_params(width=3)
+    ax.yaxis.set_tick_params(width=3)
+    # 添加图例
+    # ax.legend(loc='upper right', bbox_to_anchor=(1.2, 1.0))
 
     # 保存图像，构造输出文件名
-    output_file = f"../output/12_{input_file}_move"
+    if output_file is None:
+        output_file = f"../output/12_{input_file}_polar"
+    else:
+        output_file = f"../output/{output_file}"
     fig.savefig(f'{output_file}.pdf', dpi=300, bbox_inches='tight')
     save_figure(fig, output_file)
 

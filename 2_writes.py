@@ -105,6 +105,6 @@ if __name__ == "__main__":
     new_csv_filename = check_from_csv(os.path.join(run_path, csv_path))
     os.chdir(run_path)
     # create_task_runs("/".join(Path(new_csv_filename).parts[-2:]) , use_multithreading=True, num_workers=3, script_name="1_write")
-    create_task_runs(csv_path, use_multithreading=True, num_workers=9,script_name="1_write")
+    create_task_runs(csv_path, use_multithreading=True, num_workers=9,script_name="1_write_repeat")
 
 
