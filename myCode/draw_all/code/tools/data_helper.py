@@ -55,7 +55,7 @@ def rename_and_filter_columns(data_dict, columns_to_keep, new_column_names=None)
 
 
 def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
-                   condition_column_name=None, condition_value=None, use_parallel=True, n_jobs=-1):
+                   condition_column_name=None, condition_value=None, use_parallel=False, n_jobs=-1):
     """
     从多个文件中读取数据并按指定列分组求和，并可根据条件列进行筛选。
 
@@ -473,12 +473,29 @@ def compute_land_use_change_metrics(input_file, use_parallel=True):
             result_df.loc[year, (land_use, 'Distance (km)')] = round(distance, 3) if not pd.isna(distance) else np.nan
             result_df.loc[year, (land_use, 'Angle (degrees)')] = round(angle_deg, 2) if not pd.isna(
                 angle_deg) else np.nan
-            result_df.loc[year, (land_use, 'Area (km2)')] = round(area_conv, 3) if not pd.isna(area_conv) else np.nan
+            result_df.loc[year, (land_use, 'Area (km2)')] = area_conv if not pd.isna(area_conv) else np.nan
             result_df.loc[year, (land_use, 'Area×Distance')] = round(area_distance, 3) if not pd.isna(
                 area_distance) else np.nan
 
+    # 假设已经完成了原始DataFrame的计算
+    # 使用stack和unstack重塑数据
+    flat_df = result_df.stack(level=[0, 1], future_stack=True).reset_index()
+    flat_df.columns = ['Year', 'Land Use', 'Metric', 'Value']
+
+    # 然后使用pivot_table重组
+    new_result_df = flat_df.pivot_table(
+        index='Land Use',
+        columns=['Year', 'Metric'],
+        values='Value'
+    )
     # 保存结果到 Excel 文件
     excel_path = os.path.join("..", "output", "12_land_use_movement_all.xlsx")
-    # 使用 openpyxl 引擎，如果该文件已存在，则以追加模式写入
-    with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-        result_df.to_excel(writer, sheet_name=input_file)
+    # 检查文件是否存在，根据情况选择写入模式
+    if os.path.exists(excel_path):
+        # 文件存在，使用追加模式
+        with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+            new_result_df.to_excel(writer, sheet_name=input_file)
+    else:
+        # 文件不存在，创建新文件
+        with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+            new_result_df.to_excel(writer, sheet_name=input_file)

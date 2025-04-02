@@ -12,7 +12,7 @@ grid_search = {
         'timeseries'
     ],
     'OBJECTIVE': ['maxprofit'],
-    'WRITE_OUTPUT_GEOTIFFS': [False],
+    'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
     # GHG settings
@@ -41,9 +41,9 @@ grid_search = {
     'SOLVE_BIODIV_PRIORITY_WEIGHT': [0],
 }
 
-suffixs = ['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT']
+suffixs = ['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT','RESFACTOR']
 
-output_file = os.path.join("Custom_runs", "setting_0401_linux.csv")
-create_grid_search_template( grid_search,output_file,suffixs,run_time="20250403")
+output_file = os.path.join("Custom_runs", "setting_0401_20.csv")
+create_grid_search_template( grid_search,output_file,suffixs)
 print(f"saved to {output_file}")
 

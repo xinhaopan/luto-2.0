@@ -61,7 +61,7 @@ def main():
         total_duration = overall_end_time - overall_start_time
 
         # 转换为 hh:mm:ss 格式
-        formatted_duration = time.strftime("%H:%M:%S", time.gmtime(total_duration_seconds))
+        formatted_duration = time.strftime("%H:%M:%S", time.gmtime(total_duration))
 
         # 记录日志
         write_log(f"Total run time: {formatted_duration}")

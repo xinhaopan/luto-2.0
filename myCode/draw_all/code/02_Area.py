@@ -15,7 +15,7 @@ csv_name, value_column_name, filter_column_name = 'area_agricultural_landuse', '
 area_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 area_group_dict = aggregate_by_mapping(area_dict, 'tools/land use group.xlsx', 'desc', 'ag_group')
 area_ag_group_dict,legend_colors = get_colors(area_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
-y_range, y_ticks = calculate_y_axis_range(area_ag_group_dict,5)
+y_range, y_ticks = calculate_y_axis_range(area_ag_group_dict,6)
 output_png = '../output/02_area_ag_group'
 plot_Combination_figures(area_ag_group_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
@@ -35,7 +35,7 @@ plot_Combination_figures(area_am_dict, output_png, input_files, plot_stacked_bar
 csv_name, value_column_name, filter_column_name = 'area_non_agricultural_landuse', 'Area (ha)', 'Land-use'
 area_non_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 area_non_ag_dict,legend_colors = get_colors(area_non_ag_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
-y_range, y_ticks = calculate_y_axis_range(area_non_ag_dict)
+y_range, y_ticks = calculate_y_axis_range(area_non_ag_dict,5)
 output_png = '../output/02_area_non_ag_group'
 plot_Combination_figures(area_non_ag_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
