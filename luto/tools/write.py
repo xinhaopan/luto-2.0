@@ -169,7 +169,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_species(data, yr_cal, path_yr)
-
+    #
     write_quantity_separate(data, yr_cal, path_yr)
     write_biodiversity(data, yr_cal, path_yr)
     write_npy(data, yr_cal, path_yr)
@@ -374,7 +374,7 @@ def write_quantity_separate(data: Data, yr_cal, path):
     else:
         ag_X_mrj = tools.lumap2ag_l_mrj(data.lumaps[yr_cal], data.lmmaps[yr_cal])
         non_ag_X_rk = tools.lumap2non_ag_l_mk(data.lumaps[yr_cal], len(settings.NON_AG_LAND_USES.keys()))
-        ag_man_X_mrj = tools.get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS)
+        ag_man_X_mrj = data.ag_man_dvars[yr_cal]
 
     # Calculate year index (i.e., number of years since 2010)
     yr_idx = yr_cal - data.YR_CAL_BASE
@@ -421,6 +421,7 @@ def write_quantity_separate(data: Data, yr_cal, path):
                 current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
 
         ag_man_qu_mrp = np.einsum('mrp,mrp->mrp', ag_man_q_mrp[am], current_ag_man_X_mrp)
+        print(am,np.sum(ag_man_qu_mrp),np.sum(ag_man_q_mrp[am]),np.sum(current_ag_man_X_mrp))
         ag_man_qu_mrj = np.einsum('mrp,pj->mrj', ag_man_qu_mrp, data.LU2PR.astype(bool))
         ag_man_q_mrj_dict[am] = ag_man_qu_mrj
 
