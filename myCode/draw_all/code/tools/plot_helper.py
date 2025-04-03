@@ -508,7 +508,7 @@ def get_max_min(df):
 #
 #     return min_v, max_v, ticks
 
-def get_y_axis_ticks(min_value, max_value, desired_ticks=4):
+def get_y_axis_ticks(min_value, max_value, desired_ticks=5):
     """
     生成Y轴刻度，根据数据范围智能调整刻度间隔和范围。
     优化版本，提高运行速度，并处理0-100特殊情况。
@@ -525,18 +525,15 @@ def get_y_axis_ticks(min_value, max_value, desired_ticks=4):
 
     # 2. 一次性计算间隔
     ideal_interval = range_value / (desired_ticks - 1)
-    e = math.floor(math.log10(ideal_interval))
+    # 根据理想间隔选择“nice”间隔
+    e = math.floor(math.log10(ideal_interval))  # 计算数量级
     base = 10 ** e
+    normalized_interval = ideal_interval / base
 
-    # 使用查表法替代计算
-    if ideal_interval / base <= 1:
-        interval = base
-    elif ideal_interval / base <= 2:
-        interval = 2 * base
-    elif ideal_interval / base <= 5:
-        interval = 5 * base
-    else:
-        interval = 10 * base
+    # 定义“nice”间隔选项
+    nice_intervals = [1, 2, 2.5, 5, 10]
+    # 选择最接近理想间隔的“nice”值
+    interval = min(nice_intervals, key=lambda x: abs(x - normalized_interval)) * base
 
     # 3. 整合计算，减少中间变量
     min_tick = math.floor(min_value / interval) * interval
@@ -582,7 +579,7 @@ def get_y_axis_ticks(min_value, max_value, desired_ticks=4):
     return min_v, max_v, ticks.tolist()  # 根据需要转回列表
 
 
-def calculate_y_axis_range(data_dict, desired_ticks=4,use_parallel=True, n_jobs=-1):
+def calculate_y_axis_range(data_dict, desired_ticks=5,use_parallel=True, n_jobs=-1):
     """
     并行计算所有 DataFrame 的 (max, min) 值，并计算 y 轴范围和间隔
     """

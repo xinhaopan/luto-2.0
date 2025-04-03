@@ -14,7 +14,7 @@ grid_search = {
     'OBJECTIVE': ['maxprofit'],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [20],
-    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [55],
+    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [20],
     # 'SOLVE_BIODIV_PRIORITY_WEIGHT': [0],
     # GHG settings
     'GHG_EMISSIONS_LIMITS': ['off','on'],
@@ -43,9 +43,9 @@ grid_search = {
 
 }
 
-suffixs = ['GHG_EMISSIONS_LIMITS','BIODIVERSTIY_TARGET_GBF_2']
+suffixs = ['GHG_EMISSIONS_LIMITS','BIODIVERSTIY_TARGET_GBF_2','RESFACTOR']
 
-output_file = os.path.join("Custom_runs", "setting_0331_cp.csv")
+output_file = os.path.join("Custom_runs", "setting_0403_cp.csv")
 create_grid_search_template( grid_search,output_file,suffixs)
 print(f"saved to {output_file}")
 

@@ -1529,15 +1529,15 @@ class LutoSolver:
                 "Water Deviation (ML)":        (self.W.X                                                               if settings.WATER_CONSTRAINT_TYPE == "soft" else 0),
                 "Water Penalty":               (self.penalty_water.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)    if settings.WATER_CONSTRAINT_TYPE == "soft" else 0),
                 
-                "GHG Ag Value (tCO2e)":         self.ghg_ag_contr.getValue(),
-                "GHG Non-Ag Value (tCO2e)":     self.ghg_non_ag_contr.getValue(),
-                "GHG Ag-Mam Value t(CO2e)":     self.ghg_ag_man_contr.getValue(),
-                "GHG Deviation (tCO2e)":       (self.E.X                                                               if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
-                "GHG Penalty":                 (self.penalty_ghg.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)      if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
+                "GHG Ag Value (tCO2e)":        (self.ghg_ag_contr.getValue()                                           if settings.GHG_EMISSIONS_LIMITS == "on" else 0),
+                "GHG Non-Ag Value (tCO2e)":    (self.ghg_non_ag_contr.getValue()                                       if settings.GHG_EMISSIONS_LIMITS == "on" else 0),
+                "GHG Ag-Mam Value t(CO2e)":    (self.ghg_ag_man_contr.getValue()                                       if settings.GHG_EMISSIONS_LIMITS == "on" else 0),
+                "GHG Deviation (tCO2e)":       (self.E.X                                                               if settings.GHG_CONSTRAINT_TYPE == "soft" or settings.GHG_EMISSIONS_LIMITS == "on" else 0),
+                "GHG Penalty":                 (self.penalty_ghg.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)      if settings.GHG_CONSTRAINT_TYPE == "soft" or settings.GHG_EMISSIONS_LIMITS == "on" else 0),
 
-                "BIO (GBF2) value (ha)":        self.biodiversity_expr.getValue(),
-                "BIO (GBF2) Deviation (ha)":   (self.B.X                                                               if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
-                "BIO (GBF2) Penalty":          (self.penalty_biodiv.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)   if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
+                "BIO (GBF2) value (ha)":       (self.biodiversity_expr.getValue()                                      if settings.BIODIVERSTIY_TARGET_GBF_2 == "on" else 0),
+                "BIO (GBF2) Deviation (ha)":   (self.B.X                                                               if settings.GBF2_CONSTRAINT_TYPE == "soft" or settings.BIODIVERSTIY_TARGET_GBF_2 == "on" else 0),
+                "BIO (GBF2) Penalty":          (self.penalty_biodiv.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)   if settings.GBF2_CONSTRAINT_TYPE == "soft" or settings.BIODIVERSTIY_TARGET_GBF_2 == "on" else 0),
                 
                 "BIO (GBF3) value (ha)":       {k: v.getValue() for k,v in self.major_vegetation_exprs.items()},
                 "BIO (GBF4) value (ha)":       {k: v.getValue() for k,v in self.species_conservation_exprs.items()},
