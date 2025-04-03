@@ -531,7 +531,7 @@ def get_y_axis_ticks(min_value, max_value, desired_ticks=5):
     normalized_interval = ideal_interval / base
 
     # 定义“nice”间隔选项
-    nice_intervals = [1, 2, 2.5, 5, 10]
+    nice_intervals = [1, 2, 5, 10]
     # 选择最接近理想间隔的“nice”值
     interval = min(nice_intervals, key=lambda x: abs(x - normalized_interval)) * base
 
