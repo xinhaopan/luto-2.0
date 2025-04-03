@@ -441,6 +441,7 @@ def write_quantity_separate(data: Data, yr_cal, path):
         AM_dfs.append(df_am)
     AM_df = pd.concat(AM_dfs)
 
+
     df = pd.concat([ag_df, non_ag_df, AM_df])
     df.to_csv(os.path.join(path, f'quantity_production_kt_separate_{yr_cal}.csv'), index=False)
 
