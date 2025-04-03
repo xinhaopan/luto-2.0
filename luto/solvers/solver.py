@@ -293,24 +293,24 @@ class LutoSolver:
         """
         print(f"Setting objective function to {settings.OBJECTIVE}...", flush=True)
 
-
-        # Get objectives
+        
+        # Get objectives 
         self.obj_economy = self._setup_economy_objective()          # When 'mincost', obj_economy is the cost; when 'maxprofit', obj_economy is (profit - cost)
         self.obj_biodiv = self._setup_biodiversity_objective()
         self.obj_penalties = self._setup_penalty_objectives()
-
+ 
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
             objective = (
-                self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT
+                self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT 
                 + self.obj_penalties * ( 1 - settings.SOLVE_ECONOMY_WEIGHT)
                 - self.obj_biodiv * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
             )
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
             objective = (
-                self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT
+                self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT 
                 - self.obj_penalties *  (1 - settings.SOLVE_ECONOMY_WEIGHT)
                 + self.obj_biodiv * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
             )
@@ -318,13 +318,13 @@ class LutoSolver:
             raise ValueError(f"Unknown objective function: {settings.OBJECTIVE}")
 
         self.gurobi_model.setObjective(objective, sense)
-
+        
     def _setup_economy_objective(self):
         print("  ...setting up economy objective...")
-
+        
         # Get economic contributions
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
-
+        
         self.economy_ag_contr = gp.quicksum(
             ag_obj_mrj[0, self._input_data.ag_lu2cells[0, j], j]
             @ self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
@@ -347,10 +347,10 @@ class LutoSolver:
         )
         
         return self.economy_ag_contr + self.economy_ag_man_contr + self.economy_non_ag_contr
-
+    
     def _setup_biodiversity_objective(self):
         print("  ...setting up biodiversity objective...")
-
+        
         # Get biodiversity contributions
         self.bio_ag_contr = gp.quicksum(
             gp.quicksum(
@@ -379,12 +379,12 @@ class LutoSolver:
             )  # Non-agricultural contribution
             for k in range(self._input_data.n_non_ag_lus)
         )
-
+        
         return self.bio_ag_contr + self.bio_non_ag_contr + self.bio_ag_man_contr
         
     def _setup_penalty_objectives(self):
         print("  ...setting up penalty objectives...")
-
+        
         # Get the penalty values for each sector
         self.penalty_biodiv = (
             self.B * settings.GBF2_PENALTY
@@ -411,7 +411,7 @@ class LutoSolver:
         )
 
         return self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv
-
+        
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
@@ -860,19 +860,19 @@ class LutoSolver:
 
 
     def _add_GBF2_priority_degrade_areas_constraints(self) -> None:
-
+        
         if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
             print("    ...Biodiversity GBF 2 (conservation priority) constraints TURNED OFF ...")
             return
 
-
+        
         elif settings.BIODIVERSTIY_TARGET_GBF_2 == "on":
             # Get the biodiversity contribution expression
             self.biodiversity_expr = self._get_GBF2_biodiversity_priority_area_contribution_expr()
             biodiversity_limits = self._input_data.limits["GBF2_priority_degrade_areas"]
-
+            
             print(f"    ...Biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
-
+            
             if settings.GBF2_CONSTRAINT_TYPE == "hard":
                 constr = self.biodiversity_expr >= biodiversity_limits
                 self.biodiversity_limit_constraint = self.gurobi_model.addConstr(constr)
@@ -945,7 +945,7 @@ class LutoSolver:
         print(f"    ...Biodiversity GBF 3 (major vegetation groups) constraints...")
 
         for v, v_area_lb in enumerate(v_limits):
-
+            
             ind = v_ind[v]
             MVG_raw_area_r = self._input_data.GBF3_raw_MVG_area_vr[v, ind]
 
@@ -998,7 +998,7 @@ class LutoSolver:
 
 
     def _add_GBF4A_species_conservation_constraints(self) -> None:
-
+                
         if settings.BIODIVERSTIY_TARGET_GBF_4 != "on":
             print('     ...Biodiversity GBF 4 (species conservation) constraints TURNED OFF ...')
             return
@@ -1008,10 +1008,10 @@ class LutoSolver:
         print(f"    ...Biodiversity GBF 4 (species conservation) constraints...")
         
         for s, s_area_lb in enumerate(s_limits):
-
+            
             ind = s_ind[s]
             GBF4A_raw_area_r = self._input_data.GBF4_raw_species_area_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT
-
+            
             ag_contr = gp.quicksum(
                 gp.quicksum(
                     GBF4A_raw_area_r
