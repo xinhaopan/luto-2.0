@@ -71,7 +71,7 @@ water_point_dict = rename_and_filter_columns(water_point_dict, ['WNY LIMIT','Yie
 point_colors = ['red','black']
 
 output_png = '../output/09_S3_water'
-y_range, y_ticks = calculate_y_axis_range(water_dict)
+y_range, y_ticks = calculate_y_axis_range(water_dict,4)
 plot_Combination_figures(water_dict, output_png, input_files, plot_stacked_bar_and_line, legend_colors,point_dict=water_point_dict,point_colors=point_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,
@@ -83,7 +83,7 @@ water_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_c
 water_ag_group_dict = aggregate_by_mapping(water_ag_dict, 'tools/land use group.xlsx', 'desc', 'ag_group')
 water_ag_group_dict,legend_colors = get_colors(water_ag_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
 output_png = '../output/09_S3_water_ag_group'
-y_range, y_ticks = calculate_y_axis_range(water_ag_group_dict)
+y_range, y_ticks = calculate_y_axis_range(water_ag_group_dict,4)
 plot_Combination_figures(water_ag_group_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,
@@ -93,7 +93,7 @@ csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value
 water_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Climate Change existence'], condition_value=['Without CCI'])
 water_am_dict,legend_colors = get_colors(water_am_dict, 'tools/land use colors.xlsx', sheet_name='am')
 output_png = '../output/09_S3_water_am'
-y_range, y_ticks = calculate_y_axis_range(water_am_dict)
+y_range, y_ticks = calculate_y_axis_range(water_am_dict,4)
 plot_Combination_figures(water_am_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,

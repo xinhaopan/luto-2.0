@@ -382,7 +382,7 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # ---------------------------------------------------------------------------- #
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
+GHG_EMISSIONS_LIMITS = 'off'        # 'on' or 'off'
 
 GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 

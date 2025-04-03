@@ -81,6 +81,17 @@ def lumap2ag_l_mrj(lumap, lmmap):
 
     return x_mrj.astype(bool)
 
+def get_base_am_vars(ncells, ncms, n_ag_lus):
+    """
+    Get the 2010 agricultural management option vars.
+    It is assumed that no agricultural management options were used in 2010,
+    so get zero arrays in the correct format.
+    """
+    am_vars = {}
+    for am in settings.AG_MANAGEMENTS_TO_LAND_USES:
+        am_vars[am] = np.zeros((ncms, ncells, n_ag_lus))
+
+    return am_vars
 
 def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     """
