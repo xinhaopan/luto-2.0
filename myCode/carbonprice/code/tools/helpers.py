@@ -19,19 +19,38 @@ def apply_operations_on_files(path_dir, files_with_ops):
     for file, operation in files_with_ops:
         file_path = os.path.join(path_dir, file)
         if os.path.exists(file_path):
-            # 读取 .npy 文件
-            data = np.load(file_path)
+            try:
+                # 读取 .npy 文件
+                data = np.load(file_path)
 
-            # 如果是第一次加载数据，初始化 total_sum
-            if total_sum is None:
-                total_sum = data if operation == '+' else -data
-            else:
-                if operation == '+':
-                    total_sum += data
-                elif operation == '-':
-                    total_sum -= data
+                # 如果是第一次加载数据，初始化 total_sum
+                if total_sum is None:
+                    total_sum = data if operation == '+' else -data
+                else:
+                    if operation == '+':
+                        total_sum += data
+                    elif operation == '-':
+                        total_sum -= data
+            except Exception as e:
+                print(f"Error loading file {file_path}: {e}")
+                # 如果读取失败，将值补充为 0
+                if total_sum is None:
+                    total_sum = np.zeros(1) if operation == '+' else -np.zeros(1)
+                else:
+                    if operation == '+':
+                        total_sum += np.zeros(1)
+                    elif operation == '-':
+                        total_sum -= np.zeros(1)
         else:
             print(f"File not found: {file_path}")
+            # 如果文件不存在，将值补充为 0
+            if total_sum is None:
+                total_sum = np.zeros(1) if operation == '+' else -np.zeros(1)
+            else:
+                if operation == '+':
+                    total_sum += np.zeros(1)
+                elif operation == '-':
+                    total_sum -= np.zeros(1)
 
     return total_sum
 
@@ -86,10 +105,11 @@ def process_and_save(path_dir, save_path, prefix, year, rows_nums):
     :param rows_nums: 用于存储各项结果的列表
     :return: 更新后的 rows_nums
     """
-    print(prefix)
     arr = apply_sum_on_files_with_prefix(path_dir, prefix)
     if arr is None:
         print(f"No valid data found for {prefix} in year {year}")
+        arr = np.zeros(1)
+
     rows_nums.append(np.sum(arr) / 1000000)
     if prefix.endswith('_'):
         prefix = prefix[:-1]
@@ -130,6 +150,7 @@ def process_files_with_operations(path_dir, save_path, files_with_ops, file_pref
     np.save(os.path.join(save_path, f"{file_prefix}_{year}.npy"), arr)
 
     # 将结果添加到 rows_nums，按百万单位
+    arr = np.nan_to_num(arr, nan=0.0)
     rows_nums.append(np.sum(arr) / 1000000)
 
     return rows_nums

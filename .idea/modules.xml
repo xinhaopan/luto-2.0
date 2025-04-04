@@ -3,6 +3,8 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/LUTO2.iml" filepath="$PROJECT_DIR$/.idea/LUTO2.iml" />
+      <module fileurl="file://F:/xinhao/PythonPackage/.idea/PythonPackage.iml" filepath="F:/xinhao/PythonPackage/.idea/PythonPackage.iml" />
+      <module fileurl="file://F:/xinhao/miniforge/.idea/miniforge.iml" filepath="F:/xinhao/miniforge/.idea/miniforge.iml" />
     </modules>
   </component>
 </project>

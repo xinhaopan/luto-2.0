@@ -22,3 +22,18 @@ cost_dict = {
 
 # 创建 revenue_dict，主键从 cost 换成 revenue
 revenue_dict = {key.replace('cost', 'revenue'): value for key, value in cost_dict.items()}
+
+time = '20250403'
+suffix = '20'
+
+senerios = [
+    'Run_1_off_off',
+    'Run_2_off_on',
+    'Run_3_on_off',
+    'Run_4_on_on',
+]
+input_files = [
+    f"{time}_{senerio}_{suffix}"
+    for senerio in senerios
+]
+

@@ -7,6 +7,8 @@
     </content>
     <orderEntry type="jdk" jdkName="luto" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="miniforge" />
+    <orderEntry type="module" module-name="PythonPackage" />
   </component>
   <component name="PyDocumentationSettings">
     <option name="format" value="PLAIN" />
