@@ -45,7 +45,7 @@ grid_search = {
 
 suffixs = ['GHG_EMISSIONS_LIMITS','BIODIVERSTIY_TARGET_GBF_2','RESFACTOR']
 
-output_file = os.path.join("Custom_runs", "setting_0403_cp.csv")
+output_file = os.path.join("Custom_runs", "setting_0404_cp.csv")
 create_grid_search_template( grid_search,output_file,suffixs)
 print(f"saved to {output_file}")
 

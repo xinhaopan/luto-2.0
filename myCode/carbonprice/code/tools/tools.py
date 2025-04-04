@@ -51,15 +51,16 @@ def amortize_costs(input_file, file_name = "cost_transition_ag2non_ag", rate=0.0
         np.save(output_file_name, new_costs[year])
 
 
-def calculate_cost_revenue(input_file):
-    print("Start to calculate cost_revenue.")
+def calculate_cost_revenue(input_file, use_parallel=False,output=True):
+    print("Start jobs to calculate cost_revenue.")
     path_name = get_path(input_file)
     years=get_year(path_name)
     # 初始化结果列表
 
     columns_name = ["Year", "cost_ag(M$)", "cost_am(M$)", "cost_non_ag(M$)", "cost_transition_ag2ag(M$)",
-                    "cost_transition_ag2non_ag(M$)","cost_amortised_transition_ag2non_ag(M$)",
-                    "revenue_ag(M$)","revenue_am(M$)","revenue_non_ag(M$)","GHG_ag(MtCOe2)", "GHG_am(MtCOe2)", "GHG_non-ag(MtCOe2)", "GHG_transition(MtCOe2)"]
+                    "cost_transition_ag2non_ag(M$)","revenue_ag(M$)","revenue_am(M$)","revenue_non_ag(M$)",
+                    "GHG_ag(MtCOe2)", "GHG_am(MtCOe2)", "GHG_non-ag(MtCOe2)", "GHG_transition(MtCOe2)",
+                    "BIO_ag(M ha)", "BIO_am(M ha)", "BIO_non_ag(M ha)"]
 
     save_path = os.path.join(path_name, "data_for_carbon_price")
     os.makedirs(save_path, exist_ok=True)
@@ -75,33 +76,48 @@ def calculate_cost_revenue(input_file):
     ]
 
     # 并行执行 process_and_save，并收集结果
-    results = Parallel(n_jobs=n_jobs)(
-        delayed(process_and_save)(
-            os.path.join(path_name, f"out_{year}/data_for_carbon_price"),
-            save_path,
-            prefix,
-            year,
-            [year]  # **每个任务初始化自己的 rows_nums**
+    if use_parallel:
+        # 并行执行 process_and_save，并收集结果
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(process_and_save)(
+                os.path.join(path_name, f"out_{year}/data_for_carbon_price"),
+                save_path,
+                prefix,
+                year,
+                [year]  # 每个任务初始化自己的 rows_nums
+            )
+            for year, prefix in tasks
         )
-        for year, prefix in tasks
-    )
+    else:
+        # 顺序执行 process_and_save，并使用 tqdm 显示进度条
+        results = []
+        for year, prefix in tqdm(tasks, desc="Processing tasks"):
+            result = process_and_save(
+                os.path.join(path_name, f"out_{year}/data_for_carbon_price"),
+                save_path,
+                prefix,
+                year,
+                [year]  # 每个任务初始化自己的 rows_nums
+            )
+            results.append(result)
 
     # 转换为 DataFrame
     df_results = pd.DataFrame(results).groupby(0)[1].agg(list).reset_index().apply(lambda x: [x[0]] + list(x[1]), axis=1).apply(
         pd.Series).set_axis(columns_name, axis=1)
 
-    # output_excel_path = os.path.join(r"output\Carbon_Price", path_name.split("/")[1] + "_cost_revenue_summary.xlsx")
-    # df_results.to_excel(output_excel_path, index=False)
+    if output:
+        output_excel_path = os.path.join(f"../output/01_{input_file}_summary.xlsx")
+        df_results.to_excel(output_excel_path, index=False)
     return df_results
 
 
-def calculate_Discriminatory(path_name):
-    path_name = "output/" + path_name
+def calculate_price_cells(input_file, output=True):
+    path_name = get_path(input_file)
     years = get_year(path_name)
     path_dir = os.path.join(path_name, "data_for_carbon_price")
     save_path = os.path.join(path_name, "data_for_carbon_price")
     print("Start to calculate Discriminatory carbon price.")
-    columns_name = ["Year", "Opportunity cost(M$)","Transition cost(M$)","AM profit(M$)","Non_AG profit(M$)","All cost(M$)","GHG Abatement(MtCOe2)","carbon price($/tCOe2)"]
+    columns_name = ["Year", "Opportunity cost(M$)","Transition cost(M$)","AM profit(M$)","Non_AG profit(M$)","All cost(M$)","GHG Abatement(MtCOe2)","BIO(Mha)","carbon price($/tCOe2)","biodiversity price($/ha)"]
     results = []
     for year in trange(years[1], years[-1] + 1):
         rows_nums = [year]
@@ -138,63 +154,109 @@ def calculate_Discriminatory(path_name):
                                                    ("GHG_transition_" + str(year), '+')],
                                                   "ghg", year, rows_nums, negate=True)
         ghg_arr = np.load(os.path.join(path_dir, f"ghg_{year}.npy"))
+        rows_nums = process_files_with_operations(path_dir, save_path,
+                                                  [("BIO_ag_" + str(year), '-'),
+                                                   ("BIO_am_" + str(year), '-'), ("BIO_non_ag_" + str(year), '-')],
+                                                  "bio", year, rows_nums, negate=True)
+        bio_arr = np.load(os.path.join(path_dir, f"bio_{year}.npy"))
 
         with np.errstate(divide='ignore', invalid='ignore'):
             cp_arr = np.divide(cost_arr, ghg_arr)
             cp_arr[np.isinf(cp_arr)] = 0
             cp_arr = np.nan_to_num(cp_arr, nan=0.0)
+
+            bp_arr = np.divide(cost_arr, bio_arr)
+            bp_arr[np.isinf(bp_arr)] = 0
+            bp_arr = np.nan_to_num(bp_arr, nan=0.0)
+
         rows_nums.append(np.sum(cp_arr * ghg_arr) / np.sum(ghg_arr))
+        rows_nums.append(np.sum(bp_arr * bio_arr) / np.sum(bio_arr))
         np.save(os.path.join(save_path, f"cp_{year}.npy"), cp_arr)
+        np.save(os.path.join(save_path, f"bp_{year}.npy"), bp_arr)
 
         results.append(rows_nums)
 
     df_results = pd.DataFrame(results, columns=columns_name)
-    # output_excel_path = os.path.join(r"output\Carbon_Price", path_name.split("/")[1] + "_cp_Discriminatory.xlsx")
-    # df_results.to_excel(output_excel_path, index=False)
+    if output:
+        output_excel_path = os.path.join(f"../output/02_{input_file}_price.xlsx")
+        df_results.to_excel(output_excel_path, index=False)
     return df_results
 
-def caculate_carbon_price(input_file,percentile_num=95,mask_use=True):
+def caculate_shadow_price(input_file,percentile_num=95,mask_use=True, output=True):
     print("Start to calculate Uniform carbon price.")
     path_name = get_path(input_file)
     years = get_year(path_name)
     results = []
 
-    for year in trange(years[0] + 1, years[1] + 1):
+    for year in trange(years[1], years[-1] + 1):
         # 加载每年的 .npy 文件
         payment_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"cost_{year}.npy"))
         ghg_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"ghg_{year}.npy"))
         cp_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"cp_{year}.npy"))
 
-        output_file = f"carbon_price_analysis_{percentile_num}_nomask1.xlsx"
         # 使用 mask 过滤掉 ghg_arr < 1的值
         if mask_use:
             mask = ghg_arr >= 1
             cp_arr1 = cp_arr[mask]
-            output_file =  f"carbon_price_analysis_{percentile_num}_mask1.xlsx"
 
         # 计算所需的值
         carbon_price_uniform = np.percentile(cp_arr1, percentile_num)
         total_emissions_abatement = np.sum(ghg_arr)
-        total_cost_uniform = carbon_price_uniform * total_emissions_abatement
-        total_cost_discriminatory = np.sum(cp_arr * ghg_arr)
-        carbon_price_discriminatory_avg = total_cost_discriminatory / total_emissions_abatement if total_emissions_abatement != 0 else 0
+        total_ghg_uniform = carbon_price_uniform * total_emissions_abatement
+        total_ghg_discriminatory = np.sum(cp_arr * ghg_arr)
+        carbon_price_discriminatory_avg = total_ghg_discriminatory / total_emissions_abatement if total_emissions_abatement != 0 else 0
 
-        # 将计算结果添加到列表中
+        try:
+            bio_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"bio_{year}.npy"))
+            bp_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"bp_{year}.npy"))
+        except Exception as e:
+            print(f"Error loading file for year {year}: {e}")
+            bio_arr = np.zeros_like(payment_arr)  # 示例形状，请根据实际数据调整
+            bp_arr = np.zeros_like(payment_arr)  # 示例形状，请根据实际数据调整
+
+        if mask_use:
+            mask = bio_arr >= 1
+            if mask.shape == bio_arr.shape and bp_arr.shape == bio_arr.shape:
+                bp_arr1 = bp_arr[mask]
+                bio_price_uniform = np.percentile(bp_arr1, percentile_num)
+                total_bio = np.sum(bio_arr)
+                total_bio_uniform = bio_price_uniform * total_bio
+                total_bio_discriminatory = np.sum(bp_arr * bio_arr)
+                bio_price_discriminatory_avg = total_bio_discriminatory / total_bio if total_bio != 0 else 0
+
+
+            else:
+                print(
+                    f"Dimension mismatch: mask shape {mask.shape}, bio_arr shape {bio_arr.shape}, bp_arr shape {bp_arr.shape}")
+                bio_price_uniform = 0
+                total_bio = 0
+                total_bio_uniform = 0
+                total_bio_discriminatory = 0
+                bio_price_discriminatory_avg = 0
+
+            # 将计算结果添加到列表中
         results.append({
             "Year": year,
             "Total emissions abatement (MtCO2e)": total_emissions_abatement / 1000000,
-            "Total cost for Uniform Payment (M$)": total_cost_uniform / 1000000,
-            "Total cost for Discriminatory Payment (M$)": total_cost_discriminatory / 1000000,
+            "Total cost for ghg Uniform Payment (M$)": total_ghg_uniform / 1000000,
+            "Total cost for ghg Discriminatory Payment (M$)": total_ghg_discriminatory / 1000000,
             "Carbon price for Uniform Payment ($/tCO2e)": carbon_price_uniform,
-            "Carbon Price for Discriminatory Payment average ($/tCO2e)": carbon_price_discriminatory_avg
+            "Carbon Price for Discriminatory Payment average ($/tCO2e)": carbon_price_discriminatory_avg,
+
+            "Total bio (Mha)": total_bio / 1000000,
+            "Total cost for bio Uniform Payment (M$)": total_bio_uniform / 1000000,
+            "Total cost for bio Discriminatory Payment (M$)": total_bio_discriminatory / 1000000,
+            "BIO price for Uniform Payment ($/tCO2e)": bio_price_uniform,
+            "BIO Price for Discriminatory Payment average ($/tCO2e)": bio_price_discriminatory_avg
         })
 
     # 创建DataFrame
     df_results = pd.DataFrame(results)
 
     # 保存结果到CSV文件
-    # output_excel_path = os.path.join(r"output\Carbon_Price", path_name.split("/")[1] + "_" + output_file)
-    # df_results.to_excel(output_excel_path, index=False)
+    if output:
+        output_excel_path = os.path.join(f"../output/03_{input_file}_shadow_price.xlsx")
+        df_results.to_excel(output_excel_path, index=False)
     return df_results
 
 def caculate_carbonprice_compare(path_name,percentiles = [100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84, 83, 82, 81, 80]):
@@ -306,7 +368,7 @@ def caculate_carbonprice_compare(path_name,percentiles = [100, 99, 98, 97, 96, 9
 
 def draw_histogram(path_name,year=2050, mask_use=True):
     print("Start to draw histogram.")
-    path_name = "output/" + path_name
+    path_name = get_path(input_file)
     # 加载 2050 年的 .npy 文件
     payment_arr_2050 = np.load(os.path.join(path_name, "data_for_carbon_price", f"cost_{year}.npy"))
     ghg_arr_2050 = np.load(os.path.join(path_name, "data_for_carbon_price", f"ghg_{year}.npy"))
@@ -444,11 +506,113 @@ def summarize_from_csv(path_name):
             # 写入Excel的对应工作表
             df_result1.to_excel(writer, sheet_name=key[:-9], index=False, columns=columns_to_write)
 
-def carbon_price(path_name):
+def sanitize_filename(filename):
+    return filename.replace('/', '_').replace('\\', '_').replace(':', '_')
+
+
+def draw_figure(input_file):
+    # 读取表格数据
+    file_path = f'../output/03_{input_file}_shadow_price.xlsx'  # 替换为你的文件路径
+    df = pd.read_excel(file_path)
+
+    # 设置 Year 列为索引
+    df.set_index('Year', inplace=True)
+
+    # 遍历每一列并绘制点线图
+    for column in df.columns:
+        # 计算均值和标准差
+        mean = df[column].mean()
+        std = df[column].std()
+
+        # 将超出均值±3倍标准差的值替换为NaN
+        df[column] = df[column].where((df[column] <= mean + 3*std) & (df[column] >= mean - 3*std), np.nan)
+
+        plt.figure()
+        plt.plot(df.index, df[column], marker='o', linestyle='-', label=column, color='b')
+
+        # 检查是否有NaN值
+        has_nan = df[column].isna().any()
+
+        if has_nan:
+            # 绘制带断点的图
+            plt.plot(df.index, df[column].interpolate(), linestyle='--', color='r')  # 插值显示断点
+
+        plt.xlabel('Year')
+        plt.ylabel(column)
+        plt.title(f'{input_file} {column}')
+        plt.legend()
+        plt.grid(True)
+
+        sanitized_column = sanitize_filename(column)
+        plt.savefig(f'../Figure/{input_file}_{sanitized_column}.png')  # 保存图像为文件
+        plt.close()  # 关闭当前图像，避免内存问题
+        # plt.show()
+# def draw_figure(input_file):
+#     # 读取表格数据
+#     file_path = f'../output/03_{input_file}_shadow_price.xlsx'  # 替换为你的文件路径
+#     df = pd.read_excel(file_path)
+#
+#     # 设置 Year 列为索引
+#     df.set_index('Year', inplace=True)
+#
+#     # 遍历每一列并绘制点线图
+#     for column in df.columns:
+#         # 计算均值和标准差
+#         mean = df[column].mean()
+#         std = df[column].std()
+#
+#         # 将超出均值±3倍标准差的值标记为异常值
+#         is_outlier = (df[column] > mean + 3*std) | (df[column] < mean - 3*std)
+#
+#         # 获取非异常值的最大最小值
+#         non_outlier_max = df[column][~is_outlier].max()
+#         non_outlier_min = df[column][~is_outlier].min()
+#
+#         # 设置断点范围（略低于断点的值，略高于去掉断点后的最大值）
+#         break_start = mean + 3 * std - 0.1 * std
+#         break_end = non_outlier_max + 0.1 * std
+#
+#         # 创建带有断点的双轴图
+#         fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 6), gridspec_kw={'height_ratios': [3, 1]})
+#
+#         # 绘制正常值
+#         ax1.plot(df.index, df[column], marker='o', linestyle='-', label=column, color='b')
+#         ax2.plot(df.index, df[column], marker='o', linestyle='-', label=column, color='b')
+#
+#         # 隐藏异常值
+#         ax1.plot(df.index[is_outlier], df[column][is_outlier], 'o', color='white')
+#         ax2.plot(df.index[~is_outlier], df[column][~is_outlier], 'o', color='white')
+#
+#         # 设置轴范围
+#         ax1.set_ylim(break_start, df[column].max() + std)
+#         ax2.set_ylim(df[column].min() - std, break_end)
+#
+#         # 添加断点标记
+#         d = .015  # 断点大小
+#         kwargs = dict(transform=ax1.transAxes, color='k', clip_on=False)
+#         ax1.plot((-d, +d), (-d, +d), **kwargs)        # top-left diagonal
+#         ax1.plot((1 - d, 1 + d), (-d, +d), **kwargs)  # top-right diagonal
+#
+#         kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
+#         ax2.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
+#         ax2.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
+#
+#         plt.xlabel('Year')
+#         plt.ylabel(column)
+#         plt.title(f'{input_file} {column}')
+#         plt.legend()
+#         plt.grid(True)
+#
+#         sanitized_column = sanitize_filename(column)
+#         plt.savefig(f'../Figure/{input_file}_{sanitized_column}.png')  # 保存图像为文件
+#         plt.close()  # 关闭当前图像，避免内存问题
+#
+
+def calculate_price(input_file,use_parallel=False):
     # amortize_costs(path_name)
-    # calculate_cost_revenue(path_name)
-    # calculate_Discriminatory(path_name)
-    caculate_carbon_price(path_name, percentile_num=97, mask_use=True)
-    # caculate_carbonprice_compare(path_name)
-    # # draw_histogram(path_name)
+    calculate_cost_revenue(input_file,use_parallel)
+    calculate_price_cells(input_file)
+    caculate_shadow_price(input_file, percentile_num=97, mask_use=True)
+    # caculate_carbonprice_compare(input_file)
+    # draw_histogram(input_file)
     # summarize_from_csv(path_name)

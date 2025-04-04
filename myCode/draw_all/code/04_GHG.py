@@ -56,7 +56,7 @@ plot_Combination_figures(am_dict, output_png, input_files, plot_stacked_bar, leg
 
 non_ag_dict,legend_colors = get_colors(non_ag_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
 output_png = '../output/04_ghg_non_ag_emissions'
-y_range, y_ticks = calculate_y_axis_range(non_ag_dict,6)
+y_range, y_ticks = calculate_y_axis_range(non_ag_dict,5)
 # y_range, y_ticks = (-360,0),90
 plot_Combination_figures(non_ag_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,

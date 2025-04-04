@@ -1123,7 +1123,7 @@ class Data:
             settings.INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
             sheet_name = f'NVIS_{settings.NVIS_CLASS_DETAIL}'
         )
-        
+
         for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
             if not all([
                 row['USER_DEFINED_TARGET_PERCENT_2030'] >= 0,
@@ -1131,12 +1131,12 @@ class Data:
                 row['USER_DEFINED_TARGET_PERCENT_2100'] >= 0]
             ):
                 raise ValueError(f"NVIS class {row['group']} has no user-defined targets for all years.")
-        
+
         self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['group']))
         self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
         self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
         self.BIO_GBF3_N_CLASSES = self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA.shape[0]
-      
+
 
         # Read in vegetation layer data
         NVIS_layers = xr.load_dataarray(settings.INPUT_DIR + f'/NVIS_{settings.NVIS_CLASS_DETAIL}.nc').sel(cell=self.MASK).values / 100  # divide by 100 to convert percentage to proportion
@@ -1147,14 +1147,14 @@ class Data:
             NVIS_layers * settings.BIO_CONTRIBUTION_LDS,
             NVIS_layers
         )
-        
+
         # Container storing which cells apply to each major vegetation group
         epsilon = 1e-5
         self.MAJOR_VEG_INDECES = {
             v: np.where(NVIS_layers[v] > epsilon)[0]
             for v in range(NVIS_layers.shape[0])
         }
-            
+
             
  
         #####################################################################

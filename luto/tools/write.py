@@ -111,7 +111,7 @@ def write_data(data: Data):
 
     # Copy the base-year outputs to the path_begin_end_compare
     shutil.copytree(f"{data.path}/out_{years[0]}", f"{data.path_begin_end_compare}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
-    
+
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(data.path)
@@ -364,6 +364,8 @@ def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # NOTE:Non-agricultural production are all zeros, therefore skip the calculation
     # --------------------------------------------------------------------------------------------
 
+
+
 def write_quantity_separate(data: Data, yr_cal, path):
     index_levels = ['Landuse Type', 'Landuse subtype', 'Landuse', 'Land management', 'Production (tonnes, KL)']
     if yr_cal == data.YR_CAL_BASE:
@@ -421,7 +423,7 @@ def write_quantity_separate(data: Data, yr_cal, path):
                 current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
 
         ag_man_qu_mrp = np.einsum('mrp,mrp->mrp', ag_man_q_mrp[am], current_ag_man_X_mrp)
-        print(am,np.sum(ag_man_qu_mrp),np.sum(ag_man_q_mrp[am]),np.sum(current_ag_man_X_mrp))
+        # print(am,np.sum(ag_man_qu_mrp),np.sum(ag_man_q_mrp[am]),np.sum(current_ag_man_X_mrp))
         ag_man_qu_mrj = np.einsum('mrp,pj->mrj', ag_man_qu_mrp, data.LU2PR.astype(bool))
         ag_man_q_mrj_dict[am] = ag_man_qu_mrj
 
@@ -1784,7 +1786,9 @@ def write_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     write_cost_transition_npy(data, yr_cal, path, yr_cal_sim_pre)
     write_GHG_npy(data, yr_cal, path)
     write_map_npy(data, yr_cal, path)
+    write_GBF2_npy(data, yr_cal, path)
     # write_rev_non_ag_npy(data, yr_cal, path)
+
 
 def save_map_to_npy(data, product, filename_prefix, yr_cal, path):
     """
@@ -2228,7 +2232,7 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
                     path)
     save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
 
-def GBF2_npy(data: Data, yr_cal, path):
+def write_GBF2_npy(data: Data, yr_cal, path):
 
     # Do nothing if biodiversity limits are off and no need to report
     if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
@@ -2272,9 +2276,9 @@ def GBF2_npy(data: Data, yr_cal, path):
     ag_mam_dvar_mrj =  tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
 
-    bio_ag_r = np.einsum('mrj,mrj -> r', ag_dvar_mrj, ag_biodiv_rj)
-    bio_am_r = np.einsum('am,mrj -> r', ag_mam_dvar_mrj, am_biodiv_arj)
-    bio_non_ag_r = np.einsum('rk,k -> r', non_ag_dvar_rk, non_ag_biodiv_k)
+    bio_ag_r = np.einsum('mrj,rj,r -> r', ag_dvar_mrj, ag_biodiv_rj,GBF2_priority_degrade_areas_r)
+    bio_am_r = np.einsum('amrj,arj,r -> r', np.nan_to_num(ag_mam_dvar_mrj, nan=0.0), np.nan_to_num(am_biodiv_arj, nan=0.0),GBF2_priority_degrade_areas_r)
+    bio_non_ag_r = np.einsum('rk,k,r -> r', non_ag_dvar_rk, non_ag_biodiv_k,GBF2_priority_degrade_areas_r)
 
     save_map_to_npy(data, bio_ag_r, 'BIO_ag', yr_cal, path)
     save_map_to_npy(data, bio_am_r, 'BIO_am', yr_cal, path)
