@@ -1067,7 +1067,7 @@ def write_biodiversity(data: Data, yr_cal, path):
         return
 
     # Check biodiversity limits and report
-    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal)
+    biodiv_limit = ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
 
     print(f'Writing biodiversity outputs for {yr_cal}')
 
@@ -2383,52 +2383,46 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
     save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
 
 def write_GBF2_npy(data: Data, yr_cal, path):
-
-    # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
-        return
-
-    print(f'Writing biodiversity GBF2 scores (PRIORITY) for {yr_cal}')
-
-    # Get the priority degrade areas
-    GBF2_priority_degrade_areas_r =  xr.DataArray(
-        ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
-        dims=['cell'],
-        coords={'cell':range(data.NCELLS)}
-    )
-
-
     # Get the biodiversity scores b_mrj
-    ag_biodiv_rj = xr.DataArray(
-        ag_biodiversity.get_bio_contribution_matrices_rj(data),
-        dims=['cell','lu'],
-        coords={'cell':range(data.NCELLS), 'lu':data.AGRICULTURAL_LANDUSES}
-    )
-    am_biodiv_arj = xr.DataArray(
-        np.zeros((len(settings.AG_MANAGEMENTS_TO_LAND_USES), data.NCELLS ,data.N_AG_LUS)),
-        dims=['am','cell','lu'],
-        coords={'am':list(settings.AG_MANAGEMENTS_TO_LAND_USES.keys()), 'cell':range(data.NCELLS), 'lu':data.AGRICULTURAL_LANDUSES}
-    )
-    non_ag_biodiv_k = xr.DataArray(
-        list(non_ag_biodiversity.get_non_ag_lu_biodiv_impacts(data).values()),
-        dims=['lu'],
-        coords={'lu':list(NON_AG_LAND_USES.keys())}
-    )
-
-    am_biodiv_dict_ajr = ag_biodiversity.get_ag_management_biodiversity_impacts(data, yr_cal)
-    for am in am_biodiv_dict_ajr.keys():
-        for j_idx in am_biodiv_dict_ajr[am]:
-            am_biodiv_arj.loc[am, :, settings.AG_MANAGEMENTS_TO_LAND_USES[am][j_idx]] = am_biodiv_dict_ajr[am][j_idx]
-
+    # Get the total priority degraded areas
+    total_priority_degraded_area = (data.BIO_PRIORITY_DEGRADED_AREAS_MASK * data.REAL_AREA).sum()
 
     # Get the decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
-    ag_mam_dvar_mrj =  tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    ag_mam_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
 
-    bio_ag_r = np.einsum('mrj,rj,r -> r', ag_dvar_mrj, ag_biodiv_rj,GBF2_priority_degrade_areas_r)
-    bio_am_r = np.einsum('amrj,arj,r -> r', np.nan_to_num(ag_mam_dvar_mrj, nan=0.0), np.nan_to_num(am_biodiv_arj, nan=0.0),GBF2_priority_degrade_areas_r)
-    bio_non_ag_r = np.einsum('rk,k,r -> r', non_ag_dvar_rk, non_ag_biodiv_k,GBF2_priority_degrade_areas_r)
+    # Get the priority degrade areas scores
+    GBF2_priority_degrade_areas_r = xr.DataArray(
+        ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
+        dims=['cell'],
+        coords={'cell': range(data.NCELLS)}
+    )
+
+    bio_ag_priority_rmj, _ = xr.broadcast(GBF2_priority_degrade_areas_r, ag_dvar_mrj)
+    bio_am_priority_rtmj, _ = xr.broadcast(GBF2_priority_degrade_areas_r, ag_mam_dvar_mrj)
+    bio_non_ag_priority_rk, _ = xr.broadcast(GBF2_priority_degrade_areas_r, non_ag_dvar_rk)
+
+    # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
+    ag_impacts_rj = ag_biodiversity.get_ag_biodiversity_contribution(data)
+    for lu, lu_idx in data.DESC2AGLU.items():
+        bio_ag_priority_rmj = bio_ag_priority_rmj.copy()  # Get a copy of the data array to avoid assign to a view
+        bio_ag_priority_rmj.loc[{'lu': lu}] = bio_ag_priority_rmj.loc[{'lu': lu}] * ag_impacts_rj[:, lu_idx][:, None]
+    bio_ag_r = bio_ag_priority_rmj.sum(dim=['lm', 'lu'])
+
+    am_contribution = ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal)
+    for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items():
+        for idx, lu in enumerate(lus):
+            bio_am_priority_rtmj = bio_am_priority_rtmj.copy()  # Get a copy of the data array to avoid assign to a view
+            bio_am_priority_rtmj.loc[{'am': am, 'lu': lu}] = bio_am_priority_rtmj.loc[{'am': am, 'lu': lu}] * \
+                                                             am_contribution[am][idx][:, None]
+    bio_am_r = bio_am_priority_rtmj.sum(dim=['lm', 'am', 'lu'])
+
+    non_ag_contribution = non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data)
+    for idx, lu in enumerate(NON_AG_LAND_USES.keys()):
+        bio_non_ag_priority_rk = bio_non_ag_priority_rk.copy()  # Get a copy of the data array to avoid assign to a view
+        bio_non_ag_priority_rk.loc[{'lu': lu}] = bio_non_ag_priority_rk.loc[{'lu': lu}] * non_ag_contribution[idx]
+    bio_non_ag_r = bio_non_ag_priority_rk.sum(dim=['lu'])
 
     save_map_to_npy(data, bio_ag_r, 'BIO_ag', yr_cal, path)
     save_map_to_npy(data, bio_am_r, 'BIO_am', yr_cal, path)

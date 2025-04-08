@@ -18,7 +18,7 @@ grid_search = {
     # 'SOLVE_BIODIV_PRIORITY_WEIGHT': [0],
     # GHG settings
     'GHG_EMISSIONS_LIMITS': ['off','on'],
-    'GHG_CONSTRAINT_TYPE': ['soft'],
+    'GHG_CONSTRAINT_TYPE': ['hard'],
     'GHG_LIMITS_FIELD': [
         # '1.5C (67%) excl. avoided emis',
         '1.5C (50%) excl. avoided emis',
@@ -45,7 +45,7 @@ grid_search = {
 
 suffixs = ['GHG_EMISSIONS_LIMITS','BIODIVERSTIY_TARGET_GBF_2','RESFACTOR']
 
-output_file = os.path.join("Custom_runs", "setting_0404_cp.csv")
+output_file = os.path.join("Custom_runs", "setting_0407_cp.csv")
 create_grid_search_template( grid_search,output_file,suffixs)
 print(f"saved to {output_file}")
 
