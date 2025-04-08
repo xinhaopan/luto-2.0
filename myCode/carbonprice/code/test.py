@@ -1,9 +1,11 @@
-from joblib import Parallel, delayed
-from tools.desc import input_files,n_jobs
-from tools.tools import *
-for input_file in input_files:
-    draw_figure(input_file)
+from tools.helper_map import plot_bivariate_rgb_map
 
-# Parallel(n_jobs=n_jobs)(
-#     delayed(calculate_price)(input_file, True) for input_file in input_files
-# )
+plot_bivariate_rgb_map(
+    input_file="20250407_Run_4_on_on_20",
+    arr_path1="cost_2050.npy",
+    arr_path2="bio_2050.npy",
+    output_png="../output/carbon_bio_rgb_map.png",
+    proj_file="lumap_2050.tiff",
+    quantile=0.005,
+)
+
