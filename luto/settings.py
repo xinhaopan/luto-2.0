@@ -100,7 +100,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 STEP_SIZE = 1
@@ -128,7 +128,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-WRITE_OUTPUT_GEOTIFFS = True   # Write GeoTiffs to output directory: True or False
+WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 
 PARALLEL_WRITE = False           # If to use parallel processing to write GeoTiffs: True or False
@@ -383,7 +383,7 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # ---------------------------------------------------------------------------- #
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'off'        # 'on' or 'off'
+GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
 
 GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 
@@ -395,7 +395,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
+GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis'
 
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or None.
 # Setting to None falls back to the 'Default' scenario.
@@ -407,9 +407,8 @@ if CARBON_PRICES_FIELD == 'AS_GHG':
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15
 
-# GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
-GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
-GHG_ALLOW_LB_DELTA_T = 1e6    # The amount of GHG emissions that can be lowered than the target in the objective function (in tonnes CO2e)
+GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
+# GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
@@ -483,8 +482,8 @@ BIODIV_GBF_TARGET_2_DICT = {
 """
 
 
-# GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 The constraint type for the biodiversity target.
 - 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
@@ -581,31 +580,34 @@ Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
 
-NVIS_CLASS_DETAIL  = 'MVG_LOW_SPATIAL_DETAIL'                  # 'MVG' or 'MVS'
+NVIS_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBRA'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
 
-- If 'MVG' is selected, the NVIS input layers will be be resampled to 1km resolution, 
-  and each layer representing the percentage of a vegetation group's coverage.
-    
-- If 'MVS' is selected, the NVIS input layers will be be resampled to a single 1km resolution layer,
-  and each cell has a group index who covers the most area within this cell.
+- If 'MVG/MVS' is selected, use need to define conservation target for each NVIS group across the whole study area.
+- If 'MVS_IBRA/MVG_IBRA' is selected, use need to define conservation target for each NVIS group for selected the IBRA region.
 '''
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4 =  'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
+
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 halt the extinction of known threatened species, protect genetic diversity, 
 and manage human-wildlife interactions
 '''
 
-BIODIVERSTIY_TARGET_GBF_4A = 'off'    # 'on' or 'off'
-BIODIVERSTIY_TARGET_GBF_4B = 'off'   # 'on' or 'off'
 
-NES_LAYER_TYPE = 'likely'  # 'likely' or 'likely_and_maybe'
+
+# -------------------------------- Climate change impacts on biodiversity -------------------------------
+BIODIVERSTIY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
+'''
+Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
+reduce the impacts of climate change on biodiversity and ecosystems.
+'''
 
 
 
