@@ -31,6 +31,33 @@ gurobi.log
 *.dat
 *.log
 
+# Xinhao's personal settings
+.idea/
+temp*
+*.ipynb
+*.gitignore
+myCode/draw_all/output/
+myCode/Map/Assets/basemap.tif
+myCode/Map/Assets/shp/
+output/
+input/
+.idea
+# The mannual build files
+/docs/manual/*
+
+*.png
+*.tif
+*.shp
+*.ffs_db
+*.ffs_lock
+myCode/**/Assets/
+/myCode/tasks_run/rsync/rsync_password
+
+# Ignore rsync sensitive files
+myCode/tasks_run/rsync/rsync_password
+myCode/tasks_run/rsync/sync_files.sh
+myCode/clear_output.txt
+
 # The mannual build files
 /docs/manual/*
 

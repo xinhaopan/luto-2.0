@@ -37,9 +37,6 @@ import luto.settings as settings
 from typing import Tuple
 from datetime import datetime
 
-import luto.economics.agricultural.water as ag_water
-import luto.economics.non_agricultural.water as non_ag_water
-
 
 def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
@@ -304,7 +301,8 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
      
      
     """
-    
+    import luto.economics.agricultural.water as ag_water
+    import luto.economics.non_agricultural.water as non_ag_water
     yr_cal = data.YR_CAL_BASE + yr_idx
     l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     non_ag_cells = get_non_ag_cells(lumap)
@@ -499,7 +497,7 @@ def calc_water(
     '''
     
     # Calculate water yields for year and region.
-    index_levels = ['Landuse Type', 'Landuse', 'Water_supply',  'Water Net Yield (ML)']
+    index_levels = ['Landuse Type','Landuse subtype', 'Landuse', 'Water_supply',  'Water Net Yield (ML)']
 
     # Agricultural contribution
     ag_mrj = ag_w_mrj[:, ind, :] * ag_dvar[:, ind, :]   
@@ -508,6 +506,7 @@ def calc_water(
         ag_jm.reshape(-1).tolist(),
         index=pd.MultiIndex.from_product(
             [['Agricultural Landuse'],
+             ['Agricultural Landuse'],
                 data.AGRICULTURAL_LANDUSES,
                 data.LANDMANS])).reset_index()
     ag_df.columns = index_levels
@@ -519,6 +518,7 @@ def calc_water(
         non_ag_k, 
         index= pd.MultiIndex.from_product([
                 ['Non-agricultural Landuse'],
+                ['Non-Agricultural Landuse'],
                 settings.NON_AG_LAND_USES.keys() ,
                 ['dry']  # non-agricultural land is always dry
     ])).reset_index()
@@ -528,13 +528,14 @@ def calc_water(
     AM_dfs = []
     for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
         am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
-        am_mrj = ag_man_w_mrj[am][:, ind, :] * am_dvar[am][:, ind, :][:, :, am_j] 
+        am_mrj = ag_man_w_mrj[am][:, ind, :] * am_dvar[am][:, ind, :][:, :, am_j]
         am_jm = np.einsum('mrj->jm', am_mrj)
         # water yields for each agricultural management in long dataframe format
         df_am = pd.DataFrame(
             am_jm.reshape(-1).tolist(),
             index=pd.MultiIndex.from_product([
                 ['Agricultural Management'],
+                [am],
                 am_lus,
                 data.LANDMANS
                 ])).reset_index()

@@ -1933,3 +1933,4 @@ class Data:
         dr_prop = self.DEEP_ROOTED_PROPORTION
 
         return (dr_prop * water_dr_yield + (1 - dr_prop) * water_sr_yield)
+

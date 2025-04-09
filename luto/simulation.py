@@ -64,11 +64,11 @@ def load_data() -> Data:
     memory_thread.start()
     
     # Remove previous log files
-    for f in glob(f'{settings.OUTPUT_DIR}/*.log') + glob(f'{settings.OUTPUT_DIR}/*.txt'):
-        try:
-            os.remove(f)
-        except:
-            print(f"Error removing file {f}")
+    # for f in glob(f'{settings.OUTPUT_DIR}/*.log') + glob(f'{settings.OUTPUT_DIR}/*.txt'):
+    #     try:
+    #         os.remove(f)
+    #     except [PermissionError, FileNotFoundError] as e:
+    #         print(f"Error removing file {f}: {e}")
 
     return Data()
 
@@ -135,7 +135,7 @@ def run(
         raise ValueError(f"Unkown MODE: {settings.MODE}.")
     
     # Save the Data object to disk
-    write_outputs(data)
+    # write_outputs(data)
 
 
 def validate_simulation_years_settings(
@@ -226,8 +226,7 @@ def populate_containers_dynamic_base_year(
     data.add_production_data(base_year, "GHG Emissions", ghg_emission_data)
     data.add_production_data(base_year, "Biodiversity", biodiversity_data)
     data.add_production_data(base_year, "Major Vegetation Groups", major_vegetation_data)
-    data.add_production_data(base_year, "Species Conservation", species_conservation_data)    
-
+    data.add_production_data(base_year, "Species Conservation", species_conservation_data)
 
 def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
     print('\n')
