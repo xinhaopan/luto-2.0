@@ -1233,8 +1233,8 @@ class LutoSolver:
         """
         self._input_data = input_data
         self.d_c = d_c
-        self.penalties_coefficient = abs(settings.penalties_weight *  self.obj_economy.getValue() / self.obj_penalties.getValue())
-        self.biodiversity_coefficient = abs(settings.penalties_weight * self.obj_economy.getValue() / self.obj_biodiv.getValue())
+        self.penalties_coefficient = abs(settings.PENALTIES_WEIGHT *  self.obj_economy.getValue() / self.obj_penalties.getValue())
+        self.biodiversity_coefficient = abs(settings.BIODIV_WEIGHT * self.obj_economy.getValue() / self.obj_biodiv.getValue())
 
         print("Updating variables...", flush=True)
         updated_cells = self._update_variables(

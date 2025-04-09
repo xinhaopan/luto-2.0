@@ -412,8 +412,8 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 
 # Weight for the penalties/biodiversity deviation in the objective function
 ''' Penalties/biodiversity is of equal importance to the economy, 1 means equal importance, 0.5 means that penalties/biodiversity are half the economy.'''
-penalties_weight = 1
-biodiversity_weight = 1
+PENALTIES_WEIGHT = 0.5
+BIODIV_WEIGHT = 1
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
