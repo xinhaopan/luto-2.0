@@ -196,6 +196,21 @@ class Data:
             # Update the geospatial metadata.
             self.GEO_META = self.update_geo_meta()
 
+            # Get the resfactored lumap_2D as xarray DataArray
+            self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
+                self.LUMAP_2D_RESFACTORED,
+                dims=["y", "x"],
+                coords={
+                    "y": self.GEO_META['transform'].f + self.GEO_META['transform'].e * (
+                                np.arange(self.LUMAP_2D_RESFACTORED.shape[0]) + 0.5),
+                    "x": self.GEO_META['transform'].c + self.GEO_META['transform'].a * (
+                                np.arange(self.LUMAP_2D_RESFACTORED.shape[1]) + 0.5),
+                },
+                attrs={
+                    "crs": self.GEO_META['crs'],
+                    "transform": self.GEO_META['transform'],
+                }
+            )
 
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
@@ -204,20 +219,6 @@ class Data:
         else:
             raise KeyError("Resfactor setting invalid")
 
-
-        # Get the resfactored lumap_2D as xarray DataArray
-        self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
-                self.LUMAP_2D_RESFACTORED,
-                dims=["y", "x"],
-                coords={
-                    "y": self.GEO_META['transform'].f + self.GEO_META['transform'].e * (np.arange(self.LUMAP_2D_RESFACTORED.shape[0]) + 0.5),
-                    "x": self.GEO_META['transform'].c + self.GEO_META['transform'].a * (np.arange(self.LUMAP_2D_RESFACTORED.shape[1]) + 0.5),
-                },
-                attrs={
-                    "crs": self.GEO_META['crs'],
-                    "transform": self.GEO_META['transform'],
-                }
-            )
 
 
         ###############################################################

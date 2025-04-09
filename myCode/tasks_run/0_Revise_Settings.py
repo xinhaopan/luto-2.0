@@ -11,7 +11,8 @@ grid_search = {
         # 'snapshot',
         'timeseries'
     ],
-    'OBJECTIVE': ['mincost'], # maxprofit
+    'STEP_SIZE': [1],
+    'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [False],
     'RESFACTOR': [20],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
@@ -24,18 +25,18 @@ grid_search = {
         '1.8C (67%) excl. avoided emis'
     ],
     'CARBON_PRICES_FIELD': ['c0'],
-    # Water settings
-    'WATER_LIMITS': ['on'],
-    'WATER_CONSTRAINT_TYPE': ['soft'],
-    # Biodiversity settings
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],
     'GBF2_CONSTRAINT_TYPE': ['soft'],
-    'HCAS_PERCENTILE': [50],
     'BIODIV_GBF_TARGET_2_DICT': [
         # {2010: 0, 2030: 0, 2050: 0, 2100: 0 },
         # {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 },
         {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
     ],
+
+    # Water settings
+    'WATER_LIMITS': ['on'],
+    'WATER_CONSTRAINT_TYPE': ['soft'],
+    # Biodiversity settings
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4': ['off'],
@@ -43,9 +44,9 @@ grid_search = {
     'SOLVE_BIODIV_PRIORITY_WEIGHT': [10],
 }
 
-suffixs = ['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT','OBJECTIVE']
+suffixs = ['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT']
 
-output_file = os.path.join("Custom_runs", "setting_0405_10.csv")
-create_grid_search_template( grid_search,output_file,suffixs,'20240405')
+output_file = os.path.join("Custom_runs", "setting_0408_test.csv")
+create_grid_search_template( grid_search,output_file,suffixs)
 print(f"saved to {output_file}")
 
