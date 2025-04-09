@@ -338,14 +338,6 @@ def draw_figure(input_file):
 #
 
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-
 def plot_cost_vs_price(input_file: str, start_year: int = 2021):
     # 构造文件路径并读取数据
     file_path = f"../output/02_{input_file}_price.xlsx"
@@ -558,8 +550,8 @@ def plot_ghg_stack(input_file: str, start_year: int = 2021):
     ax.set_xticks(x)
     ax.set_xticklabels(x_labels, rotation=45)
     ax.set_xlabel("Year")
-    ax.set_ylabel("GHG (MtCO2e)")
-    ax.set_title(f"GHG: {input_file.split('_')[3]} & BIO {input_file.split('_')[4]}")
+    ax.set_ylabel("GHG abatement (MtCO2e)")
+    ax.set_title(f"GHG abatement: {input_file.split('_')[3]} & BIO {input_file.split('_')[4]}")
     ax.grid(True)
 
     # 将图例显示在图下方一行

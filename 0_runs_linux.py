@@ -1,6 +1,7 @@
 import os
 import dill
 import luto.simulation as sim
+import luto.settings as settings
 import traceback
 import time
 
@@ -28,7 +29,7 @@ def main(start_year, end_year):
         write_log("Data loaded")
 
         # 运行模拟
-        sim.run(data=data, base_year=start_year, target_year=end_year)
+        sim.run(data=data, base_year=start_year, target_year=end_year, step_size=settings.STEP_SIZE)
         write_log("Simulation completed")
 
         # 保存数据
