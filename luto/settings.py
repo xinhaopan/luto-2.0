@@ -113,8 +113,8 @@ does not reach the target year.
 '''
 
 # How does the model run over time
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
