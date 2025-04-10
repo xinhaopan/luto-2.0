@@ -202,8 +202,8 @@ class Data:
 
         else:
             raise KeyError("Resfactor setting invalid")
-
-
+        
+        
         # Get the resfactored lumap_2D as xarray DataArray
         self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
                 self.LUMAP_2D_RESFACTORED,
@@ -1429,23 +1429,23 @@ class Data:
             return lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
 
 
-        lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)
+        lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)  
         for idx_lu in self.DESC2AGLU.values():
             for idx_w, _ in enumerate(self.LANDMANS):
                 arr_lu_lm = self.LUMAP_NO_RESFACTOR * self.LMMAP_NO_RESFACTOR
                 lumap_resample_avg[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr(arr_lu_lm)
-
+                
         return lumap_resample_avg
-
-
+    
+    
     def get_exact_resfactored_lumap_mrj(self):
         """
         Rather than picking the center cell when resfactoring the lumap, this function
         calculate the exact value of each land-use cell based from lumap to create dvars.
-
+        
         E.g., given a resfactor of 5, then each resfactored dvar cell will cover a 5x5 area.
-        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25.
-
+        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25. 
+        
         """
         if settings.RESFACTOR == 1:
             return lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
@@ -1455,17 +1455,17 @@ class Data:
             for idx_w, _ in enumerate(self.LANDMANS):
                 # Get the cells with the same ID and water supply
                 lu_arr = (self.LUMAP_NO_RESFACTOR == idx_lu) * (self.LMMAP_NO_RESFACTOR == idx_w)
-                lumap_mrj[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr(lu_arr)
-
+                lumap_mrj[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr(lu_arr)        
+                    
         return lumap_mrj
-
-
+    
+    
     def get_exact_resfactored_average_arr(self, arr: np.ndarray) -> np.ndarray:
-
+            
         arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)      # Create a 2D array of zeros with the same shape as the LUMAP_2D_FULLRES
         np.place(arr_2d, self.NLUM_MASK == 1, arr)                           # Place the values of arr in the 2D array where the LUMAP_2D_RESFACTORED is equal to idx_lu
-
-        mask_arr_2d_resfactor = (self.LUMAP_2D_RESFACTORED != self.NODATA) & (self.LUMAP_2D_RESFACTORED != self.MASK_LU_CODE)
+        
+        mask_arr_2d_resfactor = (self.LUMAP_2D_RESFACTORED != self.NODATA) & (self.LUMAP_2D_RESFACTORED != self.MASK_LU_CODE) 
         mask_arr_2d_fullres = (self.LUMAP_2D_FULLRES != self.NODATA) & (self.LUMAP_2D_FULLRES != self.MASK_LU_CODE)
 
         # Create a 2D array of IDs for the LUMAP_2D_RESFACTORED
@@ -1478,12 +1478,12 @@ class Data:
         with np.errstate(divide='ignore', invalid='ignore'):                    # Ignore the division by zero warning
             cell_avg = cell_sum / cell_count
             cell_avg[~np.isfinite(cell_avg)] = 0                                # Set the NaN and Inf to 0
-
+            
         # Reshape the 1D avg array to 2D array
         cell_avg_2d = cell_avg.reshape(self.LUMAP_2D_RESFACTORED.shape)
     
         return cell_avg_2d[np.nonzero(mask_arr_2d_resfactor)]
-
+ 
     # Get the habitat condition score within priority degraded areas for base year (2010)
     def get_GBF2_target_for_yr_cal(self, yr_cal:int) -> float:
         """
@@ -1896,7 +1896,7 @@ class Data:
         The resulting year should be between 2010 - 2100
         """
         yr_cal = yr_idx + self.YR_CAL_BASE
-        return 0 #self.get_carbon_price_by_year(yr_cal)
+        return settings.CARBON_PRICE_COSTANT if settings.CARBON_PRICES_FIELD == 'CONSTANT' else self.get_carbon_price_by_year(yr_cal)
 
     def get_carbon_price_by_year(self, yr_cal: int) -> float:
         """
@@ -1908,7 +1908,7 @@ class Data:
                 f"Carbon price data not given for the given year: {yr_cal}. "
                 f"Year should be between {self.YR_CAL_BASE} and 2100."
             )
-        return 0 #self.CARBON_PRICES[yr_cal]
+        return settings.CARBON_PRICE_COSTANT if settings.CARBON_PRICES_FIELD == 'CONSTANT' else self.CARBON_PRICES[yr_cal]
 
     def get_water_nl_yield_for_yr_idx(
         self,
