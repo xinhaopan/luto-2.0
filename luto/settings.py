@@ -103,7 +103,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-STEP_SIZE = 5
+STEP_SIZE = 1
 '''
 The gap between two consecutive years in the model. For example, if the set-size is 5,
 the model will simulate on years of 2010, 2015, 2020, ..., 2050.
@@ -113,8 +113,8 @@ does not reach the target year.
 '''
 
 # How does the model run over time
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -412,7 +412,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 
 # Weight for the penalties/biodiversity deviation in the objective function
 ''' Penalties/biodiversity is of equal importance to the economy, 1 means equal importance, 0.5 means that penalties/biodiversity are half the economy.'''
-PENALTIES_WEIGHT = 0.5
+PENALTIES_WEIGHT = 2.71
 BIODIV_WEIGHT = 1
 
 # Water use yield and parameters *******************************

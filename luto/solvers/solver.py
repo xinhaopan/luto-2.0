@@ -99,7 +99,7 @@ class LutoSolver:
         self.E = None
         self.B = None
         self.W = None
-        self.penalties_coefficient = 1
+        self.penalties_coefficient = 3.47
         self.biodiversity_coefficient = 1
 
         # Initialise constraint lookups

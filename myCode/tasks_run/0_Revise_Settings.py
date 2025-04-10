@@ -11,8 +11,8 @@ grid_search = {
         # 'snapshot',
         'timeseries'
     ],
-    'PENALTIES_WEIGHT': [0.05],
-    'BIODIV_WEIGHT': [0.5,1,10,50,100,500,1000,3000,5000,10000],
+    'PENALTIES_WEIGHT': [2.71],
+    'BIODIV_WEIGHT': [2,3,4,5,6,7,8,9],
     'STEP_SIZE': [5],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [False],
@@ -20,13 +20,13 @@ grid_search = {
 
     # GHG settings
     'GHG_EMISSIONS_LIMITS' : ['on'],
-    'GHG_CONSTRAINT_TYPE': ['soft'],
+    'GHG_CONSTRAINT_TYPE': ['hard'],
     'GHG_LIMITS_FIELD': [
         # '1.5C (67%) excl. avoided emis',
         '1.5C (50%) excl. avoided emis',
         # '1.8C (67%) excl. avoided emis'
     ],
-    # 'CARBON_PRICES_FIELD': ['c0'],
+    'CARBON_PRICES_FIELD': ['c0'],
 
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],
     'GBF2_CONSTRAINT_TYPE': ['soft'],
@@ -53,7 +53,7 @@ grid_search = {
 
 suffixs = ['BIODIV_WEIGHT']
 
-output_file = os.path.join("Custom_runs", "setting_0409_test.csv")
-create_grid_search_template(grid_search,output_file,suffixs)
+output_file = os.path.join("Custom_runs", "setting_0409_test_BIO3.csv")
+create_grid_search_template(grid_search,output_file,suffixs,run_time='BIODIV')
 print(f"saved to {output_file}")
 
