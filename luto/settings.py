@@ -113,8 +113,8 @@ does not reach the target year.
 '''
 
 # How does the model run over time
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -415,10 +415,9 @@ SOC_AMORTISATION = 15
 GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
-# Weight for the penalties/biodiversity deviation in the objective function
-''' Penalties/biodiversity is of equal importance to the economy, 1 means equal importance, 0.5 means that penalties/biodiversity are half the economy.'''
-PENALTIES_WEIGHT = 2.71
-BIODIV_WEIGHT = 1
+# Weight for the GHG/Demand deviation in the objective function
+''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
+SOLVE_ECONOMY_WEIGHT = 0.05
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -462,6 +461,12 @@ LIVESTOCK_DRINKING_WATER = 1
 
 # Consider water license costs (0 [off] or 1 [on]) of land-use transition ***** If on then there is a noticeable water sell-off by irrigators in the MDB when maximising profit
 INCLUDE_WATER_LICENSE_COSTS = 0
+
+
+
+# Biodiversity limits and parameters *******************************
+SOLVE_BIODIV_PRIORITY_WEIGHT = 10
+'''The weight of the biodiversity target in the objective function'''
 
 
 # ------------------- Agricultural biodiversity parameters -------------------
@@ -574,7 +579,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
@@ -591,8 +596,8 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
-BIODIVERSTIY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
@@ -603,7 +608,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSTIY_TARGET_GBF_8 = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.
