@@ -548,8 +548,8 @@ class LutoSolver:
 
         # Repeat to get contributions of alternative agr. management options
         # Convert variables to PR/p representation
-        self.ag_man_q_dry_c = [0 for _ in range(self.ncms)]
-        self.ag_man_q_irr_c = [0 for _ in range(self.ncms)]
+        self.ag_man_q_dry_c = [0] * self.ncms
+        self.ag_man_q_irr_c = [0] * self.ncms
 
         for am, am_j_list in self._input_data.am2j.items():
             X_ag_man_dry_pr = np.zeros(
