@@ -2385,14 +2385,14 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
     save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
 
 def write_GBF2_npy(data: Data, yr_cal, path):
-    # Get the biodiversity scores b_mrj
-    # Get the total priority degraded areas
-    total_priority_degraded_area = (data.BIO_PRIORITY_DEGRADED_AREAS_MASK * data.REAL_AREA).sum()
+    # Unpack the ag managements and land uses
+    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
 
-    # Get the decision variables for the year
+    # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
-    ag_mam_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
+    am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
 
     # Get the priority degrade areas scores
     GBF2_priority_degrade_areas_r = xr.DataArray(
@@ -2400,31 +2400,44 @@ def write_GBF2_npy(data: Data, yr_cal, path):
         dims=['cell'],
         coords={'cell': range(data.NCELLS)}
     )
+    # Get the priority degraded areas score
+    priority_degraded_area_score_r = xr.DataArray(
+        ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
+        dims=['cell'],
+        coords={'cell': range(data.NCELLS)}
+    )
 
-    bio_ag_priority_rmj, _ = xr.broadcast(GBF2_priority_degrade_areas_r, ag_dvar_mrj)
-    bio_am_priority_rtmj, _ = xr.broadcast(GBF2_priority_degrade_areas_r, ag_mam_dvar_mrj)
-    bio_non_ag_priority_rk, _ = xr.broadcast(GBF2_priority_degrade_areas_r, non_ag_dvar_rk)
+    # Get the impacts of each ag/non-ag/am to vegetation matrices
+    ag_impact_j = xr.DataArray(
+        ag_biodiversity.get_ag_biodiversity_contribution(data),
+        dims=['lu'],
+        coords={'lu': data.AGRICULTURAL_LANDUSES}
+    )
+    non_ag_impact_k = xr.DataArray(
+        list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
+        dims=['lu'],
+        coords={'lu': data.NON_AGRICULTURAL_LANDUSES}
+    )
+    am_impact_ir = xr.DataArray(
+        np.stack(
+            [arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr
+             in v.values()]),
+        dims=['idx', 'cell'],
+        coords={
+            'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
+            'cell': range(data.NCELLS)}
+    )
+    # Get the total area of the priority degraded areas
+    total_priority_degraded_area = (data.BIO_PRIORITY_DEGRADED_AREAS_MASK * data.REAL_AREA).sum()
+    real_area_xr = xr.DataArray(data.REAL_AREA, dims=['cell'], coords={'cell': range(data.NCELLS)})
 
-    # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
-    ag_impacts_rj = ag_biodiversity.get_ag_biodiversity_contribution(data)
-    for lu, lu_idx in data.DESC2AGLU.items():
-        bio_ag_priority_rmj = bio_ag_priority_rmj.copy()  # Get a copy of the data array to avoid assign to a view
-        bio_ag_priority_rmj.loc[{'lu': lu}] = bio_ag_priority_rmj.loc[{'lu': lu}] * ag_impacts_rj[:, lu_idx][:, None]
-    bio_ag_r = bio_ag_priority_rmj.sum(dim=['lm', 'lu'])
-
-    am_contribution = ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal)
-    for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items():
-        for idx, lu in enumerate(lus):
-            bio_am_priority_rtmj = bio_am_priority_rtmj.copy()  # Get a copy of the data array to avoid assign to a view
-            bio_am_priority_rtmj.loc[{'am': am, 'lu': lu}] = bio_am_priority_rtmj.loc[{'am': am, 'lu': lu}] * \
-                                                             am_contribution[am][idx][:, None]
-    bio_am_r = bio_am_priority_rtmj.sum(dim=['lm', 'am', 'lu'])
-
-    non_ag_contribution = non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data)
-    for idx, lu in enumerate(NON_AG_LAND_USES.keys()):
-        bio_non_ag_priority_rk = bio_non_ag_priority_rk.copy()  # Get a copy of the data array to avoid assign to a view
-        bio_non_ag_priority_rk.loc[{'lu': lu}] = bio_non_ag_priority_rk.loc[{'lu': lu}] * non_ag_contribution[idx]
-    bio_non_ag_r = bio_non_ag_priority_rk.sum(dim=['lu'])
+    bio_ag_r = (priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
+                     ).sum(['lm', 'lu'])
+    bio_am_r = (priority_degraded_area_score_r * am_impact_ir * am_dvar_jri
+        ).sum(['lm', 'idx'], skipna=False
+        )
+    bio_non_ag_r = (priority_degraded_area_score_r * non_ag_impact_k * non_ag_dvar_rk
+                         ).sum(['lu'])
 
     save_map_to_npy(data, bio_ag_r, 'BIO_ag', yr_cal, path)
     save_map_to_npy(data, bio_am_r, 'BIO_am', yr_cal, path)
