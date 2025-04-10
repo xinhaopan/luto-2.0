@@ -11,8 +11,8 @@ grid_search = {
         # 'snapshot',
         'timeseries'
     ],
-    'PENALTIES_WEIGHT': [2.71],
-    'BIODIV_WEIGHT': [2,3,4,5,6,7,8,9],
+    'SOLVE_ECONOMY_WEIGHT': [2.71],
+    'SOLVE_BIODIV_PRIORITY_WEIGHT': [2,3,4,5,6,7,8,9],
     'STEP_SIZE': [5],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [False],

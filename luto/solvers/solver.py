@@ -548,9 +548,8 @@ class LutoSolver:
 
         # Repeat to get contributions of alternative agr. management options
         # Convert variables to PR/p representation
-        self.ag_man_q_dry_c = [0] * self.ncms
-        self.ag_man_q_irr_c = [0] * self.ncms
-
+        self.ag_man_q_dry_c = [0 for _ in range(self.ncms)]
+        self.ag_man_q_irr_c = [0 for _ in range(self.ncms)]
         for am, am_j_list in self._input_data.am2j.items():
             X_ag_man_dry_pr = np.zeros(
                 (self._input_data.nprs, self._input_data.ncells), dtype=object
@@ -578,22 +577,17 @@ class LutoSolver:
                 for p in range(self._input_data.nprs)
             ]
 
-            self.ag_man_q_dry_c += [
-                gp.quicksum(
+            for c in range(self.ncms):
+                self.ag_man_q_dry_c[c] += gp.quicksum(
                     ag_man_q_dry_p[p]
                     for p in range(self._input_data.nprs)
                     if self._input_data.pr2cm_cp[c, p]
                 )
-                for c in range(self.ncms)
-            ]
-            self.ag_man_q_irr_c += [
-                gp.quicksum(
+                self.ag_man_q_irr_c[c] += gp.quicksum(
                     ag_man_q_irr_p[p]
                     for p in range(self._input_data.nprs)
                     if self._input_data.pr2cm_cp[c, p]
                 )
-                for c in range(self.ncms)
-            ]
 
         # Calculate non-agricultural commodity contributions
         self.non_ag_q_c = [
