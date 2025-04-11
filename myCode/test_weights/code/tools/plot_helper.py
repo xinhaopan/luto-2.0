@@ -12,6 +12,7 @@ def create_combined_plot(df_all, output_name):
     """
     # 调用 data_processing 模块中的函数获取合并后的数据
     # 分割数据：对 Production 和 Water 分别生成图例，其它指标不生成图例
+    w1, w2 = [float(f"{a}.{b}") for a, b in zip(output_name.split('_')[-4::2], output_name.split('_')[-3::2])]
     df_prod_leg = df_all[df_all['Indicator'] == "Production Deviation (%)"].copy()
     df_water_leg = df_all[df_all['Indicator'] == "Water Deviation (TL)"].copy()
     df_other = df_all[~df_all['Indicator'].isin(["Production Deviation (%)", "Water Deviation (TL)"])].copy()
@@ -39,7 +40,7 @@ def create_combined_plot(df_all, output_name):
                 show_legend=False
             ) +
             facet_wrap('~Indicator', scales='free_y') +
-            labs(x="", y="", title="") +
+            labs(x="", y="", title=f"ECONOMY_WEIGHT: {w1} & BIODIV WEIGHT: {w2}") +
             labs(fill="") +  # 使图例标题为空
             theme(
                 axis_text_x=element_text(size=8, family="Arial"),
@@ -51,7 +52,7 @@ def create_combined_plot(df_all, output_name):
                 legend_position='bottom',
                 legend_box='vertical',
                 legend_key_size=6,
-            ) + theme_classic()
+            )
     )
     p_all.show()
     output_path = os.path.join('..', 'output', f'{output_name}.png')
