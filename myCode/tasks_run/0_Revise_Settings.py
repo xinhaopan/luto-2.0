@@ -11,8 +11,8 @@ grid_search = {
         # 'snapshot',
         'timeseries'
     ],
-    'SOLVE_ECONOMY_WEIGHT': [0.5],
-    'SOLVE_BIODIV_PRIORITY_WEIGHT': [0,10,100,500,1000,5000,10000],
+    'SOLVE_ECONOMY_WEIGHT': [i / 100 for i in range(0, 101, 5)],
+    'SOLVE_BIODIV_PRIORITY_WEIGHT': [i / 100 for i in range(0, 101, 5)],
     'STEP_SIZE': [5],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [False],
@@ -26,7 +26,7 @@ grid_search = {
         '1.5C (50%) excl. avoided emis',
         # '1.8C (67%) excl. avoided emis'
     ],
-    'CARBON_PRICES_FIELD': ['CONSTANT'],
+    'CARBON_PRICES_FIELD': ['c0'],
 
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],
     'GBF2_CONSTRAINT_TYPE': ['soft'],

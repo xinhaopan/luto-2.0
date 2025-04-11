@@ -91,7 +91,7 @@ def process_column(col, custom_settings, script_name, delay):
     if os.name == 'nt':
         submit_task_windows(task_dir, col, script_name)  # 执行任务
     elif os.name == 'posix':
-        submit_task_linux(task_dir, custom_dict)  # 执行任务
+        submit_task_linux(task_dir, custom_dict, script_name)  # 执行任务
 
 
 def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 3, script_name='0_runs', delay=0):
@@ -169,7 +169,7 @@ def submit_task_windows(task_dir, col,script_name):
         print_with_time(f"{col}: exception occurred during execution, see {log_file} for details.")
 
 
-def submit_task_linux(task_dir, config):
+def submit_task_linux(task_dir, config,script_name='0_runs_linux'):
     """
     提交单个 PBS 作业，并在作业成功完成后执行同步操作。
     :param col: 作业列名称，用于区分任务
@@ -182,7 +182,7 @@ def submit_task_linux(task_dir, config):
     mem = config.get("MEM", "40") + "GB"
     queue = config.get("QUEUE", "normal")
     script_content = config.get("script_content",
-                                f"/home/582/xp7241/apps/miniforge3/envs/luto/bin/python 0_runs_linux.py")
+                                f"/home/582/xp7241/apps/miniforge3/envs/luto/bin/python {script_name}.py")
 
     # 动态生成 PBS 脚本内容
     pbs_script = f"""#!/bin/bash
