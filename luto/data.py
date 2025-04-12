@@ -20,6 +20,7 @@
 
 import os
 import xarray as xr
+import netCDF4
 import numpy as np
 import pandas as pd
 import rasterio
@@ -195,22 +196,6 @@ class Data:
             # Update the geospatial metadata.
             self.GEO_META = self.update_geo_meta()
 
-            # Get the resfactored lumap_2D as xarray DataArray
-            self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
-                self.LUMAP_2D_RESFACTORED,
-                dims=["y", "x"],
-                coords={
-                    "y": self.GEO_META['transform'].f + self.GEO_META['transform'].e * (
-                                np.arange(self.LUMAP_2D_RESFACTORED.shape[0]) + 0.5),
-                    "x": self.GEO_META['transform'].c + self.GEO_META['transform'].a * (
-                                np.arange(self.LUMAP_2D_RESFACTORED.shape[1]) + 0.5),
-                },
-                attrs={
-                    "crs": self.GEO_META['crs'],
-                    "transform": self.GEO_META['transform'],
-                }
-            )
-
 
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
@@ -219,7 +204,20 @@ class Data:
         else:
             raise KeyError("Resfactor setting invalid")
         
-
+        
+        # Get the resfactored lumap_2D as xarray DataArray
+        self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
+                self.LUMAP_2D_RESFACTORED,
+                dims=["y", "x"],
+                coords={
+                    "y": self.GEO_META['transform'].f + self.GEO_META['transform'].e * (np.arange(self.LUMAP_2D_RESFACTORED.shape[0]) + 0.5),
+                    "x": self.GEO_META['transform'].c + self.GEO_META['transform'].a * (np.arange(self.LUMAP_2D_RESFACTORED.shape[1]) + 0.5),
+                },
+                attrs={
+                    "crs": self.GEO_META['crs'],
+                    "transform": self.GEO_META['transform'],
+                }
+            )
 
 
         ###############################################################
@@ -996,20 +994,24 @@ class Data:
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
 
         # Read the carbon price per tonne over the years (indexed by the relevant year)
-        carbon_price_sheet = settings.CARBON_PRICES_FIELD or "Default"
-        carbon_price_usecols = "A,B"
-        carbon_price_col_names = ["Year", "Carbon_price_$_tCO2e"]
-        carbon_price_sheet_index_col = "Year" # if carbon_price_sheet != "Default" else 0
-        carbon_price_sheet_header = 0         # if carbon_price_sheet != "Default" else None
+        if settings.CARBON_PRICES_FIELD == 'CONSTANT':
+            self.CARBON_PRICES = {yr: settings.CARBON_PRICE_COSTANT for yr in range(2010, 2101)}
+        else:
+            carbon_price_sheet = settings.CARBON_PRICES_FIELD or "Default"
+            carbon_price_usecols = "A,B"
+            carbon_price_col_names = ["Year", "Carbon_price_$_tCO2e"]
+            carbon_price_sheet_index_col = "Year" # if carbon_price_sheet != "Default" else 0
+            carbon_price_sheet_header = 0         # if carbon_price_sheet != "Default" else None
 
-        self.CARBON_PRICES: dict[int, float] = pd.read_excel(
-            os.path.join(settings.INPUT_DIR, 'carbon_prices.xlsx'),
-            sheet_name=carbon_price_sheet,
-            usecols=carbon_price_usecols,
-            names=carbon_price_col_names,
-            header=carbon_price_sheet_header,
-            index_col=carbon_price_sheet_index_col,
-        )["Carbon_price_$_tCO2e"].to_dict()
+            self.CARBON_PRICES: dict[int, float] = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, 'carbon_prices.xlsx'),
+                sheet_name=carbon_price_sheet,
+                usecols=carbon_price_usecols,
+                names=carbon_price_col_names,
+                header=carbon_price_sheet_header,
+                index_col=carbon_price_sheet_index_col,
+            )["Carbon_price_$_tCO2e"].to_dict()
+
 
 
         ###############################################################
@@ -1780,43 +1782,30 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def set_path(self, base_year, target_year, step_size, years) -> str:
+    def set_path(self, years) -> str:
         """Create a folder for storing outputs and return folder name."""
 
-        # Get the years to write
-        if settings.MODE == "snapshot":
-            yr_all = [base_year, target_year]
-        elif settings.MODE == "timeseries":
-            yr_all = list(range(base_year, target_year + 1, step_size))
- 
-        # `years` will supersede `yr_all` if it is not None
-        if years is not None:
-            yr_all = years
-            
-        # Append target year if not in the list
-        if target_year not in yr_all:
-            yr_all.append(target_year)
 
         # Create path name
-        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
+        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}_{settings.MODE}"
 
         # Get all paths
         paths = (
             [self.path]
-            + [f"{self.path}/out_{yr}" for yr in yr_all]
-            + [f"{self.path}/out_{yr}/lucc_separate" for yr in yr_all[1:]]
+            + [f"{self.path}/out_{yr}" for yr in years]
+            + [f"{self.path}/out_{yr}/lucc_separate" for yr in years[1:]]
         )  # Skip creating lucc_separate for base year
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
         if settings.MODE == "timeseries":
-            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
+            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
             paths = (
                 paths
                 + [self.path_begin_end_compare]
                 + [
-                    f"{self.path_begin_end_compare}/out_{yr_all[0]}",
-                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}",
-                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate",
+                    f"{self.path_begin_end_compare}/out_{years[0]}",
+                    f"{self.path_begin_end_compare}/out_{years[-1]}",
+                    f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
                 ]
             )
 
@@ -1899,7 +1888,7 @@ class Data:
         The resulting year should be between 2010 - 2100
         """
         yr_cal = yr_idx + self.YR_CAL_BASE
-        return settings.CARBON_PRICE_COSTANT if settings.CARBON_PRICES_FIELD == 'CONSTANT' else self.get_carbon_price_by_year(yr_cal)
+        return self.get_carbon_price_by_year(yr_cal)
 
     def get_carbon_price_by_year(self, yr_cal: int) -> float:
         """
@@ -1911,7 +1900,7 @@ class Data:
                 f"Carbon price data not given for the given year: {yr_cal}. "
                 f"Year should be between {self.YR_CAL_BASE} and 2100."
             )
-        return settings.CARBON_PRICE_COSTANT if settings.CARBON_PRICES_FIELD == 'CONSTANT' else self.CARBON_PRICES[yr_cal]
+        return self.CARBON_PRICES[yr_cal]
 
     def get_water_nl_yield_for_yr_idx(
         self,

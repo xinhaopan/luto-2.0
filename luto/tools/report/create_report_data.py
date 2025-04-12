@@ -60,12 +60,16 @@ def save_report_data(raw_data_dir:str):
     # Set the save directory    
     SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
     
+    # Select the years to reduce the column number to avoid cluttering in the multi-level axis graphing
+    years = sorted(settings.SIM_YERAS)
+    years_select = select_years(years)
+
     # Create the directory if it does not exist
     if not os.path.exists(SAVE_DIR):
         os.makedirs(SAVE_DIR)
 
     # Get all LUTO output files and store them in a dataframe
-    files = get_all_files(raw_data_dir)
+    files = get_all_files(raw_data_dir).reset_index(drop=True)
     files.drop(files[files['path'].str.contains('data_for_carbon_price')].index, inplace=True) # Remove the data_for_carbon_price files
     files.drop(files[files['path'].str.contains('quantity_production_kt_separate')].index, inplace=True)
     files.drop(files[files['path'].str.contains('biodiversity_separate')].index, inplace=True)
@@ -78,9 +82,7 @@ def save_report_data(raw_data_dir:str):
     # Set the years to be int
     files['Year'] = files['Year'].astype(int)
     
-    # Select the years to reduce the column number to avoid cluttering in the multi-level axis graphing
-    years = sorted(files['Year'].unique().tolist())
-    years_select = select_years(years)
+
     
     
 
@@ -1684,12 +1686,12 @@ def save_report_data(raw_data_dir:str):
             .groupby(['species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
-
+            
         bio_df_species.columns = ['name','data']
         bio_df_species['type'] = 'spline'
         bio_df_species.to_json(f'{SAVE_DIR}/biodiversity_GBF4_1_contribution_species_score_total.json', orient='records')
-
-
+        
+        
         # Plot_GBF4_2: Biodiversity contribution score (species) by Type
         bio_df_species_type_sum = bio_df\
             .groupby(['Year','Type','species'])\
@@ -1710,19 +1712,19 @@ def save_report_data(raw_data_dir:str):
 
         with open(f'{SAVE_DIR}/biodiversity_GBF4_2_contribution_species_score_by_type.json', 'w') as outfile:
             json.dump(bio_df_species_type_records, outfile)
-
-
+        
+        
         # Plot_GBF4_3: Biodiversity contribution score (species) by landuse
         bio_species_lu_sum = bio_df\
             .groupby(['Year','Landuse','species'])\
             .sum(numeric_only=True)\
             .reset_index()
-
+            
         bio_species_lu_sum = bio_species_lu_sum\
             .groupby(['Landuse','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
-
+            
         bio_df_species_records = []
         for idx, df in bio_species_lu_sum.groupby('species'):
             df = df.drop('species', axis=1)
@@ -1730,51 +1732,51 @@ def save_report_data(raw_data_dir:str):
             df['type'] = 'column'
             df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
             bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
-
+            
         with open(f'{SAVE_DIR}/biodiversity_GBF4_3_contribution_species_score_by_landuse.json', 'w') as outfile:
             json.dump(bio_df_species_records, outfile)
-
-
+        
+        
         # Plot_GBF4_4: Biodiversity contribution score (species) by agricultural management
         bio_species_am_sum = bio_df\
             .groupby(['Year','Agri-Management','species'])\
             .sum(numeric_only=True)\
             .reset_index()
-
+            
         bio_species_am_sum = bio_species_am_sum\
             .groupby(['Agri-Management','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
-
+            
         bio_df_species_records = []
         for idx, df in bio_species_am_sum.groupby('species'):
             df = df.drop('species', axis=1)
             df.columns = ['name', 'data']
             df['type'] = 'column'
             bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
-
+            
         with open(f'{SAVE_DIR}/biodiversity_GBF4_4_contribution_species_score_by_agri_management.json', 'w') as outfile:
             json.dump(bio_df_species_records, outfile)
-
-
+        
+        
         # Plot_GBF4_5: Biodiversity contribution score (species) by non-agricultural landuse
         bio_species_non_ag_sum = bio_df\
             .groupby(['Year','Landuse','species'])\
             .sum(numeric_only=True)\
             .reset_index()
-
+            
         bio_species_non_ag_sum = bio_species_non_ag_sum\
             .groupby(['Landuse','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
-
+            
         bio_df_species_records = []
         for idx, df in bio_species_non_ag_sum.groupby('species'):
             df = df.drop('species', axis=1)
             df.columns = ['name', 'data']
             df['type'] = 'column'
             bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
-
+            
         with open(f'{SAVE_DIR}/biodiversity_GBF4_5_contribution_species_score_by_non_agri_landuse.json', 'w') as outfile:
             json.dump(bio_df_species_records, outfile)
     
@@ -1904,7 +1906,7 @@ def save_report_data(raw_data_dir:str):
             
             
             
-        # Plot Species level biodiversity contribution score
+        # Plot Species level biodiversity contribution score 
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
