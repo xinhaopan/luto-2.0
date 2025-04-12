@@ -6,6 +6,7 @@ import traceback
 import time
 from memory_profiler import memory_usage
 
+
 # 定义日志文件
 log_file = 'output/simulation_log.txt'  # 自定义路径
 error_log_file = 'output/error_log.txt'  # 错误日志路径
