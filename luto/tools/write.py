@@ -94,6 +94,7 @@ def write_data(data: Data):
     years = sorted(list(data.lumaps.keys()))
     paths = [f"{data.path}/out_{yr}" for yr in years]
 
+
     ###############################################################
     #                     Create raw outputs                      #
     ###############################################################
