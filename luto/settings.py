@@ -300,7 +300,7 @@ To disable an ag-mangement option, change the corresponding value in the AG_MANA
 AG_MANAGEMENTS_REVERSIBLE = {
     'Asparagopsis taxiformis': True,
     'Precision Agriculture': True,
-    'Ecological Grazing': True,
+    'Ecological Grazing': False,
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
@@ -453,8 +453,8 @@ SOLVE_WEIGHT_ALPHA = 0.99
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 WATER_PENALTY = 1
 

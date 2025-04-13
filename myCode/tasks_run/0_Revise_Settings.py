@@ -11,12 +11,11 @@ grid_search = {
         # 'snapshot',
         'timeseries'
     ],
-    'SOLVE_ECONOMY_WEIGHT': [0.05],
-    'SOLVE_BIODIV_PRIORITY_WEIGHT': [0.05],
-    'STEP_SIZE': [1],
+    'SOLVE_WEIGHT_ALPHA': [0.05],
+    'SOLVE_WEIGHT_BETA': [0.05],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'RESFACTOR': [5],
+    'RESFACTOR': [20],
 
     # GHG settings
     'GHG_EMISSIONS_LIMITS' : ['on'],
@@ -36,6 +35,7 @@ grid_search = {
         {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
     ],
 
+    'SIM_YERAS': [i for i in range(2010,2051)],
     # Water settings
     'WATER_LIMITS': ['on'],
     'WATER_CONSTRAINT_TYPE': ['soft'],
