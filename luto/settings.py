@@ -103,7 +103,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YERAS = [2020,2035,2050] # range(2020,2050)
+SIM_YERAS = list(range(2020,2051,5)) # range(2020,2050)
 
 
 # How does the model run over time
@@ -175,7 +175,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
  - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'on'  # 'on' or 'off'
+REGIONAL_ADOPTION_CONSTRAINTS = 'off'  # 'on' or 'off'
 REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS'   # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
@@ -201,7 +201,7 @@ NON_AG_LAND_USES = {
     'Carbon Plantings (Block)': True,
     'Sheep Carbon Plantings (Belt)': True,
     'Beef Carbon Plantings (Belt)': True,
-    'BECCS': True,
+    'BECCS': False,
 }
 """
 The dictionary here is the master list of all of the non agricultural land uses
@@ -359,7 +359,7 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 REMOVED_DICT = {}
 for am in list(AG_MANAGEMENTS_TO_LAND_USES.keys()):  # Iterate over a copy of the keys
     if not AG_MANAGEMENTS[am]:
-        REMOVED_DICT[am] = AG_MANAGEMENTS_TO_LAND_USES[am]
+        REMOVED_DICT[am] = AG_MANAGEMENTS_TO_LAND_USES[am] 
         AG_MANAGEMENTS_TO_LAND_USES.pop(am)
         AG_MANAGEMENTS_REVERSIBLE.pop(am)
 
@@ -400,7 +400,7 @@ GHG_LIMITS = {
               2100: -100 * 1e6   # GHG emissions target and year (can add more years/targets)
              }
 
-# Take data from 'GHG_targets.xlsx',
+# Take data from 'GHG_targets.xlsx', 
 GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
 '''
 options include: 
@@ -411,7 +411,7 @@ options include:
 - Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions from land-use and livestock types)
     - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
 '''
-
+  	  	  
 
 
 
@@ -423,13 +423,14 @@ CARBON_PRICES_FIELD = 'CONSTANT'
 if CARBON_PRICES_FIELD == 'AS_GHG':
     CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
 
-CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
+if CARBON_PRICES_FIELD == 'CONSTANT':
+    CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
 '''
 Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
 '''
 
 
-USE_GHG_SCOPE_1 = False  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
+USE_GHG_SCOPE_1 = True  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
 '''
 Basic GHG types are the direct emissions from the land-use and livestock types, excluding
 indirect emissions such as fertiliser, irrigation, land management, etc.
@@ -447,7 +448,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_WEIGHT_ALPHA = 0.8
+SOLVE_WEIGHT_ALPHA = 0.99
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -495,7 +496,7 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_WEIGHT_BETA = 0.98
+SOLVE_WEIGHT_BETA = 0.99
 '''The weight of the biodiversity target in the objective function'''
 
 
@@ -508,8 +509,8 @@ BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiv
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIV_GBF_TARGET_2_DICT = {
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.3   # Stays at 2050 level
+              2050: 0.5,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.5   # Stays at 2050 level
              }            # (can add more years/targets)\
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,

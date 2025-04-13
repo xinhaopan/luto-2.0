@@ -31,7 +31,6 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 
-from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.spatializers import upsample_array
 
 from collections import defaultdict
@@ -39,7 +38,6 @@ from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
-from rasterio.enums import Resampling
 
 
 
@@ -172,39 +170,27 @@ class Data:
         # (True means included cells. Boolean dtype.)
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
 
-        # Get the lon/lat coordinates.
-        self.COORD_LON_LAT_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
-
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
-
-            # Create settings.RESFACTOR mask for spatial coarse-graining.
             rf_mask = self.NLUM_MASK.copy()
             nonzeroes = np.nonzero(rf_mask)
             rf_mask[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR] = 0
             resmask = np.where(rf_mask[nonzeroes] == 0, True, False)
-
-            # Superimpose resfactor mask upon land-use map mask (Boolean).
             self.MASK = self.LUMASK * resmask
-
-            # Get the resfactored 2D lumap and x/y coordinates.
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
-
-            # Get the resfactored lon/lat coordinates.
-            self.COORD_LON_LAT = self.COORD_LON_LAT_FULLRES[0][self.MASK], self.COORD_LON_LAT_FULLRES[1][self.MASK]
-
-            # Update the geospatial metadata.
             self.GEO_META = self.update_geo_meta()
-
-
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
             self.GEO_META = self.GEO_META_FULLRES
-
+            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES
         else:
             raise KeyError("Resfactor setting invalid")
         
         
+        # Get the lon/lat coordinates.
+        self.COORD_LON_LAT_2D_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
+        self.COORD_LON_LAT = [i[self.MASK] for i in self.COORD_LON_LAT_2D_FULLRES]  # Only keep the coordinates for the cells that are not masked out (i.e., land uses). 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only) and not masked out
+
         # Get the resfactored lumap_2D as xarray DataArray
         self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
                 self.LUMAP_2D_RESFACTORED,
@@ -1638,7 +1624,7 @@ class Data:
         ).interp(                                                       # Then the spatial interpolation and masking is done
             x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
             y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
-            method='linear'                                             # Use LINEAR interpolation for the `suitability` values
+            method='linear'                                             # Use LINEAR interpolation
         ).drop_vars(['year']).values
         
         # Apply Savanna Burning penalties
