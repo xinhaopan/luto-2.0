@@ -9,6 +9,7 @@ import datetime
 import time
 import numpy as np
 import ast
+import sys
 
 from joblib import delayed, Parallel
 
@@ -130,7 +131,7 @@ def submit_task_windows(task_dir, col,script_name):
     start_time = time.time()  # 记录任务开始时间
     log_file = f'{task_dir}/output/{script_name}_error_log.txt'  # 定义日志文件路径
 
-    python_path = r'F:\xinhao\miniforge\envs\luto\python.exe'
+    python_path = sys.executable
     task_dir = os.path.abspath(task_dir)
 
     try:

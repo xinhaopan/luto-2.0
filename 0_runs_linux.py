@@ -29,7 +29,7 @@ def main(start_year, end_year):
         write_log("Data loaded")
 
         # 运行模拟
-        sim.run(data=data, base_year=start_year, target_year=end_year, step_size=settings.STEP_SIZE)
+        sim.run(data=data)
         write_log("Simulation completed")
 
         # 保存数据

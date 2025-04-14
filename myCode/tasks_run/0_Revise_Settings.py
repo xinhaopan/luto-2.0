@@ -11,11 +11,11 @@ grid_search = {
         # 'snapshot',
         'timeseries'
     ],
-    'SOLVE_WEIGHT_ALPHA': [0.05],
-    'SOLVE_WEIGHT_BETA': [0.05],
+    'SOLVE_WEIGHT_ALPHA': [0.8],
+    'SOLVE_WEIGHT_BETA': [0.98],
     'OBJECTIVE': ['maxprofit'], # maxprofit
-    'WRITE_OUTPUT_GEOTIFFS': [False],
-    'RESFACTOR': [20],
+    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'RESFACTOR': [5],
 
     # GHG settings
     'GHG_EMISSIONS_LIMITS' : ['on'],
@@ -25,7 +25,7 @@ grid_search = {
         '1.5C (50%) excl. avoided emis',
         '1.8C (67%) excl. avoided emis'
     ],
-    'CARBON_PRICES_FIELD': ['c0'],
+    'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],
     'GBF2_CONSTRAINT_TYPE': ['soft'],
@@ -35,11 +35,11 @@ grid_search = {
         {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
     ],
 
-    'SIM_YERAS': [i for i in range(2010,2051)],
+    'SIM_YERAS': [[i for i in range(2010,2051,5)]],
     # Water settings
     'WATER_LIMITS': ['on'],
-    'WATER_CONSTRAINT_TYPE': ['soft'],
-    'INCLUDE_WATER_LICENSE_COSTS ': [1],
+    'WATER_CONSTRAINT_TYPE': ['hard'],
+    'INCLUDE_WATER_LICENSE_COSTS': [1],
     # Demand settings
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
 
@@ -48,12 +48,12 @@ grid_search = {
     'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_8': ['off'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
 }
 
 suffixs = ['GHG_LIMITS_FIELD','BIODIV_GBF_TARGET_2_DICT','RESFACTOR']
 
-output_file = os.path.join("Custom_runs", "setting_0412.csv")
+output_file = os.path.join("Custom_runs", "setting_0414_5.csv")
 create_grid_search_template(grid_search,output_file,suffixs)
 print(f"saved to {output_file}")
 
