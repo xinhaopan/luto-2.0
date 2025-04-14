@@ -110,7 +110,7 @@ def run(
         raise ValueError(f"Unkown MODE: {settings.MODE}.")
     
     # Save the data to disk
-    write_outputs(data)
+    # write_outputs(data)
 
 
 

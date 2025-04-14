@@ -41,7 +41,7 @@ def main():
         write_log(f"Data loaded. Peak memory usage: {load_data_memory:.2f} GB")
 
         # 监控运行模拟
-        _, simulation_memory = monitor_memory(sim.run, data=data, base_year=start_year, target_year=target_year, step_size=settings.STEP_SIZE)
+        _, simulation_memory = monitor_memory(sim.run, data=data)
         write_log(f"Simulation completed. Peak memory usage: {simulation_memory:.2f} GB")
 
         # 保存数据
