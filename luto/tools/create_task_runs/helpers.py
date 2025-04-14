@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import os, re, time, json
+import numpy as np
 import shutil, psutil, itertools, subprocess
 import pandas as pd
 
@@ -28,108 +29,100 @@ from luto import settings
 from luto.tools.create_task_runs.parameters import BIO_TARGET_ORDER, EXCLUDE_DIRS, GHG_ORDER, TASK_ROOT_DIR
 from datetime import datetime
 
-def create_settings_template(to_path:str=TASK_ROOT_DIR):
+
+
+
+
+def copy_settings_as_df() -> pd.DataFrame:
+    '''
+    Save {k:v} in the settings.py file to a DataFrame.
+    '''
 
     # Save the settings template to the root task folder
-    if not os.path.exists(to_path):
-        os.makedirs(to_path, exist_ok=True)
+    if not os.path.exists(TASK_ROOT_DIR):
+        os.makedirs(TASK_ROOT_DIR, exist_ok=True)
     
-    # Check if the settings_template.csv already exists
-    if os.path.exists(f'{to_path}/settings_template.csv'):
-        print('settings_template.csv already exists! Skip creating a new one!')
-    else:
-        # Get the settings from luto.settings
-        with open('luto/settings.py', 'r') as file, \
-             open(f'{to_path}/non_str_val.txt', 'w') as non_str_val_file:
-           
-            lines = file.readlines()
+    # Get the settings from luto.settings
+    with open('luto/settings.py', 'r') as file, \
+         open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'w') as non_str_val_file:
+        
+        # Regex patterns that matches variable assignments from settings
+        lines = file.readlines()
+        parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=") # Keys are uppercase and start with a letter
+        settings_keys = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
 
-            # Regex patterns that matches variable assignments from settings
-            parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
-            settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
+        # Reorder the settings dictionary to match the order in the settings.py file
+        settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
+        settings_dict = {key: settings_dict[key] for key in settings_keys if key in settings_dict}
+        
+        # Add parameters for the job submission
+        settings_dict['JOB_NAME'] = 'auto'
+        settings_dict['MEM'] = 'auto'
+        settings_dict['QUEUE'] = 'normal'
+        settings_dict['WRITE_THREADS'] = 10                     # 10 threads for writing is a safe number to avoid out-of-memory issues
+        settings_dict['KEEP_OUTPUTS'] = True
+        settings_dict['NCPUS'] = settings_dict['THREADS']//4*4  # Round down to the nearest multiple of 4
+        settings_dict['TIME'] = '10:00:00'
 
-            # Reorder the settings dictionary to match the order in the settings.py file
-            settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
-            settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
-            
-            # Add parameters for the job submission
-            settings_dict['JOB_NAME'] = 'auto'
-            settings_dict['MEM'] = 'auto'
-            settings_dict['QUEUE'] = 'normal'
-            settings_dict['WRITE_THREADS'] = 10                     # 10 threads for writing is a safe number to avoid out-of-memory issues
-            settings_dict['KEEP_OUTPUTS'] = True
-            settings_dict['NCPUS'] = settings_dict['THREADS']//4*4  # Round down to the nearest multiple of 4
-            settings_dict['TIME'] = '10:00:00'
+        # Write the non-string values to a file
+        for k, v in settings_dict.items():
+            if not isinstance(v, str):
+                non_str_val_file.write(f'{k}\n')
 
-            # Write the non-string values to a file
-            for k, v in settings_dict.items():
-                if not isinstance(v, str):
-                    non_str_val_file.write(f'{k}\n')
-
-        # Create a template for custom settings
-        settings_df = pd.DataFrame({k:[v] for k,v in settings_dict.items()}).T.reset_index()
-        settings_df.columns = ['Name','Default_run']
-        settings_df = settings_df.map(str)    
+    # Create a template for custom settings
+    settings_df = pd.DataFrame({k:[v] for k,v in settings_dict.items()}).T.reset_index()
+    settings_df.columns = ['Name','Default_run']
+    settings_df = settings_df.map(str)    
          
     return settings_df
 
 
 
-def create_grid_search_parameters(grid_dict:dict):
-
-    # Convert all values in the grid_dict to string representations
-    grid_dict = {k: [str(i) for i in v] for k, v in grid_dict.items()}
-
+def create_grid_search_permutations(grid_dict:dict) -> None:
+    '''
+    Permutate the grid search parameters and save them to a CSV file.\n
+    '''
     # Create a list of dictionaries with all possible permutations
+    grid_dict = {k: [str(i) for i in v] for k, v in grid_dict.items()}
     keys, values = zip(*grid_dict.items())
     permutations = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
-    permutations_df = pd.DataFrame(permutations)
-    permutations_df.insert(0, 'run_idx', [f'{i:03}' for i in range(1, len(permutations_df) + 1)])
-    
     # Save the grid search parameters to the root task folder
-    num_para_csv = len([i for i in glob(f'{TASK_ROOT_DIR}/*') if 'grid_search_parameters' in i])
-    permutations_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters_{num_para_csv}.csv', index=False)
-    
-    # Reporting the grid search template
+    permutations_df = pd.DataFrame(permutations)
+    permutations_df.insert(0, 'run_idx', [i for i in range(1, len(permutations_df) + 1)])
+    permutations_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
+
     print(f'Grid search template has been created with {len(permutations_df)} permutations!')
     
     
 
-def create_grid_search_template(
-    template_df:pd.DataFrame = create_settings_template(), 
-) -> pd.DataFrame:
+def create_grid_search_settings_df(settings_df:pd.DataFrame = copy_settings_as_df()) -> pd.DataFrame:
+    '''
+    Create a dataframe that each row is an independent settings for a run.\n
+    '''
     
-    # Collect new columns in a list
-    template_grid_search = template_df.copy()
-    
-    # Concatenate the default settings with the grid search parameters
-    permutations_df = pd.concat(
-        [pd.read_csv(i) for i in glob(f'{TASK_ROOT_DIR}/grid_search_parameters_*.csv')], ignore_index=True
-    )
-    
-    permutations_df['run_idx'] = [f'{i:03}' for i in range(1, len(permutations_df) + 1)]
-    permutations_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
-   
+    # Read the settings template file and the grid search parameters
+    template_grid_search = settings_df.copy()
+    permutations_df = pd.read_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv')
+
 
     # Loop through the permutations DataFrame and create new columns with updated settings
     for _, row in permutations_df.iterrows():
-        # Copy the default settings
-        new_column = template_grid_search['Default_run'].copy() 
-        
         # Replace the settings using the key-value pairs in the permutation item
+        new_column = template_grid_search['Default_run'].copy() 
         for k, v in row.items():
             if k != 'run_idx':
-                new_column.loc[template_df['Name'] == k] = v
+                new_column.loc[settings_df['Name'] == k] = v
                 
         # Rename the column and add it to the DataFrame
         new_column.name = f'Run_{row["run_idx"]}'
-        template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]}')], axis=1)
+        template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]:04}')], axis=1)
         
-    # Save the grid search template to the root task folder
+    # Check for NANs and save the template CSV
     num_nan = template_grid_search.isna().sum().sum()
     if num_nan > 0:
-        raise ValueError(f'{num_nan} NANs found in the template CSV! \n Check settings before proceeding!')
+        print(f'{num_nan} NANs found in the template CSV! \n Check settings before proceeding!') 
+        
     template_grid_search.to_csv(f'{TASK_ROOT_DIR}/grid_search_template.csv', index=False)
 
     return template_grid_search
@@ -159,24 +152,25 @@ def create_task_runs(custom_settings:pd.DataFrame, mode:Literal['single','cluste
     # Check if there are any custom settings
     if not custom_cols:
         raise ValueError('No custom settings found in the settings_template.csv file!')
+    
+    # Eval the non-string settings back to it type
+    with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
+            eval_vars = file.read().splitlines()
+            
+    for col in custom_cols:
+        custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(str).map(eval)
+
 
     def process_col(col):
-        # Read the non-string values from the file
-        with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
-            eval_vars = file.read().splitlines()
-        # Evaluate the non-string values to their original types
-        custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(str).map(eval)
-        # Update the settings dictionary
         custom_dict = update_settings(custom_settings[col].to_dict(), col)
-        # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
         return submit_task(col, mode=mode)
 
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
-    workers = min(n_workers, len(custom_cols)) if os.name == 'posix' else n_workers
-    for msg in Parallel(n_jobs=workers)(delayed(process_col)(col) for col in custom_cols):
+    workers = min(n_workers, len(custom_cols))
+    for msg in Parallel(n_jobs=workers, return_as='generator')(delayed(process_col)(col) for col in custom_cols):
         print(msg)
 
 
@@ -250,12 +244,7 @@ def update_settings(settings_dict:dict, col:str):
     # Update the settings dictionary
     settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
     settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
-    
-    # Set the carbon prices field based on the GHG limits field
-    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
-
-    # Update the threads based on the number of cpus
-    settings_dict['THREADS'] = int(settings_dict['NCPUS'] * 1.5) # 1.5 times the number of cpus to increase CPU utilization
+    settings_dict['THREADS'] = int(settings_dict['NCPUS'])
 
     return settings_dict
 
@@ -277,14 +266,22 @@ def create_run_folders(col):
 
 
 
-def submit_task(col:str,mode:Literal['single','cluster']='single'):
+def submit_task(col:str, mode:Literal['single','cluster']='single'):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
     
+    time.sleep(np.random.choice([1, 2]))
+    
     if mode == 'single': 
-        # Submit the task 
-        subprocess.run(['python', 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}')
+        # Submit the task
+        while True:
+            try:
+                subprocess.run(['python', 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}', check=True)
+                break  # Exit the loop if the task succeeds
+            except subprocess.CalledProcessError:
+                print(f"Task {col} failed. Retrying in 10 seconds...")
+                time.sleep(10)
     
     # Start the task if the os is linux
     elif mode == 'cluster' and os.name == 'posix':
@@ -361,7 +358,7 @@ def process_GHG_deforestation_data(json_path):
     return df
 
 def process_bio_GBF2_data(json_path):
-    return load_json_data(json_path, 'biodiversity_GBF2_1_total_score_by_type.json')
+    return load_json_data(json_path, 'biodiversity_priority_1_total_score_by_type.json')
 
 
 def process_demand_data(json_path):
@@ -408,7 +405,8 @@ def process_task_root_dirs(task_root_dirs):
                 report_Profit_GHG_BIO,
                 df_profit[['year', 'name', 'val']].assign(**run_paras),
                 df_ghg_deviation[['year', 'name', 'val']].assign(**run_paras),
-                df_ghg_deforestation[['year', 'name', 'val']].assign(**run_paras)
+                df_ghg_deforestation[['year', 'name', 'val']].assign(**run_paras),
+                df_bio_GBF2[['year', 'name', 'val']].assign(**run_paras),
             ]).reset_index(drop=True)
 
             report_Production = pd.concat([
