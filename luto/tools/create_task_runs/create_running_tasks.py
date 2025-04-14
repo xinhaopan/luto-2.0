@@ -20,12 +20,12 @@
 import os
 import numpy as np
 from luto.tools.create_task_runs.helpers import (
-    create_grid_search_parameters, 
-    create_grid_search_template, 
+    create_grid_search_permutations, 
+    create_grid_search_settings_df, 
     create_task_runs
 )
 
-# os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_res1/gurobi.lic"
+os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_compute/gurobi.lic"
 
 # Set the grid search parameters
 grid_search = {
@@ -33,7 +33,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['24GB'],
-    'NCPUS':[32],
+    'NCPUS':[2],
     'TIME': ['2:00:00'],
     'QUEUE': ['normalsr'],
     
@@ -43,11 +43,11 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                     # 'snapshot' or 'timeseries'
-    'RESFACTOR': [3],
-    'SIM_YERAS': [list(range(2020, 2051, 11))],   # Years to run the model 
+    'RESFACTOR': [13],
+    'SIM_YERAS': [[2010,2020,2030,2040,2050]],   # Years to run the model 
     'WRITE_THREADS': [5],
-    'WRITE_OUTPUT_GEOTIFFS': [True],
-    'KEEP_OUTPUTS': [True],                    # If false, only keep report HTML
+    'WRITE_OUTPUT_GEOTIFFS': [False],
+    'KEEP_OUTPUTS': [False],                    # If false, only keep report HTML
     
  
     ###############################################################
@@ -56,9 +56,10 @@ grid_search = {
     
     # --------------- Demand settings ---------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft' 
-    'CARBON_PRICES_FIELD': ['CONSTANT'],   
+       
     
     # --------------- GHG settings ---------------
+    'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],         # True or False
     'GHG_LIMITS_FIELD': [
@@ -72,7 +73,7 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [0],
     
     # --------------- Biodiversity priority zone ---------------
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
@@ -95,7 +96,10 @@ grid_search = {
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_WEIGHT_ALPHA': [0.8],
+    'SOLVE_WEIGHT_ALPHA': (
+        (np.arange(1,6000,100)/600000).tolist()
+        + (np.arange(1,10,1)/1000).tolist()
+    ),
     'SOLVE_WEIGHT_BETA': [0.98], 
     
     
@@ -113,16 +117,16 @@ grid_search = {
 
 # Create the settings parameters
 ''' This will create a parameter CSV based on `grid_search`. '''
-create_grid_search_parameters(grid_search)
+create_grid_search_permutations(grid_search)
 
 # Read the template for the custom settings
-grid_search_df = create_grid_search_template()
+grid_search_df = create_grid_search_settings_df()
 
 
 # Create the task runs
 
 # 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', n_workers=4)
+create_task_runs(grid_search_df, mode='single', n_workers=50)
 
 # 2) Submit task to multiple linux computation nodes
 # create_task_runs(grid_search_df, mode='cluster')
