@@ -87,13 +87,13 @@ def run(
     memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
     memory_thread.start()
     
-
-    # Update the simulation years in the data object
+    
+    # Update the simulation years in the data object  
     years = sorted(years)
     data.set_path(years)
     print('\n')
     print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
-
+        
     # Sanity check
     if data.YR_CAL_BASE not in years:
         years.insert(0, data.YR_CAL_BASE)
