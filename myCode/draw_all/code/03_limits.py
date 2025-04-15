@@ -135,8 +135,8 @@ def get_biodiversity_target(input_files):
 
 font_size = 25
 # Bio
-# df = get_biodiversity_target(input_files)
-df = pd.read_csv('biodiversity_targets.csv', index_col=0)
+df = get_biodiversity_target(input_files)
+# df = pd.read_csv('biodiversity_targets.csv', index_col=0)
 min_v, max_v, ticks = get_y_axis_ticks(df.min().min(), df.max().max(), desired_ticks=5)
 colors = ['#2ECC71', '#3498DB','#E74C3C']  # 根据数据列数调整颜色列表
 draw_plot_lines(df, colors, ' ', (min_v, max_v), ticks, "../output/03_biodiversity_limit.png", font_size=font_size)

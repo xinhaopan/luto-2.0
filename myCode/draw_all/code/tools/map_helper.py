@@ -717,6 +717,7 @@ def concatenate_images(image_files, output_image, rows=3, cols=3):
 
     # 保存拼接后的图片
     new_img.save(output_image)
+    new_img.show()
 
 def assign_color_by_area_ratio(overlay_reproject_geo_tif, overlay_reproject_rgb_tif, color_hex='#FF0000',
                                background_value=-9999, write_png=False):

@@ -29,6 +29,7 @@ def main():
     target_year = 2050
 
     try:
+        os.environ["GRB_LICENSE_FILE"] = r"C:\Users\s222552331\gurobi\gurobi_xp.lic"
         # 确保日志目录存在
         os.makedirs('output', exist_ok=True)
 
