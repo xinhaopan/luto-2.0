@@ -23,13 +23,12 @@ Provides minimalist Solver class and pure helper functions.
 """
 
 import numpy as np
-import gurobipy as gp
 import luto.settings as settings
 
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, Any
-from gurobipy import GRB
+
 
 from luto import tools
 from luto.solvers.input_data import SolverInputData
@@ -40,7 +39,10 @@ from luto.settings import (
     NON_AG_LAND_USES, 
     NON_AG_LAND_USES_REVERSIBLE
 )
-
+import os
+os.environ["GRB_LICENSE_FILE"] = r"C:\Users\s222552331\gurobi\gurobi_xp.lic"
+import gurobipy as gp
+from gurobipy import GRB
 
 # Set Gurobi environment.
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)

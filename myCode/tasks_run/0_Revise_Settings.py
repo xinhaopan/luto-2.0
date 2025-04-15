@@ -35,7 +35,7 @@ grid_search = {
         {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
     ],
 
-    'SIM_YERAS': [[i for i in range(2010,2051,5)]],
+    'SIM_YERAS': [[i for i in range(2010,2051,1)]],
     # Water settings
     'WATER_LIMITS': ['on'],
     'WATER_CONSTRAINT_TYPE': ['hard'],
@@ -53,7 +53,7 @@ grid_search = {
 
 suffixs = ['GHG_LIMITS_FIELD','BIODIV_GBF_TARGET_2_DICT','RESFACTOR']
 
-output_file = os.path.join("Custom_runs", "setting_0414_5.csv")
+output_file = os.path.join("Custom_runs", "setting_0416_5.csv")
 create_grid_search_template(grid_search,output_file,suffixs)
 print(f"saved to {output_file}")
 

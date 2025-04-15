@@ -594,25 +594,28 @@ def calculate_y_axis_range(data_dict, desired_ticks=5,use_parallel=True, n_jobs=
     min_value = min(res[1] for res in results)
 
     range_value = max_value - min_value
-    scale_factor = 1
+    if range_value == 0:
+        return (0, 1), [0, 1]
+    else:
+        scale_factor = 1
 
-    if range_value > -1 and range_value < 1:
-        scale_exponent = int(abs(math.floor(math.log10(range_value))))
-        scale_factor = 10 ** scale_exponent
-        max_value *= scale_factor
-        min_value *= scale_factor
+        if range_value > -1 and range_value < 1:
+            scale_exponent = int(abs(math.floor(math.log10(range_value))))
+            scale_factor = 10 ** scale_exponent
+            max_value *= scale_factor
+            min_value *= scale_factor
 
-    min_v, max_v, ticks = get_y_axis_ticks(min_value, max_value, desired_ticks=desired_ticks)
+        min_v, max_v, ticks = get_y_axis_ticks(min_value, max_value, desired_ticks=desired_ticks)
 
-    # 缩小结果回原比例
-    if scale_factor != 1:
-        min_v /= scale_factor
-        max_v /= scale_factor
-        ticks = [t / scale_factor for t in ticks]
+        # 缩小结果回原比例
+        if scale_factor != 1:
+            min_v /= scale_factor
+            max_v /= scale_factor
+            ticks = [t / scale_factor for t in ticks]
 
-    if ticks==[0,20,40,60,80,100]:
-        ticks=[0,25,50,75,100]
-    return ((min_v, max_v), ticks)
+        if ticks==[0,20,40,60,80,100]:
+            ticks=[0,25,50,75,100]
+        return ((min_v, max_v), ticks)
 
 
 def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_land_use_movement_all.xlsx", yticks=None, fontsize=30,x_offset=1.3):
