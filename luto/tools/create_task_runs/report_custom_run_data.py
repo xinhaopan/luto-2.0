@@ -17,51 +17,81 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import numpy as np
-import pandas as pd
-import plotnine as p9
 
+import plotnine as p9
 from glob import glob
 from luto.tools.create_task_runs.helpers import process_task_root_dirs
 
 
+# Plot settings
+p9.options.figure_size = (12, 6)
+p9.options.dpi = 100
+
+
 # Get the data
-task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250414_RES5_GRID_SEARCH_ALPHA_WEIGHTS" in i][:10]
-report_data, report_data_demand = process_task_root_dirs(task_root_dirs)
+task_root_dir = '/g/data/jk53/jinzhu/LUTO/Custom_runs/20250415_RES13_GRID_SEARCH_ALPHA_BETA_WEIGHTS/'
+report_data = process_task_root_dirs(task_root_dir)
 
 
-# Weights
-weight_alpha = 0.8
-weight_beta = 0.98
+# ------------------ Demand ------------------
+query_str = '''
+    Type == "Production_Mt" 
+    and year != 2010
+    and SOLVE_WEIGHT_BETA == 0.05
+    '''.replace('\n', ' ').replace('  ', ' ')
 
-# Filter the data
-filter_rules = '''
-    year != 2010 
+df_demand = report_data.query(query_str).copy()
 
-'''.strip().replace('\n', '')
-
-report_data_filter = report_data.query(filter_rules).copy()
-report_data_filter['group'] = (
-    report_data_filter['GHG_LIMITS_FIELD'].astype(str) 
-    + '_' 
-    + report_data_filter['BIODIV_GBF_TARGET_2_DICT'].astype(str)
-    + '_'
-    + report_data_filter['SOLVE_WEIGHT_ALPHA'].astype(str)
-)
-
-
-# Plotting
-p9.options.figure_size = (15, 8)
-p9.options.dpi = 300
-
-
-# Time series
-p_weight_vs_profit = (
+p_weight_vs_demand = (
     p9.ggplot(
-        report_data_filter, 
+        df_demand, 
         p9.aes(
             x='year', 
-            y='Profit', 
+            y='val', 
+            fill='name', 
+        )
+    ) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
+    p9.geom_col(position='jitter') +
+    p9.theme_bw() +
+    p9.theme(strip_text=p9.element_text(size=8)) +
+    p9.guides(color=p9.guide_legend(ncol=1))
+)
+
+p_weight_vs_demand.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_3_p_weight_vs_demand.svg')
+
+
+
+
+# -------------------- Profit -------------------
+# Ensure consistent data types for 'run_idx' in both DataFrames
+report_data['run_idx'] = report_data['run_idx'].astype(str)
+df_demand['run_idx'] = df_demand['run_idx'].astype(str)
+
+query_str = '''
+    Type == "Profit_billion_AUD" 
+    and SOLVE_WEIGHT_ALPHA == 0.95 
+    and SOLVE_WEIGHT_BETA == 0.05
+    '''.replace('\n', ' ').replace('  ', ' ')
+
+df_profit = report_data.query(query_str).copy()
+
+df_profit['group'] = (
+    df_profit['GHG_LIMITS_FIELD'].astype(str) 
+    + '_' 
+    + df_profit['BIODIV_GBF_TARGET_2_DICT'].astype(str)
+    + '_'
+    + df_profit['SOLVE_WEIGHT_ALPHA'].astype(str)
+    + '_'
+    + df_profit['SOLVE_WEIGHT_BETA'].astype(str)
+)
+
+p_weight_vs_profit = (
+    p9.ggplot(
+        df_profit, 
+        p9.aes(
+            x='year', 
+            y='val', 
             color='SOLVE_WEIGHT_ALPHA',
             linetype='BIODIV_GBF_TARGET_2_DICT',
             group='group'
@@ -80,153 +110,47 @@ p_weight_vs_profit = (
 
 p_weight_vs_profit.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_1_p_weight_vs_profit.svg')
 
-# ------------------
-report_data_demand_filterd = (
-    report_data_demand
-    .query('SOLVE_WEIGHT_ALPHA==@weight_alpha and SOLVE_WEIGHT_BETA==@weight_beta')
-    .query('abs(`deviation_%`) <=5 and abs(`deviation_%`)>=0.001')
-)
 
-p_weight_vs_demand = (
+
+
+
+
+
+
+# ------------------ Biodiversity ------------------
+query_str = '''
+    Type == "Biodiversity_area_score"
+    and SOLVE_WEIGHT_ALPHA != 0 
+    and SOLVE_WEIGHT_ALPHA != 1
+    and SOLVE_WEIGHT_BETA != 1
+    and SOLVE_WEIGHT_BETA != 0
+    '''.replace('\n', ' ').replace('  ', ' ')
+    
+df_bio = report_data.query(query_str).copy()
+
+df_bio_sum = df_bio.groupby(
+    ['year', 'GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT', 'SOLVE_WEIGHT_ALPHA']
+)['val'].sum().reset_index()
+
+
+p_weight_vs_bio = (
     p9.ggplot(
-        report_data_demand_filterd, 
+        df_bio_sum, 
         p9.aes(
             x='year', 
-            y='deviation_%', 
-            fill='name', 
+            y='val', 
+            color='SOLVE_WEIGHT_ALPHA',
+            group='SOLVE_WEIGHT_ALPHA',
         )
     ) +
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
-    p9.geom_col(position='stack') +
+    p9.geom_line(size=0.3) +
     p9.theme_bw() +
     p9.theme(strip_text=p9.element_text(size=8)) +
-    p9.guides(color=p9.guide_legend(ncol=1))
+    p9.ylab('Mean Biodiversity Area Score')
 )
 
-p_weight_vs_demand.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_3_p_weight_vs_demand.svg')
 
 
-
-
-# p_weight_vs_GHG_deviation = (
-#     p9.ggplot(
-#         report_data_filter, 
-#         p9.aes(
-#             x='year', 
-#             y='GHG deviation', 
-#             color='GBF2_PENALTY', 
-#             # linetype='DIET_GLOB',
-#             group='GBF2_PENALTY',
-#         )
-#     ) +
-#     # p9.facet_wrap('WATER_PENALTY', labeller='label_both') +
-#     p9.geom_line() +
-#     p9.theme_bw() +
-#     # p9.scale_x_log10() +
-#     p9.ylab('GHG deviation (Mt)')
-#     )
-
-# p_weight_vs_GHG_deviation.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_2_p_weight_vs_GHG_deviation.svg')
-
-# p_weight_vs_GHG_deforestation = (
-#     p9.ggplot(
-#         report_data_filter, 
-#         p9.aes(
-#             x='year', 
-#             y='Total_Deforestation', 
-#             # lintype='BIODIV_GBF_TARGET_2_DICT',
-#             color='GBF2_PENALTY', 
-#             # linetype='DIET_GLOB',
-#             group='GBF2_PENALTY',
-#         )
-#     ) +
-#     # p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-#     p9.geom_line() +
-#     p9.theme_bw() +
-#     # p9.scale_x_log10() +
-#     p9.ylab('Deforestation (Mt)')
-#     )
-
-
-# # Snapshoot plots
-# p_weight_vs_profit = (
-#     p9.ggplot(
-#         report_data_filter, 
-#         p9.aes(
-#             x='SOLVE_WEIGHT_ALPHA', 
-#             y='Profit',
-#         )
-#     ) +
-#     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-#     p9.geom_line(size=0.3) +
-#     p9.theme_bw() +
-#     # p9.scale_x_log10() +
-#     p9.ylab('Profit (billion AUD)')
-#     )
-
-
-# p_weight_vs_GHG_deviation = (
-#     p9.ggplot(
-#         report_data_filter, 
-#         p9.aes(
-#             x='SOLVE_WEIGHT_ALPHA', 
-#             y='GHG deviation'
-#         )
-#     ) +
-#     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-#     p9.geom_line() +
-#     p9.theme_bw() +
-#     # p9.scale_x_log10() +
-#     p9.ylab('GHG deviation (Mt)')
-#     )
-
-# p_weight_vs_GHG_deforestation = (
-#     p9.ggplot(
-#         report_data_filter, 
-#         p9.aes(
-#             x='SOLVE_WEIGHT_ALPHA', 
-#             y='Deforestation', 
-#         )
-#     ) +
-#     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-#     p9.geom_line() +
-#     p9.theme_bw() +
-#     # p9.scale_x_log10() +
-#     p9.ylab('Deforestation (Mt)')
-#     )
-
-
-# p_GHG_vs_profit = (
-#     p9.ggplot(report_data_filter, 
-#         p9.aes(
-#             x='GHG deviation', 
-#             y='Profit', 
-#             color='SOLVE_WEIGHT_ALPHA', 
-#             shape='DIET_GLOB',
-#             group='interaction',
-#         )
-        
-#     ) +
-#     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-#     p9.geom_point(size=0.1) +
-#     p9.theme_bw()
-#     )
-
-
-# p_weigth_vs_demand = (
-#     p9.ggplot(
-#         report_data_demand_filterd, 
-#         p9.aes(
-#             x='SOLVE_ECONOMY_WEIGHT', 
-#             y='deviation_%', 
-#             fill='name', 
-#         )
-#     ) +
-#     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-#     p9.geom_col(position='dodge') +
-#     p9.theme_bw() +
-#     p9.scale_x_log10() +
-#     p9.guides(fill=p9.guide_legend(ncol=1))
-# )
 
 
