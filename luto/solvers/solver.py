@@ -297,29 +297,32 @@ class LutoSolver:
 
         
         # Get objectives 
-        self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["Economy Total Value (AUD)"]         # Normalise to the base year economy value
-        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["Biodiversity Value (score)"]      # Normalise to the base year biodiversity value
-        self.obj_penalties = self._setup_penalty_objectives()
+        self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]              # Normalise to the base year economy value
+        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["BASE_YR Biodiversity (score)"]  # Normalise to the base year biodiversity value
+        self.obj_penalties = (
+            (self._setup_penalty_objectives() + self._input_data.base_yr_prod["BASE_YR Production (t)"])
+            / self._input_data.base_yr_prod["BASE_YR Production (t)"]
+        )                                                                                                                       # Normalise to the base year production value
  
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
             obj_wrap = (
-                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA
+                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA 
                 - self.obj_biodiv * ( 1 - settings.SOLVE_WEIGHT_ALPHA)
             )
             objective = (
-                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) +
+                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) + 
                 self.obj_penalties * settings.SOLVE_WEIGHT_BETA
             )
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
             obj_wrap = (
-                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA
+                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA 
                 + self.obj_biodiv * (1 - settings.SOLVE_WEIGHT_ALPHA)
             )
             objective = (
-                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA)
+                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) 
                 - self.obj_penalties * settings.SOLVE_WEIGHT_BETA
             )
         else:
@@ -410,10 +413,11 @@ class LutoSolver:
             else 0
         )
         self.penalty_demand = (
-            gp.quicksum(
-                v * price
-                for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
-            )
+            # gp.quicksum(
+            #     v * price
+            #     for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
+            # )
+            gp.quicksum(v for v in self.V)
             if settings.DEMAND_CONSTRAINT_TYPE == "soft"
             else 0
         )
@@ -590,7 +594,7 @@ class LutoSolver:
                         ag_man_q_dry_p[p]
                         for p in range(self._input_data.nprs)
                         if self._input_data.pr2cm_cp[c, p]
-                    )
+                    )   
                 )
                 self.ag_man_q_irr_c[c] += (
                     gp.quicksum(
@@ -599,7 +603,7 @@ class LutoSolver:
                         if self._input_data.pr2cm_cp[c, p]
                     )
                 )
-
+                
 
         # Calculate non-agricultural commodity contributions
         self.non_ag_q_c = [
