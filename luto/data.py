@@ -192,7 +192,7 @@ class Data:
         # Get the lon/lat coordinates.
         self.COORD_LON_LAT_2D_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
         self.COORD_LON_LAT = [i[self.MASK] for i in self.COORD_LON_LAT_2D_FULLRES]  # Only keep the coordinates for the cells that are not masked out (i.e., land uses). 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only) and not masked out
-
+        
         # Get the resfactored lumap_2D as xarray DataArray
         self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
                 self.LUMAP_2D_RESFACTORED,
@@ -371,8 +371,8 @@ class Data:
             for lu in self.AGRICULTURAL_LANDUSES:
                 if lu.split(' -')[0].lower() in c:
                     self.CM2LU_IDX[c].append(self.AGRICULTURAL_LANDUSES.index(lu))
-
-
+                    
+                    
         ###############################################################
         # Cost multiplier data.
         ###############################################################
@@ -1008,7 +1008,7 @@ class Data:
                 header=carbon_price_sheet_header,
                 index_col=carbon_price_sheet_index_col,
             )["Carbon_price_$_tCO2e"].to_dict()
-
+            
 
 
         ###############################################################
@@ -1330,13 +1330,7 @@ class Data:
 
         print(f"\tCalculating base year productivity...", flush=True)
         yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
-        yr_cal_base_economy = self.get_economic_value(self.YR_CAL_BASE)
-        yr_cal_base_biodiv = self.get_biodiv_value()
-
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
-        self.add_production_data(self.YR_CAL_BASE, "Economy Total Value (AUD)", yr_cal_base_economy)
-        self.add_production_data(self.YR_CAL_BASE, "Biodiversity Total Priority Score (score)", yr_cal_base_biodiv)
-
 
         print("Data loading complete\n")
 
@@ -1877,36 +1871,6 @@ class Data:
         # Return total commodity production as numpy array.
         total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
         return total_q_c
-
-    def get_economic_value(self, yr_cal):
-        """
-        Calculate the economic value of the agricultural sector.
-        """
-
-        yr_idx = yr_cal - self.YR_CAL_BASE
-
-        # Get the revenue and cost matrices
-        r_mrj = get_rev_matrices(self, yr_idx)
-        c_mrj = get_cost_matrices(self, yr_idx)
-
-        # Calculate the economic value
-        if settings.OBJECTIVE == 'maxprofit':
-            e_mrj = (r_mrj - c_mrj)
-        elif settings.OBJECTIVE == 'mincost':
-            e_mrj = c_mrj
-        else:
-            raise ValueError("Invalid `settings.OBJECTIVE`. Use 'maxprofit' or 'maxcost'.")
-
-        return np.einsum('mrj,mrj->', e_mrj, self.AG_L_MRJ)
-
-
-    def get_biodiv_value(self):
-        """
-        Calculate the economic value of the agricultural sector.
-        """
-        # Get the revenue and cost matrices
-        ag_b_mrj = get_bio_overall_priority_score_matrices_mrj(self)
-        return np.einsum('mrj,mrj->', ag_b_mrj, self.AG_L_MRJ)
 
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:
