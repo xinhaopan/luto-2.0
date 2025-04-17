@@ -148,14 +148,14 @@ df = pd.read_excel(INPUT_DIR + '/GHG_targets.xlsx', index_col=0)
 
 # 选择 2010 到 2050 年的数据
 df_filtered = df.loc[2010:2050,
-              ['1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', '1.8C (67%) excl. avoided emis']]
+              ['1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', '1.8C (67%) excl. avoided emis SCOPE1']]
 
 # 将所有数据单位转换为 million (除以 1,000,000)
 df_filtered = df_filtered / 1e6
 df_filtered.columns = ['1.5°C (67%)', '1.5°C (50%)', '1.8°C (67%)']
 colors = ['#E74C3C', '#3498DB', '#2ECC71']  # 根据数据列数调整颜色列表
 min_v, max_v, ticks = get_y_axis_ticks(df_filtered.min().min(), df_filtered.max().max(), desired_ticks=6)
-draw_plot_lines(df_filtered, colors, ' ', (min_v, max_v), ticks, "../output/03_BIO_limit.png", font_size=font_size)
+draw_plot_lines(df_filtered, colors, ' ', (min_v, max_v), ticks, "../output/03_GHG_limit.png", font_size=font_size)
 
 
 # Food demand

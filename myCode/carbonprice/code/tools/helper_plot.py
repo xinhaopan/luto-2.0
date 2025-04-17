@@ -3,17 +3,13 @@ import os
 import re
 import math
 
-# --- 第三方库 ---
-import numpy as np
+# --- 第三方库 ---import numpy as np
 import pandas as pd
-import matplotlib
+
 import matplotlib.pyplot as plt
-import numpy_financial as npf
-from joblib import Parallel, delayed
-from tqdm import tqdm  # 更推荐只导入 tqdm 本体
-import rasterio
-from sklearn.preprocessing import MinMaxScaler
-from PIL import Image
+import pandas as pd
+from plotnine import *
+import numpy as np
 
 import cairosvg
 from lxml import etree
@@ -280,64 +276,64 @@ def draw_figure(input_file):
 #     # 读取表格数据
 #     file_path = f'../output/03_{input_file}_shadow_price.xlsx'  # 替换为你的文件路径
 #     df = pd.read_excel(file_path)
-#
+# 
 #     # 设置 Year 列为索引
 #     df.set_index('Year', inplace=True)
-#
+# 
 #     # 遍历每一列并绘制点线图
 #     for column in df.columns:
 #         # 计算均值和标准差
 #         mean = df[column].mean()
 #         std = df[column].std()
-#
+# 
 #         # 将超出均值±3倍标准差的值标记为异常值
 #         is_outlier = (df[column] > mean + 3*std) | (df[column] < mean - 3*std)
-#
+# 
 #         # 获取非异常值的最大最小值
 #         non_outlier_max = df[column][~is_outlier].max()
 #         non_outlier_min = df[column][~is_outlier].min()
-#
+# 
 #         # 设置断点范围（略低于断点的值，略高于去掉断点后的最大值）
 #         break_start = mean + 3 * std - 0.1 * std
 #         break_end = non_outlier_max + 0.1 * std
-#
+# 
 #         # 创建带有断点的双轴图
 #         fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 6), gridspec_kw={'height_ratios': [3, 1]})
-#
+# 
 #         # 绘制正常值
 #         ax1.plot(df.index, df[column], marker='o', linestyle='-', label=column, color='b')
 #         ax2.plot(df.index, df[column], marker='o', linestyle='-', label=column, color='b')
-#
+# 
 #         # 隐藏异常值
 #         ax1.plot(df.index[is_outlier], df[column][is_outlier], 'o', color='white')
 #         ax2.plot(df.index[~is_outlier], df[column][~is_outlier], 'o', color='white')
-#
+# 
 #         # 设置轴范围
 #         ax1.set_ylim(break_start, df[column].max() + std)
 #         ax2.set_ylim(df[column].min() - std, break_end)
-#
+# 
 #         # 添加断点标记
 #         d = .015  # 断点大小
 #         kwargs = dict(transform=ax1.transAxes, color='k', clip_on=False)
 #         ax1.plot((-d, +d), (-d, +d), **kwargs)        # top-left diagonal
 #         ax1.plot((1 - d, 1 + d), (-d, +d), **kwargs)  # top-right diagonal
-#
+# 
 #         kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
 #         ax2.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
 #         ax2.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
-#
+# 
 #         plt.xlabel('Year')
 #         plt.ylabel(column)
 #         plt.title(f'{input_file} {column}')
 #         plt.legend()
 #         plt.grid(True)
-#
+# 
 #         sanitized_column = sanitize_filename(column)
 #         plt.savefig(f'../Figure/{input_file}_{sanitized_column}.png')  # 保存图像为文件
 #         plt.close()  # 关闭当前图像，避免内存问题
-#
-
-
+# 
+# 
+# 
 def plot_cost_vs_price(input_file: str, start_year: int = 2021):
     # 构造文件路径并读取数据
     file_path = f"../output/02_{input_file}_price.xlsx"
@@ -412,6 +408,7 @@ def plot_cost_vs_price(input_file: str, start_year: int = 2021):
     ax.grid(True)
 
     plt.tight_layout()
+    plt.savefig(f"../output/{input_file}_price.png")
     plt.show()
 
 
@@ -480,6 +477,7 @@ def plot_absolute_cost_stack(input_file: str, start_year: int = 2021):
     ax.grid(True)
 
     plt.tight_layout()
+    plt.savefig(f"../output/{input_file}_cost.png")
     plt.show()
 
 
@@ -559,5 +557,154 @@ def plot_ghg_stack(input_file: str, start_year: int = 2021):
               ncol=3, fancybox=True, shadow=False)
 
     plt.tight_layout()
+    plt.savefig(f"../output/{input_file}_ghg.png")
     plt.show()
 
+
+
+
+def plot_combined_with_facets(input_file: str, start_year: int = 2021):
+    """
+    使用 plotnine 绘制堆叠柱状图和折线图，使用分面展示所有图表。
+
+    参数：
+    - input_file (str): 输入文件名，用于构造文件路径。
+    - start_year (int): 起始年份，过滤数据用。
+    """
+    # 构造文件路径并读取数据
+    file_path_price = f"../output/02_{input_file}_price.xlsx"
+    file_path_summary = f"../output/01_{input_file}_summary.xlsx"
+    df_price = pd.read_excel(file_path_price)
+    df_summary = pd.read_excel(file_path_summary)
+
+    # 删除 2010 年并重置年份
+    df_price = df_price[df_price["Year"] >= start_year]
+    df_summary = df_summary[df_summary["Year"] >= start_year]
+
+    # --------- 处理 cost_vs_price 数据 ---------
+    cost_columns = {
+        'Opportunity cost(M$)': 'Opportunity cost($/tCOe2)',
+        'Transition cost(M$)': 'Transition cost($/tCOe2)',
+        'AM net cost(M$)': 'AM net cost($/tCOe2)',
+        'Non_AG net cost(M$)': 'Non_AG net cost($/tCOe2)'
+    }
+    ghg_column = 'GHG Abatement(MtCOe2)'
+    price_column = 'carbon price($/tCOe2)'
+
+    # 计算单位减排成本列
+    for raw_col, new_col in cost_columns.items():
+        df_price[new_col] = df_price[raw_col] / df_price[ghg_column]
+
+    # 转换为长格式
+    melted_price = pd.melt(
+        df_price,
+        id_vars=["Year"],
+        value_vars=list(cost_columns.values()) + [price_column],
+        var_name="Metric",
+        value_name="Value"
+    )
+
+    # 添加类型标识
+    melted_price["Type"] = "Cost vs Price"
+
+    # --------- 处理 absolute_cost 数据 ---------
+    absolute_cost_columns = {
+        'Opportunity cost(M$)': 'Opportunity cost',
+        'Transition cost(M$)': 'Transition cost',
+        'AM net cost(M$)': 'AM net cost',
+        'Non_AG net cost(M$)': 'Non_AG net cost'
+    }
+    df_price = df_price.rename(columns=absolute_cost_columns)
+    melted_absolute_cost = pd.melt(
+        df_price,
+        id_vars=["Year"],
+        value_vars=list(absolute_cost_columns.values()),
+        var_name="Metric",
+        value_name="Value"
+    )
+    melted_absolute_cost["Type"] = "Absolute Cost"
+
+    # --------- 处理 ghg_stack 数据 ---------
+    df_summary["GHG_ag difference(MtCO2e)"] = df_summary["GHG_ag(MtCOe2)"].diff().fillna(0)
+
+    ghg_columns = {
+        'GHG_ag difference(MtCO2e)': 'GHG_ag difference',
+        'GHG_am(MtCOe2)': 'GHG_am',
+        'GHG_non-ag(MtCOe2)': 'GHG_non-ag',
+        'GHG_transition(MtCOe2)': 'GHG_transition'
+    }
+    df_summary = df_summary.rename(columns=ghg_columns)
+    melted_ghg = pd.melt(
+        df_summary,
+        id_vars=["Year"],
+        value_vars=list(ghg_columns.values()),
+        var_name="Metric",
+        value_name="Value"
+    )
+    melted_ghg["Type"] = "GHG Stack"
+
+    # --------- 合并所有数据 ---------
+    # combined_df = pd.concat([melted_price, melted_absolute_cost, melted_ghg], ignore_index=True)
+    combined_df = pd.concat([melted_price], ignore_index=True)
+
+    # --------- 绘制分面图 ---------
+    # plot = (
+    #         ggplot(combined_df, aes(x="Year", y="Value", fill="Metric")) +
+    #         geom_bar(stat="identity", position="stack", data=combined_df[combined_df["Type"] != "Cost vs Price"]) +
+    #         geom_line(aes(color="Metric"), size=1, data=combined_df[combined_df["Type"] == "Cost vs Price"]) +
+    #         facet_wrap('~Type', scales='free_y') +
+    #         labs(
+    #             title="Combined Metrics with Facets",
+    #             x="Year",
+    #             y="Value"
+    #         ) +
+    #         theme_minimal() +
+    #         theme(
+    #             axis_text_x=element_text(rotation=45, hjust=1),
+    #             legend_position="bottom",
+    #         )
+    # )
+    # plot.show()
+
+    # 计算每年总和用于折线图
+    total_by_year = (
+        melted_price.groupby("Year")["Value"]
+        .sum()
+        .reset_index()
+        .rename(columns={"Value": "TotalValue"})
+    )
+
+    # 绘图
+    plot = (
+            ggplot() +
+            geom_bar(
+                data=melted_price,
+                mapping=aes(x="Year", y="Value", fill="Metric"),
+                stat="identity",
+                position="stack"
+            ) +
+            geom_line(
+                data=total_by_year,
+                mapping=aes(x="Year", y="TotalValue"),
+                color="black",
+                size=1.2
+            ) +
+            geom_point(
+                data=total_by_year,
+                mapping=aes(x="Year", y="TotalValue"),
+                color="black",
+                size=2
+            ) +
+            labs(
+                title="Stacked Bar Chart of Agri-food Prices with Total Line",
+                x="Year",
+                y="Value"
+            ) +
+            theme_minimal() +
+            theme(
+                legend_position='bottom',
+                axis_text_x=element_text(rotation=45, hjust=1)
+            )
+    )
+    plot.show()
+    return plot

@@ -6,16 +6,18 @@ grid_search = {
     # Computational settings, which are not relevant to LUTO itself
     'MEM': ['4'],
     'NCPUS': ['1'],
-    'TIME': ['01:00:00'],
+    'TIME': ['1:00:00'],
     'MODE': [
         # 'snapshot',
         'timeseries'
     ],
-    'OBJECTIVE': ['maxprofit'],
-    'WRITE_OUTPUT_GEOTIFFS': [False],
+    'SOLVE_WEIGHT_ALPHA': [0.8],
+    'SOLVE_WEIGHT_BETA': [0.98],
+    'OBJECTIVE': ['maxprofit'], # maxprofit
+    'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [20],
-    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [20],
-    # 'SOLVE_BIODIV_PRIORITY_WEIGHT': [0],
+    'SIM_YERAS': [[i for i in range(2010,2051,1)]],
+
     # GHG settings
     'GHG_EMISSIONS_LIMITS': ['off','on'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
@@ -24,28 +26,35 @@ grid_search = {
         '1.5C (50%) excl. avoided emis',
         # '1.8C (67%) excl. avoided emis'
     ],
-    'CARBON_PRICES_FIELD': ['c0'],
-    # Water settings
-    'WATER_CONSTRAINT_TYPE': ['soft'],
+    'CARBON_PRICES_FIELD': ['CONSTANT'],
+
     # Biodiversity settings
     'BIODIVERSTIY_TARGET_GBF_2': ['off','on'],
-    'GBF2_CONSTRAINT_TYPE': ['soft'],
-    'HCAS_PERCENTILE': [50],
+    'GBF2_CONSTRAINT_TYPE': ['hard'],
     'BIODIV_GBF_TARGET_2_DICT': [
         # {2010: 0, 2030: 0, 2050: 0, 2100: 0 },
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 },
         # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
     ],
-
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4': ['off'],
     'INCLUDE_WATER_LICENSE_COSTS ': [1],
+    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [20],
+
+    # Water settings
+    'WATER_LIMITS': ['on'],
+    'WATER_CONSTRAINT_TYPE': ['hard'],
+    'INCLUDE_WATER_LICENSE_COSTS': [1],
+    # Demand settings
+    'DEMAND_CONSTRAINT_TYPE': ['soft'],
+
+
 
 }
 
 suffixs = ['GHG_EMISSIONS_LIMITS','BIODIVERSTIY_TARGET_GBF_2','RESFACTOR']
 
-output_file = os.path.join("Custom_runs", "setting_0408_cp.csv")
+output_file = os.path.join("Custom_runs", "setting_0416_cp.csv")
 create_grid_search_template( grid_search,output_file,suffixs)
 print(f"saved to {output_file}")
 
