@@ -428,9 +428,9 @@ def modify_column_name(template_grid_search, suffixs=['GHG_LIMITS_FIELD', 'BIODI
 
     # Default GHG and BIO mappings
     ghg_name_map = {
-        "1.8C (67%) excl. avoided emis": "GHG_1_8C_67",
-        "1.5C (50%) excl. avoided emis": "GHG_1_5C_50",
-        "1.5C (67%) excl. avoided emis": "GHG_1_5C_67"
+        "1.8C (67%) excl. avoided emis SCOPE1": "GHG_1_8C_67",
+        "1.5C (50%) excl. avoided emis SCOPE1": "GHG_1_5C_50",
+        "1.5C (67%) excl. avoided emis SCOPE1": "GHG_1_5C_67"
     }
     bio_name_map = {
         "{2010: 0, 2030: 0, 2050: 0, 2100: 0}": "BIO_0",

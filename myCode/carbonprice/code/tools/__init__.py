@@ -6,8 +6,7 @@ from .helper_data import (
     calculate_shadow_price
 )
 from .helper_plot import (
-    plot_cost_vs_price,
-    plot_ghg_stack,
+    plot_combined_with_facets
 )
 
 def run_analysis_pipeline(input_file, use_parallel=False):
@@ -15,5 +14,4 @@ def run_analysis_pipeline(input_file, use_parallel=False):
     calculate_baseline_costs(input_file, use_parallel)
     compute_unit_prices(input_file)
     calculate_shadow_price(input_file, percentile_num=97, mask_use=True)
-    plot_cost_vs_price(input_file)
-    plot_ghg_stack(input_file)
+    plot_combined_with_facets(input_file)

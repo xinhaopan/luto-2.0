@@ -16,39 +16,39 @@ grid_search = {
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],
+    'SIM_YERAS': [[i for i in range(2010,2051,1)]],
 
     # GHG settings
     'GHG_EMISSIONS_LIMITS' : ['on'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'GHG_LIMITS_FIELD': [
-        '1.5C (67%) excl. avoided emis',
-        '1.5C (50%) excl. avoided emis',
-        '1.8C (67%) excl. avoided emis'
+        '1.5C (67%) excl. avoided emis SCOPE1',
+        '1.5C (50%) excl. avoided emis SCOPE1',
+        '1.8C (67%) excl. avoided emis SCOPE1'
     ],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
+    # Biodiversity settings
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],
-    'GBF2_CONSTRAINT_TYPE': ['soft'],
+    'GBF2_CONSTRAINT_TYPE': ['hard'],
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0, 2050: 0, 2100: 0 },
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 },
         {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
     ],
-
-    'SIM_YERAS': [[i for i in range(2010,2051,1)]],
-    # Water settings
-    'WATER_LIMITS': ['on'],
-    'WATER_CONSTRAINT_TYPE': ['hard'],
-    'INCLUDE_WATER_LICENSE_COSTS': [1],
-    # Demand settings
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],
-
-    # Biodiversity settings
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_8': ['off'],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
+
+    # Water settings
+    'WATER_LIMITS': ['on'],
+    'WATER_CONSTRAINT_TYPE': ['hard'],
+    'INCLUDE_WATER_LICENSE_COSTS': [1],
+
+    # Demand settings
+    'DEMAND_CONSTRAINT_TYPE': ['soft'],
 }
 
 suffixs = ['GHG_LIMITS_FIELD','BIODIV_GBF_TARGET_2_DICT','RESFACTOR']

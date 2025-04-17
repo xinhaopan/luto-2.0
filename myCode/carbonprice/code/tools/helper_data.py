@@ -290,6 +290,7 @@ def calculate_baseline_costs(input_file, use_parallel=False,output=True):
         pd.Series).set_axis(columns_name, axis=1)
 
     if output:
+        os.makedirs("../output", exist_ok=True)
         output_excel_path = os.path.join(f"../output/01_{input_file}_summary.xlsx")
         df_results.to_excel(output_excel_path, index=False)
     return df_results
