@@ -103,12 +103,12 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YERAS = list(range(2010,2051,10)) # range(2020,2050)
+SIM_YERAS = list(range(2010,2051,1)) # range(2020,2050)
 
 
 # How does the model run over time
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -122,7 +122,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or False
+WRITE_OUTPUT_GEOTIFFS = True   # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
@@ -300,7 +300,7 @@ To disable an ag-mangement option, change the corresponding value in the AG_MANA
 AG_MANAGEMENTS_REVERSIBLE = {
     'Asparagopsis taxiformis': True,
     'Precision Agriculture': True,
-    'Ecological Grazing': False,
+    'Ecological Grazing': True,
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
@@ -401,7 +401,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', 
-GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
+GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis SCOPE1'
 '''
 options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
@@ -447,14 +447,14 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
-SOLVE_WEIGHT_ALPHA = 0.5
+SOLVE_WEIGHT_ALPHA = 0.1
 ''' 
 Range from 0 to 1 that balances the relative important between economic values and biodiversity scores.
  - if approaching 0, the model will focus on maximising biodiversity scores.
  - if approaching 1, the model will focus on maximising prifit (or minimising cost).
 '''
 
-SOLVE_WEIGHT_BETA = 0.99
+SOLVE_WEIGHT_BETA = 0.9
 '''
 The weight of the deviations from target in the objective function.
  - if approaching 0, the model will ignore the deviations from target.
@@ -519,8 +519,8 @@ BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiv
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIV_GBF_TARGET_2_DICT = {
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.5,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.5   # Stays at 2050 level
+              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.3   # Stays at 2050 level
              }            # (can add more years/targets)\
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -536,7 +536,7 @@ The constraint type for the biodiversity target.
 - 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 50
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 

@@ -3,7 +3,7 @@ cost_dict = {
     'cost_am': [
         'Asparagopsis taxiformis',
         'Precision Agriculture',
-        'Ecological Grazing',
+        # 'Ecological Grazing',
         'Savanna Burning',
         'AgTech EI',
         'Biochar',
@@ -16,21 +16,21 @@ cost_dict = {
         'Carbon Plantings (Block)',
         'Sheep Carbon Plantings (Belt)',
         'Beef Carbon Plantings (Belt)',
-        'BECCS'
+        # 'BECCS'
     ]
 }
 
 # 创建 revenue_dict，主键从 cost 换成 revenue
 revenue_dict = {key.replace('cost', 'revenue'): value for key, value in cost_dict.items()}
 
-time = '20250416'
-suffix = '20'
+time = '20250424'
+suffix = '0_20'
 
 senerios = [
-    'Run_1_off_off',
-    'Run_2_off_on',
-    'Run_3_on_off',
-    'Run_4_on_on',
+    'Run_1_on_on',
+    'Run_2_on_off',
+    'Run_3_off_on',
+    'Run_4_off_off',
 ]
 input_files = [
     f"{time}_{senerio}_{suffix}"

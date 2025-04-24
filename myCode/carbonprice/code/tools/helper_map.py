@@ -56,6 +56,7 @@ def clip_outliers(arr, quantile=0.005):
     low_val, high_val = np.nanquantile(arr, [quantile, 1 - quantile])
     return np.clip(arr, low_val, high_val)
 
+
 def plot_bivariate_rgb_map(
     input_file,
     arr_path1,
@@ -107,40 +108,52 @@ def plot_bivariate_rgb_map(
     carbon_bin = np.clip(np.digitize(carbon_scaled, bins) - 1, 0, n_bins - 1)
     biodiv_bin = np.clip(np.digitize(biodiv_scaled, bins) - 1, 0, n_bins - 1)
 
-    # 统计分布
+    # 统计分布（行=bio，列=carbon）
     joint_counts = np.zeros((n_bins, n_bins), dtype=int)
     for i in range(n_bins):
         for j in range(n_bins):
             joint_counts[i, j] = np.sum((biodiv_bin == i) & (carbon_bin == j))
-    df = pd.DataFrame(np.flipud(joint_counts),
-                      columns=[f'{arr_path1.split("_")[0]} {i}' for i in range(n_bins)],
-                      index=[f'{arr_path2.split("_")[0]} {i}' for i in reversed(range(n_bins))])
+    df = pd.DataFrame(joint_counts,
+                      index=[f'{arr_path2.split("_")[0]} {i}' for i in reversed(range(n_bins))],
+                      columns=[f'{arr_path1.split("_")[0]} {j}' for j in range(n_bins)]
+                      )
+
     print("📊 每个 bin 组合的像元数量 (bio row × carbon col):")
     print(df)
 
-    # 构建颜色矩阵（黄绿）
-    color_matrix = [
-        ['#f0f0f0', '#e8d7d0', '#e0bfb0', '#d8a790', '#d08f70'],
-        ['#e0e0e0', '#d8c8c0', '#d0b0a0', '#c89880', '#c08060'],
-        ['#d0d0d0', '#c8bfb0', '#c0a090', '#b88870', '#b07050'],
-        ['#c0c0c0', '#b8a890', '#b09070', '#a87850', '#a06030'],
+    # 颜色矩阵：行=bio（0-4），列=carbon（0-4），左下最浅，右上最深
+    color_matrix_hex = [
         ['#b0b0b0', '#a89880', '#a08060', '#986840', '#900820'],
+        ['#c0c0c0', '#b8a890', '#b09070', '#a87850', '#a06030'],
+        ['#d0d0d0', '#c8bfb0', '#c0a090', '#b88870', '#b07050'],
+        ['#e0e0e0', '#d8c8c0', '#d0b0a0', '#c89880', '#c08060'],
+        ['#f0f0f0', '#e8d7d0', '#e0bfb0', '#d8a790', '#d08f70'],
     ]
-    # 左下角就是最浅色：low-low,右上角就是最深色：high-high
-    # ✅ 构建 color_array，注意翻转
-    color_array = np.flipud(np.array([[to_rgb(c) for c in row] for row in color_matrix]))
+    color_matrix = np.array([[to_rgb(c) for c in row] for row in color_matrix_hex])
+    # 图例
+    output_legend = output_png.replace('.png', '_legend.png')
+    plot_bivariate_legend(color_matrix, save_path=output_legend)
 
-    # Remove this line: color_array = np.flipud(color_array)  # 🔄 翻转 Y 轴
 
     # 构建 RGB 图像
     rgb = np.zeros((carbon.shape[0], carbon.shape[1], 3))
+    # for i in range(n_bins):
+    #     for j in range(n_bins):
+    #         mask_ij = (biodiv_bin == i) & (carbon_bin == j)
+    #         rgb[mask_ij] = color_matrix[i, j]
+    #
+    # for i in range(n_bins):
+    #     for j in range(n_bins):
+    #         mask_ij = (biodiv_bin == (n_bins - 1 - i)) & (carbon_bin == j)
+    #         rgb[mask_ij] = color_matrix[i, j]
+
     for i in range(n_bins):
         for j in range(n_bins):
             mask_ij = (biodiv_bin == i) & (carbon_bin == j)
-            rgb[mask_ij] = color_array[j, i]
-    rgb[~mask] = np.nan  # 屏蔽背景
+            rgb[mask_ij] = color_matrix[n_bins - 1 - i, j]
+    rgb[~mask] = np.nan
 
-    # 显示图像
+    # 显示图像（不翻转）
     if show:
         plt.figure(figsize=(10, 8))
         plt.imshow(rgb)
@@ -154,18 +167,15 @@ def plot_bivariate_rgb_map(
     img.save(output_png, dpi=(dpi, dpi))
     print(f"✅ 图像已保存：{os.path.abspath(output_png)}")
 
-    # 图例
-    output_legend = output_png.replace('.png', '_legend.png')
-    plot_bivariate_legend(color_array, save_path=output_legend)
 
-def plot_bivariate_legend(color_array, labels=('Low', 'High'), figsize=(3, 3), save_path=None):
-    n = color_array.shape[0]
+def plot_bivariate_legend(color_matrix, labels=('Low', 'High'), figsize=(3, 3), save_path=None):
+    n = color_matrix.shape[0]
     fig, ax = plt.subplots(figsize=figsize)
 
     for i in range(n):
         for j in range(n):
-            color = color_array[i, j]  # ✅ 不翻转，确保左下是最浅色
-            ax.add_patch(plt.Rectangle((j, i), 1, 1, color=color))
+            ax.add_patch(plt.Rectangle((j, n - 1 - i), 1, 1, color=color_matrix[i, j]))
+            # 将 (i=0, j=0) 画在左下：行号 i 要从上往下翻
 
     ax.set_xticks([0, n - 1])
     ax.set_yticks([0, n - 1])

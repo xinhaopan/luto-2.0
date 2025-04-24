@@ -1,8 +1,8 @@
 INPUT_DIR = '../../../input'
 
-time = '20250416'
+time = '20250423'
 middle = ''
-suffix = '20'
+suffix = '1'
 # senerios = [
 #     'Run_16_GHG_1_8C_67_BIO_0',
 #     'Run_13_GHG_1_5C_50_BIO_0',
@@ -18,15 +18,15 @@ suffix = '20'
 run_number_origin = [7,4,1,8,5,2,9,6,3]
 run_number = [num for num in run_number_origin]
 senerios_origin = [
-    'GHG_1_8C_67_BIO_0',
-    'GHG_1_5C_50_BIO_0',
-    'GHG_1_5C_67_BIO_0',
-    'GHG_1_8C_67_BIO_3',
-    'GHG_1_5C_50_BIO_3',
-    'GHG_1_5C_67_BIO_3',
-    'GHG_1_8C_67_BIO_5',
-    'GHG_1_5C_50_BIO_5',
-    'GHG_1_5C_67_BIO_5',
+    'GHG_Low_BIO_Low',
+    'GHG_Moderate_BIO_Low',
+    'GHG_High_BIO_Low',
+    'GHG_Low_BIO_Moderate',
+    'GHG_Moderate_BIO_Moderate',
+    'GHG_High_BIO_Moderate',
+    'GHG_Low_BIO_High',
+    'GHG_Moderate_BIO_High',
+    'GHG_High_BIO_High',
 ]
 senerios = [f"Run_{num}_{senerio}" for num, senerio in zip(run_number, senerios_origin)]
 input_files = [
@@ -37,7 +37,7 @@ input_files = [
 # 子任务及对应颜色配置文件
 sub_tasks = [
     ('lumap_2050', 'ag_group_map'),
-    ('ammap_2050', 'am'),
+    ('ammap_2050_1', 'am'),
     ('non_ag_2050', 'non_ag')
 ]
 

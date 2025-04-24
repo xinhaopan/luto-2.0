@@ -19,7 +19,8 @@ def process_task(INPUT_NAME, source_name, colors_sheet):
         legend_png_name=legend_png_name,
         cfg=cfg
     )
-
+# for INPUT_NAME, source_name, colors_sheet in tasks:
+#     process_task(INPUT_NAME, source_name, colors_sheet)
 # 使用 joblib 的 Parallel 和 delayed 并行化任务
 results = Parallel(n_jobs=9, backend="loky")(
     delayed(process_task)(INPUT_NAME, source_name, colors_sheet)
