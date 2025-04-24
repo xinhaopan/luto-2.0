@@ -112,21 +112,21 @@ def get_biodiversity_target(input_files):
     bio_target_dict = get_dict_data(input_files, "biodiversity_targets", 'Score', 'Variable')
 
     # Find keys that contain the specified patterns
-    bio_0_key = next((k for k in bio_target_dict if '1_5C_67_BIO_0' in k), None)
-    bio_30_key = next((k for k in bio_target_dict if '1_5C_67_BIO_3' in k), None)
-    bio_50_key = next((k for k in bio_target_dict if '1_5C_67_BIO_5' in k), None)
+    # bio_0_key = next((k for k in bio_target_dict if '1_5C_67_BIO_0' in k), None)
+    bio_30_key = next((k for k in bio_target_dict if 'BIO_Moderate' in k), None)
+    bio_50_key = next((k for k in bio_target_dict if 'BIO_High' in k), None)
 
     # Extract the DataFrames corresponding to these keys
-    df_0 = bio_target_dict.get(bio_0_key)
+    # df_0 = bio_target_dict.get(bio_0_key)
     df_30 = bio_target_dict.get(bio_30_key)
     df_50 = bio_target_dict.get(bio_50_key)
 
     # Create a new DataFrame using the index from the first DataFrame
-    new_df = pd.DataFrame(index=df_0.index)
+    new_df = pd.DataFrame(index=df_30.index)
 
     # Extract 'Biodiversity score limit' column from each DataFrame
     # and add to the new DataFrame with the appropriate column names
-    new_df['0%'] = df_0['Biodiversity score limit']
+    # new_df['0%'] = df_0['Biodiversity score limit']
     new_df['30%'] = df_30['Biodiversity score limit']
     new_df['50%'] = df_50['Biodiversity score limit']
 

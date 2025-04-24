@@ -39,7 +39,7 @@ food_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_co
 # food_ag_group_dict = aggregate_by_mapping(food_ag_dict, 'tools/land use group.xlsx', 'desc', 'ag')
 food_ag_dict,legend_colors = get_colors(food_ag_dict, 'tools/land use colors.xlsx', sheet_name='ag')
 output_png = '../output/09_food_ag'
-y_range, y_ticks = calculate_y_axis_range(food_ag_dict)
+y_range, y_ticks = (0,200),[0,50,100,150,200]
 plot_Combination_figures(food_ag_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,

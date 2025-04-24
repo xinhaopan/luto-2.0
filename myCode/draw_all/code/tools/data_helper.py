@@ -23,39 +23,80 @@ def get_path(path_name):
         print(f"Error occurred while getting path for {path_name}: {e}")
         print(f"Current directory content for {output_path}: {os.listdir(output_path) if os.path.exists(output_path) else 'Directory not found'}")
 
+import pandas as pd
 
-def rename_and_filter_columns(data_dict, columns_to_keep, new_column_names=None):
+def fill_empty_dataframes(data_dict, fill_value=None, columns_to_fill=None):
     """
-    从字典中的每个 DataFrame 中保留指定列，并可选择性地将列名重命名。
+    对于字典中为空的 DataFrame，填充指定列，所有值设为 fill_value，保留原始索引。
 
     Parameters:
         data_dict (dict): 包含 DataFrame 的字典。
-        columns_to_keep (list): 需要保留的列名列表。
-        new_column_names (list, optional): 重命名后的列名列表。如果未提供，则不修改列名。
+        fill_value (any): 用于填充的值，例如 None、0、-10 等。
+        columns_to_fill (list): 要填充的列名列表。如果未提供，则跳过空表。
 
     Returns:
-        dict: 处理后的 DataFrame 的新字典。
+        dict: 处理后的 DataFrame 字典。
+    """
+    new_data_dict = {}
+
+    for key, df in data_dict.items():
+        if df.empty or df.shape[1] == 0:
+            if columns_to_fill is not None:
+                index = df.index if not df.index.empty else range(2010, 2051)
+                filled_df = pd.DataFrame(
+                    {col: [fill_value] * len(index) for col in columns_to_fill},
+                    index=index
+                )
+                new_data_dict[key] = filled_df
+            else:
+                # 如果没有提供 columns_to_fill，就跳过
+                new_data_dict[key] = df.copy()
+        else:
+            new_data_dict[key] = df.copy()
+
+    return new_data_dict
+
+
+import pandas as pd
+
+def rename_and_filter_columns(data_dict, columns_to_keep, new_column_names=None, default_value=None):
+    """
+    保留并重命名字典中每个 DataFrame 的指定列，如果缺列则添加并填充默认值。
+
+    Parameters:
+        data_dict (dict): 包含 DataFrame 的字典。
+        columns_to_keep (list): 要保留的列名。
+        new_column_names (list, optional): 新列名（与 columns_to_keep 对应）。
+        default_value (any): 如果某列不存在，用该值填充新列。
+
+    Returns:
+        dict: 处理后的新 DataFrame 字典。
     """
     if new_column_names and len(columns_to_keep) != len(new_column_names):
         raise ValueError("The lengths of `columns_to_keep` and `new_column_names` must match.")
 
     new_data_dict = {}
     for key, df in data_dict.items():
-        # 筛选指定列
-        filtered_df = df[columns_to_keep]
+        df_copy = df.copy()
 
-        # 重命名列（如果提供新名字）
+        for col in columns_to_keep:
+            if col not in df_copy.columns:
+                df_copy[col] = default_value  # 添加缺失列并赋默认值
+
+        filtered_df = df_copy[columns_to_keep]
+
         if new_column_names:
             filtered_df.columns = new_column_names
 
-        # 存入新字典
         new_data_dict[key] = filtered_df
 
     return new_data_dict
 
 
+
+
 def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
-                   condition_column_name=None, condition_value=None, use_parallel=True, n_jobs=-1):
+                   condition_column_name=None, condition_value=None, use_parallel=False, n_jobs=-1):
     """
     从多个文件中读取数据并按指定列分组求和，并可根据条件列进行筛选。
 
@@ -289,8 +330,8 @@ def concatenate_dicts_by_year(data_dicts):
 def parse_column_name(col):
     try:
         temp = col.split('_GHG_')[1].split('_BIO_')[0]  # 提取温度目标
-        bio = int(col.split('_BIO_')[1].split('_')[0]) * 10  # 提取 BIO 百分比
-        return f"{temp}", f"{bio}%"  # 返回多级索引 (温度目标, BIO 百分比)
+        bio = col.split('_BIO_')[1].split('_')[0]  # 提取 BIO 百分比
+        return f"{temp}", f"{bio}"  # 返回多级索引 (温度目标, BIO 百分比)
     except IndexError:
         raise ValueError(f"Invalid column format: {col}")
 
@@ -307,10 +348,10 @@ def sort_columns_by_priority(df):
     """
     # 解析列名
     parsed_columns = [parse_column_name(col) for col in df.columns]
-    priority = {'1_8C_67': 0, '1_5C_50': 1, '1_5C_67': 2}
+    order = {'Low': 0, 'Moderate': 1, 'High': 2}
 
     # 对列按温度目标和百分比排序
-    sorted_columns = sorted(parsed_columns, key=lambda x: (priority[x[0]], int(x[1].strip('%'))))
+    sorted_columns = sorted(parsed_columns, key=lambda x: (order[x[0]], order[x[1]]))
 
     # 根据排序结果重新排列列
     sorted_indices = [df.columns[list(parsed_columns).index(col)] for col in sorted_columns]
@@ -488,7 +529,6 @@ def compute_land_use_change_metrics(input_file, use_parallel=True):
         columns=['Year', 'Metric'],
         values='Value'
     )
-    # 保存结果到 Excel 文件
     excel_path = os.path.join("..", "output", "12_land_use_movement_all.xlsx")
     # 检查文件是否存在，根据情况选择写入模式
     if os.path.exists(excel_path):

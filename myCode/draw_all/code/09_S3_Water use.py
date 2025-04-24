@@ -103,7 +103,7 @@ csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value
 water_non_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Climate Change existence'], condition_value=['Without CCI'])
 water_non_ag_dict,legend_colors = get_colors(water_non_ag_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
 output_png = '../output/09_S3_water_non-ag'
-y_range, y_ticks = calculate_y_axis_range(water_non_ag_dict)
+y_range, y_ticks = calculate_y_axis_range(water_non_ag_dict,3)
 plot_Combination_figures(water_non_ag_dict, output_png, input_files, plot_stacked_bar, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,

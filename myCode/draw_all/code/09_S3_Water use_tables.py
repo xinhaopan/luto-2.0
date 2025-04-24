@@ -5,53 +5,48 @@ from tools.plot_helper import *
 from tools.parameters import *
 
 
-def create_summary_df(df):
-    data = []
-    for _, row in df.iterrows():
-        # 获取 Water Net Yield 的 2050 值
-        yield_2050 = next(
-            value
-            for entry in row['data']
-            if entry['name'] == "Water Net Yield"
-            for year, value in entry['data']
-            if year == 2050
-        )
+def compute_2050_water_difference_series(water_yield_dict, water_public_dict, water_limit_dict):
+    result_dict = {}
 
-        # 获取 Historical Limit 的 2050 值
-        limit = next(
-            value
-            for entry in row['data']
-            if entry['name'] == "Historical Limit"
-            for year, value in entry['data']
-            if year == 2050
-        )
+    common_keys = (
+        set(water_yield_dict.keys()) &
+        set(water_public_dict.keys()) &
+        set(water_limit_dict.keys())
+    )
+
+    for key in common_keys:
+        yield_df = water_yield_dict[key]
+        public_df = water_public_dict[key]
+        limit_df = water_limit_dict[key]
+
+        # 确保2050存在
+        if 2050 not in yield_df.index or 2050 not in public_df.index or 2050 not in limit_df.index:
+            continue
+
+        # 提取2050年行
+        yield_2050 = yield_df.loc[2050]
+        public_2050 = public_df.loc[2050]
+        limit_2050 = limit_df.loc[2050]
+
+        # 正确求交集
+        common_columns = yield_2050.index.intersection(public_2050.index).intersection(limit_2050.index)
 
         # 计算差值
-        difference = yield_2050 - limit
+        diff_series = yield_2050[common_columns] + public_2050[common_columns] - limit_2050[common_columns]
+        diff_series.name = "Difference"
+        diff_series.index.name = "Region Name"
 
-        # 添加数据行
-        data.append({
-            'Region Name': row['name'],
-            'Difference': difference / 1e6
-        })
+        result_dict[key] = diff_series
 
-    # 创建 DataFrame
-    summary_df = pd.DataFrame(data)
-    return summary_df
+    return result_dict
 
-json_name = 'water_3_water_net_yield_by_region'
-summary_dict = {}
-for input_name in input_files:
-    # 获取输入文件的基本路径
-    base_path = get_path(input_name)
 
-    # 创建以年份为索引的 DataFrame
-    file_path = os.path.join(base_path, 'DATA_REPORT', 'data', f'{json_name}.json')
-    df = pd.read_json(file_path)
-    summary_df = create_summary_df(df)
 
-    # 将 summary_df 的数据存储到字典中，键为 input_name
-    summary_dict[input_name] = summary_df.set_index("Region Name")["Difference"]
+csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)',  'region'
+water_yield_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Climate Change existence'], condition_value=['Without CCI'])
+water_public_dict = get_dict_data(input_files, 'water_yield_limits_and_public_land', value_column_name, 'REGION', condition_column_name=['Type','CCI Existence'], condition_value=['WNY Pubulic','HIST (ML)'])
+water_limit_dict = get_dict_data(input_files, 'water_yield_limits_and_public_land', value_column_name, 'REGION', condition_column_name=['Type'], condition_value=['WNY LIMIT'])
+summary_dict = compute_2050_water_difference_series(water_yield_dict, water_public_dict, water_limit_dict)
 
 # 合并所有 summary_df 的 Difference 列为一个 DataFrame
 merged_summary_df = pd.DataFrame(summary_dict)
