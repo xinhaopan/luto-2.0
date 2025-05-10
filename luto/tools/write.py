@@ -1968,6 +1968,7 @@ def write_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     write_GHG_npy(data, yr_cal, path)
     write_map_npy(data, yr_cal, path)
     write_GBF2_npy(data, yr_cal, path)
+    write_bio_score_npy(data, yr_cal, path)
     # write_rev_non_ag_npy(data, yr_cal, path)
 
 
@@ -1985,16 +1986,14 @@ def save_map_to_npy(data, product, filename_prefix, yr_cal, path):
     np.save(f"{full_path}", product)
     print(f'Map saved to {filename}')
 
-    '''
-    # Create the map array
-    map_arr = create_2d_map(data, product, filler = data.MASK_LU_CODE)
-
-    # Construct the filename and save the TIFF file
-    filename = f"{filename_prefix}_{yr_cal}.tiff"
-    full_path = os.path.join(path, filename)
-    write_gtiff(map_arr, full_path)
-    print(f"Map saved to {full_path}")
-    '''
+    # # Create the map array
+    # map_arr = create_2d_map(data, product, filler = data.MASK_LU_CODE)
+    #
+    # # Construct the filename and save the TIFF file
+    # filename = f"{filename_prefix}_{yr_cal}.tiff"
+    # full_path = os.path.join(path, filename)
+    # write_gtiff(map_arr, full_path)
+    # print(f"Map saved to {full_path}")
 
 
 def write_rev_cost_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
@@ -2471,5 +2470,38 @@ def write_GBF2_npy(data: Data, yr_cal, path):
     save_map_to_npy(data, bio_ag_r, 'BIO_ag', yr_cal, path)
     save_map_to_npy(data, bio_am_r, 'BIO_am', yr_cal, path)
     save_map_to_npy(data, bio_non_ag_r, 'BIO_non_ag', yr_cal, path)
+
+def write_bio_score_npy(data: Data, yr_cal, path):
+    yr_cal_previouse = sorted(data.lumaps.keys())[sorted(data.lumaps.keys()).index(yr_cal) - 1]
+    yr_idx = yr_cal - data.YR_CAL_BASE
+
+    # Get the decision variables for the year
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    ag_mam_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+
+    # Get the biodiversity scores b_mrj
+    bio_ag_priority_mrj = tools.ag_mrj_to_xr(data, ag_biodiversity.get_bio_overall_priority_score_matrices_mrj(data))
+    bio_am_priority_tmrj = tools.am_mrj_to_xr(data,
+                                              ag_biodiversity.get_agricultural_management_biodiversity_matrices(data,
+                                                                                                                bio_ag_priority_mrj.values,
+                                                                                                                yr_idx))
+    bio_non_ag_priority_rk = tools.non_ag_rk_to_xr(data,
+                                                   non_ag_biodiversity.get_breq_matrix(data, bio_ag_priority_mrj.values,
+                                                                                       data.lumaps[yr_cal_previouse]))
+
+    # Calculate the biodiversity scores
+    base_yr_score = np.einsum('j,mrj->', ag_biodiversity.get_ag_biodiversity_contribution(data), data.AG_L_MRJ)
+
+    priority_ag_r = (ag_dvar_mrj * bio_ag_priority_mrj).sum(['lm','lu'], skipna=False)
+
+    priority_am_r = (ag_mam_dvar_mrj * bio_am_priority_tmrj
+                   ).sum(['am','lm','lu'], skipna=False)
+
+    priority_non_ag_r = (non_ag_dvar_rk * bio_non_ag_priority_rk).sum(['lu'], skipna=False)
+
+    save_map_to_npy(data, priority_ag_r, 'PBIO_ag', yr_cal, path)
+    save_map_to_npy(data, priority_am_r, 'PBIO_am', yr_cal, path)
+    save_map_to_npy(data, priority_non_ag_r, 'PBIO_non_ag', yr_cal, path)
 
 

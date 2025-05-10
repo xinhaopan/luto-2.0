@@ -107,8 +107,8 @@ SIM_YERAS = list(range(2010,2051,1)) # range(2020,2050)
 
 
 # How does the model run over time
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -389,7 +389,7 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # ---------------------------------------------------------------------------- #
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
+GHG_EMISSIONS_LIMITS = 'off'        # 'on' or 'off'
 
 GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 
@@ -514,7 +514,7 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+BIODIVERSTIY_TARGET_GBF_2 = 'off'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIV_GBF_TARGET_2_DICT = {
