@@ -25,17 +25,24 @@ Pure helper functions and other tools.
 
 import sys
 import os.path
+import time
 import traceback
 import functools
 
 import pandas as pd
 import numpy as np
+import psutil
 import xarray as xr
 import numpy_financial as npf
-import luto.settings as settings
+import matplotlib.patches as patches
 
 from typing import Tuple
 from datetime import datetime
+from matplotlib import pyplot as plt
+
+import luto.settings as settings
+import luto.economics.agricultural.water as ag_water
+import luto.economics.non_agricultural.water as non_ag_water
 
 
 def write_timestamp():
@@ -197,6 +204,13 @@ def get_beccs_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 7)[0]
 
 
+def get_destocked_land_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all destocked land cells
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 8)[0]
+
+
 def get_unallocated_natural_lu_cells(data, lumap) -> np.ndarray:
     """
     Gets all cells being used for unallocated natural land uses.
@@ -301,8 +315,7 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
      
      
     """
-    import luto.economics.agricultural.water as ag_water
-    import luto.economics.non_agricultural.water as non_ag_water
+    
     yr_cal = data.YR_CAL_BASE + yr_idx
     l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     non_ag_cells = get_non_ag_cells(lumap)
@@ -403,6 +416,35 @@ def get_beef_code(data):
     """
     return data.DESC2AGLU['Beef - modified land']
 
+
+def get_natural_sheep_code(data):
+    """
+    Get the land use code (j) for 'Sheep - natural land'
+    """
+    return data.DESC2AGLU['Sheep - natural land']
+
+
+def get_natural_beef_code(data):
+    """
+    Get the land use code (j) for 'Beef - modified land'
+    """
+    return data.DESC2AGLU['Beef - natural land']
+
+
+def get_unallocated_natural_land_code(data):
+    """
+    Get the land use code (j) for 'Unallocated - natural land'
+    """
+    return data.DESC2AGLU['Unallocated - natural land']
+
+
+def get_cells_using_ag_landuse(lumap: np.ndarray, j: int) -> np.ndarray:
+    """
+    Gets the cells in the given 'lumap' using the land use indexed by 'j'
+    """
+    return np.where(lumap == j)[0]
+
+
 def ag_mrj_to_xr(data, arr):
     return xr.DataArray(
         arr,
@@ -460,6 +502,43 @@ def map_desc_to_dvar_index(category: str,
     df['dvar'] = [dvar_arr[:, j] for j in df['dvar_idx']]
 
     return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+
+
+def plot_t_mat(t_mat:xr.DataArray):
+
+    '''
+    Plot the transition matrix with hatched rectangles for NaN values.
+
+    Parameters
+    ----------
+    t_mat : xr.DataArray
+        The transition matrix to plot.
+
+    '''
+
+    # Set up plot
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Plot with imshow for correct alignment
+    im = ax.imshow(t_mat.values, cmap='viridis', origin='upper')
+
+    # Set tick positions and labels
+    ax.set_xticks(np.arange(len(t_mat.coords['to_lu'])))
+    ax.set_yticks(np.arange(len(t_mat.coords['from_lu'])))
+    ax.set_xticklabels(t_mat.coords['to_lu'].values, rotation=90)
+    ax.set_yticklabels(t_mat.coords['from_lu'].values)
+
+    # Move x labels to top
+    ax.xaxis.set_label_position('top')
+    ax.xaxis.tick_top()
+
+    # Draw hatched rectangles over NaNs
+    nrows, ncols = t_mat.shape
+    for i in range(nrows):
+        for j in range(ncols):
+            if np.isnan(t_mat[i, j]):
+                rect = patches.Rectangle((j - 0.5, i - 0.5), 1, 1, hatch='////', fill=False, edgecolor='gray', linewidth=0.0)
+                ax.add_patch(rect)
 
 
 def get_out_resfactor(dvar_path:str):
@@ -645,3 +724,28 @@ class LogToFile:
         def flush(self):
             # Ensure content is written to disk
             self.file.flush()
+
+
+
+def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
+    '''
+    Log the memory usage of the current process to a file.
+    Parameters
+        output_dir (str): The directory to save the memory log file.
+        mode (str): The mode to open the file. Default is 'a' (append).
+        interval (int): The interval in seconds to log the memory usage.
+    '''
+
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
+        while True:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            process = psutil.Process(os.getpid())
+            memory_usage = process.memory_info().rss
+            children = process.children(recursive=True)
+            # Include the memory usage of the child processes to get accurate memory usage under parallel processing
+            if children:
+                memory_usage += sum(child.memory_info().rss for child in children)
+            memory_usage /= (1024 * 1024 * 1024)
+            file.write(f'{timestamp}\t{memory_usage:.2f}\n')
+            file.flush()  # Ensure data is written to the file immediately
+            time.sleep(interval)
