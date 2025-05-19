@@ -20,13 +20,14 @@
 
 import os
 import xarray as xr
-import netCDF4
 import numpy as np
 import pandas as pd
 import rasterio
 import rasterio.features
 import geopandas as gpd
+import netCDF4 # necessary for running luto in Denethor
 
+from luto import tools
 import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
@@ -38,10 +39,6 @@ from affine import Affine
 from scipy.interpolate import interp1d
 
 from luto.tools.spatializers import upsample_array
-from luto.economics.agricultural.biodiversity import get_bio_overall_priority_score_matrices_mrj
-from luto.economics.agricultural.cost import get_cost_matrices
-from luto.economics.agricultural.revenue import get_rev_matrices
-
 
 
 def dict2matrix(d, fromlist, tolist):
@@ -193,19 +190,6 @@ class Data:
         self.COORD_LON_LAT_2D_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
         self.COORD_LON_LAT = [i[self.MASK] for i in self.COORD_LON_LAT_2D_FULLRES]  # Only keep the coordinates for the cells that are not masked out (i.e., land uses). 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only) and not masked out
         
-        # Get the resfactored lumap_2D as xarray DataArray
-        self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
-                self.LUMAP_2D_RESFACTORED,
-                dims=["y", "x"],
-                coords={
-                    "y": self.GEO_META['transform'].f + self.GEO_META['transform'].e * (np.arange(self.LUMAP_2D_RESFACTORED.shape[0]) + 0.5),
-                    "x": self.GEO_META['transform'].c + self.GEO_META['transform'].a * (np.arange(self.LUMAP_2D_RESFACTORED.shape[1]) + 0.5),
-                },
-                attrs={
-                    "crs": self.GEO_META['crs'],
-                    "transform": self.GEO_META['transform'],
-                }
-            )
 
 
         ###############################################################
@@ -230,10 +214,7 @@ class Data:
         self.AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(settings.INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
         self.NON_AGRICULTURAL_LANDUSES = list(settings.NON_AG_LAND_USES.keys())
 
-        self.NONAGLU2DESC = dict(zip(range(settings.NON_AGRICULTURAL_LU_BASE_CODE,
-                                    settings.NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES)),
-                            self.NON_AGRICULTURAL_LANDUSES))
-
+        self.NONAGLU2DESC = dict(zip(range(settings.NON_AGRICULTURAL_LU_BASE_CODE, settings.NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES)), self.NON_AGRICULTURAL_LANDUSES))
         self.DESC2NONAGLU = {value: key for key, value in self.NONAGLU2DESC.items()}
 
         # Get number of land-uses
@@ -244,6 +225,11 @@ class Data:
         self.AGLU2DESC = {i: lu for i, lu in enumerate(self.AGRICULTURAL_LANDUSES)}
         self.DESC2AGLU = {value: key for key, value in self.AGLU2DESC.items()}
         self.AGLU2DESC[-1] = 'Non-agricultural land'
+
+        # Combine ag and non-ag landuses
+        self.ALL_LANDUSES = self.AGRICULTURAL_LANDUSES + self.NON_AGRICULTURAL_LANDUSES
+        self.ALLDESC2LU = {**self.AGLU2DESC, **self.DESC2NONAGLU}
+        self.ALLLU2DESC = {**self.AGLU2DESC, **self.NONAGLU2DESC}
 
         # Some useful sub-sets of the land uses.
         self.LU_CROPS = [ lu for lu in self.AGRICULTURAL_LANDUSES if 'Beef' not in lu
@@ -262,6 +248,7 @@ class Data:
             self.DESC2AGLU["Unallocated - natural land"],
         ]
         self.LU_LVSTK_NATURAL = [lu for lu in self.LU_NATURAL if self.AGLU2DESC[lu] != 'Unallocated - natural land']
+        self.LU_LVSTK_NATURAL_DESC = [self.AGLU2DESC[lu] for lu in self.LU_LVSTK_NATURAL]
         self.LU_MODIFIED_LAND = [self.DESC2AGLU[lu] for lu in self.AGRICULTURAL_LANDUSES if self.DESC2AGLU[lu] not in self.LU_NATURAL]
         
         self.LU_CROPS_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_CROPS]
@@ -510,6 +497,8 @@ class Data:
                 ]
             ]
 
+
+
         ###############################################################
         # Livestock related data.
         ###############################################################
@@ -638,8 +627,8 @@ class Data:
         # Load BioChar data
         biochar_file = os.path.join(settings.INPUT_DIR, '20240918_Bundle_BC.xlsx')
         self.BIOCHAR_DATA = {}
-        cropping_data = pd.read_excel( biochar_file, sheet_name='Biochar (cropping)', index_col='Year' )
-        horticulture_data = pd.read_excel( biochar_file, sheet_name='Biochar (horticulture)', index_col='Year' )
+        cropping_data = pd.read_excel(biochar_file, sheet_name='Biochar (cropping)', index_col='Year' )
+        horticulture_data = pd.read_excel(biochar_file, sheet_name='Biochar (horticulture)', index_col='Year' )
 
         for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
                 'Winter cereals', 'Winter legumes', 'Winter oilseeds']:
@@ -701,7 +690,8 @@ class Data:
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(settings.INPUT_DIR, "ag_tmatrix.npy"))
-        
+        self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = np.load(os.path.join(settings.INPUT_DIR, "ag_to_destock_tmatrix.npy"))
+
   
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(settings.INPUT_DIR, "x_mrj.npy"))
@@ -713,6 +703,9 @@ class Data:
         # Non-agricultural data.
         ###############################################################
         print("\tLoading non-agricultural data...", flush=True)
+
+        # Load HIR mask
+        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
@@ -769,6 +762,77 @@ class Data:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             os.path.join(settings.INPUT_DIR, "ep_to_ag_tmatrix.npy")
         )  # shape: (28,)
+
+
+        ##############################################################
+        # Transition cost for all land use
+        #############################################################
+
+        # Transition matrix from ag
+        tmat_ag2ag_xr = xr.DataArray(
+            self.AG_TMATRIX,
+            dims=['from_lu','to_lu'],
+            coords={'from_lu':self.AGRICULTURAL_LANDUSES, 'to_lu':self.AGRICULTURAL_LANDUSES }
+        )
+        tmat_ag2non_ag_xr = xr.DataArray(
+            np.repeat(self.AG2EP_TRANSITION_COSTS_HA.reshape(-1,1), len(self.NON_AGRICULTURAL_LANDUSES), axis=1),
+            dims=['from_lu','to_lu'],
+            coords={'from_lu':self.AGRICULTURAL_LANDUSES, 'to_lu':self.NON_AGRICULTURAL_LANDUSES}
+        )
+        tmat_from_ag_xr = xr.concat([tmat_ag2ag_xr, tmat_ag2non_ag_xr], dim='to_lu')                        # Combine ag2ag and ag2non-ag
+        tmat_from_ag_xr.loc[:,'Destocked - natural land'] = self.AG_TO_DESTOCKED_NATURAL_COSTS_HA           # Ag to Destock-natural has its own values
+
+
+        # Transition matrix of non-ag to unallocated-modified land (land clearing)
+        tmat_wood_clear = np.load(os.path.join(settings.INPUT_DIR, 'transition_cost_clearing_forest.npz'))
+
+        tmat_clear_EP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
+        tmat_clear_RP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
+        tmat_clear_sheep_ag_forest = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.AF_PROPORTION
+        tmat_clear_beef_ag_forest = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.AF_PROPORTION
+        tmat_clear_CP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
+        tmat_clear_sheep_CP = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.CP_BELT_PROPORTION
+        tmat_clear_beef_CP = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.CP_BELT_PROPORTION
+        tmat_clear_BECCS = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
+        tmat_clear_destocked_nat = tmat_wood_clear['tmat_clear_light_wood'] + tmat_wood_clear['tmat_clear_dense_wood']
+
+        tmat_costs = np.array([
+            tmat_clear_EP, tmat_clear_RP, tmat_clear_sheep_ag_forest, tmat_clear_beef_ag_forest,
+            tmat_clear_CP, tmat_clear_sheep_CP, tmat_clear_beef_CP, tmat_clear_BECCS, tmat_clear_destocked_nat
+        ]).T
+
+
+
+
+        # Transition matrix from non-ag
+        tmat_non_ag2ag_xr = xr.DataArray(
+            np.repeat(self.EP2AG_TRANSITION_COSTS_HA.reshape(1,-1), len(self.NON_AGRICULTURAL_LANDUSES), axis=0),
+            dims=['from_lu','to_lu'],
+            coords={'from_lu':self.NON_AGRICULTURAL_LANDUSES, 'to_lu':self.AGRICULTURAL_LANDUSES }
+        )
+        tmat_non_ag2non_ag_xr = xr.DataArray(
+            np.full((len(self.NON_AGRICULTURAL_LANDUSES), len(self.NON_AGRICULTURAL_LANDUSES)), np.nan),
+            dims=['from_lu','to_lu'],
+            coords={'from_lu':self.NON_AGRICULTURAL_LANDUSES, 'to_lu':self.NON_AGRICULTURAL_LANDUSES }
+        )
+
+
+        np.fill_diagonal(tmat_non_ag2non_ag_xr.values, 0)                                                   # Lu staty the same has 0 cost
+        tmat_from_non_ag_xr = xr.concat([tmat_non_ag2ag_xr, tmat_non_ag2non_ag_xr], dim='to_lu')            # Combine non-ag2ag and non-ag2non-ag
+        tmat_from_non_ag_xr.loc['Destocked - natural land', 'Unallocated - natural land'] = np.nan          # Destocked-natural can not transit to unallow-natural
+
+
+
+
+        # Get the full transition cost matrix
+        self.T_MAT = xr.concat([tmat_from_ag_xr, tmat_from_non_ag_xr], dim='from_lu')
+        self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, [self.AGLU2DESC[i] for i in self.LU_NATURAL]] = np.nan       # non-ag2natural is not allowed
+        self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, 'Unallocated - modified land'] = tmat_costs                  # Clearing non-ag land requires such cost
+        self.T_MAT.loc['Destocked - natural land', self.LU_LVSTK_NATURAL_DESC] = self.T_MAT.loc['Unallocated - natural land', self.LU_LVSTK_NATURAL_DESC]   # Destocked-natural transits to LVSTK-natural has the same cost as unallocated-natural to LVSTK-natural
+
+
+        # tools.plot_t_mat(self.T_MAT)
+
 
 
         ###############################################################
@@ -913,21 +977,13 @@ class Data:
     
         # Load the natural land carbon data.
         nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
-        # Get the carbon sequestration in each natural land types
-        co2e_stock_unall_natural = np.array(
+
+        # Get the carbon stock of unallowcated natural land
+        self.CO2E_STOCK_UNALL_NATURAL = np.array(
             nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * fire_risk.to_numpy() / 100),
-            dtype=np.float32
-        )
-        co2e_stock_lvstk_natural = np.array(
-            co2e_stock_unall_natural - (0.3 * nat_land_CO2['NATURAL_LAND_AGB_TCO2_HA']) * (fire_risk.to_numpy() / 100),
-            dtype=np.float32
         )
 
-        # Get the carbon emissions from the one natural land to another
-        self.GHG_PENALTY_UNALL_NATURAL_TO_MODIFIED = co2e_stock_unall_natural
-        self.GHG_PENALTY_UNALL_NATURAL_TO_LVSTK_NATURAL = co2e_stock_unall_natural - co2e_stock_lvstk_natural
-        self.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL = co2e_stock_lvstk_natural - co2e_stock_unall_natural
-        self.GHG_PENALTY_LVSTK_NATURAL_TO_MODIFIED = co2e_stock_lvstk_natural
+
 
 
 
@@ -1097,10 +1153,9 @@ class Data:
             case 'HCAS':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HCAS_PERCENTILE}'].to_dict()       # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
                 unallow_nat_scale = bio_HCAS_contribution_lookup[self.DESC2AGLU['Unallocated - natural land']]                                      # Get the biodiversity degradation score for unallocated natural land (float)
-                bio_HCAS_contribution_lookup = {k:v*(1/unallow_nat_scale) for k,v in bio_HCAS_contribution_lookup.items()}                          # Normalise the biodiversity degradation score to the unallocated natural land score
+                bio_HCAS_contribution_lookup = {int(k):v*(1/unallow_nat_scale) for k,v in bio_HCAS_contribution_lookup.items()}                     # Normalise the biodiversity degradation score to the unallocated natural land score
             case 'USER_DEFINED':
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup[['lu', 'USER_DEFINED']]
-                bio_HCAS_contribution_lookup = {int(k):v for k,v in dict(bio_HCAS_contribution_lookup.values).items()}                              # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[ 'USER_DEFINED'].to_dict()
             case _:
                 raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
         
@@ -1136,174 +1191,160 @@ class Data:
         ###############################################################
         # Vegetation data (GBF3).
         ###############################################################
-        if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
-            print("\tLoading vegetation data...", flush=True)
-
-            # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
-            self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = pd.read_excel(
-                settings.INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
-                sheet_name = f'NVIS_{settings.NVIS_TARGET_CLASS}'
-            )
-
-            for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
-                if not all([
-                    row['USER_DEFINED_TARGET_PERCENT_2030'] >= 0,
-                    row['USER_DEFINED_TARGET_PERCENT_2050'] >= 0,
-                    row['USER_DEFINED_TARGET_PERCENT_2100'] >= 0]
-                ):
-                    raise ValueError(f"NVIS class {row['group']} has no user-defined targets for all years.")
-
-            self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['group']))
-            self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
-            self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
-            self.BIO_GBF3_N_CLASSES = self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA.shape[0]
+        
+        print("\tLoading vegetation data...", flush=True)
+        
+        # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
+        GBF3_targets_df = pd.read_excel(
+            settings.INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
+            sheet_name = f'NVIS_{settings.GBF3_TARGET_CLASS}'
+        ).sort_values(by='group', ascending=True)
 
 
-            # Read in vegetation layer data
-            NVIS_layers = xr.load_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.NVIS_TARGET_CLASS.split('_')[0]}.nc").values / 100  # divide by 100 to convert percentage to proportion
-            # NVIS_layers = np.array(Parallel(n_jobs=5)([delayed(self.get_exact_resfactored_arr)(arr.astype(np.float32)) for arr in NVIS_layers]))
-
-            # Apply Savanna Burning penalties
-            self.NVIS_LAYERS_LDS = np.where(
-                self.SAVBURN_ELIGIBLE,
-                NVIS_layers * settings.BIO_CONTRIBUTION_LDS,
-                NVIS_layers
-            )
-
-            # Container storing which cells apply to each major vegetation group
-            epsilon = 1e-5
-            self.MAJOR_VEG_INDECES = {
-                v: np.where(NVIS_layers[v] > epsilon)[0]
-                for v in range(NVIS_layers.shape[0])
-            }
+        if settings.BIODIVERSTIY_TARGET_GBF_3 == 'USER_DEFINED':
+            self.GBF3_GROUPS_SEL = [row['group'] for _,row in GBF3_targets_df.iterrows()
+                if all([
+                    row['USER_DEFINED_TARGET_PERCENT_2030']>0,
+                    row['USER_DEFINED_TARGET_PERCENT_2050']>0,
+                    row['USER_DEFINED_TARGET_PERCENT_2100']>0]
+                )]
+            self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = GBF3_targets_df.query('group.isin(@self.GBF3_GROUPS_SEL)')
+        else:
+            self.GBF3_GROUPS_SEL = GBF3_targets_df['group'].tolist()
+            self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = GBF3_targets_df.query('group.isin(@self.GBF3_GROUPS_SEL)')
+            self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS[[
+                'USER_DEFINED_TARGET_PERCENT_2030',
+                'USER_DEFINED_TARGET_PERCENT_2050',
+                'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGET_PERCENT
 
 
+        self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
+        self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
+        self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_GROUPS_SEL))
+        self.BIO_GBF3_N_CLASSES = len(self.GBF3_GROUPS_SEL)
+
+
+
+        # Read in vegetation layer data
+        NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.GBF3_TARGET_CLASS.split('_')[0]}.nc").sel(group=self.GBF3_GROUPS_SEL)
+        NVIS_layers = np.array([self.get_exact_resfactored_average_arr(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
+
+        # Apply Savanna Burning penalties
+        self.NVIS_LAYERS_LDS = np.where(
+            self.SAVBURN_ELIGIBLE,
+            NVIS_layers * settings.BIO_CONTRIBUTION_LDS,
+            NVIS_layers
+        )
+        
+        # Container storing which cells apply to each major vegetation group
+        epsilon = 1e-5
+        self.MAJOR_VEG_INDECES = {
+            v: np.where(NVIS_layers[v] > epsilon)[0]
+            for v in range(NVIS_layers.shape[0])
+        }
+            
+            
+ 
         
         ##########################################################################
         #  Biodiersity environmental significance (GBF4)                         #
         ##########################################################################
-        if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == 'on':
-            print("\tLoading environmental significance data for SNES...", flush=True)
+        print("\tLoading environmental significance data...", flush=True)
+        
+        # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4)
+        BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv').sort_values(by='SCIENTIFIC_NAME', ascending=True)
+        BIO_GBF4_ECNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv').sort_values(by='COMMUNITY', ascending=True)
+        
+        self.BIO_GBF4_SNES_LIKELY_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4_SNES_score.iterrows()
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']>0])]
+        
+        self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4_SNES_score.iterrows()
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
+                
+        self.BIO_GBF4_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4_ECNES_score.iterrows()
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']>0])]
+        
+        self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4_ECNES_score.iterrows()
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
+    
+        
+        if len(self.BIO_GBF4_SNES_LIKELY_SEL) == 0 or len(self.BIO_GBF4_ECNES_LIKELY_SEL) == 0:
+            raise ValueError("At least one of 'LIKELY' layers should be selected!")
+        
+        
+        likely_maybe_union = set(self.BIO_GBF4_SNES_LIKELY_SEL).intersection(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
+        if likely_maybe_union:
+            print(f"\tWARNING: {len(likely_maybe_union)} duplicate SNE species targets found, using 'LIKELY' targets only:")
+            print("\n".join(f"    {idx+1}) {name}" for idx, name in enumerate(likely_maybe_union)))
+            self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
+            
+            
+        likely_maybe_union = set(self.BIO_GBF4_ECNES_LIKELY_SEL).intersection(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
+        if likely_maybe_union:
+            print(f"\tWARNING: {len(likely_maybe_union)} duplicate ECNES species targets found, using 'LIKELY' targets only:")
+            print("\n".join(f"    {idx+1}) {name}" for idx, name in enumerate(likely_maybe_union)))
+            self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
+            
+            
+        self.BIO_GBF4_SNES_SEL_ALL = self.BIO_GBF4_SNES_LIKELY_SEL + self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL
+        self.BIO_GBF4_ECNES_SEL_ALL = self.BIO_GBF4_ECNES_LIKELY_SEL + self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL
+        self.BIO_GBF4_PRESENCE_SNES_SEL = ['LIKELY'] * len(self.BIO_GBF4_SNES_LIKELY_SEL) + ['LIKELY_MAYBE'] * len(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)    
+        self.BIO_GBF4_PRESENCE_ECNES_SEL = ['LIKELY'] * len(self.BIO_GBF4_ECNES_LIKELY_SEL) + ['LIKELY_MAYBE'] * len(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
 
-            # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4)
-            BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv')
-
-            self.BIO_GBF4_SNES_LIKELY_SEL = [row['SCIENTIFIC_NAME'] for _, row in BIO_GBF4_SNES_score.iterrows()
-                                             if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY'] > 0,
-                                                     row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY'] > 0,
-                                                     row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY'] > 0])]
-
-            self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = [row['SCIENTIFIC_NAME'] for _, row in
-                                                       BIO_GBF4_SNES_score.iterrows()
-                                                       if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE'] > 0,
-                                                               row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE'] > 0,
-                                                               row[
-                                                                   'USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE'] > 0])]
-
-            if len(self.BIO_GBF4_SNES_LIKELY_SEL) == 0:
-                raise ValueError("At least one of 'LIKELY' layers should be selected!")
-
-            likely_maybe_union = set(self.BIO_GBF4_SNES_LIKELY_SEL).intersection(
-                self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
-            if likely_maybe_union:
-                print(
-                    f"\tWARNING: {len(likely_maybe_union)} duplicate SNE species targets found, using 'LIKELY' targets only:")
-                print("\n".join(f"    {idx + 1}) {name}" for idx, name in enumerate(likely_maybe_union)))
-                self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = list(
-                    set(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
-
-            self.BIO_GBF4_SNES_SEL_ALL = self.BIO_GBF4_SNES_LIKELY_SEL + self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL
-            self.BIO_GBF4_PRESENCE_SNES_SEL = ['LIKELY'] * len(self.BIO_GBF4_SNES_LIKELY_SEL) + ['LIKELY_MAYBE'] * len(
-                self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
-
-            self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4_SNES_score.query(
-                f'SCIENTIFIC_NAME in {self.BIO_GBF4_SNES_LIKELY_SEL}')
-            self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_SNES_score.query(
-                f'SCIENTIFIC_NAME in {self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL}')
-
-            BIO_GBF4_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_SNES.nc', chunks={'species': 1})
-            snes_arr_likely = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_SEL, presence='LIKELY')
-            snes_arr_likely_maybe = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL,
-                                                             presence='LIKELY_AND_MAYBE')
-            snes_arr = xr.concat([snes_arr_likely, snes_arr_likely_maybe], dim='species')
-            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_exact_resfactored_arr(arr) for arr in snes_arr])
-
-        if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == 'on':
-            print("\tLoading environmental significance data for ECNES...", flush=True)
-
-            # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4)
-            BIO_GBF4_ECNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv')
-
-            self.BIO_GBF4_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _, row in BIO_GBF4_ECNES_score.iterrows()
-                                              if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY'] > 0,
-                                                      row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY'] > 0,
-                                                      row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY'] > 0])]
-
-            self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = [row['COMMUNITY'] for _, row in BIO_GBF4_ECNES_score.iterrows()
-                                                        if
-                                                        all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE'] > 0,
-                                                             row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE'] > 0,
-                                                             row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE'] > 0])]
-
-            if len(self.BIO_GBF4_ECNES_LIKELY_SEL) == 0:
-                raise ValueError("At least one of 'LIKELY' layers should be selected!")
-
-            likely_maybe_union = set(self.BIO_GBF4_ECNES_LIKELY_SEL).intersection(
-                self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
-            if likely_maybe_union:
-                print(
-                    f"\tWARNING: {len(likely_maybe_union)} duplicate ECNES species targets found, using 'LIKELY' targets only:")
-                print("\n".join(f"    {idx + 1}) {name}" for idx, name in enumerate(likely_maybe_union)))
-                self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = list(
-                    set(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
-
-            self.BIO_GBF4_ECNES_SEL_ALL = self.BIO_GBF4_ECNES_LIKELY_SEL + self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL
-            self.BIO_GBF4_PRESENCE_ECNES_SEL = ['LIKELY'] * len(self.BIO_GBF4_ECNES_LIKELY_SEL) + [
-                'LIKELY_MAYBE'] * len(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
-
-            self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4_ECNES_score.query(
-                f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_SEL}')
-            self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_ECNES_score.query(
-                f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL}')
-
-            BIO_GBF4_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_ECNES.nc', chunks={'species': 1})
-            ecnes_arr_likely = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_SEL, cell=self.MASK,
-                                                         presence='LIKELY').compute()
-            ecnes_arr_likely_maybe = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL,
-                                                               cell=self.MASK, presence='LIKELY_AND_MAYBE').compute()
-            ecnes_arr = xr.concat([ecnes_arr_likely, ecnes_arr_likely_maybe], dim='species')
-            self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_exact_resfactored_arr(arr) for arr in ecnes_arr])
-
-
-
+        self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4_SNES_score.query(f'SCIENTIFIC_NAME in {self.BIO_GBF4_SNES_LIKELY_SEL}')
+        self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_SNES_score.query(f'SCIENTIFIC_NAME in {self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL}')
+        self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_SEL}')
+        self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL}')
+        
+        BIO_GBF4_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_SNES.nc', chunks={'species':1})
+        snes_arr_likely = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_SEL, presence='LIKELY')
+        snes_arr_likely_maybe = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE')
+        snes_arr = xr.concat([snes_arr_likely, snes_arr_likely_maybe], dim='species')
+        self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_exact_resfactored_average_arr(arr) for arr in snes_arr])
+                
+        BIO_GBF4_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_ECNES.nc', chunks={'species':1})
+        ecnes_arr_likely = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_SEL, cell=self.MASK, presence='LIKELY').compute()
+        ecnes_arr_likely_maybe = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL, cell=self.MASK, presence='LIKELY_AND_MAYBE').compute()
+        ecnes_arr = xr.concat([ecnes_arr_likely, ecnes_arr_likely_maybe], dim='species')
+        self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_exact_resfactored_average_arr(arr) for arr in ecnes_arr])
+        
+  
+        
         ##########################################################################
         # Biodiersity species suitability under climate change (GBF8)            #
         ##########################################################################
-        if settings.BIODIVERSTIY_TARGET_GBF_8 == 'on':
-            print("\tLoading Species suitability data...", flush=True)
-
-            # Read in the species data from Carla Archibald (noted as GBF-8)
-            BIO_GBF8_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']
-            bio_GBF8_baseline_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES.csv')
-            bio_GBF8_target_percent = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET.csv')
-
-            self.BIO_GBF8_SEL_SPECIES = [row['species'] for _,row in bio_GBF8_target_percent.iterrows()
-                                          if all([row['USER_DEFINED_TARGET_PERCENT_2030']>0,
-                                                  row['USER_DEFINED_TARGET_PERCENT_2050']>0,
-                                                  row['USER_DEFINED_TARGET_PERCENT_2100']>0])]
-
-            self.BIO_GBF8_OUTSDIE_LUTO_SCORE_SPECIES = bio_GBF8_baseline_score.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
-            self.BIO_GBF8_OUTSDIE_LUTO_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES_group.csv')[['group', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
-
-            self.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES = bio_GBF8_target_percent.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')
-            self.BIO_GBF8_BASELINE_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET_group.csv')
-
-            self.BIO_GBF8_SPECIES_LAYER = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SEL_SPECIES).compute()
-            self.N_GBF8_SPECIES = len(self.BIO_GBF8_SEL_SPECIES)
-
-            self.BIO_GBF8_GROUPS_LAYER = xr.load_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit_group.nc')['data']
-            self.BIO_GBF8_GROUPS_NAMES = [i.capitalize() for i in self.BIO_GBF8_GROUPS_LAYER['group'].values]
-
+        print("\tLoading Species suitability data...", flush=True)
+        
+        # Read in the species data from Carla Archibald (noted as GBF-8)
+        BIO_GBF8_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
+        bio_GBF8_baseline_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES.csv').sort_values(by='species', ascending=True)
+        bio_GBF8_target_percent = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET.csv').sort_values(by='species', ascending=True)
+        
+        self.BIO_GBF8_SEL_SPECIES = [row['species'] for _,row in bio_GBF8_target_percent.iterrows() 
+                                      if all([row['USER_DEFINED_TARGET_PERCENT_2030']>0,
+                                              row['USER_DEFINED_TARGET_PERCENT_2050']>0,
+                                              row['USER_DEFINED_TARGET_PERCENT_2100']>0])]
+        
+        self.BIO_GBF8_OUTSDIE_LUTO_SCORE_SPECIES = bio_GBF8_baseline_score.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
+        self.BIO_GBF8_OUTSDIE_LUTO_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES_group.csv')[['group', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
+        
+        self.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES = bio_GBF8_target_percent.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')
+        self.BIO_GBF8_BASELINE_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET_group.csv')
+        
+        self.BIO_GBF8_SPECIES_LAYER = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SEL_SPECIES).compute()
+        self.N_GBF8_SPECIES = len(self.BIO_GBF8_SEL_SPECIES)
+        
+        self.BIO_GBF8_GROUPS_LAYER = xr.load_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit_group.nc')['data']
+        self.BIO_GBF8_GROUPS_NAMES = [i.capitalize() for i in self.BIO_GBF8_GROUPS_LAYER['group'].values]
+        
 
         ###############################################################
         # BECCS data.
@@ -1322,19 +1363,28 @@ class Data:
 
 
         ###############################################################
-        # Calculate base year production
+        # HIR data.
+        ###############################################################
+        print("\tLoading HIR data...", flush=True)
+
+        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK].astype(bool)
+
+
+        ###############################################################
+        # Calculate base year production 
         ###############################################################
 
         self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
-
+        
         print(f"\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
+        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)        
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
 
-        print("Data loading complete\n")
 
-
+        print("Data loading complete\n")     
+        
+           
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """
@@ -1365,10 +1415,10 @@ class Data:
             dict: The updated geographic metadata.
         """
         meta = self.GEO_META_FULLRES.copy()
-        height, width = (self.GEO_META_FULLRES['height'], self.GEO_META_FULLRES['width'])  if settings.WRITE_FULL_RES_MAPS else self.LUMAP_2D_RESFACTORED.shape
+        height, width =  self.LUMAP_2D_RESFACTORED.shape
         trans = list(self.GEO_META_FULLRES['transform'])
-        trans[0] = trans[0] if settings.WRITE_FULL_RES_MAPS else trans[0] * settings.RESFACTOR    # Adjust the X resolution
-        trans[4] = trans[4] if settings.WRITE_FULL_RES_MAPS else trans[4] * settings.RESFACTOR    # Adjust the Y resolution
+        trans[0] = trans[0] * settings.RESFACTOR    # Adjust the X resolution
+        trans[4] = trans[4] * settings.RESFACTOR    # Adjust the Y resolution
         trans = Affine(*trans)
         meta.update(width=width, height=height, compress='lzw', driver='GTiff', transform=trans, nodata=self.NODATA, dtype='float32')
         return meta
@@ -1501,12 +1551,12 @@ class Data:
 
         bio_habitat_target_proportion = [
             bio_habitat_score_base_yr_proportion + ((1 - bio_habitat_score_base_yr_proportion) * i)
-            for i in settings.BIODIV_GBF_TARGET_2_DICT.values()
+            for i in settings.GBF2_TARGET_DICT.values()
         ]
 
         targets_key_years = {
             self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
-            **dict(zip(settings.BIODIV_GBF_TARGET_2_DICT.keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
+            **dict(zip(settings.GBF2_TARGET_DICT.keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
         }
 
         f = interp1d(
@@ -1777,7 +1827,7 @@ class Data:
 
 
         # Create path name
-        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}_{settings.MODE}"
+        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
 
         # Get all paths
         paths = (
@@ -1787,17 +1837,16 @@ class Data:
         )  # Skip creating lucc_separate for base year
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
-        if settings.MODE == "timeseries":
-            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
-            paths = (
-                paths
-                + [self.path_begin_end_compare]
-                + [
-                    f"{self.path_begin_end_compare}/out_{years[0]}",
-                    f"{self.path_begin_end_compare}/out_{years[-1]}",
-                    f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
-                ]
-            )
+        self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
+        paths = (
+            paths
+            + [self.path_begin_end_compare]
+            + [
+                f"{self.path_begin_end_compare}/out_{years[0]}",
+                f"{self.path_begin_end_compare}/out_{years[-1]}",
+                f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
+            ]
+        )
 
         # Create all paths
         for p in paths:
@@ -1859,6 +1908,9 @@ class Data:
         j2p = {j: [p for p in range(self.NPRS) if self.LU2PR[p, j]]
                         for j in range(self.N_AG_LUS)}
         for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
+            if not settings.AG_MANAGEMENTS[am]:
+                continue
+
             am_j_list = [self.DESC2AGLU[lu] for lu in am_lus]
             current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
             for j in am_j_list:

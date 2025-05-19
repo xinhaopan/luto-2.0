@@ -30,7 +30,6 @@ from luto.economics.off_land_commodity import get_demand_df
 from luto.tools.report.data_tools import   get_all_files, get_quantity_df        
 from luto.tools.report.data_tools.helper_func import select_years
 
-from luto.tools.report.data_tools.colors import LANDUSE_ALL_COLORS, COMMODITIES_ALL_COLORS 
 from luto.tools.report.data_tools.parameters import (
     AG_LANDUSE, 
     COMMODITIES_ALL,
@@ -61,7 +60,7 @@ def save_report_data(raw_data_dir:str):
     SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
     
     # Select the years to reduce the column number to avoid cluttering in the multi-level axis graphing
-    years = sorted(settings.SIM_YERAS)
+    years = sorted(settings.SIM_YEARS)
     years_select = select_years(years)
     
     # Create the directory if it does not exist
@@ -77,12 +76,12 @@ def save_report_data(raw_data_dir:str):
 
     files['Year'] = files['Year'].astype(int)
     files = files.query('Year.isin(@years)')
-
+    
     # The land-use groupings to combine the land-use into a single category
     lu_group = pd.read_csv('luto/tools/report/Assets/lu_group.csv')
     lu_group_expand = lu_group.set_index(['Category', 'color_HEX']).apply(lambda x: x.str.split(', ').explode()).reset_index()
     
-
+    
     
     
     
@@ -137,7 +136,6 @@ def save_report_data(raw_data_dir:str):
     lu_area_dvar['type'] = 'column'
     lu_area_dvar['sort_index'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
     lu_area_dvar = lu_area_dvar.sort_values('sort_index').drop('sort_index', axis=1)
-    lu_area_dvar['color'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
     
     lu_area_dvar.to_json(f'{SAVE_DIR}/area_1_total_area_wide.json', orient='records')
 
@@ -202,7 +200,6 @@ def save_report_data(raw_data_dir:str):
         
     am_dvar_area_lu.columns = ['name','data']
     am_dvar_area_lu['type'] = 'column'
-    am_dvar_area_lu['color'] = am_dvar_area_lu['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
     am_dvar_area_lu.to_json(f'{SAVE_DIR}/area_5_am_lu_area_wide.json', orient='records')
 
 
@@ -336,8 +333,7 @@ def save_report_data(raw_data_dir:str):
                                     .reset_index()
                                     
     DEMAND_DATA_commodity_series.columns = ['name','data']
-    DEMAND_DATA_commodity_series['type'] = 'column' 
-    DEMAND_DATA_commodity_series['color'] = DEMAND_DATA_commodity_series['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
+    DEMAND_DATA_commodity_series['type'] = 'column'
     
     DEMAND_DATA_commodity_series = DEMAND_DATA_commodity_series.set_index('name').reindex(COMMODITIES_ALL).reset_index()
     DEMAND_DATA_commodity_series = DEMAND_DATA_commodity_series.dropna()
@@ -372,7 +368,6 @@ def save_report_data(raw_data_dir:str):
             
         DEMAND_DATA_on_off_commodity_wide.columns = ['name','data']
         DEMAND_DATA_on_off_commodity_wide['type'] = 'column'
-        DEMAND_DATA_on_off_commodity_wide['color'] = DEMAND_DATA_on_off_commodity_wide['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
 
         DEMAND_DATA_on_off_commodity_wide.to_json(f'{SAVE_DIR}/production_4_{idx+1}_demand_domestic_{on_off_land}_commodity.json', orient='records')
         
@@ -390,7 +385,6 @@ def save_report_data(raw_data_dir:str):
             
         DEMAND_DATA_commodity_wide.columns = ['name','data']
         DEMAND_DATA_commodity_wide['type'] = 'column'
-        DEMAND_DATA_commodity_wide['color'] = DEMAND_DATA_commodity_wide['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
         
         DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
         DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.dropna()
@@ -405,7 +399,7 @@ def save_report_data(raw_data_dir:str):
         and base_name == "quantity_comparison" 
         and year_types == "single_year"
     '''.replace('\n','').replace('    ','')
-
+    
     quantity_csv_paths = files.query(filter_str).reset_index(drop=True)
     quantity_df = get_quantity_df(quantity_csv_paths).query('Year.isin(@years)')
     quantity_df = quantity_df.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
@@ -417,7 +411,6 @@ def save_report_data(raw_data_dir:str):
         
     quantity_df_wide.columns = ['name','data']
     quantity_df_wide['type'] = 'column'
-    quantity_df_wide['color'] = quantity_df_wide['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
     
     quantity_df_wide = quantity_df_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
     quantity_df_wide = quantity_df_wide.dropna()
@@ -442,7 +435,7 @@ def save_report_data(raw_data_dir:str):
     mask = quantify_diff.groupby('Commodity')['Demand Achievement (%)'].transform(lambda x: (round(x) == 100).all())
     quantify_diff = quantify_diff[~mask]
 
-
+    
     quantify_diff_wide = quantify_diff\
         .groupby(['Commodity'])[['Year','Demand Achievement (%)']]\
         .apply(lambda x: list(map(list,zip(x['Year'],x['Demand Achievement (%)']))))\
@@ -1473,8 +1466,9 @@ def save_report_data(raw_data_dir:str):
     
         
     # ---------------- (GBF2) Biodiversity priority score  ----------------
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
-        
+    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off':
+        pass
+    else:
         # get biodiversity dataframe
         filter_str = '''
             category == "biodiversity" 
@@ -1551,8 +1545,9 @@ def save_report_data(raw_data_dir:str):
             
             
     # ---------------- (GBF3) Biodiversity Major Vegetation Group score  ----------------
-    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
-        
+    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'off':
+        pass
+    else:
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
@@ -1616,7 +1611,6 @@ def save_report_data(raw_data_dir:str):
             df.columns = ['name','data']
             df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
             df['type'] = 'column'
-            df['color'] = df['name'].apply(lambda x: LANDUSE_ALL_COLORS.get(x,'grey'))
             bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
             
         with open(f'{SAVE_DIR}/biodiversity_GBF3_3_contribution_group_score_by_landuse.json', 'w') as outfile:
@@ -1860,7 +1854,6 @@ def save_report_data(raw_data_dir:str):
             df.columns = ['name','data']
             df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
             df['type'] = 'column'
-            df['color'] = df['name'].apply(lambda x: LANDUSE_ALL_COLORS.get(x,'grey'))
             bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
             
         with open(f'{SAVE_DIR}/biodiversity_GBF8_3_contribution_group_score_by_landuse.json', 'w') as outfile:
@@ -1891,6 +1884,7 @@ def save_report_data(raw_data_dir:str):
             
         # Plot_GBF8_5: Biodiversity contribution score (group) by non-agricultural landuse
         bio_group_non_ag_sum = bio_df\
+            .query('Type == "Non-Agricultural land-use"')\
             .groupby(['Year','Landuse','Group'])\
             .sum(numeric_only=True)\
             .reset_index()
@@ -2006,6 +2000,7 @@ def save_report_data(raw_data_dir:str):
             
         # Plot_GBF8_10: Biodiversity contribution score (species) by non-agricultural landuse
         bio_species_non_ag_sum = bio_df\
+            .query('Type == "Non-Agricultural land-use"')\
             .groupby(['Year','Landuse','Species'])\
             .sum(numeric_only=True)\
             .reset_index()

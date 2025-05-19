@@ -38,13 +38,13 @@ from glob import glob
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
-from luto.tools.create_task_runs.helpers import log_memory_usage
 from luto.tools.write import write_outputs
 
 import luto.settings as settings
 
 from luto.tools import (
     LogToFile,
+    log_memory_usage,
     write_timestamp,
     read_timestamp
 )
@@ -73,7 +73,7 @@ def load_data() -> Data:
 @LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
 def run(
     data: Data, 
-    years = settings.SIM_YERAS,
+    years = settings.SIM_YEARS,
 ) -> None:
     """
     Run the simulation.
@@ -81,7 +81,7 @@ def run(
     Parameters
         - data: is a Data object which is previously loaded using load_data(),
         - years: is a list of years to run the simulation for. If not provided, it will
-            use the default years from settings.SIM_YERAS.
+            use the default years from settings.SIM_YEARS.
     """
     # Start recording memory usage
     memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
@@ -94,24 +94,13 @@ def run(
     print('\n')
     print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
         
-    # Sanity check
-    if data.YR_CAL_BASE not in years:
-        years.insert(0, data.YR_CAL_BASE)
+    # Insert the base year at the beginning of the years list if not already present
+    if data.YR_CAL_BASE not in years: years.insert(0, data.YR_CAL_BASE)
 
-    if settings.MODE == 'snapshot' and (len(years) > 2 or years[0] != data.YR_CAL_BASE):
-        raise ValueError(f"Snapshot mode only works with 2 years starting from {data.YR_CAL_BASE}. Please provide a base and target year.")
-
-    # Run the simulation up to `year` sequentially.
-    if settings.MODE == 'timeseries':
-        solve_timeseries(data, years)
-    elif settings.MODE == 'snapshot':
-        solve_snapshot(data, years[0], years[-1])
-    else:
-        raise ValueError(f"Unkown MODE: {settings.MODE}.")
+    # Solve and write output
+    solve_timeseries(data, years)
+    write_outputs(data)
     
-    # Save the data to disk
-    # write_outputs(data)
-
 
 
 def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
@@ -126,33 +115,34 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
         start_time = time.time()
 
         input_data = get_input_data(data, base_year, target_year)
-        d_c = data.D_CY[target_year - data.YR_CAL_BASE]
 
-        if step == 0:
-            luto_solver = LutoSolver(input_data, d_c)
-            luto_solver.formulate()
+        # if step == 0:
+        #     luto_solver = LutoSolver(input_data, d_c)
+        #     luto_solver.formulate()
 
-        if step > 0:
-            prev_base_year = years_to_run[step - 1]
+        # if step > 0:
+        #     prev_base_year = years_to_run[step - 1]
 
-            old_ag_x_mrj = luto_solver._input_data.ag_x_mrj.copy()
-            old_ag_man_lb_mrj = luto_solver._input_data.ag_man_lb_mrj.copy()
-            old_non_ag_x_rk = luto_solver._input_data.non_ag_x_rk.copy()
-            old_non_ag_lb_rk = luto_solver._input_data.non_ag_lb_rk.copy()
+        #     old_ag_x_mrj = luto_solver._input_data.ag_x_mrj.copy()
+        #     old_ag_man_lb_mrj = luto_solver._input_data.ag_man_lb_mrj.copy()
+        #     old_non_ag_x_rk = luto_solver._input_data.non_ag_x_rk.copy()
+        #     old_non_ag_lb_rk = luto_solver._input_data.non_ag_lb_rk.copy()
 
-            luto_solver.update_formulation(
-                input_data=input_data,
-                d_c=d_c,
-                old_ag_x_mrj=old_ag_x_mrj,
-                old_ag_man_lb_mrj=old_ag_man_lb_mrj,
-                old_non_ag_x_rk=old_non_ag_x_rk,
-                old_non_ag_lb_rk=old_non_ag_lb_rk,
-                old_lumap=data.lumaps[prev_base_year],
-                current_lumap=data.lumaps[base_year],
-                old_lmmap=data.lmmaps[prev_base_year],
-                current_lmmap=data.lmmaps[base_year],
-            )
+        #     luto_solver.update_formulation(
+        #         input_data=input_data,
+        #         d_c=d_c,
+        #         old_ag_x_mrj=old_ag_x_mrj,
+        #         old_ag_man_lb_mrj=old_ag_man_lb_mrj,
+        #         old_non_ag_x_rk=old_non_ag_x_rk,
+        #         old_non_ag_lb_rk=old_non_ag_lb_rk,
+        #         old_lumap=data.lumaps[prev_base_year],
+        #         current_lumap=data.lumaps[base_year],
+        #         old_lmmap=data.lmmaps[prev_base_year],
+        #         current_lmmap=data.lmmaps[base_year],
+        #     )
 
+        luto_solver = LutoSolver(input_data)
+        luto_solver.formulate()
         solution = luto_solver.solve()
 
         data.add_lumap(target_year, solution.lumap)
@@ -168,35 +158,6 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
 
-
-def solve_snapshot(data: Data, base_year: int, target_year: int):
-    if len(data.D_CY.shape) == 2:
-        d_c = data.D_CY[target_year - data.YR_CAL_BASE]       # Demands needs to be a timeseries from 2010 to target year
-    else:
-        d_c = data.D_CY
-
-    print("-------------------------------------------------")
-    print(f"Running for year {target_year}")
-    print("-------------------------------------------------")
-
-    start_time = time.time()
-    input_data = get_input_data(data, base_year, target_year)
-    luto_solver = LutoSolver(input_data, d_c, target_year)
-    luto_solver.formulate()
-
-    solution = luto_solver.solve()
-    data.add_lumap(target_year, solution.lumap)
-    data.add_lmmap(target_year, solution.lmmap)
-    data.add_ammaps(target_year, solution.ammaps)
-    data.add_ag_dvars(target_year, solution.ag_X_mrj)
-    data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
-    data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
-    data.add_obj_vals(target_year, solution.obj_val)
-
-    for data_type, prod_data in solution.prod_data.items():
-        data.add_production_data(target_year, data_type, prod_data)
-
-    print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n')
 
 
 def save_data_to_disk(data: Data, path: str, compress_level=9) -> None:

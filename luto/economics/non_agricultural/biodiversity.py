@@ -19,6 +19,7 @@
 
 import numpy as np
 
+from luto import settings
 from luto.data import Data
 from luto import tools
 from luto.settings import (
@@ -166,7 +167,40 @@ def get_biodiv_beef_carbon_plantings_belt(
 
 
 def get_biodiv_beccs(data: Data):
+    """
+    Parameters
+    ------
+    data: Data object.
+
+    Returns
+    ------
+    Numpy array indexed by r
+    """
     return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_BECCS
+
+
+def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
+    """
+    Parameters
+    ------
+    data: Data object.
+    ag_b_mrj: agricultural biodiversity matrix.
+
+    Returns
+    ------
+    Numpy array indexed by r
+    """
+    destock_b_contr = np.zeros(data.NCELLS)
+    to_lu = data.DESC2AGLU['Unallocated - natural land']
+
+    for from_lu in data.LU_LVSTK_NATURAL:
+        destock_b_contr[lumap == from_lu] = (
+            data.BIO_CONNECTIVITY_RAW[lumap == from_lu] 
+            * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu] - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu])
+            * data.REAL_AREA[lumap == from_lu]
+        )
+        
+    return destock_b_contr
 
 
 def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
@@ -190,6 +224,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
     sheep_carbon_plantings_belt_biodiv = get_biodiv_sheep_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r)
     beef_carbon_plantings_belt_biodiv = get_biodiv_beef_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r)
     beccs_biodiv = get_biodiv_beccs(data)
+    destocked_biodiv = get_biodiv_destocked_land(data, lumap)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_agr_b_matrices = [
@@ -201,6 +236,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
         sheep_carbon_plantings_belt_biodiv.reshape((data.NCELLS, 1)),
         beef_carbon_plantings_belt_biodiv.reshape((data.NCELLS, 1)),
         beccs_biodiv.reshape((data.NCELLS, 1)),
+        destocked_biodiv.reshape((data.NCELLS, 1)),
     ]
 
     return np.concatenate(non_agr_b_matrices, axis=1)
@@ -236,4 +272,6 @@ def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:
         ),
         # BECCS
         7: BIO_CONTRIBUTION_BECCS,
+        # Destocked land
+        8: data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_unallocated_natural_land_code(data)],
     }

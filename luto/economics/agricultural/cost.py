@@ -29,13 +29,14 @@ import itertools
 import numpy as np
 import pandas as pd
 
+from luto.data import Data
 import luto.settings as settings
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
 
 
-def get_cost_crop(data, lu, lm, yr_idx):
+def get_cost_crop(data:Data, lu, lm, yr_idx):
     """Return crop production cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
 
     Args:
@@ -142,7 +143,7 @@ def get_cost_crop(data, lu, lm, yr_idx):
                             columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))
 
 
-def get_cost_lvstk(data, lu, lm, yr_idx):
+def get_cost_lvstk(data:Data, lu, lm, yr_idx):
     """Return lvstk prodution cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
 
     Args:
@@ -201,7 +202,7 @@ def get_cost_lvstk(data, lu, lm, yr_idx):
                          columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))
 
 
-def get_cost(data, lu, lm, yr_idx):
+def get_cost(data:Data, lu, lm, yr_idx):
     """Return production cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
 
     Args:
@@ -231,7 +232,7 @@ def get_cost(data, lu, lm, yr_idx):
         raise KeyError(f"Land use '{lu}' not found in any LANDUSES")
 
 
-def get_cost_matrix(data, lm, yr_idx):
+def get_cost_matrix(data:Data, lm, yr_idx):
     """
     Return agricultural c_rj matrix <unit: $/cell> per lu under `lm` in `yr_idx`.
     
@@ -250,7 +251,7 @@ def get_cost_matrix(data, lm, yr_idx):
     return cost.fillna(0)
 
 
-def get_cost_matrices(data, yr_idx, aggregate=True):
+def get_cost_matrices(data:Data, yr_idx, aggregate=True):
     """
     Return agricultural c_mrj matrix <unit: $/cell> as 3D Numpy array.
 
@@ -279,7 +280,7 @@ def get_cost_matrices(data, yr_idx, aggregate=True):
 
 
 
-def get_asparagopsis_effect_c_mrj(data, yr_idx):
+def get_asparagopsis_effect_c_mrj(data:Data, yr_idx):
     """
     Applies the effects of using asparagopsis to the cost data
     for all relevant agricultural land uses.
@@ -318,7 +319,7 @@ def get_asparagopsis_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_precision_agriculture_effect_c_mrj(data, yr_idx):
+def get_precision_agriculture_effect_c_mrj(data:Data, yr_idx):
     """
     Applies the effects of using precision agriculture to the cost data
     for all relevant agr. land uses.
@@ -347,7 +348,7 @@ def get_precision_agriculture_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_ecological_grazing_effect_c_mrj(data, yr_idx):
+def get_ecological_grazing_effect_c_mrj(data:Data, yr_idx):
     """
     Applies the effects of using ecological grazing to the cost data
     for all relevant agr. land uses.
@@ -389,7 +390,7 @@ def get_ecological_grazing_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_savanna_burning_effect_c_mrj(data, yr_idx: int):
+def get_savanna_burning_effect_c_mrj(data:Data, yr_idx: int):
     """
     Applies the effects of using LDS Savanna Burning to the cost data
     for all relevant agr. land uses.
@@ -418,7 +419,7 @@ def get_savanna_burning_effect_c_mrj(data, yr_idx: int):
     return new_c_mrj
 
 
-def get_agtech_ei_effect_c_mrj(data, yr_idx):
+def get_agtech_ei_effect_c_mrj(data:Data, yr_idx):
     """
     Applies the effects of using AgTech EI to the cost data
     for all relevant agr. land uses.
@@ -447,7 +448,7 @@ def get_agtech_ei_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_biochar_effect_c_mrj(data, yr_idx: int):
+def get_biochar_effect_c_mrj(data:Data, yr_idx: int):
     """
     Applies the effects of using Biochar to the cost data
     for all relevant agr. land uses.
@@ -476,7 +477,47 @@ def get_biochar_effect_c_mrj(data, yr_idx: int):
     return new_c_mrj
 
 
-def get_agricultural_management_cost_matrices(data, c_mrj, yr_idx):
+def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
+
+    c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    for m, lm in enumerate(data.LANDMANS):
+        for lu_idx, lu in enumerate(land_uses):
+            # Quantity costs are reduced by 50% under HIR
+            lvstype, vegtype = lvs_veg_types(lu)
+            lvstype_capital = lvstype.capitalize()
+            yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+
+            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
+            c_mrj_effects[m, :, lu_idx] = (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
+
+    return c_mrj_effects + (settings.BEEF_HIR_MAINTAINANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
+
+
+def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
+
+    c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    for m, lm in enumerate(data.LANDMANS):
+        for lu_idx, lu in enumerate(land_uses):
+            # Quantity costs are reduced by 50% under HIR
+            lvstype, vegtype = lvs_veg_types(lu)
+            lvstype_capital = lvstype.capitalize()
+            yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+
+            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
+            c_mrj_effects[m, :, lu_idx] = (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
+
+    return c_mrj_effects + (settings.SHEEP_HIR_MAINTAINANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
+
+
+def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     """
     Calculate the cost matrices for different agricultural management practices.
 
@@ -495,6 +536,8 @@ def get_agricultural_management_cost_matrices(data, c_mrj, yr_idx):
     sav_burning_data = get_savanna_burning_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
     biochar_data = get_biochar_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
+    beef_hir_data = get_beef_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['HIR - Beef'] else 0
+    sheep_hir_data = get_sheep_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['HIR - Sheep'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -503,4 +546,6 @@ def get_agricultural_management_cost_matrices(data, c_mrj, yr_idx):
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
+        'HIR - Beef': beef_hir_data,
+        'HIR - Sheep': sheep_hir_data,
     }

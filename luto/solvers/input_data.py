@@ -52,6 +52,7 @@ class SolverInputData:
     """   
     base_year: int                                                      # The base year of this solving process
     target_year: int                                                    # The target year of this solving process
+    demand_c: np.ndarray                                                # The commodity demand of the target year
 
     ag_g_mrj: np.ndarray                                                # Agricultural greenhouse gas emissions matrices.
     ag_w_mrj: np.ndarray                                                # Agricultural water yields matrices.
@@ -88,6 +89,7 @@ class SolverInputData:
     GBF8_raw_species_area_sr: np.ndarray                                # Raw areas (GBF8) Species data - indexed by species (s) and cell (r).
 
     savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
+    hir_eligible_r: np.ndarray                                          # Cells that are eligible for the HIR agricultural management option. 
     priority_degraded_mask_idx: np.ndarray                                # Mask of priority degraded areas - indexed by cell (r).
 
     economic_contr_mrj: float                                           # base year economic contribution matrix.
@@ -188,6 +190,9 @@ class SolverInputData:
 
         return dict(cells2non_ag_lu) 
     
+def get_demand_c(data, target_year):
+    return data.D_CY[target_year - data.YR_CAL_BASE]
+    
 def get_ag_c_mrj(data: Data, target_index):
     print('Getting agricultural cost matrices...', flush = True)
     output = ag_cost.get_cost_matrices(data, target_index)
@@ -260,14 +265,14 @@ def get_ag_man_biodiv_impacts(data: Data, target_year: int) -> dict[str, dict[st
     return ag_biodiversity.get_ag_management_biodiversity_contribution(data, target_year)
 
 def get_GBF2_priority_degrade_area_r(data: Data) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_2 != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
         return np.empty(0)
     print('Getting priority degrade area matrices...', flush = True)
     output = ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data)
     return output
 
 def get_GBF3_MVG_area_vr(data: Data):
-    if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_3 == "off":
         return np.empty(0)
     print('Getting agricultural major vegetation groups matrices...', flush = True)
     output = ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data)
@@ -326,14 +331,14 @@ def get_non_ag_q_crk(data: Data, ag_q_mrp: np.ndarray, base_year: int):
 
 def get_ag_ghg_t_mrj(data: Data, base_year):
     print('Getting agricultural transitions GHG emissions...', flush = True)
-    output = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[base_year])
+    output = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
 def get_ag_t_mrj(data: Data, target_index, base_year):
     print('Getting agricultural transition cost matrices...', flush = True)
     
-    ag_t_mrj = ag_transition.get_transition_matrices(
+    ag_t_mrj = ag_transition.get_transition_matrices_from_base_year(
         data, 
         target_index, 
         base_year
@@ -342,14 +347,15 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
     return ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(ag_t_mrj).astype(np.float32)
 
 
-def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year):
+def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, ag_t_mrj):
     print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
     non_ag_t_mrj = non_ag_transition.get_from_ag_transition_matrix( 
         data, 
         target_index, 
         base_year, 
         data.lumaps[base_year], 
-        data.lmmaps[base_year]).astype(np.float32)
+        data.lmmaps[base_year],
+        ag_t_mrj).astype(np.float32)
     # Transition costs occures if the base year is not the target year
     return non_ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_t_mrj).astype(np.float32)
 
@@ -361,7 +367,8 @@ def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
         data, 
         target_index, 
         data.lumaps[base_year], 
-        data.lmmaps[base_year]).astype(np.float32)
+        data.lmmaps[base_year],
+    ).astype(np.float32)
     # Transition costs occures if the base year is not the target year
     return non_ag_to_ag_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_to_ag_mrj).astype(np.float32)
 
@@ -374,13 +381,13 @@ def get_non_ag_t_rk(data: Data, base_year):
 
 def get_ag_x_mrj(data: Data, base_year):
     print('Getting agricultural exclude matrices...', flush = True)
-    output = ag_transition.get_exclude_matrices(data, data.lumaps[base_year])
+    output = ag_transition.get_to_ag_exclude_matrices(data, data.lumaps[base_year])
     return output
 
 
-def get_non_ag_x_rk(data: Data, ag_x_mrj, base_year):
+def get_non_ag_x_rk(data: Data, base_year):
     print('Getting non-agricultural exclude matrices...', flush = True)
-    output = non_ag_transition.get_exclude_matrices(data, ag_x_mrj, data.lumaps[base_year])
+    output = non_ag_transition.get_to_non_ag_exclude_matrices(data, data.lumaps[base_year])
     return output
 
 
@@ -402,9 +409,9 @@ def get_ag_man_c_mrj(data: Data, target_index, ag_c_mrj: np.ndarray):
     return output
 
 
-def get_ag_man_g_mrj(data: Data, target_index, ag_g_mrj: np.ndarray):
+def get_ag_man_g_mrj(data: Data, target_index):
     print('Getting agricultural management options\' GHG emission effects...', flush = True)
-    output = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, target_index)
+    output = ag_ghg.get_agricultural_management_ghg_matrices(data, target_index)
     return output
 
 
@@ -563,6 +570,9 @@ def get_BASE_YR_production_t(data: Data):
 def get_savanna_eligible_r(data: Data) -> np.ndarray:
     return np.where(data.SAVBURN_ELIGIBLE == 1)[0]
 
+def get_hir_eligible_r(data: Data) -> np.ndarray:
+    return np.where(data.HIR_MASK == 1)[0]
+
 def get_priority_degraded_mask_idx(data: Data) -> np.ndarray:
     return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_MASK)[0]
 
@@ -588,15 +598,15 @@ def get_limits(
 
     # If biodiversity limits are not turned on, set the limit to 0.
     limits["GBF2_priority_degrade_areas"] = (
-        ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
-        if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on'
-        else 0
+        0
+        if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off'
+        else ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
     )
 
     limits["GBF_3_major_vegetation_groups"] = (
-        ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)
-        if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on'
-        else 0
+        0
+        if settings.BIODIVERSTIY_TARGET_GBF_3 == 'off'
+        else ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)
     )
 
     limits["GBF4_SNES"] = (
@@ -634,7 +644,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_c_mrj = get_ag_c_mrj(data, target_index)
     ag_r_mrj = get_ag_r_mrj(data, target_index)
     ag_t_mrj = get_ag_t_mrj(data, target_index, base_year)
-    ag_to_non_ag_t_rk = get_ag_to_non_ag_t_rk(data, target_index, base_year)
+    ag_to_non_ag_t_rk = get_ag_to_non_ag_t_rk(data, target_index, base_year, ag_t_mrj)
     
     non_ag_c_rk = get_non_ag_c_rk(data, ag_c_mrj, data.lumaps[base_year], target_year)
     non_ag_r_rk = get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year)
@@ -672,6 +682,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     return SolverInputData(
         base_year=base_year,
         target_year=target_year,
+        demand_c=get_demand_c(data, target_year),
         
         ag_g_mrj=ag_g_mrj,
         ag_w_mrj=ag_w_mrj,
@@ -683,11 +694,11 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
         non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR),  # Calculate non-ag water yield matrices based on historical water yield layers
         non_ag_b_rk=get_non_ag_b_rk(data, ag_b_mrj, base_year),
-        non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
+        non_ag_x_rk=get_non_ag_x_rk(data, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
         
-        ag_man_g_mrj=get_ag_man_g_mrj(data, target_index, ag_g_mrj),
+        ag_man_g_mrj=get_ag_man_g_mrj(data, target_index),
         ag_man_q_mrp=get_ag_man_q_mrj(data, target_index, ag_q_mrp),
         ag_man_w_mrj=get_ag_man_w_mrj(data, target_index),
         ag_man_b_mrj=get_ag_man_b_mrj(data, target_index, ag_b_mrj),
@@ -708,6 +719,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         GBF8_raw_species_area_sr=get_GBF8_species_area_sr(data, target_year),
 
         savanna_eligible_r=get_savanna_eligible_r(data),
+        hir_eligible_r=get_hir_eligible_r(data),
         priority_degraded_mask_idx=get_priority_degraded_mask_idx(data),
 
         economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs),
