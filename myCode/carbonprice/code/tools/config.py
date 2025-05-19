@@ -24,8 +24,10 @@ cost_dict = {
 # 创建 revenue_dict，主键从 cost 换成 revenue
 revenue_dict = {key.replace('cost', 'revenue'): value for key, value in cost_dict.items()}
 
-time = '20250430'
-suffix = '0_5'
+time = '20250510'
+refactor = '5'
+include_water_cost = '1'
+suffix = include_water_cost + '_' + refactor
 
 KEY_TO_COLUMN_MAP = {
     "opportunity_cost": "Opportunity Cost(M$)",
@@ -44,8 +46,8 @@ KEY_TO_COLUMN_MAP = {
 senerios = [
     'Run_1_on_on',
     'Run_2_on_off',
-    'Run_3_off_on',
-    'Run_4_off_off',
+    # 'Run_3_off_on',
+    # 'Run_4_off_off',
 ]
 input_files = [
     f"{time}_{senerio}_{suffix}"
@@ -59,7 +61,7 @@ name_dict = {
     "cost": {"title": "Cost", "unit": "(MAU$)"},
 }
 
-start_year = 2020
+start_year = 2010
 cost_columns = ["Opportunity Cost(M$)", "Transition AG2AG Cost(M$)", "Transition AG2Non-AG Cost(M$)",
                 "AM Net Cost(M$)", "Non-AG Net Cost(M$)"]
 

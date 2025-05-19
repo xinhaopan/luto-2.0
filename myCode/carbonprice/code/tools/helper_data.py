@@ -6,8 +6,8 @@ import re
 from joblib import Parallel, delayed
 from tqdm import *
 
-from .tools import get_path, get_year
-from .config import n_jobs,cost_dict,revenue_dict,cost_columns,KEY_TO_COLUMN_MAP
+from .tools import get_path, get_year, npy_to_map
+from .config import n_jobs,cost_dict,revenue_dict,cost_columns,KEY_TO_COLUMN_MAP,input_files,suffix
 
 
 def apply_operations_on_files(path_dir, files_with_ops):
@@ -22,11 +22,11 @@ def apply_operations_on_files(path_dir, files_with_ops):
 
     for file, operation in files_with_ops:
         file_path = os.path.join(path_dir, file)
-        if os.path.exists(file_path):
-            try:
+        if "restored" not in file_path:
+            if os.path.exists(file_path):
                 # 读取 .npy 文件
                 data = np.load(file_path)
-
+                data = np.nan_to_num(data, nan=0.0)
                 # 如果是第一次加载数据，初始化 total_sum
                 if total_sum is None:
                     total_sum = data if operation == '+' else -data
@@ -35,9 +35,10 @@ def apply_operations_on_files(path_dir, files_with_ops):
                         total_sum += data
                     elif operation == '-':
                         total_sum -= data
-            except Exception as e:
-                print(f"Error loading file {file_path}: {e}")
-                # 如果读取失败，将值补充为 0
+
+            else:
+                print(f"File not found: {file_path}")
+                # 如果文件不存在，将值补充为 0
                 if total_sum is None:
                     total_sum = np.zeros(1) if operation == '+' else -np.zeros(1)
                 else:
@@ -45,16 +46,6 @@ def apply_operations_on_files(path_dir, files_with_ops):
                         total_sum += np.zeros(1)
                     elif operation == '-':
                         total_sum -= np.zeros(1)
-        else:
-            print(f"File not found: {file_path}")
-            # 如果文件不存在，将值补充为 0
-            if total_sum is None:
-                total_sum = np.zeros(1) if operation == '+' else -np.zeros(1)
-            else:
-                if operation == '+':
-                    total_sum += np.zeros(1)
-                elif operation == '-':
-                    total_sum -= np.zeros(1)
 
     return total_sum
 
@@ -244,12 +235,11 @@ def calculate_baseline_costs(input_file, use_parallel=False,output=True):
     columns_name = ["Year", "cost_ag(M$)", "cost_am(M$)", "cost_non_ag(M$)", "cost_transition_ag2ag(M$)","cost_transition_ag2non_ag(M$)",
                     "cost_amortised_transition_ag2non_ag(M$)","revenue_ag(M$)","revenue_am(M$)","revenue_non_ag(M$)",
                     "GHG_ag(MtCOe2)", "GHG_am(MtCOe2)", "GHG_non-ag(MtCOe2)", "GHG_transition(MtCOe2)",
-                    "BIO_ag(M ha)", "BIO_am(M ha)", "BIO_non_ag(M ha)"]
+                    "PBIO_ag(M ha)", "PBIO_am(M ha)", "PBIO_non_ag(M ha)"]
 
     save_path = os.path.join(path_name, "data_for_carbon_price")
     os.makedirs(save_path, exist_ok=True)
 
-    results = []
     prefixes = columns_name[1:]
 
     # 生成所有 (year, prefix) 任务
@@ -301,11 +291,10 @@ def compute_unit_prices(input_file, output=True):
     years = get_year(path_name)
     path_dir = os.path.join(path_name, "data_for_carbon_price")
     save_path = os.path.join(path_name, "data_for_carbon_price")
-    print("Start to calculate Discriminatory carbon price.")
+    print("Start to calculate unit price.")
 
     # 定义固定的字段名称，确保顺序和一致性
-    columns_name = ["Year"] + cost_columns + ["All cost(M$)","BIO cost(M$)", "GHG Abatement(MtCOe2)", "BIO(Mha)",
-                                              "carbon price($/tCOe2)","biodiversity price($/ha)"]
+    columns_name = ["Year"] + cost_columns + ["All cost(M$)", "GHG Abatement(MtCOe2)", "BIO(Mha)"]
     results = []
 
     for year in trange(years[1], years[-1] + 1):
@@ -340,40 +329,17 @@ def compute_unit_prices(input_file, output=True):
                                                   ("transition_ag2non-ag_cost_" + str(year), '+'), ("am_net_cost_" + str(year), '+'),
                                                   ("non_ag_net_cost_" + str(year), '+')],
                                                  "cost", year, row_data)
-        cost_arr = np.load(os.path.join(path_dir, f"cost_{year}.npy"))
 
         row_data = process_files_with_operations(path_dir, save_path,
                                                  [("GHG_ag_" + str(year), '+'), ("GHG_ag_" + str(year - 1), '-'),
                                                   ("GHG_am_" + str(year), '+'), ("GHG_non-ag_" + str(year), '+'),
                                                   ("GHG_transition_" + str(year), '+')],
                                                  "ghg", year, row_data, negate=True)
-        ghg_arr = np.load(os.path.join(path_dir, f"ghg_{year}.npy"))
 
         row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("BIO_ag_" + str(year), '-'),
-                                                  ("BIO_am_" + str(year), '-'), ("BIO_non_ag_" + str(year), '-')],
-                                                 "bio", year, row_data, negate=True)
-        bio_arr = np.load(os.path.join(path_dir, f"bio_{year}.npy"))
-
-        # 计算 cp_arr 和 bp_arr
-        with np.errstate(divide='ignore', invalid='ignore'):
-            cp_arr = np.divide(cost_arr, ghg_arr)
-            cp_arr[np.isinf(cp_arr)] = 0
-            cp_arr = np.nan_to_num(cp_arr, nan=0.0)
-
-            bp_arr = np.divide(cost_arr, bio_arr)
-            bp_arr[np.isinf(bp_arr)] = 0
-            bp_arr = np.nan_to_num(bp_arr, nan=0.0)
-
-        # 添加计算结果到字典
-        row_data["carbon_price"] = np.sum(cp_arr * ghg_arr) / np.sum(ghg_arr)
-        row_data["biodiversity_cost"] = np.sum(bp_arr * bio_arr) / 1e6
-        row_data["biodiversity_price"] = np.sum(bp_arr * bio_arr) / np.sum(bio_arr)
-
-        # 保存 .npy 文件
-        np.save(os.path.join(save_path, f"cp_{year}.npy"), cp_arr)
-        np.save(os.path.join(save_path, f"bio_cost_{year}.npy"), cp_arr)
-        np.save(os.path.join(save_path, f"bp_{year}.npy"), bp_arr)
+                                                 [("PBIO_ag_" + str(year), '+'),("PBIO_ag_" + str(year - 1), '-'),
+                                                  ("PBIO_am_" + str(year), '+'), ("PBIO_non_ag_" + str(year), '+')],
+                                                 "bio", year, row_data, negate=False)
 
         # 将字典结果追加到列表
         results.append(row_data)
@@ -389,6 +355,114 @@ def compute_unit_prices(input_file, output=True):
         df_results.to_excel(output_excel_path, index=False)
     return df_results
 
+
+
+
+
+def calculate_year_data(year, ghg_bio_path, ghg_path):
+    """
+    计算单年的生物多样性和碳排放数据，并返回结果。
+    """
+    try:
+        # 加载数据
+        cost_all = np.load(os.path.join(ghg_bio_path, f"cost_{year}.npy"))
+        cost_ghg = np.load(os.path.join(ghg_path, f"cost_{year}.npy"))
+        cost_bio = cost_all - cost_ghg
+
+        ghg_arr = np.load(os.path.join(ghg_path, f"ghg_{year}.npy"))
+        bio_arr = np.load(os.path.join(ghg_bio_path, f"bio_{year}.npy"))
+
+        # 计算价格
+        price_bio = cost_bio / bio_arr
+        price_carbon = cost_ghg / ghg_arr
+
+        # 保存每年的中间数据
+        save_data(f"../data/bio_cost_{year}.npy", cost_bio)
+        save_data(f"../data/carbon_cost_{year}.npy", cost_ghg)
+        save_data(f"../data/bio_price_{year}.npy", price_bio)
+        save_data(f"../data/carbon_price_{year}.npy", price_carbon)
+        save_data(f"../data/bio_{year}.npy", bio_arr)
+        save_data(f"../data/ghg_{year}.npy", ghg_arr)
+
+        # 返回计算结果
+        return {
+            "Year": year,
+            "Carbon cost(M$)": cost_ghg.sum() / 1e6,
+            "Biodiversity cost(M$)": cost_bio.sum() / 1e6,
+            "GHG abatement(MtCO2e)": ghg_arr.sum() / 1e6,
+            "Biodiversity score(Mha)": bio_arr.sum() / 1e6,
+            "Carbon price($/tCO2e)": cost_ghg.sum() / ghg_arr.sum(),
+            "Biodiversity price($/ha)": cost_bio.sum() / bio_arr.sum()
+        }
+
+    except Exception as e:
+        print(f"Error processing year {year}: {e}")
+        return None
+
+
+def calculate_bio_price(input_files, enable_parallel=True, n_jobs=-1):
+    """
+    计算生物多样性价格 (Biodiversity price)，支持并行处理。
+
+    参数:
+    - input_files: 输入文件列表。
+    - enable_parallel: 是否启用并行处理。
+    - n_jobs: 并行处理的工作线程数（默认为使用所有可用线程）。
+    """
+    print("Start to calculate biodiversity price.")
+
+    # 获取路径和年份范围
+    path_name = get_path(input_files[0])
+    years = get_year(path_name)
+    ghg_bio_path = os.path.join(get_path(input_files[0]), "data_for_carbon_price")
+    ghg_path = os.path.join(get_path(input_files[1]), "data_for_carbon_price")
+
+    # 初始化结果 DataFrame
+    df_columns = [
+        "Year", "Carbon cost(M$)", "Biodiversity cost(M$)",
+        "GHG abatement(MtCO2e)", "Biodiversity score(Mha)",
+        "Carbon price($/tCO2e)", "Biodiversity price($/ha)"
+    ]
+
+    # 使用并行或串行计算年度数据
+    if enable_parallel:
+        print("Running in parallel mode...")
+        results = Parallel(n_jobs=n_jobs, backend="loky")(
+            delayed(calculate_year_data)(year, ghg_bio_path, ghg_path)
+            for year in tqdm(range(years[1], years[-1] + 1), desc="Processing years")
+        )
+    else:
+        print("Running in sequential mode...")
+        results = [
+            calculate_year_data(year, ghg_bio_path, ghg_path)
+            for year in tqdm(range(years[1], years[-1] + 1), desc="Processing years")
+        ]
+
+    # 过滤掉返回值为 None 的结果
+    results = [result for result in results if result is not None]
+
+    # 转换为 DataFrame
+    df = pd.DataFrame(results, columns=df_columns)
+
+    # 保存结果到 Excel 文件
+    output_path =  f"../output/03_price_{suffix}.xlsx"
+    try:
+        df.to_excel(output_path, index=False)
+        print(f"Results saved to {output_path}")
+    except Exception as e:
+        print(f"Failed to save results: {e}")
+
+def save_data(file_path, data):
+    """
+    保存中间数据，增加异常处理。
+    """
+    try:
+        np.save(file_path, data)
+        output_tif = file_path.replace(".npy", ".tif")
+        proj_file = os.path.join(get_path(input_files[1]), "out_2050", "ammap_2050.tiff")
+        npy_to_map(file_path, output_tif, proj_file)
+    except Exception as e:
+        print(f"Failed to save file {file_path}: {e}")
 
 def calculate_shadow_price(input_file,percentile_num=95,mask_use=True, output=True):
     print("Start to calculate Uniform carbon price.")
@@ -423,7 +497,9 @@ def calculate_shadow_price(input_file,percentile_num=95,mask_use=True, output=Tr
         if mask_use:
             mask = bio_arr >= 1
             bp_arr1 = bp_arr[mask]
-        bio_price_uniform = np.percentile(bp_arr1, percentile_num)
+            bio_price_uniform = np.percentile(bp_arr1, percentile_num)
+        else:
+            bio_price_uniform = np.percentile(bp_arr, percentile_num)
         total_bio = np.sum(bio_arr)
         total_bio_uniform = bio_price_uniform * total_bio
         total_bio_discriminatory = np.sum(bp_arr * bio_arr)
@@ -562,3 +638,284 @@ def calculate_carbonprice_compare(path_name,percentiles = [100, 99, 98, 97, 96, 
 
     print(f"Results saved to {output_excel_path}")
 
+import numpy as np
+import rasterio
+import os
+
+def compute_and_save_class_metrics(output_dir='../Hexagon'):
+    def read_tif(filename):
+        with rasterio.open(filename) as src:
+            arr = src.read(1)
+            nodata_value = src.nodata
+            nan_mask = (arr == nodata_value) if nodata_value is not None else np.isnan(arr)
+            return arr, src.profile, nan_mask
+
+    # 读取数据
+    class_arr, profile, nan_mask = read_tif(os.path.join(output_dir, "Hexagonal.tif"))
+    ghg, _, _  = read_tif(os.path.join("../data", "ghg_2050.tif"))
+    carbon_cost, _, _ = read_tif(os.path.join("../data", "carbon_cost_2050.tif"))
+    bio, _, _ = read_tif(os.path.join("../data", "bio_2050.tif"))
+    bio_cost, _, _ = read_tif(os.path.join("../data", "bio_cost_2050.tif"))
+
+    n_rows, n_cols = class_arr.shape
+
+    # 初始化输出数组
+    total_carbon_cost_raster = np.zeros_like(class_arr, dtype=np.float32)
+    total_bio_cost_raster = np.zeros_like(class_arr, dtype=np.float32)
+    carbon_price_raster = np.zeros_like(class_arr, dtype=np.float32)
+    bio_price_raster = np.zeros_like(class_arr, dtype=np.float32)
+
+    unique_classes = np.unique(class_arr)
+    unique_classes = unique_classes[unique_classes != 0]
+
+    for cls in unique_classes:
+        # 找到这一类所有坐标位置
+        indices = np.argwhere(class_arr == cls)
+
+        # 有效索引：确保不越界 & bio 和 bio_cost 不是 nan
+        valid_rows = []
+        valid_cols = []
+
+        for row, col in indices:
+            if row < bio.shape[0] and col < bio.shape[1]:
+                b = bio[row, col]
+                bc = bio_cost[row, col]
+                if not np.isnan(b) and not np.isnan(bc):
+                    valid_rows.append(row)
+                    valid_cols.append(col)
+
+        if not valid_rows:
+            continue  # 无有效数据，跳过
+
+        valid_rows = np.array(valid_rows)
+        valid_cols = np.array(valid_cols)
+
+        # 提取有效值
+        ghg_vals = ghg[valid_rows, valid_cols]
+        bio_vals = bio[valid_rows, valid_cols]
+        carbon_cost_vals = carbon_cost[valid_rows, valid_cols]
+        bio_cost_vals = bio_cost[valid_rows, valid_cols]
+
+        # 计算总量与价格
+        ghg_sum = np.sum(ghg_vals)
+        bio_sum = np.sum(bio_vals)
+        carbon_cost_sum = np.sum(carbon_cost_vals)
+        bio_cost_sum = np.sum(bio_cost_vals)
+
+        carbon_price = carbon_cost_sum / ghg_sum if ghg_sum != 0 else 0
+        bio_price = bio_cost_sum / bio_sum if bio_sum != 0 else 0
+
+        # 所有属于该类的像元赋相同值
+        class_mask = (class_arr == cls)
+        total_carbon_cost_raster[class_mask] = carbon_cost_sum
+        total_bio_cost_raster[class_mask] = bio_cost_sum
+        carbon_price_raster[class_mask] = carbon_price
+        bio_price_raster[class_mask] = bio_price
+
+    # 将 class_arr 中为 NaN 的位置，设为 NaN
+    total_carbon_cost_raster[nan_mask] = np.nan
+    total_bio_cost_raster[nan_mask] = np.nan
+    carbon_price_raster[nan_mask] = np.nan
+    bio_price_raster[nan_mask] = np.nan
+
+    def write_tif(filename, array, profile):
+        profile.update(dtype=rasterio.float32, count=1, nodata=np.nan)
+        with rasterio.open(filename, 'w', **profile) as dst:
+            dst.write(array, 1)
+
+    write_tif(os.path.join(output_dir, "total_carbon_cost.tif"), total_carbon_cost_raster, profile)
+    write_tif(os.path.join(output_dir, "total_bio_cost.tif"), total_bio_cost_raster, profile)
+    write_tif(os.path.join(output_dir, "carbon_price.tif"), carbon_price_raster, profile)
+    write_tif(os.path.join(output_dir, "bio_price.tif"), bio_price_raster, profile)
+
+    print("✅ All output files saved to", output_dir)
+
+
+import numpy as np
+import rasterio
+import geopandas as gpd
+from rasterio.features import rasterize
+import os
+
+
+def compute_class_metrics_from_shapefile(shapefile_path, ref_raster_path, output_dir):
+    """
+    从 shapefile 中计算每个区域的 bio, bio_cost, carbon_price, ghg 等指标，并生成对应的 TIF 文件。
+
+    参数:
+        shapefile_path (str): 输入的 shapefile 文件路径。
+        ref_raster_path (str): 参考栅格路径，用于确定输出 TIF 文件的形状和投影。
+        output_dir (str): 输出 TIF 文件保存目录。
+
+    输出:
+        生成的 4 个 TIF 文件，分别为 total_carbon_cost.tif、total_bio_cost.tif、carbon_price.tif 和 bio_price.tif。
+    """
+
+    # 1. 读取参考栅格（用于确定 shape、transform、crs 等信息）
+    with rasterio.open(ref_raster_path) as ref:
+        ref_shape = ref.shape
+        ref_transform = ref.transform
+        ref_crs = ref.crs
+        ref_profile = ref.profile
+
+    # 2. 读取生物和碳数据
+    def read_tif(path):
+        with rasterio.open(path) as src:
+            arr = src.read(1)
+            return arr
+
+    ghg = read_tif("../data/ghg_2050.tif")
+    carbon_cost = read_tif("../data/carbon_cost_2050.tif")
+    bio = read_tif("../data/bio_2050.tif")
+    bio_cost = read_tif("../data/bio_cost_2050.tif")
+
+    # 3. 读取 shapefile
+    gdf = gpd.read_file(shapefile_path)
+
+    # 栅格化：将每个 polygon 的 id 字段 rasterize 到栅格中
+    print("Rasterizing shapefile...")
+    shapes = [(geom, fid) for geom, fid in zip(gdf.geometry, gdf['id'])]
+    class_arr = rasterize(
+        shapes=shapes,
+        out_shape=ref_shape,
+        transform=ref_transform,
+        fill=0,
+        dtype=np.int32
+    )
+
+    # 4. 初始化输出栅格
+    total_carbon_cost_raster = np.zeros(ref_shape, dtype=np.float32)
+    total_bio_cost_raster = np.zeros(ref_shape, dtype=np.float32)
+    carbon_price_raster = np.zeros(ref_shape, dtype=np.float32)
+    bio_price_raster = np.zeros(ref_shape, dtype=np.float32)
+
+    # 获取唯一的区域 ID
+    unique_ids = np.unique(class_arr)
+    unique_ids = unique_ids[unique_ids != 0]  # 去掉背景值
+
+    # 5. 遍历每个区域 ID，计算指标并赋值
+    print("Processing unique IDs...")
+    for uid in unique_ids:
+        mask = (class_arr == uid)
+
+        # 去除 bio 或 bio_cost 是 nan 的像元
+        valid_mask = mask & ~np.isnan(bio) & ~np.isnan(bio_cost)
+
+        if not np.any(valid_mask):
+            continue
+
+        # 获取有效区域的值
+        ghg_vals = ghg[valid_mask]
+        bio_vals = bio[valid_mask]
+        carbon_cost_vals = carbon_cost[valid_mask]
+        bio_cost_vals = bio_cost[valid_mask]
+
+        # 计算总量和价格
+        ghg_sum = np.sum(ghg_vals)
+        bio_sum = np.sum(bio_vals)
+        carbon_cost_sum = np.sum(carbon_cost_vals)
+        bio_cost_sum = np.sum(bio_cost_vals)
+
+        carbon_price = carbon_cost_sum / ghg_sum if ghg_sum != 0 else 0
+        bio_price = bio_cost_sum / bio_sum if bio_sum != 0 else 0
+
+        # 将计算结果写入对应栅格
+        total_carbon_cost_raster[mask] = carbon_cost_sum
+        total_bio_cost_raster[mask] = bio_cost_sum
+        carbon_price_raster[mask] = carbon_price
+        bio_price_raster[mask] = bio_price
+
+    # 6. 写出结果到 TIF 文件
+    def write_tif(filename, array):
+        profile = ref_profile.copy()
+        profile.update(dtype=rasterio.float32, count=1, nodata=np.nan)
+        with rasterio.open(os.path.join(output_dir, filename), 'w', **profile) as dst:
+            dst.write(array, 1)
+
+    print("Writing output TIF files...")
+    write_tif("total_carbon_cost.tif", total_carbon_cost_raster)
+    write_tif("total_bio_cost.tif", total_bio_cost_raster)
+    write_tif("carbon_price.tif", carbon_price_raster)
+    write_tif("bio_price.tif", bio_price_raster)
+
+    print("Processing completed. TIF files saved to:", output_dir)
+
+import geopandas as gpd
+from rasterstats import zonal_stats
+import numpy as np
+import os
+
+def compute_zonal_stats_to_shp(
+    shapefile_path,
+    raster_paths,  # dict: {"ghg": ..., "carbon_cost": ..., ...}
+    output_shp_path,
+    id_field='id'
+):
+    gdf = gpd.read_file(shapefile_path)
+    assert id_field in gdf.columns, f"Shapefile must contain '{id_field}' field"
+
+    stats = {}
+    for name, path in raster_paths.items():
+        zs = zonal_stats(shapefile_path, path, stats=["sum"], nodata=np.nan)
+        stats[name + "_sum"] = [s["sum"] if s["sum"] is not None else 0 for s in zs]
+
+    for k, v in stats.items():
+        gdf[k] = v
+
+    # 计算价格字段
+    gdf["carbon_price"] = gdf["carbon_cost_sum"] / gdf["ghg_sum"]
+    gdf["bio_price"] = gdf["bio_cost_sum"] / gdf["bio_sum"]
+
+    # 替换 inf 和 nan 为 0（可选）
+    gdf = gdf.replace([np.inf, -np.inf], np.nan)
+    gdf = gdf.fillna(0)
+
+    # 保存为新的 shapefile
+    gdf.to_file(output_shp_path)
+    print(f"✅ Zonal stats written to {output_shp_path}")
+
+import rasterio
+from rasterio.features import rasterize
+from rasterio.transform import from_bounds
+import numpy as np
+
+def rasterize_fields_from_shp(
+    shapefile_path,
+    output_dir,
+    fields,         # list of fields to rasterize
+    resolution=1000 # 输出分辨率（单位：米）
+):
+    os.makedirs(output_dir, exist_ok=True)
+    gdf = gpd.read_file(shapefile_path)
+
+    minx, miny, maxx, maxy = gdf.total_bounds
+    width = int(np.ceil((maxx - minx) / resolution))
+    height = int(np.ceil((maxy - miny) / resolution))
+    transform = from_bounds(minx, miny, maxx, maxy, width, height)
+
+    profile = {
+        "driver": "GTiff",
+        "height": height,
+        "width": width,
+        "count": 1,
+        "dtype": "float32",
+        "crs": gdf.crs,
+        "transform": transform,
+        "nodata": np.nan
+    }
+
+    for field in fields:
+        print(f"▶ Rasterizing field: {field}")
+        shapes = [(geom, val) for geom, val in zip(gdf.geometry, gdf[field])]
+        out_arr = rasterize(
+            shapes=shapes,
+            out_shape=(height, width),
+            transform=transform,
+            fill=np.nan,
+            dtype='float32'
+        )
+        out_path = os.path.join(output_dir, f"{field}.tif")
+        with rasterio.open(out_path, 'w', **profile) as dst:
+            dst.write(out_arr, 1)
+
+    print("✅ Raster files saved to", output_dir)
