@@ -24,4 +24,4 @@ quota -s
 ```
 
 Res = 20, timeseries, 4GB,1CPU, 1h
-Res = 5, 20GB 4CPU 15h
+Res = 5, 28GB 7CPU 15h

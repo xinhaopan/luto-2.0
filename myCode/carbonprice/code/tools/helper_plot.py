@@ -4,13 +4,14 @@ import re
 import math
 
 # --- 第三方库 ---import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 from plotnine import *
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from datetime import datetime
+import seaborn as sns
 
 import cairosvg
 from lxml import etree
@@ -277,64 +278,64 @@ def draw_figure(input_file):
 #     # 读取表格数据
 #     file_path = f'../output/03_{input_file}_shadow_price.xlsx'  # 替换为你的文件路径
 #     df = pd.read_excel(file_path)
-# 
+#
 #     # 设置 Year 列为索引
 #     df.set_index('Year', inplace=True)
-# 
+#
 #     # 遍历每一列并绘制点线图
 #     for column in df.columns:
 #         # 计算均值和标准差
 #         mean = df[column].mean()
 #         std = df[column].std()
-# 
+#
 #         # 将超出均值±3倍标准差的值标记为异常值
 #         is_outlier = (df[column] > mean + 3*std) | (df[column] < mean - 3*std)
-# 
+#
 #         # 获取非异常值的最大最小值
 #         non_outlier_max = df[column][~is_outlier].max()
 #         non_outlier_min = df[column][~is_outlier].min()
-# 
+#
 #         # 设置断点范围（略低于断点的值，略高于去掉断点后的最大值）
 #         break_start = mean + 3 * std - 0.1 * std
 #         break_end = non_outlier_max + 0.1 * std
-# 
+#
 #         # 创建带有断点的双轴图
 #         fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 6), gridspec_kw={'height_ratios': [3, 1]})
-# 
+#
 #         # 绘制正常值
 #         ax1.plot(df.index, df[column], marker='o', linestyle='-', label=column, color='b')
 #         ax2.plot(df.index, df[column], marker='o', linestyle='-', label=column, color='b')
-# 
+#
 #         # 隐藏异常值
 #         ax1.plot(df.index[is_outlier], df[column][is_outlier], 'o', color='white')
 #         ax2.plot(df.index[~is_outlier], df[column][~is_outlier], 'o', color='white')
-# 
+#
 #         # 设置轴范围
 #         ax1.set_ylim(break_start, df[column].max() + std)
 #         ax2.set_ylim(df[column].min() - std, break_end)
-# 
+#
 #         # 添加断点标记
 #         d = .015  # 断点大小
 #         kwargs = dict(transform=ax1.transAxes, color='k', clip_on=False)
 #         ax1.plot((-d, +d), (-d, +d), **kwargs)        # top-left diagonal
 #         ax1.plot((1 - d, 1 + d), (-d, +d), **kwargs)  # top-right diagonal
-# 
+#
 #         kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
 #         ax2.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
 #         ax2.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
-# 
+#
 #         plt.xlabel('Year')
 #         plt.ylabel(column)
 #         plt.title(f'{input_file} {column}')
 #         plt.legend()
 #         plt.grid(True)
-# 
+#
 #         sanitized_column = sanitize_filename(column)
 #         plt.savefig(f'../Figure/{input_file}_{sanitized_column}.png')  # 保存图像为文件
 #         plt.close()  # 关闭当前图像，避免内存问题
-# 
-# 
-# 
+#
+#
+#
 def plot_cost_vs_price(input_file: str):
     # 构造文件路径并读取数据
     file_path = f"../output/02_{input_file}_price.xlsx"
@@ -1161,407 +1162,294 @@ def plot_histogram(input_file, arr_name, bins=30):
     print(plot)
 
 
-def plot_violin_box(input_file: str,
-                    arr_name: str,
-                    year: int = 2050,
-                    thr: list[float] = (0.25, 0.75)):
+def plot_bio_and_carbon_price(output_file):
     """
-    在指定年份用小提琴+箱线图展示 cost 分布，按分位数 [0,thr[0],thr[1],1] 划 Low/Moderate/High 三组，
-    三个面板并排，各面板只显示组名，不带数量。
+    绘制 carbon price 和 biodiversity price 的点线图。
+
+    参数:
+    - output_file: 输出图像文件路径（可选）。如果提供，则保存图像。
+    - start_year: 起始年份，默认从 2000 开始。
     """
-    # 1. 载入数据并缩放
-    path_name = get_path(input_file)
-    arr_path = os.path.join(
-        path_name, "data_for_carbon_price", f"{arr_name}_{year}.npy"
+    # 读取数据
+    file_path = "../output/03_price.xlsx"
+    df = pd.read_excel(file_path)
+    data = df[df["Year"] >= start_year].copy()
+
+    # 绘制点线图
+    carbon_plot = (
+            ggplot(data, aes(x="Year")) +
+            geom_line(aes(y="Carbon price($/tCO2e)", color="'Carbon Price'"), size=1.2) +
+            geom_point(aes(y="Carbon price($/tCO2e)", color="'Carbon Price'"), size=2) +
+            labs(x="", y="Carbon price($/tCO2e))") +  # 设置 Y 轴标签
+            theme(
+                text=element_text(family="Arial"),  # 使用 Arial 字体
+                axis_text=element_text(size=10),  # 坐标轴刻度字体大小
+                axis_ticks=element_line(color="black"),  # 坐标轴刻度线颜色
+                axis_ticks_direction='out',  # 刻度朝外
+                panel_background=element_rect(fill="white"),  # 背景为白色
+                panel_border=element_rect(color="black", fill=None),  # 显示所有框线
+                legend_position=(0.85, 0.15),  # 图例放在右上角
+                legend_title=element_text(size=10),  # 图例标题字体大小
+                legend_text=element_text(size=10),  # 图例文本字体大小
+                legend_background=element_rect(fill="white", color=None)  # 移除图例框
+            ) +
+            guides(color=guide_legend(title=None))  # 移除图例标题
     )
-    vals = np.load(arr_path) / 1e6
+    output_file = f"../Graphs/04_carbon_price.png"
+    carbon_plot.show()
+    carbon_plot.save(output_file, dpi=300)
 
-    # 2. 准备 DataFrame
-    df = pd.DataFrame({"Value": vals})
-
-    # 3. 按分位数分组
-    df['Group'] = pd.qcut(
-        df['Value'],
-        q=[0, thr[0], thr[1], 1.0],
-        labels=['Low', 'Moderate', 'High'],
-        duplicates='drop'
+    # Biodiversity Price 图
+    biodiversity_plot = (
+            ggplot(data, aes(x="Year")) +
+            geom_line(aes(y="Biodiversity price($/ha)", color="'Biodiversity Price'"), size=1.2) +
+            geom_point(aes(y="Biodiversity price($/ha)", color="'Biodiversity Price'"), size=2) +
+            labs(x="", y="Biodiversity Price ($/ha)") +  # 设置 Y 轴标签
+            theme(
+                text=element_text(family="Arial"),  # 使用 Arial 字体
+                axis_text=element_text(size=10),  # 坐标轴刻度字体大小
+                axis_ticks=element_line(color="black"),  # 坐标轴刻度线颜色
+                axis_ticks_direction='out',  # 刻度朝外
+                panel_background=element_rect(fill="white"),  # 背景为白色
+                panel_border=element_rect(color="black", fill=None),  # 显示所有框线
+                legend_position=(0.85, 0.65),  # 图例放在右上角
+                legend_title=element_text(size=10),  # 图例标题字体大小
+                legend_text=element_text(size=10),  # 图例文本字体大小
+                legend_background=element_rect(fill="white", color=None)  # 移除图例框
+            ) +
+            guides(color=guide_legend(title=None))  # 移除图例标题
     )
 
-    # 4. 强制顺序
-    df['Group'] = pd.Categorical(
-        df['Group'],
-        categories=['Low', 'Moderate', 'High'],
-        ordered=True
-    )
+    # 如果提供了输出路径，则保存 Biodiversity Price 图像
+    biodiversity_output_file = f"../Graphs/04_biodiversity_price.png"
+    biodiversity_plot.show()
+    biodiversity_plot.save(biodiversity_output_file, dpi=300)
 
-    # 5. 绘图
-    p = (
-        ggplot(df, aes(x='Group', y='Value', fill='Group'))
-      + geom_violin(alpha=0.7, scale='width', trim=True)
-      # 箱线宽度调小一点，背景填白
-      + geom_boxplot(width=0.1, fill='white', outlier_size=1, alpha=0.8)
-      + facet_wrap('~Group', scales='free_y', nrow=1)
-      + labs(
-            title=f"{arr_name} Distribution in {year}",
-            x="Group",
-            y="Value (M$)"
-        )
-      + theme(
-            axis_text_x=element_text(angle=0, hjust=0.5),
-            legend_position='none'
-        )
-    )
-    p.show()
-    return p
+    return carbon_plot, biodiversity_plot
 
-
-import os
-import numpy as np
+from plotnine import ggplot, aes, geom_line, geom_point, labs, theme, element_text, element_rect, element_line, guides, guide_legend
 import pandas as pd
-from plotnine import (
-    ggplot, aes, geom_boxplot, geom_violin, facet_wrap,
-    scale_x_discrete, labs, theme, element_text
-)
-
-def plot_box(input_file: str,
-             arr_name: str,
-             year: int = 2050,
-             thr: tuple[float,float] = (0.25, 0.75)):
-    """
-    箱型图：按分位数 [0,thr[0],thr[1],1] 划 Low/Moderate/High 三组，
-    三个面板并排，面板标签为 "组名 (样本数)"，X 轴仅显示组名。
-    """
-    # 1. 载入并缩放到 M$
-    path_name = get_path(input_file)
-    arr_file = os.path.join(
-        path_name, "data_for_carbon_price", f"{arr_name}_{year}.npy"
-    )
-    vals = np.load(arr_file)
-    df = pd.DataFrame({"Value": vals})
-
-    # 2. 分组并强制顺序
-    df['Group'] = pd.qcut(
-        df['Value'],
-        q=[0, thr[0], thr[1], 1.0],
-        labels=['Low','Moderate','High'],
-        duplicates='drop'
-    )
-    df['Group'] = df['Group'].astype(
-        pd.CategoricalDtype(['Low','Moderate','High'], ordered=True)
-    )
-
-    # 3. 统计样本数，生成面板标签
-    counts = df['Group'].value_counts().reindex(['Low','Moderate','High']).fillna(0).astype(int)
-    df['GroupLabel'] = df['Group'].map(lambda g: f"{g} ({counts[g]})")
-    df['GroupLabel'] = df['GroupLabel'].astype(
-        pd.CategoricalDtype(
-            [f"Low ({counts['Low']})",
-             f"Moderate ({counts['Moderate']})",
-             f"High ({counts['High']})"],
-            ordered=True
-        )
-    )
-
-    # 4. 绘图
-    p = (
-        ggplot(df, aes(x='Group', y='Value', fill='Group'))
-      + geom_boxplot(width=0.6, outlier_size=1, alpha=0.8)
-      + facet_wrap('~GroupLabel', scales='free_y', nrow=1)
-      + scale_x_discrete(labels=['Low','Moderate','High'])
-      + labs(
-            title=f"{input_file} {arr_name} {year}",
-            x="Group",
-            y="Value (M$)"
-        )
-      + theme(
-            axis_text_x=element_text(angle=0, hjust=0.5),
-            legend_position='none'
-        )
-    )
-    p.show()
-    return p
-
-
-def plot_violin(input_file: str,
-                arr_name: str,
-                year: int = 2050,
-                thr: tuple[float,float] = (0.25, 0.75)):
-    """
-    小提琴+箱型图：按分位数 [0,thr[0],thr[1],1] 划 Low/Moderate/High 三组，
-    三个面板并排，面板标签为 "组名 (样本数)"，X 轴仅显示组名。
-    """
-    # 1. 载入并缩放到 M$
-    path_name = get_path(input_file)
-    arr_file = os.path.join(
-        path_name, "data_for_carbon_price", f"{arr_name}_{year}.npy"
-    )
-    vals = np.load(arr_file) / 1e6
-    df = pd.DataFrame({"Value": vals})
-
-    # 2. 分组并强制顺序
-    df['Group'] = pd.qcut(
-        df['Value'],
-        q=[0, thr[0], thr[1], 1.0],
-        labels=['Low','Moderate','High'],
-        duplicates='drop'
-    )
-    df['Group'] = df['Group'].astype(
-        pd.CategoricalDtype(['Low','Moderate','High'], ordered=True)
-    )
-
-    # 3. 统计样本数，生成面板标签
-    counts = df['Group'].value_counts().reindex(['Low','Moderate','High']).fillna(0).astype(int)
-    df['GroupLabel'] = df['Group'].map(lambda g: f"{g} ({counts[g]})")
-    df['GroupLabel'] = df['GroupLabel'].astype(
-        pd.CategoricalDtype(
-            [f"Low ({counts['Low']})",
-             f"Moderate ({counts['Moderate']})",
-             f"High ({counts['High']})"],
-            ordered=True
-        )
-    )
-
-    # 4. 绘图
-    p = (
-            ggplot(df, aes(x='Group', y='Value', fill='Group'))
-            + geom_violin(alpha=0.7, scale='width', trim=True)
-            + facet_wrap('~GroupLabel', scales='free_y', nrow=1)
-            + scale_x_discrete(labels=['Low', 'Moderate', 'High'])
-            + labs(
-        title=f"{arr_name} Violin in {year}",
-        x="Group",
-        y="Value (M$)"
-    )
-            + theme(
-        axis_text_x=element_text(angle=0, hjust=0.5),
-        legend_position='none'
-    )
-    )
-    p.show()
-    return p
-
 import os
-import numpy as np
-import pandas as pd
-from plotnine import (
-    ggplot, aes, geom_violin, facet_wrap,
-    labs, theme, element_text
-)
 
-def plot_violin_quantile_groups(input_file: str,
-                                arr_name: str,
-                                year: int = 2050,
-                                quantile_thresholds: list[float] = [0.2,0.4,0.6,0.8]):
+def plot_all_columns(file_path,output_file=f"../Graphs/04_all_price_{suffix}.png"):
     """
-    Split the data into five quantile‐based groups and draw side‐by‐side violin plots,
-    with each facet only showing its own group on the x‐axis.
+    将表中的所有列绘制为点线图。
+
+    参数:
+    - output_file_dir: 输出图像文件的目录。如果提供，则保存所有图像。
     """
-    # 1. load and scale to millions
-    data_dir = get_path(input_file)
-    arr_path = os.path.join(
-        data_dir,
-        "data_for_carbon_price",
-        f"{arr_name}_{year}.npy"
-    )
-    vals = np.load(arr_path) / 1e6
-    df = pd.DataFrame({"Value": vals})
+    # 读取数据
+    df = pd.read_excel(file_path)
 
-    # 2. validate thresholds
-    if quantile_thresholds is None or len(quantile_thresholds) != 4:
-        raise ValueError("Please supply four quantile thresholds in (0,1), e.g. [0.2,0.4,0.6,0.8]")
-
-    # 3. compute quantile cut points
-    q_values = df["Value"].quantile(quantile_thresholds).tolist()
-
-    # 4. bin into five ordered groups
-    bins = [-np.inf, *q_values, np.inf]
-    group_names = ['Low', 'Lower-Mid', 'Mid', 'Upper-Mid', 'High']
-    df['Group'] = pd.cut(
-        df['Value'], bins=bins, labels=group_names,
-        include_lowest=True, right=False
-    ).astype(pd.CategoricalDtype(group_names, ordered=True))
-
-    # 5. count and make facet labels
-    counts = df['Group'].value_counts().reindex(group_names).fillna(0).astype(int)
-    label_map = {g: f"{g} ({counts[g]})" for g in group_names}
-    df['GroupLabel'] = df['Group'].map(label_map)
-    df['GroupLabel'] = df['GroupLabel'].astype(
-        pd.CategoricalDtype([label_map[g] for g in group_names], ordered=True)
+    data = df[df["Year"] >= start_year].copy()
+    print(data)
+    long_data = data.melt(
+        id_vars=["Year"],
+        var_name="Metric",
+        value_name="Value"
     )
 
-    # 6. draw violins with free x‐ and y‐scales
+    # 打印长格式的指标列
+    print("Melted columns (Metric):", long_data["Metric"].unique().tolist())
+
+    # 按照 Metric 列的顺序排序
+    column_order = df.columns[df.columns != "Year"].tolist()  # 原始列顺序
+    long_data["Metric"] = pd.Categorical(long_data["Metric"], categories=column_order, ordered=True)
+    long_data = long_data.sort_values(by="Metric")  # 排序
+
+    # 绘制点线图
+    plot = (
+            ggplot(long_data, aes(x="Year", y="Value", color="Metric", group="Metric")) +
+            geom_line(size=1.2) +
+            geom_point(size=2) +
+            labs(x="", y="", title="") +
+            theme(
+                text=element_text(family="Arial"),  # 使用 Arial 字体
+                axis_text=element_text(size=10),  # 坐标轴刻度字体大小
+                axis_ticks=element_line(color="black"),  # 坐标轴刻度线颜色
+                panel_background=element_rect(fill="white"),  # 背景为白色
+                panel_border=element_rect(color="black", fill=None),  # 显示所有框线
+                legend_position="none"  # 移除图例
+            ) +
+            facet_wrap("~Metric", ncol=2, scales="free_y")  # 按列顺序绘制
+    )
+
+    # 保存图像
+    plot.show()
+    plot.save(output_file, dpi=300)
+    print(f"Saved plot to {output_file}")
+
+    return plot
+
+
+def plot_revenue_cost_faceted(input_files, figure_size=(14, 8)):
+    """
+    为多个输入文件生成分面图，所有子图共享相同的 Y 轴范围和刻度。
+
+    参数:
+        input_files: 输入文件列表（不含路径和后缀）
+        figure_size: 图表尺寸，默认为 (14, 8)
+
+    返回:
+        p: plotnine 图表对象
+    """
+    # 初始化存储所有数据的列表
+    all_df_long = []
+
+    # 遍历每个输入文件，处理数据
+    for input_file in input_files:
+        # 假设文件路径格式为 "../output/02_{input_file}_price.xlsx"
+        file_path = f"../output/02_{input_file}_price.xlsx"
+        df = pd.read_excel(file_path)
+
+        # 从数据中获取起始年份（可根据需求调整）
+        df = df[df["Year"] >= start_year].copy()
+
+        # 筛选包含货币单位 (M$) 的列
+        dollar_cols = [col for col in df.columns if '(M$)' in col or '（M$）' in col]
+        if not dollar_cols:
+            raise ValueError(f"没有找到符合条件的 (M$) 列 in {input_file}")
+
+        # 提取相关列
+        df_wide = df[['Year'] + dollar_cols].copy()
+
+        # 转换为长格式数据
+        df_long = pd.DataFrame()
+        for col in dollar_cols:
+            metric_name = col.replace('（M$）', '').replace('(M$)', '').strip()
+            temp_df = df_wide[['Year', col]].copy()
+            temp_df.columns = ['Year', 'Value']
+            temp_df['Metric'] = metric_name
+            # 将收入（revenue）转为负值以便堆叠显示（根据需求调整）
+            if 'revenue' in metric_name.lower():
+                temp_df['Value'] = -temp_df['Value']
+            df_long = pd.concat([df_long, temp_df], ignore_index=True)
+
+        # 添加标识列
+        df_long['InputFile'] = input_file
+        all_df_long.append(df_long)
+
+    # 合并所有数据
+    all_df_long = pd.concat(all_df_long, ignore_index=True)
+
+    # 计算统一的 Y 轴范围
+    y_min = all_df_long['Value'].min()
+    y_max = all_df_long['Value'].max()
+    # 添加 10% 的缓冲区以美化显示
+    y_buffer = 0.1 * (y_max - y_min)
+    y_range = (y_min - y_buffer, y_max + y_buffer)
+
+    # 绘制分面图
     p = (
-        ggplot(df, aes(x='Group', y='Value', fill='Group'))
-      + geom_violin(alpha=0.7, scale='width', trim=True)
-      + facet_wrap('~GroupLabel', scales='free', nrow=1)
-      + labs(
-            title=f"{input_file} {arr_name} ({year})",
-            x="Group", y="Value ($M)"
-        )
-      + theme(
-            axis_text_x=element_text(angle=0, hjust=0.5),
-            legend_position='none'
-        )
+        ggplot(all_df_long, aes(x='Year', y='Value', fill='Metric')) +
+        geom_bar(stat='identity', position='stack') +  # 堆叠柱形图
+        facet_wrap('~InputFile', scales='free_x') +    # 按 InputFile 分面，X 轴自由
+        labs(
+            title="",
+            x="",
+            y="Value (M$)",
+            fill="Component"
+        ) +
+        theme_minimal() +  # 简洁主题
+        theme(
+            figure_size=figure_size,
+            text=element_text(family="Arial", size=13),
+            legend_position='bottom',  # 图例置于底部
+            axis_text_x=element_text(rotation=0, hjust=1),
+            subplots_adjust={'wspace': 0.2, 'hspace': 0.2}  # 调整子图间距
+        ) +
+        scale_fill_brewer(type='qual', palette='Set2') +  # 设置颜色
+        scale_y_continuous(limits=y_range)  # 统一 Y 轴范围和刻度
     )
+
+    # 保存图像
     p.show()
+    output_path = f"../Pannels/03_combined_revenue_cost_stacked_{suffix}.png"
+    p.save(output_path, dpi=300)
+
+    # 显示图像
+    print(f"已生成分面图并保存到: {output_path}")
     return p
 
-import os
-import numpy as np
-import pandas as pd
-from plotnine import (
-    ggplot, aes, geom_boxplot, facet_wrap,
-    labs, theme, element_text
-)
+def plot_violin(arr_name: str, year: int = 2050, scale_type: str = 'symlog', linthresh: float = 1):
+    import os
+    import numpy as np
+    import pandas as pd
+    from plotnine import ggplot, aes, geom_violin, labs, theme, element_text
 
-def plot_box_quantile_groups(input_file: str,
-                             arr_name: str,
-                             year: int = 2050,
-                             quantile_thresholds: list[float] = [0.2,0.4,0.6,0.8]):
-    """
-    Split the data into five quantile‐based groups and plot side‐by‐side boxplots,
-    with each facet only showing its own group on the x‐axis and titled "GroupName (count)".
-    """
-    # 1. load and scale to millions
-    data_dir = get_path(input_file)
-    arr_path = os.path.join(
-        data_dir,
-        "data_for_carbon_price",
-        f"{arr_name}_{year}.npy"
-    )
+    arr_path = os.path.join("../data/", f"{arr_name}_{year}.npy")
     vals = np.load(arr_path)
-    df = pd.DataFrame({"Value": vals})
-    if arr_name == 'bp' or arr_name == 'cp':
-        df = df[df["Value"] > 0].copy()
 
-    # 2. validate thresholds
-    if quantile_thresholds is None or len(quantile_thresholds) != 4:
-        raise ValueError("Please supply four quantile thresholds in (0,1), e.g. [0.2,0.4,0.6,0.8]")
-
-    # 3. compute cut points
-    q_values = df["Value"].quantile(quantile_thresholds).tolist()
-
-    # 4. bin into 5 ordered groups
-    bins = [-np.inf, *q_values, np.inf]
-    group_names = ['Low', 'Lower-Mid', 'Mid', 'Upper-Mid', 'High']
-    df['Group'] = pd.cut(
-        df['Value'],
-        bins=bins,
-        labels=group_names,
-        include_lowest=True,
-        right=False
-    ).astype(pd.CategoricalDtype(group_names, ordered=True))
-
-    # 5. count and create facet labels
-    counts = df['Group'].value_counts().reindex(group_names).fillna(0).astype(int)
-    label_map = {g: f"{g} ({counts[g]})" for g in group_names}
-    df['GroupLabel'] = df['Group'].map(label_map)
-    df['GroupLabel'] = df['GroupLabel'].astype(
-        pd.CategoricalDtype([label_map[g] for g in group_names], ordered=True)
-    )
-
-    # 6. plot boxplots with free x and y scales
-    p = (
-        ggplot(df, aes(x='Group', y='Value', fill='Group'))
-      + geom_boxplot(width=0.6, outlier_size=1, alpha=0.8)
-      + facet_wrap('~GroupLabel', scales='free', nrow=1)
-      + labs(
-            title=f"{input_file} {arr_name} ({year})",
-            x="Group",
-            y="Value ($M)"
-        )
-      + theme(
-            axis_text_x=element_text(angle=0, hjust=0.5),
-            legend_position='none'
-        )
-    )
-    p.show()
-    return p
-
-
-def plot_box_trimmed_equal_bins(input_file: str,
-                                arr_name: str,
-                                year: int = 2050,
-                                trim_pct: float = 0.05) -> None:
-    """
-    1. Load the .npy array (divide by 1e6 if 'cost'),
-    2. Trim lowest & highest `trim_pct` fraction,
-    3. Bin the remainder into 5 equal–width bins,
-    4. Save a *_bins.npy mask matching original shape (nan where trimmed),
-    5. Plot side–by–side boxplots with free y–axes.
-    """
-    # 1) load
-    data_dir = get_path(input_file)
-    arr_path = os.path.join(data_dir,
-                            "data_for_carbon_price",
-                            f"{arr_name}_{year}.npy")
-    vals = np.load(arr_path)
-    if arr_name == 'cost':
-        vals = vals / 1e6  # scale
-
-    # 2) trim extremes
-    mask = np.ones_like(vals, dtype=bool)
-    if arr_name in ('bp', 'cp'):
-        # keep only positive and drop top trim_pct
-        positive = vals > 0
-        lo, hi = np.quantile(vals[positive], [trim_pct, 1 - trim_pct])
-        mask &= positive & (vals >= lo) & (vals <= hi)
-
-    # 3) compute bins on the trimmed values
-    kept = vals[mask]
-    labels = ['Low', 'Lower-Mid', 'Mid', 'Upper-Mid', 'High']
-    if kept.size:
-        lo, hi = kept.min(), kept.max()
-        bins = np.linspace(lo, hi, 6)  # 5 intervals
-
-        # digitize -> 0..4
-        inds = np.digitize(kept, bins, right=False) - 1
-        inds = np.clip(inds, 0, 4)
+    # Apply transformation
+    if scale_type == 'symlog':
+        transformed_vals = np.sign(vals) * np.log10(1 + np.abs(vals) / linthresh)
+        y_label = f"{arr_name} (symlog scaled)"
+    elif scale_type == 'log':
+        transformed_vals = np.log10(vals[vals > 0])
+        vals = vals[vals > 0]
+        y_label = f"{arr_name} (log10)"
+    elif scale_type == 'sqrt':
+        transformed_vals = np.sqrt(vals)
+        y_label = f"{arr_name} (sqrt)"
     else:
-        # nothing kept
-        bins = np.linspace(0, 1, 6)
-        inds = np.array([], dtype=int)
+        transformed_vals = vals
+        y_label = f"{arr_name}"
 
-    # 4) build full_codes array and save
-    full_codes = np.full(vals.shape, np.nan)
-    full_codes[mask] = inds
-    out_path = os.path.join(data_dir,
-                            "data_for_carbon_price",
-                            f"{arr_name}_{year}_bins.npy")
-    np.save(out_path, full_codes)
+    df = pd.DataFrame({"Value": transformed_vals})
 
-    # 5) prepare DataFrame for plotting
-    df = pd.DataFrame({
-        'Value': kept,
-        'Group': pd.Categorical.from_codes(
-            codes=inds,
-            categories=labels,
-            ordered=True
-        )
-    })
-    # make nice facet labels "Name (count)"
-    counts = df['Group'].value_counts().reindex(labels, fill_value=0)
-    df['GroupLabel'] = df['Group'].map(lambda g: f"{g} ({counts[g]})")
-    df['GroupLabel'] = pd.Categorical(
-        df['GroupLabel'],
-        categories=[f"{g} ({counts[g]})" for g in labels],
-        ordered=True
-    )
-
-    # 6) plot
     p = (
-            ggplot(df, aes(x='Group', y='Value', fill='Group'))
-            + geom_boxplot(width=0.6, outlier_size=1, alpha=0.8)
-            + facet_wrap('~GroupLabel', scales='free_y', nrow=1)
-            + labs(
-        title=f"{name_dict[arr_name]['title']} after trimming ±{int(trim_pct * 100)}%",
-        x="Group",
-        y=name_dict[arr_name]['unit']
+        ggplot(df, aes(x="'All Data'", y='Value', fill="'All Data'"))
+        + geom_violin(alpha=0.7, scale='width', trim=True)
+        + labs(title=f"{arr_name} {scale_type} Violin Plot in {year}", x="", y=y_label)
+        + theme(axis_text_x=element_text(angle=0, hjust=0.5), legend_position='none')
     )
-            + theme(
-        axis_text_x=element_blank(),
-        legend_position='none'
-    )
-    )
+
+    output_path = f"../Graphs/04_{arr_name}_{year}_violin_{scale_type}.png"
     p.show()
+    p.save(output_path, dpi=300)
+    print(f"Violin plot saved to {output_path}")
+
     return p
+
+
+def plot_boxplot(arr_name: str, year: int = 2050, scale_type: str = 'symlog', linthresh: float = 1):
+    import os
+    import numpy as np
+    import pandas as pd
+    from plotnine import ggplot, aes, geom_boxplot, labs, theme, element_text, scale_y_continuous
+    from plotnine import scale_y_log10
+
+    arr_path = os.path.join("../data/", f"{arr_name}_{year}.npy")
+    vals = np.load(arr_path)
+
+    # Apply transformation
+    if scale_type == 'symlog':
+        transformed_vals = np.sign(vals) * np.log10(1 + np.abs(vals) / linthresh)
+        y_label = f"{arr_name} (symlog scaled)"
+    elif scale_type == 'log':
+        transformed_vals = np.log10(vals[vals > 0])
+        vals = vals[vals > 0]  # remove non-positive for plotting consistency
+        y_label = f"{arr_name} (log10)"
+    elif scale_type == 'sqrt':
+        transformed_vals = np.sqrt(vals)
+        y_label = f"{arr_name} (sqrt)"
+    else:  # linear
+        transformed_vals = vals
+        y_label = f"{arr_name}"
+
+    df = pd.DataFrame({"Value": transformed_vals})
+
+    p = (
+        ggplot(df, aes(x="'All Data'", y='Value'))
+        + geom_boxplot(fill='lightblue', width=0.4, outlier_size=1, alpha=0.8)
+        + labs(title=f"{arr_name} {scale_type} Boxplot in {year}", x="", y=y_label)
+        + theme(axis_text_x=element_text(angle=0, hjust=0.5), legend_position='none')
+    )
+
+    output_path = f"../Graphs/04_{arr_name}_{year}_boxplot_{scale_type}.png"
+    p.show()
+    p.save(output_path, dpi=300)
+    print(f"Boxplot saved to {output_path}")
+
+    return p
+
