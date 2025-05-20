@@ -26,7 +26,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_02_GBF3_MVS_ON_OFF' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_06_HCAS_50TH_CUSTOM' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -73,11 +73,12 @@ grid_search = {
     
     # --------------- Water constraints ---------------
     'WATER_LIMITS': ['on'],                     # 'on' or 'off'
-    'WATER_CONSTRAINT_TYPE': ['hard'],          # 'hard' or 'soft'
+    'WATER_CONSTRAINT_TYPE': ['soft'],          # 'hard' or 'soft'
     'WATER_PENALTY': [1],
     'INCLUDE_WATER_LICENSE_COSTS': [0],
     
-    # --------------- Biodiversity priority zone ---------------
+    # --------------- Biodiversity overall ---------------
+    'HABITAT_CONDITION': ['HCAS', 'USER_DEFINED', 'LUTO_ORIGINAL'],                
     'CONNECTIVITY_SOURCE': ['NCI'],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
@@ -127,7 +128,7 @@ if __name__ == '__main__':
     grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
 
     # 1) Submit task to a single linux machine, and run simulations parallely
-    # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
     create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster')
