@@ -190,7 +190,7 @@ class Data:
         self.COORD_LON_LAT_2D_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
         self.COORD_LON_LAT = [i[self.MASK] for i in self.COORD_LON_LAT_2D_FULLRES]  # Only keep the coordinates for the cells that are not masked out (i.e., land uses). 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only) and not masked out
         
-
+        
 
         ###############################################################
         # Load agricultural crop and livestock data.
@@ -216,7 +216,7 @@ class Data:
 
         self.NONAGLU2DESC = dict(zip(range(settings.NON_AGRICULTURAL_LU_BASE_CODE, settings.NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES)), self.NON_AGRICULTURAL_LANDUSES))
         self.DESC2NONAGLU = {value: key for key, value in self.NONAGLU2DESC.items()}
-
+ 
         # Get number of land-uses
         self.N_AG_LUS = len(self.AGRICULTURAL_LANDUSES)
         self.N_NON_AG_LUS = len(self.NON_AGRICULTURAL_LANDUSES)
@@ -225,7 +225,7 @@ class Data:
         self.AGLU2DESC = {i: lu for i, lu in enumerate(self.AGRICULTURAL_LANDUSES)}
         self.DESC2AGLU = {value: key for key, value in self.AGLU2DESC.items()}
         self.AGLU2DESC[-1] = 'Non-agricultural land'
-
+        
         # Combine ag and non-ag landuses
         self.ALL_LANDUSES = self.AGRICULTURAL_LANDUSES + self.NON_AGRICULTURAL_LANDUSES
         self.ALLDESC2LU = {**self.AGLU2DESC, **self.DESC2NONAGLU}
@@ -691,7 +691,7 @@ class Data:
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(settings.INPUT_DIR, "ag_tmatrix.npy"))
         self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = np.load(os.path.join(settings.INPUT_DIR, "ag_to_destock_tmatrix.npy"))
-
+        
   
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(settings.INPUT_DIR, "x_mrj.npy"))
@@ -703,7 +703,7 @@ class Data:
         # Non-agricultural data.
         ###############################################################
         print("\tLoading non-agricultural data...", flush=True)
-
+        
         # Load HIR mask
         self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))
 
@@ -762,12 +762,12 @@ class Data:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             os.path.join(settings.INPUT_DIR, "ep_to_ag_tmatrix.npy")
         )  # shape: (28,)
-
-
+        
+        
         ##############################################################
         # Transition cost for all land use
         #############################################################
-
+        
         # Transition matrix from ag
         tmat_ag2ag_xr = xr.DataArray(
             self.AG_TMATRIX,
@@ -781,11 +781,11 @@ class Data:
         )
         tmat_from_ag_xr = xr.concat([tmat_ag2ag_xr, tmat_ag2non_ag_xr], dim='to_lu')                        # Combine ag2ag and ag2non-ag
         tmat_from_ag_xr.loc[:,'Destocked - natural land'] = self.AG_TO_DESTOCKED_NATURAL_COSTS_HA           # Ag to Destock-natural has its own values
-
-
+        
+        
         # Transition matrix of non-ag to unallocated-modified land (land clearing)
         tmat_wood_clear = np.load(os.path.join(settings.INPUT_DIR, 'transition_cost_clearing_forest.npz'))
-
+        
         tmat_clear_EP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_RP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_sheep_ag_forest = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.AF_PROPORTION
@@ -795,15 +795,15 @@ class Data:
         tmat_clear_beef_CP = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.CP_BELT_PROPORTION
         tmat_clear_BECCS = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_destocked_nat = tmat_wood_clear['tmat_clear_light_wood'] + tmat_wood_clear['tmat_clear_dense_wood']
-
+        
         tmat_costs = np.array([
             tmat_clear_EP, tmat_clear_RP, tmat_clear_sheep_ag_forest, tmat_clear_beef_ag_forest,
             tmat_clear_CP, tmat_clear_sheep_CP, tmat_clear_beef_CP, tmat_clear_BECCS, tmat_clear_destocked_nat
         ]).T
-
-
-
-
+        
+        
+        
+        
         # Transition matrix from non-ag
         tmat_non_ag2ag_xr = xr.DataArray(
             np.repeat(self.EP2AG_TRANSITION_COSTS_HA.reshape(1,-1), len(self.NON_AGRICULTURAL_LANDUSES), axis=0),
@@ -820,20 +820,20 @@ class Data:
         np.fill_diagonal(tmat_non_ag2non_ag_xr.values, 0)                                                   # Lu staty the same has 0 cost
         tmat_from_non_ag_xr = xr.concat([tmat_non_ag2ag_xr, tmat_non_ag2non_ag_xr], dim='to_lu')            # Combine non-ag2ag and non-ag2non-ag
         tmat_from_non_ag_xr.loc['Destocked - natural land', 'Unallocated - natural land'] = np.nan          # Destocked-natural can not transit to unallow-natural
+        
+                                                                                                     
 
-
-
-
+        
         # Get the full transition cost matrix
         self.T_MAT = xr.concat([tmat_from_ag_xr, tmat_from_non_ag_xr], dim='from_lu')
         self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, [self.AGLU2DESC[i] for i in self.LU_NATURAL]] = np.nan       # non-ag2natural is not allowed
         self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, 'Unallocated - modified land'] = tmat_costs                  # Clearing non-ag land requires such cost
         self.T_MAT.loc['Destocked - natural land', self.LU_LVSTK_NATURAL_DESC] = self.T_MAT.loc['Unallocated - natural land', self.LU_LVSTK_NATURAL_DESC]   # Destocked-natural transits to LVSTK-natural has the same cost as unallocated-natural to LVSTK-natural
 
-
+        
         # tools.plot_t_mat(self.T_MAT)
-
-
+        
+        
 
         ###############################################################
         # Water data.
@@ -842,6 +842,7 @@ class Data:
         
         # Initialize water constraints to avoid recalculating them every time.
         self.WATER_YIELD_LIMITS = None
+        self.WREQ_DOMESTIC_REGIONS = None
 
         # Water requirements by land use -- LVSTK.
         wreq_lvstk_dry = pd.DataFrame()
@@ -958,7 +959,7 @@ class Data:
             self.WATER_UNDER_NATURAL_LAND_DD = dd_natural_land
             
         # Place holder for Water Yield under River Region to avoid recalculating it every time.
-        self.WATER_YIELD_RR_BASE_YR = None
+        self.water_yield_regions_BASE_YR = None
         
         
         ###############################################################
@@ -977,13 +978,13 @@ class Data:
     
         # Load the natural land carbon data.
         nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
-
+        
         # Get the carbon stock of unallowcated natural land
         self.CO2E_STOCK_UNALL_NATURAL = np.array(
             nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * fire_risk.to_numpy() / 100),
         )
-
-
+        
+        
 
 
 
@@ -1156,8 +1157,10 @@ class Data:
                 bio_HCAS_contribution_lookup = {int(k):v*(1/unallow_nat_scale) for k,v in bio_HCAS_contribution_lookup.items()}                     # Normalise the biodiversity degradation score to the unallocated natural land score
             case 'USER_DEFINED':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[ 'USER_DEFINED'].to_dict()
+            case 'LUTO_ORIGINAL':
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[ 'LUTO_ORIGINAL'].to_dict()
             case _:
-                raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
+                print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}             # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
@@ -1199,8 +1202,8 @@ class Data:
             settings.INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
             sheet_name = f'NVIS_{settings.GBF3_TARGET_CLASS}'
         ).sort_values(by='group', ascending=True)
-
-
+        
+        
         if settings.BIODIVERSTIY_TARGET_GBF_3 == 'USER_DEFINED':
             self.GBF3_GROUPS_SEL = [row['group'] for _,row in GBF3_targets_df.iterrows()
                 if all([
@@ -1214,17 +1217,17 @@ class Data:
             self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = GBF3_targets_df.query('group.isin(@self.GBF3_GROUPS_SEL)')
             self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS[[
                 'USER_DEFINED_TARGET_PERCENT_2030',
-                'USER_DEFINED_TARGET_PERCENT_2050',
+                'USER_DEFINED_TARGET_PERCENT_2050', 
                 'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGET_PERCENT
-
+            
 
         self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
         self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
         self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_GROUPS_SEL))
-        self.BIO_GBF3_N_CLASSES = len(self.GBF3_GROUPS_SEL)
-
-
-
+        self.BIO_GBF3_N_CLASSES = len(self.GBF3_GROUPS_SEL) 
+        
+        
+        
         # Read in vegetation layer data
         NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.GBF3_TARGET_CLASS.split('_')[0]}.nc").sel(group=self.GBF3_GROUPS_SEL)
         NVIS_layers = np.array([self.get_exact_resfactored_average_arr(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
@@ -1910,7 +1913,7 @@ class Data:
         for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
             if not settings.AG_MANAGEMENTS[am]:
                 continue
-
+            
             am_j_list = [self.DESC2AGLU[lu] for lu in am_lus]
             current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
             for j in am_j_list:

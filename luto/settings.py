@@ -278,25 +278,25 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
 
 AG_MANAGEMENTS_TO_LAND_USES = {
     'Asparagopsis taxiformis':  ['Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'],
-
+    
     'Precision Agriculture':    [# Cropping:
                                 'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
                                 # Intensive Cropping:
                                 'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
                                 # Horticulture:
                                 'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
-
+    
     'Ecological Grazing':       ['Beef - modified land', 'Sheep - modified land', 'Dairy - modified land'],
-
+    
     'Savanna Burning': [        'Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land'],
-
+    
     'AgTech EI': [              # Cropping:
                                 'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
                                 # Intensive Cropping:
                                 'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
                                 # Horticulture:
                                 'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
-
+    
     'Biochar':                  [# Cropping
                                 'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
                                 # Horticulture:
@@ -389,7 +389,7 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # ---------------------------------------------------------------------------- #
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'off'        # 'on' or 'off'
+GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
 
 GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 
@@ -447,7 +447,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
-SOLVE_WEIGHT_ALPHA = 0.1
+SOLVE_WEIGHT_ALPHA = 0.1  
 ''' 
 Range from 0 to 1 that balances the relative important between economic values and biodiversity scores.
  - if approaching 0, the model will focus on maximising biodiversity scores.
@@ -465,8 +465,8 @@ The weight of the deviations from target in the objective function.
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 WATER_PENALTY = 1
 
@@ -495,8 +495,9 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
     https://chinawaterrisk.org/resources/analysis-reviews/aqueduct-global-water-stress-rankings/ 
 """
 
-WATER_STRESS = 0.4          # Aqueduct limit catchments not under high stress
-AG_SHARE_OF_WATER_USE = 0.7 # Ag share is 70% across all catchments, could be updated for each specific catchment based on actual data
+WATER_STRESS = 0.6                                      # Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield
+WATER_USE_SHARE_AG = 0.7                                # Ag share is 70% across all catchments, could be updated for each specific catchment based on actual data
+WATER_USE_SHARE_DOMESTIC  = 1 - WATER_USE_SHARE_AG      # Domestic share is 30% across all catchments, could be updated for each specific catchment based on actual data
 
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water can cause infeasibility issues with water constraint in Pilbara
@@ -538,12 +539,14 @@ The constraint type for the biodiversity target.
 match BIODIVERSTIY_TARGET_GBF_2:
     case 'off':
         GBF2_TARGET_DICT = None
+    case 'low':
+        GBF2_TARGET_DICT = {2030: 0,    2050: 0,    2100: 0}
     case 'medium':
         GBF2_TARGET_DICT = {2030: 0.15, 2050: 0.15, 2100: 0.15}
     case 'high':
         GBF2_TARGET_DICT = {2030: 0.15, 2050: 0.25, 2100: 0.25}
     case _:
-        raise ValueError(f"Invalid value for BIODIVERSTIY_TARGET_GBF_2: {BIODIVERSTIY_TARGET_GBF_2}. Must be 'off', 'medium', or 'high'.")
+        raise ValueError(f"Invalid value for BIODIVERSTIY_TARGET_GBF_2: {BIODIVERSTIY_TARGET_GBF_2}. Must be 'off', 'low', 'medium', or 'high'.")
 
 
 GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
@@ -617,7 +620,7 @@ BIO_CONTRIBUTION_ENV_PLANTING = 0.8
 BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.1
 BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
 BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2
-BIO_CONTRIBUTION_AGROFORESTRY = 0.75
+BIO_CONTRIBUTION_AGROFORESTRY = 0.75       
 BIO_CONTRIBUTION_BECCS = 0
 ''' 
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
@@ -630,7 +633,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'USER_DEFINED'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
