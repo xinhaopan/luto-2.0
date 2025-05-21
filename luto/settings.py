@@ -60,7 +60,7 @@ SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
-SCENARIO = SSP_NUM = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
+SCENARIO = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
 DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
 DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
 CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
@@ -99,10 +99,10 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
+SIM_YEARS = list(range(2020,2051,10)) # range(2020,2050)
 
 
 # Define the objective function
@@ -146,7 +146,7 @@ CROSSOVER = 0
 # Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
 SCALE_FLAG = -1     # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
 NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
-BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
+BARHOMOGENOUS = 1   # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = min(32, os.cpu_count())
@@ -389,7 +389,7 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # ---------------------------------------------------------------------------- #
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
+GHG_EMISSIONS_LIMITS = 'medium'        # 'off', 'low', 'medium', or 'high'
 
 GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 
@@ -401,9 +401,20 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', 
-GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis SCOPE1'
+match GHG_EMISSIONS_LIMITS:
+    case 'off':
+        GHG_LIMITS_FIELD = None
+    case 'low':
+        GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis SCOPE1'
+    case 'medium':
+        GHG_LIMITS_FIELD = '1.5C (50%) excl. avoided emis SCOPE1'
+    case 'high':
+        GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis SCOPE1'
+    case _:
+        raise ValueError(f"Invalid GHG_EMISSIONS_LIMITS value: {GHG_EMISSIONS_LIMITS}. Must be 'off', 'low', 'medium', or 'high'.")
+
 '''
-options include: 
+`GHG_LIMITS_FIELD` options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
 - Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
@@ -465,10 +476,10 @@ The weight of the deviations from target in the objective function.
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
-WATER_PENALTY = 1
+WATER_PENALTY = 1e-5
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
@@ -504,7 +515,7 @@ WATER_USE_SHARE_DOMESTIC  = 1 - WATER_USE_SHARE_AG      # Domestic share is 30% 
 LIVESTOCK_DRINKING_WATER = 1
 
 # Consider water license costs (0 [off] or 1 [on]) of land-use transition ***** If on then there is a noticeable water sell-off by irrigators in the MDB when maximising profit
-INCLUDE_WATER_LICENSE_COSTS = 1
+INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 
@@ -515,13 +526,14 @@ INCLUDE_WATER_LICENSE_COSTS = 1
 
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'medium', or 'high'
+BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
 in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 
 - 'off' will turn off the GBF-3 target. 
+- 'low' is the low level of biodiversity target (i.e., restore 0% of degreaded biodiversity socore in the 'priority degraded land').
 - 'medium' is the medium level of biodiversity target (i.e., restore 15% of degreaded biodiversity socore in the 'priority degraded land').
 - 'high' is the high level of biodiversity target (i.e., restore 25% of degreaded biodiversity socore in the 'priority degraded land').
 '''
@@ -591,7 +603,7 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
+HABITAT_CONDITION = 'USER_DEFINED'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
 '''
 Used to calculate the level of degradation of biodiversity under agricultural land uses (i.e., multiplier of the impact of ag on biodiversity).
 - If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
