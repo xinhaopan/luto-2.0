@@ -26,7 +26,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_06_HCAS_50TH_CUSTOM' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250521_XINHAO_GRIDSEARCH' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -44,10 +44,10 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
-    'RESFACTOR': [7],
-    'SIM_YEARS': [list(range(2020,2051,5))],   # Years to run the model 
+    'RESFACTOR': [13],
+    'SIM_YEARS': [list(range(2020,2051,10))],   # Years to run the model 
     'WRITE_THREADS': [2],
-    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'WRITE_OUTPUT_GEOTIFFS': [False],
     'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML
     
  
@@ -63,19 +63,17 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
+    'GHG_EMISSIONS_LIMITS': ['low'],            # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],            # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                  # True or False
-    'GHG_LIMITS_FIELD': [
-        '1.5C (50%) excl. avoided emis SCOPE1', 
-        # '1.8C (67%) excl. avoided emis SCOPE1'
-    ],
+
     
     # --------------- Water constraints ---------------
     'WATER_LIMITS': ['on'],                     # 'on' or 'off'
     'WATER_CONSTRAINT_TYPE': ['soft'],          # 'hard' or 'soft'
-    'WATER_PENALTY': [1],
-    'INCLUDE_WATER_LICENSE_COSTS': [0],
+    'WATER_PENALTY': [1e-5],
+    'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
     'HABITAT_CONDITION': ['HCAS', 'USER_DEFINED', 'LUTO_ORIGINAL'],                
@@ -127,8 +125,8 @@ if __name__ == '__main__':
     grid_search_param_df = get_grid_search_param_df(TASK_ROOT_DIR, grid_search)
     grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
 
-    # 1) Submit task to a single linux machine, and run simulations parallely
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
+    # # 1) Submit task to a single linux machine, and run simulations parallely
+    # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
     create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster')

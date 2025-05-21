@@ -505,17 +505,17 @@ def map_desc_to_dvar_index(category: str,
 
 
 def plot_t_mat(t_mat:xr.DataArray):
-
+    
     '''
     Plot the transition matrix with hatched rectangles for NaN values.
-
+    
     Parameters
     ----------
     t_mat : xr.DataArray
         The transition matrix to plot.
-
+        
     '''
-
+ 
     # Set up plot
     fig, ax = plt.subplots(figsize=(8, 8))
 
@@ -579,8 +579,8 @@ def calc_water(
     index_levels = ['Landuse Type','Landuse subtype', 'Landuse', 'Water_supply',  'Water Net Yield (ML)']
 
     # Agricultural contribution
-    ag_mrj = ag_w_mrj[:, ind, :] * ag_dvar[:, ind, :]   
-    ag_jm = np.einsum('mrj->jm', ag_mrj)                             
+    ag_mrj = ag_w_mrj[:, ind, :] * ag_dvar[:, ind, :]
+    ag_jm = np.einsum('mrj->jm', ag_mrj)
     ag_df = pd.DataFrame(
         ag_jm.reshape(-1).tolist(),
         index=pd.MultiIndex.from_product(
@@ -594,7 +594,7 @@ def calc_water(
     non_ag_rk = non_ag_w_rk[ind, :] * non_ag_dvar[ind, :]  # Non-agricultural contribution
     non_ag_k = np.einsum('rk->k', non_ag_rk)                             # Sum over cells
     non_ag_df = pd.DataFrame(
-        non_ag_k, 
+        non_ag_k,
         index= pd.MultiIndex.from_product([
                 ['Non-agricultural Landuse'],
                 ['Non-Agricultural Landuse'],
@@ -724,8 +724,8 @@ class LogToFile:
         def flush(self):
             # Ensure content is written to disk
             self.file.flush()
-
-
+            
+            
 
 def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
     '''
@@ -735,7 +735,7 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
         mode (str): The mode to open the file. Default is 'a' (append).
         interval (int): The interval in seconds to log the memory usage.
     '''
-
+    
     with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
         while True:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
