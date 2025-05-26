@@ -193,10 +193,6 @@ def get_settings(setting_path:str):
         settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
 
-        # Set unused variables to None
-        settings_dict['GHG_LIMITS_FIELD'] = 'None'         if settings.GHG_LIMITS_TYPE == 'dict' else settings_dict['GHG_LIMITS_FIELD']
-        settings_dict['GHG_LIMITS'] = 'None'               if settings.GHG_LIMITS_TYPE == 'file' else settings_dict['GHG_LIMITS']
-
     return settings_dict
 
 
@@ -689,8 +685,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     else:
         ag_t_mrj = ag_transitions.get_transition_matrices_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
         non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
-            data, yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], ag_t_mrj,
-            separate=True
+            data,yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], ag_t_mrj, separate=True
         )
     
     # Get all land use decision variables
@@ -972,116 +967,6 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             swass[am].to_csv(os.path.join(path, f'switches-amstat-{am_snake_case}_{yr_cal}.csv'), index=False)
 
 
-def write_water(data: Data, yr_cal, path):
-    """Calculate water yield totals. Takes a Data Object, a calendar year (e.g., 2030), and an output path as input."""
-
-    print(f'Writing water outputs for {yr_cal}')
-
-    # Convert calendar year to year index.
-    yr_idx = yr_cal - data.YR_CAL_BASE
-
-    # Set up data for river regions or drainage divisions
-    if settings.WATER_REGION_DEF == 'Drainage Division':
-        region_limits = data.DRAINDIV_LIMITS
-        region_id = data.DRAINDIV_ID
-        region_dict = data.DRAINDIV_DICT
-
-    elif settings.WATER_REGION_DEF == 'River Region':
-        region_limits = data.RIVREG_LIMITS
-        region_id = data.RIVREG_ID
-        region_dict = data.RIVREG_DICT
-
-    else:
-        raise ValueError(
-            f"Incorrect option for WATER_REGION_DEF in settings: {settings.WATER_REGION_DEF} "
-            f"(must be either 'Drainage Division' or 'River Region')."
-        )
-
-        # Get water use for year in mrj format
-    ag_w_mrj_CCI = ag_water.get_water_net_yield_matrices(data, yr_idx)
-    non_ag_w_rk_CCI = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_CCI, data.lumaps[yr_cal], yr_idx)
-    wny_outside_luto_study_area_CCI = ag_water.get_water_outside_luto_study_area(data, yr_cal)
-
-    ag_w_mrj_base_yr = ag_water.get_water_net_yield_matrices(data, yr_idx, data.WATER_YIELD_HIST_DR,
-                                                             data.WATER_YIELD_HIST_SR)
-    non_ag_w_rk_base_yr = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_base_yr, data.lumaps[yr_cal], yr_idx,
-                                                              data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
-    wny_outside_luto_study_area_base_yr = ag_water.get_water_outside_luto_study_area_from_hist_level(data)
-
-    # Water yield from agricultural management is a multiple of the area of the water requirement,
-    # so it is not affected by the climate change impact.
-    ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, yr_idx)
-
-    # Get water use limits used as constraints in model
-    w_net_yield_limits = ag_water.get_water_net_yield_limit_values(data)
-
-    # Loop through specified water regions
-    df_water_seperate_dfs = []
-    df_water_limits_and_public_land_dfs = []
-    for region, (reg_name, limit_hist_level, ind) in w_net_yield_limits.items():
-        # Get the water yield limits and public land water yield
-        water_limit_pub = pd.DataFrame({
-            ('WNY LIMIT', 'HIST (ML)'): [limit_hist_level],
-            ('WNY Pubulic', 'HIST (ML)'): [wny_outside_luto_study_area_base_yr[region]],
-            ('WNY Pubulic', 'HIST + CCI (ML)'): [wny_outside_luto_study_area_CCI[region]]},
-            index=[reg_name]).unstack().reset_index()
-
-        water_limit_pub.columns = ['Type', 'CCI Existence', 'REGION', 'Value (ML)']
-        water_limit_pub = water_limit_pub[['REGION', 'Type', 'CCI Existence', 'Value (ML)']]
-        water_limit_pub.insert(0, 'Year', yr_cal)
-
-        # Calculate water yield for region and save to dataframe
-        df_region = tools.calc_water(
-            data,
-            ind,
-            ag_w_mrj_base_yr,
-            non_ag_w_rk_base_yr,
-            ag_man_w_mrj,
-            data.ag_dvars[yr_cal],
-            data.non_ag_dvars[yr_cal],
-            data.ag_man_dvars[yr_cal])
-
-        # Fix the land-use to the base year
-        # so that we can calculate water-yield only under climate change impact.
-        df_region_CCI = tools.calc_water(
-            data,
-            ind,
-            ag_w_mrj_CCI,
-            non_ag_w_rk_CCI,
-            ag_man_w_mrj,
-            data.ag_dvars[yr_cal],
-            data.non_ag_dvars[yr_cal],
-            data.ag_man_dvars[yr_cal])
-
-        # Calculate the water yield under different impacts
-        df_region['Without CCI'] = df_region['Water Net Yield (ML)']
-        df_region['With CCI'] = df_region_CCI['Water Net Yield (ML)']
-
-        # Add the region name and year to the dataframe
-        df_region.insert(0, 'region', region_dict[region])
-        df_region.insert(0, 'Year', yr_cal)
-
-        # Add dfs to list
-        df_water_seperate_dfs.append(df_region)
-        df_water_limits_and_public_land_dfs.append(water_limit_pub)
-
-    # Write the water limits and public land water yield to CSV
-    df_water_limits_and_public_land = pd.concat(df_water_limits_and_public_land_dfs)
-    df_water_limits_and_public_land.to_csv(os.path.join(path, f'water_yield_limits_and_public_land_{yr_cal}.csv'),
-                                           index=False)
-
-    # Write the separate water use to CSV
-    df_water_seperate = pd.concat(df_water_seperate_dfs)
-    df_water_seperate = df_water_seperate.melt(
-        id_vars=['Year', 'region', 'Landuse Type', 'Landuse subtype', 'Landuse', 'Water_supply'],
-        value_vars=['Without CCI', 'With CCI'],
-        var_name='Climate Change existence',
-        value_name='Value (ML)'
-    )
-    df_water_seperate['Water_supply'] = df_water_seperate['Water_supply'].replace(
-        {'dry': 'Dryland', 'irr': 'Irrigated'})
-    df_water_seperate.to_csv(os.path.join(path, f'water_yield_separate_{yr_cal}.csv'), index=False)
-
 
 def write_water(data: Data, yr_cal, path):
     """Calculate water yield totals. Takes a Data Object, a calendar year (e.g., 2030), and an output path as input."""
@@ -1089,20 +974,10 @@ def write_water(data: Data, yr_cal, path):
     print(f'Writing water outputs for {yr_cal}')
 
     yr_idx = yr_cal - data.YR_CAL_BASE
-
-
-    # Get the idx-name mapping for the water regions
-    if settings.WATER_REGION_DEF == 'Drainage Division':
-        region_dict = data.DRAINDIV_DICT
-    elif settings.WATER_REGION_DEF == 'River Region':
-        region_dict = data.RIVREG_DICT
-    else:
-        raise ValueError(f"Unknown water region definition: {settings.WATER_REGION_DEF}")
 
     # Get water water yield historical level, and the domestic water use
-    w_hist_yield = data.WATER_REGION_HIST_LEVEL
+    w_limit_inside_luto = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
     domestic_water_use = data.WATER_USE_DOMESTIC
-
 
     # Get the decision variables
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1115,7 +990,7 @@ def write_water(data: Data, yr_cal, path):
     wny_outside_luto_study_area_base_yr = xr.DataArray(
         list(ag_water.get_water_outside_luto_study_area_from_hist_level(data).values()),
         dims=['region'],
-        coords={'region': [region_dict[k] for k in ag_water.get_water_outside_luto_study_area_from_hist_level(data)]},
+        coords={'region': [data.WATER_REGION_NAMES[k] for k in ag_water.get_water_outside_luto_study_area_from_hist_level(data)]},
     )
 
     # Get water use under climate change impact; i.e., not providing 'water_dr_yield' and 'water_sr_yield' arguments
@@ -1128,8 +1003,9 @@ def write_water(data: Data, yr_cal, path):
 
     water_yields_inside_luto = pd.DataFrame()
     water_other_records = pd.DataFrame()
-    for reg_idx, wny_hist_level in w_hist_yield.items():
+    for reg_idx, w_limit_inside in w_limit_inside_luto.items():
         
+
         ind = data.WATER_REGION_INDEX_R[reg_idx]
         reg_name = data.WATER_REGION_NAMES[reg_idx]
 
@@ -1147,20 +1023,25 @@ def write_water(data: Data, yr_cal, path):
         am_wny = (am_dvar_mrj.isel(cell=ind) * ag_man_w_mrj.isel(cell=ind)).sum('cell').to_dataframe('Water Net Yield (ML)'
             ).reset_index(
             ).assign(Type='Agricultural Management', Year=yr_cal, Region=reg_name)
-
+            
         water_yields_inside_luto = pd.concat([water_yields_inside_luto, ag_wny, non_ag_wny, am_wny], ignore_index=True)
-
+            
         # Get the climate change impact, limit, and outside water yield for the region
         CCI_impact = (
-            (ag_w_mrj_CCI.isel(cell=ind) * ag_dvar_mrj.isel(cell=ind)).sum()
+            (ag_w_mrj_CCI.isel(cell=ind) * ag_dvar_mrj.isel(cell=ind)).sum() 
             + (non_ag_w_rk_CCI.isel(cell=ind) * non_ag_dvar_rj.isel(cell=ind)).sum()
             + wny_outside_luto_study_area_CCI.sel(region=reg_name)
         )
         
-        wny_limit = wny_hist_level * settings.WATER_STRESS
-        
+
         wny_sum = (
-             water_yields_inside_luto.query('Region == @reg_name')['Water Net Yield (ML)'].sum()
+             water_yields_inside_luto.query('Region == @reg_name')['Water Net Yield (ML)'].sum() 
+            + wny_outside_luto_study_area_base_yr.sel(region=reg_name).values
+            - domestic_water_use[reg_idx]
+        )
+
+        wny_limit_region = (
+            w_limit_inside
             + wny_outside_luto_study_area_base_yr.sel(region=reg_name).values
             - domestic_water_use[reg_idx]
         )
@@ -1171,10 +1052,10 @@ def write_water(data: Data, yr_cal, path):
             'Water yield outside LUTO (ML)': wny_outside_luto_study_area_base_yr.sel(region=reg_name).values,
             'Climate Change Impact (ML)': CCI_impact.values,
             'Domestic Water Use (ML)': domestic_water_use[reg_idx],
-            'Water Yield Limit (ML)': wny_limit,
+            'Water Yield Limit (ML)': wny_limit_region,
             'Water Net Yield (ML)': wny_sum,
         }])], ignore_index=True)
-
+        
         
     # Save the water yield data
     water_yields_inside_luto.rename(columns={
@@ -1449,8 +1330,8 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
 
     # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
     veg_base_score_score = veg_base_score_score.assign(
-        Type='Outside LUTO study area',
-        Year=yr_cal,
+        Type='Outside LUTO study area', 
+        Year=yr_cal, 
         lu='Outside LUTO study area'
     )
     pd.concat([
