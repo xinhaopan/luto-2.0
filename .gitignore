@@ -51,6 +51,7 @@ input/
 *.shp
 *.ffs_db
 *.ffs_lock
+*.npy
 myCode/**/Assets/
 /myCode/tasks_run/rsync/rsync_password
 

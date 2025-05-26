@@ -6,6 +6,7 @@ import re
 import cairosvg
 from lxml import etree
 from joblib import Parallel, delayed
+from plotnine import ggplot, aes, geom_area, theme, element_text, scale_fill_manual, labs, xlim, ylim
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -123,8 +124,11 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
             ax.set_yticks(y_ticks)  # 更新刻度
             ax.set_ylim(y_range[0], y_range[1])
 
-            # 显示所有图的水平网格线
+            # 显示所有图的 x 轴刻度
             ax.grid(True, axis='y', linestyle='--', linewidth=1.5)
+            # for year in [2020,2030,2040,2050]:
+            #     ax.axvline(x=year, color='grey', linestyle='--', linewidth=1.5)
+
             # 仅隐藏刻度标签，保留刻度和网格线
             # 仅隐藏刻度和刻度标签，保留水平网格线
             if not is_left_col:
@@ -153,6 +157,12 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
                 ax.set_xlim(x_range[0] - X_OFFSET, x_range[1] + X_OFFSET)
                 ax.set_xticks(np.arange(x_range[0], x_range[1] + 1, x_ticks))
                 ax.set_xticklabels(ax.get_xticks(), rotation=0, fontsize=font_size)
+
+                y0 = y_range[0]
+                tick_len = (y_range[1] - y_range[0]) * 0.03  # 相对高度，建议 1-2%
+                for x in [2010, 2020, 2030, 2040, 2050]:
+                    ax.plot([x, x], [y0, y0 - tick_len], color='black', linewidth=3, clip_on=False)
+
             else:
                 ax.spines['bottom'].set_visible(False)  # 隐藏 x 轴边框
                 ax.xaxis.set_ticks([])  # 隐藏 x 轴刻度
@@ -181,11 +191,12 @@ def plot_Combination_figures(merged_dict, output_png, input_names, plot_func, le
 
     ncol = math.ceil(len(all_labels) / legend_n_rows)
     legend_file = f"{output_png}" + "_legend.svg"
-    save_legend_as_image(all_handles, all_labels, legend_file, ncol, font_size=10)
     # 调整布局
     plt.tight_layout()
-    save_figure(fig, output_png)
     plt.show()
+    save_legend_as_image(all_handles, all_labels, legend_file, ncol, font_size=10)
+    save_figure(fig, output_png)
+
 
 
 
@@ -243,20 +254,52 @@ def save_figure(fig, output_prefix):
 
 
 
-def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(0.5, -0.03), font_size=10,format='svg'):
-    # 创建单独的图，用于保存图例
-    fig, ax = plt.subplots(figsize=(6, 1))  # 设置图例的大小
-    ax.axis('off')  # 关闭坐标轴
+# def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(0.5, -0.03), font_size=10,format='svg'):
+#     # 创建单独的图，用于保存图例
+#     fig, ax = plt.subplots(figsize=(6, 1))  # 设置图例的大小
+#     ax.axis('off')  # 关闭坐标轴
+#
+#     # 添加图例
+#     legend = fig.legend(handles, labels, loc='center', ncol=ncol, fontsize=font_size,
+#                         handlelength=0.5, handleheight=0.4, handletextpad=0.2,
+#                         labelspacing=0.4, columnspacing=0.5, frameon=False)
+#
+#     # 保存图例为单独的文件
+#     plt.savefig(output_file, bbox_inches='tight', pad_inches=0, dpi=300, transparent=True, format=format)
+#     plt.show()
+#     plt.close(fig)  # 关闭图，避免显示在主图上
+
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+
+def save_legend_as_image(handles, labels, output_file, ncol=3, legend_position=(0.5, -0.03),
+                         font_size=10, format='svg'):
+    # 提取颜色，重建 legend handle（防止 RuntimeError）
+    new_handles = []
+    for h in handles:
+        if hasattr(h, "get_facecolor"):
+            color = h.get_facecolor()
+            if isinstance(color, np.ndarray):
+                color = color[0]
+            new_handles.append(Patch(facecolor=color, edgecolor='none'))
+        else:
+            # fallback: use grey
+            new_handles.append(Patch(facecolor='grey', edgecolor='none'))
+
+    # 创建图像容器
+    fig, ax = plt.subplots(figsize=(6, 1))
+    ax.axis('off')
 
     # 添加图例
-    legend = fig.legend(handles, labels, loc='center', ncol=ncol, fontsize=font_size,
-                        handlelength=0.5, handleheight=0.4, handletextpad=0.2,
-                        labelspacing=0.4, columnspacing=0.5, frameon=False)
+    fig.legend(new_handles, labels, loc='center', ncol=ncol, fontsize=font_size,
+               handlelength=0.5, handleheight=0.4, handletextpad=0.2,
+               labelspacing=0.4, columnspacing=0.5, frameon=False)
 
-    # 保存图例为单独的文件
-    plt.savefig(output_file, bbox_inches='tight', pad_inches=0, dpi=300, transparent=True, format=format)
-    plt.show()
-    plt.close(fig)  # 关闭图，避免显示在主图上
+    # 保存为图片
+    plt.savefig(output_file, bbox_inches='tight', pad_inches=0, dpi=300,
+                transparent=True, format=format)
+    plt.close(fig)
+
 
 
 def plot_stacked_bar_and_line(ax, merged_dict, input_name, legend_colors, point_dict=None, point_colors=None,
@@ -618,7 +661,7 @@ def calculate_y_axis_range(data_dict, desired_ticks=5,use_parallel=True, n_jobs=
         return ((min_v, max_v), ticks)
 
 
-def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_land_use_movement_all.xlsx", yticks=None, fontsize=30,x_offset=1.3):
+def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_land_use_movement_all.xlsx", yticks=None, fontsize=30):
     """
     绘制土地利用变化的极坐标图。
 
@@ -688,8 +731,8 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
 
     # 设置极坐标的角度刻度与标签
     angles_deg_fixed = np.arange(0, 360, 45)
-    labels = ['North', 'Northeast', 'East', 'Southeast',
-              'South', 'Southwest', 'West', 'Northwest']
+    labels = ['N', 'NE', 'E', 'SE',
+              'S', 'SW', 'W', 'NW']
     offset_angles = [45, 90, 135, 225, 270, 315]
     # 对于 offset_angles 的位置先不显示标签，后续用 ax.text 标注
     masked_labels = [label if angle not in offset_angles else "" for angle, label in zip(angles_deg_fixed, labels)]
@@ -728,10 +771,6 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
     labels_y = ax.get_yticklabels()
     ax.set_yticklabels(labels_y, fontname='Arial', fontsize=fontsize)
 
-    # 在指定角度处添加完整标签
-    # 定义不同方向的偏移乘数
-    cardinal_offset = 1.0  # 控制四个主方向（东南西北）的偏移
-    east_west_offset = 0.92  # 控制东西方向的额外偏移
 
     # 在指定角度处添加完整标签
     for angle_deg in offset_angles:
@@ -739,12 +778,23 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
         # 查找对应的标签
         label = labels[angles_deg_fixed.tolist().index(angle_deg)]
 
-        # 设置基础偏移量
-        current_offset = x_offset * cardinal_offset
-
-        # 为东西方向设置额外偏移
-        if angle_deg == 90 or angle_deg == 270:  # 东西方向
-            current_offset = x_offset * east_west_offset
+        # 根据方向调整偏移量
+        if angle_deg == 0:  # 北 (North)
+            current_offset = 1
+        elif angle_deg == 45:  # 东北 (Northeast)
+            current_offset = 1.15
+        elif angle_deg == 90:  # 东 (East)
+            current_offset = 1.1
+        elif angle_deg == 135:  # 东南 (Southeast)
+            current_offset = 1.12
+        elif angle_deg == 180:  # 南 (South)
+            current_offset = 100
+        elif angle_deg == 225:  # 西南 (Southwest)
+            current_offset = 1.2
+        elif angle_deg == 270:  # 西 (West)
+            current_offset = 1.1
+        elif angle_deg == 315:  # 西北 (Northwest)
+            current_offset = 1.15
 
         # 添加标签
         ax.text(angle_rad,
@@ -777,3 +827,79 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
     save_figure(fig, output_file)
 
     plt.show()
+
+def plot_stacked_area(ax, merged_dict, input_name, legend_colors, font_size=10,
+                      x_range=(2010, 2050), y_range=(0, 100), x_ticks=None, y_ticks=None,
+                      show_legend=False):
+    merged_df = merged_dict[input_name]
+    merged_df.index = merged_df.index.astype(int)
+
+    categories = list(legend_colors.keys())
+    colors = list(legend_colors.values())
+
+    # 提取数据：正值、负值分开处理
+    years = merged_df.index
+    data = np.array([merged_df[cat].values for cat in categories])
+    data = np.nan_to_num(data)  # 防止有 NaN
+
+    # 正值堆叠（上方）
+    pos_data = np.where(data > 0, data, 0)
+    pos_stack = ax.stackplot(years, pos_data, labels=categories, colors=colors, alpha=0.9)
+
+    # 负值堆叠（下方）
+    neg_data = np.where(data < 0, data, 0)
+    # 负值方向堆叠时，需要手动“倒序堆叠”颜色，使其不和正值重叠
+    neg_stack = ax.stackplot(years, neg_data, labels=categories, colors=colors, alpha=0.9)
+
+    # 坐标轴设置
+    ax.set_xlim(x_range[0], x_range[1])
+    ax.set_ylim(y_range[0], y_range[1])
+    ax.tick_params(axis='both', which='both', direction='out', labelsize=font_size)
+
+    return pos_stack + neg_stack
+
+def plot_stacked_area_and_line(ax, merged_dict, input_name, legend_colors, point_dict=None, point_colors=None,
+                              font_size=10, x_range=(2010, 2050), y_range=(-600, 100),
+                              x_ticks=None, y_ticks=None, show_legend=False):
+    merged_df = merged_dict[input_name]
+    merged_df.index = merged_df.index.astype(int)
+
+    if point_dict is not None:
+        point_df = point_dict[input_name]
+        point_df.index = point_df.index.astype(int)
+
+    # 从 legend_colors 中获取 categories 和 color_list
+    categories = list(legend_colors.keys())
+    color_list = list(legend_colors.values())
+
+    # 准备数据
+    years = merged_df.index
+    data = np.array([merged_df[cat].values for cat in categories])
+    data = np.nan_to_num(data)  # 防止 NaN
+
+    # 分开正值和负值
+    pos_data = np.where(data > 0, data, 0)
+    neg_data = np.where(data < 0, data, 0)
+
+    # 绘制正数堆叠面积图
+    pos_area = ax.stackplot(years, pos_data, labels=categories, colors=color_list, alpha=1.0, zorder=1)
+
+    # 绘制负数堆叠面积图（镜像，颜色顺序相同）
+    neg_area = ax.stackplot(years, neg_data, labels=categories, colors=color_list, alpha=1.0, zorder=1)
+
+    # 绘制点线图
+    line_list = []
+    if point_dict is not None:
+        for idx, column in enumerate(point_df.columns):
+            color = point_colors[idx] if point_colors and idx < len(point_colors) else 'black'
+            line = ax.plot(years, point_df[column], marker='o', linewidth=1.5,
+                           label=column, markersize=3, color=color, zorder=3)
+            line_list.append(line)
+
+    # 坐标轴设置
+    ax.set_xlim(x_range[0], x_range[1])
+    ax.set_ylim(y_range[0], y_range[1])
+    ax.tick_params(axis='both', direction='out', labelsize=font_size)
+
+
+    return pos_area + neg_area, line_list

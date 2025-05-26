@@ -104,6 +104,47 @@ def draw_coloum(data, legend_colors, output_file, fontsize=22, y_range=(0, 200),
     save_figure(fig, output_file)
     plt.show()
 
+def draw_stacked_area(data, legend_colors, output_file, fontsize=22, y_range=(0, 200),
+                      y_tick_interval=50, ylabel='Food Demand (million tonnes/kilolitres [milk])'):
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # 设置边框粗细
+    for side in ['left', 'bottom', 'right', 'top']:
+        ax.spines[side].set_linewidth(axis_linewidth)
+
+    # 获取类别顺序和颜色
+    categories = list(legend_colors.keys())
+    colors = list(legend_colors.values())
+
+    # 绘制堆积面积图
+    data_to_plot = np.array([data[cat].values for cat in categories])
+    years = data.index
+    area_stack = ax.stackplot(years, data_to_plot, labels=categories, colors=colors)
+
+    # 设置 Y 轴范围和刻度
+    ax.set_ylim(y_range[0], y_range[1])
+    ax.set_yticks(np.arange(y_range[0], y_range[1] + 1, y_tick_interval))
+
+    # 设置 Y 轴标签
+    ax.yaxis.set_label_coords(-0.06, -1)
+    ax.set_ylabel(ylabel, fontsize=fontsize)
+
+    # 设置 X 轴范围和刻度
+    ax.set_xlim(2010, 2050)
+    ax.set_xticks(range(2010, 2051, 10))
+    ax.tick_params(axis='x', labelsize=fontsize, pad=10, direction='out')
+    ax.tick_params(axis='y', labelsize=fontsize, pad=10, direction='out')
+
+    # 图例另存为 SVG
+    handles, labels = ax.get_legend_handles_labels()
+    legend_file = f"{output_file}_legend.svg"
+    save_legend_as_image(handles, labels, legend_file, ncol=2, font_size=10)
+
+    # 保存图像
+    plt.tight_layout()
+    save_figure(fig, output_file)
+    plt.show()
+
 
 # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
 def get_biodiversity_target(input_files):
@@ -132,82 +173,82 @@ def get_biodiversity_target(input_files):
 
     return new_df
 
-
-font_size = 25
-# Bio
-df = get_biodiversity_target(input_files)
-# df = pd.read_csv('biodiversity_targets.csv', index_col=0)
-min_v, max_v, ticks = get_y_axis_ticks(df.min().min(), df.max().max(), desired_ticks=5)
-colors = ['#2ECC71', '#3498DB','#E74C3C']  # 根据数据列数调整颜色列表
-draw_plot_lines(df, colors, ' ', (min_v, max_v), ticks, "../output/03_biodiversity_limit.png", font_size=font_size)
-
-
-# GHG
-# 读取 Excel 文件
-df = pd.read_excel(INPUT_DIR + '/GHG_targets.xlsx', index_col=0)
-
-# 选择 2010 到 2050 年的数据
-df_filtered = df.loc[2010:2050,
-              ['1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', '1.8C (67%) excl. avoided emis SCOPE1']]
-
-# 将所有数据单位转换为 million (除以 1,000,000)
-df_filtered = df_filtered / 1e6
-df_filtered.columns = ['1.5°C (67%)', '1.5°C (50%)', '1.8°C (67%)']
-colors = ['#E74C3C', '#3498DB', '#2ECC71']  # 根据数据列数调整颜色列表
-min_v, max_v, ticks = get_y_axis_ticks(df_filtered.min().min(), df_filtered.max().max(), desired_ticks=6)
-draw_plot_lines(df_filtered, colors, ' ', (min_v, max_v), ticks, "../output/03_GHG_limit.png", font_size=font_size)
+if __name__ == "__main__":
+    font_size = 25
+    # Bio
+    df = get_biodiversity_target(input_files)
+    # df = pd.read_csv('biodiversity_targets.csv', index_col=0)
+    min_v, max_v, ticks = get_y_axis_ticks(df.min().min(), df.max().max(), desired_ticks=5)
+    colors = ['#2ECC71', '#3498DB','#E74C3C']  # 根据数据列数调整颜色列表
+    draw_plot_lines(df, colors, ' ', (min_v, max_v), ticks, "../output/03_biodiversity_limit.png", font_size=font_size)
 
 
-# Food demand
-dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5'))
-demand_data = dd.loc[(settings.SCENARIO,
-                      settings.DIET_DOM,
-                      settings.DIET_GLOB,
-                      settings.CONVERGENCE,
-                      settings.IMPORT_TREND,
-                      settings.WASTE,
-                      settings.FEED_EFFICIENCY),
-'PRODUCTION'].copy()
+    # GHG
+    # 读取 Excel 文件
+    df = pd.read_excel(INPUT_DIR + '/GHG_targets.xlsx', index_col=0)
 
-# 处理 'eggs' 数据
-demand_data.loc['eggs'] = demand_data.loc['eggs'] * settings.EGGS_AVG_WEIGHT / 1000 / 1000
-demand_data = demand_data.T / 1e6
-demand_data = demand_data.loc[2010:2050]
-demand_data = demand_data.drop(columns=['aquaculture', 'chicken', 'eggs', 'pork'])
+    # 选择 2010 到 2050 年的数据
+    df_filtered = df.loc[2010:2050,
+                  ['1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', '1.8C (67%) excl. avoided emis SCOPE1']]
 
-mapping_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='food')
-demand_data, legend_colors = process_single_df(demand_data, mapping_df)
-draw_coloum(demand_data, legend_colors, '../output/03_Food_demand.png', fontsize=font_size, y_range=(0, 200), y_tick_interval=50, ylabel=' ')
+    # 将所有数据单位转换为 million (除以 1,000,000)
+    df_filtered = df_filtered / 1e6
+    df_filtered.columns = ['1.5°C (67%)', '1.5°C (50%)', '1.8°C (67%)']
+    colors = ['#E74C3C', '#3498DB', '#2ECC71']  # 根据数据列数调整颜色列表
+    min_v, max_v, ticks = get_y_axis_ticks(df_filtered.min().min(), df_filtered.max().max(), desired_ticks=6)
+    draw_plot_lines(df_filtered, colors, ' ', (min_v, max_v), ticks, "../output/03_GHG_limit.png", font_size=font_size)
 
-# water
-dd = pd.read_hdf(os.path.join(INPUT_DIR, "draindiv_lut.h5"), index_col='HR_DRAINDIV_ID')
 
-# 生成 2010 到 2050 的年份作为行索引
-years = pd.Index(range(2010, 2051), name='Year')
+    # Food demand
+    dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5'))
+    demand_data = dd.loc[(settings.SCENARIO,
+                          settings.DIET_DOM,
+                          settings.DIET_GLOB,
+                          settings.CONVERGENCE,
+                          settings.IMPORT_TREND,
+                          settings.WASTE,
+                          settings.FEED_EFFICIENCY),
+    'PRODUCTION'].copy()
 
-# 创建一个以年份为索引的 DataFrame
-dd_yield_df = pd.DataFrame(index=years)
+    # 处理 'eggs' 数据
+    demand_data.loc['eggs'] = demand_data.loc['eggs'] * settings.EGGS_AVG_WEIGHT / 1000 / 1000
+    demand_data = demand_data.T / 1e6
+    demand_data = demand_data.loc[2010:2050]
+    demand_data = demand_data.drop(columns=['aquaculture', 'chicken', 'eggs', 'pork'])
 
-# 构建最终的 dd_yield_df
-for name, value in zip(dd['HR_DRAINDIV_NAME'], dd['WATER_YIELD_HIST_BASELINE_ML']):
-    dd_yield_df[name] = value * (1 - settings.WATER_STRESS * settings.AG_SHARE_OF_WATER_USE) / 1e6
+    mapping_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='food')
+    demand_data, legend_colors = process_single_df(demand_data, mapping_df)
+    draw_stacked_area(demand_data, legend_colors, '../output/03_Food_demand.png', fontsize=font_size, y_range=(0, 200), y_tick_interval=50, ylabel=' ')
 
-dd_outside_luto = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'))
-water_yield_natural_land = dd_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]] / 1e6
-water_cci_delta = pd.DataFrame()
-for col_name, col_data in water_yield_natural_land.items():
-    min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
-    before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
-    min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
-    min_gap_df = pd.DataFrame({col_name: min_gap})
-    water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
-
-water_cci_delta.columns = dd_yield_df.columns
-# 对两个 DataFrame 逐列相加
-dd_water_limit_df = dd_yield_df + water_cci_delta
-# dd_water_limit_df = dd_yield_df
-
-mapping_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='water')
-dd_water_limit_df, legend_colors = process_single_df(dd_water_limit_df, mapping_df)
-draw_coloum(dd_water_limit_df, legend_colors, '../output/03_water_limit.png', fontsize=font_size, y_range=(0, 300), y_tick_interval=100, ylabel=' ')
-
+    # # water------------------------------------------------------------------------------------------
+    # dd = pd.read_hdf(os.path.join(INPUT_DIR, "draindiv_lut.h5"), index_col='HR_DRAINDIV_ID')
+    #
+    # # 生成 2010 到 2050 的年份作为行索引
+    # years = pd.Index(range(2010, 2051), name='Year')
+    #
+    # # 创建一个以年份为索引的 DataFrame
+    # dd_yield_df = pd.DataFrame(index=years)
+    #
+    # # 构建最终的 dd_yield_df
+    # for name, value in zip(dd['HR_DRAINDIV_NAME'], dd['WATER_YIELD_HIST_BASELINE_ML']):
+    #     dd_yield_df[name] = value * (1 - settings.WATER_STRESS * settings.AG_SHARE_OF_WATER_USE) / 1e6
+    #
+    # dd_outside_luto = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'))
+    # water_yield_natural_land = dd_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]] / 1e6
+    # water_cci_delta = pd.DataFrame()
+    # for col_name, col_data in water_yield_natural_land.items():
+    #     min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
+    #     before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
+    #     min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
+    #     min_gap_df = pd.DataFrame({col_name: min_gap})
+    #     water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
+    #
+    # water_cci_delta.columns = dd_yield_df.columns
+    # # 对两个 DataFrame 逐列相加
+    # dd_water_limit_df = dd_yield_df + water_cci_delta
+    # # dd_water_limit_df = dd_yield_df
+    #
+    # mapping_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='water')
+    # dd_water_limit_df, legend_colors = process_single_df(dd_water_limit_df, mapping_df)
+    # draw_coloum(dd_water_limit_df, legend_colors, '../output/03_water_limit.png', fontsize=font_size, y_range=(0, 300), y_tick_interval=100, ylabel=' ')
+    #

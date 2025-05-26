@@ -23,7 +23,7 @@ area_dict = get_dict_data(input_files, csv_name, value_column_name, filter_colum
 ag_dict,legend_colors = get_colors(area_dict, 'tools/land use colors.xlsx', sheet_name='ag')
 output_png = '../output/07_S1_area_ag.png'
 y_range, y_ticks = calculate_y_axis_range(ag_dict,6)
-plot_Combination_figures(ag_dict, output_png, input_files, plot_stacked_bar, legend_colors,
+plot_Combination_figures(ag_dict, output_png, input_files, plot_stacked_area, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=7)
@@ -33,7 +33,7 @@ ghg_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column
 ghg_dict,legend_colors = get_colors(ghg_dict, 'tools/land use colors.xlsx', sheet_name='ag')
 output_png = '../output/07_S1_GHG_ag.png'
 y_range, y_ticks = calculate_y_axis_range(ghg_dict)
-plot_Combination_figures(ghg_dict, output_png, input_files, plot_stacked_bar, legend_colors,
+plot_Combination_figures(ghg_dict, output_png, input_files, plot_stacked_area, legend_colors,
                               n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
@@ -43,7 +43,7 @@ bio_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column
 bio_dict,legend_colors = get_colors(bio_dict, 'tools/land use colors.xlsx', sheet_name='ag')
 output_png = '../output/07_S1_BIO_ag.png'
 y_range, y_ticks = calculate_y_axis_range(bio_dict,4)
-plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_bar, legend_colors,
+plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_area, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
@@ -53,7 +53,7 @@ water_dict = get_dict_data(input_files, csv_name, value_column_name, filter_colu
 water_dict,legend_colors = get_colors(water_dict, 'tools/land use colors.xlsx', sheet_name='ag')
 output_png = '../output/07_S1_Water_ag.png'
 y_range, y_ticks = calculate_y_axis_range(water_dict)
-plot_Combination_figures(water_dict, output_png, input_files, plot_stacked_bar, legend_colors,
+plot_Combination_figures(water_dict, output_png, input_files, plot_stacked_area, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)

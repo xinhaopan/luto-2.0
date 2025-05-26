@@ -287,39 +287,73 @@ def write_custom_settings(task_dir: str, settings_dict: dict):
                 file.write(f'{k}={v}\n')
 
 
-def update_settings(settings_dict: dict, col: str):
-    # The input dir for each task will point to the absolute path of the input dir
-    settings_dict['INPUT_DIR'] = os.path.join(SOURCE_DIR, settings_dict['INPUT_DIR']).replace('\\', '/')
-    settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
-    # if settings_dict['CARBON_PRICES_FIELD'] != 'c0':
-    #     settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(', '')
-    settings_dict['NO_GO_VECTORS'] = {
-        'Winter cereals': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Winter_cereals.shp',
-        'Environmental Plantings': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Enviornmental_Plantings.shp'
-    }
-    if os.name == 'posix':
-        # Set the memory and time based on the resolution factor
-        # if int(settings_dict['RESFACTOR']) == 1:
-        #     MEM = "250G"
-        # elif int(settings_dict['RESFACTOR']) == 2:
-        #     MEM = "150G"
-        # elif int(settings_dict['RESFACTOR']) <= 5:
-        #     MEM = "100G"
-        # elif int(settings_dict['RESFACTOR']) <= 10:
-        #     MEM = "80G"
-        # else:
-        #     MEM = "40G"
-
-        # Update the settings dictionary
-        settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
-        settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
-        settings_dict['NCPUS'] = settings_dict['NCPUS'] if settings_dict['NCPUS'] != 'auto' else NCPUS
-
-        # Update the threads based on the number of cpus
-        settings_dict['THREADS'] = settings_dict['NCPUS']
-        settings_dict['WRITE_THREADS'] = settings_dict['NCPUS']
+def update_settings(settings_dict: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Update the task run settings with parameters for the server, and change the data path to absolute path.
+    E.g. job name, input directory, raw data directory, and threads.
+    '''
+    settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\', '/')
+    settings_dict['RAW_DATA'] = os.path.abspath(settings_dict['RAW_DATA']).replace('\\', '/')
+    settings_dict['THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
+
+def update_permutations(settings_df: pd.DataFrame) -> pd.DataFrame:
+    # --------------------------------------- GHG_EMISSIONS_LIMITS process -------------------------------------------------
+    ghg_map_name = {
+        'off': None,
+        'GHG_Low': 'low',
+        'GHG_Medium': 'medium',
+        'GHG_High': 'high'
+    }
+    settings_df['GHG_EMISSIONS_LIMITS'] = settings_df['GHG_NAME'].map(ghg_map_name)
+    if settings_df['GHG_EMISSIONS_LIMITS'].isnull().any():
+        bad_vals = settings_df.loc[settings_df['GHG_EMISSIONS_LIMITS'].isnull(), 'GHG_NAME'].unique()
+        raise ValueError(
+            f"Invalid value(s) for GHG_EMISSIONS_LIMITS: {bad_vals}. Must be 'off', 'GHG_Low', 'GHG_Medium', or 'GHG_High'.")
+
+
+    # --------------------------------------- GHG_LIMITS_FIELD process -------------------------------------------------
+    ghg_map = {
+        'off': None,
+        'GHG_Low': '1.8C (67%) excl. avoided emis SCOPE1',
+        'GHG_Medium': '1.5C (50%) excl. avoided emis SCOPE1',
+        'GHG_High': '1.5C (67%) excl. avoided emis SCOPE1',
+    }
+    settings_df['GHG_LIMITS_FIELD'] = settings_df['GHG_NAME'].map(ghg_map)
+    if settings_df['GHG_LIMITS_FIELD'].isnull().any():
+        bad_vals = settings_df.loc[settings_df['GHG_LIMITS_FIELD'].isnull(), 'GHG_NAME'].unique()
+        raise ValueError(f"Invalid value(s) for GHG_NAME: {bad_vals}. Must be 'GHG_Low', 'GHG_Medium', or 'GHG_High'.")
+
+    # --------------------------------------- BIODIVERSTIY_TARGET_GBF_2 process -------------------------------------------------
+    gbf2_map_name = {
+        'off': 'off',
+        'BIO_Low': 'low',
+        'BIO_Medium': 'medium',
+        'BIO_High': 'high'
+    }
+    settings_df['BIODIVERSTIY_TARGET_GBF_2'] = settings_df['GBF2_NAME'].map(gbf2_map_name)
+    if settings_df['BIODIVERSTIY_TARGET_GBF_2'].isnull().any():
+        bad_vals = settings_df.loc[settings_df['BIODIVERSTIY_TARGET_GBF_2'].isnull(), 'GBF2_NAME'].unique()
+        raise ValueError(
+            f"Invalid value(s) for BIODIVERSTIY_TARGET_GBF_2: {bad_vals}. Must be 'off', 'BIO_Low', 'BIO_Medium', or 'BIO_High'.")
+
+    # ---------------------------------------------- GBF2_TARGET_DICT -------------------------------------------------
+    gbf2_map = {
+        'off': None,
+        'BIO_Low': {2030: 0, 2050: 0, 2100: 0},
+        'BIO_Medium': {2030: 0.15, 2050: 0.15, 2100: 0.15},
+        'BIO_High': {2030: 0.15, 2050: 0.25, 2100: 0.25}
+    }
+    settings_df['GBF2_TARGET_DICT'] = settings_df['GBF2_NAME'].map(gbf2_map)
+    if settings_df['GBF2_TARGET_DICT'].isnull().any():
+        bad_vals = settings_df.loc[settings_df['GBF2_TARGET_DICT'].isnull(), 'GBF2_NAME'].unique()
+        raise ValueError(
+            f"Invalid value(s) for GBF2_NAME: {bad_vals}. Must be 'off', 'BIO_Low', 'BIO_Medium', or 'BIO_High'.")
+
+    # remove the NAME columns
+    settings_df = settings_df.loc[:, ~settings_df.columns.str.contains('NAME')]
+    return settings_df
 
 
 def create_run_folders(col):
@@ -370,39 +404,37 @@ def recommend_resources(df):
 
 def create_grid_search_template(grid_dict, output_file,suffixs=['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT'], run_time=None) -> pd.DataFrame:
     # Collect new columns in a list
-    template_df = create_settings_template('Custom_runs')
-    template_grid_search = template_df.copy()
 
-    # Convert all values in the grid_dict to string representations
-    grid_dict = {k: [str(v) for v in v] for k, v in grid_dict.items()}
 
     # Create a list of dictionaries with all possible permutations
+    grid_dict = {k: [str(i) for i in v] for k, v in grid_dict.items()}
     keys, values = zip(*grid_dict.items())
     permutations = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
-    permutations_df = pd.DataFrame(permutations)
-    permutations_df.insert(0, 'run_idx', range(1, len(permutations_df) + 1))
+    grid_search_param_df = pd.DataFrame(permutations)
 
-    # Reporting the grid search template
-    print(f'Grid search template has been created with {len(permutations_df)} permutations!')
-    # permutations_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
+    run_settings_dfs = []
+    total = len(grid_search_param_df)
+    template_df = create_settings_template('Custom_runs')
+    template_grid_search = template_df.copy()
+    for idx, (_, row) in enumerate(grid_search_param_df.iterrows()):
+        settings_dict = template_grid_search.set_index('Name')['Default_run'].to_dict()
+        settings_dict.update(row.to_dict())
+        settings_dict = update_settings(settings_dict)
+        run_id = generate_run_id(row, idx, total, suffixs=suffixs, run_time=run_time)
+        run_settings_dfs.append(pd.Series(settings_dict, name=run_id))
 
-    # Loop through the permutations DataFrame and create new columns with updated settings
-    for _, row in permutations_df.iterrows():
-        # Copy the default settings
-        new_column = template_df['Default_run'].copy()
+    grid_search_param_df = update_permutations(pd.DataFrame(run_settings_dfs))
 
-        # Replace the settings using the key-value pairs in the permutation item
+    param_names = template_df['Name'].values
+    template_grid_search.index = template_grid_search['Name'].values
+    for idx, row in grid_search_param_df.iterrows():
+        new_column = pd.Series(template_df['Default_run'].values, index=param_names)
         for k, v in row.items():
-            if k != 'run_idx':
-                new_column.loc[template_df['Name'] == k] = v
+            if k != 'run_idx' and k in new_column.index:
+                new_column[k] = v
+        template_grid_search = pd.concat([template_grid_search, new_column.rename(row.name)], axis=1)
 
-        # Rename the column and add it to the DataFrame
-        new_column.name = f'Run_{row["run_idx"]}'
-        template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]}')], axis=1)
-
-    # Modify column names using the new function
-    template_grid_search = modify_column_name(template_grid_search, suffixs, run_time)
 
     print(template_grid_search.columns)
     template_grid_search.to_csv(output_file, index=False)
@@ -411,56 +443,16 @@ def create_grid_search_template(grid_dict, output_file,suffixs=['GHG_LIMITS_FIEL
     recommend_resources(template_grid_search)
     return template_grid_search
 
-def modify_column_name(template_grid_search, suffixs=['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT'], run_time=None):
+def generate_run_id(row, idx, total, suffixs=['GHG_NAME', 'GBF2_NAME'], run_time=None):
     """
-    Modify column names in the template grid search DataFrame based on the provided suffixes.
-
-    Args:
-        template_grid_search (pd.DataFrame): DataFrame containing the template settings.
-        suffixs (list): List of suffixes to append to column names.
-        run_time (str): Custom timestamp to use in column names. If None, uses current time.
-
-    Returns:
-        pd.DataFrame: DataFrame with modified column names.
+    生成如 20240521_Run_01_GHG_Low_BIO_Low 这样格式的run_id，编号宽度根据实验总数自动调整。
     """
     if run_time is None:
         run_time = datetime.datetime.now().strftime("%Y%m%d")
+    width = len(str(total))
+    run_num = str(idx + 1).zfill(width)
+    run_id = f"{run_time}_Run_{run_num}"
+    for suffix in suffixs:
+        run_id += f"_{row[suffix]}"
+    return run_id
 
-    # Default GHG and BIO mappings
-    ghg_name_map = {
-        "1.8C (67%) excl. avoided emis SCOPE1": "GHG_Low",
-        "1.5C (50%) excl. avoided emis SCOPE1": "GHG_Moderate",
-        "1.5C (67%) excl. avoided emis SCOPE1": "GHG_High"
-    }
-    bio_name_map = {
-        "{2010: 0, 2030: 0, 2050: 0, 2100: 0}": "BIO_Low",
-        "{2010: 0, 2030: 0.15, 2050: 0.15, 2100: 0.3}": "BIO_Moderate",
-        "{2010: 0, 2030: 0.15, 2050: 0.3, 2100: 0.3}": "BIO_High"
-    }
-
-    # Initialize new column names list
-    new_column_names = []
-
-    for col in template_grid_search.columns[2:]:  # Skip the first two columns
-        new_name = f"{run_time}_{col.split('.')[0]}"
-        for suffix in suffixs:
-            try:
-                if suffix == 'GHG_LIMITS_FIELD' or suffix == 'BIODIV_GBF_TARGET_2_DICT':
-                    if suffix == 'GHG_LIMITS_FIELD':
-                        ghg_value = template_grid_search.loc[template_grid_search['Name'] == 'GHG_LIMITS_FIELD', col].values[0]
-                        new_name += f"_{ghg_name_map.get(ghg_value, 'Unknown_GHG')}"
-                    elif suffix == 'BIODIV_GBF_TARGET_2_DICT':
-                        bio_value = template_grid_search.loc[template_grid_search['Name'] == 'BIODIV_GBF_TARGET_2_DICT', col].values[0]
-                        new_name += f"_{bio_name_map.get(bio_value, 'Unknown_BIO')}"
-                else:
-                    # Use suffix as an index to get the corresponding value from template_grid_search
-                    suffix_value = template_grid_search.loc[template_grid_search['Name'] == suffix, col].values[0]
-                    new_name += f"_{suffix_value}"
-            except Exception as e:
-                print(f'Error processing suffix {suffix} for column {col}: {e}')
-        new_column_names.append(new_name)
-
-    # Update the column names of the DataFrame
-    template_grid_search.columns = template_grid_search.columns[:2].tolist() + new_column_names
-
-    return template_grid_search
