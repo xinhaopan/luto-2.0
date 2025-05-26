@@ -736,7 +736,7 @@ def save_report_data(raw_data_dir:str):
     
     # Save the transition matrix cost
     cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_df.groupby(['Year','From land-use', 'To land-use']).sum(numeric_only=True).reset_index()
-    cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat.set_index(['Year','From land-use', 'To land-use'])
+    cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat.set_index(['Year','From land-use', 'To land-use']).query('abs(`Value (million)`) > 1')
     cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat\
                                         .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, AG_LANDUSE], 
                                                  names = ['Year','From land-use', 'To land-use'])).reset_index()
@@ -782,7 +782,7 @@ def save_report_data(raw_data_dir:str):
     # Get the transition matrix cost
     cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_df\
                                             .groupby(['Year','From land-use', 'To land-use'])\
-                                            .sum(numeric_only=True).reset_index()
+                                            .sum(numeric_only=True).reset_index().query('abs(`Value (million)`) > 1')
                                             
     cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_trans_mat\
                                            .set_index(['Year','From land-use', 'To land-use'])\
@@ -831,7 +831,7 @@ def save_report_data(raw_data_dir:str):
     # Get the transition matrix cost
     cost_transition_non_ag2ag_trans_mat = cost_transition_non_ag2ag_df\
                                             .groupby(['Year','From land-use', 'To land-use'])\
-                                            .sum(numeric_only=True).reset_index()
+                                            .sum(numeric_only=True).reset_index().query('abs(`Value (million)`) > 1')
                                             
     cost_transition_non_ag2ag_trans_mat = cost_transition_non_ag2ag_trans_mat\
                                              .set_index(['Year','From land-use', 'To land-use'])\
@@ -1243,9 +1243,9 @@ def save_report_data(raw_data_dir:str):
         .reset_index()
     water_inside_LUTO_broad_cat_sum_wide.columns = ['name','data']
     water_inside_LUTO_broad_cat_sum_wide['type'] = 'column'
-
-
-    water_outside_LUTO = water_hist_and_public_land_yield.query('Type == "Water yield outside LUTO (ML)"').copy()
+    
+        
+    water_outside_LUTO = water_hist_and_public_land_yield.query('Type == "Water yield outside LUTO (ML)"').copy()    
     water_outside_LUTO_total = water_outside_LUTO\
         .groupby('Year')\
         .sum(numeric_only=True)\
@@ -1253,8 +1253,8 @@ def save_report_data(raw_data_dir:str):
     water_outside_LUTO_total_wide = list(map(list,zip(
         water_outside_LUTO_total['Year'], water_outside_LUTO_total['Water Net Yield (ML)']
     )))
-
-
+    
+    
     water_CCI = water_hist_and_public_land_yield.query('Type == "Climate Change Impact (ML)"').copy()\
         .groupby('Year')\
         .sum(numeric_only=True)\
@@ -1262,12 +1262,13 @@ def save_report_data(raw_data_dir:str):
     water_CCI_wide = list(map(list,zip(
         water_CCI['Year'], water_CCI['Water Net Yield (ML)']
     )))
-
+    
     water_domestic = water_hist_and_public_land_yield.query('Type == "Domestic Water Use (ML)"').copy()\
         .groupby('Year')\
         .sum(numeric_only=True)\
         .reset_index()
-    water_domestic_wide = (-water_domestic[['Year','Water Net Yield (ML)']].values).tolist()  # Domestic water use is negative, indicating a water loss (consumption)
+    water_domestic['Water Net Yield (ML)'] = -water_domestic['Water Net Yield (ML)']  # Domestic water use is negative, indicating a water loss (consumption)
+    water_domestic_wide = (water_domestic[['Year','Water Net Yield (ML)']].values).tolist()
     
     water_yield_sum = water_hist_and_public_land_yield.query('Type == "Water Net Yield (ML)"').copy()\
         .groupby('Year')\
@@ -1284,23 +1285,23 @@ def save_report_data(raw_data_dir:str):
     water_limit_wide = list(map(list,zip(
         water_limit['Year'], water_limit['Water Net Yield (ML)']
     )))
-
+  
     
     water_yield_df = water_inside_LUTO_broad_cat_sum_wide.copy()
     water_yield_df.loc[len(water_yield_df)] = ['Outside LUTO Study Area', water_outside_LUTO_total_wide,  'column']
     water_yield_df.loc[len(water_yield_df)] = ['Climate Change Impact', water_CCI_wide,  'column']
-    water_yield_df.loc[len(water_yield_df)] = ['Domestic Water Use', water_CCI_wide,  'column']
+    water_yield_df.loc[len(water_yield_df)] = ['Domestic Water Use', water_domestic_wide,  'column']
     water_yield_df.loc[len(water_yield_df)] = ['Water Net Yield', water_yield_sum_wide, 'spline']
     water_yield_df.loc[len(water_yield_df)] = ['Water Limit', water_limit_wide, 'spline']
     water_yield_df.to_json(f'{SAVE_DIR}/water_1_water_net_use_by_broader_category.json', orient='records')
-
+    
 
     # Plot_5-2: Water net yield by specific land-use (ML)
     water_inside_LUTO_specific_lu_sum = water_df_separate\
         .groupby(['Year','Landuse'])[['Water Net Yield (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()
-
+            
     water_inside_LUTO_specific_lu_sum_wide = water_inside_LUTO_specific_lu_sum\
         .groupby(['Landuse'])[['Year','Water Net Yield (ML)']]\
         .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
@@ -1321,19 +1322,19 @@ def save_report_data(raw_data_dir:str):
         water_inside_LUTO_region = water_df_separate.query('Region == @reg_name').copy()
         water_inside_yield_sum = water_inside_LUTO_region.groupby(['Year'])[['Water Net Yield (ML)']].sum(numeric_only=True).reset_index()
         water_inside_yield_wide = list(map(list,zip(water_inside_yield_sum['Year'], water_inside_yield_sum['Water Net Yield (ML)'])))
-
+            
         water_outside_LUTO_region = water_outside_LUTO.query('Region == @reg_name').copy()
         water_outside_yiled_wide = list(map(list,zip(water_outside_LUTO_region['Year'], water_outside_LUTO_region['Water Net Yield (ML)'])))
 
         water_CCI = water_hist_and_public_land_yield.query('Type == "Climate Change Impact (ML)" and Region == @reg_name').copy()
         water_CCI_wide = list(map(list,zip(water_CCI['Year'], water_CCI['Water Net Yield (ML)'])))
-
+        
         water_domestic = water_hist_and_public_land_yield.query('Type == "Domestic Water Use (ML)" and Region == @reg_name').copy()
         water_domestic_wide = list(map(list,zip(water_domestic['Year'], -water_domestic['Water Net Yield (ML)'])))  # Domestic water use is negative, indicating a water loss (consumption)
-
+        
         water_yield_sum = water_hist_and_public_land_yield.query('Type == "Water Net Yield (ML)" and Region == @reg_name').copy()
         water_yield_sum_wide = list(map(list,zip(water_yield_sum['Year'], water_yield_sum['Water Net Yield (ML)'])))
-
+        
         water_limit = water_hist_and_public_land_yield.query('Type == "Water Yield Limit (ML)" and Region == @reg_name').copy()
         water_limit_wide = list(map(list,zip(water_limit['Year'], water_limit['Water Net Yield (ML)'])))
 
