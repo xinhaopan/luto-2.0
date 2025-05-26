@@ -556,55 +556,9 @@ def calc_water_net_yield_BASE_YR(data) -> np.ndarray:
 
 
 
-def get_water_net_yield_hist_level(
-    data,
-) -> dict[int, list[str, float, np.ndarray]]:
+def get_wny_for_watershed_regions_for_base_yr(data):
     """
-    Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
-
-    Parameters
-    ----------
-    - data: The data object containing the necessary input data.
-
-    Returns
-    -------
-    water_net_yield_limits: dict(int, list[str, float, np.ndarray])
-        A dictionary with the following structure:
-        - key: region ID
-        - value: 0) region name, 1) water yield limit (ML/cell), 2) indices of cells in the region
-
-    """
-    # Get the water limit from data to avoid recalculating
-    if data.WATER_YIELD_LIMITS is not None:
-        return data.WATER_YIELD_LIMITS
-    
-    # Get historical yields of regions, stored in data.RIVREG_HIST_LEVEL and data.DRAINDIV_HIST_LEVEL
-    if settings.WATER_REGION_DEF == 'River Region':
-        wny_region_hist = data.RIVREG_HIST_LEVEL
-        region_id = data.RIVREG_ID
-        region_names = data.RIVREG_DICT
-
-    elif settings.WATER_REGION_DEF == 'Drainage Division':
-        wny_region_hist = data.DRAINDIV_HIST_LEVEL
-        region_id = data.DRAINDIV_ID
-        region_names = data.DRAINDIV_DICT
-
-    # Calculate the water yield limits for each region
-    limits_by_region = {}
-    for region, name in region_names.items():
-        hist_yield = wny_region_hist[region]
-        ind = np.flatnonzero(region_id == region).astype(np.int32)
-        limits_by_region[region] = [name, hist_yield, ind]    
-
-    # Save the results in data to avoid recalculating
-    data.WATER_YIELD_LIMITS = limits_by_region
-    
-    return limits_by_region
-
-
-def get_wreq_domestic_regions(data) -> dict[int, float]:
-    """
-    Return water requirements for regions (River Regions or Drainage Divisions as specified in luto.settings.py) at the BASE_YR.
+    Return water net yield for watershed regions at the BASE_YR.
 
     Parameters
         data (object): The data object containing the required data.
@@ -612,44 +566,26 @@ def get_wreq_domestic_regions(data) -> dict[int, float]:
     Returns
         dict[int, float]: A dictionary with the following structure:
         - key: region ID
-        - value: water requirement for domestic use in this region (ML)
+        - value: water net yield for this region (ML)
     """
-    if data.WREQ_DOMESTIC_REGIONS is not None:
-        return data.WREQ_DOMESTIC_REGIONS
+    watershed_regions_r = data.DRAINDIV_ID if settings.WATER_REGION_DEF else data.RIVREG_ID
+    wny_inside_mrj = get_water_net_yield_matrices(data, data.YR_CAL_BASE, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+    wny_base_yr_inside_r = np.einsum('mrj,mrj->r', wny_inside_mrj, data.AG_L_MRJ)
     
-    # Get the water requirement matrices at the YR_CAL_BASE
-    w_req_mrj = get_wreq_matrices(data, data.YR_CAL_BASE)
-    w_req_r = np.einsum('mrj,mrj->r', w_req_mrj, data.AG_L_MRJ)
+    wny_base_yr_inside_regions = {k:v for k,v in enumerate(np.bincount(watershed_regions_r, wny_base_yr_inside_r))}
+    wny_base_yr_outside_regions = get_water_outside_luto_study_area_from_hist_level(data)
+    w_use_domestic_regions = data.WATER_USE_DOMESTIC
     
-    # Keep only the positive values as water requirements
-    w_req_r = np.where(w_req_r > 0, w_req_r, 0)
-    
-    if settings.WATER_REGION_DEF == 'River Region':
-        w_req_r = np.bincount(data.RIVREG_ID, w_req_r)
-        w_req_r = {region: w_req for region, w_req in enumerate(w_req_r) if region != 0}
-    elif settings.WATER_REGION_DEF == 'Drainage Division':
-        w_req_r = np.bincount(data.DRAINDIV_ID, w_req_r)
-        w_req_r = {region: w_req for region, w_req in enumerate(w_req_r) if region != 0}
-    else:
-        raise ValueError(
-            f"Invalid value for setting WATER_REGION_DEF: '{settings.WATER_REGION_DEF}' "
-            f"(must be either 'River Region' or 'Drainage Division')."
+    wny_sum = {}
+    for reg_id in wny_base_yr_outside_regions:
+        wny_sum[reg_id] = (
+            wny_base_yr_inside_regions[reg_id] +
+            wny_base_yr_outside_regions[reg_id] -
+            w_use_domestic_regions[reg_id]
         )
         
-    # Get the water requirement for domestic use
-    w_req_domestic = {
-        k: (v / settings.WATER_USE_SHARE_AG * settings.WATER_USE_SHARE_DOMESTIC) 
-        for k, v in w_req_r.items() 
-    }
-    
-    # TODO: this is a temporary fix to get the water requirement for domestic use
-    # w_req_domestic = pd.read_csv(f'{settings.INPUT_DIR}/water_consumption_DR.csv', index_col=0)['Water Consumption (ML/year)'].to_dict()
+    return wny_sum
         
-    # Save the results in data to avoid recalculating
-    if data.WREQ_DOMESTIC_REGIONS is None:
-        data.WREQ_DOMESTIC_REGIONS = w_req_domestic
-
-    return w_req_domestic
     
 
 

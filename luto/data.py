@@ -842,7 +842,6 @@ class Data:
         
         # Initialize water constraints to avoid recalculating them every time.
         self.WATER_YIELD_LIMITS = None
-        self.WREQ_DOMESTIC_REGIONS = None
 
         # Water requirements by land use -- LVSTK.
         wreq_lvstk_dry = pd.DataFrame()
@@ -957,11 +956,34 @@ class Data:
             self.WATER_OUTSIDE_LUTO_DD = dd_outside_luto
             self.WATER_OUTSIDE_LUTO_DD_HIST = water_yield_oustide_luto_hist.query('Region_Type == "Drainage Division"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
             self.WATER_UNDER_NATURAL_LAND_DD = dd_natural_land
-            
-        # Place holder for Water Yield under River Region to avoid recalculating it every time.
+
+
+        # Get historical yields of regions
+        if settings.WATER_REGION_DEF == 'River Region':
+            self.WATER_REGION_NAMES = self.RIVREG_DICT
+            self.WATER_REGION_HIST_LEVEL = self.RIVREG_HIST_LEVEL
+            self.WATER_REGION_ID = {k:(self.RIVREG_ID == k) for k in self.RIVREG_DICT.keys()}
+
+        elif settings.WATER_REGION_DEF == 'Drainage Division':
+            self.WATER_REGION_NAMES = self.DRAINDIV_DICT
+            self.WATER_REGION_HIST_LEVEL = self.DRAINDIV_HIST_LEVEL
+            self.WATER_REGION_ID = {k:(self.DRAINDIV_ID == k) for k in self.DRAINDIV_DICT.keys()}
+
+
+        # Calculate the water yield limits for each region
+        self.WATER_REGION_INDEX_R = {k:(self.WATER_REGION_ID == k) for k in self.WATER_REGION_NAMES.keys()}
+
+
+        # Place holder for Water Yield to avoid recalculating it every time.
         self.water_yield_regions_BASE_YR = None
         
-        
+        # Water use for domestic and industrial sectors.
+        water_use_domestic = pd.read_csv(os.path.join(settings.INPUT_DIR, "Water_Use_Domestic.csv")).query('REGION_TYPE == @settings.WATER_REGION_DEF')
+        self.WATER_USE_DOMESTIC = water_use_domestic.set_index('REGION_ID')['DOMESTIC_INDUSTRIAL_WATER_USE_ML'].to_dict()
+
+
+
+
         ###############################################################
         # Carbon sequestration by natural lands.
         ###############################################################
