@@ -99,7 +99,7 @@ def run(
 
     # Solve and write output
     solve_timeseries(data, years)
-    write_outputs(data)
+    # write_outputs(data)
     
 
 
