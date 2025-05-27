@@ -18,12 +18,12 @@ grid_search = {
     'SIM_YERAS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_NAME': ['GHG_High', 'GHG_Medium', 'GHG_Low'],
+    'GHG_EMISSIONS_LIMITS': ['high', 'medium', 'low'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'GBF2_NAME': ['BIO_Low', 'BIO_Medium', 'BIO_High'],
+    'BIODIVERSTIY_TARGET_GBF_2': ['low', 'medium', 'high'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
 
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
@@ -40,11 +40,14 @@ grid_search = {
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
 }
-
-suffixs = ['GHG_NAME','GBF2_NAME']
+settings_name_dice = {
+    'GHG_EMISSIONS_LIMITS':'GHG',
+    'BIODIVERSTIY_TARGET_GBF_2':'BIO',
+    'RESFACTOR':'RES',
+}
 
 output_file = os.path.join("Custom_runs", "setting_0520.csv")
-create_grid_search_template(grid_search,output_file,suffixs)
+create_grid_search_template(grid_search,output_file,settings_name_dice)
 
 print(f"saved to {output_file}")
 

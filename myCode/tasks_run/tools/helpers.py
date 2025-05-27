@@ -26,50 +26,35 @@ def print_with_time(message):
     print(f"[{timestamp}] {message}")
 
 
-def create_settings_template(to_path: str = 'Custom_runs'):
+def get_settings_df(task_root_dir:str) -> pd.DataFrame:
     # Save the settings template to the root task folder
-    None if os.path.exists(to_path) else os.makedirs(to_path)
+    if not os.path.exists(task_root_dir):
+        os.makedirs(task_root_dir, exist_ok=True)
 
-    # Check if the settings_template.csv already exists
-    if os.path.exists(f'{to_path}/settings_template.csv'):
-        print('settings_template.csv already exists! Skip creating a new one!')
-        return pd.read_csv(f'{to_path}/settings_template.csv')
-    else:
-        # Get the settings from luto.settings
-        with open(f'{SOURCE_DIR}/luto/settings.py', 'r') as file, \
-                open(f'{to_path}/non_str_val.txt', 'w') as non_str_val_file:
+    # Get the settings from luto.settings
+    with open('../../luto/settings.py', 'r') as file, \
+            open(f'{task_root_dir}/non_str_val.txt', 'w') as non_str_val_file:
 
-            lines = file.readlines()
+        # Regex patterns that matches variable assignments from settings
+        lines = file.readlines()
+        parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")  # Keys are uppercase and start with a letter
+        settings_keys = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
 
-            # Regex patterns that matches variable assignments from settings
-            parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
-            settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
+        # Reorder the settings dictionary to match the order in the settings.py file
+        settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
+        settings_dict = {key: settings_dict[key] for key in settings_keys if key in settings_dict}
 
-            # Reorder the settings dictionary to match the order in the settings.py file
-            settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
-            settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
+        # Write the non-string values to a file; this helps to evaluate the settings later
+        for k, v in settings_dict.items():
+            if not isinstance(v, str):
+                non_str_val_file.write(f'{k}\n')
 
-            # Add parameters
-            settings_dict['JOB_NAME'] = 'auto'
-            settings_dict['MEM'] = 'auto'
-            settings_dict['QUEUE'] = 'normal'
-            settings_dict['WRITE_THREADS'] = 10  # 10 threads for writing is a safe number to avoid out-of-memory issues
-            # settings_dict['NCPUS'] = min(settings_dict['THREADS'] // 4 * 4, 48)  # max 48 cores
-            settings_dict['NCPUS'] = 'auto'
-            settings_dict['TIME'] = '10:00:00'
-
-            # Write the non-string values to a file
-            for k, v in settings_dict.items():
-                if not isinstance(v, str):
-                    non_str_val_file.write(f'{k}\n')
-
-        # Create a template for custom settings
-        settings_df = pd.DataFrame({k: [v] for k, v in settings_dict.items()}).T.reset_index()
-        settings_df.columns = ['Name', 'Default_run']
-        settings_df = settings_df.map(str)
+    # Create a template for custom settings
+    settings_df = pd.DataFrame({k: [v] for k, v in settings_dict.items()}).T.reset_index()
+    settings_df.columns = ['Name', 'Default_run']
+    settings_df = settings_df.map(str)
 
     return settings_df
-
 
 
 def process_column(col, custom_settings, script_name, delay):
@@ -312,19 +297,6 @@ def update_permutations(settings_df: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(
             f"Invalid value(s) for GHG_EMISSIONS_LIMITS: {bad_vals}. Must be 'off', 'GHG_Low', 'GHG_Medium', or 'GHG_High'.")
 
-
-    # --------------------------------------- GHG_LIMITS_FIELD process -------------------------------------------------
-    ghg_map = {
-        'off': None,
-        'GHG_Low': '1.8C (67%) excl. avoided emis SCOPE1',
-        'GHG_Medium': '1.5C (50%) excl. avoided emis SCOPE1',
-        'GHG_High': '1.5C (67%) excl. avoided emis SCOPE1',
-    }
-    settings_df['GHG_LIMITS_FIELD'] = settings_df['GHG_NAME'].map(ghg_map)
-    if settings_df['GHG_LIMITS_FIELD'].isnull().any():
-        bad_vals = settings_df.loc[settings_df['GHG_LIMITS_FIELD'].isnull(), 'GHG_NAME'].unique()
-        raise ValueError(f"Invalid value(s) for GHG_NAME: {bad_vals}. Must be 'GHG_Low', 'GHG_Medium', or 'GHG_High'.")
-
     # --------------------------------------- BIODIVERSTIY_TARGET_GBF_2 process -------------------------------------------------
     gbf2_map_name = {
         'off': 'off',
@@ -337,19 +309,6 @@ def update_permutations(settings_df: pd.DataFrame) -> pd.DataFrame:
         bad_vals = settings_df.loc[settings_df['BIODIVERSTIY_TARGET_GBF_2'].isnull(), 'GBF2_NAME'].unique()
         raise ValueError(
             f"Invalid value(s) for BIODIVERSTIY_TARGET_GBF_2: {bad_vals}. Must be 'off', 'BIO_Low', 'BIO_Medium', or 'BIO_High'.")
-
-    # ---------------------------------------------- GBF2_TARGET_DICT -------------------------------------------------
-    gbf2_map = {
-        'off': None,
-        'BIO_Low': {2030: 0, 2050: 0, 2100: 0},
-        'BIO_Medium': {2030: 0.15, 2050: 0.15, 2100: 0.15},
-        'BIO_High': {2030: 0.15, 2050: 0.25, 2100: 0.25}
-    }
-    settings_df['GBF2_TARGET_DICT'] = settings_df['GBF2_NAME'].map(gbf2_map)
-    if settings_df['GBF2_TARGET_DICT'].isnull().any():
-        bad_vals = settings_df.loc[settings_df['GBF2_TARGET_DICT'].isnull(), 'GBF2_NAME'].unique()
-        raise ValueError(
-            f"Invalid value(s) for GBF2_NAME: {bad_vals}. Must be 'off', 'BIO_Low', 'BIO_Medium', or 'BIO_High'.")
 
     # remove the NAME columns
     settings_df = settings_df.loc[:, ~settings_df.columns.str.contains('NAME')]
@@ -402,39 +361,31 @@ def recommend_resources(df):
         break
 
 
-def create_grid_search_template(grid_dict, output_file,suffixs=['GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT'], run_time=None) -> pd.DataFrame:
-    # Collect new columns in a list
-
-
+def create_grid_search_template(grid_dict, output_file,settings_name_dict=None, run_time=None) -> pd.DataFrame:
+    grid_search_param_df = get_settings_df('Custom_runs')
+    template_grid_search = grid_search_param_df.copy()
     # Create a list of dictionaries with all possible permutations
     grid_dict = {k: [str(i) for i in v] for k, v in grid_dict.items()}
     keys, values = zip(*grid_dict.items())
     permutations = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
-    grid_search_param_df = pd.DataFrame(permutations)
+    # Save the grid search parameters to the root task folder
+    permutations_df = pd.DataFrame(permutations)
+    permutations_df.insert(0, 'run_idx', [i for i in range(1, len(permutations_df) + 1)])
 
+    grid_search_param_df = permutations_df.copy()
     run_settings_dfs = []
     total = len(grid_search_param_df)
-    template_df = create_settings_template('Custom_runs')
-    template_grid_search = template_df.copy()
     for idx, (_, row) in enumerate(grid_search_param_df.iterrows()):
         settings_dict = template_grid_search.set_index('Name')['Default_run'].to_dict()
         settings_dict.update(row.to_dict())
         settings_dict = update_settings(settings_dict)
-        run_id = generate_run_id(row, idx, total, suffixs=suffixs, run_time=run_time)
-        run_settings_dfs.append(pd.Series(settings_dict, name=run_id))
+        run_name = generate_run_name(row, idx, total, settings_name_dict, run_time=run_time)
+        run_settings_dfs.append(pd.Series(settings_dict, name=run_name))
 
-    grid_search_param_df = update_permutations(pd.DataFrame(run_settings_dfs))
-
-    param_names = template_df['Name'].values
+    # grid_search_param_df = update_permutations(pd.DataFrame(run_settings_dfs)) # update the permutations
+    template_grid_search = pd.concat(run_settings_dfs, axis=1).reset_index(names='Name')
     template_grid_search.index = template_grid_search['Name'].values
-    for idx, row in grid_search_param_df.iterrows():
-        new_column = pd.Series(template_df['Default_run'].values, index=param_names)
-        for k, v in row.items():
-            if k != 'run_idx' and k in new_column.index:
-                new_column[k] = v
-        template_grid_search = pd.concat([template_grid_search, new_column.rename(row.name)], axis=1)
-
 
     print(template_grid_search.columns)
     template_grid_search.to_csv(output_file, index=False)
@@ -443,7 +394,7 @@ def create_grid_search_template(grid_dict, output_file,suffixs=['GHG_LIMITS_FIEL
     recommend_resources(template_grid_search)
     return template_grid_search
 
-def generate_run_id(row, idx, total, suffixs=['GHG_NAME', 'GBF2_NAME'], run_time=None):
+def generate_run_name(row, idx, total, settings_name_dict, run_time=None):
     """
     生成如 20240521_Run_01_GHG_Low_BIO_Low 这样格式的run_id，编号宽度根据实验总数自动调整。
     """
@@ -451,8 +402,12 @@ def generate_run_id(row, idx, total, suffixs=['GHG_NAME', 'GBF2_NAME'], run_time
         run_time = datetime.datetime.now().strftime("%Y%m%d")
     width = len(str(total))
     run_num = str(idx + 1).zfill(width)
-    run_id = f"{run_time}_Run_{run_num}"
-    for suffix in suffixs:
-        run_id += f"_{row[suffix]}"
-    return run_id
+    run_name = f"{run_time}_Run_{run_num}"
+    if settings_name_dict is not None:
+        name = [
+            f"_{settings_name_dict[k]}_{row[k]}"
+            for k in settings_name_dict if k in row.index
+        ]
+        run_name = run_name + ''.join(name)
+    return run_name
 
