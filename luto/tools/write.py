@@ -1077,7 +1077,7 @@ def write_biodiversity(data: Data, yr_cal, path):
         return
 
     # Check biodiversity limits and report
-    biodiv_limit = ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
+    biodiv_limit = data.get_GBF2_target_for_yr_cal(yr_cal)
 
     print(f'Writing biodiversity outputs for {yr_cal}')
 
