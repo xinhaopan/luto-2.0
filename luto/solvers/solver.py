@@ -82,8 +82,6 @@ class LutoSolver:
     ):
 
         self._input_data = input_data
-        self.d_c = input_data.demand_c
-        self.ncms = self.d_c.shape[0]
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
 
         # Initialise variable stores
@@ -281,7 +279,7 @@ class LutoSolver:
         4) [B] A single penalty scalar for biodiversity, minimises its deviation from the target.
         """
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            self.V = self.gurobi_model.addMVar(self.ncms, name="V")
+            self.V = self.gurobi_model.addMVar(self._input_data.ncms, name="V")
 
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.E = self.gurobi_model.addVar(name="E")
@@ -420,7 +418,7 @@ class LutoSolver:
             #     for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
             # )
             (
-                (gp.quicksum(v for v in self.V) + self._input_data.base_yr_prod["BASE_YR Production (t)"])
+                (gp.quicksum(v for v in self.V) + self._input_data.base_yr_prod["BASE_YR Production (t)"]) 
                 / self._input_data.base_yr_prod["BASE_YR Production (t)"]
             )
             if settings.DEMAND_CONSTRAINT_TYPE == "soft"
@@ -553,7 +551,7 @@ class LutoSolver:
                 for p in range(self._input_data.nprs)
                 if self._input_data.pr2cm_cp[c, p]
             )
-            for c in range(self.ncms)
+            for c in range(self._input_data.ncms)
         ]
         self.ag_q_irr_c = [
             gp.quicksum(
@@ -561,13 +559,13 @@ class LutoSolver:
                 for p in range(self._input_data.nprs)
                 if self._input_data.pr2cm_cp[c, p]
             )
-            for c in range(self.ncms)
+            for c in range(self._input_data.ncms)
         ]
 
         # Repeat to get contributions of alternative agr. management options
         # Convert variables to PR/p representation
-        self.ag_man_q_dry_c = [gp.LinExpr(0) for _ in range(self.ncms)]
-        self.ag_man_q_irr_c = [gp.LinExpr(0) for _ in range(self.ncms)]
+        self.ag_man_q_dry_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
+        self.ag_man_q_irr_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         
         for am, am_j_list in self._input_data.am2j.items():
             X_ag_man_dry_pr = np.zeros(
@@ -596,7 +594,7 @@ class LutoSolver:
                 for p in range(self._input_data.nprs)
             ]
 
-            for c in range(self.ncms):
+            for c in range(self._input_data.ncms):
                 self.ag_man_q_dry_c[c] += (
                     gp.quicksum(
                         ag_man_q_dry_p[p]
@@ -621,20 +619,20 @@ class LutoSolver:
                 )
                 for k in range(self._input_data.n_non_ag_lus)
             )
-            for c in range(self.ncms)
+            for c in range(self._input_data.ncms)
         ]
 
         # Total quantities in CM/c representation.
         self.total_q_exprs_c = [
-            self.ag_q_dry_c[c] + self.ag_q_irr_c[c] + self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c] + self.non_ag_q_c[c] for c in range(self.ncms)
+            self.ag_q_dry_c[c] + self.ag_q_irr_c[c] + self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c] + self.non_ag_q_c[c] for c in range(self._input_data.ncms)
         ]
 
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             upper_bound_constraints = self.gurobi_model.addConstrs(
-                ((self.d_c[c] - self.total_q_exprs_c[c]) <= self.V[c] for c in range(self.ncms)),
+                ((self._input_data.limits['demand'][c] - self.total_q_exprs_c[c]) <= self.V[c] for c in range(self._input_data.ncms)),
                 name="demand_soft_bound_upper")
             lower_bound_constraints = self.gurobi_model.addConstrs(
-                ((self.total_q_exprs_c[c] - self.d_c[c]) <= self.V[c] for c in range(self.ncms)),
+                ((self.total_q_exprs_c[c] - self._input_data.limits['demand'][c]) <= self.V[c] for c in range(self._input_data.ncms)),
                 name="demand_soft_bound_lower"
             )
 
@@ -643,7 +641,7 @@ class LutoSolver:
 
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
             quantity_meets_demand_constraints = self.gurobi_model.addConstrs(
-                ((self.total_q_exprs_c[c] >= self.d_c[c]) for c in range(self.ncms)),
+                ((self.total_q_exprs_c[c] >= self._input_data.limits['demand'][c]) for c in range(self._input_data.ncms)),
                 name="demand_meets_demand"
             )
             self.demand_penalty_constraints.extend(
@@ -704,7 +702,7 @@ class LutoSolver:
             
             ind = self._input_data.water_region_indices[reg_idx]
             reg_name = self._input_data.water_region_names[reg_idx]
-            print(f"     |-- net water yield in {reg_name} >= {water_limit:.2f} ML")
+            print(f"     |-- net water yield target is {water_limit:15.2f} ML for {reg_name}")
 
             self.water_nyiled_exprs[reg_idx] = self._get_water_net_yield_expr_for_region(ind)           # Water net yield inside LUTO study area
 
@@ -821,53 +819,64 @@ class LutoSolver:
 
         print("    ...Biodiversity GBF 2 (conservation priority) constraints...")
         
-        bio_ag_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)]
-                * self._input_data.biodiv_contr_ag_j[j]
-                * self.X_ag_dry_vars_jr[j, np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)]
+        bio_ag_exprs = []
+        bio_ag_man_exprs = []
+        bio_non_ag_exprs = []
+
+        for j in range(self._input_data.n_ag_lus):
+            ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)
+            ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)
+            bio_ag_exprs.append(
+                gp.quicksum(
+                    self._input_data.GBF2_raw_priority_degraded_area_r[ind_dry]
+                    * self._input_data.biodiv_contr_ag_j[j]
+                    * self.X_ag_dry_vars_jr[j, ind_dry]
+                )
+                + gp.quicksum(
+                    self._input_data.GBF2_raw_priority_degraded_area_r[ind_irr]
+                    * self._input_data.biodiv_contr_ag_j[j]
+                    * self.X_ag_irr_vars_jr[j, ind_irr]
+                )
             )
-            + gp.quicksum(
-                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)]
-                * self._input_data.biodiv_contr_ag_j[j]
-                * self.X_ag_irr_vars_jr[j, np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)]
-            )  
-            for j in range(self._input_data.n_ag_lus)
-        )
-        bio_ag_man_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
-                * self._input_data.biodiv_contr_ag_man[am][j_idx][np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
-                * self.X_ag_man_dry_vars_jr[am][j_idx, np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
-            )  
-            + gp.quicksum(
-                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
-                * self._input_data.biodiv_contr_ag_man[am][j_idx][np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
-                * self.X_ag_man_irr_vars_jr[am][j_idx, np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
-            )  
-            for am, am_j_list in self._input_data.am2j.items()
-            for j_idx in range(len(am_j_list))
-        )
-        bio_non_ag_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)]
-                * self._input_data.biodiv_contr_non_ag_k[k]
-                * self.X_non_ag_vars_kr[k, np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)]
+        for am, am_j_list in self._input_data.am2j.items():
+            for j_idx in range(len(am_j_list)):
+
+                ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)
+                ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)
+                bio_ag_man_exprs.append(
+                    gp.quicksum(self._input_data.GBF2_raw_priority_degraded_area_r[ind_dry]
+                        * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_dry]
+                        * self.X_ag_man_dry_vars_jr[am][j_idx, ind_dry])
+                    + gp.quicksum(
+                        self._input_data.GBF2_raw_priority_degraded_area_r[ind_irr]
+                        * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_irr]
+                        * self.X_ag_man_irr_vars_jr[am][j_idx, ind_irr]
+                    )
+                )
+        for k in range(self._input_data.n_non_ag_lus):
+            ind = np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)
+            bio_non_ag_exprs.append(
+                gp.quicksum(
+                    self._input_data.GBF2_raw_priority_degraded_area_r[ind]
+                    * self._input_data.biodiv_contr_non_ag_k[k]
+                    * self.X_non_ag_vars_kr[k, ind]
+                )
             )
-            for k in range(self._input_data.n_non_ag_lus)
-        )
+
+        self.bio_GBF2_priority_degraded_area_expr = gp.quicksum(bio_ag_exprs) + gp.quicksum(bio_ag_man_exprs) + gp.quicksum(bio_non_ag_exprs)
         
-        # Get the biodiversity contribution expression
-        self.bio_GBF2_priority_degraded_area_expr = bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
-        biodiversity_limits = self._input_data.limits["GBF2_priority_degrade_areas"]
-        
-        print(f"       |-- Biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
+        print(f"       |-- Biodiversity GBF 2 (conservation priority): {self._input_data.limits["GBF2_priority_degrade_areas"]:,.0f}")
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
-            constr = self.bio_GBF2_priority_degraded_area_expr >= biodiversity_limits
-            self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(constr, name="bio_GBF2_priority_degraded_area_limit_hard")
+            self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(
+                self.bio_GBF2_priority_degraded_area_expr >= self._input_data.limits["GBF2_priority_degrade_areas"],
+                name="bio_GBF2_priority_degraded_area_limit_hard"
+            )
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
-            constr = self.gurobi_model.addConstr(biodiversity_limits - self.bio_GBF2_priority_degraded_area_expr <= self.B, name="bio_GBF2_priority_degraded_area_limit_soft")
+            constr = self.gurobi_model.addConstr(
+                self._input_data.limits["GBF2_priority_degrade_areas"] - self.bio_GBF2_priority_degraded_area_expr <= self.B,
+                name="bio_GBF2_priority_degraded_area_limit_soft"
+            )
             self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)
         else:
             raise ValueError(
@@ -1187,7 +1196,7 @@ class LutoSolver:
         Dynamically updates the existing formulation based on new input data and demands.
         """
         self._input_data = input_data
-        self.d_c = d_c
+        self._input_data.limits['demand'] = d_c
 
         print("Updating variables...", flush=True)
         updated_cells = self._update_variables(
@@ -1617,7 +1626,7 @@ class LutoSolver:
                     ammaps[am][r] = 1
 
         # Process production amount for each commodity
-        prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
+        prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self._input_data.ncms)]
         if self.ghg_emissions_expr:
             prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
         if self.bio_GBF2_priority_degraded_area_expr:
@@ -1665,9 +1674,9 @@ class LutoSolver:
                 "Penalties Value (AUD)": self.obj_penalties.getValue(),
                 "Penalties Objective": self.obj_penalties.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA),
                 
-                "Production Ag Value (t)":          {c:(self.ag_q_dry_c[c] + self.ag_q_irr_c[c]).getValue() for c in range(self.ncms)},
-                "Production Non-Ag Value (t)":      {c:self.non_ag_q_c[c].getValue() for c in range(self.ncms)},
-                "Production Ag-Mam Value (t)":      {c:(self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c]).getValue() for c in range(self.ncms)},
+                "Production Ag Value (t)":          {c:(self.ag_q_dry_c[c] + self.ag_q_irr_c[c]).getValue() for c in range(self._input_data.ncms)},
+                "Production Non-Ag Value (t)":      {c:self.non_ag_q_c[c].getValue() for c in range(self._input_data.ncms)},
+                "Production Ag-Mam Value (t)":      {c:(self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c]).getValue() for c in range(self._input_data.ncms)},
                 "Production Deviation (t)":         (self.V.X if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
                 "Production Penalty":               (self.penalty_demand.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)              if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
                             
