@@ -14,11 +14,11 @@ grid_search = {
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [5],
+    'RESFACTOR': [20],
     'SIM_YERAS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['high', 'medium', 'low'],
+    'GHG_EMISSIONS_LIMITS': ['high'], # ['high', 'medium', 'low']
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
@@ -46,7 +46,7 @@ settings_name_dice = {
     'RESFACTOR':'RES',
 }
 
-output_file = os.path.join("Custom_runs", "setting_0520.csv")
+output_file = os.path.join("Custom_runs", "setting_0529.csv")
 create_grid_search_template(grid_search,output_file,settings_name_dice)
 
 print(f"saved to {output_file}")
