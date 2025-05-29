@@ -65,7 +65,7 @@ def process_column(col, custom_settings, script_name, delay):
     # Evaluate the non-string values to their original types
     custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(eval)
     # Update the settings dictionary
-    custom_dict = update_settings(custom_settings[col].to_dict(), col)
+    custom_dict = update_settings(custom_settings[col].to_dict())
     for key in eval_vars:
         custom_dict[key] = ast.literal_eval(custom_dict[key]) if isinstance(custom_dict[key], str) else custom_dict[key]
 
@@ -277,8 +277,13 @@ def update_settings(settings_dict: pd.DataFrame) -> pd.DataFrame:
     Update the task run settings with parameters for the server, and change the data path to absolute path.
     E.g. job name, input directory, raw data directory, and threads.
     '''
-    settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\', '/')
-    settings_dict['RAW_DATA'] = os.path.abspath(settings_dict['RAW_DATA']).replace('\\', '/')
+    settings_dict['INPUT_DIR'] = os.path.abspath(f"../../{settings_dict['INPUT_DIR']}").replace('\\', '/')
+    settings_dict['RAW_DATA'] = os.path.abspath(f"../../{settings_dict['RAW_DATA']}").replace('\\', '/')
+    settings_dict['NO_GO_VECTORS'] = {
+        'Winter cereals': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Winter_cereals.shp',
+        'Environmental Plantings': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Enviornmental_Plantings.shp'
+    }
+
     settings_dict['THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
@@ -379,7 +384,7 @@ def create_grid_search_template(grid_dict, output_file,settings_name_dict=None, 
     for idx, (_, row) in enumerate(grid_search_param_df.iterrows()):
         settings_dict = template_grid_search.set_index('Name')['Default_run'].to_dict()
         settings_dict.update(row.to_dict())
-        settings_dict = update_settings(settings_dict)
+        # settings_dict = update_settings(settings_dict)
         run_name = generate_run_name(row, idx, total, settings_name_dict, run_time=run_time)
         run_settings_dfs.append(pd.Series(settings_dict, name=run_name))
 
