@@ -302,7 +302,7 @@ class LutoSolver:
         # Get objectives 
         self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]              # Normalise to the base year economy value
         self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["BASE_YR Biodiversity (score)"]  # Normalise to the base year biodiversity value
-        self.obj_penalties = self._setup_penalty_objectives()                                                                   # Normalise to the base year production value
+        self.obj_penalties = self._setup_penalty_objectives()
  
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
@@ -418,8 +418,10 @@ class LutoSolver:
             #     for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
             # )
             (
-                (gp.quicksum(v for v in self.V) + self._input_data.base_yr_prod["BASE_YR Production (t)"]) 
-                / self._input_data.base_yr_prod["BASE_YR Production (t)"]
+                gp.quicksum(
+                    self.V[c] / self._input_data.base_yr_prod["BASE_YR Production (t)"][c]
+                    for c in range(self._input_data.ncms)
+                ) / self._input_data.ncms
             )
             if settings.DEMAND_CONSTRAINT_TYPE == "soft"
             else 0
@@ -822,7 +824,7 @@ class LutoSolver:
         bio_ag_exprs = []
         bio_ag_man_exprs = []
         bio_non_ag_exprs = []
-
+        
         for j in range(self._input_data.n_ag_lus):
             ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)
             ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)
@@ -836,11 +838,11 @@ class LutoSolver:
                     self._input_data.GBF2_raw_priority_degraded_area_r[ind_irr]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_irr_vars_jr[j, ind_irr]
-                )
+                ) 
             )
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx in range(len(am_j_list)):
-
+                
                 ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)
                 ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)
                 bio_ag_man_exprs.append(
@@ -852,7 +854,7 @@ class LutoSolver:
                         * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_irr]
                         * self.X_ag_man_irr_vars_jr[am][j_idx, ind_irr]
                     )
-                )
+                )  
         for k in range(self._input_data.n_non_ag_lus):
             ind = np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)
             bio_non_ag_exprs.append(
@@ -869,12 +871,12 @@ class LutoSolver:
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(
-                self.bio_GBF2_priority_degraded_area_expr >= self._input_data.limits["GBF2_priority_degrade_areas"],
+                self.bio_GBF2_priority_degraded_area_expr >= self._input_data.limits["GBF2_priority_degrade_areas"], 
                 name="bio_GBF2_priority_degraded_area_limit_hard"
             )
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             constr = self.gurobi_model.addConstr(
-                self._input_data.limits["GBF2_priority_degrade_areas"] - self.bio_GBF2_priority_degraded_area_expr <= self.B,
+                self._input_data.limits["GBF2_priority_degrade_areas"] - self.bio_GBF2_priority_degraded_area_expr <= self.B, 
                 name="bio_GBF2_priority_degraded_area_limit_soft"
             )
             self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)
