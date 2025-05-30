@@ -18,15 +18,15 @@ suffix = '1'
 run_number_origin = [7,4,1,8,5,2,9,6,3]
 run_number = [num for num in run_number_origin]
 senerios_origin = [
-    'GHG_Low_BIO_Low',
-    'GHG_Moderate_BIO_Low',
-    'GHG_High_BIO_Low',
-    'GHG_Low_BIO_Moderate',
-    'GHG_Moderate_BIO_Moderate',
-    'GHG_High_BIO_Moderate',
-    'GHG_Low_BIO_High',
-    'GHG_Moderate_BIO_High',
-    'GHG_High_BIO_High',
+    'GHG_low_BIO_low',
+    'GHG_moderate_BIO_low',
+    'GHG_high_BIO_low',
+    'GHG_low_BIO_moderate',
+    'GHG_moderate_BIO_moderate',
+    'GHG_high_BIO_moderate',
+    'GHG_low_BIO_high',
+    'GHG_moderate_BIO_high',
+    'GHG_high_BIO_high',
 ]
 senerios = [f"Run_{num}_{senerio}" for num, senerio in zip(run_number, senerios_origin)]
 input_files = [
