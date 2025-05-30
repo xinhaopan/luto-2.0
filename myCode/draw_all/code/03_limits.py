@@ -148,17 +148,19 @@ def draw_stacked_area(data, legend_colors, output_file, fontsize=22, y_range=(0,
 
 # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
 def get_biodiversity_target(input_files):
+    input_files = ['20250529_Run_1_GHG_high_BIO_low_RES_20', '20250529_Run_2_GHG_high_BIO_medium_RES_20',
+                   '20250529_Run_3_GHG_high_BIO_high_RES_20']
     # Get biodiversity target data from input files
     # Extract dictionary of DataFrames
     bio_target_dict = get_dict_data(input_files, "biodiversity_targets", 'Score', 'Variable')
 
     # Find keys that contain the specified patterns
-    # bio_0_key = next((k for k in bio_target_dict if '1_5C_67_BIO_0' in k), None)
-    bio_30_key = next((k for k in bio_target_dict if 'BIO_Moderate' in k), None)
-    bio_50_key = next((k for k in bio_target_dict if 'BIO_High' in k), None)
+    bio_0_key = next((k for k in bio_target_dict if 'BIO_low' in k), None)
+    bio_30_key = next((k for k in bio_target_dict if 'BIO_medium' in k), None)
+    bio_50_key = next((k for k in bio_target_dict if 'BIO_high' in k), None)
 
     # Extract the DataFrames corresponding to these keys
-    # df_0 = bio_target_dict.get(bio_0_key)
+    df_0 = bio_target_dict.get(bio_0_key)
     df_30 = bio_target_dict.get(bio_30_key)
     df_50 = bio_target_dict.get(bio_50_key)
 
@@ -167,7 +169,7 @@ def get_biodiversity_target(input_files):
 
     # Extract 'Biodiversity score limit' column from each DataFrame
     # and add to the new DataFrame with the appropriate column names
-    # new_df['0%'] = df_0['Biodiversity score limit']
+    new_df['0%'] = df_0['Biodiversity score limit']
     new_df['30%'] = df_30['Biodiversity score limit']
     new_df['50%'] = df_50['Biodiversity score limit']
 
@@ -182,43 +184,43 @@ if __name__ == "__main__":
     colors = ['#2ECC71', '#3498DB','#E74C3C']  # 根据数据列数调整颜色列表
     draw_plot_lines(df, colors, ' ', (min_v, max_v), ticks, "../output/03_biodiversity_limit.png", font_size=font_size)
 
-
-    # GHG
-    # 读取 Excel 文件
-    df = pd.read_excel(INPUT_DIR + '/GHG_targets.xlsx', index_col=0)
-
-    # 选择 2010 到 2050 年的数据
-    df_filtered = df.loc[2010:2050,
-                  ['1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', '1.8C (67%) excl. avoided emis SCOPE1']]
-
-    # 将所有数据单位转换为 million (除以 1,000,000)
-    df_filtered = df_filtered / 1e6
-    df_filtered.columns = ['1.5°C (67%)', '1.5°C (50%)', '1.8°C (67%)']
-    colors = ['#E74C3C', '#3498DB', '#2ECC71']  # 根据数据列数调整颜色列表
-    min_v, max_v, ticks = get_y_axis_ticks(df_filtered.min().min(), df_filtered.max().max(), desired_ticks=6)
-    draw_plot_lines(df_filtered, colors, ' ', (min_v, max_v), ticks, "../output/03_GHG_limit.png", font_size=font_size)
-
-
-    # Food demand
-    dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5'))
-    demand_data = dd.loc[(settings.SCENARIO,
-                          settings.DIET_DOM,
-                          settings.DIET_GLOB,
-                          settings.CONVERGENCE,
-                          settings.IMPORT_TREND,
-                          settings.WASTE,
-                          settings.FEED_EFFICIENCY),
-    'PRODUCTION'].copy()
-
-    # 处理 'eggs' 数据
-    demand_data.loc['eggs'] = demand_data.loc['eggs'] * settings.EGGS_AVG_WEIGHT / 1000 / 1000
-    demand_data = demand_data.T / 1e6
-    demand_data = demand_data.loc[2010:2050]
-    demand_data = demand_data.drop(columns=['aquaculture', 'chicken', 'eggs', 'pork'])
-
-    mapping_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='food')
-    demand_data, legend_colors = process_single_df(demand_data, mapping_df)
-    draw_stacked_area(demand_data, legend_colors, '../output/03_Food_demand.png', fontsize=font_size, y_range=(0, 200), y_tick_interval=50, ylabel=' ')
+    #
+    # # GHG
+    # # 读取 Excel 文件
+    # df = pd.read_excel(INPUT_DIR + '/GHG_targets.xlsx', index_col=0)
+    #
+    # # 选择 2010 到 2050 年的数据
+    # df_filtered = df.loc[2010:2050,
+    #               ['1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', '1.8C (67%) excl. avoided emis SCOPE1']]
+    #
+    # # 将所有数据单位转换为 million (除以 1,000,000)
+    # df_filtered = df_filtered / 1e6
+    # df_filtered.columns = ['1.5°C (67%)', '1.5°C (50%)', '1.8°C (67%)']
+    # colors = ['#E74C3C', '#3498DB', '#2ECC71']  # 根据数据列数调整颜色列表
+    # min_v, max_v, ticks = get_y_axis_ticks(df_filtered.min().min(), df_filtered.max().max(), desired_ticks=6)
+    # draw_plot_lines(df_filtered, colors, ' ', (min_v, max_v), ticks, "../output/03_GHG_limit.png", font_size=font_size)
+    #
+    #
+    # # Food demand
+    # dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5'))
+    # demand_data = dd.loc[(settings.SCENARIO,
+    #                       settings.DIET_DOM,
+    #                       settings.DIET_GLOB,
+    #                       settings.CONVERGENCE,
+    #                       settings.IMPORT_TREND,
+    #                       settings.WASTE,
+    #                       settings.FEED_EFFICIENCY),
+    # 'PRODUCTION'].copy()
+    #
+    # # 处理 'eggs' 数据
+    # demand_data.loc['eggs'] = demand_data.loc['eggs'] * settings.EGGS_AVG_WEIGHT / 1000 / 1000
+    # demand_data = demand_data.T / 1e6
+    # demand_data = demand_data.loc[2010:2050]
+    # demand_data = demand_data.drop(columns=['aquaculture', 'chicken', 'eggs', 'pork'])
+    #
+    # mapping_df = pd.read_excel('tools/land use colors.xlsx', sheet_name='food')
+    # demand_data, legend_colors = process_single_df(demand_data, mapping_df)
+    # draw_stacked_area(demand_data, legend_colors, '../output/03_Food_demand.png', fontsize=font_size, y_range=(0, 200), y_tick_interval=50, ylabel=' ')
 
     # # water------------------------------------------------------------------------------------------
     # dd = pd.read_hdf(os.path.join(INPUT_DIR, "draindiv_lut.h5"), index_col='HR_DRAINDIV_ID')
