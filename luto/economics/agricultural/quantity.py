@@ -523,6 +523,11 @@ def get_biochar_effect_q_mrp(data, q_mrp, yr_idx):
 
 
 def get_beef_hir_effect_q_mrp(data, q_mrp):
+    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['HIR - Beef']:
+        return new_q_mrp
+
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
 
@@ -543,6 +548,11 @@ def get_beef_hir_effect_q_mrp(data, q_mrp):
 
 
 def get_sheep_hir_effect_q_mrp(data, q_mrp):
+    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['HIR - Sheep']:
+        return new_q_mrp
+
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
 

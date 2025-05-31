@@ -5,20 +5,20 @@ from tools.helpers import create_grid_search_template
 
 grid_search = {
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['4'],
-    'NCPUS': ['1'],
-    'TIME': ['1:00:00'],
+    'MEM': ['28'],
+    'NCPUS': ['7'],
+    'TIME': ['15:00:00'],
 
     # ---------------------------------- Model settings ------------------------------
-    'SOLVE_WEIGHT_ALPHA': [0.1],
+    'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [20],
+    'RESFACTOR': [5],
     'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['high'], # ['high', 'medium', 'low']
+    'GHG_EMISSIONS_LIMITS': ['high', 'medium', 'low'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
@@ -35,18 +35,42 @@ grid_search = {
     # ----------------------------------- Water settings --------------------------------
     'WATER_LIMITS': ['on'],
     'WATER_CONSTRAINT_TYPE': ['hard'],
-    'INCLUDE_WATER_LICENSE_COSTS': [1],
+    'INCLUDE_WATER_LICENSE_COSTS': [0,1],
 
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
+
+    # ----------------------------------- Paper 1 settings --------------------------------
+    'NON_AG_LAND_USES' : [{
+        'Environmental Plantings': True,
+        'Riparian Plantings': True,
+        'Sheep Agroforestry': True,
+        'Beef Agroforestry': True,
+        'Carbon Plantings (Block)': True,
+        'Sheep Carbon Plantings (Belt)': True,
+        'Beef Carbon Plantings (Belt)': True,
+        'BECCS': False,
+        'Destocked - natural land': False,
+    }],
+
+    'AG_MANAGEMENTS' : [{
+        'Asparagopsis taxiformis': True,
+        'Precision Agriculture': True,
+        'Ecological Grazing': False,
+        'Savanna Burning': True,
+        'AgTech EI': True,
+        'Biochar': True,
+        'HIR - Beef': False,
+        'HIR - Sheep': False,
+    }]
 }
 settings_name_dice = {
     'GHG_EMISSIONS_LIMITS':'GHG',
     'BIODIVERSTIY_TARGET_GBF_2':'BIO',
-    'RESFACTOR':'RES',
+    'INCLUDE_WATER_LICENSE_COSTS':'',
 }
 
-output_file = os.path.join("Custom_runs", "setting_0529.csv")
+output_file = os.path.join("Custom_runs", "setting_0531.csv")
 create_grid_search_template(grid_search,output_file,settings_name_dice)
 
 print(f"saved to {output_file}")
