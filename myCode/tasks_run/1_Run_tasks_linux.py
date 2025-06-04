@@ -1,8 +1,10 @@
 from myCode.tasks_run.tools.helpers import create_task_runs
 import os
+import pandas as pd
 
 if os.name == 'posix':
-    input_file = 'Custom_runs/setting_0530_0.csv'
-    create_task_runs(input_file, use_multithreading=False, num_workers=3)
+    task_root_dir = '../../output/setting_0603'
+    grid_search_settings_df = pd.read_csv(f'{task_root_dir}/grid_search_template.csv')
+    create_task_runs(task_root_dir, grid_search_settings_df, mode='cluster', n_workers=min(len(grid_search_settings_df.columns), 100),use_parallel=False)
 else:
     print("This script is designed to run only on Linux.")
