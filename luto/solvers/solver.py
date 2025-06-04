@@ -302,7 +302,7 @@ class LutoSolver:
         # Get objectives 
         self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]              # Normalise to the base year economy value
         self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["BASE_YR Biodiversity (score)"]  # Normalise to the base year biodiversity value
-        self.obj_penalties = self._setup_penalty_objectives()
+        self.obj_penalties = self._setup_penalty_objectives()                                                                   
  
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
@@ -419,7 +419,7 @@ class LutoSolver:
             # )
             (
                 gp.quicksum(
-                    self.V[c] / self._input_data.base_yr_prod["BASE_YR Production (t)"][c]
+                    self.V[c] / self._input_data.base_yr_prod["BASE_YR Production (t)"][c] 
                     for c in range(self._input_data.ncms)
                 ) / self._input_data.ncms
             )
@@ -699,6 +699,8 @@ class LutoSolver:
 
     def _add_water_usage_limit_constraints(self) -> None:
         
+        print("  ...water usage constraints...")
+
         # Ensure water use remains below limit for each region
         for reg_idx, water_limit in self._input_data.limits["water"].items():
             
@@ -1025,7 +1027,8 @@ class LutoSolver:
             print('    ...Biodiversity GBF 4 (Ecological Communities of National Environmental Significance) constraints TURNED OFF ...')
             return
         
-        x_limits, x_names = self._input_data.limits["GBF4_ECNES"]
+        x_limits = self._input_data.limits["GBF4_ECNES"]
+        x_names = self._input_data.GBF4_ECNES_names
 
         print(f"    ...Biodiversity GBF 4 (Ecological Communities of National Environmental Significance) constraints...")
         

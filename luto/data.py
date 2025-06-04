@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
+
 import os
 import xarray as xr
 import numpy as np
@@ -32,11 +33,13 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 
+from math import ceil
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
+from scipy.ndimage import distance_transform_edt
 
 from luto.tools.spatializers import upsample_array
 
@@ -159,8 +162,8 @@ class Data:
         # NLUM mask.
         with rasterio.open(os.path.join(settings.INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
             self.NLUM_MASK = rst.read(1).astype(np.int8)                                                                # 2D map,  0 for ocean, 1 for land
-            self.LUMAP_2D_FULLRES = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                                   # 2D map,  full of nodata (-9999)
-            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                                       # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
+            self.LUMAP_2D_FULLRES = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
+            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
             self.GEO_META_FULLRES = rst.meta                                                                            # dict,  key-value pairs of geospatial metadata for the full resolution land-use map
             self.GEO_META_FULLRES['dtype'] = 'float32'                                                                  # Set the data type to float32
             self.GEO_META_FULLRES['nodata'] = self.NODATA                                                               # Set the nodata value to -9999
@@ -296,10 +299,10 @@ class Data:
             'BEEF - MODIFIED LAND MEAT',
             'BEEF - NATURAL LAND LEXP',
             'BEEF - NATURAL LAND MEAT',
-
+            
             'DAIRY - MODIFIED LAND',
             'DAIRY - NATURAL LAND',
-
+            
             'SHEEP - MODIFIED LAND LEXP',
             'SHEEP - MODIFIED LAND MEAT',
             'SHEEP - MODIFIED LAND WOOL',
@@ -411,7 +414,13 @@ class Data:
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
-        self.LUMAP = self.AG_L_MRJ.sum(axis=0).argmax(axis=1).astype("int8")
+        # self.LUMAP = self.AG_L_MRJ.sum(axis=0).argmax(axis=1).astype("int8")
+        self.LU_RESFACTOR_CELLS = pd.DataFrame({
+            'lu_code': list(self.DESC2AGLU.values()),
+            'res_size': [ceil((self.LUMAP_NO_RESFACTOR == lu_code).sum() / self.RESMULT) for _,lu_code in self.DESC2AGLU.items()
+            ]}).sort_values('res_size').reset_index(drop=True)
+
+        self.LUMAP = self.get_resfactored_lumap() if settings.RESFACTOR > 1 else self.LUMAP_NO_RESFACTOR[self.MASK]
         self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
 
         # Initial (2010) land management map.
@@ -1019,14 +1028,14 @@ class Data:
         
         
         ###############################################################
-        # Calculate base year production
+        # Calculate base year production 
         ###############################################################
 
         self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
-
+        
         print(f"\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
+        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)        
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
 
 
@@ -1059,9 +1068,9 @@ class Data:
 
         # Convert to numpy array of shape (91, 26)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
-
+        
         # Adjust demand data to the production data calculated using the base year layers;
-        # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops)
+        # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops) 
         # are distorted more under higher resfactoring.
         self.D_CY *= (yr_cal_base_prod_data / self.D_CY[0])[None, :]
 
@@ -1152,7 +1161,7 @@ class Data:
         ###############################################################
         # Biodiversity priority conservation data. (GBF Target 2)
         ###############################################################
-
+        
         print("\tLoading biodiversity data...", flush=True)
         """
         Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
@@ -1210,33 +1219,33 @@ class Data:
         
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
         if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
-
+        
             # Get the mask of 'priority degraded areas' for habitat conservation
             conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
             ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
-
+            
             self.BIO_PRIORITY_DEGRADED_AREAS_MASK = (
                 bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
             )
-
+            
             self.BIO_PRIORITY_DEGRADED_AREAS_LY_BASE_YR = np.vectorize(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.get, otypes=[np.float32])(self.LUMAP) * self.BIO_PRIORITY_DEGRADED_AREAS_MASK
-
+            
 
         
         ###############################################################
         # Vegetation data (GBF3).
         ###############################################################
         if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
-
+        
             print("\tLoading vegetation data...", flush=True)
-
+            
             # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
             GBF3_targets_df = pd.read_excel(
                 settings.INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
                 sheet_name = f'NVIS_{settings.GBF3_TARGET_CLASS}'
             ).sort_values(by='group', ascending=True)
-
-
+            
+            
             if settings.BIODIVERSTIY_TARGET_GBF_3 == 'USER_DEFINED':
                 self.GBF3_GROUPS_SEL = [row['group'] for _,row in GBF3_targets_df.iterrows()
                     if all([
@@ -1250,17 +1259,17 @@ class Data:
                 self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = GBF3_targets_df.query('group.isin(@self.GBF3_GROUPS_SEL)')
                 self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS[[
                     'USER_DEFINED_TARGET_PERCENT_2030',
-                    'USER_DEFINED_TARGET_PERCENT_2050',
+                    'USER_DEFINED_TARGET_PERCENT_2050', 
                     'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSTIY_TARGET_GBF_3]
-
+                
 
             self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
             self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
             self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_GROUPS_SEL))
-            self.BIO_GBF3_N_CLASSES = len(self.GBF3_GROUPS_SEL)
-
-
-
+            self.BIO_GBF3_N_CLASSES = len(self.GBF3_GROUPS_SEL) 
+            
+            
+            
             # Read in vegetation layer data
             NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.GBF3_TARGET_CLASS.split('_')[0]}.nc").sel(group=self.GBF3_GROUPS_SEL)
             NVIS_layers = np.array([self.get_exact_resfactored_average_arr(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
@@ -1271,7 +1280,7 @@ class Data:
                 NVIS_layers * settings.BIO_CONTRIBUTION_LDS,
                 NVIS_layers
             )
-
+            
             # Container storing which cells apply to each major vegetation group
             epsilon = 1e-5
             self.MAJOR_VEG_INDECES = {
@@ -1288,21 +1297,21 @@ class Data:
         if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != 'off':
 
             print("\tLoading environmental significance data (SNES)...", flush=True)
-
+            
             # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4)
             BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv').sort_values(by='SCIENTIFIC_NAME', ascending=True)
-
+            
             self.BIO_GBF4_SNES_LIKELY_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4_SNES_score.iterrows()
                                                     if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']>0])]
-
+            
             self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4_SNES_score.iterrows()
                                                     if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
-
-            if len(self.BIO_GBF4_SNES_LIKELY_SEL) == 0 or len(self.BIO_GBF4_ECNES_LIKELY_SEL) == 0:
+            
+            if len(self.BIO_GBF4_SNES_LIKELY_SEL) == 0:
                 raise ValueError("At least one of 'LIKELY' layers should be selected!")
 
             likely_maybe_union = set(self.BIO_GBF4_SNES_LIKELY_SEL).intersection(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
@@ -1312,44 +1321,47 @@ class Data:
                 self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
                 
             self.BIO_GBF4_SNES_SEL_ALL = self.BIO_GBF4_SNES_LIKELY_SEL + self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL
-            self.BIO_GBF4_PRESENCE_SNES_SEL = ['LIKELY'] * len(self.BIO_GBF4_SNES_LIKELY_SEL) + ['LIKELY_MAYBE'] * len(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
+            self.BIO_GBF4_PRESENCE_SNES_SEL = ['LIKELY'] * len(self.BIO_GBF4_SNES_LIKELY_SEL) + ['LIKELY_MAYBE'] * len(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)  
             self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4_SNES_score.query(f'SCIENTIFIC_NAME in {self.BIO_GBF4_SNES_LIKELY_SEL}')
-            self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_SNES_score.query(f'SCIENTIFIC_NAME in {self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL}')
-
+            self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_SNES_score.query(f'SCIENTIFIC_NAME in {self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL}') 
+            
             BIO_GBF4_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_SNES.nc', chunks={'species':1})
             snes_arr_likely = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_SEL, presence='LIKELY')
             snes_arr_likely_maybe = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE')
             snes_arr = xr.concat([snes_arr_likely, snes_arr_likely_maybe], dim='species')
-            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_exact_resfactored_average_arr(arr) for arr in snes_arr])
-
-
+            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_exact_resfactored_average_arr(arr) for arr in snes_arr]) 
+        
+        
         if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != 'off':
             print("\tLoading environmental significance data (ECNES)...", flush=True)
-
-
+        
+        
             BIO_GBF4_ECNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv').sort_values(by='COMMUNITY', ascending=True)
-
+       
             self.BIO_GBF4_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4_ECNES_score.iterrows()
                                                     if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']>0])]
-
+            
             self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4_ECNES_score.iterrows()
                                                     if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
+
+            if len(self.BIO_GBF4_ECNES_LIKELY_SEL) == 0:
+                raise ValueError("At least one of 'LIKELY' layers should be selected!")
 
             likely_maybe_union = set(self.BIO_GBF4_ECNES_LIKELY_SEL).intersection(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
                 print(f"\tWARNING: {len(likely_maybe_union)} duplicate ECNES species targets found, using 'LIKELY' targets only:")
                 print("\n".join(f"    {idx+1}) {name}" for idx, name in enumerate(likely_maybe_union)))
                 self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
-
+                 
             self.BIO_GBF4_ECNES_SEL_ALL = self.BIO_GBF4_ECNES_LIKELY_SEL + self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL
             self.BIO_GBF4_PRESENCE_ECNES_SEL = ['LIKELY'] * len(self.BIO_GBF4_ECNES_LIKELY_SEL) + ['LIKELY_MAYBE'] * len(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
             self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_SEL}')
             self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL}')
-
+    
             BIO_GBF4_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_ECNES.nc', chunks={'species':1})
             ecnes_arr_likely = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_SEL, cell=self.MASK, presence='LIKELY').compute()
             ecnes_arr_likely_maybe = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL, cell=self.MASK, presence='LIKELY_AND_MAYBE').compute()
@@ -1361,30 +1373,30 @@ class Data:
         ##########################################################################
         # Biodiersity species suitability under climate change (GBF8)            #
         ##########################################################################
-
+        
         if settings.BIODIVERSTIY_TARGET_GBF_8 != 'off':
-
+            
             print("\tLoading Species suitability data...", flush=True)
-
+            
             # Read in the species data from Carla Archibald (noted as GBF-8)
-            BIO_GBF8_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']
+            BIO_GBF8_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
             bio_GBF8_baseline_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES.csv').sort_values(by='species', ascending=True)
             bio_GBF8_target_percent = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET.csv').sort_values(by='species', ascending=True)
-
-            self.BIO_GBF8_SEL_SPECIES = [row['species'] for _,row in bio_GBF8_target_percent.iterrows()
+            
+            self.BIO_GBF8_SEL_SPECIES = [row['species'] for _,row in bio_GBF8_target_percent.iterrows() 
                                         if all([row['USER_DEFINED_TARGET_PERCENT_2030']>0,
                                                 row['USER_DEFINED_TARGET_PERCENT_2050']>0,
                                                 row['USER_DEFINED_TARGET_PERCENT_2100']>0])]
-
+            
             self.BIO_GBF8_OUTSDIE_LUTO_SCORE_SPECIES = bio_GBF8_baseline_score.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
             self.BIO_GBF8_OUTSDIE_LUTO_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES_group.csv')[['group', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
-
+            
             self.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES = bio_GBF8_target_percent.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')
             self.BIO_GBF8_BASELINE_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET_group.csv')
-
+            
             self.BIO_GBF8_SPECIES_LAYER = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SEL_SPECIES).compute()
             self.N_GBF8_SPECIES = len(self.BIO_GBF8_SEL_SPECIES)
-
+            
             self.BIO_GBF8_GROUPS_LAYER = xr.load_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit_group.nc')['data']
             self.BIO_GBF8_GROUPS_NAMES = [i.capitalize() for i in self.BIO_GBF8_GROUPS_LAYER['group'].values]
         
@@ -1409,11 +1421,11 @@ class Data:
         # HIR data.
         ###############################################################
         print("\tLoading HIR data...", flush=True)
-
+        
         self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK].astype(bool)
 
 
-
+ 
         print("Data loading complete\n")     
         
            
@@ -1558,9 +1570,37 @@ class Data:
             
         # Reshape the 1D avg array to 2D array
         cell_avg_2d = cell_avg.reshape(self.LUMAP_2D_RESFACTORED.shape)
-    
         return cell_avg_2d[np.nonzero(mask_arr_2d_resfactor)]
- 
+
+
+    def get_resfactored_lumap(self) -> np.ndarray:
+        """
+        Coarsens the LUMAP to the specified resolution factor.
+        """
+
+        lumap_resfactored = np.zeros(self.NCELLS, dtype=np.int8) - 1
+        fill_mask = np.ones(self.NCELLS, dtype=bool)
+
+        # Fill resfactored land-use map with the land-use codes given their resfactored size
+        for _,(lu_code, res_size) in self.LU_RESFACTOR_CELLS.iterrows():
+
+            lu_avg = self.AG_L_MRJ[:,:,lu_code].sum(0) * fill_mask
+            res_size = min(res_size, (lu_avg > 0).sum())
+
+            # Assign the n-largets cells with the land-use code
+            lu_idx = np.argsort(lu_avg)[-res_size:]
+            lumap_resfactored[lu_idx] = lu_code
+            fill_mask[lu_idx] = False
+
+        # Fill -1 with nearest neighbour values
+        nearst_ind = distance_transform_edt(
+            (lumap_resfactored == -1),
+            return_distances=False,
+            return_indices=True
+        )
+
+        return lumap_resfactored[*nearst_ind]
+
     # Get the habitat condition score within priority degraded areas for base year (2010)
     def get_GBF2_target_for_yr_cal(self, yr_cal:int) -> float:
         """
@@ -1583,12 +1623,12 @@ class Data:
 
         bio_habitat_target_proportion = [
             bio_habitat_score_base_yr_proportion + ((1 - bio_habitat_score_base_yr_proportion) * i)
-            for i in settings.GBF2_TARGETS_DICT[settings.BIODIVERSTIY_TARGET_GBF_2].values()
+            for i in settings.GBF2_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS].values()
         ]
 
         targets_key_years = {
             self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
-            **dict(zip(settings.GBF2_TARGETS_DICT[settings.BIODIVERSTIY_TARGET_GBF_2].keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
+            **dict(zip(settings.GBF2_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS].keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
         }
 
         f = interp1d(
