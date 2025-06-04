@@ -1,19 +1,14 @@
-import os
-import re
-import shutil
-import random
-import itertools
+import os, re, json
+import shutil, itertools, subprocess, zipfile
 import pandas as pd
-import subprocess
-import datetime
-import time
 import numpy as np
-import ast
-import sys
+import datetime
 
+from tqdm.auto import tqdm
+from typing import Literal
 from joblib import delayed, Parallel
 
-from myCode.tasks_run.tools.parameters import EXCLUDE_DIRS, SOURCE_DIR
+from myCode.tasks_run.tools.parameters import EXCLUDE_DIRS, SERVER_PARAMS
 from myCode.tasks_run.tools import calculate_total_cost
 from luto import settings
 
@@ -65,7 +60,7 @@ def process_column(col, custom_settings, script_name, delay):
     # Evaluate the non-string values to their original types
     custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(eval)
     # Update the settings dictionary
-    custom_dict = update_settings(custom_settings[col].to_dict())
+    custom_dict = update_settings(custom_settings[col].to_dict(),col)
     for key in eval_vars:
         custom_dict[key] = ast.literal_eval(custom_dict[key]) if isinstance(custom_dict[key], str) else custom_dict[key]
 
@@ -79,36 +74,102 @@ def process_column(col, custom_settings, script_name, delay):
     elif os.name == 'posix':
         submit_task_linux(task_dir, custom_dict, script_name)  # 执行任务
 
+def write_settings(task_dir:str, settings_dict:dict):
+    with open(f'{task_dir}/luto/settings.py', 'w') as file:
+        for k, v in settings_dict.items():
+            if isinstance(v, str):
+                file.write(f'{k}="{v}"\n')
+            else:
+                file.write(f'{k}={v}\n')
 
-def create_task_runs(csv_path: str,use_multithreading=True,  num_workers: int = 3, script_name='0_runs', delay=0):
-    """读取设置模板文件并并行运行任务"""
-    # 读取自定义设置文件
-    custom_settings = pd.read_csv(csv_path, index_col=0)
+def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
+    with open(f'{task_dir}/luto/settings_bash.py', 'w') as bash_file:
+        for key, value in settings_dict.items():
+            if key not in SERVER_PARAMS:
+                continue
+            if isinstance(value, str):
+                bash_file.write(f'export {key}="{value}"\n')
+            else:
+                bash_file.write(f'export {key}={value}\n')
+
+
+def submit_task(task_root_dir: str, col: str, mode: Literal['single', 'cluster'], max_concurrent_tasks):
+    shutil.copyfile('bash_scripts/task_cmd.sh', f'{task_root_dir}/{col}/task_cmd.sh')
+    shutil.copyfile('bash_scripts/python_script.py',
+                    f'{task_root_dir}/{col}/python_script.py')
+
+    # Wait until the number of running jobs is less than max_concurrent_tasks
+    if os.name == 'posix':
+        while True:
+            try:
+                running_jobs = int(
+                    subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
+            except Exception as e:
+                print(f"Error checking running jobs: {e}")
+            if running_jobs < max_concurrent_tasks:
+                break
+            else:
+                print(
+                    f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
+                import time;
+                time.sleep(10)
+
+    # Open log files for the task run
+    with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
+            open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
+        if mode == 'single':
+            subprocess.run(['python', 'python_script.py'], cwd=f'{task_root_dir}/{col}', stdout=std_file,
+                           stderr=err_file, check=True)
+        elif mode == 'cluster' and os.name == 'posix':
+            subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file,
+                           check=True)
+        else:
+            raise ValueError('Mode must be either "single" or "cluster"!')
+
+def create_task_runs(
+    task_root_dir:str,
+    custom_settings:pd.DataFrame,
+    mode:Literal['single','cluster']='single',
+    n_workers:int=4,
+    max_concurrent_tasks:int=300,
+    use_parallel:bool=True
+) -> None:
     if os.name == 'posix':
         calculate_total_cost(custom_settings)
+    if mode not in ['single', 'cluster']:
+        raise ValueError('Mode must be either "single" or "cluster"!')
+
+    # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
-
-    # 处理需要评估的参数
-    custom_settings.columns = [re.sub(r'\W+', '_', col.strip()) for col in custom_settings.columns]
+    custom_settings = custom_settings.set_index('Name') if 'Name' in custom_settings.columns else custom_settings
+    # Replace TRUE/FALSE (Excel) with True/False (Python)
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
-
-    # 获取列名列表，并排除 'Default_run'
-    custom_cols = [col for col in custom_settings.columns if col not in ['Default_run']]
-    # num_task = len(custom_cols)
-
-    if not custom_cols:
+    # Check if there are any custom settings
+    if custom_settings.columns.size == 0:
         raise ValueError('No custom settings found in the settings_template.csv file!')
+    # Evaluate settings that are not originally strings
+    with open(f'{task_root_dir}/non_str_val.txt', 'r') as file:
+        eval_vars = file.read().splitlines()
+        custom_settings.loc[eval_vars] = custom_settings.loc[eval_vars].map(str).map(eval)
 
-    if use_multithreading:
-        Parallel(n_jobs=num_workers, batch_size=1)(
-            delayed(process_column)(col, custom_settings, script_name, i * delay)
-            for i, col in enumerate(custom_cols)
-        )
 
+    def task_wraper(col):
+        settings_dict = custom_settings.loc[:, col].copy()
+        create_run_folders(task_root_dir, col, n_workers)
+        write_settings(f'{task_root_dir}/{col}', settings_dict)
+        write_terminal_vars(f'{task_root_dir}/{col}', col, settings_dict)
+        submit_task(task_root_dir, col, mode, max_concurrent_tasks)
+
+    if use_parallel:
+        tasks = [delayed(task_wraper)(col) for col in custom_settings.columns]
+        for result in tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)):
+            pass
     else:
-        delay = 0
-        for col in custom_cols:
-            process_column(col, custom_settings, script_name, delay)
+        for col in tqdm(custom_settings.columns):
+            task_wraper(col)
+
+
+
 
 
 def submit_task_windows(task_dir, col,script_name):
@@ -233,17 +294,13 @@ def submit_task_linux(task_dir, config,script_name='0_runs_linux'):
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
     ignore_dirs = set() if ignore_dirs is None else set(ignore_dirs)
-
-    jobs = []
     os.makedirs(destination, exist_ok=True)
+    jobs = []
     for item in os.listdir(source):
-
         if item in ignore_dirs: continue
-
         s = os.path.join(source, item)
         d = os.path.join(destination, item)
         jobs += copy_folder_custom(s, d) if os.path.isdir(s) else [(s, d)]
-
     return jobs
 
 
@@ -272,7 +329,7 @@ def write_custom_settings(task_dir: str, settings_dict: dict):
                 file.write(f'{k}={v}\n')
 
 
-def update_settings(settings_dict: pd.DataFrame) -> pd.DataFrame:
+def update_settings(settings_dict: pd.DataFrame,job_name) -> pd.DataFrame:
     '''
     Update the task run settings with parameters for the server, and change the data path to absolute path.
     E.g. job name, input directory, raw data directory, and threads.
@@ -283,14 +340,10 @@ def update_settings(settings_dict: pd.DataFrame) -> pd.DataFrame:
         'Winter cereals': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Winter_cereals.shp',
         'Environmental Plantings': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Enviornmental_Plantings.shp'
     }
-    # settings_dict['REMOVED_DICT'] = {}
-    for am in list(settings_dict['AG_MANAGEMENTS_TO_LAND_USES'].keys()):  # Iterate over a copy of the keys
-        if not settings_dict['AG_MANAGEMENTS'][am]:
-            settings_dict['REMOVED_DICT'][am] = settings_dict['AG_MANAGEMENTS_TO_LAND_USES'][am]
-            settings_dict['AG_MANAGEMENTS_TO_LAND_USES'].pop(am)
-            settings_dict['AG_MANAGEMENTS_REVERSIBLE'].pop(am)
 
+    settings_dict['KEEP_OUTPUTS'] = eval(settings_dict['KEEP_OUTPUTS'])  # Convert string to boolean
     settings_dict['THREADS'] = settings_dict['NCPUS']
+    settings_dict['JOB_NAME'] = job_name
 
     return settings_dict
 
@@ -326,19 +379,14 @@ def update_permutations(settings_df: pd.DataFrame) -> pd.DataFrame:
     return settings_df
 
 
-def create_run_folders(col):
-    # Copy codes to the each custom run folder, excluding {EXCLUDE_DIRS} directories
-    from_to_files = copy_folder_custom(SOURCE_DIR, f'{SOURCE_DIR}/output/{col}', EXCLUDE_DIRS)
-    worker = min(settings.WRITE_THREADS, len(from_to_files))
-    for s, d in from_to_files:
-        if not os.path.exists(s):
-            print(f"Source file not found: {s}")
-        if not os.path.exists(os.path.dirname(d)):
-            print(f"Destination directory does not exist: {os.path.dirname(d)}")
-
-    Parallel(n_jobs=worker, backend="threading")(delayed(shutil.copy2)(s, d) for s, d in from_to_files)
+def create_run_folders(task_root_dir:str, col:str, n_workers:int):
+    src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
+    dst_dir = f'{task_root_dir}/{col}'
+    # Copy the files from the source to the destination
+    from_to_files = copy_folder_custom(src_dir, dst_dir, EXCLUDE_DIRS)
+    Parallel(n_jobs=n_workers)(delayed(shutil.copy2)(s, d) for s, d in from_to_files)
     # Create an output folder for the task
-    os.makedirs(f'{SOURCE_DIR}/output/{col}/output', exist_ok=True)
+    os.makedirs(f'{dst_dir}/output', exist_ok=True)
 
 
 def recommend_resources(df):
@@ -372,8 +420,13 @@ def recommend_resources(df):
         break
 
 
-def create_grid_search_template(grid_dict, output_file,settings_name_dict=None, run_time=None) -> pd.DataFrame:
-    grid_search_param_df = get_settings_df('Custom_runs')
+
+def create_grid_search_template(grid_dict, settings_name_dict=None, run_time=None) -> pd.DataFrame:
+    task_root_dir = f'../../output/{grid_dict['TASK_NAME'][0]}'
+    os.makedirs(os.path.dirname(task_root_dir), exist_ok=True)
+    grid_search_param_df = get_settings_df(task_root_dir)
+
+    # get_grid_search_param_df
     template_grid_search = grid_search_param_df.copy()
     # Create a list of dictionaries with all possible permutations
     grid_dict = {k: [str(i) for i in v] for k, v in grid_dict.items()}
@@ -381,17 +434,27 @@ def create_grid_search_template(grid_dict, output_file,settings_name_dict=None, 
     permutations = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
     # Save the grid search parameters to the root task folder
+
     permutations_df = pd.DataFrame(permutations)
     permutations_df.insert(0, 'run_idx', [i for i in range(1, len(permutations_df) + 1)])
+    permutations_df.to_csv(f'{task_root_dir}/grid_search_parameters.csv', index=False)
 
+    # Report the grid search parameters
+    print(f'Grid search template has been created with {len(permutations_df)} permutations!')
+    for k, v in grid_dict.items():
+        if len(v) > 1:
+            print(f'    {k:<30} : {len(v)} values')
+
+    # get_grid_search_settings_df
     grid_search_param_df = permutations_df.copy()
     run_settings_dfs = []
     total = len(grid_search_param_df)
     for idx, (_, row) in enumerate(grid_search_param_df.iterrows()):
         settings_dict = template_grid_search.set_index('Name')['Default_run'].to_dict()
         settings_dict.update(row.to_dict())
-        # settings_dict = update_settings(settings_dict)
+
         run_name = generate_run_name(row, idx, total, settings_name_dict, run_time=run_time)
+        settings_dict = update_settings(settings_dict,run_name)
         run_settings_dfs.append(pd.Series(settings_dict, name=run_name))
 
     # grid_search_param_df = update_permutations(pd.DataFrame(run_settings_dfs)) # update the permutations
@@ -399,7 +462,11 @@ def create_grid_search_template(grid_dict, output_file,settings_name_dict=None, 
     template_grid_search.index = template_grid_search['Name'].values
 
     print(template_grid_search.columns)
-    template_grid_search.to_csv(output_file, index=False)
+    template_grid_search.to_csv(f'{task_root_dir}/grid_search_template.csv', index=False)
+
+    grid_search_param_df = grid_search_param_df.loc[:, grid_search_param_df.nunique() > 1]
+    grid_search_param_df.to_csv(f'{task_root_dir}/grid_search_parameters_unique.csv', index=False)
+
     total_cost = calculate_total_cost(template_grid_search)
     print(f"Job Cost: {total_cost}k")
     recommend_resources(template_grid_search)

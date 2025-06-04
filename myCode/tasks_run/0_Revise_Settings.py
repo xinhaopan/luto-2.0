@@ -4,17 +4,19 @@ import pandas as pd
 from tools.helpers import create_grid_search_template
 
 grid_search = {
+    'TASK_NAME': ['setting_0603'],
+    'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['28'],
-    'NCPUS': ['7'],
-    'TIME': ['15:00:00'],
+    'MEM': ['4'],
+    'NCPUS': ['1'],
+    'TIME': ['1:00:00'],
 
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [5],
+    'RESFACTOR': [20],
     'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
@@ -35,7 +37,7 @@ grid_search = {
     # ----------------------------------- Water settings --------------------------------
     'WATER_LIMITS': ['on'],
     'WATER_CONSTRAINT_TYPE': ['hard'],
-    'INCLUDE_WATER_LICENSE_COSTS': [0,1],
+    'INCLUDE_WATER_LICENSE_COSTS': [0],
 
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
@@ -70,8 +72,6 @@ settings_name_dice = {
     'INCLUDE_WATER_LICENSE_COSTS':'',
 }
 
-output_file = os.path.join("Custom_runs", "setting_0531.csv")
-create_grid_search_template(grid_search,output_file,settings_name_dice)
+create_grid_search_template(grid_search,settings_name_dice)
 
-print(f"saved to {output_file}")
 
