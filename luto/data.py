@@ -419,7 +419,7 @@ class Data:
             'lu_code': list(self.DESC2AGLU.values()),
             'res_size': [ceil((self.LUMAP_NO_RESFACTOR == lu_code).sum() / self.RESMULT) for _,lu_code in self.DESC2AGLU.items()
             ]}).sort_values('res_size').reset_index(drop=True)
-
+        
         self.LUMAP = self.get_resfactored_lumap() if settings.RESFACTOR > 1 else self.LUMAP_NO_RESFACTOR[self.MASK]
         self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
 
@@ -1347,10 +1347,10 @@ class Data:
                                                     if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
-
+            
             if len(self.BIO_GBF4_ECNES_LIKELY_SEL) == 0:
                 raise ValueError("At least one of 'LIKELY' layers should be selected!")
-
+  
             likely_maybe_union = set(self.BIO_GBF4_ECNES_LIKELY_SEL).intersection(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
                 print(f"\tWARNING: {len(likely_maybe_union)} duplicate ECNES species targets found, using 'LIKELY' targets only:")
@@ -1363,8 +1363,8 @@ class Data:
             self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL}')
     
             BIO_GBF4_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_ECNES.nc', chunks={'species':1})
-            ecnes_arr_likely = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_SEL, cell=self.MASK, presence='LIKELY').compute()
-            ecnes_arr_likely_maybe = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL, cell=self.MASK, presence='LIKELY_AND_MAYBE').compute()
+            ecnes_arr_likely = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_SEL, presence='LIKELY').compute()
+            ecnes_arr_likely_maybe = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE').compute()
             ecnes_arr = xr.concat([ecnes_arr_likely, ecnes_arr_likely_maybe], dim='species')
             self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_exact_resfactored_average_arr(arr) for arr in ecnes_arr])
         
@@ -1572,7 +1572,7 @@ class Data:
         cell_avg_2d = cell_avg.reshape(self.LUMAP_2D_RESFACTORED.shape)
         return cell_avg_2d[np.nonzero(mask_arr_2d_resfactor)]
 
-
+    
     def get_resfactored_lumap(self) -> np.ndarray:
         """
         Coarsens the LUMAP to the specified resolution factor.
@@ -1583,24 +1583,24 @@ class Data:
 
         # Fill resfactored land-use map with the land-use codes given their resfactored size
         for _,(lu_code, res_size) in self.LU_RESFACTOR_CELLS.iterrows():
-
+            
             lu_avg = self.AG_L_MRJ[:,:,lu_code].sum(0) * fill_mask
             res_size = min(res_size, (lu_avg > 0).sum())
-
+            
             # Assign the n-largets cells with the land-use code
-            lu_idx = np.argsort(lu_avg)[-res_size:]
+            lu_idx = np.argsort(lu_avg)[-res_size:]  
             lumap_resfactored[lu_idx] = lu_code
             fill_mask[lu_idx] = False
-
+            
         # Fill -1 with nearest neighbour values
         nearst_ind = distance_transform_edt(
             (lumap_resfactored == -1),
             return_distances=False,
             return_indices=True
         )
-
+      
         return lumap_resfactored[*nearst_ind]
-
+ 
     # Get the habitat condition score within priority degraded areas for base year (2010)
     def get_GBF2_target_for_yr_cal(self, yr_cal:int) -> float:
         """
@@ -1666,7 +1666,7 @@ class Data:
         return np.where(limit_score_inside_LUTO < 0, 0, limit_score_inside_LUTO)
 
     
-    def get_GBF4_SNES_target_inside_LUTO_by_year(self, yr:int):
+    def get_GBF4_SNES_target_inside_LUTO_by_year(self, yr:int) -> np.ndarray:
         
         # Check the layer name
         snes_df_likely = self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
@@ -1690,8 +1690,7 @@ class Data:
         return np.array(targets).astype(np.float32)
 
         
-    def get_GBF4_ECNES_target_inside_LUTO_by_year(self, yr:int):
-        
+    def get_GBF4_ECNES_target_inside_LUTO_by_year(self, yr:int) -> np.ndarray:
         # Check the layer name
         ecnes_df_likely = self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
         ecnes_df_likely_maybe = self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE
@@ -1763,7 +1762,7 @@ class Data:
         return current_species_val.astype(np.float32)
     
 
-    def get_GBF8_target_inside_LUTO_by_yr(self, yr: int):
+    def get_GBF8_target_inside_LUTO_by_yr(self, yr: int) -> np.ndarray:
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Inside LUTO natural land.
         '''
