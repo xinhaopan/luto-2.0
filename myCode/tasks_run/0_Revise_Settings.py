@@ -40,29 +40,29 @@ grid_search = {
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
 
-    # ----------------------------------- Paper 1 settings --------------------------------
-    'NON_AG_LAND_USES' : [{
-        'Environmental Plantings': True,
-        'Riparian Plantings': True,
-        'Sheep Agroforestry': True,
-        'Beef Agroforestry': True,
-        'Carbon Plantings (Block)': True,
-        'Sheep Carbon Plantings (Belt)': True,
-        'Beef Carbon Plantings (Belt)': True,
-        'BECCS': False,
-        'Destocked - natural land': False,
-    }],
-
-    'AG_MANAGEMENTS' : [{
-        'Asparagopsis taxiformis': True,
-        'Precision Agriculture': True,
-        'Ecological Grazing': False,
-        'Savanna Burning': True,
-        'AgTech EI': True,
-        'Biochar': True,
-        'HIR - Beef': False,
-        'HIR - Sheep': False,
-    }]
+    # # ----------------------------------- Paper 1 settings --------------------------------
+    # 'NON_AG_LAND_USES' : [{
+    #     'Environmental Plantings': True,
+    #     'Riparian Plantings': True,
+    #     'Sheep Agroforestry': True,
+    #     'Beef Agroforestry': True,
+    #     'Carbon Plantings (Block)': True,
+    #     'Sheep Carbon Plantings (Belt)': True,
+    #     'Beef Carbon Plantings (Belt)': True,
+    #     'BECCS': False,
+    #     'Destocked - natural land': False,
+    # }],
+    #
+    # 'AG_MANAGEMENTS' : [{
+    #     'Asparagopsis taxiformis': True,
+    #     'Precision Agriculture': True,
+    #     'Ecological Grazing': False,
+    #     'Savanna Burning': True,
+    #     'AgTech EI': True,
+    #     'Biochar': True,
+    #     'HIR - Beef': False,
+    #     'HIR - Sheep': False,
+    # }]
 }
 settings_name_dice = {
     'GHG_EMISSIONS_LIMITS':'GHG',

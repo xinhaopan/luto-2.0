@@ -283,6 +283,12 @@ def update_settings(settings_dict: pd.DataFrame) -> pd.DataFrame:
         'Winter cereals': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Winter_cereals.shp',
         'Environmental Plantings': f'{os.path.abspath(settings_dict['INPUT_DIR'])}/no_go_areas/no_go_Enviornmental_Plantings.shp'
     }
+    # settings_dict['REMOVED_DICT'] = {}
+    for am in list(settings_dict['AG_MANAGEMENTS_TO_LAND_USES'].keys()):  # Iterate over a copy of the keys
+        if not settings_dict['AG_MANAGEMENTS'][am]:
+            settings_dict['REMOVED_DICT'][am] = settings_dict['AG_MANAGEMENTS_TO_LAND_USES'][am]
+            settings_dict['AG_MANAGEMENTS_TO_LAND_USES'].pop(am)
+            settings_dict['AG_MANAGEMENTS_REVERSIBLE'].pop(am)
 
     settings_dict['THREADS'] = settings_dict['NCPUS']
 
