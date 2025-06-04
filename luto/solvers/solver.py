@@ -1455,6 +1455,32 @@ class LutoSolver:
 
         print("Completed solve, collecting results...\n", flush=True)
 
+        # Collect results
+        status = self.gurobi_model.status
+        print(f"Solver status: {status} ")
+        if status == gp.GRB.INFEASIBLE:
+            print("The model is infeasible. Analyzing conflict IIS...\n")
+            try:
+                self.gurobi_model.computeIIS()
+                self.gurobi_model.write("model.ilp")
+                self.gurobi_model.write("model.ilp.iis")
+                print("Conflict IIS written to 'model.ilp.iis'. Please check the file for infeasibility reasons.\n")
+            except gp.GurobiError as e:
+                print(f"Error computing IIS: {e}")
+                print("Exporting model for manual inspection...")
+                self.gurobi_model.write("model.ilp")
+                print("Model written to 'model.ilp'. Check coefficients and constraints manually.\n")
+        elif status == gp.GRB.OPTIMAL:
+            print(f"Optimal solution found. Objective: {self.gurobi_model.objVal}\n")
+        elif status == gp.GRB.INF_OR_UNBD:
+            print("Model is infeasible or unbounded. Check constraints and bounds.\n")
+        elif status == gp.GRB.UNBOUNDED:
+            print("Model is unbounded. Check variable bounds.\n")
+        else:
+            print(f"Unexpected status: {status}. Refer to Gurobi documentation for details.\n")
+
+        # Collect results into a SolverSolution object
+
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
 
         # Collect optimised decision variables in one X_mrj Numpy array.

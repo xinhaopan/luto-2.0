@@ -324,8 +324,8 @@ AG_MANAGEMENTS = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
-    'HIR - Beef': True,
-    'HIR - Sheep': True,
+    'HIR - Beef': False,
+    'HIR - Sheep': False,
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -357,7 +357,7 @@ the rest of the simulation. This may be an unintended side effect.
 REMOVED_DICT = {}
 for am in list(AG_MANAGEMENTS_TO_LAND_USES.keys()):  # Iterate over a copy of the keys
     if not AG_MANAGEMENTS[am]:
-        REMOVED_DICT[am] = AG_MANAGEMENTS_TO_LAND_USES[am] 
+        REMOVED_DICT[am] = AG_MANAGEMENTS_TO_LAND_USES[am]
         AG_MANAGEMENTS_TO_LAND_USES.pop(am)
         AG_MANAGEMENTS_REVERSIBLE.pop(am)
 
@@ -398,7 +398,7 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-# Take data from 'GHG_targets.xlsx', 
+# Take data from 'GHG_targets.xlsx',
 GHG_TARGETS_DICT = {
     'off':      None,
     'low':      '1.8C (67%) excl. avoided emis SCOPE1',
