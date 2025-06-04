@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import datetime
+import re
 
 def get_path(path_name):
     output_path = f"../../output/{path_name}/output"
@@ -45,57 +46,44 @@ def get_folders_in_directory(directory_path):
     return folder_names
 
 def calculate_total_cost(df):
-    """
-    Calculate the total job cost based on CPU_PER_TASK, MEM, and TIME in the input DataFrame.
-
-    Args:
-        df (pd.DataFrame): Input DataFrame with rows containing CPU_PER_TASK, MEM, and TIME.
-
-    Returns:
-        float: The total job cost calculated using NCI's formula.
-    """
-
     def convert_time_to_hours(time_obj):
-        """Convert time (datetime.time or string) to hours."""
         if pd.isna(time_obj) or time_obj is None:
             return 0
-        if isinstance(time_obj, datetime.time):  # 如果是 datetime.time 类型
+        if isinstance(time_obj, datetime.time):
             return time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600
-        if isinstance(time_obj, str) and ":" in time_obj:  # 如果是字符串
+        if isinstance(time_obj, str) and ":" in time_obj:
             h, m, s = map(int, time_obj.split(":"))
             return h + m / 60 + s / 3600
         return 0
-    # 提取所有列名，并排除 'Name' 和 'Default_run'（即使它们不存在）
-    columns_to_remove = {'Default_run'}.intersection(df.columns)  # 找到需要移除的列
-    df = df.drop(columns=columns_to_remove)  # 移除这些列
 
-    # Ensure columns are strings
+    # Remove unused columns
+    columns_to_remove = {'Default_run'}.intersection(df.columns)
+    df = df.drop(columns=columns_to_remove)
     df.columns = df.columns.astype(str)
-
-    # Remove unnamed columns if present
     df = df.loc[:, ~df.columns.str.startswith('Unnamed')]
     if 'Name' in df.columns:
         df = df.set_index('Name')
-    # Extract relevant rows for CPU, MEM, and TIME
-    cpu_row = df[df.index == 'NCPUS']
-    mem_row = df[df.index == 'MEM']
-    time_row = df[df.index == 'TIME']
 
-    # Extract values and convert where needed
-    cpu_values = cpu_row.iloc[0, 0:].astype(float)  # CPU per task
-    mem_values = mem_row.iloc[0, 0:].astype(float)  # Memory in GB
-    time_values = time_row.iloc[0, 0:].apply(convert_time_to_hours).astype(float)  # Time in hours
+    cpu_row = df.loc['NCPUS']
+    mem_row = df.loc['MEM']
+    time_row = df.loc['TIME']
 
-    # Calculate memory proportion (memory-based CPUs)
-    memory_cpu_values = np.ceil(mem_values / 4)   # 每核 4GB 内存，向上取整
+    # CPU as float Series
+    cpu_values = cpu_row.astype(float)
 
-    # Determine effective CPUs (max of requested CPUs and memory CPUs)
+    # MEM: 提取数字部分并转为 float Series
+    mem_values = mem_row.str.replace(r'([0-9]*\.?[0-9]+).*', r'\1', regex=True).astype(float)
+    # TIME: 转小时
+    time_values = time_row.apply(convert_time_to_hours).astype(float)
+
+    # Memory-based CPUs
+    memory_cpu_values = np.ceil(mem_values / 4)
+
+    # 保证所有变量都是 Series
     effective_cpus = pd.concat([cpu_values, memory_cpu_values], axis=1).max(axis=1)
 
-    # Calculate total cost: 2 * Effective CPUs * Time (hours)
-    every_cost = (2 * effective_cpus * time_values)
+    every_cost = 2 * effective_cpus * time_values
     total_cost = every_cost.sum() / 1000
     print(f"Every Job Cost: {every_cost.iloc[0]},Number:{len(every_cost)}")
     print(f"Total Job Cost: {total_cost}k")
-
     return total_cost

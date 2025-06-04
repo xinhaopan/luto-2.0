@@ -6,8 +6,9 @@ from tools.helpers import create_grid_search_template
 grid_search = {
     'TASK_NAME': ['setting_0603'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
+    'QUEUE': ['normalsr'],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['4'],
+    'MEM': ['4GB'],
     'NCPUS': ['1'],
     'TIME': ['1:00:00'],
 
@@ -20,12 +21,12 @@ grid_search = {
     'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['high', 'medium', 'low'],
+    'GHG_EMISSIONS_LIMITS': ['high'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['low', 'medium', 'high'],
+    'BIODIVERSTIY_TARGET_GBF_2': ['low'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
 
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],

@@ -408,7 +408,7 @@ def recommend_resources(df):
     mem_row = df[df['Name'] == 'MEM']
 
     cpu_values = cpu_row.iloc[0, 1:].astype(float)
-    mem_values = mem_row.iloc[0, 1:].astype(float)
+    mem_values = mem_row.iloc[0, 1:].str.replace(r'([0-9]*\.?[0-9]+).*', r'\1', regex=True).astype(float).astype(float)
 
     recommended_cpus = np.ceil(mem_values / 4)
     recommended_mem = cpu_values * 4
