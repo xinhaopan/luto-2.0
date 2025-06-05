@@ -25,9 +25,6 @@ def monitor_memory(func, *args, **kwargs):
     return result, peak_memory
 
 def main():
-    # 设置参数
-    start_year = 2010
-    target_year = 2050
 
     try:
         os.environ["GRB_LICENSE_FILE"] = r"C:\Users\s222552331\gurobi\gurobi_xp.lic"
@@ -71,15 +68,6 @@ def main():
         write_log(f"Total run time: {formatted_duration}")
         write_log(f"Overall peak memory usage: {max(load_data_memory, simulation_memory, write_output_memory):.2f} GB")
 
-    except Exception as e:
-        # 记录错误到日志文件
-        error_message = f"An error occurred during simulation:\n{str(e)}\n{traceback.format_exc()}"
-        write_log(error_message, file=error_log_file)
-
-        # 打印错误信息，便于调试
-        print(f"Error in simulation: {e}")
-        print("Full traceback written to error_log.txt")
-
         # Remove all files except the report directory if settings.KEEP_OUTPUTS is False
         '''
         KEEP_OUTPUTS is not originally defined in the settings, but will be added in the `luto/tools/create_task_runs/create_running_tasks.py` file.
@@ -88,7 +76,7 @@ def main():
         if settings.KEEP_OUTPUTS:
 
             # Save the data object to disk
-            sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_RES{settings.RESFACTOR}.gz")
+            pass
 
         else:
             report_dir = f"{data.path}/DATA_REPORT"
@@ -112,6 +100,16 @@ def main():
                             shutil.rmtree(item)  # Remove the directory
                     except Exception as e:
                         print(f"Failed to delete {item}. Reason: {e}")
+
+    except Exception as e:
+        # 记录错误到日志文件
+        error_message = f"An error occurred during simulation:\n{str(e)}\n{traceback.format_exc()}"
+        write_log(error_message, file=error_log_file)
+
+        # 打印错误信息，便于调试
+        print(f"Error in simulation: {e}")
+        print("Full traceback written to error_log.txt")
+
 
 
 if __name__ == "__main__":

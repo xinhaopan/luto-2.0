@@ -23,6 +23,12 @@ nci_account -P jk53
 quota -s
 ```
 
+取消所有任务
+```
+qstat -u $USER | awk 'NR>2 && $1 ~ /^[0-9]+/' | awk '{print $1}' | xargs -r qdel 
+```
+
+
 Res = 20, timeseries, 4GB,1CPU, 1h
 
 Res = 5, 28GB 7CPU 15h
