@@ -1,32 +1,32 @@
 import os
 import numpy as np
 import pandas as pd
-from tools.helpers import create_grid_search_template
+from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['setting_0604'],
-    'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
+    'TASK_NAME': ['BEAT_weight_test_demand_production'],
+    'KEEP_OUTPUTS': [False],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['4GB'],
-    'NCPUS': ['1'],
+    'MEM': ['8GB'],
+    'NCPUS': ['2'],
     'TIME': ['1:00:00'],
 
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
-    'SOLVE_WEIGHT_BETA': [0.9],
+    'SOLVE_WEIGHT_BETA': [i for i in np.arange(0, 1.01, 0.01).tolist()],
     'OBJECTIVE': ['maxprofit'], # maxprofit
-    'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [20],
-    'SIM_YEARS': [[i for i in range(2010,2051,1)]],
+    'WRITE_OUTPUT_GEOTIFFS': [False],
+    'RESFACTOR': [15],
+    'SIM_YEARS': [[i for i in range(2010,2051,10)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['high'],
+    'GHG_EMISSIONS_LIMITS': ['medium'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['low'],
+    'BIODIVERSTIY_TARGET_GBF_2': ['medium'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
 
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
@@ -38,7 +38,7 @@ grid_search = {
     # ----------------------------------- Water settings --------------------------------
     'WATER_LIMITS': ['on'],
     'WATER_CONSTRAINT_TYPE': ['hard'],
-    'INCLUDE_WATER_LICENSE_COSTS': [0],
+    'INCLUDE_WATER_LICENSE_COSTS': [1],
 
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
@@ -67,12 +67,13 @@ grid_search = {
     #     'HIR - Sheep': False,
     # }]
 }
-settings_name_dice = {
-    'GHG_EMISSIONS_LIMITS':'GHG',
-    'BIODIVERSTIY_TARGET_GBF_2':'BIO',
-    'INCLUDE_WATER_LICENSE_COSTS':'',
-}
+# settings_name_dice = {
+#     'GHG_EMISSIONS_LIMITS':'GHG',
+#     'BIODIVERSTIY_TARGET_GBF_2':'BIO',
+# }
 
-create_grid_search_template(grid_search,settings_name_dice)
+task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
+grid_search_settings_df = create_grid_search_template(grid_search)
+create_task_runs(task_root_dir, grid_search_settings_df, mode='cluster', n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 

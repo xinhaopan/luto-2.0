@@ -13,13 +13,6 @@ from myCode.tasks_run.tools import calculate_total_cost
 from luto import settings
 
 
-def print_with_time(message):
-    """
-    打印带有时间戳的消息。
-    """
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] {message}")
-
 
 def get_settings_df(task_root_dir:str) -> pd.DataFrame:
     # Save the settings template to the root task folder
@@ -52,27 +45,6 @@ def get_settings_df(task_root_dir:str) -> pd.DataFrame:
     return settings_df
 
 
-def process_column(col, custom_settings, script_name, delay):
-    time.sleep(delay * 60)  # 让每个任务启动前等待固定时间
-    """并行处理单个列的任务"""
-    with open('Custom_runs/non_str_val.txt', 'r') as file:
-        eval_vars = file.read().splitlines()
-    # Evaluate the non-string values to their original types
-    custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(eval)
-    # Update the settings dictionary
-    custom_dict = update_settings(custom_settings[col].to_dict(),col)
-    for key in eval_vars:
-        custom_dict[key] = ast.literal_eval(custom_dict[key]) if isinstance(custom_dict[key], str) else custom_dict[key]
-
-    # Submit the task
-    create_run_folders(col)
-    task_dir = f'{SOURCE_DIR}/output/{col}'
-    write_custom_settings(task_dir, custom_dict)
-
-    if os.name == 'nt':
-        submit_task_windows(task_dir, col, script_name)  # 执行任务
-    elif os.name == 'posix':
-        submit_task_linux(task_dir, custom_dict, script_name)  # 执行任务
 
 def write_settings(task_dir:str, settings_dict:dict):
     with open(f'{task_dir}/luto/settings.py', 'w') as file:
@@ -126,6 +98,16 @@ def submit_task(task_root_dir: str, col: str, mode: Literal['single', 'cluster']
         else:
             raise ValueError('Mode must be either "single" or "cluster"!')
 
+def check_mode_system(mode):
+    """
+    检查运行模式与操作系统是否匹配，不匹配则报错退出
+    """
+    sys_type = os.name  # 'posix' (Linux/macOS), 'nt' (Windows)
+    if mode == 'single' and sys_type != 'nt':
+        raise RuntimeError("single just run on Windows, please switch to Windows or change mode to 'cluster'.")
+    if mode == 'cluster' and sys_type != 'posix':
+        raise RuntimeError("cluster just run on Linux, please switch to Linux or change mode to 'single'.")
+
 def create_task_runs(
     task_root_dir:str,
     custom_settings:pd.DataFrame,
@@ -134,6 +116,7 @@ def create_task_runs(
     max_concurrent_tasks:int=300,
     use_parallel:bool=True
 ) -> None:
+    check_mode_system(mode)
     if os.name == 'posix':
         calculate_total_cost(custom_settings)
     if mode not in ['single', 'cluster']:
@@ -160,6 +143,8 @@ def create_task_runs(
         write_terminal_vars(f'{task_root_dir}/{col}', col, settings_dict)
         submit_task(task_root_dir, col, mode, max_concurrent_tasks)
 
+
+    use_parallel = False if os.name == 'posix' else use_parallel
     if use_parallel:
         tasks = [delayed(task_wraper)(col) for col in custom_settings.columns]
         for result in tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)):
@@ -172,125 +157,6 @@ def create_task_runs(
 
 
 
-def submit_task_windows(task_dir, col,script_name):
-    print_with_time(f"{task_dir}: running task for column...")
-    start_time = time.time()  # 记录任务开始时间
-    log_file = f'{task_dir}/output/{script_name}_error_log.txt'  # 定义日志文件路径
-
-    python_path = sys.executable
-    task_dir = os.path.abspath(task_dir)
-
-    try:
-        # 运行子进程，捕获标准输出和标准错误
-        result = subprocess.run(
-            [python_path, f'{task_dir}/{script_name}.py'],
-            cwd=f'{task_dir}',
-            capture_output=True,  # 捕获输出
-            text=True,  # 将输出转换为文本
-            encoding="utf-8"
-        )
-
-        end_time = time.time()  # 记录任务结束时间
-        elapsed_time = (end_time - start_time) / 3600  # 计算用时，单位：小时
-
-        # 检查子进程的返回码和错误输出
-        if result.returncode == 0 and not result.stderr:
-            # 如果成功运行，记录成功信息
-            with open(log_file, 'a', encoding="utf-8") as f:
-                f.write(f"Success running temp_runs.py for {col}:\n")
-                f.write(f"stdout:\n{result.stdout}\n")
-            print_with_time(f"{col} {script_name}: successfully completed. Elapsed time: {elapsed_time:.2f} h")
-        else:
-            # 如果运行失败，记录错误信息
-            with open(log_file, 'a', encoding="utf-8") as f:
-                f.write(f"Error running temp_runs.py for {col}:\n")
-                f.write(f"stdout:\n{result.stdout}\n")
-                f.write(f"stderr:\n{result.stderr}\n")
-            print_with_time(f"{col}: error occurred. Elapsed time: {elapsed_time:.2f} h")
-
-    except Exception as e:
-        # 捕获 Python 异常，并将其写入日志文件
-        with open(log_file, 'a', encoding="utf-8") as f:
-            f.write(f"Exception occurred while running temp_runs.py for {col}:\n")
-            f.write(f"{str(e)}\n")
-        print_with_time(f"{col}: exception occurred during execution, see {log_file} for details.")
-
-
-def submit_task_linux(task_dir, config,script_name='0_runs_linux'):
-    """
-    提交单个 PBS 作业，并在作业成功完成后执行同步操作。
-    :param col: 作业列名称，用于区分任务
-    :param config: 单个作业的配置字典，包含 walltime, ncpus, mem, queue, job_name, script_content 等参数。
-    """
-    # 从配置字典中读取参数
-    job_name = config.get("JOB_NAME", "default_job")
-    walltime = config.get("TIME", "05:00:00")
-    ncpus = config.get("NCPUS", "10")
-    mem = config.get("MEM", "40") + "GB"
-    queue = config.get("QUEUE", "normal")
-    script_content = config.get("script_content",
-                                f"/home/582/xp7241/apps/miniforge3/envs/luto/bin/python {script_name}.py")
-
-    # 动态生成 PBS 脚本内容
-    pbs_script = f"""#!/bin/bash
-    # 作业名称
-    #PBS -N {job_name}
-    # 分配资源：CPU核心数和内存
-    #PBS -l ncpus={ncpus}
-    #PBS -l mem={mem}
-    #PBS -l jobfs=10GB
-    # 最大运行时间
-    #PBS -l walltime={walltime}
-    # 在提交作业时的当前工作目录下运行
-    #PBS -l wd
-    # 合并标准输出和错误输出到同一文件
-    #PBS -j oe
-    #PBS -o output
-    # 提交到指定队列
-    #PBS -q {queue}
-
-    # 指定需要的存储路径（按实际配置调整）
-    #PBS -l storage=gdata/jk53+scratch/jk53
-
-    # 设置日志目录
-    LOG_DIR=output
-    mkdir -p $LOG_DIR
-
-    # 加载 Gurobi 许可证
-    source ~/.bashrc
-    export GRB_LICENSE_FILE=/g/data/jk53/config/gurobi_cfg.txt
-    export GRB_TOKEN_SERVER=gurobi.licensing.its.deakin.edu.au
-    export GRB_TOKEN_PORT=41954
-    
-    # 输出作业开始时间到日志
-    echo "Job started at $(date)" >> $LOG_DIR/$PBS_JOBID.log
-    echo "Current directory: $(pwd)" >> $LOG_DIR/$PBS_JOBID.log
-    
-    # 执行脚本内容
-    {script_content} >> $LOG_DIR/$PBS_JOBID.log 2>&1
-    
-    # 输出作业结束时间到日志
-    echo "Job finished at $(date)" >> $LOG_DIR/$PBS_JOBID.log
-    """
-
-    # 写入 PBS 脚本到文件
-    script_file = f"{task_dir}/output/{job_name}.pbs"
-    with open(script_file, "w") as f:
-        f.write(pbs_script)
-
-    # 提交作业
-    try:
-        result = subprocess.run(["qsub", f"output/{job_name}.pbs"], check=True, capture_output=True, text=True, cwd=task_dir)
-        job_id = result.stdout.strip()
-        submission_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        print(f"{submission_time}: Job '{job_name}' submitted successfully! ID: {job_id}.")
-        # 等待作业完成
-        # log_file = f"{dir}/output/simulation_log.txt"
-        # if wait_for_job_to_complete(job_id, log_file):
-        #     # 作业完成后执行同步操作
-        #     sync_files(cwd,col)
-    except subprocess.CalledProcessError as e:
-        print(f"Error submitting job '{job_name}':", e.stderr)
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
     ignore_dirs = set() if ignore_dirs is None else set(ignore_dirs)
@@ -303,30 +169,6 @@ def copy_folder_custom(source, destination, ignore_dirs=None):
         jobs += copy_folder_custom(s, d) if os.path.isdir(s) else [(s, d)]
     return jobs
 
-
-def write_custom_settings(task_dir: str, settings_dict: dict):
-    # Write the custom settings to the settings.py of each task
-    with open(f'{task_dir}/luto/settings.py', 'w') as file, \
-            open(f'{task_dir}/luto/settings_bash.py', 'w') as bash_file:
-        for k, v in settings_dict.items():
-            # List values need to be converted to bash arrays
-            if isinstance(v, list):
-                bash_file.write(f'{k}=({" ".join([str(elem) for elem in v])})\n')
-                file.write(f'{k}={v}\n')
-            # Dict values need to be converted to bash variables
-            elif isinstance(v, dict):
-                file.write(f'{k}={v}\n')
-                bash_file.write(f'# {k} is a dictionary, which is not natively supported in bash\n')
-                for key, value in v.items():
-                    key = str(key).replace(' ', '_').replace('(', '').replace(')', '')
-                    bash_file.write(f'{k}_{key}={value}\n')
-                    # If the value is a string, write it as a string
-            elif isinstance(v, str):
-                file.write(f'{k}="{v}"\n')
-                bash_file.write(f'{k}="{v}"\n')
-            # Write the rest as it is
-            else:
-                file.write(f'{k}={v}\n')
 
 
 def update_settings(settings_dict: pd.DataFrame,job_name) -> pd.DataFrame:
@@ -346,37 +188,6 @@ def update_settings(settings_dict: pd.DataFrame,job_name) -> pd.DataFrame:
     settings_dict['JOB_NAME'] = job_name
 
     return settings_dict
-
-def update_permutations(settings_df: pd.DataFrame) -> pd.DataFrame:
-    # --------------------------------------- GHG_EMISSIONS_LIMITS process -------------------------------------------------
-    ghg_map_name = {
-        'off': None,
-        'GHG_Low': 'low',
-        'GHG_Medium': 'medium',
-        'GHG_High': 'high'
-    }
-    settings_df['GHG_EMISSIONS_LIMITS'] = settings_df['GHG_NAME'].map(ghg_map_name)
-    if settings_df['GHG_EMISSIONS_LIMITS'].isnull().any():
-        bad_vals = settings_df.loc[settings_df['GHG_EMISSIONS_LIMITS'].isnull(), 'GHG_NAME'].unique()
-        raise ValueError(
-            f"Invalid value(s) for GHG_EMISSIONS_LIMITS: {bad_vals}. Must be 'off', 'GHG_Low', 'GHG_Medium', or 'GHG_High'.")
-
-    # --------------------------------------- BIODIVERSTIY_TARGET_GBF_2 process -------------------------------------------------
-    gbf2_map_name = {
-        'off': 'off',
-        'BIO_Low': 'low',
-        'BIO_Medium': 'medium',
-        'BIO_High': 'high'
-    }
-    settings_df['BIODIVERSTIY_TARGET_GBF_2'] = settings_df['GBF2_NAME'].map(gbf2_map_name)
-    if settings_df['BIODIVERSTIY_TARGET_GBF_2'].isnull().any():
-        bad_vals = settings_df.loc[settings_df['BIODIVERSTIY_TARGET_GBF_2'].isnull(), 'GBF2_NAME'].unique()
-        raise ValueError(
-            f"Invalid value(s) for BIODIVERSTIY_TARGET_GBF_2: {bad_vals}. Must be 'off', 'BIO_Low', 'BIO_Medium', or 'BIO_High'.")
-
-    # remove the NAME columns
-    settings_df = settings_df.loc[:, ~settings_df.columns.str.contains('NAME')]
-    return settings_df
 
 
 def create_run_folders(task_root_dir:str, col:str, n_workers:int):
@@ -421,7 +232,7 @@ def recommend_resources(df):
 
 
 
-def create_grid_search_template(grid_dict, settings_name_dict=None, run_time=None) -> pd.DataFrame:
+def create_grid_search_template(grid_dict, settings_name_dict=None, use_date=False) -> pd.DataFrame:
     task_root_dir = f'../../output/{grid_dict['TASK_NAME'][0]}'
     os.makedirs(os.path.dirname(task_root_dir), exist_ok=True)
     grid_search_param_df = get_settings_df(task_root_dir)
@@ -453,7 +264,7 @@ def create_grid_search_template(grid_dict, settings_name_dict=None, run_time=Non
         settings_dict = template_grid_search.set_index('Name')['Default_run'].to_dict()
         settings_dict.update(row.to_dict())
 
-        run_name = generate_run_name(row, idx, total, settings_name_dict, run_time=run_time)
+        run_name = generate_run_name(row, idx, total, settings_name_dict, use_date=use_date)
         settings_dict = update_settings(settings_dict,run_name)
         run_settings_dfs.append(pd.Series(settings_dict, name=run_name))
 
@@ -472,20 +283,20 @@ def create_grid_search_template(grid_dict, settings_name_dict=None, run_time=Non
     recommend_resources(template_grid_search)
     return template_grid_search
 
-def generate_run_name(row, idx, total, settings_name_dict, run_time=None):
+def generate_run_name(row, idx, total, settings_name_dict, use_date=True):
     """
     生成如 20240521_Run_01_GHG_Low_BIO_Low 这样格式的run_id，编号宽度根据实验总数自动调整。
     """
-    if run_time is None:
-        run_time = datetime.datetime.now().strftime("%Y%m%d")
+    parts = []
+    if use_date:
+        parts.append(datetime.datetime.now().strftime("%Y%m%d"))
     width = len(str(total))
     run_num = str(idx + 1).zfill(width)
-    run_name = f"{run_time}_Run_{run_num}"
-    if settings_name_dict is not None:
-        name = [
-            f"_{settings_name_dict[k]}_{row[k]}"
-            for k in settings_name_dict if k in row.index
-        ]
-        run_name = run_name + ''.join(name)
-    return run_name
+    parts.append(f"Run_{run_num}")
+
+    if settings_name_dict:
+        for k in settings_name_dict:
+            if k in row:
+                parts.append(f"{settings_name_dict[k]}_{row[k]}")
+    return "_".join(parts)
 
