@@ -1176,7 +1176,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
         dims=['cell'],
         coords={'cell':range(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS)}) # Chunking to save mem use
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
@@ -1274,7 +1274,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data), 
         dims=['group','cell'], 
         coords={'group':list(data.BIO_GBF3_ID2DESC.values()),  'cell':range(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS), 'group': 1})
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
@@ -1369,7 +1369,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ag_biodiversity.get_GBF4_SNES_matrix_sr(data), 
         dims=['species','cell'], 
         coords={'species':data.BIO_GBF4_SNES_SEL_ALL, 'cell':np.arange(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS), 'species': 1})
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -1470,7 +1470,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ag_biodiversity.get_GBF4_ECNES_matrix_sr(data), 
         dims=['species','cell'], 
         coords={'species':data.BIO_GBF4_ECNES_SEL_ALL, 'cell':np.arange(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS), 'species': 1})
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -1572,7 +1572,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         coords={
             'group': data.BIO_GBF8_GROUPS_NAMES,
             'cell': np.arange(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS), 'group': 1})  # Chunking to save mem use
         
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -1668,7 +1668,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         coords={
             'species': data.BIO_GBF8_SEL_SPECIES,
             'cell': np.arange(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS), 'group': 1})  # Chunking to save mem use
 
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(

@@ -632,13 +632,13 @@ class LutoSolver:
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             upper_bound_constraints = self.gurobi_model.addConstrs(
                 (
-                    (self._input_data.limits['demand'][c] - self.total_q_exprs_c[c]) <= self.V[c]
+                    (self._input_data.limits['demand'][c] - self.total_q_exprs_c[c]) <= self.V[c] 
                     for c in range(self._input_data.ncms)
                 ),  name="demand_soft_bound_upper"
                 )
             lower_bound_constraints = self.gurobi_model.addConstrs(
                 (
-                    (self.total_q_exprs_c[c] - self._input_data.limits['demand'][c]) <= self.V[c]
+                    (self.total_q_exprs_c[c] - self._input_data.limits['demand'][c]) <= self.V[c] 
                     for c in range(self._input_data.ncms)
                 ),  name="demand_soft_bound_lower"
             )
@@ -649,7 +649,7 @@ class LutoSolver:
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
             quantity_meets_demand_constraints = self.gurobi_model.addConstrs(
                 (
-                    (self.total_q_exprs_c[c] >= self._input_data.limits['demand'][c])
+                    (self.total_q_exprs_c[c] >= self._input_data.limits['demand'][c]) 
                     for c in range(self._input_data.ncms)
                 ),
                     name="demand_meets_demand"
@@ -711,13 +711,14 @@ class LutoSolver:
         
         # Ensure water use remains below limit for each region
         for reg_idx, water_limit in self._input_data.limits["water"].items():
-            
-            if water_limit == 0:
-                print(f"     |-- target is {water_limit:15.2f} ML for region {reg_idx} (skipped in constraints)")
-                continue
 
             ind = self._input_data.water_region_indices[reg_idx]
             reg_name = self._input_data.water_region_names[reg_idx]
+
+            if water_limit == 0:
+                print(f"     |-- target is {water_limit:15.2f} ML for {reg_name} (skipped in constraints)")
+                continue
+
             print(f"     |-- target is {water_limit:15.2f} ML for {reg_name}")
 
             self.water_nyiled_exprs[reg_idx] = self._get_water_net_yield_expr_for_region(ind)           # Water net yield inside LUTO study area
@@ -1025,7 +1026,7 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_SNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / x_area_lb
+            self.bio_GBF4_SNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / x_area_lb  
 
             print(f"       |-- target is {x_area_lb:15,.0f} for {x_names[x]}")
             self.bio_GBF4_SNES_constrs[x] = self.gurobi_model.addConstr(
@@ -1156,7 +1157,7 @@ class LutoSolver:
 
             # Divide by constant to reduce strain on the constraint matrix range
             self.bio_GBF8_species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / s_area_lb
-
+    
             print(f"       |-- target area is {s_area_lb:15,.0f} for {s_names[s]}")
             self.bio_GBF8_species_conservation_constrs[s] = self.gurobi_model.addConstr(
                 self.bio_GBF8_species_conservation_exprs[s] >= 1,
