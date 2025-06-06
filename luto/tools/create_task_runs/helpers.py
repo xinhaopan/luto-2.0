@@ -358,7 +358,7 @@ def get_report_df(json_dir_path, run_paras):
 
 
 
-def process_task_root_dirs(task_root_dir, n_workers=10):
+def process_task_root_dirs(task_root_dir, n_workers=5):
     
     grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters_unique.csv")
     run_dirs = [i for i in os.listdir(task_root_dir) if os.path.isdir(os.path.join(task_root_dir, i))]

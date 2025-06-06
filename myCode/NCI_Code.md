@@ -25,7 +25,7 @@ quota -s
 
 取消所有任务
 ```
-qstat -u $USER | awk 'NR>2 && $1 ~ /^[0-9]+/' | awk '{print $1}' | xargs -r qdel 
+qselect | xargs qdel
 ```
 
 

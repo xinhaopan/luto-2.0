@@ -98,6 +98,54 @@ def submit_task(task_root_dir: str, col: str, mode: Literal['single', 'cluster']
         else:
             raise ValueError('Mode must be either "single" or "cluster"!')
 
+
+def submit_write_task(task_root_dir: str, col: str):
+    # 1. 写入 write_output.py 脚本
+    script_content = f'''import gzip
+    import dill
+    from luto.tools.write import write_outputs
+
+    gz_path = r"{gz_path_escaped}"
+
+    with gzip.open(gz_path, 'rb') as f:
+        data = dill.load(f)
+
+    write_outputs(data)
+    '''
+    script_path = os.path.join(f'{task_root_dir}/{col}/python_script.py', 'write_output.py')
+    with open(script_path, 'w', encoding='utf-8') as f:
+        f.write(script_content)
+    subprocess.run(['python', 'python_script.py'], cwd=f'{task_root_dir}/{col}', stdout=std_file,
+                   stderr=err_file, check=True)
+
+    # Wait until the number of running jobs is less than max_concurrent_tasks
+    if os.name == 'posix':
+        while True:
+            try:
+                running_jobs = int(
+                    subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
+            except Exception as e:
+                print(f"Error checking running jobs: {e}")
+            if running_jobs < max_concurrent_tasks:
+                break
+            else:
+                print(
+                    f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
+                import time;
+                time.sleep(10)
+
+    # Open log files for the task run
+    with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
+            open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
+        if mode == 'single':
+            subprocess.run(['python', 'python_script.py'], cwd=f'{task_root_dir}/{col}', stdout=std_file,
+                           stderr=err_file, check=True)
+        elif mode == 'cluster' and os.name == 'posix':
+            subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file,
+                           check=True)
+        else:
+            raise ValueError('Mode must be either "single" or "cluster"!')
+
 def check_mode_system(mode):
     """
     检查运行模式与操作系统是否匹配，不匹配则报错退出

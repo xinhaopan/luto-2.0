@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['BEAT_weight_test_demand_production'],
+    'TASK_NAME': ['BEAT_weight_test_demand_price'],
     'KEEP_OUTPUTS': [False],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     # ---------Computational settings, which are not relevant to LUTO itself---------
