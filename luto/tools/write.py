@@ -405,6 +405,8 @@ def write_quantity_separate(data: Data, yr_cal, path):
     # 创建一个字典存储结果
     ag_man_q_mrj_dict = {}
     for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
+        if not settings.AG_MANAGEMENTS[am]:
+            continue
         am_j_list = [data.DESC2AGLU[lu] for lu in am_lus]
         current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
         for j in am_j_list:
@@ -417,7 +419,9 @@ def write_quantity_separate(data: Data, yr_cal, path):
         ag_man_q_mrj_dict[am] = ag_man_qu_mrj
 
     AM_dfs = []
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
+    for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
+        if not settings.AG_MANAGEMENTS[am]:
+            continue
         am_mrj = ag_man_q_mrj_dict[am]
         am_jm = np.einsum('mrj->jm', am_mrj)
         df_am = pd.DataFrame(
@@ -1987,8 +1991,8 @@ def write_rev_cost_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     am_cost_mat = ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx)
 
     # Iterate through agricultural management and non-agricultural land uses
-    for am, am_desc in AG_MANAGEMENTS_TO_LAND_USES.items():
-        if not AG_MANAGEMENTS[am]:
+    for am, am_desc in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
+        if not settings.AG_MANAGEMENTS[am]:
             continue
 
         # Get the land use codes for the agricultural management
@@ -2236,7 +2240,9 @@ def write_GHG_npy(data: Data, yr_cal, path):
     ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data, yr_idx)
 
     am_dfs = []
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
+    for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
+        if not settings.AG_MANAGEMENTS[am]:
+            continue
         # Get the lucc_code for this the agricultural management in this loop
         am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
 
@@ -2363,7 +2369,12 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
 
 def write_GBF2_npy(data: Data, yr_cal, path):
     # Unpack the ag managements and land uses
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [
+        (am, l)
+        for am, lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items()
+        if settings.AG_MANAGEMENTS[am]
+        for l in lus
+    ]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])

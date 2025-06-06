@@ -1481,25 +1481,25 @@ class LutoSolver:
         status = self.gurobi_model.status
         print(f"Solver status: {status} ")
         if status == gp.GRB.INFEASIBLE:
-            print("The model is infeasible. Analyzing conflict IIS...\n")
+            print("Model is infeasible. Attempting conflict analysis...\n")
             try:
-                self.gurobi_model.computeIIS()
-                self.gurobi_model.write("model.ilp")
-                self.gurobi_model.write("model.ilp.iis")
-                print("Conflict IIS written to 'model.ilp.iis'. Please check the file for infeasibility reasons.\n")
-            except gp.GurobiError as e:
-                print(f"Error computing IIS: {e}")
-                print("Exporting model for manual inspection...")
-                self.gurobi_model.write("model.ilp")
-                print("Model written to 'model.ilp'. Check coefficients and constraints manually.\n")
-        elif status == gp.GRB.OPTIMAL:
-            print(f"Optimal solution found. Objective: {self.gurobi_model.objVal}\n")
-        elif status == gp.GRB.INF_OR_UNBD:
-            print("Model is infeasible or unbounded. Check constraints and bounds.\n")
-        elif status == gp.GRB.UNBOUNDED:
-            print("Model is unbounded. Check variable bounds.\n")
+                # 1) 优先使用新版冲突算法
+                self.gurobi_model.computeConflict()
+                self.gurobi_model.write("model.clq")
+                print("Conflict analysis saved to model.clq")
+            except gp.GurobiError:
+                # 2) 如果冲突算法也失败，再尝试旧的 IIS
+                try:
+                    self.gurobi_model.computeIIS()
+                    self.gurobi_model.write("model.ilp.iis")
+                    print("IIS saved to model.ilp.iis")
+                except gp.GurobiError as e:
+                    print(f"⚠️ Both computeConflict and computeIIS failed: {e}")
+                    print("Exporting full LP for manual inspection...")
+                    self.gurobi_model.write("model_for_debug.lp")
+                    print("LP file saved to model_for_debug.lp")
         else:
-            print(f"Unexpected status: {status}. Refer to Gurobi documentation for details.\n")
+            print(f"Solver status is {status} (not infeasible).")
 
         # Collect results into a SolverSolution object
 
