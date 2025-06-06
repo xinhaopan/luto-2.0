@@ -4,21 +4,21 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['BEAT_test_demand_production_new'],
-    'KEEP_OUTPUTS': [False],  # If False, only keep report HTML
+    'TASK_NAME': ['Paper1_results'],
+    'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['8GB'],
-    'NCPUS': ['2'],
-    'TIME': ['1:00:00'],
+    'MEM': ['28GB'],
+    'NCPUS': ['7'],
+    'TIME': ['15:00:00'],
 
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
-    'SOLVE_WEIGHT_BETA': [i for i in np.arange(0, 1.01, 0.01).tolist()],
+    'SOLVE_WEIGHT_BETA': [0.98],
     'OBJECTIVE': ['maxprofit'], # maxprofit
-    'WRITE_OUTPUT_GEOTIFFS': [False],
-    'RESFACTOR': [15],
-    'SIM_YEARS': [[i for i in range(2010,2051,10)]],
+    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'RESFACTOR': [5],
+    'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
     'GHG_EMISSIONS_LIMITS': ['low','medium','high'],
@@ -67,13 +67,13 @@ grid_search = {
     #     'HIR - Sheep': False,
     # }]
 }
-# settings_name_dice = {
-#     'GHG_EMISSIONS_LIMITS':'GHG',
-#     'BIODIVERSTIY_TARGET_GBF_2':'BIO',
-# }
+settings_name_dict = {
+    'GHG_EMISSIONS_LIMITS':'GHG',
+    'BIODIVERSTIY_TARGET_GBF_2':'BIO',
+}
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
-grid_search_settings_df = create_grid_search_template(grid_search)
-create_task_runs(task_root_dir, grid_search_settings_df, mode='cluster', n_workers=min(len(grid_search_settings_df.columns), 100),max_concurrent_tasks=300,use_parallel=True)
+grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
+create_task_runs(task_root_dir, grid_search_settings_df, mode='cluster', n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 

@@ -419,7 +419,7 @@ class LutoSolver:
             # )
             (
                 gp.quicksum(
-                    self.V[c] / self._input_data.base_yr_prod["BASE_YR Production (t)"][c] 
+                    (self.V[c] + self._input_data.base_yr_prod["BASE_YR Production (t)"][c]) / self._input_data.base_yr_prod["BASE_YR Production (t)"][c]
                     for c in range(self._input_data.ncms)
                 ) / self._input_data.ncms
             )
