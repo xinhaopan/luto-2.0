@@ -109,7 +109,7 @@ The hurdled_costs  = original_transition_costs * (1 + TRANSITION_HURDEL_FACTOR)
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 9      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
@@ -324,8 +324,8 @@ AG_MANAGEMENTS = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
-    'HIR - Beef': False,
-    'HIR - Sheep': False,
+    'HIR - Beef': True,
+    'HIR - Sheep': True,
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -353,14 +353,6 @@ and agricultural management combination in all subsequent years.
 WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for
 the rest of the simulation. This may be an unintended side effect.
 """
-# Update AG_MANAGEMENTS_TO_LAND_USES to remove any land uses that are not enabled
-REMOVED_DICT = {}
-for am in list(AG_MANAGEMENTS_TO_LAND_USES.keys()):  # Iterate over a copy of the keys
-    if not AG_MANAGEMENTS[am]:
-        REMOVED_DICT[am] = AG_MANAGEMENTS_TO_LAND_USES[am]
-        AG_MANAGEMENTS_TO_LAND_USES.pop(am)
-        AG_MANAGEMENTS_REVERSIBLE.pop(am)
-
 
 
 # The cost for removing and establishing irrigation infrastructure ($ per hectare)
@@ -398,7 +390,7 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-# Take data from 'GHG_targets.xlsx',
+# Take data from 'GHG_targets.xlsx', 
 GHG_TARGETS_DICT = {
     'off':      None,
     'low':      '1.8C (67%) excl. avoided emis SCOPE1',
