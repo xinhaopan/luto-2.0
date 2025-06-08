@@ -220,7 +220,7 @@ def plot_all_transition_matrices(matrices, labels_list, label_mapping, output_pa
     if cax is not None:  # 确保cax非空
         legend_output_path = f'{output_path}_legend.png'
         save_colorbar(cax, legend_output_path, font_size)
-
+    plt.show()
     plt.close(fig)
 
 mapping_data_path = 'tools/land use group.xlsx'

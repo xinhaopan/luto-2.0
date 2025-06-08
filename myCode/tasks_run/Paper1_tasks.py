@@ -4,9 +4,10 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['Paper1_results'],
+    'TASK_NAME': ['20250608_Paper1_results'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
+    'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['28GB'],
     'NCPUS': ['7'],
@@ -14,7 +15,7 @@ grid_search = {
 
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
-    'SOLVE_WEIGHT_BETA': [0.98],
+    'SOLVE_WEIGHT_BETA': [0.99],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],
@@ -74,6 +75,6 @@ settings_name_dict = {
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
 grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
-create_task_runs(task_root_dir, grid_search_settings_df, mode='cluster', n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
+create_task_runs(task_root_dir, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 

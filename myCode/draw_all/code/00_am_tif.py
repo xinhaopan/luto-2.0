@@ -16,6 +16,8 @@ def shift_tif_values(input_tif, output_tif):
     new_data[data == 3] = 4
     new_data[data == 4] = 5
     new_data[data == 5] = 6
+    new_data[data == 6] = 7
+    new_data[data == 7] = 8
 
     # 写入新 tif 文件
     with rasterio.open(output_tif, 'w', **profile) as dst:

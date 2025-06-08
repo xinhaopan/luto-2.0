@@ -389,12 +389,12 @@ def process_raster(
     color_df = pd.read_csv(color_csv)
     color_df['lu_color_numeric'] = color_df['lu_color_HEX'].apply(hex_color_to_numeric)
     
-    # Update the lu_code in in the cause some AM/Non-ag are deselected
-    for idx,row in color_df.iterrows():
-        if row['lu_desc'] in AM_NON_AG_REMOVED_DESC:
-            color_df.drop(idx, inplace=True)
-        elif row['lu_desc'] in AM_NON_AG_CODES:
-            color_df.at[idx, 'lu_code'] = AM_NON_AG_CODES[row['lu_desc']]
+    # # Update the lu_code in in the cause some AM/Non-ag are deselected
+    # for idx,row in color_df.iterrows():
+    #     if row['lu_desc'] in AM_NON_AG_REMOVED_DESC:
+    #         color_df.drop(idx, inplace=True)
+    #     elif row['lu_desc'] in AM_NON_AG_CODES:
+    #         color_df.at[idx, 'lu_code'] = AM_NON_AG_CODES[row['lu_desc']]
 
     val_color_dict = color_df.set_index('lu_code')['lu_color_numeric'].to_dict()
     

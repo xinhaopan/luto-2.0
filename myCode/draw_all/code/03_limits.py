@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 import sys
 from scipy.interpolate import interp1d
 from tools.parameters import *
-from tools.data_helper import *
+from tools.data_helper import get_path
 from tools.plot_helper import *
 
 # 获取到文件的绝对路径，并将其父目录添加到 sys.path
@@ -145,14 +145,76 @@ def draw_stacked_area(data, legend_colors, output_file, fontsize=22, y_range=(0,
     save_figure(fig, output_file)
     plt.show()
 
+def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
+                   condition_column_name=None, condition_value=None, use_parallel=False, n_jobs=-1):
+    """
+    从多个文件中读取数据并按指定列分组求和，并可根据条件列进行筛选。
+
+    参数:
+    - input_files (list): 输入文件的列表。
+    - csv_name (str): 目标 CSV 文件的名称前缀（不含年份）。
+    - value_column_name (str): 要求和的列名。
+    - filter_column_name (str): 过滤列名，根据此列的唯一值进行分组求和。
+    - condition_column_name (str or list, optional): 一个或多个筛选列名。
+    - condition_value (any or list, optional): 对应的一个或多个筛选值。
+    - use_parallel (bool): 是否启用并行处理，默认启用。
+    - n_jobs (int): 并行作业数，默认使用所有可用核心。
+
+    返回:
+    - dict: 每个输入文件的汇总数据字典，每个文件对应一个 DataFrame。
+    """
+
+    def process_single_file(input_name):
+        base_path = get_path(input_name)
+        file_list = os.listdir(base_path)
+
+        out_numbers = sorted([
+            int(re.search(r"out_(\d+)", filename).group(1))
+            for filename in file_list
+            if "out_" in filename and re.search(r"out_(\d+)", filename)
+        ])
+
+        temp_results = pd.DataFrame(index=out_numbers)
+        temp_results.index.name = 'Year'
+
+        for year in out_numbers:
+            file_path = os.path.join(base_path, f'out_{year}', f'{csv_name}_{year}.csv')
+
+            if os.path.exists(file_path):
+                df = pd.read_csv(file_path)
+
+                # 多列筛选支持
+                if condition_column_name and condition_value is not None:
+                    if isinstance(condition_column_name, list) and isinstance(condition_value, list):
+                        for col, val in zip(condition_column_name, condition_value):
+                            df = df[df[col] == val]
+                    else:
+                        df = df[df[condition_column_name] == condition_value]
+
+                unique_values = df[filter_column_name].unique()
+                for value in unique_values:
+                    total_value = df[df[filter_column_name] == value][value_column_name].sum()
+                    temp_results.loc[year, value] = total_value
+
+        return input_name, temp_results
+
+    if use_parallel:
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(process_single_file)(input_name) for input_name in input_files
+        )
+    else:
+        results = [process_single_file(input_name) for input_name in input_files]
+
+    return dict(results)
+
 
 # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
 def get_biodiversity_target(input_files):
-    input_files = ['20250529_Run_1_GHG_high_BIO_low_RES_20', '20250529_Run_2_GHG_high_BIO_medium_RES_20',
-                   '20250529_Run_3_GHG_high_BIO_high_RES_20']
+    input_files = ['Run_1_GHG_low_BIO_low', 'Run_5_GHG_medium_BIO_medium',
+                   'Run_9_GHG_high_BIO_high']
     # Get biodiversity target data from input files
     # Extract dictionary of DataFrames
-    bio_target_dict = get_dict_data(input_files, "biodiversity_targets", 'Score', 'Variable')
+    bio_target_dict = get_dict_data(input_files, "biodiversity_GBF2_priority_scores", 'Priority Target (%)', 'Landuse',['Landuse','Type'],['Apples','Agricultural Landuse'])
 
     # Find keys that contain the specified patterns
     bio_0_key = next((k for k in bio_target_dict if 'BIO_low' in k), None)
@@ -169,9 +231,9 @@ def get_biodiversity_target(input_files):
 
     # Extract 'Biodiversity score limit' column from each DataFrame
     # and add to the new DataFrame with the appropriate column names
-    new_df['0%'] = df_0['Biodiversity score limit']
-    new_df['30%'] = df_30['Biodiversity score limit']
-    new_df['50%'] = df_50['Biodiversity score limit']
+    new_df['0%'] = df_0['Apples']
+    new_df['30%'] = df_30['Apples']
+    new_df['50%'] = df_50['Apples']
 
     return new_df
 
@@ -180,7 +242,7 @@ if __name__ == "__main__":
     # Bio
     df = get_biodiversity_target(input_files)
     # df = pd.read_csv('biodiversity_targets.csv', index_col=0)
-    min_v, max_v, ticks = get_y_axis_ticks(df.min().min(), df.max().max(), desired_ticks=5)
+    min_v, max_v, ticks = get_y_axis_ticks(df.min().min(), df.max().max(), desired_ticks=3)
     colors = ['#2ECC71', '#3498DB','#E74C3C']  # 根据数据列数调整颜色列表
     draw_plot_lines(df, colors, ' ', (min_v, max_v), ticks, "../output/03_biodiversity_limit.png", font_size=font_size)
 

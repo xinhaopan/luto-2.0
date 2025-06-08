@@ -823,6 +823,7 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
         output_file = f"../output/12_{input_file}_polar"
     else:
         output_file = f"../output/{output_file}"
+    print(output_file)
     fig.savefig(f'{output_file}.pdf', dpi=300, bbox_inches='tight')
     save_figure(fig, output_file)
 

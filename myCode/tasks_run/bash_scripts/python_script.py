@@ -45,10 +45,7 @@ def main():
 
         # 保存数据
         pkl_path = f'{data.path}/data_with_solution.gz'
-
-        sim.save_data_to_disk(data,pkl_path)
-        # with open(pkl_path, 'wb') as f:
-        #     dill.dump(data, f)
+        sim.save_data_to_disk(data, pkl_path)
         write_log(f"Data with solution saved in {data.path}.")
 
         # 监控写输出结果
@@ -61,8 +58,16 @@ def main():
         overall_end_time = time.time()
         total_duration = overall_end_time - overall_start_time
 
-        # 转换为 hh:mm:ss 格式
-        formatted_duration = time.strftime("%H:%M:%S", time.gmtime(total_duration))
+        # 跨天友好显示
+        days = int(total_duration // (24 * 3600))
+        hours = int((total_duration % (24 * 3600)) // 3600)
+        minutes = int((total_duration % 3600) // 60)
+        seconds = int(total_duration % 60)
+
+        if days > 0:
+            formatted_duration = f"{days}d {hours:02}:{minutes:02}:{seconds:02}"
+        else:
+            formatted_duration = f"{hours:02}:{minutes:02}:{seconds:02}"
 
         # 记录日志
         write_log(f"Total run time: {formatted_duration}")
