@@ -82,7 +82,7 @@ def update_luto_code(run_path):
 
 
 # Main execution
-task_root_dir = '../../output/Paper1_results_test_99'
+task_root_dir = '../../output/20250608_Paper1_results_test_99'
 found, not_found = find_data_with_solution_all_subdirs(task_root_dir, n_jobs=8)
 print("有解:")
 for p in found:
