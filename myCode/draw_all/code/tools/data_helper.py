@@ -146,7 +146,9 @@ def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
                 for value in unique_values:
                     if unit_adopt:
                         total_value = df[df[filter_column_name] == value][value_column_name].sum() / 1e6
-                    temp_results.loc[year, value] = df[df[filter_column_name] == value][value_column_name].sum()
+                    else:
+                        total_value = df[df[filter_column_name] == value][value_column_name].sum()
+                    temp_results.loc[year, value] = total_value
 
         return input_name, temp_results
 
