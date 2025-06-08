@@ -6,10 +6,11 @@ import rasterio
 from rasterio.transform import xy
 from pyproj import CRS, Transformer
 from joblib import Parallel, delayed
+from tools.parameters import TASK_ROOT
 
 
 def get_path(path_name):
-    output_path = f"../../../output/{path_name}/output"
+    output_path = f"../../../output/{TASK_ROOT}/{path_name}/output"
     try:
         if os.path.exists(output_path):
             subdirectories = os.listdir(output_path)
@@ -96,7 +97,7 @@ def rename_and_filter_columns(data_dict, columns_to_keep, new_column_names=None,
 
 
 def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
-                   condition_column_name=None, condition_value=None, use_parallel=False, n_jobs=-1):
+                   condition_column_name=None, condition_value=None, use_parallel=False, n_jobs=-1,unit_adopt=True):
     """
     从多个文件中读取数据并按指定列分组求和，并可根据条件列进行筛选。
 
@@ -114,7 +115,7 @@ def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
     - dict: 每个输入文件的汇总数据字典，每个文件对应一个 DataFrame。
     """
 
-    def process_single_file(input_name):
+    def process_single_file(input_name,unit_adopt):
         base_path = get_path(input_name)
         file_list = os.listdir(base_path)
 
@@ -143,17 +144,18 @@ def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
 
                 unique_values = df[filter_column_name].unique()
                 for value in unique_values:
-                    total_value = df[df[filter_column_name] == value][value_column_name].sum() / 1e6
-                    temp_results.loc[year, value] = total_value
+                    if unit_adopt:
+                        total_value = df[df[filter_column_name] == value][value_column_name].sum() / 1e6
+                    temp_results.loc[year, value] = df[df[filter_column_name] == value][value_column_name].sum()
 
         return input_name, temp_results
 
     if use_parallel:
         results = Parallel(n_jobs=n_jobs)(
-            delayed(process_single_file)(input_name) for input_name in input_files
+            delayed(process_single_file)(input_name,unit_adopt) for input_name in input_files
         )
     else:
-        results = [process_single_file(input_name) for input_name in input_files]
+        results = [process_single_file(input_name,unit_adopt) for input_name in input_files]
 
     return dict(results)
 

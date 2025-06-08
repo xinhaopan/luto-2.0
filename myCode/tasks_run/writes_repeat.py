@@ -2,6 +2,7 @@ import os
 from joblib import Parallel, delayed
 import dill
 import gzip
+import shutil
 import subprocess
 import re
 from collections import defaultdict
@@ -36,6 +37,7 @@ def find_data_with_solution_all_subdirs(task_root_dir, n_jobs=4):
     return found_paths, not_found_dirs
 
 def process_target(run_path, script_path, gz_path):
+    update_luto_code(run_path)
     try:
         with open(os.path.join(run_path, 'write_stdout.log'), 'a') as std_file, \
              open(os.path.join(run_path, 'write_stderr.log'), 'a') as err_file:
@@ -50,10 +52,37 @@ def process_target(run_path, script_path, gz_path):
     except Exception as e:
         return gz_path, f"failed: {e}"
 
+def update_luto_code(run_path):
+    """
+    根据 run_path 自动推断 src_dir，并将 src_dir 下除了 settings.py 以外的内容复制到 run_path/luto
+    """
+    # 找到 LUTO2 路径
+    abs_run_path = os.path.abspath(run_path)
+    luto2_dir = abs_run_path.split('output')[0].rstrip(os.sep)  # 取 output 之前的路径
+    src_dir = os.path.join(luto2_dir, 'luto')
+    dst_dir = os.path.join(run_path, 'luto')
+
+    if not os.path.exists(src_dir):
+        raise FileNotFoundError(f"源代码目录不存在: {src_dir}")
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+
+    for item in os.listdir(src_dir):
+        src_item = os.path.join(src_dir, item)
+        dst_item = os.path.join(dst_dir, item)
+        if item == 'settings.py':
+            continue
+        if os.path.isdir(src_item):
+            # 如果目标目录存在，先删除
+            if os.path.exists(dst_item):
+                shutil.rmtree(dst_item)
+            shutil.copytree(src_item, dst_item)
+        else:
+            shutil.copy2(src_item, dst_item)
 
 
 # Main execution
-task_root_dir = '../../output/Paper1_results_test'
+task_root_dir = '../../output/Paper1_results_test_99'
 found, not_found = find_data_with_solution_all_subdirs(task_root_dir, n_jobs=8)
 print("有解:")
 for p in found:
@@ -72,6 +101,8 @@ for file_path in found:
         with_htmls.append(folder_path)
     else:
         without_htmls.append(folder_path)
+        print("没有html 的目录:", folder_path)
+
 
 # Group directories by run_path and process efficiently
 run_path_to_targets = defaultdict(list)
@@ -122,7 +153,7 @@ success_list, failed_list = [], []
 results = []
 
 with tqdm(total=len(all_jobs), desc="Processing all targets") as pbar:
-    parallel = Parallel(n_jobs=4)
+    parallel = Parallel(n_jobs=9)
     tasks = (delayed(process_target)(run_path, script_name, gz_path)
              for run_path, script_name, gz_path in all_jobs)
     for result in parallel(tasks):

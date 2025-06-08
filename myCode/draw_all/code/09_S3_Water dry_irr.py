@@ -41,8 +41,8 @@ plot_Combination_figures(area_ag_group_dict, output_png, input_files, plot_stack
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 
-csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)', 'Landuse'
-area_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,['Water_supply','Climate Change existence','Landuse Type'],['Dryland','Without CCI','Agricultural Landuse'])
+csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Water Net Yield (ML)', 'Landuse'
+area_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,['Water Supply','Type'],['Dryland','Agricultural Landuse'])
 area_group_dict = aggregate_by_mapping(area_dict, 'tools/land use group.xlsx', 'desc', 'ag_group')
 area_ag_group_dict,legend_colors = get_colors(area_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
 y_range, y_ticks = calculate_y_axis_range(area_ag_group_dict,4)
@@ -52,8 +52,8 @@ plot_Combination_figures(area_ag_group_dict, output_png, input_files, plot_stack
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
-csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)', 'Landuse'
-area_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,['Water_supply','Climate Change existence','Landuse Type'],['Irrigated','Without CCI','Agricultural Landuse'])
+csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Water Net Yield (ML)', 'Landuse'
+area_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,['Water Supply','Type'],['Irrigated','Agricultural Landuse'])
 area_group_dict = aggregate_by_mapping(area_dict, 'tools/land use group.xlsx', 'desc', 'ag_group')
 area_ag_group_dict,legend_colors = get_colors(area_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
 y_range, y_ticks = calculate_y_axis_range(area_ag_group_dict,3)

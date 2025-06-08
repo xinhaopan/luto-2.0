@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['Paper1_results_test1'],
+    'TASK_NAME': ['20250608_Paper1_results_test_99'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -15,7 +15,7 @@ grid_search = {
 
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
-    'SOLVE_WEIGHT_BETA': [0.98],
+    'SOLVE_WEIGHT_BETA': [0.99],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [15],

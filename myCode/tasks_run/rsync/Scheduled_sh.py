@@ -8,7 +8,7 @@ import socket
 remote_host = "xp7241@gadi.nci.org.au"
 remote_directory = "/g/data/jk53/LUTO_XH/LUTO2/myCode/tasks_run/rsync"
 shell_script_path = "sync_files.sh"  # 远程服务器上的脚本名
-log_file_path = "Scheduled_log.txt"
+log_file_path = '0_log_file.txt'
 
 def log_message(message):
     """将消息记录到日志文件"""
