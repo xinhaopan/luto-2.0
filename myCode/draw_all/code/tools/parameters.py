@@ -23,9 +23,9 @@ senerios_origin = [
     'GHG_low_BIO_medium',
     'GHG_medium_BIO_medium',
     'GHG_high_BIO_medium',
-    'GHG_low_BIO_high',
-    'GHG_medium_BIO_high',
-    'GHG_high_BIO_high',
+    'GHG_low_BIO_high1',
+    'GHG_medium_BIO_high1',
+    'GHG_high_BIO_high1',
 ]
 senerios = [f"Run_{num}_{senerio}" for num, senerio in zip(run_number, senerios_origin)]
 input_files = [
@@ -49,4 +49,4 @@ X_OFFSET = 2
 font_size = 25
 axis_linewidth = 2
 
-TASK_ROOT = '20250608_Paper1_results_test_99'
+TASK_ROOT = "20250608_Paper1_results_test_BIO"
