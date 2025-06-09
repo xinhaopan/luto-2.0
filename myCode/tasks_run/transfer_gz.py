@@ -50,13 +50,11 @@ def download_file(sftp, remote_path, local_path):
     ensure_local_dir_exists(os.path.dirname(local_path))
     sftp.get(remote_path, local_path)
 
-if __name__ == "__main__":
-    # 配置区
+def download_all_data_gz(file_name):
     linux_host = "gadi.nci.org.au"
     linux_port = 22
     linux_username = "xp7241"
     private_key_path = r"C:\Users\s222552331\.ssh\id_rsa"
-    file_name = "20250608_Paper1_results_test_99"  # ===> 你的输入
     remote_base_dir = f"/g/data/jk53/LUTO_XH/LUTO2/output/{file_name}"
     local_base_dir = os.path.join(r"N:\LUF-Modelling\LUTO2_XH\LUTO2\output", file_name)
 
@@ -84,7 +82,18 @@ if __name__ == "__main__":
             local_path = os.path.join(r"N:\LUF-Modelling\LUTO2_XH\LUTO2\output", rel_path)
             download_file(sftp, remote_path, local_path)
 
+            settings_path = os.path.dirname(os.path.dirname(os.path.dirname(rel_path)))
+            local_settings_path = os.path.join(r"N:\LUF-Modelling\LUTO2_XH\LUTO2\output",settings_path, 'luto', 'settings.py')
+            remote_settings_path = os.path.join('/g/data/jk53/LUTO_XH/LUTO2/output',settings_path, 'luto', 'settings.py').replace('\\', '/')
+            download_file(sftp, remote_settings_path, local_settings_path)
+
         print("全部下载完成！")
     finally:
         sftp.close()
         transport.close()
+
+if __name__ == "__main__":
+    # 配置区
+    file_name = "20250608_Paper1_results_test_99"  # ===> 你的输入
+
+

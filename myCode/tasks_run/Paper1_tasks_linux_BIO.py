@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250608_Paper1_results_linux'],
+    'TASK_NAME': ['20250608_Paper1_results_linux_BIO'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -27,14 +27,14 @@ grid_search = {
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['low','medium','high'],
+    'BIODIVERSTIY_TARGET_GBF_2': ['low','medium','high1'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
 
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_8': ['off'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [100],
 
     # ----------------------------------- Water settings --------------------------------
     'WATER_LIMITS': ['on'],

@@ -399,7 +399,7 @@ GHG_TARGETS_DICT = {
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'medium'        # 'off', 'low', 'medium', or 'high'
+GHG_EMISSIONS_LIMITS = 'off'        # 'off', 'low', 'medium', or 'high'
 '''
 `GHG_EMISSIONS_LIMITS` options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
@@ -525,10 +525,11 @@ GBF2_TARGETS_DICT = {
     'low':    {2030: 0,    2050: 0,    2100: 0},
     'medium': {2030: 0.15, 2050: 0.15, 2100: 0.15},
     'high':   {2030: 0.15, 2050: 0.25, 2100: 0.25},
+    'high1':   {2030: 0.15, 2050: 0.30, 2100: 0.30},
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
+BIODIVERSTIY_TARGET_GBF_2 = 'off'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,

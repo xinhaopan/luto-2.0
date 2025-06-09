@@ -19,12 +19,12 @@ sys.path.append(os.path.abspath('../../../luto'))
 import settings
 
 csv_name, value_column_name, filter_column_name = 'biodiversity_GBF2_priority_scores', 'Contribution Relative to Pre-1750 Level (%)', 'Type'
-bio_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
+bio_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,unit_adopt=False)
 bio_dict,legend_colors = get_colors(bio_dict, 'tools/land use colors.xlsx', sheet_name='lu')
 
 bio_target_dict = get_dict_data(input_files, "biodiversity_GBF2_priority_scores", 'Priority Target (%)', 'Landuse',['Landuse','Type'],['Apples','Agricultural Landuse'],unit_adopt=False)
 # point_dict = rename_and_filter_columns(bio_target_dict, ['Biodiversity score limit','Solve biodiversity score'], ['Constraints','Score'],-10)
-point_dict = rename_and_filter_columns(bio_target_dict, ['apples'], ['Targets'],-10)
+point_dict = rename_and_filter_columns(bio_target_dict, ['Apples'], ['Targets'])
 
 point_colors = ['red']
 # y_range, y_ticks = calculate_y_axis_range(bio_dict)
@@ -37,7 +37,7 @@ plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_area_an
 
 
 csv_name, value_column_name, filter_column_name = 'biodiversity_GBF2_priority_scores', 'Contribution Relative to Pre-1750 Level (%)', 'Landuse'
-bio_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,['Type'],['Agricultural Landuse'])
+bio_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,['Type'],['Agricultural Landuse'],unit_adopt=False)
 bio_ag_group_dict = aggregate_by_mapping(bio_ag_dict, 'tools/land use group.xlsx', 'desc', 'ag_group')
 bio_ag_group_dict,legend_colors = get_colors(bio_ag_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
 y_range, y_ticks = calculate_y_axis_range(bio_ag_group_dict,3)
@@ -48,7 +48,7 @@ plot_Combination_figures(bio_ag_group_dict, output_png, input_files, plot_stacke
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = 'biodiversity_GBF2_priority_scores', 'Contribution Relative to Pre-1750 Level (%)', 'Agri-Management'
-bio_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name, ['Type'],['Agricultural Management'])
+bio_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name, ['Type'],['Agricultural Management'],unit_adopt=False)
 bio_am_dict,legend_colors = get_colors(bio_am_dict, 'tools/land use colors.xlsx', sheet_name='am')
 output_png = '../output/05_bio_am.png'
 y_range, y_ticks = (0,2),[0,1,2]
@@ -58,7 +58,7 @@ plot_Combination_figures(bio_am_dict, output_png, input_files, plot_stacked_area
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 csv_name, value_column_name, filter_column_name = 'biodiversity_GBF2_priority_scores', 'Contribution Relative to Pre-1750 Level (%)', 'Landuse'
-bio_non_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name, ['Type'],['Non-Agricultural land-use'])
+bio_non_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name, ['Type'],['Non-Agricultural land-use'],unit_adopt=False)
 bio_non_ag_dict,legend_colors = get_colors(bio_non_ag_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
 output_png = '../output/05_bio_non-ag.png'
 y_range, y_ticks = calculate_y_axis_range(bio_non_ag_dict,3)

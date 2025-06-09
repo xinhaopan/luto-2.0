@@ -97,7 +97,7 @@ def rename_and_filter_columns(data_dict, columns_to_keep, new_column_names=None,
 
 
 def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
-                   condition_column_name=None, condition_value=None, use_parallel=False, n_jobs=-1,unit_adopt=True):
+                   condition_column_name=None, condition_value=None, use_parallel=True, n_jobs=-1,unit_adopt=True):
     """
     从多个文件中读取数据并按指定列分组求和，并可根据条件列进行筛选。
 

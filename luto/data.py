@@ -1130,10 +1130,11 @@ class Data:
         ###############################################################
         print("\tLoading GHG targets data...", flush=True)
 
-        self.GHG_TARGETS = pd.read_excel(
-            os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
-        )
-        self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
+        if settings.GHG_EMISSIONS_LIMITS != "off":
+            self.GHG_TARGETS = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
+            )
+            self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
 
 
 

@@ -2183,6 +2183,8 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
 
 def write_GHG_npy(data: Data, yr_cal, path):
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
+        return
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # -------------------------------------------------------#
@@ -2368,6 +2370,8 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
     save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
 
 def write_GBF2_npy(data: Data, yr_cal, path):
+    if settings.BIO_DIVERSITY_LIMITS == 'off':
+        return
     # Unpack the ag managements and land uses
     am_lu_unpack = [
         (am, l)
