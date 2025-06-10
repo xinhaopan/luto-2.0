@@ -524,12 +524,15 @@ GBF2_TARGETS_DICT = {
     'off':     None,
     'low':    {2030: 0,    2050: 0,    2100: 0},
     'medium': {2030: 0.15, 2050: 0.15, 2100: 0.15},
+    'medium2': {2030: 0.15, 2050: 0.30, 2100: 0.30},
     'high':   {2030: 0.15, 2050: 0.25, 2100: 0.25},
     'high1':   {2030: 0.15, 2050: 0.30, 2100: 0.30},
+    'high2':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
+    'high3':   {2030: 0.30, 2050: 0.45, 2100: 0.45},
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'off'            # 'off', 'low', 'medium', or 'high'
+BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -644,7 +647,7 @@ GBF3_TARGETS_DICT = {
     'USER_DEFINED': None
 }
 
-BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSTIY_TARGET_GBF_3  = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.

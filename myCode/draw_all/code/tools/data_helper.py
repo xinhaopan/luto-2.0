@@ -96,7 +96,7 @@ def rename_and_filter_columns(data_dict, columns_to_keep, new_column_names=None,
 
 
 
-def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
+def get_dict_data(input_files, csv_name, value_column_name, filter_column_name=None,
                    condition_column_name=None, condition_value=None, use_parallel=True, n_jobs=-1,unit_adopt=True):
     """
     从多个文件中读取数据并按指定列分组求和，并可根据条件列进行筛选。
@@ -142,13 +142,21 @@ def get_dict_data(input_files, csv_name, value_column_name, filter_column_name,
                     else:
                         df = df[df[condition_column_name] == condition_value]
 
-                unique_values = df[filter_column_name].unique()
-                for value in unique_values:
+                if filter_column_name is None:
+                    # 不分组，直接求和
                     if unit_adopt:
-                        total_value = df[df[filter_column_name] == value][value_column_name].sum() / 1e6
+                        total_value = df[value_column_name].sum() / 1e6
                     else:
-                        total_value = df[df[filter_column_name] == value][value_column_name].sum()
-                    temp_results.loc[year, value] = total_value
+                        total_value = df[value_column_name].sum()
+                    temp_results.loc[year, 'Total'] = total_value
+                else:
+                    unique_values = df[filter_column_name].unique()
+                    for value in unique_values:
+                        if unit_adopt:
+                            total_value = df[df[filter_column_name] == value][value_column_name].sum() / 1e6
+                        else:
+                            total_value = df[df[filter_column_name] == value][value_column_name].sum()
+                        temp_results.loc[year, value] = total_value
 
         return input_name, temp_results
 
