@@ -128,7 +128,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     years = sorted(list(data.lumaps.keys()))
 
     if not os.path.isdir(path_yr):
-        os.mkdir(path_yr)
+        os.makedirs(path_yr, exist_ok=True)
 
     write_files(data, yr_cal, path_yr)
     write_files_separate(data, yr_cal, path_yr) if settings.WRITE_OUTPUT_GEOTIFFS else None
@@ -856,6 +856,7 @@ def write_area_transition_start_end(data: Data, path):
     transition.columns = ['From land-use','To land-use','Area (ha)']
 
     # Write the transition matrix to a csv file
+    os.makedirs(path, exist_ok=True)
     transition.to_csv(os.path.join(path, f'transition_matrix_{yr_cal_start}_{yr_cal_end}.csv'), index=False)
 
 
@@ -2370,7 +2371,7 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
     save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
 
 def write_GBF2_npy(data: Data, yr_cal, path):
-    if settings.BIO_DIVERSITY_LIMITS == 'off':
+    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off':
         return
     # Unpack the ag managements and land uses
     am_lu_unpack = [

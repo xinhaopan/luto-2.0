@@ -43,12 +43,16 @@ def find_all_data_gz(sftp, remote_base_dir):
                         except FileNotFoundError:
                             continue
     except Exception as e:
-        print(f"[错误] 查找data_with_solution.gz时出错: {e}")
+        print(f"[错误] {remote_base_dir}出错: {e}")
     return result
 
 def download_file(sftp, remote_path, local_path):
     ensure_local_dir_exists(os.path.dirname(local_path))
     sftp.get(remote_path, local_path)
+    remote_size = sftp.stat(remote_path).st_size
+    local_size = os.path.getsize(local_path)
+    if remote_size != local_size:
+        raise ValueError(f"文件大小不一致: 远程{remote_size}字节，本地{local_size}字节")
 
 def download_all_data_gz(file_name):
     linux_host = "gadi.nci.org.au"
@@ -71,7 +75,7 @@ def download_all_data_gz(file_name):
             print("未找到任何 data_with_solution.gz 文件。")
             exit(0)
 
-        print(f"共找到 {len(data_gz_paths)} 个 data_with_solution.gz 文件，开始下载...")
+        print(f"{file_name}共找到 {len(data_gz_paths)} 个 data_with_solution.gz 文件，开始下载...")
         for remote_path in tqdm(data_gz_paths, desc="Downloading files"):
             # 构造相对路径
             # remote_path: /g/data/jk53/LUTO_XH/LUTO2/output/20250608_Paper1_results_test_99/Run_1_GHG_low_BIO_low/output/xxx/data_with_solution.gz

@@ -29,9 +29,9 @@ qselect | xargs qdel
 ```
 
 
-Res = 20, timeseries, 4GB,1CPU, 1h
+Res = 15, timeseries, 8GB,2CPU, 2h
 
-Res = 5, 28GB 7CPU 15h
+Res = 5, 48GB, 12CPU, 15h for RUN
 
 
 
