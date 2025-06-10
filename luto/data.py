@@ -842,16 +842,14 @@ class Data:
         tmat_from_non_ag_xr = xr.concat([tmat_non_ag2ag_xr, tmat_non_ag2non_ag_xr], dim='to_lu')            # Combine non-ag2ag and non-ag2non-ag
         tmat_from_non_ag_xr.loc['Destocked - natural land', 'Unallocated - natural land'] = np.nan          # Destocked-natural can not transit to unallow-natural
         
-                                                                                                     
 
-        
         # Get the full transition cost matrix
         self.T_MAT = xr.concat([tmat_from_ag_xr, tmat_from_non_ag_xr], dim='from_lu')
         self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, [self.AGLU2DESC[i] for i in self.LU_NATURAL]] = np.nan       # non-ag2natural is not allowed
         self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, 'Unallocated - modified land'] = tmat_costs                  # Clearing non-ag land requires such cost
         self.T_MAT.loc['Destocked - natural land', self.LU_LVSTK_NATURAL_DESC] = self.T_MAT.loc['Unallocated - natural land', self.LU_LVSTK_NATURAL_DESC]   # Destocked-natural transits to LVSTK-natural has the same cost as unallocated-natural to LVSTK-natural
 
-        
+
         # tools.plot_t_mat(self.T_MAT)
         
         
@@ -1130,11 +1128,10 @@ class Data:
         ###############################################################
         print("\tLoading GHG targets data...", flush=True)
 
-        if settings.GHG_EMISSIONS_LIMITS != "off":
-            self.GHG_TARGETS = pd.read_excel(
-                os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
-            )
-            self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
+        self.GHG_TARGETS = pd.read_excel(
+            os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
+        )
+        self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
 
 
 
@@ -1996,6 +1993,16 @@ class Data:
         # Return total commodity production as numpy array.
         total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
         return total_q_c
+
+    def get_GBF2_base_yr(self) -> float:
+        """
+        Get the baseline habitat condition score for priority degraded areas conservation.
+
+        Returns
+        -------
+        float: The baseline habitat condition score for priority degraded areas conservation.
+        """
+        return (self.BIO_PRIORITY_DEGRADED_AREAS_LY_BASE_YR * self.REAL_AREA).sum() / (self.BIO_PRIORITY_DEGRADED_AREAS_MASK * self.REAL_AREA).sum()
 
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:

@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250604_RES5_DCCEEW_RUNS' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250611_RES3_DCCEEW' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -35,9 +35,9 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['20GB'],
-    'NCPUS':[10],
-    'TIME': ['4:00:00'],
+    'MEM': ['160GB'],
+    'NCPUS':[40],
+    'TIME': ['6:00:00'],
     'QUEUE': ['normalsr'],
     
  
@@ -56,8 +56,11 @@ grid_search = {
     # Model run settings
     ###############################################################
     
-    # --------------- Economic settings --------------- 
-    'TRANSITION_HURDEL_FACTOR': [0],         # Between 0 and 1, the higher the value, the more difficult it is to transition land use
+    # --------------- Target deviation weight ---------------
+    'SOLVER_WEIGHT_DEMAND': [1], 
+    'SOLVER_WEIGHT_GHG': [1],
+    'SOLVER_WEIGHT_WATER': [1],
+    'SOLVER_WEIGHT_GBF2': [1],
     
     # --------------- Demand settings ---------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],         # 'hard' or 'soft' 
@@ -67,7 +70,7 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low', 'medium', 'high'],              # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['medium'],              # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                      # True or False
@@ -85,7 +88,7 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['low', 'medium', 'high'],         # 'off', 'low', 'medium', 'high'
+    'BIODIVERSTIY_TARGET_GBF_2': ['medium'],         # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],           # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -103,7 +106,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': [0.9],         
+    'SOLVE_WEIGHT_BETA': np.arange(0.8,1,0.0025),         
     
     
     #-------------------- Diet BAU --------------------
@@ -131,8 +134,8 @@ if __name__ == '__main__':
     grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
 
     # # 1) Submit task to a single linux machine, and run simulations parallely
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
+    # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
-    # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 500)
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 300)
 
