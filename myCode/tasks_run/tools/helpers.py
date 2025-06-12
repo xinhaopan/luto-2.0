@@ -3,6 +3,7 @@ import shutil, itertools, subprocess, zipfile
 import pandas as pd
 import numpy as np
 import datetime
+import time
 
 from tqdm.auto import tqdm
 from typing import Literal
@@ -65,110 +66,190 @@ def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
                 bash_file.write(f'export {key}={value}\n')
 
 
-def submit_task(task_root_dir: str, col: str, mode: Literal['single', 'cluster'], max_concurrent_tasks):
-    shutil.copyfile('bash_scripts/task_cmd.sh', f'{task_root_dir}/{col}/task_cmd.sh')
-    shutil.copyfile('bash_scripts/python_script.py',
-                    f'{task_root_dir}/{col}/python_script.py')
 
-    # Wait until the number of running jobs is less than max_concurrent_tasks
-    if os.name == 'posix':
-        while True:
+def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI','HPC'], max_concurrent_tasks):
+    # 复制bash和python脚本到对应目录
+    shutil.copyfile('bash_scripts/python_script.py', f'{task_root_dir}/{col}/python_script.py')
+    if platform == 'NCI':
+        shutil.copyfile('bash_scripts/task_cmd.sh', f'{task_root_dir}/{col}/task_cmd.sh')
+    elif platform == 'HPC':
+        shutil.copyfile('bash_scripts/task_cmd_HPC.sh', f'{task_root_dir}/{col}/task_cmd_HPC.sh')
+
+    # 控制最大并发
+    while True:
+        if platform == 'NCI':
+            cmd = "qselect | wc -l"
+        elif platform == 'HPC':
+            cmd = "squeue -u $USER | wc -l"
+        else:
+            cmd = None
+
+        if cmd:
             try:
-                running_jobs = int(
-                    subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
+                running_jobs = int(subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout.strip())
             except Exception as e:
                 print(f"Error checking running jobs: {e}")
-            if running_jobs < max_concurrent_tasks:
-                break
-            else:
-                print(
-                    f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
-                import time;
-                time.sleep(10)
-
-    # Open log files for the task run
-    with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
-            open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
-        if mode == 'single':
-            subprocess.run(['python', 'python_script.py'], cwd=f'{task_root_dir}/{col}', stdout=std_file,
-                           stderr=err_file, check=True)
-        elif mode == 'cluster' and os.name == 'posix':
-            subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file,
-                           check=True)
+                running_jobs = 0
         else:
-            raise ValueError('Mode must be either "single" or "cluster"!')
+            running_jobs = 0
+
+        if running_jobs < max_concurrent_tasks:
+            break
+        else:
+            print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
+            time.sleep(10)
+
+    # 输出
+    print(f"[START] Submitting task for {col} in platform: {platform}")
+
+    try:
+        with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
+             open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
+            if platform == 'Denethor':
+                result = subprocess.run(['python', 'python_script.py'],
+                                        cwd=f'{task_root_dir}/{col}',
+                                        stdout=std_file, stderr=err_file)
+            elif platform == 'NCI':
+                result = subprocess.run(['bash', 'task_cmd.sh'],
+                                        cwd=f'{task_root_dir}/{col}',
+                                        stdout=std_file, stderr=err_file)
+            elif platform == 'HPC':
+                result = subprocess.run(['bash', 'task_cmd_HPC.sh'],
+                                        cwd=f'{task_root_dir}/{col}',
+                                        stdout=std_file, stderr=err_file)
+            else:
+                raise ValueError('platform must be either "Denethor", "NCI", or "HPC"!')
+
+        if result.returncode == 0:
+            print(f"[SUCCESS] Task for {col} finished successfully (submitted)!")
+        else:
+            print(f"[FAILED] Task for {col} failed with exit code {result.returncode}!")
+
+    except Exception as e:
+        print(f"[ERROR] Exception occurred for task {col}: {e}")
 
 
-def submit_write_task(task_root_dir: str, col: str):
-    # 1. 写入 write_output.py 脚本
-    script_content = f'''import gzip
-    import dill
-    from luto.tools.write import write_outputs
+def submit_write_task(task_root_dir: str, col: str, platform: Literal['Denethor', 'NCI', 'HPC'], max_concurrent_tasks: int):
+    # 1. 复制/准备 shell 脚本（如果需要）
+    settings_path = f'{task_root_dir}/{col}/luto/settings_bash.py'
+    if os.path.exists(settings_path):
+        with open(settings_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        # 替换 MEM
+        new_content = re.sub(
+            r'export MEM="[^"]*"',
+            'export MEM="20GB"',
+            content
+        )
+        # 替换 TIME
+        new_content = re.sub(
+            r'export TIME="[^"]*"',
+            'export TIME="1:00:00"',
+            new_content
+        )
+        # 替换 NCPUS
+        new_content = re.sub(
+            r'export NCPUS="[^"]*"',
+            'export NCPUS="7"',
+            new_content
+        )
+        with open(settings_path, 'w', encoding='utf-8') as f:
+            f.write(new_content)
 
-    gz_path = r"{gz_path_escaped}"
+    shutil.copyfile('bash_scripts/python_writes_script.py', f'{task_root_dir}/{col}/python_writes_script.py')
+    if platform == 'NCI':
+        # 确保PBS脚本存在
+        if not os.path.exists(f'{task_root_dir}/{col}/task_cmd.sh'):
+            raise FileNotFoundError('PBS脚本 task_cmd.sh 未找到！')
+    elif platform == 'HPC':
+        # 确保Slurm脚本存在
+        if not os.path.exists(f'{task_root_dir}/{col}/task_cmd_HPC.sh'):
+            raise FileNotFoundError('Slurm脚本 task_cmd_HPC.sh 未找到！')
 
-    with gzip.open(gz_path, 'rb') as f:
-        data = dill.load(f)
+    # 2. 控制最大并发
+    while True:
+        if platform == 'NCI':
+            cmd = "qselect | wc -l"
+        elif platform == 'HPC':
+            cmd = "squeue -u $USER | wc -l"
+        else:
+            cmd = None
 
-    write_outputs(data)
-    '''
-    script_path = os.path.join(f'{task_root_dir}/{col}/python_script.py', 'write_output.py')
-    with open(script_path, 'w', encoding='utf-8') as f:
-        f.write(script_content)
-    subprocess.run(['python', 'python_script.py'], cwd=f'{task_root_dir}/{col}', stdout=std_file,
-                   stderr=err_file, check=True)
-
-    # Wait until the number of running jobs is less than max_concurrent_tasks
-    if os.name == 'posix':
-        while True:
+        if cmd:
             try:
-                running_jobs = int(
-                    subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
+                running_jobs = int(subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout.strip())
             except Exception as e:
                 print(f"Error checking running jobs: {e}")
-            if running_jobs < max_concurrent_tasks:
-                break
-            else:
-                print(
-                    f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
-                import time;
-                time.sleep(10)
-
-    # Open log files for the task run
-    with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
-            open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
-        if mode == 'single':
-            subprocess.run(['python', 'python_script.py'], cwd=f'{task_root_dir}/{col}', stdout=std_file,
-                           stderr=err_file, check=True)
-        elif mode == 'cluster' and os.name == 'posix':
-            subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file,
-                           check=True)
+                running_jobs = 0
         else:
-            raise ValueError('Mode must be either "single" or "cluster"!')
+            running_jobs = 0
 
-def check_mode_system(mode):
+        if running_jobs < max_concurrent_tasks:
+            break
+        else:
+            print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
+            time.sleep(10)
+
+    # 3. 日志文件路径
+    std_log = os.path.join(task_root_dir, col, 'run_std.log')
+    err_log = os.path.join(task_root_dir, col, 'run_err.log')
+
+    # 4. 提交/运行
+    print(f"[START] Submitting write_output task for {col} in platform: {platform}")
+    try:
+        with open(std_log, 'w') as std_file, open(err_log, 'w') as err_file:
+            if platform == 'Denethor':
+                # 本地直接运行
+                result = subprocess.run(['python', 'write_output.py'],
+                                       cwd=f'{task_root_dir}/{col}',
+                                       stdout=std_file, stderr=err_file)
+            elif platform == 'NCI':
+                # PBS
+                result = subprocess.run(['bash', 'task_cmd.sh'],
+                                       cwd=f'{task_root_dir}/{col}',
+                                       stdout=std_file, stderr=err_file)
+            elif platform == 'HPC':
+                # Slurm
+                result = subprocess.run(['bash', 'task_cmd_HPC.sh'],
+                                       cwd=f'{task_root_dir}/{col}',
+                                       stdout=std_file, stderr=err_file)
+            else:
+                raise ValueError('platform must be either "Denethor", "NCI" or "HPC"!')
+
+        if result.returncode == 0:
+            print(f"[SUCCESS] Write output task for {col} finished successfully (submitted)!")
+        else:
+            print(f"[FAILED] Write output task for {col} failed with exit code {result.returncode}!")
+
+    except Exception as e:
+        print(f"[ERROR] Exception occurred for write_output task {col}: {e}")
+
+
+def check_platform_system(platform):
     """
     检查运行模式与操作系统是否匹配，不匹配则报错退出
     """
     sys_type = os.name  # 'posix' (Linux/macOS), 'nt' (Windows)
-    if mode == 'single' and sys_type != 'nt':
-        raise RuntimeError("single just run on Windows, please switch to Windows or change mode to 'cluster'.")
-    if mode == 'cluster' and sys_type != 'posix':
-        raise RuntimeError("cluster just run on Linux, please switch to Linux or change mode to 'single'.")
+    if platform == 'Denethor' and sys_type != 'nt':
+        raise RuntimeError("Denethor just run on Windows, please switch to Windows or change platform to 'NCI' or 'HPC'.")
+    if platform == 'NCI' and sys_type != 'posix':
+        raise RuntimeError("NCI just run on Linux, please switch to Linux or change platform to 'Denethor'.")
+    if platform == 'HPC' and sys_type != 'posix':
+        raise RuntimeError("HPC just run on Linux, please switch to Linux or change platform to 'Denethor'.")
 
 def create_task_runs(
     task_root_dir:str,
     custom_settings:pd.DataFrame,
-    mode:Literal['single','cluster']='single',
+    platform:Literal['Denathor','NCI','HPC']='single',
     n_workers:int=4,
     max_concurrent_tasks:int=300,
     use_parallel:bool=True
 ) -> None:
-    check_mode_system(mode)
-    if os.name == 'posix':
+    check_platform_system(platform)
+    if platform == 'NCI':
         calculate_total_cost(custom_settings)
-    if mode not in ['single', 'cluster']:
-        raise ValueError('Mode must be either "single" or "cluster"!')
+    if platform not in ['Denethor', 'NCI','HPC']:
+        raise ValueError('Platform must be one of "Denethor", "NCI", or "HPC"!')
 
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
@@ -189,7 +270,7 @@ def create_task_runs(
         create_run_folders(task_root_dir, col, n_workers)
         write_settings(f'{task_root_dir}/{col}', settings_dict)
         write_terminal_vars(f'{task_root_dir}/{col}', col, settings_dict)
-        submit_task(task_root_dir, col, mode, max_concurrent_tasks)
+        submit_task(task_root_dir, col, platform, max_concurrent_tasks)
 
 
     use_parallel = False if os.name == 'posix' else use_parallel

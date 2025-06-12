@@ -48,11 +48,11 @@ def main():
         sim.save_data_to_disk(data, pkl_path)
         write_log(f"Data with solution saved in {data.path}.")
 
-        # 监控写输出结果
-        write_log(f"start write_outputs")
-        from luto.tools.write import write_outputs
-        _, write_output_memory = monitor_memory(write_outputs, data)
-        write_log(f"Outputs written. Peak memory usage: {write_output_memory:.2f} GB")
+        # 保存数据并监控内存
+        pkl_path = f'{data.path}/data_with_solution.gz'
+        write_log("Start saving data with solution...")
+        _, save_data_memory = monitor_memory(sim.save_data_to_disk, data, pkl_path)
+        write_log(f"Data with solution saved in {data.path}. Peak memory usage: {save_data_memory:.2f} GB")
 
         # 总结束时间
         overall_end_time = time.time()
