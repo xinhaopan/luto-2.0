@@ -7,6 +7,12 @@ import subprocess
 import re
 from collections import defaultdict
 from tqdm import tqdm
+import time
+
+def tprint(*args, **kwargs):
+    """打印带时间戳的内容，自动换行，支持所有print参数。"""
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    print(f"{timestamp}   ", *args, **kwargs)
 
 
 def dir_has_target_file(dir_path, target_filename):
@@ -19,7 +25,7 @@ def dir_has_target_file(dir_path, target_filename):
     return None
 
 
-def find_data_with_solution_all_subdirs(task_root_dir, n_jobs=4):
+def find_data_with_solution_all_subdirs(task_root_dir, n_jobs=3):
     """
     递归查找task_root_dir下所有子目录中data_with_solution.gz文件。
     返回：(所有找到的完整路径列表，所有完全未找到该文件的一级子目录的名称列表)
@@ -37,6 +43,7 @@ def find_data_with_solution_all_subdirs(task_root_dir, n_jobs=4):
     return found_paths, not_found_dirs
 
 def process_target(run_path, script_path, gz_path):
+    tprint(f"PID {os.getpid()} is working on {run_path}")
     update_luto_code(run_path)
     try:
         with open(os.path.join(run_path, 'write_stdout.log'), 'a') as std_file, \
@@ -48,8 +55,10 @@ def process_target(run_path, script_path, gz_path):
                 stderr=err_file,
                 check=True
             )
+        tprint(f"Success: PID {os.getpid()} {run_path}")
         return gz_path, "success"
     except Exception as e:
+        tprint(f"Failed: PID {os.getpid()} {run_path}, Error: {e}")
         return gz_path, f"failed: {e}"
 
 def update_luto_code(run_path):
@@ -80,14 +89,14 @@ def update_luto_code(run_path):
         else:
             shutil.copy2(src_item, dst_item)
 
-def write_repeat(task_root_dir,n_jobs=9):
+def write_repeat(task_root_dir,n_jobs=1):
     found, not_found = find_data_with_solution_all_subdirs(task_root_dir, n_jobs)
-    print("有解:")
+    tprint("有解:")
     for p in found:
-        print(p)
-    print("\n无解:")
+        tprint(p)
+    tprint("\n无解:")
     for d in not_found:
-        print(d)
+        tprint(d)
 
     # Identify directories with and without production.html
     with_htmls = []
@@ -99,7 +108,7 @@ def write_repeat(task_root_dir,n_jobs=9):
             with_htmls.append(folder_path)
         else:
             without_htmls.append(folder_path)
-            print("没有html 的目录:", folder_path)
+            tprint("没有html 的目录:", folder_path)
 
 
     # Group directories by run_path and process efficiently
@@ -110,7 +119,7 @@ def write_repeat(task_root_dir,n_jobs=9):
         run_path = os.sep.join(parts[:5])
         run_path_to_targets[run_path].append(norm_path)
 
-    print("\nStart write output.......")
+    tprint("\nStart write output.......")
     all_jobs = []
     for run_path, targets in run_path_to_targets.items():
         # 修改 settings.py 和写 script 略（同你已有的代码）
@@ -141,7 +150,6 @@ write_outputs(data)
         with open(script_path, 'w', encoding='utf-8') as f:
             f.write(script_content)
 
-        print("Start processing run_path:", run_path)
         for target_dir in targets:
             parts = target_dir.split(os.sep)
             gz_path = os.path.join(os.sep.join(parts[5:]), 'data_with_solution.gz')
@@ -151,30 +159,32 @@ write_outputs(data)
     results = []
 
     with tqdm(total=len(all_jobs), desc="Processing all targets") as pbar:
-        parallel = Parallel(n_jobs=9)
+        parallel = Parallel(n_jobs=n_jobs, batch_size=1)
         tasks = (delayed(process_target)(run_path, script_name, gz_path)
                  for run_path, script_name, gz_path in all_jobs)
         for result in parallel(tasks):
             results.append(result)
             run_path, gz_path, status = result
             if status == "success":
-                success_list.append(run_path)  # 或 success_list.append((run_path, gz_path))
+                success_list.append(run_path)
             else:
                 failed_list.append((run_path, gz_path, status))
             pbar.set_postfix(success=len(success_list), failed=len(failed_list))
             pbar.update()
 
-    print("\n--- Success ---")
+    tprint("\n--- Success ---")
     for path in success_list:
-        print(path)
+        tprint(path)
 
-    print("\n--- Failed ---")
+    tprint("\n--- Failed ---")
     for path, error in failed_list:
-        print(path, error)
+        tprint(path, error)
 
 if __name__ == "__main__":
     # Main execution
-    task_root_dir = '../../output/20250608_Paper1_results_test_99'
+    import time
+    # time.sleep(60*60*5)
+    task_root_dir = '../../output/20250610_Paper1_results_jinzhu'
     write_repeat(task_root_dir)
 
 

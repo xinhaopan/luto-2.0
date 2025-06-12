@@ -616,8 +616,8 @@ def get_y_axis_ticks(min_value, max_value, desired_ticks=5):
     # 8. 特殊情况：当刻度范围是0到100时，使用规则的25间隔
     if (abs(ticks[0]) < 1e-10 and abs(ticks[-1] - 100) < 1e-10) or (min_tick == 0 and max_tick == 100):
         ticks = np.array([0, 25, 50, 75, 100])
-        min_v = 0
-        max_v = 100
+        # min_v = 0
+        # max_v = 100
 
     return min_v, max_v, ticks.tolist()  # 根据需要转回列表
 
