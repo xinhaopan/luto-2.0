@@ -40,7 +40,7 @@ csv_name, value_column_name, filter_column_name = 'biodiversity_GBF2_priority_sc
 bio_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,['Type'],['Agricultural Landuse'],unit_adopt=False)
 bio_ag_group_dict = aggregate_by_mapping(bio_ag_dict, 'tools/land use group.xlsx', 'desc', 'ag_group')
 bio_ag_group_dict,legend_colors = get_colors(bio_ag_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
-y_range, y_ticks = calculate_y_axis_range(bio_ag_group_dict,3)
+y_range, y_ticks = calculate_y_axis_range(bio_ag_group_dict,4)
 output_png = '../output/05_bio_ag_group.png'
 plot_Combination_figures(bio_ag_group_dict, output_png, input_files, plot_stacked_area, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,

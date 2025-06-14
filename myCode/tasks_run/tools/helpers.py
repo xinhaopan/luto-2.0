@@ -138,7 +138,7 @@ def submit_write_task(task_root_dir: str, col: str, platform: Literal['Denethor'
         # 替换 MEM
         new_content = re.sub(
             r'export MEM="[^"]*"',
-            'export MEM="20GB"',
+            'export MEM="100GB"',
             content
         )
         # 替换 TIME
@@ -150,13 +150,14 @@ def submit_write_task(task_root_dir: str, col: str, platform: Literal['Denethor'
         # 替换 NCPUS
         new_content = re.sub(
             r'export NCPUS="[^"]*"',
-            'export NCPUS="7"',
+            'export NCPUS="25"',
             new_content
         )
         with open(settings_path, 'w', encoding='utf-8') as f:
             f.write(new_content)
 
-    shutil.copyfile('bash_scripts/python_writes_script.py', f'{task_root_dir}/{col}/python_writes_script.py')
+    shutil.copyfile('bash_scripts/python_write_script.py', f'{task_root_dir}/{col}/python_write_script.py')
+    shutil.copyfile('bash_scripts/task_cmd_HPC.sh', f'{task_root_dir}/{col}/task_cmd_HPC.sh')
     if platform == 'NCI':
         # 确保PBS脚本存在
         if not os.path.exists(f'{task_root_dir}/{col}/task_cmd.sh'):
@@ -191,8 +192,8 @@ def submit_write_task(task_root_dir: str, col: str, platform: Literal['Denethor'
             time.sleep(10)
 
     # 3. 日志文件路径
-    std_log = os.path.join(task_root_dir, col, 'run_std.log')
-    err_log = os.path.join(task_root_dir, col, 'run_err.log')
+    std_log = os.path.join(task_root_dir, col, 'write_std.log')
+    err_log = os.path.join(task_root_dir, col, 'write_err.log')
 
     # 4. 提交/运行
     print(f"[START] Submitting write_output task for {col} in platform: {platform}")
