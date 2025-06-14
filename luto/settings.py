@@ -93,15 +93,6 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
-TRANSITION_HURDEL_FACTOR = 0
-'''
-The transition hurdle factor is an additional factor applied to the transition costs matrix to determine the hurdle rate for land-use transitions.
-
-The hurdled_costs  = original_transition_costs * (1 + TRANSITION_HURDEL_FACTOR)
- - A value of 0 means that the original transition costs is used.
- - A value of 1 means that the transition costs are are doubled.
-
-'''
 
 
 # ---------------------------------------------------------------------------- #
@@ -109,7 +100,7 @@ The hurdled_costs  = original_transition_costs * (1 + TRANSITION_HURDEL_FACTOR)
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 9      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
@@ -124,12 +115,32 @@ OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires sof
 DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
+"""
+If any of the targets are set to 'soft':
+    Then they will have a deviation from target (normalised to near 1
+    by dividing their BASE_YR (2010) sum) in the objective function.
+
+    Here the weights determine the relative importance of each target 
+    in the objective function.E.g., if SOLVER_WEIGHT_GHG = 2 and the 
+    rest are 1, then reducing GHG deviation from target will be twice 
+    as important as the other targets in the objective function.
+
+If the target is set to 'hard' or 'off': 
+    Then the deviation from target will be 0 and the weight will not be used.
+"""
+SOLVER_WEIGHT_DEMAND = 1
+SOLVER_WEIGHT_GHG = 1
+SOLVER_WEIGHT_WATER = 1
+SOLVER_WEIGHT_GBF2 = 1
+
+
+
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 WRITE_OUTPUT_GEOTIFFS = True   # Write GeoTiffs to output directory: True or False
-PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 5               # The Threads to use for map making, only work with PARALLEL_WRITE = True
+PARALLEL_WRITE = True          # If to use parallel processing to write GeoTiffs: True or False
+WRITE_THREADS = 32             # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -377,7 +388,6 @@ HIR_EFFECT_YEARS = 91
 
 
 
-
 # ---------------------------------------------------------------------------- #
 # Off-land commodity parameters
 # ---------------------------------------------------------------------------- #
@@ -399,7 +409,7 @@ GHG_TARGETS_DICT = {
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'off'        # 'off', 'low', 'medium', or 'high'
+GHG_EMISSIONS_LIMITS = 'medium'        # 'off', 'low', 'medium', or 'high'
 '''
 `GHG_EMISSIONS_LIMITS` options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
@@ -452,7 +462,7 @@ Range from 0 to 1 that balances the relative important between economic values a
  - if approaching 1, the model will focus on maximising prifit (or minimising cost).
 '''
 
-SOLVE_WEIGHT_BETA = 0.90
+SOLVE_WEIGHT_BETA = 0.9
 '''
 The weight of the deviations from target in the objective function.
  - if approaching 0, the model will ignore the deviations from target.
@@ -466,7 +476,6 @@ WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield lim
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
-WATER_PENALTY = 1e-5
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
@@ -523,16 +532,12 @@ The constraint type for the biodiversity target.
 GBF2_TARGETS_DICT = {
     'off':     None,
     'low':    {2030: 0,    2050: 0,    2100: 0},
-    'medium': {2030: 0.15, 2050: 0.15, 2100: 0.15},
-    'medium2': {2030: 0.15, 2050: 0.30, 2100: 0.30},
-    'high':   {2030: 0.15, 2050: 0.25, 2100: 0.25},
-    'high1':   {2030: 0.15, 2050: 0.30, 2100: 0.30},
-    'high2':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
-    'high3':   {2030: 0.30, 2050: 0.45, 2100: 0.45},
+    'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
+    'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
+BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', 'high', or 'USER_DEFINED'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -542,9 +547,6 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
  - 'medium' is the medium level of biodiversity target (i.e., restore 15% of degreaded biodiversity socore in the 'priority degraded land').
  - 'high' is the high level of biodiversity target (i.e., restore 25% of degreaded biodiversity socore in the 'priority degraded land').
 '''
-
-
-
 
 
 GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
@@ -563,12 +565,8 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 '''
 
 
-GBF2_PENALTY = 1e4
-'''The penalty multiplier for not meeting the biodiversity target, only applies when undershooting the target'''
-
-
 # Connectivity source source
-CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
+CONNECTIVITY_SOURCE = 'DCCEEW_NCI'                 # 'DCCEEW_NCI', 'NATURAL_AREA_CONNECTIVITY' or 'NONE'
 '''
 The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
 This score is normalised between 0 (fartherst) and 1 (closest).
@@ -580,8 +578,7 @@ Can be either 'NCI' or 'DWI'.
 '''
 
 # Connectivity score importance
-connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
-CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
+CONNECTIVITY_LB = 0.7                       # Avaliable values are [0.5, 0.6, 0.7, 0.8, 0.9]
 '''
 The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
 I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
@@ -589,7 +586,7 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HABITAT_CONDITION = 'USER_DEFINED'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
+HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
 '''
 Used to calculate the level of degradation of biodiversity under agricultural land uses (i.e., multiplier of the impact of ag on biodiversity).
 - If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
@@ -647,7 +644,7 @@ GBF3_TARGETS_DICT = {
     'USER_DEFINED': None
 }
 
-BIODIVERSTIY_TARGET_GBF_3  = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.

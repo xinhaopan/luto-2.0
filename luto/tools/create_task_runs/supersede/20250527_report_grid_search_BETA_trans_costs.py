@@ -21,7 +21,6 @@
 import plotnine as p9
 from luto.tools.create_task_runs.create_grid_search_tasks import TASK_ROOT_DIR
 from luto.tools.create_task_runs.helpers import process_task_root_dirs
-from tqdm.auto import tqdm
 
 
 # Plot settings
@@ -31,7 +30,10 @@ p9.options.dpi = 300
 
 # Get the data
 task_root_dir = TASK_ROOT_DIR.rstrip('/')       # Or replace with the desired task run root dir
-task_root_dir = 'N:/LUF-Modelling/LUTO2_JZ/Custom_runs/20250530_GRIDSEARCH_ALPHAT_BETA'
+
+task_root_dir = '../Custom_runs/20250610_RES13_TEST_BETA_DEVIATION_AUD'
+task_root_dir = '/g/data/jk53/jinzhu/LUTO/Custom_runs/20250610_RES13_TEST_BETA_DEVIATION_T'
+
 report_data = process_task_root_dirs(task_root_dir)
 
 print(report_data['Type'].unique())
@@ -44,7 +46,7 @@ print(report_data['Type'].unique())
 demand_df = report_data.query('Type == "Production_deviation_pct"').copy()
 
 df_demand_avg = demand_df.eval('val = abs(val)'
-    ).groupby(['GHG_EMISSIONS_LIMITS', 'BIODIVERSTIY_TARGET_GBF_2', 'SOLVE_WEIGHT_BETA']
+    ).groupby(['SOLVE_WEIGHT_BETA']
     )[['val','run_idx']].agg(val=('val', 'mean'), run_idx=('run_idx', 'first')
     ).reset_index()
 
@@ -61,7 +63,7 @@ plot_landscape_profit = (
     ) +
     p9.geom_point(size=3,stroke=0) +
     p9.theme_bw() +
-    p9.facet_grid('GHG_EMISSIONS_LIMITS~BIODIVERSTIY_TARGET_GBF_2') +
+    # p9.facet_grid('GHG_EMISSIONS_LIMITS~BIODIVERSTIY_TARGET_GBF_2') +
     p9.theme(
         strip_text=p9.element_text(size=8), 
         legend_position='bottom',
@@ -72,12 +74,9 @@ plot_landscape_profit = (
 
 # Plot individual demand landscape 
 query_str = '''
-    year == 2050 
-    and GHG_EMISSIONS_LIMITS == "medium" 
-    and BIODIVERSTIY_TARGET_GBF_2 == "medium"
-    and abs(val) < 30
+    year == 2050
     '''.replace('\n', ' ').replace('  ', ' ')
-    
+
 demand_df_individual = demand_df.query(query_str).copy()
 
 plot_landscape_profit = (
@@ -108,7 +107,6 @@ plot_landscape_profit = (
 # -------------- Plot profit ----------------------
 query_str = '''
     name == "Profit" 
-    and year != 2010
     '''.replace('\n', ' ').replace('  ', ' ')
     
 df_profit = report_data.query(query_str).copy()
@@ -117,9 +115,7 @@ df_profit = report_data.query(query_str).copy()
 
 # Plot individual profit landscape 
 query_str = '''
-    GHG_EMISSIONS_LIMITS == "medium" 
-    and BIODIVERSTIY_TARGET_GBF_2 == "medium"
-    and val < 100
+    abs(val) < 30
     '''.replace('\n', ' ').replace('  ', ' ')
     
 df_profit_individual = df_profit.query(query_str).copy()
@@ -133,7 +129,7 @@ plot_landscape_profit = (
         )
     ) +
     p9.geom_point(size=0.1) +
-    p9.geom_vline(xintercept=0.9,color='red') +
+    p9.geom_vline(xintercept=0.9, color='red') +
     p9.theme_bw() +
     p9.facet_wrap('year', scales='free_y') +
     p9.theme(
