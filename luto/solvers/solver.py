@@ -35,7 +35,7 @@ from luto import tools
 from luto.solvers.input_data import SolverInputData
 from luto.settings import (
     AG_MANAGEMENTS, 
-    AG_MANAGEMENTS_REVERSIBLE,
+    AG_MANAGEMENTS_REVERSIBLE, 
     NON_AG_LAND_USES, 
     NON_AG_LAND_USES_REVERSIBLE
 )
@@ -296,7 +296,7 @@ class LutoSolver:
         
         # Get objectives 
         self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]              # Normalise to the base year economy value
-        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["BASE_YR Biodiversity (score)"]  # Normalise to the base year biodiversity value
+        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["BASE_YR Overall Bio (score)"]  # Normalise to the base year biodiversity value
         self.obj_penalties = self._setup_penalty_objectives()                                                                   
  
         # Set the objective function
@@ -374,18 +374,18 @@ class LutoSolver:
             ag_exprs.append(
                 gp.quicksum(
                     self._input_data.ag_b_mrj[0, :, j] * self.X_ag_dry_vars_jr[j, :]
-                )
+                )  
                 + gp.quicksum(
                     self._input_data.ag_b_mrj[1, :, j] * self.X_ag_irr_vars_jr[j, :]
                 )
-
+                
             )
-
+ 
         ag_mam_exprs = []
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-
+                
             for j_idx in range(len(am_j_list)):
                 ag_mam_exprs.append(
                     gp.quicksum(
@@ -395,9 +395,9 @@ class LutoSolver:
                     + gp.quicksum(
                         self._input_data.ag_man_b_mrj[am][1, :, j_idx]
                         * self.X_ag_man_irr_vars_jr[am][j_idx, :]
-                    )  # Irrigated alt. ag. management contributions
+                    )  # Irrigated alt. ag. management contributions   
                 )
-
+    
         non_ag_exprs = []
         for k,k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
@@ -407,7 +407,7 @@ class LutoSolver:
                     self._input_data.non_ag_b_rk[:, k] * self.X_non_ag_vars_kr[k, :]
                 )
             )
-
+        
         self.bio_ag_contr = gp.quicksum(ag_exprs)
         self.bio_ag_man_contr = gp.quicksum(ag_mam_exprs)
         self.bio_non_ag_contr = gp.quicksum(non_ag_exprs)
@@ -416,41 +416,70 @@ class LutoSolver:
         
     def _setup_penalty_objectives(self):
         print("  ...setting up penalty objectives...")
-        
-        # Get the penalty values for each sector
-        self.penalty_biodiv = (
-            self.B * settings.GBF2_PENALTY
-            if settings.GBF2_CONSTRAINT_TYPE == "soft"
-            else 0
-        )
-        self.penalty_ghg = (
-            self.E * self._input_data.economic_target_yr_carbon_price
-            if settings.GHG_CONSTRAINT_TYPE == "soft"
-            else 0
-        )
-        self.penalty_water = (
-            self.W.sum() * settings.WATER_PENALTY
-            if settings.WATER_CONSTRAINT_TYPE == "soft"
-            else 0
-        )
-        self.penalty_demand = (
-            # gp.quicksum(
-            #     v * price
-            #     for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
-            # )
-            (
-                gp.quicksum(
-                    (self.V[c] + self._input_data.base_yr_prod["BASE_YR Production (t)"][c])
-                    / self._input_data.base_yr_prod["BASE_YR Production (t)"][c]
-                    for c in range(self._input_data.ncms)
-                ) / self._input_data.ncms
-            )
-            if settings.DEMAND_CONSTRAINT_TYPE == "soft"
-            else 0
-        )
 
-        return self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv + gp.LinExpr(0)
-        
+        self.penalty_demand = 0
+        self.penalty_ghg = 0
+        self.penalty_water = 0
+        self.penalty_biodiv = 0
+
+        weight_demand = 0
+        weight_ghg = 0
+        weight_water = 0
+        weight_biodiv = 0
+
+
+        # Get the penalty values for each sector
+        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+            weight_demand = settings.SOLVER_WEIGHT_DEMAND
+
+            self.penalty_demand = (
+                gp.quicksum(
+                    v * price
+                    for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
+                )
+                / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]
+                + 1
+            )
+
+            # self.penalty_demand = (
+            #     gp.quicksum(v for v in self.V)
+            #     / self._input_data.base_yr_prod["BASE_YR Production (t)"].sum()
+            #     + 1
+            # ) / self._input_data.ncms
+
+        if settings.GHG_CONSTRAINT_TYPE == "soft":
+            weight_ghg = settings.SOLVER_WEIGHT_GHG
+
+            self.penalty_ghg = (
+                self.E
+                / self._input_data.base_yr_prod["BASE_YR GHG (tCO2e)"]
+                + 1
+            )
+
+        if settings.WATER_CONSTRAINT_TYPE == "soft":
+            weight_water = settings.SOLVER_WEIGHT_WATER
+            self.penalty_water = (
+                gp.quicksum(v for v in self.W)
+                / self._input_data.base_yr_prod["BASE_YR Water (ML)"].sum()
+                + 1
+            ) / len(self._input_data.limits["water"].keys())
+
+        if settings.GBF2_CONSTRAINT_TYPE == "soft":
+            weight_biodiv = settings.SOLVER_WEIGHT_GBF2
+            self.penalty_biodiv = (
+                self.B
+                / self._input_data.base_yr_prod["BASE_YR GBF_2 (score)"].sum()
+                + 1
+            )
+
+        return (
+            self.penalty_demand   * weight_demand
+            + self.penalty_ghg    * weight_ghg
+            + self.penalty_water  * weight_water
+            + self.penalty_biodiv * weight_biodiv
+            + gp.LinExpr(0)
+        ) / sum([ weight_demand, weight_ghg, weight_water, weight_biodiv])
+
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
@@ -475,7 +504,7 @@ class LutoSolver:
         )
         for r, expr in zip(cells, X_sum_r):
             self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(
-                expr == 1,
+                expr == 1, 
                 name=f"const_cell_usage_{r}"
             )
 
@@ -546,51 +575,51 @@ class LutoSolver:
         Constraints to penalise under and over production compared to demand.
         """
         print("  ...demand constraints...")
-
+        
         self.ag_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         for j in range(self._input_data.n_ag_lus):
             X_ag_dry_r = self.X_ag_dry_vars_jr[j, :]
             X_ag_irr_r = self.X_ag_irr_vars_jr[j, :]
-
+            
             for p in range(self._input_data.nprs):
                 if not self._input_data.lu2pr_pj[p, j]:
                     continue
                 ag_q_p = (
                     gp.quicksum(
                         self._input_data.ag_q_mrp[0, :, p] * X_ag_dry_r
-                    )
+                    ) 
                     + gp.quicksum(
                         self._input_data.ag_q_mrp[1, :, p] * X_ag_irr_r
-                    )
-                )
-
+                    ) 
+                )  
+                
                 for c in range(self._input_data.ncms):
                     if not self._input_data.pr2cm_cp[c, p]:
                         continue
                     self.ag_q_c[c] += ag_q_p
-
-
+                        
+                        
         self.ag_man_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-
+            
             for j_idx,j in enumerate(am_j_list):
                 X_ag_mam_dry_r = self.X_ag_man_dry_vars_jr[am][j_idx, :]
                 X_ag_mam_irr_r = self.X_ag_man_irr_vars_jr[am][j_idx, :]
-
+                
                 for p in range(self._input_data.nprs):
                     if not self._input_data.lu2pr_pj[p, j]:
                         continue
                     ag_mam_q_p = (
                         gp.quicksum(
                             self._input_data.ag_man_q_mrp[am][0, :, p] * X_ag_mam_dry_r
-                        )
+                        ) 
                         + gp.quicksum(
                             self._input_data.ag_man_q_mrp[am][1, :, p] * X_ag_mam_irr_r
-                        )
-                    )
-
+                        ) 
+                    )  
+                    
                     for c in range(self._input_data.ncms):
                         if not self._input_data.pr2cm_cp[c, p]:
                             continue
@@ -601,18 +630,18 @@ class LutoSolver:
         for k,k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-
+            
             for c in range(self._input_data.ncms):
                 self.non_ag_q_c[c] += gp.quicksum(
                     self._input_data.non_ag_q_crk[c, :, k] * self.X_non_ag_vars_kr[k, :]
                 )
-
+            
 
         # Total quantities in CM/c representation.
         self.total_q_exprs_c = [
             self.ag_q_c[c]
-            + self.ag_man_q_c[c]
-            + self.non_ag_q_c[c]
+            + self.ag_man_q_c[c] 
+            + self.non_ag_q_c[c] 
             for c in range(self._input_data.ncms)
         ]
 
@@ -657,7 +686,7 @@ class LutoSolver:
         """
         Get the Gurobi linear expression for the net water yield of a given region.
         """
-
+        
         ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
             ag_exprs.append(
@@ -668,12 +697,12 @@ class LutoSolver:
                     self._input_data.ag_w_mrj[1, ind, j] * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
             )
-
+ 
         ag_mam_exprs = []
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-
+            
             for j_idx in range(len(am_j_list)):
                 ag_mam_exprs.append(
                     gp.quicksum(
@@ -693,8 +722,8 @@ class LutoSolver:
                     self._input_data.non_ag_w_rk[ind, k] * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
             )
-
-        ag_contr = gp.quicksum(ag_exprs)
+        
+        ag_contr = gp.quicksum(ag_exprs) 
         ag_man_contr = gp.quicksum(ag_mam_exprs)
         non_ag_contr = gp.quicksum(non_ag_exprs)
         return ag_contr + ag_man_contr + non_ag_contr
@@ -756,24 +785,24 @@ class LutoSolver:
                     g_irr_coeff[:, j] * self.X_ag_irr_vars_jr[j, :]
                 )
             )
-
+            
         ghg_ag_man_exprs = []
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-
+            
             for j_idx in range(len(am_j_list)):
                 ghg_ag_man_exprs.append(
                     gp.quicksum(
                         self._input_data.ag_man_g_mrj[am][0, :, j_idx]
                         * self.X_ag_man_dry_vars_jr[am][j_idx, :]
-                    )
+                    )  
                     + gp.quicksum(
                         self._input_data.ag_man_g_mrj[am][1, :, j_idx]
                         * self.X_ag_man_irr_vars_jr[am][j_idx, :]
-                    )
+                    )  
                 )
-
+                
         ghg_non_ag_exprs = []
         for k,k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
@@ -783,11 +812,11 @@ class LutoSolver:
                     self._input_data.non_ag_g_rk[:, k] * self.X_non_ag_vars_kr[k, :]
                 )
             )
-
+            
         self.ghg_ag_contr = gp.quicksum(ghg_ag_exprs)
         self.ghg_ag_man_contr = gp.quicksum(ghg_ag_man_exprs)
-        self.ghg_non_ag_contr = gp.quicksum(ghg_non_ag_exprs)
-
+        self.ghg_non_ag_contr = gp.quicksum(ghg_non_ag_exprs)    
+        
         return self.ghg_ag_contr + self.ghg_ag_man_contr + self.ghg_non_ag_contr + self._input_data.offland_ghg
 
     def _add_ghg_emissions_limit_constraints(self):
@@ -893,18 +922,22 @@ class LutoSolver:
                 )
             )
 
-        self.bio_GBF2_priority_degraded_area_expr = gp.quicksum(bio_ag_exprs) + gp.quicksum(bio_ag_man_exprs) + gp.quicksum(bio_non_ag_exprs)
+        self.bio_GBF2_priority_degraded_area_expr = (
+            gp.quicksum(bio_ag_exprs)
+            + gp.quicksum(bio_ag_man_exprs)
+            + gp.quicksum(bio_non_ag_exprs)
+        ) / self._input_data.limits["GBF2_priority_degrade_areas"]
         
         print(f"       |-- target is {self._input_data.limits["GBF2_priority_degrade_areas"]:15,.0f}")
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(
-                self.bio_GBF2_priority_degraded_area_expr >= self._input_data.limits["GBF2_priority_degrade_areas"], 
+                self.bio_GBF2_priority_degraded_area_expr >= 1,
                 name="bio_GBF2_priority_degraded_area_limit_hard"
             )
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             constr = self.gurobi_model.addConstr(
-                self._input_data.limits["GBF2_priority_degrade_areas"] - self.bio_GBF2_priority_degraded_area_expr <= self.B, 
+                1 - self.bio_GBF2_priority_degraded_area_expr <= self.B,
                 name="bio_GBF2_priority_degraded_area_limit_soft"
             )
             self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)
@@ -974,11 +1007,11 @@ class LutoSolver:
             )
 
 
-            self.bio_GBF3_major_vegetation_exprs[v] = ag_contr + ag_man_contr + non_ag_contr 
+            self.bio_GBF3_major_vegetation_exprs[v] = (ag_contr + ag_man_contr + non_ag_contr) / v_area_lb
 
             print(f"       |-- target is {v_area_lb:15,.0f} for {v_names[v]} ")
             self.bio_GBF3_major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
-                self.bio_GBF3_major_vegetation_exprs[v] >= v_area_lb,
+                self.bio_GBF3_major_vegetation_exprs[v] >= 1,
                 name=f"bio_GBF3_major_vegetation_limit_{v}",
             )
 
@@ -1476,26 +1509,6 @@ class LutoSolver:
         self.gurobi_model.optimize()
 
         print("Completed solve, collecting results...\n", flush=True)
-
-        # Collect results
-        status = self.gurobi_model.Status
-        print(f"Solver status: {status}")
-        if status == gp.GRB.INFEASIBLE:
-            print("Model is infeasible. Running IIS analysis...\n")
-            try:
-                # 仅使用 Python API 中可用的 computeIIS()
-                self.gurobi_model.computeIIS()
-                self.gurobi_model.write("model.ilp.iis")
-                print("IIS result saved to model.ilp.iis")
-            except gp.GurobiError as e:
-                # 捕获意外错误，导出 LP 供手动检查
-                print(f"Error computing IIS: {e}")
-                self.gurobi_model.write("model_for_debug.lp")
-                print("Exported full LP model to model_for_debug.lp for manual inspection.")
-        else:
-            print(f"Solver status is {status} (not infeasible).")
-
-        # Collect results into a SolverSolution object
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
 
