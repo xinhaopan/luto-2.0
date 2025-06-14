@@ -43,16 +43,17 @@ def main():
         _, simulation_memory = monitor_memory(sim.run, data=data)
         write_log(f"Simulation completed. Peak memory usage: {simulation_memory:.2f} GB")
 
-        # 保存数据
-        pkl_path = f'{data.path}/data_with_solution.gz'
-        sim.save_data_to_disk(data, pkl_path)
-        write_log(f"Data with solution saved in {data.path}.")
-
         # 保存数据并监控内存
         pkl_path = f'{data.path}/data_with_solution.gz'
         write_log("Start saving data with solution...")
         _, save_data_memory = monitor_memory(sim.save_data_to_disk, data, pkl_path)
         write_log(f"Data with solution saved in {data.path}. Peak memory usage: {save_data_memory:.2f} GB")
+
+        # 监控write_output
+        write_log("Start writing output...")
+        from luto.tools.write import write_outputs
+        _, write_output_memory = monitor_memory(write_outputs, data)
+        write_log(f"Output written. Peak memory usage: {write_output_memory:.2f} GB")
 
         # 总结束时间
         overall_end_time = time.time()
@@ -71,7 +72,7 @@ def main():
 
         # 记录日志
         write_log(f"Total run time: {formatted_duration}")
-        write_log(f"Overall peak memory usage: {max(load_data_memory, simulation_memory, write_output_memory):.2f} GB")
+        write_log(f"Overall peak memory usage: {max(load_data_memory, simulation_memory,save_data_memory, write_output_memory):.2f} GB")
 
         # Remove all files except the report directory if settings.KEEP_OUTPUTS is False
         '''
