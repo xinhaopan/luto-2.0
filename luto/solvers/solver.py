@@ -233,14 +233,6 @@ class LutoSolver:
                         dry_lu_cells, self._input_data.savanna_eligible_r
                     )
 
-                elif am_name == "hir_-_beef" or am_name == "hir_-_sheep":
-                    dry_lu_cells = np.intersect1d(
-                        dry_lu_cells, self._input_data.hir_eligible_r
-                    )
-                    irr_lu_cells = np.intersect1d(
-                        irr_lu_cells, self._input_data.hir_eligible_r
-                    )
-
                 for r in dry_lu_cells:
                     dry_x_lb = (
                         0
@@ -421,64 +413,64 @@ class LutoSolver:
         self.penalty_ghg = 0
         self.penalty_water = 0
         self.penalty_biodiv = 0
-
+        
         weight_demand = 0
         weight_ghg = 0
         weight_water = 0
         weight_biodiv = 0
-
-
+        
+ 
         # Get the penalty values for each sector
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             weight_demand = settings.SOLVER_WEIGHT_DEMAND
-
+            
             self.penalty_demand = (
                 gp.quicksum(
                     v * price
                     for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
-                )
+                ) 
                 / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]
-                + 1
+                + 1 
             )
-
+            
             # self.penalty_demand = (
-            #     gp.quicksum(v for v in self.V)
+            #     gp.quicksum(v for v in self.V) 
             #     / self._input_data.base_yr_prod["BASE_YR Production (t)"].sum()
-            #     + 1
+            #     + 1 
             # ) / self._input_data.ncms
-
+            
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             weight_ghg = settings.SOLVER_WEIGHT_GHG
-
+            
             self.penalty_ghg = (
-                self.E
+                self.E 
                 / self._input_data.base_yr_prod["BASE_YR GHG (tCO2e)"]
                 + 1
-            )
-
+            ) 
+        
         if settings.WATER_CONSTRAINT_TYPE == "soft":
             weight_water = settings.SOLVER_WEIGHT_WATER
             self.penalty_water = (
                 gp.quicksum(v for v in self.W)
                 / self._input_data.base_yr_prod["BASE_YR Water (ML)"].sum()
                 + 1
-            ) / len(self._input_data.limits["water"].keys())
-
+            ) / len(self._input_data.limits["water"].keys()) 
+            
         if settings.GBF2_CONSTRAINT_TYPE == "soft":
             weight_biodiv = settings.SOLVER_WEIGHT_GBF2
             self.penalty_biodiv = (
-                self.B
+                self.B 
                 / self._input_data.base_yr_prod["BASE_YR GBF_2 (score)"].sum()
                 + 1
-            )
-
+            ) 
+      
         return (
             self.penalty_demand   * weight_demand
             + self.penalty_ghg    * weight_ghg
             + self.penalty_water  * weight_water
             + self.penalty_biodiv * weight_biodiv
             + gp.LinExpr(0)
-        ) / sum([ weight_demand, weight_ghg, weight_water, weight_biodiv])
+        ) / sum([ weight_demand, weight_ghg, weight_water, weight_biodiv]) 
 
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
@@ -923,8 +915,8 @@ class LutoSolver:
             )
 
         self.bio_GBF2_priority_degraded_area_expr = (
-            gp.quicksum(bio_ag_exprs)
-            + gp.quicksum(bio_ag_man_exprs)
+            gp.quicksum(bio_ag_exprs) 
+            + gp.quicksum(bio_ag_man_exprs) 
             + gp.quicksum(bio_non_ag_exprs)
         ) / self._input_data.limits["GBF2_priority_degrade_areas"]
         
@@ -932,12 +924,12 @@ class LutoSolver:
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(
-                self.bio_GBF2_priority_degraded_area_expr >= 1,
+                self.bio_GBF2_priority_degraded_area_expr >= 1, 
                 name="bio_GBF2_priority_degraded_area_limit_hard"
             )
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             constr = self.gurobi_model.addConstr(
-                1 - self.bio_GBF2_priority_degraded_area_expr <= self.B,
+                1 - self.bio_GBF2_priority_degraded_area_expr <= self.B, 
                 name="bio_GBF2_priority_degraded_area_limit_soft"
             )
             self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)
@@ -1583,14 +1575,6 @@ class LutoSolver:
                     )
                     eligible_irr_cells = np.intersect1d(
                         eligible_irr_cells, self._input_data.savanna_eligible_r
-                    )
-
-                elif am == "HIR - Beef" or am == "HIR - Sheep":
-                    eligible_dry_cells = np.intersect1d(
-                        eligible_dry_cells, self._input_data.hir_eligible_r
-                    )
-                    eligible_irr_cells = np.intersect1d(
-                        eligible_irr_cells, self._input_data.hir_eligible_r
                     )
 
                 for r in eligible_dry_cells:
