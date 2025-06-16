@@ -1,3 +1,5 @@
+import os
+os.environ['GRB_LICENSE_FILE'] = r'C:\Users\s222552331\gurobi\gurobi_xp.lic'
 import luto.simulation as sim
 
 data = sim.load_data()

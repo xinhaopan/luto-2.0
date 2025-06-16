@@ -2186,30 +2186,33 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 def write_GHG_npy(data: Data, yr_cal, path):
     if settings.GHG_EMISSIONS_LIMITS == 'off':
         return
+    print(f'Writing GHG outputs for {yr_cal}')
+
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # -------------------------------------------------------#
     # Get greenhouse gas emissions from agricultural landuse #
     # -------------------------------------------------------#
-
-    # Get the ghg_df
-    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
-    dvar_rmj = data.ag_dvars[yr_cal]
-    ag_g_r = np.einsum('mrj,mrj -> r', dvar_rmj, ag_g_mrj)
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])  # (m,r,j)
+    ag_g_mrj = tools.ag_mrj_to_xr(data, ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)).chunk({'cell': min(4096, data.NCELLS)})
+    ag_g_r = (ag_dvar_mrj * ag_g_mrj).sum(['lm', 'lu']).values  # (r)
     save_map_to_npy(data, ag_g_r, 'GHG_ag', yr_cal, path)
 
     # -----------------------------------------------------------#
     # Get greenhouse gas emissions from non-agricultural landuse #
     # -----------------------------------------------------------#
     # Get the non_ag GHG reduction
-    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal])
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])  # (cell, lu)
+    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
+    non_ag_g_rk = tools.non_ag_rk_to_xr(data, non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal])).chunk(
+        {'cell': min(4096, data.NCELLS)})
+    lmmap_mr = xr.DataArray(
+        np.stack([data.lmmaps[yr_cal] == 0, data.lmmaps[yr_cal] == 1], axis=0),
+        dims=('lm', 'cell'),
+        coords={'lm': data.LANDMANS, 'cell': np.arange(data.NCELLS)}
+    )
 
-    # Multiply with decision variable to get the GHG in yr_cal
-    non_ag_g_rk = non_ag_g_rk * data.non_ag_dvars[yr_cal]
-    lmmap_mr = np.stack([data.lmmaps[yr_cal] == 0, data.lmmaps[yr_cal] == 1], axis=0)
-
-    # get the non_ag GHG reduction on dry/irr land
-    non_ag_g_r = np.einsum('rk, mr -> r', non_ag_g_rk, lmmap_mr)
+    non_ag_g_r = (non_ag_g_rk * non_ag_dvar_rk * lmmap_mr).sum(['lm', 'lu']).values  # (cell)
     save_map_to_npy(data, non_ag_g_r, 'GHG_non-ag', yr_cal, path)
 
     # -------------------------------------------------------------------#
@@ -2224,21 +2227,18 @@ def write_GHG_npy(data: Data, yr_cal, path):
 
     # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
     if yr_cal == data.YR_CAL_BASE:
-        ghg_t = np.zeros(data.ag_dvars[yr_cal].shape, dtype=np.bool_)
+        ghg_t_mrj = tools.ag_mrj_to_xr(data, np.zeros(data.ag_dvars[yr_cal].shape, dtype=np.bool_))
     else:
         yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
-        ghg_t = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[yr_cal_sim_pre])
+        ghg_t_mrj = tools.ag_mrj_to_xr(data, ag_ghg.get_ghg_transition_emissions(data, data.lumaps[yr_cal_sim_pre]))
 
     # Get the GHG emissions from lucc-convertion compared to the previous year
-    ghg_t_r = np.einsum('mrj,mrj -> r', data.ag_dvars[yr_cal], ghg_t)
+    ghg_t_r = (ag_dvar_mrj * ghg_t_mrj).sum(['lm', 'lu']).values  # (r)
     save_map_to_npy(data, ghg_t_r, 'GHG_transition', yr_cal, path)
 
     # -------------------------------------------------------------------#
     # Get greenhouse gas emissions from agricultural management          #
     # -------------------------------------------------------------------#
-
-    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
-
     # Get the ag_man_g_mrj
     ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data, yr_idx)
 
@@ -2280,9 +2280,21 @@ def write_map_npy(data: Data, yr_cal, path):
     save_map_to_npy(data, data.lmmaps[yr_cal], f'lm_map', yr_cal, path)
 
 def write_rev_non_ag_npy(data: Data, yr_cal, path):
-    from luto import tools
+    print(f'Writing non-agricultural land-use revenue for {yr_cal}')
     yr_idx = yr_cal - data.YR_CAL_BASE
-    non_ag_dvar = data.non_ag_dvars[yr_cal]  # rk
+    # non_ag_dvar = tools.non_ag_rk_to_xr(data.non_ag_dvars[yr_cal])  # rk
+    #
+    # # Get the non-agricultural revenue/cost matrices
+    # ag_r_mrj = tools.ag_mrj_to_xr(data, ag_revenue.get_rev_matrices(data, yr_idx))
+    # ag_c_mrj = tools.ag_mrj_to_xr(data, ag_cost.get_cost_matrices(data, yr_idx))
+    # non_ag_rev_mat = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_r_mrj, data.lumaps[yr_cal]))  # rk
+    # non_ag_cost_mat = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_c_mrj, data.lumaps[yr_cal], yr_cal))  # rk
+    # non_ag_rev_mat = np.nan_to_num(non_ag_rev_mat)
+    # non_ag_cost_mat = np.nan_to_num(non_ag_cost_mat)
+    #
+    # rev_non_ag_r = (non_ag_dvar * non_ag_rev_mat).sum(['lu'])  # (r)
+    # cost_non_ag_r = (non_ag_dvar * non_ag_cost_mat).sum(['lu'])  # (r)
+
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, data.lumaps[yr_cal])
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, data.lumaps[yr_cal])
     ag_r_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
@@ -2371,6 +2383,7 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
     save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
 
 def write_GBF2_npy(data: Data, yr_cal, path):
+    print(f'Writing GBF2 biodiversity outputs for {yr_cal}')
     if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off':
         return
     # Unpack the ag managements and land uses
@@ -2388,17 +2401,11 @@ def write_GBF2_npy(data: Data, yr_cal, path):
     am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
 
     # Get the priority degrade areas scores
-    GBF2_priority_degrade_areas_r = xr.DataArray(
-        ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
-        dims=['cell'],
-        coords={'cell': range(data.NCELLS)}
-    )
-    # Get the priority degraded areas score
     priority_degraded_area_score_r = xr.DataArray(
         ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
         dims=['cell'],
         coords={'cell': range(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS)}) # Chunking to save mem use
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
