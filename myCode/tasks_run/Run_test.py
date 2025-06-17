@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250617_Paper2_Results'],
+    'TASK_NAME': ['test_run'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -23,12 +23,12 @@ grid_search = {
     'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['off','high'],
+    'GHG_EMISSIONS_LIMITS': ['low'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['off','high'],
+    'BIODIVERSTIY_TARGET_GBF_2': ['high'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
 
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
@@ -53,6 +53,6 @@ settings_name_dict = {
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
 grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
-create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
+create_task_runs(task_root_dir, grid_search_settings_df, platform="Denethor", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 
