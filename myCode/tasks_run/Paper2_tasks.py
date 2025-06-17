@@ -11,6 +11,7 @@ grid_search = {
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['60GB'],
     'NCPUS': ['12'],
+    'WRITE_THREADS': ['4'],
     'TIME': ['24:00:00'],
 
     # ---------------------------------- Model settings ------------------------------

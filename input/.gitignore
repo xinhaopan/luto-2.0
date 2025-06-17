@@ -1,10 +1,5 @@
-# Ignore everything:
-
-*
-
-
-
-# Except this very file:
-
-!.gitignore
-
+# Ignore everything:
+*
+
+# Except this very file:
+!.gitignore
