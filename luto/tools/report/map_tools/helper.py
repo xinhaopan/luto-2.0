@@ -99,7 +99,7 @@ def get_map_meta():
     
     # Create a DataFrame from the COLOR_TYPES dictionary
     map_meta = pd.DataFrame(
-        COLOR_TYPES.items(),
+        COLOR_TYPES.items(), 
         columns=['category', 'color_csv']
     )
  
@@ -142,9 +142,9 @@ def get_scenario(data_root_dir:str):
         for line in f:
             if 'GHG_EMISSIONS_LIMITS' in line:
                 GHG_scenario = line.split(':')[-1].strip()
-            if 'BIODIVERSTIY_TARGET_GBF_2' in line:
+            if 'BIODIVERSITY_TARGET_GBF_2' in line:
                 bio_scenario = line.split(':')[-1].strip()
-
+        
     return f'GHG {GHG_scenario} - Biodiversity {bio_scenario}'
 
 

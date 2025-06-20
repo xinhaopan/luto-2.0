@@ -78,7 +78,7 @@ class SolverInputData:
 
     water_region_indices: dict[int, np.ndarray]                         # Water region indices -> dict. Key: region.
     water_region_names: dict[int, str]                                  # Water yield for the BASE_YR based on historical water yield layers.
-
+      
     biodiv_contr_ag_j: np.ndarray                                       # Biodiversity contribution scale from agricultural land uses.
     biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
     biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale from agricultural management options.
@@ -96,6 +96,7 @@ class SolverInputData:
     GBF8_species_indices: dict[int, float]                              # Species indices - indexed by species (s).
 
     savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
+    hir_eligible_r: np.ndarray                                          # Cells that are eligible for the HIR agricultural management option. 
     priority_degraded_mask_idx: np.ndarray                              # Mask of priority degraded areas - indexed by cell (r).
 
     economic_contr_mrj: float                                           # base year economic contribution matrix.
@@ -273,10 +274,10 @@ def get_ag_man_biodiv_impacts(data: Data, target_year: int) -> dict[str, dict[st
     return ag_biodiversity.get_ag_management_biodiversity_contribution(data, target_year)
 
 def get_GBF2_priority_degrade_area_r(data: Data) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
+    if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
         return np.empty(0)
     print('Getting priority degrade area matrices...', flush = True)
-    output = ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data)
+    output = data.BIO_PRIORITY_DEGRADED_AREAS_R
     return output
 
 def get_GBF3_MVG_area_vr(data: Data):
@@ -381,7 +382,7 @@ def get_ag_ghg_t_mrj(data: Data, base_year):
 def get_ag_t_mrj(data: Data, target_index, base_year):
     print('Getting agricultural transition cost matrices...', flush = True)
     
-    ag_t_mrj = ag_transition.get_transition_matrices_ag2ag_from_base_year(
+    ag_t_mrj = ag_transition.get_transition_matrices_from_base_year(
         data, 
         target_index, 
         base_year
@@ -393,11 +394,11 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
 
 def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, ag_t_mrj):
     print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
-    non_ag_t_mrj = non_ag_transition.get_transition_matrix_ag2nonag( 
+    non_ag_t_mrj = non_ag_transition.get_transition_matrix_ag2nonag(
         data, 
-        target_index, 
+        target_index,
         data.lumaps[base_year], 
-        data.lmmaps[base_year],
+        data.lmmaps[base_year]
     ).astype(np.float32)
     # Transition costs occures if the base year is not the target year
     return non_ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_t_mrj).astype(np.float32)
@@ -406,7 +407,7 @@ def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, ag_t_mrj):
 def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
     print('Getting non-agricultural to agricultural transition cost matrices...', flush = True)
     
-    non_ag_to_ag_mrj = non_ag_transition.get_transition_matrix_nonag2ag(
+    non_ag_to_ag_mrj = non_ag_transition.get_to_ag_transition_matrix(
         data, 
         target_index, 
         data.lumaps[base_year], 
@@ -594,7 +595,7 @@ def get_BASE_YR_overall_bio_value(data: Data):
     return np.einsum('mrj,mrj->', ag_b_mrj, data.AG_L_MRJ)
 
 def get_BASE_YR_GBF2_score(data: Data) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
+    if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
         return np.empty(0)
     print('Getting priority degrade area base year score...', flush = True)
     GBF2_ly_r = get_GBF2_priority_degrade_area_r(data)
@@ -621,9 +622,13 @@ def get_BASE_YR_water_ML(data: Data) -> np.ndarray:
 def get_savanna_eligible_r(data: Data) -> np.ndarray:
     return np.where(data.SAVBURN_ELIGIBLE == 1)[0]
 
+def get_hir_eligible_r(data: Data) -> np.ndarray:
+    return np.where(data.HIR_MASK == 1)[0]
 
 def get_priority_degraded_mask_idx(data: Data) -> np.ndarray:
-    return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_MASK)[0] if settings.BIODIVERSTIY_TARGET_GBF_2 != "off" else np.empty(0)
+    if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
+        return np.empty(0)
+    return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_R)[0]
 
 
 def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
@@ -658,7 +663,7 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[yr_cal]
 
-    if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limits["GBF2_priority_degrade_areas"] = data.get_GBF2_target_for_yr_cal(yr_cal)
 
     if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
@@ -716,7 +721,7 @@ def set_limits(data: Data, yr_cal) -> None:
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limit_GHG = pd.DataFrame([{'Type': 'GHG', 'target': data.GHG_TARGETS[yr_cal]}])
         
-    if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limit_GBF_2= pd.DataFrame([{'Type': 'GBF-2',  'target': data.get_GBF2_target_for_yr_cal(yr_cal)}])
 
     if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
@@ -865,6 +870,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         GBF8_species_indices=get_GBF8_species_conservation_indices(data,target_year),
 
         savanna_eligible_r=get_savanna_eligible_r(data),
+        hir_eligible_r=get_hir_eligible_r(data),
         priority_degraded_mask_idx=get_priority_degraded_mask_idx(data),
 
         economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs),
@@ -876,7 +882,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
             "BASE_YR Production (t)": get_BASE_YR_production_t(data),
             "BASE_YR GHG (tCO2e)": get_BASE_YR_GHG_t(data),
             "BASE_YR Water (ML)": get_BASE_YR_water_ML(data),
-            "BASE_YR Overall Bio (score)": get_BASE_YR_overall_bio_value(data),
+            "BASE_YR Bio quality (score)": get_BASE_YR_overall_bio_value(data),
             "BASE_YR GBF_2 (score)": get_BASE_YR_GBF2_score(data),
         },
         
