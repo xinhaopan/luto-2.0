@@ -4,22 +4,22 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250618_Paper2_Results'],
+    'TASK_NAME': ['20250618_Paper2_Results_test'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['60GB'],
-    'NCPUS': ['12'],
+    'MEM': ['30GB'],
+    'NCPUS': ['6'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['40:00:00'],
+    'TIME': ['3:00:00'],
 
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [5],
+    'RESFACTOR': [20],
     'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
