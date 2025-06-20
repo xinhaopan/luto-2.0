@@ -67,21 +67,34 @@ timestamp = tools.write_timestamp()
           
 def write_outputs(data: Data):
     """Write model outputs to file"""
-    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
+
+   # Start recording memory usage
+    stop_event = threading.Event()
+    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event))
     memory_thread.start()
     
-    write_data(data)
-    move_logs(data)
+    try:
+        write_data(data)
+        move_logs(data)
+    except Exception as e:
+        print(f"An error occurred while writing outputs: {e}")
+        raise e
+    finally:
+        # Ensure the memory logging thread is stopped
+        stop_event.set()
+        memory_thread.join()
 
 
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp}")
 def write_data(data: Data):
 
-    years = settings.SIM_YEARS
+    years = [i for i in settings.SIM_YEARS if i<=data.last_year]
+    data.set_path(years)
     paths = [f"{data.path}/out_{yr}" for yr in years]
+
     write_settings(data.path)
-    write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}')
+    write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}', data.last_year)
 
     # Wrap write to a list of delayed jobs
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
@@ -590,7 +603,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ag_transitions_cost_mat = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
     else:
         # Get the transition cost matrices for agricultural land-use
-        ag_transitions_cost_mat = ag_transitions.get_transition_matrices_ag2ag_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
+        ag_transitions_cost_mat = ag_transitions.get_transition_matrices_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
 
     # Convert the transition cost matrices to a DataFrame
     cost_dfs = []
@@ -647,7 +660,6 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             for k in NON_AG_LAND_USES.keys()
         }
     else:
-        ag_t_mrj = ag_transitions.get_transition_matrices_ag2ag_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
         non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
             data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
         )
@@ -704,12 +716,11 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
                                         for k in NON_AG_LAND_USES.keys()}
     else:
-        non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_nonag2ag(data,
+        non_ag_transitions_cost_mat = non_ag_transitions.get_to_ag_transition_matrix(data,
                                                                                     yr_idx,
                                                                                     data.lumaps[yr_cal_sim_pre],
                                                                                     data.lmmaps[yr_cal_sim_pre],
                                                                                     separate=True)
-
 
     cost_dfs = []
     for non_ag_type in non_ag_transitions_cost_mat:
@@ -822,13 +833,12 @@ def write_dvar_area(data: Data, yr_cal, path):
     df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{yr_cal}.csv'), index = False)
 
 
-def write_area_transition_start_end(data: Data, path):
+def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
     print(f'Save transition matrix between start and end year\n')
 
     # Get the end year
     yr_cal_start = data.YR_CAL_BASE
-    yr_cal_end = settings.SIM_YEARS[-1]
 
     # Get the decision variables for the start year
     dvar_base = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
@@ -940,7 +950,7 @@ def write_water(data: Data, yr_cal, path):
     print(f'Writing water outputs for {yr_cal}')
 
     yr_idx = yr_cal - data.YR_CAL_BASE
-
+    
     # Get water water yield historical level, and the domestic water use
     w_limit_inside_luto = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
     domestic_water_use = data.WATER_USE_DOMESTIC
@@ -1005,13 +1015,13 @@ def write_water(data: Data, yr_cal, path):
             + wny_outside_luto_study_area_base_yr.sel(region=reg_name).values
             - domestic_water_use[reg_idx]
         )
-
+        
         wny_limit_region = (
             w_limit_inside
             + wny_outside_luto_study_area_base_yr.sel(region=reg_name).values
-            - domestic_water_use[reg_idx]
+            - domestic_water_use[reg_idx]   
         )
-
+        
         water_other_records = pd.concat([water_other_records, pd.DataFrame([{
             'Year': yr_cal,
             'Region': reg_name,
@@ -1123,7 +1133,7 @@ def write_biodiversity_overall_priority_scores(data: Data, yr_cal, path):
 def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
     # Do nothing if biodiversity limits are off and no need to report
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
         return
 
     print(f'Writing biodiversity GBF2 scores (PRIORITY) for {yr_cal}')
@@ -1139,7 +1149,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
     # Get the priority degraded areas score
     priority_degraded_area_score_r = xr.DataArray(
-        ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
+        data.BIO_PRIORITY_DEGRADED_AREAS_R,
         dims=['cell'],
         coords={'cell':range(data.NCELLS)}
     ).chunk({'cell': min(4096, data.NCELLS)}) # Chunking to save mem use
@@ -1164,8 +1174,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     )
 
     # Get the total area of the priority degraded areas
-    total_priority_degraded_area = (data.BIO_PRIORITY_DEGRADED_AREAS_MASK * data.REAL_AREA).sum()
-    real_area_xr = xr.DataArray(data.REAL_AREA, dims=['cell'],coords={'cell': range(data.NCELLS)})
+    total_priority_degraded_area = data.BIO_PRIORITY_DEGRADED_AREAS_R.sum()
 
     GBF2_score_ag = (priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
         ).sum(['cell','lm']
