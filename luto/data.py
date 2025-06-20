@@ -1105,11 +1105,11 @@ class Data:
         # GHG targets data.
         ###############################################################
         print("\tLoading GHG targets data...", flush=True)
-
-        self.GHG_TARGETS = pd.read_excel(
-            os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
-        )
-        self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
+        if settings.GHG_EMISSIONS_LIMITS != "off":
+            self.GHG_TARGETS = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
+            )
+            self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
 
 
 
@@ -1168,6 +1168,7 @@ class Data:
         self.CONNECTIVITY_SCORE = connectivity_score
 
         # Get the HCAS contribution scale (0-1)
+        settings.HABITAT_CONDITION = int(float(settings.HABITAT_CONDITION)) if str(settings.HABITAT_CONDITION).replace('.', '', 1).replace('-', '', 1).isdigit() and float(settings.HABITAT_CONDITION) == int(float(settings.HABITAT_CONDITION)) else settings.HABITAT_CONDITION
         match settings.HABITAT_CONDITION:
             case 10 | 25 | 50 | 75 | 90:
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HABITAT_CONDITION}'].to_dict()

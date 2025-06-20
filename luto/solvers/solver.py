@@ -557,7 +557,7 @@ class LutoSolver:
                 )
                 constr = self.gurobi_model.addConstr(
                     ag_man_vars_sum <= adoption_limit * all_vars_sum,
-                    name=f"const_ag_mam_adoption_limit_{am}_{j}",
+                    name=f"const_ag_mam_adoption_limit_{tools.am_name_snake_case(am)}_{j}",
                 )
 
                 self.adoption_limit_constraints.append(constr)

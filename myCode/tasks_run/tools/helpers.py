@@ -325,7 +325,10 @@ def create_run_folders(task_root_dir:str, col:str, n_workers:int):
     dst_dir = f'{task_root_dir}/{col}'
     # Copy the files from the source to the destination
     from_to_files = copy_folder_custom(src_dir, dst_dir, EXCLUDE_DIRS)
-    Parallel(n_jobs=n_workers)(delayed(shutil.copy2)(s, d) for s, d in from_to_files)
+    Parallel(n_jobs=n_workers)(
+        delayed(lambda s, d: (shutil.copy2(s, d), os.utime(d, (time.time(), time.time()))))(s, d)
+        for s, d in from_to_files
+    )
     # Create an output folder for the task
     os.makedirs(f'{dst_dir}/output', exist_ok=True)
 

@@ -17,11 +17,13 @@ import cairosvg
 from lxml import etree
 
 # --- 本地模块 ---
-from .config import *
+import tools.config as config
 from .tools import get_path, get_year
 
 
 plt.rcParams['font.sans-serif'] = ['Arial']
+plt.rcParams['font.family'] = 'Arial'
+plt.rcParams['font.size'] = 12
 
 def get_y_axis_ticks(min_value, max_value, desired_ticks=5):
     """
@@ -700,10 +702,10 @@ def create_cost_data(input_file: str):
     """
     将df_cost表中所有包含（M$）的列转换为长表格式
     """
-    file_path_cost = f"../output/01_{input_file}_summary.xlsx"
+    file_path_cost = f"{config.TASK_DIR}/carbon_price/excel/01_{input_file}_summary.xlsx"
     df_cost = pd.read_excel(file_path_cost)
     # 1. 过滤
-    df_cost = df_cost[df_cost["Year"] >= start_year].copy()
+    df_cost = df_cost[df_cost["Year"] >= config.START_YEAR].copy()
     # 筛选包含（M$）的列
     dollar_cols = [col for col in df_cost.columns if '（M$）' in col]
 
@@ -737,15 +739,11 @@ def create_cost_data(input_file: str):
     return long_df
 
 
-def plot_cost(input_file: str):
+def plot_origin_data(input_file: str):
     """
     将df_cost中包含（M$）的列转为长表并绘制分面图
     """
     long_df = create_cost_data(input_file)
-
-    # 设置matplotlib参数
-    plt.rcParams['font.family'] = 'Arial'
-    plt.rcParams['font.size'] = 12
 
     # 创建分面图
     p = (
@@ -778,7 +776,9 @@ def plot_cost(input_file: str):
             )
     )
     p.show()
-    p.save(f"../Graphs/{input_file}_cost.png", dpi=300)  # 保存图像为文件
+    output_dir = f"{config.TASK_DIR}/carbon_price/Graphs"
+    os.makedirs(output_dir, exist_ok=True)  # 确保输出目录存在
+    p.save(f"{output_dir}/{input_file}_cost.png", dpi=300)  # 保存图像为文件
     return p
 
 
@@ -1231,7 +1231,7 @@ from plotnine import ggplot, aes, geom_line, geom_point, labs, theme, element_te
 import pandas as pd
 import os
 
-def plot_all_columns(file_path,output_file=f"../Graphs/04_all_price_{suffix}.png"):
+def plot_all_columns(df):
     """
     将表中的所有列绘制为点线图。
 
@@ -1239,9 +1239,7 @@ def plot_all_columns(file_path,output_file=f"../Graphs/04_all_price_{suffix}.png
     - output_file_dir: 输出图像文件的目录。如果提供，则保存所有图像。
     """
     # 读取数据
-    df = pd.read_excel(file_path)
-
-    data = df[df["Year"] >= start_year].copy()
+    data = df[df["Year"] >= config.START_YEAR].copy()
     print(data)
     long_data = data.melt(
         id_vars=["Year"],
@@ -1276,6 +1274,7 @@ def plot_all_columns(file_path,output_file=f"../Graphs/04_all_price_{suffix}.png
 
     # 保存图像
     plot.show()
+    output_file = f"{config.TASK_DIR}/carbon_price/Graphs/01_all_columns_plot.png"
     plot.save(output_file, dpi=300)
     print(f"Saved plot to {output_file}")
 
@@ -1453,3 +1452,4 @@ def plot_boxplot(arr_name: str, year: int = 2050, scale_type: str = 'symlog', li
 
     return p
 
+def plot_process_data(input_file)

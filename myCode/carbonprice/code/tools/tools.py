@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import re
 import rasterio
+import tools.config as config
 
 
 def get_year(path_name):
@@ -17,7 +18,7 @@ def get_year(path_name):
     return []
 
 def get_path(path_name):
-    output_path = f"../../../output/{path_name}/output"
+    output_path = f"{config.TASK_DIR}/{path_name}/output"
     try:
         if os.path.exists(output_path):
             subdirectories = os.listdir(output_path)

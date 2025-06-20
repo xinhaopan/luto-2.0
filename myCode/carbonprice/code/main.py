@@ -1,20 +1,19 @@
 from joblib import Parallel, delayed
-from tools.config import n_jobs, input_files,suffix
+import tools.config as config
 from tools import run_analysis_pipeline, draw_plots
 from tools.helper_plot import merge_png_images,plot_all_columns,plot_revenue_cost_faceted
 from tools.helper_data import calculate_bio_price
 
-Parallel(n_jobs=n_jobs)(
+Parallel(n_jobs=config.N_JOBS)(
     delayed(lambda input_file: (run_analysis_pipeline(input_file, True), draw_plots(input_file)))(input_file)
-    for input_file in input_files
+    for input_file in config.INPUT_FILES
 )
 
-# for input_file in input_files:
-#     # run_analysis_pipeline(input_file, False)
+# for input_file in config.INPUT_FILES:
+#     run_analysis_pipeline(input_file, False)
 #     draw_plots(input_file)
-calculate_bio_price(input_files)
+df = calculate_bio_price(config.INPUT_FILES)
 
-file_path = f"../output/03_price_{suffix}.xlsx"
-plot_all_columns(file_path)
+plot_all_columns(df)
 merge_png_images('cost',index="01_")
-plot_revenue_cost_faceted(input_files)
+plot_revenue_cost_faceted(config.INPUT_FILES)
