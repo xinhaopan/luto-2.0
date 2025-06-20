@@ -1049,7 +1049,7 @@ def write_biodiversity(data: Data, yr_cal, path):
     Write biodiversity info for a given year ('yr_cal'), simulation ('sim')
     and output path ('path').
     """
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
         return
 
     # Check biodiversity limits and report
@@ -2079,7 +2079,7 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
     else:
         # Get the transition cost matrices for agricultural land-use
-        ag_transitions_cost_mat = ag_transitions.get_transition_matrices_ag2ag_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
+        ag_transitions_cost_mat = ag_transitions.get_transition_matrices_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
 
     cost_dfs = []
     # Convert the transition cost matrices to a DataFrame
@@ -2125,7 +2125,6 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             for k in NON_AG_LAND_USES.keys()
         }
     else:
-        ag_t_mrj = ag_transitions.get_transition_matrices_ag2ag_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
         non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
             data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
         )
@@ -2175,7 +2174,7 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             k: {'Transition cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
             for k in NON_AG_LAND_USES.keys()}
     else:
-        non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_nonag2ag(data,
+        non_ag_transitions_cost_mat = non_ag_transitions.get_to_ag_transition_matrix(data,
                                                                                         yr_idx,
                                                                                         data.lumaps[yr_cal_sim_pre],
                                                                                         data.lmmaps[yr_cal_sim_pre],
@@ -2394,7 +2393,7 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
 
 def write_GBF2_npy(data: Data, yr_cal, path):
     print(f'Writing GBF2 biodiversity outputs for {yr_cal}')
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
         return
     # Unpack the ag managements and land uses
     am_lu_unpack = [
@@ -2412,10 +2411,10 @@ def write_GBF2_npy(data: Data, yr_cal, path):
 
     # Get the priority degrade areas scores
     priority_degraded_area_score_r = xr.DataArray(
-        ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
+        data.BIO_PRIORITY_DEGRADED_AREAS_R,
         dims=['cell'],
         coords={'cell': range(data.NCELLS)}
-    ).chunk({'cell': min(4096, data.NCELLS)}) # Chunking to save mem use
+    ).chunk({'cell': min(4096, data.NCELLS)})  # Chunking to save mem use
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
@@ -2437,9 +2436,6 @@ def write_GBF2_npy(data: Data, yr_cal, path):
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
             'cell': range(data.NCELLS)}
     )
-    # Get the total area of the priority degraded areas
-    total_priority_degraded_area = (data.BIO_PRIORITY_DEGRADED_AREAS_MASK * data.REAL_AREA).sum()
-    real_area_xr = xr.DataArray(data.REAL_AREA, dims=['cell'], coords={'cell': range(data.NCELLS)})
 
     bio_ag_r = (priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
                      ).sum(['lm', 'lu'])

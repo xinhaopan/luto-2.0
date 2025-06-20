@@ -45,7 +45,7 @@ def get_first_subfolder_name(output_path="output"):
 
 # 调用函数并加载数据
 # pkl_path = get_first_subfolder_name("output")
-pkl_path = 'output/2025_06_17__14_31_54_RF15_2010-2050/data_with_solution.gz'
+pkl_path = 'output/2025_06_20__20_48_46_RF13_2010-2050/data_with_solution.gz'
 print_with_time(f"PKL file path: {pkl_path}")
 if not pkl_path or not os.path.exists(pkl_path):
     raise FileNotFoundError(f"PKL file does not exist at path: {pkl_path}")

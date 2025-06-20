@@ -4,18 +4,19 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['HPC_test'],
+    'TASK_NAME': ['20250620_Paper1_Results_test'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [2],
+    'NUMERIC_FOCUS': [0,2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['8GB'],
-    'NCPUS': ['2'],
-    'TIME': ['2:00:00'],
+    'MEM': ['30GB'],
+    'NCPUS': ['6'],
+    'WRITE_THREADS': ['2'],
+    'TIME': ['3:00:00'],
 
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
-    'SOLVE_WEIGHT_BETA': [0.99],
+    'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [15],
@@ -27,14 +28,15 @@ grid_search = {
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['low','medium','high1'],
+    'BIODIVERSTIY_TARGET_GBF_2': ['low','medium','high'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
 
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_8': ['off'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [100],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
+    'HABITAT_CONDITION': [50],
 
     # ----------------------------------- Water settings --------------------------------
     'WATER_LIMITS': ['on'],
@@ -43,34 +45,11 @@ grid_search = {
 
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
-
-    # # ----------------------------------- Paper 1 settings --------------------------------
-    # 'NON_AG_LAND_USES' : [{
-    #     'Environmental Plantings': True,
-    #     'Riparian Plantings': True,
-    #     'Sheep Agroforestry': True,
-    #     'Beef Agroforestry': True,
-    #     'Carbon Plantings (Block)': True,
-    #     'Sheep Carbon Plantings (Belt)': True,
-    #     'Beef Carbon Plantings (Belt)': True,
-    #     'BECCS': False,
-    #     'Destocked - natural land': False,
-    # }],
-    #
-    # 'AG_MANAGEMENTS' : [{
-    #     'Asparagopsis taxiformis': True,
-    #     'Precision Agriculture': True,
-    #     'Ecological Grazing': False,
-    #     'Savanna Burning': True,
-    #     'AgTech EI': True,
-    #     'Biochar': True,
-    #     'HIR - Beef': False,
-    #     'HIR - Sheep': False,
-    # }]
 }
 settings_name_dict = {
     'GHG_EMISSIONS_LIMITS':'GHG',
     'BIODIVERSTIY_TARGET_GBF_2':'BIO',
+    'NUMERIC_FOCUS': 'FOCUS',
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
