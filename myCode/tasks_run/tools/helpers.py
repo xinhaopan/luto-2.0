@@ -68,6 +68,8 @@ def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
 
 
 def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI','HPC'], max_concurrent_tasks):
+    if platform == 'HPC':
+        time.sleep(40)  # 确保目录创建完成
     # 复制bash和python脚本到对应目录
     shutil.copyfile('bash_scripts/python_script.py', f'{task_root_dir}/{col}/python_script.py')
     if platform == 'NCI':

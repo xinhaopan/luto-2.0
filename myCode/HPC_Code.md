@@ -1,10 +1,13 @@
 切换到常用的目录
 ```
-cd /home/remote/s222552331/LUTO_XH/LUTO2/output
+cd /home/remote/s222552331/LUTO2_XH/LUTO2
+```
+```
+rm -rf output/20250620*/
 ```
 查询作业状态
 ```
-squeue -u $USER
+squeue --noheader --format="%.18i %.50j %.8u %.2t %.10M %.6D %R"
 ```
 取消任务
 ```

@@ -4,10 +4,10 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250620_Paper2_Results_test'],
+    'TASK_NAME': ['20250621_Paper2_Results_test'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [2],
+    'NUMERIC_FOCUS': [2,0],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['30GB'],
     'NCPUS': ['6'],
@@ -49,6 +49,7 @@ grid_search = {
 settings_name_dict = {
     'GHG_EMISSIONS_LIMITS':'GHG',
     'BIODIVERSTIY_TARGET_GBF_2':'BIO',
+    'NUMERIC_FOCUS': 'FOCUS',
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
