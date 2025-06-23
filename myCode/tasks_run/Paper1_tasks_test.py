@@ -4,16 +4,17 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250621_Paper1_Results_test'],
+    'TASK_NAME': ['20250623_Paper1_Results_test'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [2,0],
+    'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['30GB'],
     'NCPUS': ['6'],
     'WRITE_THREADS': ['2'],
     'TIME': ['3:00:00'],
 
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50, 100],
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
@@ -28,14 +29,14 @@ grid_search = {
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['low','medium','high'],
+    'BIODIVERSITY_TARGET_GBF_2': ['low','medium','high'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
 
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_8': ['off'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
+
     'HABITAT_CONDITION': [50],
 
     # ----------------------------------- Water settings --------------------------------
@@ -48,8 +49,8 @@ grid_search = {
 }
 settings_name_dict = {
     'GHG_EMISSIONS_LIMITS':'GHG',
-    'BIODIVERSTIY_TARGET_GBF_2':'BIO',
-    'NUMERIC_FOCUS': 'FOCUS',
+    'BIODIVERSITY_TARGET_GBF_2':'BIO',
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': 'PRI',
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
