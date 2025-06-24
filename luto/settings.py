@@ -564,7 +564,7 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 
 
 # Connectivity source source
-CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
+CONNECTIVITY_SOURCE = 'NCI'                 # 'DCCEEW_NCI', 'NATURAL_AREA_CONNECTIVITY' or 'NONE'
 '''
 The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
 This score is normalised between 0 (fartherst) and 1 (closest).

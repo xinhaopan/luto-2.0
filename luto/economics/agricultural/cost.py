@@ -505,6 +505,7 @@ def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
+    # Cost reduction due to reduced livestock density
     for m, lm in enumerate(data.LANDMANS):
         for j_idx, lu in enumerate(land_uses):
             # Quantity costs are reduced by `HIR_PRODUCTIVITY_CONTRIBUTION` under HIR
