@@ -10,7 +10,7 @@ COST_DICT = {
         'HIR - Beef',
         'HIR - Sheep'
     ],
-    'cost_non_ag': [
+    'cost_non-ag': [
         'Environmental Plantings',
         'Riparian Plantings',
         'Sheep Agroforestry',
@@ -24,17 +24,20 @@ COST_DICT = {
 }
 
 KEY_TO_COLUMN_MAP = {
-    "opportunity_cost": "Opportunity Cost(M$)",
-    "transition_ag2ag_cost": "Transition AG2AG Cost(M$)",
-    "transition_ag2non-ag_cost": "Transition AG2Non-AG Cost(M$)",
-    "am_net_cost": "AM Net Cost(M$)",
-    "non_ag_net_cost": "Non-AG Net Cost(M$)",
+    "opportunity_cost": "AG opportunity cost(M$)",
+    "am_net_cost": "AM net Cost(M$)",
+    "non-ag_net_cost": "NON-AG net cost(M$)",
+    "transition_cost": "Transition cost(M$)",
     "cost": "All cost(M$)",
-    "biodiversity_cost": "BIO cost(M$)",
-    "ghg": "GHG Abatement(MtCOe2)",
-    "bio": "BIO(Mha)",
-    "carbon_price": "carbon price($/tCOe2)",
-    "biodiversity_price": "biodiversity price($/ha)"
+    "ghg_ag": "AG carbon sequestration (MtCO2e)",
+    "ghg_am": "AM carbon sequestration (MtCO2e)",
+    "ghg_non-ag": "NON-AG carbon sequestration (MtCO2e)",
+    "ghg_tran": "Transition carbon sequestration (MtCO2e)",
+    "ghg": "Carbon sequestration (MtCO2e)",
+    "bio_ag": "AG biodiversity restoration (Mha)",
+    "bio_am": "AM biodiversity restoration (Mha)",
+    "bio_non-ag": "NON-AG biodiversity restoration (Mha)",
+    "bio": "Biodiversity restoration (Mha)",
 }
 
 # 创建 revenue_dict，主键从 cost 换成 revenue
@@ -59,5 +62,5 @@ NAME_DICT = {
 }
 
 START_YEAR = 2010
-COST_COLUMN = ["Agricultural Cost(M$)", "Agricultural Cost(M$)",  "Non-agricultural Cost(M$)", "Transition cost(M$)"]
+COST_COLUMN = ["AG opportunity cost(M$)", "AM net cost(M$)",  "NON-AG net cost(M$)", "Transition cost(M$)"]
 TASK_DIR = f'../../../output/{TASK_NAME}'

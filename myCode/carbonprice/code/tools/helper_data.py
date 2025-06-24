@@ -55,16 +55,16 @@ def apply_sum_on_files_with_prefix(path_dir, file_prefix):
     对路径下所有以指定前缀开头的文件进行加法运算。
 
     :param path_dir: 文件所在的目录
-    :param file_prefix: 文件名前缀（如 'cost_non_ag'）
+    :param file_prefix: 文件名前缀（如 'cost_non-ag'）
     :return: 所有以指定前缀开头的文件内容的总和
     """
     # 获取目录下所有以指定前缀开头的文件名
     # 创建一个包含 cost_dict 和 revenue_dict 的字典
     combined_dict = {
         'cost_am': config.COST_DICT.get('cost_am', []),
-        'cost_non_ag': config.COST_DICT.get('cost_non_ag', []),
+        'cost_non-ag': config.COST_DICT.get('cost_non-ag', []),
         'revenue_am': config.REVENUE_DICT.get('revenue_am', []),
-        'revenue_non_ag': config.REVENUE_DICT.get('revenue_non_ag', [])
+        'revenue_non-ag': config.REVENUE_DICT.get('revenue_non-ag', [])
     }
 
     # 优化后的逻辑
@@ -95,14 +95,14 @@ def process_and_save(path_dir, save_path, prefix, year, rows_nums):
 
     :param path_dir: 文件所在的目录
     :param save_path: 保存 .npy 文件的路径
-    :param prefix: 文件名前缀（如 'cost_ag', 'cost_non_ag' 等）
+    :param prefix: 文件名前缀（如 'cost_ag', 'cost_non-ag' 等）
     :param year: 当前年份，用于命名保存的文件
     :param rows_nums: 用于存储各项结果的列表
     :return: 更新后的 rows_nums
     """
     arr = apply_sum_on_files_with_prefix(path_dir, prefix)
     if arr is None:
-        print(f"No valid data found for {prefix} in year {year}")
+        print(f"No valid data found for {path_dir}: {prefix} in year {year}")
         arr = np.zeros(1)
 
     rows_nums.append(np.sum(arr) / 1000000)
@@ -131,7 +131,7 @@ def process_files_with_operations(path_dir, save_path, files_with_ops, file_pref
     arr = apply_operations_on_files(path_dir, files_with_ops)
 
     if arr is None:
-        print(f"No valid data found for {file_prefix} in year {year}")
+        print(f"No valid data found for {path_dir} {file_prefix} in year {year}")
         row_data[file_prefix] = 0
         return row_data
 
@@ -142,6 +142,7 @@ def process_files_with_operations(path_dir, save_path, files_with_ops, file_pref
     # 保存结果到 .npy 文件
     if file_prefix.endswith('_'):
         file_prefix = file_prefix[:-1]
+    os.makedirs(save_path, exist_ok=True)  # 确保保存路径存在
     np.save(os.path.join(save_path, f"{file_prefix}_{year}.npy"), arr)
 
     # 将结果添加到 row_data 字典，按百万单位
@@ -185,7 +186,7 @@ def process_year_data(year, path, categories, column_keywords):
         year_data[category] = total_sum
     return year_data
 
-def amortize_costs(input_file, file_name = "cost_transition_ag2non_ag", rate=0.07, horizon=30):
+def amortize_costs(input_file, file_name = "cost_transition_ag2non-ag", rate=0.07, horizon=30):
     """
     计算成本均摊并保存新的成本数组。
 
@@ -232,19 +233,18 @@ def calculate_baseline_costs(input_file, use_parallel=False,output=True):
     years=get_year(path_name)
     # 初始化结果列表
 
-    columns_name = ["Year", "cost_ag(M$)", "cost_am(M$)", "cost_non_ag(M$)", "cost_transition_ag2ag(M$)","cost_transition_ag2non_ag(M$)",
-                    "cost_amortised_transition_ag2non_ag(M$)","revenue_ag(M$)","revenue_am(M$)","revenue_non_ag(M$)",
+    columns_name = ["Year", "cost_ag(M$)", "cost_am(M$)", "cost_non-ag(M$)", "cost_transition_ag2ag(M$)","cost_transition_ag2non-ag(M$)",
+                    "cost_amortised_transition_ag2non-ag(M$)","revenue_ag(M$)","revenue_am(M$)","revenue_non-ag(M$)",
                     "GHG_ag(MtCOe2)", "GHG_am(MtCOe2)", "GHG_non-ag(MtCOe2)", "GHG_transition(MtCOe2)",
-                    "BIO_ag(M ha)", "BIO_am(M ha)", "BIO_non_ag(M ha)"]
+                    "BIO_ag(M ha)", "BIO_am(M ha)", "BIO_non-ag(M ha)"]
 
-    save_path = os.path.join(path_name, "data_for_carbon_price")
+    save_path = os.path.join(path_name, "origin_carbon_price_arr")
     os.makedirs(save_path, exist_ok=True)
 
     prefixes = columns_name[1:]
 
     # 生成所有 (year, prefix) 任务
-    tasks = [
-        (year, re.match(r"([^\(]+)", prefix).group(1).strip())
+    tasks = [(year, re.match(r"([^\(]+)", prefix).group(1).strip())
         for year in range(years[0], years[-1] + 1)
         for prefix in prefixes
     ]
@@ -290,12 +290,10 @@ def calculate_baseline_costs(input_file, use_parallel=False,output=True):
 def compute_unit_prices(input_file, output=True):
     path_name = get_path(input_file)
     years = get_year(path_name)
-    path_dir = os.path.join(path_name, "data_for_carbon_price")
-    save_path = os.path.join(path_name, "data_for_carbon_price")
+    path_dir = os.path.join(path_name, "origin_carbon_price_arr")
+    save_path = os.path.join(path_name, "carbon_price_arr")
     print("Start to calculate unit price.")
 
-    # 定义固定的字段名称，确保顺序和一致性
-    columns_name = ["Year"] + config.COST_COLUMN + ["All cost(M$)", "GHG Abatement(MtCOe2)", "BIO(Mha)"]
     results = []
 
     for year in trange(years[1], years[-1] + 1):
@@ -313,19 +311,35 @@ def compute_unit_prices(input_file, output=True):
                                                  "am_net_cost", year, row_data)
 
         row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("revenue_non_ag_" + str(year), '-'),
-                                                  ("cost_non_ag_" + str(year), '+')],
-                                                 "non_ag_net_cost", year, row_data)
+                                                 [("revenue_non-ag_" + str(year), '-'),
+                                                  ("cost_non-ag_" + str(year), '+')],
+                                                 "non-ag_net_cost", year, row_data)
 
         row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("cost_amortised_transition_ag2non_ag_" + str(year), '+'),("cost_transition_ag2ag_" + str(year), '+')],
+                                                 [("cost_amortised_transition_ag2non-ag_" + str(year), '+'),("cost_transition_ag2ag_" + str(year), '+')],
                                                  "transition_cost", year, row_data)
 
 
-        row_data = process_files_with_operations(path_dir, save_path,
+        row_data = process_files_with_operations(save_path, save_path,
                                                  [("opportunity_cost_" + str(year), '+'), ("transition_cost_" + str(year), '+'),
-                                                  ("am_net_cost_" + str(year), '+'),("non_ag_net_cost_" + str(year), '+')],
+                                                  ("am_net_cost_" + str(year), '+'),("non-ag_net_cost_" + str(year), '+')],
                                                  "cost", year, row_data)
+
+        row_data = process_files_with_operations(path_dir, save_path,
+                                                 [("GHG_ag_" + str(year), '+'), ("GHG_ag_" + str(year - 1), '-')],
+                                                 "ghg_ag", year, row_data, negate=True)
+
+        row_data = process_files_with_operations(path_dir, save_path,
+                                                 [("GHG_am_" + str(year), '+')],
+                                                 "ghg_am", year, row_data, negate=True)
+
+        row_data = process_files_with_operations(path_dir, save_path,
+                                                 [("GHG_non-ag_" + str(year), '+')],
+                                                 "ghg_non-ag", year, row_data, negate=True)
+
+        row_data = process_files_with_operations(path_dir, save_path,
+                                                 [("GHG_transition_" + str(year), '+')],
+                                                 "ghg_tran", year, row_data, negate=True)
 
         row_data = process_files_with_operations(path_dir, save_path,
                                                  [("GHG_ag_" + str(year), '+'), ("GHG_ag_" + str(year - 1), '-'),
@@ -334,8 +348,20 @@ def compute_unit_prices(input_file, output=True):
                                                  "ghg", year, row_data, negate=True)
 
         row_data = process_files_with_operations(path_dir, save_path,
+                                                 [("BIO_ag_" + str(year), '+'),("BIO_ag_" + str(year - 1), '-')],
+                                                 "bio_ag", year, row_data, negate=False)
+
+        row_data = process_files_with_operations(path_dir, save_path,
+                                                 [("BIO_am_" + str(year), '+')],
+                                                 "bio_am", year, row_data, negate=False)
+
+        row_data = process_files_with_operations(path_dir, save_path,
+                                                 [("BIO_non-ag_" + str(year), '+')],
+                                                 "bio_non-ag", year, row_data, negate=False)
+
+        row_data = process_files_with_operations(path_dir, save_path,
                                                  [("BIO_ag_" + str(year), '+'),("BIO_ag_" + str(year - 1), '-'),
-                                                  ("BIO_am_" + str(year), '+'), ("BIO_non_ag_" + str(year), '+')],
+                                                  ("BIO_am_" + str(year), '+'), ("BIO_non-ag_" + str(year), '+')],
                                                  "bio", year, row_data, negate=False)
 
         # 将字典结果追加到列表
@@ -346,6 +372,7 @@ def compute_unit_prices(input_file, output=True):
     
     # 映射键到列名，确保顺序
     df_results.rename(columns=config.KEY_TO_COLUMN_MAP, inplace=True)
+    columns_name = ["Year"] + list(config.KEY_TO_COLUMN_MAP.values())
     df_results = df_results[columns_name]  # 按照 columns_name 排序
     output_dir = f"{config.TASK_DIR}/carbon_price/excel"
     os.makedirs(output_dir, exist_ok=True)
@@ -375,20 +402,22 @@ def calculate_year_data(year, ghg_bio_path, ghg_path):
         price_carbon = cost_ghg / ghg_arr
 
         # 保存每年的中间数据
-        save_data(f"../data/bio_cost_{year}.npy", cost_bio)
-        save_data(f"../data/carbon_cost_{year}.npy", cost_ghg)
-        save_data(f"../data/bio_price_{year}.npy", price_bio)
-        save_data(f"../data/carbon_price_{year}.npy", price_carbon)
-        save_data(f"../data/bio_{year}.npy", bio_arr)
-        save_data(f"../data/ghg_{year}.npy", ghg_arr)
+        output_dir = os.path.join(config.TASK_DIR, "carbon_price","data")
+        os.makedirs(output_dir, exist_ok=True)
+        save_data(f"{output_dir}/bio_cost_{year}.npy", cost_bio)
+        save_data(f"{output_dir}/carbon_cost_{year}.npy", cost_ghg)
+        save_data(f"{output_dir}/bio_price_{year}.npy", price_bio)
+        save_data(f"{output_dir}/carbon_price_{year}.npy", price_carbon)
+        save_data(f"{output_dir}/bio_{year}.npy", bio_arr)
+        save_data(f"{output_dir}/ghg_{year}.npy", ghg_arr)
 
         # 返回计算结果
         return {
             "Year": year,
             "Carbon cost(M$)": cost_ghg.sum() / 1e6,
             "Biodiversity cost(M$)": cost_bio.sum() / 1e6,
-            "GHG abatement(MtCO2e)": ghg_arr.sum() / 1e6,
-            "Biodiversity score(Mha)": bio_arr.sum() / 1e6,
+            "Carbon sequestration (MtCO2e)": ghg_arr.sum() / 1e6,
+            "Biodiversity restoration (Mha)": bio_arr.sum() / 1e6,
             "Carbon price($/tCO2e)": cost_ghg.sum() / ghg_arr.sum(),
             "Biodiversity price($/ha)": cost_bio.sum() / bio_arr.sum()
         }
@@ -412,13 +441,13 @@ def calculate_bio_price(input_files, enable_parallel=True, n_jobs=-1):
     # 获取路径和年份范围
     path_name = get_path(input_files[0])
     years = get_year(path_name)
-    ghg_bio_path = os.path.join(get_path(input_files[0]), "data_for_carbon_price")
-    ghg_path = os.path.join(get_path(input_files[1]), "data_for_carbon_price")
+    ghg_bio_path = os.path.join(get_path(input_files[0]), "carbon_price_arr")
+    ghg_path = os.path.join(get_path(input_files[1]), "carbon_price_arr")
 
     # 初始化结果 DataFrame
     df_columns = [
         "Year", "Carbon cost(M$)", "Biodiversity cost(M$)",
-        "GHG abatement(MtCO2e)", "Biodiversity score(Mha)",
+        "Carbon sequestration (MtCO2e)", "Biodiversity restoration (Mha)",
         "Carbon price($/tCO2e)", "Biodiversity price($/ha)"
     ]
 
@@ -456,13 +485,10 @@ def save_data(file_path, data):
     """
     保存中间数据，增加异常处理。
     """
-    try:
-        np.save(file_path, data)
-        output_tif = file_path.replace(".npy", ".tif")
-        proj_file = os.path.join(get_path(input_files[1]), "out_2050", "ammap_2050.tiff")
-        npy_to_map(file_path, output_tif, proj_file)
-    except Exception as e:
-        print(f"Failed to save file {file_path}: {e}")
+    np.save(file_path, data)
+    output_tif = file_path.replace(".npy", ".tif")
+    proj_file = os.path.join(get_path(config.INPUT_FILES[1]), "out_2050", "ammap_2050.tiff")
+    npy_to_map(file_path, output_tif, proj_file)
 
 def calculate_shadow_price(input_file,percentile_num=95,mask_use=True, output=True):
     print("Start to calculate Uniform carbon price.")

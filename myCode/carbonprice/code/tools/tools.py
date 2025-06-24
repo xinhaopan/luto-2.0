@@ -62,5 +62,5 @@ def npy_to_map(input_arr, output_tif, proj_file, fill_value=np.nan, shift=0, dty
     with rasterio.open(output_tif, 'w', **profile) as dst:
         dst.write(themap.astype(dtype), 1)
 
-    print(f"✅ 已保存为 GeoTIFF: {os.path.abspath(output_tif)}")
+    # print(f"✅ 已保存为 GeoTIFF: {os.path.abspath(output_tif)}")
     return output_tif  # 返回输出路径

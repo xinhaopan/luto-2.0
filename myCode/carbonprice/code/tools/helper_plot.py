@@ -702,7 +702,7 @@ def create_cost_data(input_file: str):
     """
     将df_cost表中所有包含（M$）的列转换为长表格式
     """
-    file_path_cost = f"{config.TASK_DIR}/carbon_price/excel/01_{input_file}_summary.xlsx"
+    file_path_cost = f"{config.TASK_DIR}/carbon_price/excel/01_origin_{input_file}.xlsx"
     df_cost = pd.read_excel(file_path_cost)
     # 1. 过滤
     df_cost = df_cost[df_cost["Year"] >= config.START_YEAR].copy()
@@ -1452,4 +1452,4 @@ def plot_boxplot(arr_name: str, year: int = 2050, scale_type: str = 'symlog', li
 
     return p
 
-def plot_process_data(input_file)
+
