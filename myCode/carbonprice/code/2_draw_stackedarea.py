@@ -1,3 +1,4 @@
+import numpy as np
 import tools.config as config
 
 import pandas as pd
@@ -9,6 +10,66 @@ import matplotlib as mpl
 import math
 
 sns.set_theme(style="ticks")
+
+def stacked_area_pos_neg(ax, df, colors=None, alpha=0.85):
+    """
+    在指定 `ax` 上绘制支持正/负值的堆叠面积图。
+
+    参数
+    ----
+    ax      : matplotlib.axes.Axes
+        目标子图
+    df      : pd.DataFrame
+        行为 X 轴（需为数值或日期），列为分类；可含正负值
+    colors  : list-like[str] | None
+        每列对应的颜色；若 None 使用 matplotlib 默认循环色
+    alpha   : float
+        填充透明度
+    font_size : int
+        轴刻度与标题字号
+    """
+    if colors is None:
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    # 若列多于颜色数，自动重复
+    if len(colors) < df.shape[1]:
+        colors = (colors * (df.shape[1] // len(colors) + 1))[:df.shape[1]]
+
+    # 准备累积数组
+    cum_pos = np.zeros(len(df))
+    cum_neg = np.zeros(len(df))
+
+    # 依次绘制每列
+    for idx, col in enumerate(df.columns):
+        y = df[col].values
+        color = colors[idx]
+
+        pos = np.where(y > 0, y, 0)       # 正值部分
+        neg = np.where(y < 0, y, 0)       # 负值部分 (负数)
+
+        # --- 正值向上堆叠 ---
+        ax.fill_between(df.index,
+                        cum_pos,
+                        cum_pos + pos,
+                        facecolor=color, alpha=alpha, label=col if pos.any() else None,
+                        linewidth=0)
+        cum_pos += pos
+
+        # --- 负值向下堆叠 ---
+        ax.fill_between(df.index,
+                        cum_neg,
+                        cum_neg + neg,     # 注意 neg 为负
+                        facecolor=color, alpha=alpha,
+                        linewidth=0)
+        cum_neg += neg
+
+    # 美化
+    # ax.axhline(0, color='black', linewidth=1)             # 0 基线
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+    ax.tick_params(direction='out')
+    for spine in ax.spines.values():
+        spine.set_color('black');  spine.set_linewidth(1.2)
+    ax.grid(False)
 
 def set_plot_style(font_size=12, font_family='Arial'):
     """
@@ -30,57 +91,28 @@ def set_plot_style(font_size=12, font_family='Arial'):
     })
 
 
-import matplotlib.pyplot as plt
-import pandas as pd
-
-
-def plot_stacked_area(ax, df, colors=None, font_size=10):
-    """
-    在指定 ax 上绘制堆叠面积图。
-
-    参数：
-    - ax: matplotlib 的轴对象
-    - df: DataFrame，行是 x 轴（例如年份），列是各分类的值
-    - colors: 自定义颜色列表
-    - font_size: 字体大小
-    """
-    # 使用 seaborn 风格
-    plt.style.use('seaborn-ticks')
-
-    # 堆叠图
-    ax.stackplot(df.index, df.values.T, labels=df.columns, colors=colors)
-
-    # 样式
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-    ax.tick_params(axis='both', labelsize=font_size, direction='out')
-    for spine in ax.spines.values():
-        spine.set_color('black')
-        spine.set_linewidth(1.2)
-
-    ax.grid(False)
-    ax.legend(loc='upper left', fontsize=font_size - 2)
 
 
 # ====== 使用方法 ======
 set_plot_style(font_size=12, font_family='Arial')
 
 df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_3_GHG_high_BIO_off.xlsx", index_col=0)
-df_ghg_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_3_GHG_high_BIO_off.xlsx", index_col=0)
+df_ghg_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_4_GHG_high_BIO_high.xlsx", index_col=0)
 df_ghg_bio = df_ghg_bio - df_ghg
 
 # --- 参数 ---
 n_cols = 2
-cols_list = df_ghg.columns  # 需要绘制的列
-n_rows = math.ceil(len(cols_list) / n_cols)  # 不包括图例行
+n_rows = 3
 
 # --- 建立画布 ---
 fig, axes = plt.subplots(n_rows, n_cols,
                          figsize=(4 * n_cols, 3.2 * (n_rows)),
                          constrained_layout=False)
 axes = axes.flatten()
-# 把多余的 Axes 关掉（不显示坐标轴、不占空间）
-for ax in axes[len(cols_list):]:  # len(cols_list) == 15
-    ax.axis('off')
 # --- 逐列作图 ---
-for idx, col in enumerate(cols_list):
+stacked_area_pos_neg(axes[0], df_ghg.iloc[:, :4], colors=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])
+stacked_area_pos_neg(axes[1], df_ghg_bio.iloc[:, :4], colors=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])
+stacked_area_pos_neg(axes[2], df_ghg.iloc[:, 5:9], colors=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])
+stacked_area_pos_neg(axes[3], df_ghg_bio.iloc[:, 10:13], colors=['#1f77b4', '#ff7f0e', '#2ca02c'])
+
+fig.show()

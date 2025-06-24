@@ -233,14 +233,6 @@ class LutoSolver:
                         dry_lu_cells, self._input_data.savanna_eligible_r
                     )
 
-                elif am_name == "hir_-_beef" or am_name == "hir_-_sheep":
-                    dry_lu_cells = np.intersect1d(
-                        dry_lu_cells, self._input_data.hir_eligible_r
-                    )
-                    irr_lu_cells = np.intersect1d(
-                        irr_lu_cells, self._input_data.hir_eligible_r
-                    )
-
                 for r in dry_lu_cells:
                     dry_x_lb = (
                         0
@@ -480,6 +472,7 @@ class LutoSolver:
             + self.penalty_biodiv * weight_biodiv
             + gp.LinExpr(0)         # Empty term in case no penalties are set
         ) / (weight_demand + weight_ghg + weight_water + weight_biodiv)
+
 
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
@@ -1584,14 +1577,6 @@ class LutoSolver:
                     )
                     eligible_irr_cells = np.intersect1d(
                         eligible_irr_cells, self._input_data.savanna_eligible_r
-                    )
-
-                elif am == "HIR - Beef" or am == "HIR - Sheep":
-                    eligible_dry_cells = np.intersect1d(
-                        eligible_dry_cells, self._input_data.hir_eligible_r
-                    )
-                    eligible_irr_cells = np.intersect1d(
-                        eligible_irr_cells, self._input_data.hir_eligible_r
                     )
 
                 for r in eligible_dry_cells:
