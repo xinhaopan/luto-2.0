@@ -255,13 +255,14 @@ def get_cost_destocked(data: Data, yr_cal: int) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        Cost of maintaining destocked land for each cell. Equivalent to maintaining unallocated land.
+        Cost of maintaining destocked land for each cell. Equivalent to maintaining environmental plantings.
+    Returns
         1-D array Indexed by cell.
     """
     return settings.EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal] * data.REAL_AREA
 
 
-def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap, yr_cal):
+def get_cost_matrix(data:Data, ag_c_mrj:np.ndarray, lumap:np.ndarray, yr_cal:int) -> np.ndarray:
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
 

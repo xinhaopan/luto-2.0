@@ -172,7 +172,7 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lm
         return t_mrj
 
 
-def get_transition_matrices_from_base_year(data: Data, yr_idx, base_year, separate=False):
+def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, separate=False):
     """
     Calculate the transition matrices for land-use and land management transitions.
     Args:

@@ -381,7 +381,7 @@ class Data:
 
         # Actual hectares per cell, including projection corrections.
         self.REAL_AREA_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "real_area.h5")).to_numpy()
-        self.REAL_AREA = self.REAL_AREA_NO_RESFACTOR[self.MASK] * self.RESMULT
+        self.REAL_AREA = self.REAL_AREA_NO_RESFACTOR[self.MASK] * self.RESMULT  # TODO: adjusting using 
 
         # Derive NCELLS (number of spatial cells) from the area array.
         self.NCELLS = self.REAL_AREA.shape[0]
@@ -392,11 +392,10 @@ class Data:
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
-        # self.LUMAP = self.AG_L_MRJ.sum(axis=0).argmax(axis=1).astype("int8")
         self.LU_RESFACTOR_CELLS = pd.DataFrame({
             'lu_code': list(self.DESC2AGLU.values()),
-            'res_size': [ceil((self.LUMAP_NO_RESFACTOR == lu_code).sum() / self.RESMULT) for _,lu_code in self.DESC2AGLU.items()
-            ]}).sort_values('res_size').reset_index(drop=True)
+            'res_size': [ceil((self.LUMAP_NO_RESFACTOR == lu_code).sum() / self.RESMULT) for _,lu_code in self.DESC2AGLU.items()]
+        }).sort_values('res_size').reset_index(drop=True)
         
         self.LUMAP = self.get_resfactored_lumap() if settings.RESFACTOR > 1 else self.LUMAP_NO_RESFACTOR[self.MASK]
         self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
@@ -702,9 +701,6 @@ class Data:
         # Non-agricultural data.
         ###############################################################
         print("\tLoading non-agricultural data...", flush=True)
-        
-        # Load HIR mask
-        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
@@ -1002,7 +998,7 @@ class Data:
         
         # Get the carbon stock of unallowcated natural land
         self.CO2E_STOCK_UNALL_NATURAL = np.array(
-            nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * fire_risk.to_numpy() / 100),
+            nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk).to_numpy() / 100),  # everyting minus the fire DAMAGE
         )
         
         
@@ -1149,9 +1145,9 @@ class Data:
         """
 
         biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'), where=self.MASK)
-        biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))
+        biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))                              
         
-        
+
         # ------------- Biodiversity priority scores for maximising overall biodiversity conservation in Australia ----------------------------
         
         # Get connectivity score
@@ -1166,7 +1162,8 @@ class Data:
                 connectivity_score = np.ones(self.NCELLS, dtype=np.float32)
             case _:
                 raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
-
+            
+        self.CONNECTIVITY_SCORE = connectivity_score
 
         # Get the HCAS contribution scale (0-1)
         settings.HABITAT_CONDITION = int(float(settings.HABITAT_CONDITION)) if str(settings.HABITAT_CONDITION).replace('.', '', 1).replace('-', '', 1).isdigit() and float(settings.HABITAT_CONDITION) == int(float(settings.HABITAT_CONDITION)) else settings.HABITAT_CONDITION
@@ -1185,8 +1182,8 @@ class Data:
         
         # Get the biodiversity contribution score 
         bio_contribution_raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values
-        
-        self.BIO_CONNECTIVITY_RAW = bio_contribution_raw * connectivity_score                                          
+
+        self.BIO_CONNECTIVITY_RAW = bio_contribution_raw * connectivity_score
         self.BIO_CONNECTIVITY_LDS = np.where(                                                                     
             self.SAVBURN_ELIGIBLE, 
             self.BIO_CONNECTIVITY_RAW * settings.BIO_CONTRIBUTION_LDS, 
@@ -1194,7 +1191,7 @@ class Data:
         )
         
 
-        
+
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
         if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         
@@ -1315,7 +1312,7 @@ class Data:
             snes_arr_likely = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_SEL, presence='LIKELY')
             snes_arr_likely_maybe = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE')
             snes_arr = xr.concat([snes_arr_likely, snes_arr_likely_maybe], dim='species')
-            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in snes_arr])
+            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in snes_arr]) 
         
         
         if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != 'off':
@@ -1401,20 +1398,7 @@ class Data:
         self.BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
         self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
 
-
-
-        ###############################################################
-        # HIR data.
-        ###############################################################
-        print("\tLoading HIR data...", flush=True)
-        
-        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK].astype(bool)
-
-
  
-        print("Data loading complete\n")     
-        
-           
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """
@@ -1504,23 +1488,23 @@ class Data:
             return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
 
 
-        lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)
+        lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)  
         for idx_lu in self.DESC2AGLU.values():
             for idx_w, _ in enumerate(self.LANDMANS):
                 arr_lu_lm = self.LUMAP_NO_RESFACTOR * self.LMMAP_NO_RESFACTOR
                 lumap_resample_avg[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr_consider_lu_mask(arr_lu_lm)
-
+                
         return lumap_resample_avg
-
-
+    
+    
     def get_exact_resfactored_lumap_mrj(self):
         """
         Rather than picking the center cell when resfactoring the lumap, this function
         calculate the exact value of each land-use cell based from lumap to create dvars.
-
+        
         E.g., given a resfactor of 5, then each resfactored dvar cell will cover a 5x5 area.
-        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25.
-
+        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25. 
+        
         """
         if settings.RESFACTOR == 1:
             return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
@@ -1530,12 +1514,12 @@ class Data:
             for idx_w, _ in enumerate(self.LANDMANS):
                 # Get the cells with the same ID and water supply
                 lu_arr = (self.LUMAP_NO_RESFACTOR == idx_lu) * (self.LMMAP_NO_RESFACTOR == idx_w)
-                lumap_mrj[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr(lu_arr)        
+                lumap_mrj[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr_consider_lu_mask(lu_arr)        
                     
         return lumap_mrj
     
     
-    def get_exact_resfactored_average_arr(self, arr: np.ndarray) -> np.ndarray:
+    def get_exact_resfactored_average_arr_consider_lu_mask(self, arr: np.ndarray) -> np.ndarray:
             
         arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)      # Create a 2D array of zeros with the same shape as the LUMAP_2D_FULLRES
         np.place(arr_2d, self.NLUM_MASK == 1, arr)                           # Place the values of arr in the 2D array where the LUMAP_2D_RESFACTORED is equal to idx_lu
@@ -1557,19 +1541,19 @@ class Data:
         # Reshape the 1D avg array to 2D array
         cell_avg_2d = cell_avg.reshape(self.LUMAP_2D_RESFACTORED.shape)
         return cell_avg_2d[mask_arr_2d_resfactor]
-
-
+    
+    
     def get_exact_resfactored_average_arr_without_lu_mask(self, arr: np.ndarray) -> np.ndarray:
-
+        
         arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)      # Create a 2D array of zeros with the same shape as the LUMAP_2D_FULLRES
         np.place(arr_2d, self.NLUM_MASK == 1, arr)                           # Place the values of arr in the 2D array where the LUMAP_2D_RESFACTORED is equal to idx_lu
-        arr_2d = np.pad(arr_2d, ((0, settings.RESFACTOR), (0, settings.RESFACTOR)), mode='reflect')
+        arr_2d = np.pad(arr_2d, ((0, settings.RESFACTOR), (0, settings.RESFACTOR)), mode='reflect')  
 
         arr_2d_xr = xr.DataArray(arr_2d, dims=['y', 'x'])
         arr_2d_xr_resfactored = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='trim').mean()
-        arr_2d_xr_resfactored = arr_2d_xr_resfactored.values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]]
+        arr_2d_xr_resfactored = arr_2d_xr_resfactored.values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]]  
 
-        mask_arr_2d_resfactor = (self.LUMAP_2D_RESFACTORED != self.NODATA) & (self.LUMAP_2D_RESFACTORED != self.MASK_LU_CODE)
+        mask_arr_2d_resfactor = (self.LUMAP_2D_RESFACTORED != self.NODATA) & (self.LUMAP_2D_RESFACTORED != self.MASK_LU_CODE) 
         return arr_2d_xr_resfactored[mask_arr_2d_resfactor]
 
 
@@ -1601,8 +1585,8 @@ class Data:
         )
       
         return lumap_resfactored[*nearst_ind]
- 
-    # Get the habitat condition score within priority degraded areas for base year (2010)
+    
+    
     def get_GBF2_target_for_yr_cal(self, yr_cal:int) -> float:
         """
         Get the target score for priority degrade areas conservation.
@@ -1617,7 +1601,7 @@ class Data:
         float
             The priority degrade areas conservation target for the given year.
         """
- 
+
         bio_habitat_score_baseline_sum = self.BIO_PRIORITY_DEGRADED_AREAS_R.sum()
         bio_habitat_score_base_yr_sum = self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R.sum()
         bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
@@ -1628,7 +1612,7 @@ class Data:
         ]
 
         targets_key_years = {
-            self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
+            self.YR_CAL_BASE: bio_habitat_score_base_yr_sum,
             **dict(zip(settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
         }
 
