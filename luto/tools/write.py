@@ -2045,8 +2045,8 @@ def write_rev_cost_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         rev_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], non_ag_rev_mat[:, index])
         cost_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], non_ag_cost_mat[:, index])
 
-        save_map_to_npy(data, rev_non_ag_r, f'revenue_non_ag_{non_ag}', yr_cal, path)
-        save_map_to_npy(data, cost_non_ag_r, f'cost_non_ag_{non_ag}', yr_cal, path)
+        save_map_to_npy(data, rev_non_ag_r, f'revenue_non-ag_{non_ag}', yr_cal, path)
+        save_map_to_npy(data, cost_non_ag_r, f'cost_non-ag_{non_ag}', yr_cal, path)
 
 
 def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
@@ -2162,7 +2162,7 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                     cost_dfs.append(full_cost_arr)
 
     summed_array_r = np.sum(cost_dfs, axis=0)
-    save_map_to_npy(data, summed_array_r, f'cost_transition_ag2non_ag', yr_cal, path)
+    save_map_to_npy(data, summed_array_r, f'cost_transition_ag2non-ag', yr_cal, path)
 
     # --------------------------------------------------------------------
     #              Non-agricultural land-use transition costs (from non-ag to ag)
@@ -2189,7 +2189,7 @@ def write_cost_transition_npy(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
 
     summed_array_r = np.sum(cost_dfs, axis=0)
-    save_map_to_npy(data, summed_array_r, f'cost_transition_non_ag2ag', yr_cal, path)
+    save_map_to_npy(data, summed_array_r, f'cost_transition_non-ag2ag', yr_cal, path)
 
 
 def write_GHG_npy(data: Data, yr_cal, path):
@@ -2284,7 +2284,7 @@ def write_map_npy(data: Data, yr_cal, path):
     non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0).astype(np.float32)
 
     save_map_to_npy(data, ag_man_dvar_argmax, f'am_map', yr_cal, path)
-    save_map_to_npy(data, non_ag_dvar_argmax, f'non_ag_map', yr_cal, path)
+    save_map_to_npy(data, non_ag_dvar_argmax, f'non-ag_map', yr_cal, path)
     save_map_to_npy(data, data.lumaps[yr_cal], f'lu_map', yr_cal, path)
     save_map_to_npy(data, data.lmmaps[yr_cal], f'lm_map', yr_cal, path)
 
@@ -2324,8 +2324,8 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
     rev_non_ag_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], sheep_agroforestry_contr)
     rev_non_ag_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], sheep_contr)
 
-    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non_ag_non_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
-    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
+    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non-ag_non-ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
+    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non-ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
 
 
     # rev_beef_agroforestry-------------------------------------------------------------------------------------------
@@ -2345,9 +2345,9 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
     rev_non_ag_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], beef_agroforestry_contr)
     rev_non_ag_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], beef_contr)
 
-    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non_ag_non_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal,
+    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non-ag_non-ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal,
                     path)
-    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
+    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non-ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
 
     # rev_sheep_carbon_plantings_belt-------------------------------------------------------------------------------------------
     sheep_j = tools.get_sheep_code(data)
@@ -2366,9 +2366,9 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
     rev_non_ag_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], sheep_cp_contr)
     rev_non_ag_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], sheep_contr)
 
-    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non_ag_non_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal,
+    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non-ag_non-ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal,
                     path)
-    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
+    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non-ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
 
     # rev_beef_carbon_plantings_belt-------------------------------------------------------------------------------------------
     beef_j = tools.get_beef_code(data)
@@ -2387,9 +2387,9 @@ def write_rev_non_ag_npy(data: Data, yr_cal, path):
     rev_non_ag_non_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], beef_cp_contr)
     rev_non_ag_ag_r = np.einsum('r,r->r', non_ag_dvar[:, index], beef_contr)
 
-    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non_ag_non_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal,
+    save_map_to_npy(data, rev_non_ag_non_ag_r, f'revenue_non-ag_non-ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal,
                     path)
-    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non_ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
+    save_map_to_npy(data, rev_non_ag_ag_r, f'revenue_non-ag_ag_{data.NON_AGRICULTURAL_LANDUSES[index]}', yr_cal, path)
 
 def write_GBF2_npy(data: Data, yr_cal, path):
     print(f'Writing GBF2 biodiversity outputs for {yr_cal}')
@@ -2447,7 +2447,7 @@ def write_GBF2_npy(data: Data, yr_cal, path):
 
     save_map_to_npy(data, bio_ag_r, 'BIO_ag', yr_cal, path)
     save_map_to_npy(data, bio_am_r, 'BIO_am', yr_cal, path)
-    save_map_to_npy(data, bio_non_ag_r, 'BIO_non_ag', yr_cal, path)
+    save_map_to_npy(data, bio_non_ag_r, 'BIO_non-ag', yr_cal, path)
 
 def write_bio_score_npy(data: Data, yr_cal, path):
     yr_cal_previouse = sorted(data.lumaps.keys())[sorted(data.lumaps.keys()).index(yr_cal) - 1]
@@ -2480,6 +2480,6 @@ def write_bio_score_npy(data: Data, yr_cal, path):
 
     save_map_to_npy(data, priority_ag_r, 'PBIO_ag', yr_cal, path)
     save_map_to_npy(data, priority_am_r, 'PBIO_am', yr_cal, path)
-    save_map_to_npy(data, priority_non_ag_r, 'PBIO_non_ag', yr_cal, path)
+    save_map_to_npy(data, priority_non_ag_r, 'PBIO_non-ag', yr_cal, path)
 
 

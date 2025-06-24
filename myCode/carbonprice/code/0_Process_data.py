@@ -12,8 +12,6 @@ Parallel(n_jobs=config.N_JOBS)(
 # for input_file in config.INPUT_FILES:
 #     run_analysis_pipeline(input_file, False)
 #     draw_plots(input_file)
-df = calculate_bio_price(config.INPUT_FILES)
 
+df = calculate_bio_price(config.INPUT_FILES)
 plot_all_columns(df)
-merge_png_images('cost',index="01_")
-plot_revenue_cost_faceted(config.INPUT_FILES)
