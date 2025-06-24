@@ -96,7 +96,6 @@ class SolverInputData:
     GBF8_species_indices: dict[int, float]                              # Species indices - indexed by species (s).
 
     savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
-    hir_eligible_r: np.ndarray                                          # Cells that are eligible for the HIR agricultural management option. 
     priority_degraded_mask_idx: np.ndarray                              # Mask of priority degraded areas - indexed by cell (r).
 
     economic_contr_mrj: float                                           # base year economic contribution matrix.
@@ -382,7 +381,7 @@ def get_ag_ghg_t_mrj(data: Data, base_year):
 def get_ag_t_mrj(data: Data, target_index, base_year):
     print('Getting agricultural transition cost matrices...', flush = True)
     
-    ag_t_mrj = ag_transition.get_transition_matrices_from_base_year(
+    ag_t_mrj = ag_transition.get_transition_matrices_ag2ag_from_base_year(
         data, 
         target_index, 
         base_year
@@ -407,7 +406,7 @@ def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, ag_t_mrj):
 def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
     print('Getting non-agricultural to agricultural transition cost matrices...', flush = True)
     
-    non_ag_to_ag_mrj = non_ag_transition.get_to_ag_transition_matrix(
+    non_ag_to_ag_mrj = non_ag_transition.get_transition_matrix_nonag2ag(
         data, 
         target_index, 
         data.lumaps[base_year], 
@@ -622,8 +621,6 @@ def get_BASE_YR_water_ML(data: Data) -> np.ndarray:
 def get_savanna_eligible_r(data: Data) -> np.ndarray:
     return np.where(data.SAVBURN_ELIGIBLE == 1)[0]
 
-def get_hir_eligible_r(data: Data) -> np.ndarray:
-    return np.where(data.HIR_MASK == 1)[0]
 
 def get_priority_degraded_mask_idx(data: Data) -> np.ndarray:
     if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
@@ -870,7 +867,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         GBF8_species_indices=get_GBF8_species_conservation_indices(data,target_year),
 
         savanna_eligible_r=get_savanna_eligible_r(data),
-        hir_eligible_r=get_hir_eligible_r(data),
         priority_degraded_mask_idx=get_priority_degraded_mask_idx(data),
 
         economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs),
