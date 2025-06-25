@@ -4,37 +4,37 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250625_Paper1_BIO_test_num0'],
+    'TASK_NAME': ['20250625_Paper1_BIO_RES3'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['30GB'],
-    'NCPUS': ['6'],
+    'MEM': ['64GB'],
+    'NCPUS': ['16'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['3:00:00'],
+    'TIME': ['40:00:00'],
 
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40,50,100],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'RESFACTOR': [15],
+    'RESFACTOR': [3],
     'SIM_YEARS': [[i for i in range(2010,2051,5)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['low'],
+    'GHG_EMISSIONS_LIMITS': ['low', 'medium', 'high'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSITY_TARGET_GBF_2': ['l1','l2','l3','l4'],
+    'BIODIVERSITY_TARGET_GBF_2': ['low', 'medium', 'high'],
     'GBF2_TARGETS_DICT': [{
-        'l1': {2030: 0.15,    2050: 0.25,    2100: 0.25},
-        'l2': {2030: 0.15,    2050: 0.30,    2100: 0.30},
-        'l3': {2030: 0.30,    2050: 0.30,    2100: 0.30},
-        'l4': {2030: 0.30,    2050: 0.50,    2100: 0.50},
+        'off': None,
+        'low': {2030: 0, 2050: 0, 2100: 0},
+        'medium': {2030: 0.15, 2050: 0.15, 2100: 0.15},
+        'high': {2030: 0.15, 2050: 0.25, 2100: 0.25},
     }],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
 
@@ -57,6 +57,7 @@ settings_name_dict = {
     'GHG_EMISSIONS_LIMITS':'GHG',
     'BIODIVERSITY_TARGET_GBF_2':'BIO',
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': 'PRI',
+    'RESFACTOR': 'RES',
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
