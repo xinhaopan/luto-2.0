@@ -1513,7 +1513,7 @@ def save_report_data(raw_data_dir:str):
             
             
     # ---------------- (GBF3) Biodiversity Major Vegetation Group score  ----------------
-    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_3 == 'off':
         pass
     else:
         filter_str = '''
@@ -1635,7 +1635,7 @@ def save_report_data(raw_data_dir:str):
             
             
     # ---------------- (GBF4) Biodiversity National Significance score  ----------------
-    if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == 'on':
+    if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'on':
         
         # Get biodiversity dataframe
         filter_str = '''
@@ -1753,7 +1753,7 @@ def save_report_data(raw_data_dir:str):
             
             
             
-    if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == 'on':
+    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'on':
         # Get biodiversity dataframe
         filter_str = '''
             category == "biodiversity" 
@@ -1869,7 +1869,7 @@ def save_report_data(raw_data_dir:str):
     # ---------------- (GBF8) Biodiversity suitability under differen climate change  ----------------
     
     # 1) Biodiversity suitability scores (GBF8) by group
-    if settings.BIODIVERSTIY_TARGET_GBF_8 == 'on':
+    if settings.BIODIVERSITY_TARGET_GBF_8 == 'on':
         
         # Get biodiversity dataframe
         filter_str = '''
