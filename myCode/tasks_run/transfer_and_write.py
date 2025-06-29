@@ -3,16 +3,16 @@ from tools.write_helper import write_repeat
 import time
 from joblib import Parallel, delayed
 
-print("starting transfer and write process...")
-# time.sleep(60*60*2)  # 等待7小时，确保服务器上的数据已经更新
 
+print("starting transfer and write process...")
+time.sleep(60*60*1.5)
 print("开始下载数据...")
-file_names = ["20250608_Paper1_results_windows_BIO3"]
+file_names = ["20250627_Paper1_Results, 20250627_Paper1_Results_1"]
 
 def process_file(file_name):
     try:
         print(f"\n{file_name}")
-        # download_all_data_gz(file_name)
+        download_all_data_gz(file_name,'NCI')
         print(f"\n{file_name}: 数据下载完成，开始写入输出...")
         write_repeat(f"../../output/{file_name}")
         print(f"\n{file_name}: 输出写入完成。")
@@ -21,7 +21,8 @@ def process_file(file_name):
         return file_name
     return file_name
 
-results = Parallel(n_jobs=3)(
+
+results = Parallel(n_jobs=2)(
     delayed(process_file)(file_name) for file_name in file_names
 )
 for name in results:

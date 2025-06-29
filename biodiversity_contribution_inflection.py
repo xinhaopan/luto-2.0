@@ -75,7 +75,7 @@ df_sorted['cumulative_biodiv_contribution'] = df_sorted['bio_contribution'].cums
 x = df_sorted['cumulative_area_percent'].values
 y = df_sorted['cumulative_biodiv_contribution'].values
 
-x_20 = 40
+x_20 = 50
 # 插值计算对应 y 值（生物多样性贡献）
 y_20 = np.interp(x_20, x, y)
 

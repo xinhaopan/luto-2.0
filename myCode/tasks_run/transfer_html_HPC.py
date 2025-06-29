@@ -65,7 +65,7 @@ def get_first_folder_and_download(sftp, remote_base_path, target_folder_name, lo
 # 主函数入口
 if __name__ == "__main__":
     # ---------- 1. 设置变量 ----------
-    base_name = "20250625_Paper1_BIO_test_num0"
+    base_name = "20250627_Paper1_Results_5years"
     local_csv_path = f"../../output/{base_name}/grid_search_template.csv"
 
     # 从 ssh_config 导入远程路径等设置

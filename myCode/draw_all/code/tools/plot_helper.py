@@ -661,7 +661,7 @@ def calculate_y_axis_range(data_dict, desired_ticks=5,use_parallel=True, n_jobs=
         return ((min_v, max_v), ticks)
 
 
-def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_land_use_movement_all.xlsx", yticks=None, fontsize=30):
+def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_land_use_movement_all.xlsx", yticks=None, fontsize=30, all_landuse=True):
     """
     绘制土地利用变化的极坐标图。
 
@@ -673,7 +673,8 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
     """
     # 读取 Excel 文件，地类是第一列
     df = pd.read_excel(result_file, sheet_name=input_file, header=[0, 1])
-
+    if not all_landuse:
+        df = df.sort_values((2050, 'Area (km2)'), ascending=False).head(5)
     # 确保列是多级索引
     if not isinstance(df.columns, pd.MultiIndex):
         raise ValueError("Excel文件的列必须是多级索引，第一级为年份，第二级为指标")
@@ -712,7 +713,7 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
 
         for year in years:
             try:
-                distance = land_use_data.loc[:, (year, 'Area×Distance')].values[0]
+                distance = land_use_data.loc[:, (year, 'Distance (km)')].values[0]
                 angle = land_use_data.loc[:, (year, 'Angle (degrees)')].values[0]
 
                 distances.append(distance)
@@ -771,7 +772,6 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
     labels_y = ax.get_yticklabels()
     ax.set_yticklabels(labels_y, fontname='Arial', fontsize=fontsize)
 
-
     # 在指定角度处添加完整标签
     for angle_deg in offset_angles:
         angle_rad = np.radians(angle_deg)
@@ -812,6 +812,10 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
     # 设置网格线的样式和粗细
     ax.grid(True, linestyle='--', linewidth=2, alpha=0.99)
 
+    # 在y轴0的位置标注单位
+    fig.text(x=0.54, y=0.51, s='km', fontsize=fontsize, fontname='Arial')
+
+
     # 设置径向网格线的粗细
     ax.xaxis.set_tick_params(width=3)
     ax.yaxis.set_tick_params(width=3)
@@ -823,6 +827,8 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
         output_file = f"../output/12_{input_file}_polar"
     else:
         output_file = f"../output/{output_file}"
+    if all_landuse:
+        output_file += "_all_landuse"
     print(output_file)
     fig.savefig(f'{output_file}.pdf', dpi=300, bbox_inches='tight')
     save_figure(fig, output_file)

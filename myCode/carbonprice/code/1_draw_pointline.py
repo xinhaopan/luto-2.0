@@ -117,14 +117,14 @@ for ax in axes[len(cols_list):]:  # len(cols_list) == 15
 # --- 逐列作图 ---
 for idx, col in enumerate(cols_list):
     if 'GHG' in col:
-        sns_two_df_comparison(ax=axes[idx], df1=df_ghg, df2=None, col=col, label1='Emission Targets',
-                              label2='Emission & BIO Targets')
+        sns_two_df_comparison(ax=axes[idx], df1=df_ghg, df2=None, col=col, label1='Emission targets',
+                              label2='Emission & biodiversity targets')
     elif 'Biodiversity' in col:
-        sns_two_df_comparison(ax=axes[idx], df1=None, df2=df_ghg_bio, col=col, label1='Emission Targets',
-                              label2='Emission & BIO Targets')
+        sns_two_df_comparison(ax=axes[idx], df1=None, df2=df_ghg_bio, col=col, label1='Emission targets',
+                              label2='Emission & biodiversity targets')
     else:
-        sns_two_df_comparison(ax=axes[idx], df1=df_ghg, df2=df_ghg_bio, col=col, label1='Emission Targets',
-                              label2='Emission & BIO Targets')
+        sns_two_df_comparison(ax=axes[idx], df1=df_ghg, df2=df_ghg_bio, col=col, label1='Emission targets',
+                              label2='Emission & biodiversity targets')
 
 # --- 全局微调间距 ---
 plt.subplots_adjust(left=0.1,  # 图像左边界（0 = 最左，1 = 最右）
