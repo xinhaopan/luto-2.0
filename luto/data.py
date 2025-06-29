@@ -209,7 +209,7 @@ class Data:
         
         # Combine ag and non-ag landuses
         self.ALL_LANDUSES = self.AGRICULTURAL_LANDUSES + self.NON_AGRICULTURAL_LANDUSES
-        self.ALLDESC2LU = {**self.AGLU2DESC, **self.DESC2NONAGLU}
+        self.ALLDESC2LU = {**self.DESC2AGLU, **self.DESC2NONAGLU}
         self.ALLLU2DESC = {**self.AGLU2DESC, **self.NONAGLU2DESC}
 
         # Some useful sub-sets of the land uses.
@@ -1012,9 +1012,9 @@ class Data:
         print(f"\tCalculating base year productivity...", flush=True)
         yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)        
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
-
-
-
+        
+        
+        
         # Place holders for base year values; will be filled in the input_data module.
         self.BASE_YR_economic_value = None
         self.BASE_YR_production_t = yr_cal_base_prod_data
@@ -1883,11 +1883,11 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def set_path(self, years) -> str:
+    def set_path(self) -> str:
         """Create a folder for storing outputs and return folder name."""
 
-
         # Create path name
+        years = [i for i in settings.SIM_YEARS if i<=self.last_year]
         self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
 
         # Get all paths
