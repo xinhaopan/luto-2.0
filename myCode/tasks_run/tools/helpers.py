@@ -67,9 +67,15 @@ def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
 
 
 
-def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI','HPC'], max_concurrent_tasks):
+def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI','HPC'], max_concurrent_tasks,model_name):
     # 复制bash和python脚本到对应目录
-    shutil.copyfile('bash_scripts/python_script.py', f'{task_root_dir}/{col}/python_script.py')
+    if model_name == 'Run':
+        script_name = 'python_script.py'
+    elif model_name == 'Write':
+        script_name = 'python_write_script.py'
+    else:
+        raise ValueError('model_name must be either "Run" or "Write"!')
+    shutil.copyfile(f'bash_scripts/{script_name}', f'{task_root_dir}/{col}/{script_name}')
     if platform == 'NCI':
         shutil.copyfile('bash_scripts/task_cmd.sh', f'{task_root_dir}/{col}/task_cmd.sh')
     elif platform == 'HPC':
@@ -106,15 +112,15 @@ def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI'
         with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
              open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
             if platform == 'Denethor':
-                result = subprocess.run(['python', 'python_script.py'],
+                result = subprocess.run(['python', script_name],
                                         cwd=f'{task_root_dir}/{col}',
                                         stdout=std_file, stderr=err_file)
             elif platform == 'NCI':
-                result = subprocess.run(['bash', 'task_cmd.sh'],
+                result = subprocess.run(['bash', 'task_cmd.sh',script_name],
                                         cwd=f'{task_root_dir}/{col}',
                                         stdout=std_file, stderr=err_file)
             elif platform == 'HPC':
-                result = subprocess.run(['bash', 'task_cmd_HPC.sh'],
+                result = subprocess.run(['bash', 'task_cmd_HPC.sh',script_name],
                                         cwd=f'{task_root_dir}/{col}',
                                         stdout=std_file, stderr=err_file)
             else:
@@ -244,7 +250,8 @@ def create_task_runs(
     platform:Literal['Denathor','NCI','HPC']='single',
     n_workers:int=4,
     max_concurrent_tasks:int=300,
-    use_parallel:bool=True
+    use_parallel:bool=True,
+    model_name:Literal['Run','Write']='Run'
 ) -> None:
     check_platform_system(platform)
     if platform == 'NCI':
@@ -271,7 +278,7 @@ def create_task_runs(
         create_run_folders(task_root_dir, col, n_workers)
         write_settings(f'{task_root_dir}/{col}', settings_dict)
         write_terminal_vars(f'{task_root_dir}/{col}', col, settings_dict)
-        submit_task(task_root_dir, col, platform, max_concurrent_tasks)
+        submit_task(task_root_dir, col, platform, max_concurrent_tasks,model_name)
 
 
     use_parallel = False if os.name == 'posix' else use_parallel

@@ -4,15 +4,14 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250625_Paper1_BIO_test_num0'],
+    'TASK_NAME': ['20250625_Paper1_BIO_test_RES3_years'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['30GB'],
+    'MEM': ['90GB'],
     'NCPUS': ['6'],
-    'WRITE_THREADS': ['2'],
-    'TIME': ['3:00:00'],
+    'WRITE_THREADS': ['3'],
+    'TIME': ['50:00:00'],
 
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40,50,100],
     # ---------------------------------- Model settings ------------------------------
@@ -20,8 +19,8 @@ grid_search = {
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'RESFACTOR': [15],
-    'SIM_YEARS': [[i for i in range(2010,2051,5)]],
+    'RESFACTOR': [3],
+    'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
     'GHG_EMISSIONS_LIMITS': ['low'],

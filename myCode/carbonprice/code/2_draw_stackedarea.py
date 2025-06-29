@@ -169,7 +169,7 @@ n_rows = 3
 
 # --- 建立画布 ---
 fig, axes = plt.subplots(n_rows, n_cols,
-                         figsize=(4.5 * n_cols, 4.4 * (n_rows)),
+                         figsize=(4.5 * n_cols, 4 * (n_rows)),
                          constrained_layout=False)
 axes = axes.flatten()
 # --- 逐列作图 ---
@@ -202,6 +202,6 @@ for i in [4, 5]:  # 第三行的两个图
     pos = axes[i].get_position()
     axes[i].set_position([pos.x0, pos.y0+0.015, pos.width, pos.height])
 
-
+plt.savefig(f"{config.TASK_DIR}/carbon_price/Paper_figure/2_draw_stackedarea.png", dpi=300, bbox_inches='tight')
 # fig.align_ylabels(axes)
 fig.show()

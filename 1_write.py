@@ -54,8 +54,6 @@ elif pkl_path == 1:
 else:
     # 如果文件存在，则加载并处理数据
     print_with_time(f"{pkl_path} Loading...")
-    # with open(pkl_path, 'rb') as f:
-    #     data = dill.load(f)
 
     with gzip.open(pkl_path, 'rb') as f:
         data = dill.load(f)

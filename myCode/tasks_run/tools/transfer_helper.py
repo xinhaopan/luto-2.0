@@ -3,6 +3,7 @@ import os
 import posixpath
 import stat
 from tqdm import tqdm
+from tools.ssh_config import ssh_config
 
 def ensure_local_dir_exists(path):
     abs_path = os.path.abspath(path)
@@ -54,12 +55,15 @@ def download_file(sftp, remote_path, local_path):
     if remote_size != local_size:
         raise ValueError(f"文件大小不一致: 远程{remote_size}字节，本地{local_size}字节")
 
-def download_all_data_gz(file_name):
-    linux_host = "gadi.nci.org.au"
-    linux_port = 22
-    linux_username = "xp7241"
-    private_key_path = r"C:\Users\s222552331\.ssh\id_rsa"
-    remote_base_dir = f"/g/data/jk53/LUTO_XH/LUTO2/output/{file_name}"
+def download_all_data_gz(file_name, platform="NCI"):
+    cfg = ssh_config(platform="HPC")
+    linux_host = cfg["linux_host"]
+    linux_port = cfg["linux_port"]
+    linux_username = cfg["linux_username"]
+    private_key_path = cfg["private_key_path"]
+    project_dir = cfg["project_dir"]
+
+    remote_base_dir = f"{project_dir}/{file_name}"
     local_base_dir = os.path.join(r"N:\LUF-Modelling\LUTO2_XH\LUTO2\output", file_name)
 
     # 建立连接
@@ -88,7 +92,7 @@ def download_all_data_gz(file_name):
 
             settings_path = os.path.dirname(os.path.dirname(os.path.dirname(rel_path)))
             local_settings_path = os.path.join(r"N:\LUF-Modelling\LUTO2_XH\LUTO2\output",settings_path, 'luto', 'settings.py')
-            remote_settings_path = os.path.join('/g/data/jk53/LUTO_XH/LUTO2/output',settings_path, 'luto', 'settings.py').replace('\\', '/')
+            remote_settings_path = os.path.join(project_dir,settings_path, 'luto', 'settings.py').replace('\\', '/')
             download_file(sftp, remote_settings_path, local_settings_path)
 
         print("全部下载完成！")

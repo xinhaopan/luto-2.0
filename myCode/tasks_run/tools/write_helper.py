@@ -89,7 +89,7 @@ def update_luto_code(run_path):
         else:
             shutil.copy2(src_item, dst_item)
 
-def write_repeat(task_root_dir,n_jobs=1):
+def write_repeat(task_root_dir,n_jobs=2):
     found, not_found = find_data_with_solution_all_subdirs(task_root_dir, n_jobs)
     tprint("有解:")
     for p in found:
