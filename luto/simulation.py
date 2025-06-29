@@ -75,12 +75,13 @@ def load_data() -> Data:
 
 @LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
 def run(
-    data: Data, 
-    years = sorted(settings.SIM_YEARS),
+    data: Data,
 ) -> None:
     """
     Run the simulation.
     """
+    # Get the years to run
+    years = sorted(settings.SIM_YEARS).copy()
 
     # Start recording memory usage
     stop_event = threading.Event()
@@ -91,7 +92,7 @@ def run(
         print('\n')
         print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
         # Insert the base year at the beginning of the years list if not already present
-        if data.YR_CAL_BASE not in years:
+        if data.YR_CAL_BASE not in years: 
             years.insert(0, data.YR_CAL_BASE)
         # Solve and write outputs
         solve_timeseries(data, years)
@@ -115,7 +116,7 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
         print( "-------------------------------------------------")
         print( f"Running for year {target_year}"   )
         print( "-------------------------------------------------\n")
-
+        
         start_time = time.time()
         input_data = get_input_data(data, base_year, target_year)
 
@@ -158,11 +159,11 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(target_year, data_type, prod_data)
-
+            
         data.last_year = target_year
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
-
+        
         if luto_solver.gurobi_model.Status != GRB.OPTIMAL:
             print('!' * 100)
             print(f"Warning: Gurobi solver did not find an optimal solution for year {target_year}. Status: {luto_solver.gurobi_model.Status}")
