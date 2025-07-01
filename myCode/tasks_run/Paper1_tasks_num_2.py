@@ -4,15 +4,15 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250629_Paper1_Results_years_5'],
+    'TASK_NAME': ['20250629_Paper1_Results_num_2'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['45GB'],
-    'NCPUS': ['3'],
+    'MEM': ['120GB'],
+    'NCPUS': ['8'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['10:00:00'],
+    'TIME': ['168:00:00'],
 
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     # ---------------------------------- Model settings ------------------------------
@@ -21,7 +21,7 @@ grid_search = {
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [3],
-    'SIM_YEARS': [[i for i in range(2010,2051,5)]],
+    'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
     'GHG_EMISSIONS_LIMITS': ['low','medium','high'],
@@ -52,6 +52,7 @@ grid_search = {
 settings_name_dict = {
     'GHG_EMISSIONS_LIMITS':'GHG',
     'BIODIVERSITY_TARGET_GBF_2':'BIO',
+    'NUMERIC_FOCUS': 'NUM'
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'

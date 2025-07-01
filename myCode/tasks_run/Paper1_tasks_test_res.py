@@ -9,10 +9,10 @@ grid_search = {
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['90GB'],
-    'NCPUS': ['6'],
+    'MEM': ['30GB'],
+    'NCPUS': ['2'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['60:00:00'],
+    'TIME': ['5:00:00'],
 
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     # ---------------------------------- Model settings ------------------------------

@@ -38,8 +38,8 @@ plot_Combination_figures(ghg_dict, output_png, input_files, plot_stacked_area, l
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
-csv_name, value_column_name, filter_column_name = 'biodiversity_GBF2_priority_scores', 'Area Weighted Score (ha)', 'Landuse'
-bio_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
+csv_name, value_column_name, filter_column_name = 'biodiversity_GBF2_priority_scores', 'Contribution Relative to Pre-1750 Level (%)', 'Landuse'
+bio_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Type'], condition_value=['Agricultural Landuse'], unit_adopt=False)
 bio_dict,legend_colors = get_colors(bio_dict, 'tools/land use colors.xlsx', sheet_name='ag')
 output_png = '../output/07_S1_BIO_ag.png'
 y_range, y_ticks = calculate_y_axis_range(bio_dict,4)
@@ -48,11 +48,11 @@ plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_area, l
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
-csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)', 'Landuse'
-water_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
+csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Water Net Yield (ML)', 'Landuse'
+water_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Type'], condition_value=['Agricultural Landuse'])
 water_dict,legend_colors = get_colors(water_dict, 'tools/land use colors.xlsx', sheet_name='ag')
 output_png = '../output/07_S1_Water_ag.png'
-y_range, y_ticks = calculate_y_axis_range(water_dict)
+y_range, y_ticks = calculate_y_axis_range(water_dict,3)
 plot_Combination_figures(water_dict, output_png, input_files, plot_stacked_area, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,

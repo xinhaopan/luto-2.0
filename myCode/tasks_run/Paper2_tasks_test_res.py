@@ -4,15 +4,15 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250629_Paper1_Results_years_5'],
+    'TASK_NAME': ['20250630_Paper2_Results_res13'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['45GB'],
-    'NCPUS': ['3'],
+    'MEM': ['30GB'],
+    'NCPUS': ['2'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['10:00:00'],
+    'TIME': ['5:00:00'],
 
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     # ---------------------------------- Model settings ------------------------------
@@ -20,8 +20,8 @@ grid_search = {
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [3],
-    'SIM_YEARS': [[i for i in range(2010,2051,5)]],
+    'RESFACTOR': [13],
+    'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
     'GHG_EMISSIONS_LIMITS': ['low','medium','high'],
@@ -29,7 +29,7 @@ grid_search = {
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSITY_TARGET_GBF_2': ['low','medium','high'],
+    'BIODIVERSITY_TARGET_GBF_2': ['high'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
     'GBF2_TARGETS_DICT': [{
         'low': {2030: 0, 2050: 0, 2100: 0},

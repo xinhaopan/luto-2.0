@@ -44,8 +44,7 @@ def main():
         write_log(f"Simulation completed. Peak memory usage: {simulation_memory:.2f} GB")
 
         # 保存数据并监控内存
-        years = [i for i in settings.SIM_YEARS if i <= data.last_year]
-        data.set_path(years)
+        data.set_path()
         pkl_path = f'{data.path}/data_with_solution.gz'
         write_log("Start saving data with solution...")
         _, save_data_memory = monitor_memory(sim.save_data_to_disk, data, pkl_path)
