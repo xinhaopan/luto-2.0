@@ -146,8 +146,8 @@ class LutoSolver:
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_constraints()
         self._add_regional_adoption_constraints()
-        self._add_water_usage_limit_constraints()
-
+        self._add_water_usage_limit_constraints() 
+           
 
     def _setup_ag_vars(self):
         print("    |__ setting up decision variables for agricultural land uses...")
@@ -175,7 +175,7 @@ class LutoSolver:
         self.X_non_ag_vars_kr = np.zeros(
             (self._input_data.n_non_ag_lus, self._input_data.ncells), dtype=object
         )
-
+        
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
@@ -254,7 +254,7 @@ class LutoSolver:
         4) [B] A single penalty scalar for biodiversity, minimises its deviation from the target.
         """
         print("    |__ Setting up decision variables for soft constraints...")
-
+        
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.V = self.gurobi_model.addMVar(self._input_data.ncms, lb=0, name="V") # force lb=0 to make sure demand penalties are positive; i.e., demand must be met or exceeded
 
@@ -412,35 +412,35 @@ class LutoSolver:
     def _setup_penalty_objectives(self):
         print("    |__ setting up objective for soft constraints...")
 
-        self.penalty_demand = 0
-        self.penalty_ghg = 0
-        self.penalty_water = 0
-        self.penalty_biodiv = 0
+        penalty_demand = 0
+        penalty_ghg = 0
+        penalty_water = 0
+        penalty_biodiv = 0
         
         weight_demand = 0
         weight_ghg = 0
         weight_water = 0
         weight_biodiv = 0
         
-        self.penalty_weight_sum = 0
+        penalty_weight_sum = 0
 
         # Get the penalty values for each sector
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             weight_demand = settings.SOLVER_WEIGHT_DEMAND
-            self.penalty_demand = (
+            penalty_demand = (
                 gp.quicksum(
-                    v * self._input_data.scale_factors['Demand'] * price
-                    for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
+                    self.V[c] * self._input_data.scale_factors['Demand'] * price
+                    for c, price in enumerate(self._input_data.economic_BASE_YR_prices)
                 ) 
                 * weight_demand
                 / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]
-                + 1
+                + 1 
             )
-
-
+        
+        
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             weight_ghg = settings.SOLVER_WEIGHT_GHG
-            self.penalty_ghg = (
+            penalty_ghg = (
                 self.E 
                  * self._input_data.scale_factors['GHG']
                  * weight_ghg
@@ -450,7 +450,7 @@ class LutoSolver:
         
         if settings.WATER_CONSTRAINT_TYPE == "soft":
             weight_water = settings.SOLVER_WEIGHT_WATER
-            self.penalty_water = (
+            penalty_water = (
                 gp.quicksum(v for v in self.W)
                  * self._input_data.scale_factors['Water']
                  * weight_water
@@ -460,7 +460,7 @@ class LutoSolver:
             
         if settings.GBF2_CONSTRAINT_TYPE == "soft":
             weight_biodiv = settings.SOLVER_WEIGHT_GBF2
-            self.penalty_biodiv = (
+            penalty_biodiv = (
                 self.B 
                  * self._input_data.scale_factors['GBF2']
                  * weight_biodiv
@@ -469,16 +469,16 @@ class LutoSolver:
             ) 
         
             
-        self.penalty_weight_sum = (weight_demand + weight_biodiv + weight_ghg + weight_water)
+        penalty_weight_sum = (weight_demand + weight_biodiv + weight_ghg + weight_water)
       
         return (
             (
-                (self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv)
-                / self.penalty_weight_sum
-                * settings.RESCALE_FACTOR
+                (penalty_demand + penalty_ghg + penalty_water + penalty_biodiv)
+                / penalty_weight_sum
+                * settings.RESCALE_FACTOR   
             )
-            if self.penalty_weight_sum > 0
-            else gp.LinExpr(0.0)  # Avoid division by zero if no penalties are set
+            if penalty_weight_sum > 0
+            else gp.LinExpr(0.0)  # Avoid null objective if no penalties are set
         )
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
@@ -646,20 +646,20 @@ class LutoSolver:
         ]
 
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            upper_bound_constraints = self.gurobi_model.addConstrs(
-                (
-                    (self._input_data.limits['demand_rescale'][c] - self.total_q_exprs_c[c]) <= self.V[c] 
-                    for c in range(self._input_data.ncms)
-                ),  name="demand_soft_bound_upper"
-                )
+            # upper_bound_constraints = self.gurobi_model.addConstrs(
+            #     (
+            #         (self._input_data.limits['demand_rescale'][c] - self.total_q_exprs_c[c]) <= self.V[c]
+            #         for c in range(self._input_data.ncms)
+            #     ),  name="demand_soft_bound_upper"
+            #     )
             lower_bound_constraints = self.gurobi_model.addConstrs(
                 (
-                    (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) <= self.V[c] 
+                    (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) == self.V[c]
                     for c in range(self._input_data.ncms)
                 ),  name="demand_soft_bound_lower"
             )
 
-            self.demand_penalty_constraints.extend(upper_bound_constraints.values())
+            # self.demand_penalty_constraints.extend(upper_bound_constraints.values())
             self.demand_penalty_constraints.extend(lower_bound_constraints.values())
 
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
@@ -731,10 +731,10 @@ class LutoSolver:
 
     def _add_water_usage_limit_constraints(self) -> None:
         
-        if settings.WATER_LIMITS != "on":
+        if settings.WATER_LIMITS != "on": 
             print("    |__ TURNING OFF water usage constraints ...")
             return
-
+        
         print("    |__ Adding constraints for water usage limits...")
         
         # Ensure water use remains below limit for each region
@@ -938,7 +938,7 @@ class LutoSolver:
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             print(f'      |__ Adding constraints <soft> for biodiversity GBF 2: {self._input_data.limits["GBF2"]:15,.0f}')
             constr = self.gurobi_model.addConstr(
-                self._input_data.limits["GBF2_rescale"] - self.bio_GBF2_expr <= self.B, 
+                self.bio_GBF2_expr - self._input_data.limits["GBF2_rescale"] == self.B,
                 name="bio_GBF2_priority_degraded_area_limit_soft"
             )
             self.bio_GBF2_constrs_soft.append(constr)
@@ -1222,7 +1222,7 @@ class LutoSolver:
         if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
             print("      |__ TURNING OFF constraints for regional adoption...")
             return
-
+                
         # Add adoption constraints for agricultural land uses
         reg_adopt_limits = self._input_data.limits["ag_regional_adoption"]
         for reg_id, j, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
@@ -1827,12 +1827,12 @@ class LutoSolver:
                     }
                 ),
                 "BIO (GBF4) SNES value (ha)":(
-                    {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'] for k,v in self.bio_GBF4_SNES_exprs.items()}
+                    {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'] for k,v in self.bio_GBF4_SNES_exprs.items()}                   
                     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"     
                     else 0
                 ),
                 "BIO (GBF4) ECNES value (ha)":(
-                    {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'] for k,v in self.bio_GBF4_ECNES_exprs.items()}
+                    {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'] for k,v in self.bio_GBF4_ECNES_exprs.items()}                  
                     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"    
                     else 0
                 ),
