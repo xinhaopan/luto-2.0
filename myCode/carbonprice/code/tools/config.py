@@ -61,6 +61,6 @@ NAME_DICT = {
     "cost": {"title": "Cost", "unit": "(MAU$)"},
 }
 
-START_YEAR = 2010
+START_YEAR = 2020
 COST_COLUMN = ["AG opportunity cost(M$)", "AM net cost(M$)",  "NON-AG net cost(M$)", "Transition cost(M$)"]
 TASK_DIR = f'../../../output/{TASK_NAME}'

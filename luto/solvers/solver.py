@@ -1508,25 +1508,25 @@ class LutoSolver:
 
         print("Completed solve, collecting results...\n", flush=True)
 
-        # Collect results
-        status = self.gurobi_model.Status
-        print(f"Solver status: {status}")
-        if status == gp.GRB.INFEASIBLE:
-            print("Model is infeasible. Running IIS analysis...\n")
-            try:
-                # 仅使用 Python API 中可用的 computeIIS()
-                self.gurobi_model.computeIIS()
-                self.gurobi_model.write("model.ilp.iis")
-                print("IIS result saved to model.ilp.iis")
-            except gp.GurobiError as e:
-                # 捕获意外错误，导出 LP 供手动检查
-                print(f"Error computing IIS: {e}")
-                self.gurobi_model.write("output/model_for_debug.lp")
-                print("Exported full LP model to model_for_debug.lp for manual inspection.")
-        else:
-            print(f"Solver status is {status} (not infeasible).")
-
-        # Collect results into a SolverSolution object
+        # # Collect results
+        # status = self.gurobi_model.Status
+        # print(f"Solver status: {status}")
+        # if status == gp.GRB.INFEASIBLE:
+        #     print("Model is infeasible. Running IIS analysis...\n")
+        #     try:
+        #         # 仅使用 Python API 中可用的 computeIIS()
+        #         self.gurobi_model.computeIIS()
+        #         self.gurobi_model.write("model.ilp.iis")
+        #         print("IIS result saved to model.ilp.iis")
+        #     except gp.GurobiError as e:
+        #         # 捕获意外错误，导出 LP 供手动检查
+        #         print(f"Error computing IIS: {e}")
+        #         self.gurobi_model.write("output/model_for_debug.lp")
+        #         print("Exported full LP model to model_for_debug.lp for manual inspection.")
+        # else:
+        #     print(f"Solver status is {status} (not infeasible).")
+        #
+        # # Collect results into a SolverSolution object
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
 

@@ -360,7 +360,7 @@ def sort_columns_by_priority(df):
     """
     # 解析列名
     parsed_columns = [parse_column_name(col) for col in df.columns]
-    order = {'Low': 0, 'Moderate': 1, 'High': 2}
+    order = {'low': 0, 'medium': 1, 'high': 2}
 
     # 对列按温度目标和百分比排序
     sorted_columns = sorted(parsed_columns, key=lambda x: (order[x[0]], order[x[1]]))
