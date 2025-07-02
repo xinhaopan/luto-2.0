@@ -51,9 +51,12 @@ def data2html(raw_data_dir):
     ####################################################  
 
     # Copy the html template to the report directory
-    shutil.copytree('luto/tools/report/data_tools/template_html', 
+    shutil.copytree('luto/tools/report/data_tools/template_html',
                     f'{report_dir}/REPORT_HTML',
                     dirs_exist_ok=True)
+    import time
+    t = time.time()
+    [os.utime(os.path.join(dp, f), (t, t)) for dp, _, files in os.walk(f'{report_dir}/REPORT_HTML') for f in files]
 
 
     ####################################################

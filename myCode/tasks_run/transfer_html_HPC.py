@@ -80,7 +80,7 @@ if __name__ == "__main__":
     sftp = paramiko.SFTPClient.from_transport(transport)
 
     # ---------- 2. 确认项目目录 ----------
-    base_names = ["20250629_Paper1_Results"]
+    base_names = ["20250702_Paper1_Results_res5","20250703_Paper1_Results_res5"]
     for base_name in base_names:
         print(f"[INFO] 处理任务: {base_name}")
         local_csv_path = f"../../output/{base_name}/grid_search_template.csv"

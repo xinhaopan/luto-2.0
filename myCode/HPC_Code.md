@@ -57,7 +57,6 @@ git reset --hard origin/master
 
 Res = 15, timeseries, 8GB,2CPU, 2h
 
-Res = 5, 48GB, 12CPU, 15h for RUN
-
+Res = 5, 35GB, 15h
 
 

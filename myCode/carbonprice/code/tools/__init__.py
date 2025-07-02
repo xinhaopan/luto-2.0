@@ -14,8 +14,8 @@ from .helper_plot import (
 
 
 def run_analysis_pipeline(input_file, use_parallel=False):
-    # amortize_costs(input_file)
-    # calculate_baseline_costs(input_file, use_parallel)
+    amortize_costs(input_file)
+    calculate_baseline_costs(input_file, use_parallel)
     compute_unit_prices(input_file)
     # calculate_shadow_price(input_file, percentile_num=97, mask_use=True)
 

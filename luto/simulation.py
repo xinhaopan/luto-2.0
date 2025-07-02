@@ -163,14 +163,21 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
         data.last_year = target_year
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
-        
-        if luto_solver.gurobi_model.Status != GRB.OPTIMAL:
+
+        status = luto_solver.gurobi_model.Status
+
+        if status == GRB.INFEASIBLE or status == GRB.UNBOUNDED:
             print('!' * 100)
-            print(f"Warning: Gurobi solver did not find an optimal solution for year {target_year}. Status: {luto_solver.gurobi_model.Status}")
-            print(f'Warning: The results are still written to disk, but will not be optimal.')
+            print(f"Error: Model status for year {target_year} is {status}, stopping simulation.")
             print('!' * 100)
-            print('\n')
             break
+
+        elif status != GRB.OPTIMAL:
+            # 这里 status==13 (SUBOPTIMAL) 或其他都只是警告，不停止
+            print('!' * 100)
+            print(f"Warning: Gurobi solver did not prove optimal for year {target_year}. Status: {status}")
+            print("         Using current feasible solution and continuing.")
+            print('!' * 100)
 
 
 
