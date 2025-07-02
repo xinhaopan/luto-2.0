@@ -70,6 +70,7 @@ class SolverSolution:
     obj_val: dict[str, float]
 
 
+
 class LutoSolver:
     """
     Class responsible for grouping the Gurobi model, relevant input data, and its variables.
