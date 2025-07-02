@@ -44,11 +44,11 @@ KEY_TO_COLUMN_MAP = {
 REVENUE_DICT = {key.replace('cost', 'revenue'): value for key, value in COST_DICT.items()}
 
 
-TASK_NAME = "20250618_Paper2_Results"
+TASK_NAME = "20250630_Paper2_Results"
 
 INPUT_FILES = [
-    'Run_4_GHG_high_BIO_high',
-    'Run_3_GHG_high_BIO_off',
+    'Run_2_GHG_high_BIO_high',
+    'Run_1_GHG_high_BIO_off',
     # 'Run_3_off_on',
     # 'Run_4_off_off',
 ]

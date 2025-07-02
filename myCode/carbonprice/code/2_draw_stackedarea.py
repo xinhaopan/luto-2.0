@@ -1,6 +1,7 @@
 import numpy as np
 import tools.config as config
 
+import statsmodels.api as sm
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -66,6 +67,7 @@ def stacked_area_pos_neg(ax, df, colors=None, alpha=0.85, title_name='', ylabel=
     ax.grid(False)
     ax.set_title(title_name, pad=6)
     ax.set_ylabel(ylabel)
+    ax.set_xlim(df.index.min(), df.index.max())
 
     if show_legend:
         # 正则表达式去除括号及内容
@@ -130,6 +132,7 @@ def plot_line_with_points(ax, df, color='#1f77b4',title_name='',ylabel=''):
             markersize=4, markeredgecolor=color)
 
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+    ax.set_xlim(df.index.min(), df.index.max())
 
     # 样式
     ax.set_title(title_name,  pad=6)
@@ -143,6 +146,69 @@ def plot_line_with_points(ax, df, color='#1f77b4',title_name='',ylabel=''):
         spine.set_linewidth(1.2)
 
     ax.grid(False)
+
+def plot_scatter_with_fit(ax, df, title_name='', ylabel=''):
+    """
+    在指定 ax 上绘制散点图并添加线性拟合直线及95%置信区间，以及显示回归公式和R²。
+
+    参数：
+    - ax: matplotlib 的轴对象
+    - df: pd.DataFrame，仅包含 index（x 值）和一列数值（y 值）
+    - title_name: 图表标题
+    - ylabel: y 轴标签
+    """
+    if df.shape[1] != 1:
+        raise ValueError("DataFrame 只能包含一列数值。")
+
+    # 准备数据
+    x = df.index.values.astype(float)
+    y = df.iloc[:, 0].values
+
+    # 绘制散点
+    ax.scatter(x, y, marker='o')
+
+    # 拟合线性模型
+    X = sm.add_constant(x)
+    model = sm.OLS(y, X).fit()
+
+    # 获取预测值及置信区间
+    pred = model.get_prediction(X)
+    pred_df = pred.summary_frame(alpha=0.05)
+
+    # 绘制拟合直线
+    ax.plot(x, pred_df['mean'], linewidth=2)
+
+    # 绘制95%置信区间
+    ax.fill_between(x,
+                    pred_df['mean_ci_lower'],
+                    pred_df['mean_ci_upper'],
+                    color='gray', alpha=0.3)
+
+    # 显示回归公式和R²
+    slope = model.params[1]
+    intercept = model.params[0]
+    r2 = model.rsquared
+    eq_text = f'y = {slope:.2f}x{intercept:+.2f}\n$R^2$ = {r2:.3f}'
+    ax.text(0.15, 0.95, eq_text, transform=ax.transAxes,
+            va='top', ha='left',
+            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="black", lw=0.5))
+
+    # 格式化坐标轴
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+    ax.set_xlim(x.min(), x.max())
+    start, end = int(df.index.min()), int(df.index.max())
+    ax.set_xticks(range(start, end + 1, 5))
+    ax.set_title(title_name, pad=6)
+    ax.set_xlabel('')
+    ax.set_ylabel(ylabel)
+    ax.tick_params(axis='both', direction='out', length=4, width=1.2)
+    for spine in ax.spines.values():
+        spine.set_linewidth(1.2)
+
+    ax.grid(False)
+
 
 def draw_legend(ax,bbox_to_anchor=(0.98, 0.69),ncol=4):
     # 获取 legend 句柄
@@ -159,10 +225,15 @@ def draw_legend(ax,bbox_to_anchor=(0.98, 0.69),ncol=4):
 # ====== 使用方法 ======
 set_plot_style(font_size=12, font_family='Arial')
 
-df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_3_GHG_high_BIO_off.xlsx", index_col=0)
-df_ghg_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_4_GHG_high_BIO_high.xlsx", index_col=0)
-df_ghg_bio = df_ghg_bio - df_ghg
+df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_{config.INPUT_FILES[1]}.xlsx", index_col=0)
+df_ghg_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_{config.INPUT_FILES[0]}.xlsx", index_col=0)
 df_price = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/03_price.xlsx", index_col=0)
+
+df_ghg = df_ghg.loc[df_ghg.index >= config.START_YEAR].copy()
+df_ghg_bio = df_ghg_bio.loc[df_ghg_bio.index >= config.START_YEAR].copy()
+df_price = df_price[df_price.index >= config.START_YEAR].copy()
+
+df_ghg_bio = df_ghg_bio - df_ghg
 # --- 参数 ---
 n_cols = 2
 n_rows = 3
@@ -177,8 +248,11 @@ stacked_area_pos_neg(axes[0], df_ghg.iloc[:, :4], colors=['#DD847E', '#DFDD89','
 stacked_area_pos_neg(axes[1], df_ghg_bio.iloc[:, :4], colors=['#DD847E', '#DFDD89','#A7D398', '#74A3D4'], title_name='Biodiversity restoration cost',ylabel='')
 stacked_area_pos_neg(axes[2], df_ghg.iloc[:, 5:9], colors=['#f7dc68', '#f46c3f', '#2e9599', '#a7226f'],title_name='Carbon sequestration',ylabel='MtCO2e')
 stacked_area_pos_neg(axes[3], df_ghg_bio.iloc[:, 10:13], colors=['#ffe3b3', '#92de8b', '#0bb68c'],title_name='Biodiversity restoration',ylabel='Mha')
-plot_line_with_points(axes[4], df_price.iloc[:, 4:5], color='black', title_name='Shadow carbon price',ylabel='AU$ tCO2e-1')
-plot_line_with_points(axes[5], df_price.iloc[:, 5:6], color='black',title_name='Shadow biodiversity price',ylabel='AU$ ha-1')
+# plot_line_with_points(axes[4], df_price.iloc[:, 4:5], color='black', title_name='Shadow carbon price',ylabel='AU$ tCO2e-1')
+# plot_line_with_points(axes[5], df_price.iloc[:, 5:6], color='black',title_name='Shadow biodiversity price',ylabel='AU$ ha-1')
+
+plot_scatter_with_fit(axes[4], df_price.iloc[:, 4:5],title_name='Shadow carbon price',ylabel='AU$ tCO2e-1')
+plot_scatter_with_fit(axes[5], df_price.iloc[:, 5:6],title_name='Shadow biodiversity price',ylabel='AU$ ha-1')
 
 draw_legend(axes[0],bbox_to_anchor=(0.92, 0.7)) #
 draw_legend(axes[2],bbox_to_anchor=(0.45, 0.4), ncol=1)

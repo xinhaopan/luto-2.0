@@ -680,14 +680,17 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
     if settings.WATER_LIMITS == 'on':
         limits['water'] = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
         limits['water_rescale'] = {k: round(v / resale_factors['Water'], settings.ROUND_DECMIALS) for k, v in limits['water'].items()}
+        # limits['water_rescale'] = {k: v / resale_factors['Water'] for k, v in limits['water'].items()}
         
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[yr_cal]
         limits['ghg_rescale'] = round(limits['ghg'] / resale_factors['GHG'],settings.ROUND_DECMIALS)
+        # limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
 
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limits["GBF2"] = data.get_GBF2_target_for_yr_cal(yr_cal)
         limits["GBF2_rescale"] = round(limits["GBF2"] / resale_factors['GBF2'], settings.ROUND_DECMIALS)
+        # limits["GBF2_rescale"] = limits["GBF2"] / resale_factors['GBF2']
 
     if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
         limits["GBF3"] = data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal)
@@ -696,7 +699,7 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
         limits["GBF4_SNES"] = data.get_GBF4_SNES_target_inside_LUTO_by_year(yr_cal)
         limits["GBF4_SNES_rescale"] = limits["GBF4_SNES"] / resale_factors['GBF4_SNES']
-        
+
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
         limits["GBF4_ECNES"] = data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)
         limits["GBF4_ECNES_rescale"] = limits["GBF4_ECNES"] / resale_factors['GBF4_ECNES']

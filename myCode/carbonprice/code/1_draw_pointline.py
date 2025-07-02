@@ -1,3 +1,5 @@
+import os
+
 import tools.config as config
 
 import pandas as pd
@@ -90,9 +92,11 @@ title_name = ["AG Cost", "AM cost", "NON-AG cost", "Transition cost (AG to AG)",
               "AG GHG emission", "AM GHG emission", "NON-AG GHG emission", "Transition GHG emision",
               "AG Biodiversity", "AM Biodiversity", "NON-AG Biodiversity "]
 col_map = dict(zip(columns_name, title_name))
-df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/01_origin_Run_3_GHG_high_BIO_off.xlsx", index_col=0)
-df_ghg_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/01_origin_Run_4_GHG_high_BIO_high.xlsx", index_col=0)
+df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/01_origin_{config.INPUT_FILES[1]}.xlsx", index_col=0)
+df_ghg_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/01_origin_{config.INPUT_FILES[0]}.xlsx", index_col=0)
 
+df_ghg = df_ghg.loc[df_ghg.index >= config.START_YEAR].copy()
+df_ghg_bio = df_ghg_bio.loc[df_ghg_bio.index >= config.START_YEAR].copy()
 # 只保留匹配的列，并重命名
 df_ghg = df_ghg[[col for col in df_ghg.columns if col in col_map]]
 df_ghg = df_ghg.rename(columns=col_map)
@@ -156,5 +160,7 @@ fig.text(0.05, 0.15, 'mha',
          va='center', ha='center')
 
 # --- 保存或显示 ---
-fig.savefig(f'{config.TASK_DIR}/carbon_price/Paper_figure/01_origin_output.png', dpi=300)
+output_path = f'{config.TASK_DIR}/carbon_price/Paper_figure'
+os.makedirs(output_path, exist_ok=True)  # 确保输出目录存在
+fig.savefig(f'{output_path}/01_origin_output.png', dpi=300)
 plt.show()

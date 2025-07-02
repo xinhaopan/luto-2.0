@@ -646,12 +646,12 @@ class LutoSolver:
         ]
 
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            # upper_bound_constraints = self.gurobi_model.addConstrs(
-            #     (
-            #         (self._input_data.limits['demand_rescale'][c] - self.total_q_exprs_c[c]) <= self.V[c]
-            #         for c in range(self._input_data.ncms)
-            #     ),  name="demand_soft_bound_upper"
-            #     )
+            upper_bound_constraints = self.gurobi_model.addConstrs(
+                (
+                    (self._input_data.limits['demand_rescale'][c] - self.total_q_exprs_c[c]) <= self.V[c]
+                    for c in range(self._input_data.ncms)
+                ),  name="demand_soft_bound_upper"
+                )
             lower_bound_constraints = self.gurobi_model.addConstrs(
                 (
                     (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) == self.V[c]
@@ -659,7 +659,7 @@ class LutoSolver:
                 ),  name="demand_soft_bound_lower"
             )
 
-            # self.demand_penalty_constraints.extend(upper_bound_constraints.values())
+            self.demand_penalty_constraints.extend(upper_bound_constraints.values())
             self.demand_penalty_constraints.extend(lower_bound_constraints.values())
 
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":

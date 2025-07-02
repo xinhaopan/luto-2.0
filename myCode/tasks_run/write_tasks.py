@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_task_runs
 import time
 # time.sleep(60*60*5)
-tasks = ['20250630_Paper2_Results']
+tasks = ['20250702_Paper1_Results_res5','20250703_Paper1_Results_res5']
 
 for task in tasks:
     task_root_dir = f'../../output/{task}'
