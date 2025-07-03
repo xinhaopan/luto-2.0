@@ -56,7 +56,7 @@ def download_file(sftp, remote_path, local_path):
         raise ValueError(f"文件大小不一致: 远程{remote_size}字节，本地{local_size}字节")
 
 def download_all_data_gz(file_name, platform="NCI"):
-    cfg = ssh_config(platform="HPC")
+    cfg = ssh_config(platform)
     linux_host = cfg["linux_host"]
     linux_port = cfg["linux_port"]
     linux_username = cfg["linux_username"]
