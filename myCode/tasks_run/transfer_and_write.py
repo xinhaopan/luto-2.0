@@ -7,7 +7,7 @@ from joblib import Parallel, delayed
 print("starting transfer and write process...")
 # time.sleep(60*60*1.5)
 print("开始下载数据...")
-file_names = ["20250630_Paper2_Results"]
+file_names = ["20250704_Paper1_Results_res5_nci"]
 
 def process_file(file_name):
     try:
