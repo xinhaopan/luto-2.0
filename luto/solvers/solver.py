@@ -70,7 +70,6 @@ class SolverSolution:
     obj_val: dict[str, float]
 
 
-
 class LutoSolver:
     """
     Class responsible for grouping the Gurobi model, relevant input data, and its variables.
@@ -146,44 +145,44 @@ class LutoSolver:
         self._add_biodiversity_constraints()
         self._add_regional_adoption_constraints()
         self._add_water_usage_limit_constraints() 
-
+        
     def _setup_objective(self):
         """
         Formulate the objective based on settings.OBJECTIVE
         """
         print(f"...Setting up the objective function to {settings.OBJECTIVE}...")
 
-        # Get objectives
-        self.obj_economy = self._setup_economy_objective()
-        self.obj_biodiv = self._setup_biodiversity_objective()
-        self.obj_penalties = self._setup_penalty_objectives()
-
+        # Get objectives 
+        self.obj_economy = self._setup_economy_objective()    
+        self.obj_biodiv = self._setup_biodiversity_objective()   
+        self.obj_penalties = self._setup_penalty_objectives()                                                                    
+ 
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
             obj_wrap = (
-                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA
+                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA 
                 - self.obj_biodiv * (1 - settings.SOLVE_WEIGHT_ALPHA)
             )
             objective = (
-                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) +
+                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) + 
                 self.obj_penalties * settings.SOLVE_WEIGHT_BETA
             )
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
             obj_wrap = (
-                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA
+                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA 
                 + self.obj_biodiv * (1 - settings.SOLVE_WEIGHT_ALPHA)
             )
             objective = (
-                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA)
+                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) 
                 - self.obj_penalties * settings.SOLVE_WEIGHT_BETA
             )
         else:
             raise ValueError(f"    Unknown objective function: {settings.OBJECTIVE}")
 
         self.gurobi_model.setObjective(objective, sense)
-
+           
 
     def _setup_ag_vars(self):
         print("    |__ setting up decision variables for agricultural land uses...")
@@ -405,7 +404,7 @@ class LutoSolver:
 
         penalty_ghg = 0
         penalty_water = 0
-
+        
         weight_ghg = 0
         weight_water = 0
 
@@ -414,11 +413,11 @@ class LutoSolver:
             gp.quicksum(
                 self.V[c] * self._input_data.scale_factors['Demand'] * price
                 for c, price in enumerate(self._input_data.economic_BASE_YR_prices)
-            )
+            ) 
             * settings.SOLVER_WEIGHT_DEMAND
             / 1e6  # Convert to million AUD
         )
-
+    
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             weight_ghg = settings.SOLVER_WEIGHT_GHG
             penalty_ghg = (
@@ -442,7 +441,7 @@ class LutoSolver:
         return (penalty_demand + penalty_ghg + penalty_water) / (settings.SOLVER_WEIGHT_DEMAND + weight_ghg + weight_water)
         
 
-
+        
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
@@ -610,7 +609,7 @@ class LutoSolver:
 
         lower_bound_constraints = self.gurobi_model.addConstrs(
             (
-                (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) == self.V[c]
+                (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) == self.V[c] 
                 for c in range(self._input_data.ncms)
             ),  name="demand_soft_bound_lower"
         )
@@ -867,9 +866,9 @@ class LutoSolver:
 
 
         print(f'      |__ Adding constraints for biodiversity GBF 2: {self._input_data.limits["GBF2"]:15,.0f}')
-
+        
         self.bio_GBF2_constrs = self.gurobi_model.addConstr(
-            self.bio_GBF2_expr >= self._input_data.limits["GBF2_rescale"],
+            self.bio_GBF2_expr >= self._input_data.limits["GBF2_rescale"], 
             name="bio_GBF2_priority_degraded_area_limit"
         )
 
@@ -1594,13 +1593,56 @@ class LutoSolver:
                     ammaps[am][r] = 1
 
         # Process production amount for each commodity
-        if True: # Production is always calculated
-            prod_data["Production"] = [
+        prod_data["Production"] = (
+            [
                 self.total_q_exprs_c[c].getValue() * self._input_data.scale_factors['Demand']
                 for c in range(self._input_data.ncms)
             ]
-        if self.ghg_expr:
-            prod_data["GHG"] = self.ghg_expr.getValue() * self._input_data.scale_factors['GHG']
+            if self.total_q_exprs_c
+            else 0
+        )
+        prod_data["GHG"] = (
+            self.ghg_expr.getValue() * self._input_data.scale_factors['GHG']
+            if self.ghg_expr
+            else 0
+        )
+        prod_data["Water"] = (
+            {
+                k: v.getValue() * self._input_data.scale_factors['Water']
+                for k,v in self.water_nyiled_exprs.items()
+            }
+            if settings.WATER_LIMITS == "on"
+            else 0
+        )
+        prod_data["BIO (GBF2) value (ha)"] = (
+            0
+            if settings.BIODIVERSITY_TARGET_GBF_2 == "off"
+            else self.bio_GBF2_expr.getValue() * self._input_data.scale_factors['GBF2']
+        )
+        prod_data["BIO (GBF3) value (ha)"]=(
+            0
+            if settings.BIODIVERSITY_TARGET_GBF_3 == "off"
+            else {
+                k: v.getValue() * self._input_data.scale_factors['GBF3']
+                for k,v in self.bio_GBF3_exprs.items()
+            }
+        )
+        prod_data["BIO (GBF4) SNES value (ha)"] = (
+            {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'] for k,v in self.bio_GBF4_SNES_exprs.items()}
+            if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"
+            else 0
+        )
+        prod_data["BIO (GBF4) ECNES value (ha)"] = (
+            {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'] for k,v in self.bio_GBF4_ECNES_exprs.items()}
+            if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"
+            else 0
+        )
+        prod_data["BIO (GBF8) value (ha)"] = (
+            {k: v.getValue() * self._input_data.scale_factors['GBF8'] for k,v in self.bio_GBF8_exprs.items()}
+            if settings.BIODIVERSITY_TARGET_GBF_8 == "on"
+            else 0
+        )
+
 
         return SolverSolution(
             lumap=lumap,
@@ -1629,86 +1671,62 @@ class LutoSolver:
                 "Bio quality (score) Non-Ag":       self.bio_non_ag_contr.getValue() * self._input_data.scale_factors['Biodiversity'],
                 "Bio quality (score) Ag-Man":       self.bio_ag_man_contr.getValue() * self._input_data.scale_factors['Biodiversity'],
 
-                "Production (t) Ag":{
-                    c:self.ag_q_c[c].getValue() * self._input_data.scale_factors['Demand'] 
+                "Deviation Production (t)":[
+                    prod_data["Production"][c] - self._input_data.limits['demand'][c]
                     for c in range(self._input_data.ncms)
-                },
-                "Production (t) Non-Ag":{
-                    c:self.non_ag_q_c[c].getValue() * self._input_data.scale_factors['Demand'] 
-                    for c in range(self._input_data.ncms)
-                },
-                "Production (t) Ag-Man":{
-                    c:self.ag_man_q_c[c].getValue() * self._input_data.scale_factors['Demand'] 
-                    for c in range(self._input_data.ncms)
-                },
-                "Production Deviation (t)":[i * self._input_data.scale_factors['Demand'] for i in self.V.X],
-                "Water value (ML)":(
-                    {
-                        k: v.getValue() * self._input_data.scale_factors['Water'] 
-                        for k,v in self.water_nyiled_exprs.items()
-                    }                    
-                    if settings.WATER_LIMITS == "on"                      
-                    else 0
-                ),
-                "Water Deviation (ML)":(
+                ],
+                "Deviation Water (ML)":(
                     [
-                        i * self._input_data.scale_factors['Water'] 
-                        for i in self.W.X
-                    ]                                                                        
-                    if settings.WATER_CONSTRAINT_TYPE == "soft"            
+                        prod_data["Water"][i] - water_limit
+                        for i,water_limit in self._input_data.limits['water'].items()
+                    ]
+                    if settings.WATER_LIMITS == "on"
                     else 0
                 ),         
-                "GHG Ag Value (tCO2e)":(
-                    self.ghg_ag_contr.getValue() * self._input_data.scale_factors['GHG']                                                  
-                    if settings.GHG_EMISSIONS_LIMITS != "off"              
-                    else 0
-                ),
-                "GHG Non-Ag Value (tCO2e)":(
-                    self.ghg_non_ag_contr.getValue() * self._input_data.scale_factors['GHG']                                                      
-                    if settings.GHG_EMISSIONS_LIMITS != "off"              
-                    else 0
-                ),
-                "GHG Ag-Man Value (tCO2e)":(
-                    self.ghg_ag_man_contr.getValue() * self._input_data.scale_factors['GHG']                                                      
-                    if settings.GHG_EMISSIONS_LIMITS != "off"             
-                    else 0
-                ),    
-                "GHG Deviation (tCO2e)":(
-                    [
-                        i * self._input_data.scale_factors['GHG'] 
-                        for i in self.E.X
-                    ]                                                                        
+                "Deviation GHG (tCO2e)":(
+                    [ prod_data["GHG"] - self._input_data.limits['ghg'] ]
                     if settings.GHG_CONSTRAINT_TYPE == "soft"              
                     else 0
                 ),
-                "BIO (GBF2) value (ha)":(
-                    0                                                                               
+                "Deviation BIO (GBF2) value (ha)":(
+                    0
                     if settings.BIODIVERSITY_TARGET_GBF_2 == "off"         
-                    else self.bio_GBF2_expr.getValue() * self._input_data.scale_factors['GBF2']       
+                    else [
+                        prod_data["BIO (GBF2) value (ha)"] - self._input_data.limits['GBF2']
+                    ]
                 ),
-                "BIO (GBF3) value (ha)":(
+                "Deviation BIO (GBF3) value (ha)":(
                     0                                                                               
                     if settings.BIODIVERSITY_TARGET_GBF_3 == "off"         
-                    else {
-                        k: v.getValue() * self._input_data.scale_factors['GBF3'] 
-                        for k,v in self.bio_GBF3_exprs.items()
-                    }
+                    else [
+                        v - self._input_data.limits['GBF3'][k]
+                        for k,v in prod_data["BIO (GBF3) value (ha)"].items()
+                    ]
                 ),
-                "BIO (GBF4) SNES value (ha)":(
-                    {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'] for k,v in self.bio_GBF4_SNES_exprs.items()}                   
+                "Deviation BIO (GBF4) SNES value (ha)":(
+                    [
+                        v - self._input_data.limits['GBF4_SNES'][k]
+                        for k,v in prod_data["BIO (GBF4) SNES value (ha)"].items()
+                    ]
                     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"     
                     else 0
                 ),
-                "BIO (GBF4) ECNES value (ha)":(
-                    {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'] for k,v in self.bio_GBF4_ECNES_exprs.items()}                  
+                "Deviation BIO (GBF4) ECNES value (ha)":(
+                    [
+                        v - self._input_data.limits['GBF4_ECNES'][k]
+                        for k,v in prod_data["BIO (GBF4) ECNES value (ha)"].items()
+                    ]
                     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"    
                     else 0
                 ),
-                "BIO (GBF8) value (ha)":(
-                    {k: v.getValue() * self._input_data.scale_factors['GBF8'] for k,v in self.bio_GBF8_exprs.items()}   
+                "Deviation BIO (GBF8) value (ha)":(
+                    [
+                        v - self._input_data.limits['GBF8'][k]
+                        for k,v in prod_data["BIO (GBF8) value (ha)"].items()
+                    ]
                     if settings.BIODIVERSITY_TARGET_GBF_8 == "on"          
                     else 0
                 ),
-            },
+            }
         )
 
