@@ -42,10 +42,13 @@ def compute_2050_water_difference_series(water_yield_dict, water_public_dict, wa
 
 
 
-csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Value (ML)',  'region'
-water_yield_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Climate Change existence'], condition_value=['Without CCI'])
-water_public_dict = get_dict_data(input_files, 'water_yield_limits_and_public_land', value_column_name, 'REGION', condition_column_name=['Type','CCI Existence'], condition_value=['WNY Pubulic','HIST (ML)'])
-water_limit_dict = get_dict_data(input_files, 'water_yield_limits_and_public_land', value_column_name, 'REGION', condition_column_name=['Type'], condition_value=['WNY LIMIT'])
+csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Water Net Yield (ML)', 'Region'
+water_yield_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
+water_public_dict = get_dict_data(input_files, 'water_yield_limits_and_public_land',
+                                 'Water yield outside LUTO (ML)',filter_column_name)
+
+water_limit_dict = get_dict_data(input_files, 'water_yield_limits_and_public_land',
+                                 'Water Yield Limit (ML)', filter_column_name)
 summary_dict = compute_2050_water_difference_series(water_yield_dict, water_public_dict, water_limit_dict)
 
 # 合并所有 summary_df 的 Difference 列为一个 DataFrame

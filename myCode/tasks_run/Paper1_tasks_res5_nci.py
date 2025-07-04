@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250705_Paper1_Results'],
+    'TASK_NAME': ['20250705_Paper1_Results_2'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -12,7 +12,7 @@ grid_search = {
     'MEM': ['44GB'],
     'NCPUS': ['11'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['7:00:00'],
+    'TIME': ['20:00:00'],
 
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     # ---------------------------------- Model settings ------------------------------
