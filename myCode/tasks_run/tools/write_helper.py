@@ -89,7 +89,7 @@ def update_luto_code(run_path):
         else:
             shutil.copy2(src_item, dst_item)
 
-def write_repeat(task_root_dir,n_jobs=2):
+def write_repeat(task_root_dir,n_jobs=9):
     found, not_found = find_data_with_solution_all_subdirs(task_root_dir, n_jobs)
     tprint("有解:")
     for p in found:
@@ -122,7 +122,7 @@ def write_repeat(task_root_dir,n_jobs=2):
     tprint("\nStart write output.......")
     all_jobs = []
     for run_path, targets in run_path_to_targets.items():
-        # 修改 settings.py 和写 script 略（同你已有的代码）
+        # 修改 settings.py 和写 script
         settings_path = os.path.join(run_path, 'luto', 'settings.py')
         with open(settings_path, 'r', encoding='utf-8') as f:
             content = f.read()
