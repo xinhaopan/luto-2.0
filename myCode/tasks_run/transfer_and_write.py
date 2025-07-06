@@ -7,14 +7,14 @@ from joblib import Parallel, delayed
 print("starting transfer and write process...")
 # time.sleep(60*60*1.5)
 print("开始下载数据...")
-file_names = ["20250705_Paper1_Results"]
+file_names = ["20250705_Paper1_Results_2"]
 
 def process_file(file_name):
     try:
         print(f"\n{file_name}")
-        download_all_data_gz(file_name,'NCI')
+        # download_all_data_gz(file_name,'NCI')
         print(f"\n{file_name}: 数据下载完成，开始写入输出...")
-        write_repeat(f"../../output/{file_name}")
+        write_repeat(f"../../output/{file_name}", force=True,write_threads=3)
         print(f"\n{file_name}: 输出写入完成。")
     except Exception as e:
         print(f"{file_name}: 处理过程中发生错误: {e}")
@@ -22,11 +22,5 @@ def process_file(file_name):
     return file_name
 
 
-results = Parallel(n_jobs=1)(
-    delayed(process_file)(file_name) for file_name in file_names
-)
-for name in results:
-    print(f"\n{name} 处理完毕。")
-
-# for file_name in file_names:
-#     process_file(file_name)
+for file_name in file_names:
+    process_file(file_name)

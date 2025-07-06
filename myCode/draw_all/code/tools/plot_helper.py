@@ -674,7 +674,7 @@ def plot_land_use_polar(input_file,output_file=None, result_file="../output/12_l
     # 读取 Excel 文件，地类是第一列
     df = pd.read_excel(result_file, sheet_name=input_file, header=[0, 1])
     if not all_landuse:
-        df = df.sort_values((2050, 'Area (km2)'), ascending=False).head(5)
+        df = df.sort_values((2050, 'Area (km2)'), ascending=False).head(6)
     # 确保列是多级索引
     if not isinstance(df.columns, pd.MultiIndex):
         raise ValueError("Excel文件的列必须是多级索引，第一级为年份，第二级为指标")
