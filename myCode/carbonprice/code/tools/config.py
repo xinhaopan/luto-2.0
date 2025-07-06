@@ -44,7 +44,7 @@ KEY_TO_COLUMN_MAP = {
 REVENUE_DICT = {key.replace('cost', 'revenue'): value for key, value in COST_DICT.items()}
 
 
-TASK_NAME = "20250630_Paper2_Results"
+TASK_NAME = "20250705_Paper2_Results"
 
 INPUT_FILES = [
     'Run_2_GHG_high_BIO_high',
@@ -61,6 +61,6 @@ NAME_DICT = {
     "cost": {"title": "Cost", "unit": "(MAU$)"},
 }
 
-START_YEAR = 2020
+START_YEAR = 2025
 COST_COLUMN = ["AG opportunity cost(M$)", "AM net cost(M$)",  "NON-AG net cost(M$)", "Transition cost(M$)"]
 TASK_DIR = f'../../../output/{TASK_NAME}'

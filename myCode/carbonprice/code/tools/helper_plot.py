@@ -1274,6 +1274,7 @@ def plot_all_columns(df):
 
     # 保存图像
     plot.show()
+    os.makedirs(f"{config.TASK_DIR}/carbon_price/Graphs", exist_ok=True)  # 确保输出目录存在
     output_file = f"{config.TASK_DIR}/carbon_price/Graphs/01_all_columns_plot.png"
     plot.save(output_file, dpi=300)
     print(f"Saved plot to {output_file}")

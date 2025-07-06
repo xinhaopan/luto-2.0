@@ -72,6 +72,7 @@ def plot_shapefile_map(shapefile_path, gdf_column, df_colors, output_file='shape
 
     # 存储为PDF
     plt.savefig(output_file, dpi=300, bbox_inches='tight', format='pdf')
+    plt.show()
     plt.close(fig)  # 关闭figure避免内存占用
 
 
@@ -92,15 +93,6 @@ df_colors = pd.read_excel('tools/land use colors.xlsx', sheet_name='water')
 shapefile_path = '../../../../Map/Data/shp/Drainage Division/ADD_2016_AUST.shp'
 # plot_shapefile_map(shapefile_path, 'ADD_NAME16', df_colors, output_file='../output/03_drainage divisions.pdf')
 
-# 存储带text标注的地图
-plot_shapefile_map(
-    shapefile_path,
-    'ADD_NAME16',
-    df_colors,
-    output_file='../output/03_drainage divisions.pdf',
-    add_labels=False
-)
-
 # 存储不带text标注的地图
 plot_shapefile_map(
     shapefile_path,
@@ -110,14 +102,25 @@ plot_shapefile_map(
     add_labels=True
 )
 
-# water
-dd = pd.read_hdf(os.path.join(INPUT_DIR, "draindiv_lut.h5"), index_col='HR_DRAINDIV_ID')
-# 替换单位并新增计算列
-dd['WATER_YIELD_HIST_BASELINE_GL'] = dd['WATER_YIELD_HIST_BASELINE_ML'] / 1000
-# 增加一列 "Water yield limits"
-dd['Water yield limits (GL)'] = dd['WATER_YIELD_HIST_BASELINE_GL'] * (1 - settings.WATER_STRESS * settings.AG_SHARE_OF_WATER_USE)
-df = dd.round(2)
-dd.to_excel('../output/03_limits_water.xlsx')
+# 存储带text标注的地图
+plot_shapefile_map(
+    shapefile_path,
+    'ADD_NAME16',
+    df_colors,
+    output_file='../output/03_drainage divisions.pdf',
+    add_labels=False
+)
 
-# 查看结果
-print(dd.head())
+
+
+# water
+# dd = pd.read_hdf(os.path.join(INPUT_DIR, "draindiv_lut.h5"), index_col='HR_DRAINDIV_ID')
+# # 替换单位并新增计算列
+# dd['WATER_YIELD_HIST_BASELINE_GL'] = dd['WATER_YIELD_HIST_BASELINE_ML'] / 1000
+# # 增加一列 "Water yield limits"
+# dd['Water yield limits (GL)'] = dd['WATER_YIELD_HIST_BASELINE_GL'] * (1 - settings.WATER_STRESS * settings.AG_SHARE_OF_WATER_USE)
+# df = dd.round(2)
+# dd.to_excel('../output/03_limits_water.xlsx')
+#
+# # 查看结果
+# print(dd.head())

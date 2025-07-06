@@ -16,5 +16,5 @@ for input_file in input_files:
     outfile = '12_movement_' + input_file.split("_")[1]
     yticks = [0,400,800,1200]
     plot_land_use_polar(input_file, outfile,fontsize=30, yticks=yticks)
-    yticks = [0,90,180,270,360]
+    yticks = [0,140,280,420,560]
     plot_land_use_polar(input_file, outfile, fontsize=30, yticks=yticks, all_landuse=False)

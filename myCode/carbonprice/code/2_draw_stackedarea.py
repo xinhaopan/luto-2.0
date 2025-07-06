@@ -7,6 +7,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from matplotlib.ticker import MaxNLocator
+import matplotlib.patches as mpatches
 import matplotlib as mpl
 import re
 from matplotlib.patches import Patch
@@ -147,67 +148,87 @@ def plot_line_with_points(ax, df, color='#1f77b4',title_name='',ylabel=''):
 
     ax.grid(False)
 
-def plot_scatter_with_fit(ax, df, title_name='', ylabel=''):
-    """
-    在指定 ax 上绘制散点图并添加线性拟合直线及95%置信区间，以及显示回归公式和R²。
-
-    参数：
-    - ax: matplotlib 的轴对象
-    - df: pd.DataFrame，仅包含 index（x 值）和一列数值（y 值）
-    - title_name: 图表标题
-    - ylabel: y 轴标签
-    """
+def plot_scatter_with_fit(ax, df, title_name='', ylabel='',legend_postiton=(0.3, 1)):
     if df.shape[1] != 1:
         raise ValueError("DataFrame 只能包含一列数值。")
 
-    # 准备数据
     x = df.index.values.astype(float)
     y = df.iloc[:, 0].values
 
-    # 绘制散点
-    ax.scatter(x, y, marker='o')
+    # 散点
+    ax.scatter(x, y, marker='o', color='C0')
 
-    # 拟合线性模型
+    # 线性拟合
     X = sm.add_constant(x)
     model = sm.OLS(y, X).fit()
-
-    # 获取预测值及置信区间
     pred = model.get_prediction(X)
     pred_df = pred.summary_frame(alpha=0.05)
 
-    # 绘制拟合直线
-    ax.plot(x, pred_df['mean'], linewidth=2)
+    # 拟合直线
+    ax.plot(x, pred_df['mean'], color='black', linewidth=2)
 
-    # 绘制95%置信区间
-    ax.fill_between(x,
-                    pred_df['mean_ci_lower'],
-                    pred_df['mean_ci_upper'],
-                    color='gray', alpha=0.3)
+    # 置信区间
+    ax.fill_between(
+        x,
+        pred_df['mean_ci_lower'],
+        pred_df['mean_ci_upper'],
+        color='gray', alpha=0.3
+    )
 
-    # 显示回归公式和R²
-    slope = model.params[1]
-    intercept = model.params[0]
+    # 组装回归公式文本
+    slope, intercept = model.params[1], model.params[0]
     r2 = model.rsquared
     eq_text = f'y = {slope:.2f}x{intercept:+.2f}\n$R^2$ = {r2:.3f}'
-    ax.text(0.15, 0.95, eq_text, transform=ax.transAxes,
-            va='top', ha='left',
-            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="black", lw=0.5))
 
-    # 格式化坐标轴
+    # 坐标轴格式化
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
     ax.set_xlim(x.min(), x.max())
     start, end = int(df.index.min()), int(df.index.max())
     ax.set_xticks(range(start, end + 1, 5))
+
     ax.set_title(title_name, pad=6)
     ax.set_xlabel('')
     ax.set_ylabel(ylabel)
     ax.tick_params(axis='both', direction='out', length=4, width=1.2)
     for spine in ax.spines.values():
         spine.set_linewidth(1.2)
-
     ax.grid(False)
+
+    # —— 新增：只创建一个图例框，把 CI 图例和公式标题放一起 —— #
+    # 构造 CI 补丁
+    ci_patch = mpatches.Patch(facecolor='gray', alpha=0.3, label='95% CI')
+
+    # 添加图例：标题右对齐，图例框放到子图右上角外一点
+    leg = ax.legend(
+        handles=[ci_patch],
+        title=eq_text,
+        loc='upper left',
+        bbox_to_anchor=legend_postiton,  # (x, y) 以 axes fraction 为单位，(1,1) 是右上角
+        frameon=True,
+    )
+
+    # 3) 取出那个标题的 Text 对象，右对齐它的所有行
+    title_obj = leg.get_title()
+    title_obj.set_ha('left')  # 水平对齐方式
+    title_obj.set_multialignment('left')  # 多行也左对齐
+
+    # 让标题文本右对齐
+    for txt in leg.get_texts():
+        txt.set_ha('left')
+        # 可选：把 x 坐标移到最右
+        txt.set_x(1.0)
+
+    # 可选：调小 handle 和 label 之间的间距
+    leg._legend_box.align = "left"  # 整体右对齐
+    leg._legend_handle_box.pad = 0.1  # handle 与 label 之间
+    leg._legend_title_box.pad = 0.3  # title 与 entries 之间
+
+    # 4) （可选）微调 legend 框线
+    frame = leg.get_frame()
+    frame.set_linewidth(0.5)
+    frame.set_edgecolor('black')
 
 
 def draw_legend(ax,bbox_to_anchor=(0.98, 0.69),ncol=4):
@@ -251,8 +272,8 @@ stacked_area_pos_neg(axes[3], df_ghg_bio.iloc[:, 10:13], colors=['#ffe3b3', '#92
 # plot_line_with_points(axes[4], df_price.iloc[:, 4:5], color='black', title_name='Shadow carbon price',ylabel='AU$ tCO2e-1')
 # plot_line_with_points(axes[5], df_price.iloc[:, 5:6], color='black',title_name='Shadow biodiversity price',ylabel='AU$ ha-1')
 
-plot_scatter_with_fit(axes[4], df_price.iloc[:, 4:5],title_name='Shadow carbon price',ylabel='AU$ tCO2e-1')
-plot_scatter_with_fit(axes[5], df_price.iloc[:, 5:6],title_name='Shadow biodiversity price',ylabel='AU$ ha-1')
+plot_scatter_with_fit(axes[4], df_price.iloc[:, 4:5],title_name='Shadow carbon price',ylabel='AU$ tCO2e-1',legend_postiton=(0.5, 1))
+plot_scatter_with_fit(axes[5], df_price.iloc[:, 5:6],title_name='Shadow biodiversity price',ylabel='AU$ ha-1',legend_postiton=(0.0, 1))
 
 draw_legend(axes[0],bbox_to_anchor=(0.92, 0.7)) #
 draw_legend(axes[2],bbox_to_anchor=(0.45, 0.4), ncol=1)

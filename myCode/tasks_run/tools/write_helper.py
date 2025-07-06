@@ -89,7 +89,7 @@ def update_luto_code(run_path):
         else:
             shutil.copy2(src_item, dst_item)
 
-def write_repeat(task_root_dir,n_jobs=9):
+def write_repeat(task_root_dir,n_jobs=9,force=False, write_threads=2):
     found, not_found = find_data_with_solution_all_subdirs(task_root_dir, n_jobs)
     tprint("有解:")
     for p in found:
@@ -113,6 +113,10 @@ def write_repeat(task_root_dir,n_jobs=9):
 
     # Group directories by run_path and process efficiently
     run_path_to_targets = defaultdict(list)
+    if force:
+        # 全部重写
+        without_htmls = without_htmls + with_htmls
+
     for target_dir in without_htmls:
         norm_path = os.path.normpath(target_dir)
         parts = norm_path.split(os.sep)
@@ -122,21 +126,30 @@ def write_repeat(task_root_dir,n_jobs=9):
     tprint("\nStart write output.......")
     all_jobs = []
     for run_path, targets in run_path_to_targets.items():
-        # 修改 settings.py 和写 script
+        # --- 1) 修改 settings.py ---
         settings_path = os.path.join(run_path, 'luto', 'settings.py')
         with open(settings_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        new_content = re.sub(
-            r'INPUT_DIR\s*=\s*(?:r)?[\'"].*?[\'"]',
-            "INPUT_DIR = '../../../input'",
+        # 替换 INPUT_DIR
+        content = re.sub(
+            r"INPUT_DIR\s*=\s*(?:r)?['\"].*?['\"]",
+            "INPUT_DIR = 'N:/LUF-Modelling/LUTO2_XH/LUTO2/input'",
+            content
+        )
+        # 替换 WRITE_THREADS
+        content = re.sub(
+            r"WRITE_THREADS\s*=\s*\d+",
+            f"WRITE_THREADS = {write_threads}",
             content
         )
         with open(settings_path, 'w', encoding='utf-8') as f:
-            f.write(new_content)
+            f.write(content)
 
+        # --- 2) 写 write_output.py ---
         script_name = 'write_output.py'
         script_path = os.path.join(run_path, script_name)
         script_content = '''import sys
+        
 import gzip
 import dill
 from luto.tools.write import write_outputs
