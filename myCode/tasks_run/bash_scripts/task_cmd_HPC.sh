@@ -161,10 +161,8 @@ EOF
   cat "$SCRIPT_SLURM"
   echo "=========== SLURM 脚本内容 END ==========="
 
-  job_submit_out=$(sbatch "$SCRIPT_SLURM" 2>&1)
-  if [[ $? -ne 0 ]]; then
+  if ! job_submit_out=$(sbatch "$SCRIPT_SLURM" 2>&1); then
     echo "[$(date '+%F %T')] sbatch failed: $job_submit_out"
-    # sbatch 失败时移除该节点
     remove_node_from_list "$SELECTED_NODE"
     rm -f "$SCRIPT_SLURM"
     sleep 10
