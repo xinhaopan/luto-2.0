@@ -32,9 +32,23 @@ def get_path(path_name):
         print(f"Error occurred while getting path for {path_name}: {e}")
         print(f"Current directory content for {output_path}: {os.listdir(output_path) if os.path.exists(output_path) else 'Directory not found'}")
 
-def npy_to_map(input_arr, output_tif, proj_file, fill_value=np.nan, shift=0, dtype=rasterio.float32):
+
+def npy_to_map(input_arr, output_tif, proj_file,
+               fill_value=np.nan, shift=0,
+               dtype=rasterio.float32):
+    """
+    将一维 .npy 数组铺回到栅格地图中。
+    - input_arr: path to .npy (1D array of length = number of valid pixels in proj_file)
+    - output_tif: 输出 GeoTIFF 路径
+    - proj_file: 用于投影和形状参照的已有 GeoTIFF
+    - fill_value: 初始填充值（默认 np.nan）
+    - shift: 在写入前对数据统一加的偏移量
+    - dtype: 输出栅格的数据类型
+    """
     if not input_arr.lower().endswith(".npy"):
         return
+
+    # 1) 读取参考栅格
     with rasterio.open(proj_file) as src:
         mask2D = src.read(1) >= 0
         transform = src.transform
@@ -42,6 +56,7 @@ def npy_to_map(input_arr, output_tif, proj_file, fill_value=np.nan, shift=0, dty
         profile = src.profile.copy()
         shape = src.shape
 
+    # 2) 加载一维数组
     nonzeroes = np.where(mask2D)
     lumap = np.load(input_arr)
 
@@ -50,9 +65,14 @@ def npy_to_map(input_arr, output_tif, proj_file, fill_value=np.nan, shift=0, dty
     if len(lumap) != len(nonzeroes[0]):
         raise ValueError("lumap 的长度与 proj_file 中的有效像元数量不一致")
 
+    # 3) 构建全图，并赋值
     themap = np.full(shape, fill_value=fill_value, dtype=float)
     themap[nonzeroes] = lumap + shift
 
+    # 4) 把 +/- inf 都变成 np.nan
+    themap[~np.isfinite(themap)] = np.nan
+
+    # 5) 更新 profile 并写出
     profile.update({
         'dtype': dtype,
         'count': 1,
@@ -62,5 +82,4 @@ def npy_to_map(input_arr, output_tif, proj_file, fill_value=np.nan, shift=0, dty
     with rasterio.open(output_tif, 'w', **profile) as dst:
         dst.write(themap.astype(dtype), 1)
 
-    # print(f"✅ 已保存为 GeoTIFF: {os.path.abspath(output_tif)}")
-    return output_tif  # 返回输出路径
+    return output_tif

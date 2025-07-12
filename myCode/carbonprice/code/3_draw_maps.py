@@ -335,7 +335,7 @@ hex_gdf.to_file(out_gpkg, driver="GPKG")
 # ------------------------------------------------------------------------------------------------
 hex_gdf = gpd.read_file(out_gpkg)
 
-threshold = 0
+threshold = 0.2
 n_plot = len(value_col_list)
 nrow, ncol = 3, 2
 fig, axes = plt.subplots(nrow, ncol, figsize=(8, 12))
@@ -350,5 +350,5 @@ for i in range(n_plot):
 for j in range(n_plot, len(axes)):
     axes[j].axis('off')
 
-plt.savefig("hex_proportion_maps.png", dpi=300)
+plt.savefig(f"{config.TASK_DIR}/carbon_price/Paper_figure/03_hex_proportion_maps.png", dpi=300, bbox_inches='tight')
 plt.show()

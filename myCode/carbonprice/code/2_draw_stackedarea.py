@@ -184,7 +184,7 @@ def plot_scatter_with_fit(ax, df, title_name='', ylabel='',legend_postiton=(0.3,
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
-    ax.set_xlim(x.min(), x.max())
+    ax.set_xlim(x.min()-0.5, x.max()+0.5)
     start, end = int(df.index.min()), int(df.index.max())
     ax.set_xticks(range(start, end + 1, 5))
 
@@ -297,6 +297,6 @@ for i in [4, 5]:  # 第三行的两个图
     pos = axes[i].get_position()
     axes[i].set_position([pos.x0, pos.y0+0.015, pos.width, pos.height])
 
-plt.savefig(f"{config.TASK_DIR}/carbon_price/Paper_figure/2_draw_stackedarea.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{config.TASK_DIR}/carbon_price/Paper_figure/02_draw_stackedarea.png", dpi=300, bbox_inches='tight')
 # fig.align_ylabels(axes)
 fig.show()
