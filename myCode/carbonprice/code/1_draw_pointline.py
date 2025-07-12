@@ -34,51 +34,116 @@ def set_plot_style(font_size=12, font_family='Arial'):
 
 # ====== 使用方法 ======
 set_plot_style(font_size=12, font_family='Arial')  # 你可以换成你想要的字体
+# def sns_two_df_comparison(ax, df1, df2, col, colors=('#ffb216', '#6db50a'),
+#                           label1='DF1', label2='DF2', y_thousands=True, tick_length=4, border_width=1.5):
+#     """
+#     在给定 `ax` 上画 df1 与 df2 指定列的对比折线图，统一字体、刻度样式、边框加粗、去掉图例与网格。
+#     """
+#     # 画 DF1（如果有）
+#     if df1 is not None and col in df1.columns:
+#         sns.lineplot(x=df1.index, y=df1[col], ax=ax,
+#                      color=colors[0], markersize=6, linewidth=1.5, marker='o',
+#                      markeredgecolor=colors[0], label=label1)
+#         df = df1  # 这里 df1 是主要数据源
+#
+#     # 画 DF2（如果有）
+#     if df2 is not None and col in df2.columns:
+#         sns.lineplot(x=df2.index, y=df2[col], ax=ax,
+#                      color=colors[1], markersize=6, linewidth=1.5, marker='o',
+#                      markeredgecolor=colors[1], label=label2)
+#         df = df2  # 如果 df2 存在，则覆盖 df1 的数据源
+#
+#     ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+#     ylim = ax.get_ylim()
+#     if abs(ylim[1] - ylim[0]) < 3:
+#         ax.yaxis.set_major_formatter(
+#             FuncFormatter(lambda x, _: f'{x:.2f}')
+#         )
+#     else:
+#         if y_thousands:
+#             ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+#
+#     x = df.index.values.astype(float)
+#     ax.set_xlim(x.min(), x.max())
+#     start, end = int(df.index.min()), int(df.index.max())
+#     ax.set_xticks(range(start, end + 1, 5))
+#     # 标题、坐标轴标签
+#     ax.set_title(col, pad=6)
+#     ax.set_xlabel('')
+#     ax.set_ylabel('')
+#
+#     # 刻度字体和方向
+#     ax.tick_params(axis='both', direction='out', length=tick_length, width=1.2, color='black')
+#
+#     # 去网格
+#     ax.grid(False)
+#
+#     # 去图例
+#     legend = ax.get_legend()
+#     if legend is not None:
+#         legend.remove()
+#
+#     # 加粗边框
+#     for spine in ax.spines.values():
+#         spine.set_color('black')  # 边框颜色
+#         spine.set_linewidth(border_width)
+
+
 def sns_two_df_comparison(ax, df1, df2, col, colors=('#ffb216', '#6db50a'),
-                          label1='DF1', label2='DF2', y_thousands=True, tick_length=4, border_width=1.5):
-    """
-    在给定 `ax` 上画 df1 与 df2 指定列的对比折线图，统一字体、刻度样式、边框加粗、去掉图例与网格。
-    """
+                          label1='DF1', label2='DF2', y_thousands=True,
+                          tick_length=4, border_width=1.5):
     # 画 DF1（如果有）
     if df1 is not None and col in df1.columns:
         sns.lineplot(x=df1.index, y=df1[col], ax=ax,
-                     color=colors[0], markersize=4, linewidth=1.5, marker='o',
+                     color=colors[0], markersize=6, linewidth=1.5, marker='o',
                      markeredgecolor=colors[0], label=label1)
+        df = df1  # 这里 df1 是主要数据源
 
     # 画 DF2（如果有）
     if df2 is not None and col in df2.columns:
         sns.lineplot(x=df2.index, y=df2[col], ax=ax,
-                     color=colors[1], markersize=4, linewidth=1.5, marker='o',
+                     color=colors[1], markersize=6, linewidth=1.5, marker='o',
                      markeredgecolor=colors[1], label=label2)
+        df = df2  # 如果 df2 存在，则覆盖 df1 的数据源
+
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
     ylim = ax.get_ylim()
     if abs(ylim[1] - ylim[0]) < 3:
-        ax.yaxis.set_major_locator(MaxNLocator(nbins=3))
+        ax.yaxis.set_major_formatter(
+            FuncFormatter(lambda x, _: f'{x:.2f}')
+        )
     else:
-        ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
-    # 标题、坐标轴标签
+        if y_thousands:
+            ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+
+    x = df.index.values.astype(float)
+    ax.set_xlim(x.min()-0.5, x.max()+0.5)
+    start, end = int(df.index.min()), int(df.index.max())
+    ax.set_xticks(range(start, end + 1, 5))
+
+    # —— 美化部分 —— #
+    # 1) 设背景色
+    ax.set_facecolor('#f0f0f0')  # 浅灰
+
+    # 2) 添加白色网格线（只要主刻度）
+    ax.grid(True, color='white', linewidth=2)
+
+    # 3) 加粗主刻度线，让它们更显眼
+    ax.tick_params(which='major', length=tick_length, width=1.5, color='gray')
     ax.set_title(col, pad=6)
+
     ax.set_xlabel('')
     ax.set_ylabel('')
 
-    # 刻度字体和方向
-    ax.tick_params(axis='both', direction='out', length=tick_length, width=1.2, color='black')
-
-    # 千分位格式
-    if y_thousands:
-        ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
-
-    # 去网格
-    ax.grid(False)
-
-    # 去图例
-    legend = ax.get_legend()
-    if legend is not None:
-        legend.remove()
-
-    # 加粗边框
+    # 5) 坐标轴标签依旧留空，轴线加粗为白色
     for spine in ax.spines.values():
-        spine.set_color('black')  # 边框颜色
         spine.set_linewidth(border_width)
+        spine.set_edgecolor('white')
+
+    # 最后移除图例、网格外的其它装饰时，如有需要，可再微调
+    legend = ax.get_legend()
+    if legend:
+        legend.remove()
 
 
 
@@ -151,11 +216,11 @@ fig.text(0.05, 0.75, 'Million AU$',
          rotation='vertical',
          va='center', ha='center')
 
-fig.text(0.05, 0.38, 'tCO2e',
+fig.text(0.075, 0.38, 'tCO2e',
          rotation='vertical',
          va='center', ha='center')
 
-fig.text(0.05, 0.15, 'mha',
+fig.text(0.07, 0.15, 'mha',
          rotation='vertical',
          va='center', ha='center')
 
