@@ -10,9 +10,9 @@ grid_search = {
     'NUMERIC_FOCUS': [0],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['120GB'],
-    'NCPUS': ['8'],
+    'NCPUS': ['30'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['60:00:00'],
+    'TIME': ['48:00:00'],
 
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     # ---------------------------------- Model settings ------------------------------
@@ -56,6 +56,6 @@ settings_name_dict = {
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
 grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
-create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
+create_task_runs(task_root_dir, grid_search_settings_df, platform="NCI", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 
