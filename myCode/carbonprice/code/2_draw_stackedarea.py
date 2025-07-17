@@ -1,95 +1,124 @@
-import numpy as np
+import os
+
+
 import tools.config as config
 
 import statsmodels.api as sm
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
-from matplotlib.ticker import MaxNLocator
+
 import matplotlib.patches as mpatches
 import matplotlib as mpl
-import re
-from matplotlib.patches import Patch
-import math
+from matplotlib.lines import Line2D
 
 sns.set_theme(style="ticks")
 
-def stacked_area_pos_neg(ax, df, colors=None, alpha=0.85, title_name='', ylabel='', show_legend=False):
-    """
-    在指定 `ax` 上绘制支持正/负值的堆叠面积图。
 
-    参数
-    ----
-    ax      : matplotlib.axes.Axes
-        目标子图
-    df      : pd.DataFrame
-        行为 X 轴（需为数值或日期），列为分类；可含正负值
-    colors  : list-like[str] | None
-        每列对应的颜色；若 None 使用 matplotlib 默认循环色
-    alpha   : float
-        填充透明度
-    title_name : str
-        子图标题
-    ylabel  : str
-        Y轴标题
-    show_legend : bool
-        是否显示图例（默认 False）
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter, MaxNLocator
+from matplotlib.patches import Patch
+import re
+
+def stacked_area_pos_neg(ax, df, colors=None, alpha=0.85,
+                         title_name='', ylabel='',
+                         show_legend=False):
     """
+    在指定 ax 上绘制支持正/负值的堆叠面积图，并可选画出总和的虚线。
+    最后总是把所有图例收集到 ax.legend() 中。
+    """
+
+    # 3) 画 Sum 虚线
+    total = df.sum(axis=1)
+    ax.plot(
+        df.index,
+        total,
+        linestyle='-',  # 实线
+        marker='o',  # 圆点标记
+        color='black',
+        linewidth=2,
+        markersize=5,
+        markeredgewidth=1,
+        markerfacecolor='black',
+        markeredgecolor='black',
+        label='Sum'
+    )
+
+    # 1) 颜色准备
     if colors is None:
         colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     if len(colors) < df.shape[1]:
         colors = (colors * (df.shape[1] // len(colors) + 1))[:df.shape[1]]
 
+
+
+    # 2) 画面积
     cum_pos = np.zeros(len(df))
     cum_neg = np.zeros(len(df))
-
     for idx, col in enumerate(df.columns):
-        y = df[col].values
-        color = colors[idx]
-        pos = np.where(y > 0, y, 0)
-        neg = np.where(y < 0, y, 0)
+        y    = df[col].values
+        pos  = np.clip(y, 0, None)
+        neg  = np.clip(y, None, 0)
+        colr = colors[idx]
 
-        # 正值
-        ax.fill_between(df.index, cum_pos, cum_pos + pos, facecolor=color, alpha=alpha, linewidth=0, label=col)
+        ax.fill_between(df.index, cum_pos, cum_pos + pos,
+                        facecolor=colr, alpha=alpha, linewidth=0, label=col)
         cum_pos += pos
-        # 负值
-        ax.fill_between(df.index, cum_neg, cum_neg + neg, facecolor=color, alpha=alpha, linewidth=0)
+
+        ax.fill_between(df.index, cum_neg, cum_neg + neg,
+                        facecolor=colr, alpha=alpha, linewidth=0)
         cum_neg += neg
 
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+
+    # 4) 美化坐标轴
     ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+
+    ax.set_xlim(df.index.min(), df.index.max())
+    ax.set_title(title_name, pad=6)
+    ax.set_ylabel(ylabel)
     ax.set_xlabel('')
-    ax.set_ylabel('')
     ax.tick_params(direction='out')
     for spine in ax.spines.values():
         spine.set_color('black')
         spine.set_linewidth(1.2)
     ax.grid(False)
-    ax.set_title(title_name, pad=6)
-    ax.set_ylabel(ylabel)
-    ax.set_xlim(df.index.min(), df.index.max())
 
+    # 5) 收集所有 handles/labels，并去重、清理括号
+    handles, labels = ax.get_legend_handles_labels()
+    clean_labels = [re.sub(r'\s*\(.*?\)', '', lbl) for lbl in labels]
+
+    # 去重（保持第一次出现的顺序）
+    unique = {}
+    for h, l in zip(handles, clean_labels):
+        if l not in unique:
+            unique[l] = h
+
+    final_labels  = list(unique.keys())
+    final_handles = list(unique.values())
+
+    # 6) 放到 legend
+    # 如果 show_legend=True，就放在 ax 内侧左上；否则放到外面
     if show_legend:
-        # 正则表达式去除括号及内容
-        def clean_label(label):
-            return re.sub(r'\s*\(.*?\)', '', label)
+        loc, bbox = 'upper left', None
+    else:
+        loc, bbox = 'upper left', (1.02, 1.0)
 
-        handles, labels = ax.get_legend_handles_labels()
-        labels = [clean_label(lbl) for lbl in labels]
+    ax.legend(
+        handles=final_handles,
+        labels=final_labels,
+        loc=loc,
+        bbox_to_anchor=bbox,
+        frameon=False,
+        ncol=1,
+        handlelength=1.0,
+        handleheight=1.0,
+        handletextpad=0.4,
+        labelspacing=0.3
+    )
 
-        # 生成方形 Patch 作为图例符号
-        patch_handles = [Patch(facecolor=h.get_facecolor()[0], edgecolor='black') for h in handles]
+    return ax
 
-        ax.legend(handles=patch_handles,
-                  labels=labels,
-                  loc='upper center',
-                  bbox_to_anchor=(0.5, -0.1),
-                  ncol=1,
-                  frameon=False,
-                  handlelength=0.9,
-                  handleheight=1.0,
-                  handletextpad=0.4)
 
 
 
@@ -230,18 +259,96 @@ def plot_scatter_with_fit(ax, df, title_name='', ylabel='',legend_postiton=(0.3,
     frame.set_linewidth(0.5)
     frame.set_edgecolor('black')
 
+# def draw_legend(ax,bbox_to_anchor=(0.98, 0.69),ncol=4):
+#     # 获取 legend 句柄
+#     handles, labels = ax.get_legend_handles_labels()
+#     clean_labels = [re.sub(r'\s*\(.*?\)', '', label) for label in labels]
+#     colors = [h.get_facecolor()[0] for h in handles]
+#     patch_handles = [Patch(facecolor=color) for color in colors]
+#     # 加入整个 figure 的图例（例如放在整个图底部中间）
+#     fig.legend(patch_handles, clean_labels, bbox_to_anchor=bbox_to_anchor,
+#                ncol=ncol, frameon=False,labelspacing=0.3,handlelength=0.9,
+#                handleheight=1.0,
+#                handletextpad=0.4)
 
-def draw_legend(ax,bbox_to_anchor=(0.98, 0.69),ncol=4):
-    # 获取 legend 句柄
+from matplotlib.collections import PathCollection
+def draw_legend(ax, bbox_to_anchor=(0.98, 0.69), ncol=5):
+    """
+    从单个 Axes 收集 legend handles/labels，清理标签中的括号内容，
+    支持 Patch、Line2D、PathCollection 三种类型，最后在 Figure 层
+    面绘制统一的 legend。
+
+    参数
+    ----
+    ax              : matplotlib.axes.Axes
+        要收集图例的那个子图
+    bbox_to_anchor  : tuple
+        图例在 Figure 坐标系中的定位 (x, y)
+    ncol            : int
+        图例分几列
+    """
+    # 取出对应的 Figure
+    fig = ax.get_figure()
+
+    # 1) 从 ax 收集原始 handles/labels
     handles, labels = ax.get_legend_handles_labels()
-    clean_labels = [re.sub(r'\s*\(.*?\)', '', label) for label in labels]
-    colors = [h.get_facecolor()[0] for h in handles]
-    patch_handles = [Patch(facecolor=color) for color in colors]
-    # 加入整个 figure 的图例（例如放在整个图底部中间）
-    fig.legend(patch_handles, clean_labels, bbox_to_anchor=bbox_to_anchor,
-               ncol=ncol, frameon=False,labelspacing=0.3,handlelength=0.9,
-               handleheight=1.0,
-               handletextpad=0.4)
+    clean_labels = [re.sub(r'\s*\(.*?\)', '', lbl) for lbl in labels]
+
+    # 2) 隐藏这个 ax 自带的 legend
+    if ax.get_legend() is not None:
+        ax.get_legend().remove()
+
+    # 3) 针对不同类型的 handle，重建一个 new_handle 列表
+    new_handles = []
+    for h in handles:
+        if isinstance(h, Patch):
+            fc = h.get_facecolor()[0]
+            ec = h.get_edgecolor()[0] if h.get_edgecolor().size else 'black'
+            lw = h.get_linewidth()
+            new_handles.append(Patch(facecolor=fc, edgecolor=ec, linewidth=lw))
+        elif isinstance(h, Line2D):
+            new_handles.append(Line2D(
+                [0], [0],
+                color=h.get_color(),
+                linestyle=h.get_linestyle(),
+                linewidth=h.get_linewidth(),
+                marker=h.get_marker(),
+                markersize=h.get_markersize(),
+                markerfacecolor=h.get_markerfacecolor(),
+                markeredgecolor=h.get_markeredgecolor()
+            ))
+        elif isinstance(h, PathCollection):
+            # 散点：重建为带 marker 的 Line2D
+            # 取 facecolor 或 edgecolor
+            fc = h.get_facecolor()
+            ec = h.get_edgecolor()
+            color = tuple(fc[0]) if len(fc) else tuple(ec[0]) if len(ec) else 'black'
+            size = (h.get_sizes()[0] ** 0.5) if hasattr(h, "get_sizes") and h.get_sizes().size else 6
+            new_handles.append(Line2D(
+                [0], [0],
+                linestyle='',
+                marker='o',
+                markersize=size,
+                markerfacecolor=color,
+                markeredgecolor=color
+            ))
+        else:
+            # 其它类型保留原 handle
+            new_handles.append(h)
+
+    # 4) 在 Figure 上绘制最终 legend
+    fig.legend(
+        handles=new_handles,
+        labels=clean_labels,
+        loc='upper left',
+        bbox_to_anchor=bbox_to_anchor,
+        ncol=ncol,
+        frameon=False,
+        handlelength=1.0,
+        handleheight=1.0,
+        handletextpad=0.4,
+        labelspacing=0.3
+    )
 
 # ====== 使用方法 ======
 set_plot_style(font_size=12, font_family='Arial')
@@ -249,12 +356,13 @@ set_plot_style(font_size=12, font_family='Arial')
 df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_{config.INPUT_FILES[1]}.xlsx", index_col=0)
 df_ghg_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_{config.INPUT_FILES[0]}.xlsx", index_col=0)
 df_price = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/03_price.xlsx", index_col=0)
+df_bio = df_ghg_bio - df_ghg
+df_bio.to_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_bio.xlsx")
 
 df_ghg = df_ghg.loc[df_ghg.index >= config.START_YEAR].copy()
-df_ghg_bio = df_ghg_bio.loc[df_ghg_bio.index >= config.START_YEAR].copy()
+df_bio = df_bio.loc[df_bio.index >= config.START_YEAR].copy()
 df_price = df_price[df_price.index >= config.START_YEAR].copy()
 
-df_ghg_bio = df_ghg_bio - df_ghg
 # --- 参数 ---
 n_cols = 2
 n_rows = 3
@@ -265,26 +373,26 @@ fig, axes = plt.subplots(n_rows, n_cols,
                          constrained_layout=False)
 axes = axes.flatten()
 # --- 逐列作图 ---
-stacked_area_pos_neg(axes[0], df_ghg.iloc[:, :4], colors=['#DD847E', '#DFDD89','#A7D398', '#74A3D4'],title_name='Carbon sequestration cost',ylabel='Million AU$')
-stacked_area_pos_neg(axes[1], df_ghg_bio.iloc[:, :4], colors=['#DD847E', '#DFDD89','#A7D398', '#74A3D4'], title_name='Biodiversity restoration cost',ylabel='')
-stacked_area_pos_neg(axes[2], df_ghg.iloc[:, 5:9], colors=['#f7dc68', '#f46c3f', '#2e9599', '#a7226f'],title_name='Carbon sequestration',ylabel='MtCO2e')
-stacked_area_pos_neg(axes[3], df_ghg_bio.iloc[:, 10:13], colors=['#ffe3b3', '#92de8b', '#0bb68c'],title_name='Biodiversity restoration',ylabel='Mha')
+stacked_area_pos_neg(axes[0], df_ghg.iloc[:, :4], colors=['#DD847E', '#DFDD89','#A7D398', '#74A3D4'],title_name='GHG reductions and removals cost',ylabel='Million AU$')
+stacked_area_pos_neg(axes[1], df_bio.iloc[:, :4], colors=['#DD847E', '#DFDD89','#A7D398', '#74A3D4'], title_name='Biodiversity restoration cost',ylabel='')
+stacked_area_pos_neg(axes[2], df_ghg.iloc[:, 5:9], colors=['#f7dc68', '#f46c3f', '#2e9599', '#a7226f'],title_name='GHG reductions and removals',ylabel='MtCO2e')
+stacked_area_pos_neg(axes[3], df_bio.iloc[:, 10:13], colors=['#ffe3b3', '#92de8b', '#0bb68c'],title_name='Biodiversity restoration',ylabel='Mha')
 # plot_line_with_points(axes[4], df_price.iloc[:, 4:5], color='black', title_name='Shadow carbon price',ylabel='AU$ tCO2e-1')
 # plot_line_with_points(axes[5], df_price.iloc[:, 5:6], color='black',title_name='Shadow biodiversity price',ylabel='AU$ ha-1')
 
-plot_scatter_with_fit(axes[4], df_price.iloc[:, 4:5],title_name='Shadow carbon price',ylabel='AU$ tCO2e-1',legend_postiton=(0.5, 1))
-plot_scatter_with_fit(axes[5], df_price.iloc[:, 5:6],title_name='Shadow biodiversity price',ylabel='AU$ ha-1',legend_postiton=(0.0, 1))
+# plot_scatter_with_fit(axes[4], df_price.iloc[:, 4:5],title_name='Shadow carbon price',ylabel='AU$ tCO2e-1',legend_postiton=(0.5, 1))
+# plot_scatter_with_fit(axes[5], df_price.iloc[:, 5:6],title_name='Shadow biodiversity price',ylabel='AU$ ha-1',legend_postiton=(0.0, 1))
 
-draw_legend(axes[0],bbox_to_anchor=(0.92, 0.7)) #
-draw_legend(axes[2],bbox_to_anchor=(0.45, 0.4), ncol=1)
-draw_legend(axes[3],bbox_to_anchor=(0.94, 0.4), ncol=1)
+draw_legend(axes[0],bbox_to_anchor=(0.11, 0.7)) #
+draw_legend(axes[2],bbox_to_anchor=(0.13, 0.4), ncol=1)
+draw_legend(axes[3],bbox_to_anchor=(0.63, 0.4), ncol=1)
 
 plt.subplots_adjust(left=0.1,  # 图像左边界（0 = 最左，1 = 最右）
                     right=0.98,  # 图像右边界
                     top=0.95,  # 图像上边界
                     bottom=0.05,  # 图像下边界
                     hspace=0.42,  # 子图上下间距
-                    wspace=0.3)  # 子图左右间距
+                    wspace=0.2)  # 子图左右间距
 
 # 手动上移第二行图像，增大第一、二行之间的间距
 for i in [2, 3]:  # 第二行的两个图
@@ -292,11 +400,15 @@ for i in [2, 3]:  # 第二行的两个图
     axes[i].set_position([pos.x0, pos.y0 + 0.03, pos.width, pos.height])
 
 
-# 手动下移第三行图像，增大第二、三行之间的间距
-for i in [4, 5]:  # 第三行的两个图
-    pos = axes[i].get_position()
-    axes[i].set_position([pos.x0, pos.y0+0.015, pos.width, pos.height])
+# # 手动下移第三行图像，增大第二、三行之间的间距
+# for i in [4, 5]:  # 第三行的两个图
+#     pos = axes[i].get_position()
+#     axes[i].set_position([pos.x0, pos.y0+0.015, pos.width, pos.height])
 
+for i in [4, 5]:
+    fig.delaxes(axes[i])
+
+os.makedirs(f"{config.TASK_DIR}/carbon_price/Paper_figure", exist_ok=True)
 plt.savefig(f"{config.TASK_DIR}/carbon_price/Paper_figure/02_draw_stackedarea.png", dpi=300, bbox_inches='tight')
 # fig.align_ylabels(axes)
 fig.show()

@@ -123,22 +123,22 @@ def sns_two_df_comparison(ax, df1, df2, col, colors=('#ffb216', '#6db50a'),
 
     # —— 美化部分 —— #
     # 1) 设背景色
-    ax.set_facecolor('#f0f0f0')  # 浅灰
-
-    # 2) 添加白色网格线（只要主刻度）
+    ax.set_facecolor('#E4E4E4')  # 浅灰
+    #
+    # # 2) 添加白色网格线（只要主刻度）
     ax.grid(True, color='white', linewidth=2)
-
+    #
     # 3) 加粗主刻度线，让它们更显眼
-    ax.tick_params(which='major', length=tick_length, width=1.5, color='gray')
+    ax.tick_params(which='major', length=tick_length, width=1.5, color='black')
     ax.set_title(col, pad=6)
 
     ax.set_xlabel('')
     ax.set_ylabel('')
 
-    # 5) 坐标轴标签依旧留空，轴线加粗为白色
+    # # 5) 坐标轴标签依旧留空，轴线加粗为白色
     for spine in ax.spines.values():
         spine.set_linewidth(border_width)
-        spine.set_edgecolor('white')
+        spine.set_edgecolor('black')
 
     # 最后移除图例、网格外的其它装饰时，如有需要，可再微调
     legend = ax.get_legend()
@@ -152,22 +152,24 @@ columns_name = ["cost_ag(M$)", "cost_am(M$)", "cost_non-ag(M$)", "cost_transitio
                 "cost_amortised_transition_ag2non-ag(M$)", "revenue_ag(M$)", "revenue_am(M$)", "revenue_non-ag(M$)",
                 "GHG_ag(MtCOe2)", "GHG_am(MtCOe2)", "GHG_non-ag(MtCOe2)", "GHG_transition(MtCOe2)",
                 "BIO_ag(M ha)", "BIO_am(M ha)", "BIO_non-ag(M ha)"]
-title_name = ["AG Cost", "AM cost", "NON-AG cost", "Transition cost (AG to AG)",
-              "Amortised Transition cost (AG to NON-AG)", "AG Revenue", "AM revenue", "NON-AG revenue",
-              "AG GHG emission", "AM GHG emission", "NON-AG GHG emission", "Transition GHG emision",
-              "AG Biodiversity", "AM Biodiversity", "NON-AG Biodiversity "]
+title_name = ["Ag cost", "AM cost", "Non-ag cost", "Transition cost (AG to AG)",
+              "Amortised transition cost (AG to NON-AG)", "Ag revenue", "AM revenue", "Non-ag revenue",
+              "Ag GHG emission", "AM GHG emission", "Non-ag GHG emission", "Transition GHG emission",
+              "Ag biodiversity", "AM biodiversity", "Non-ag biodiversity "]
 col_map = dict(zip(columns_name, title_name))
 df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/01_origin_{config.INPUT_FILES[1]}.xlsx", index_col=0)
 df_ghg_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/01_origin_{config.INPUT_FILES[0]}.xlsx", index_col=0)
+df_bio = df_ghg_bio-df_ghg
+df_bio.to_excel(f"{config.TASK_DIR}/carbon_price/excel/01_origin_bio.xlsx")
 
 df_ghg = df_ghg.loc[df_ghg.index >= config.START_YEAR].copy()
-df_ghg_bio = df_ghg_bio.loc[df_ghg_bio.index >= config.START_YEAR].copy()
+df_bio = df_bio.loc[df_bio.index >= config.START_YEAR].copy()
 # 只保留匹配的列，并重命名
 df_ghg = df_ghg[[col for col in df_ghg.columns if col in col_map]]
 df_ghg = df_ghg.rename(columns=col_map)
 
-df_ghg_bio = df_ghg_bio[[col for col in df_ghg_bio.columns if col in col_map]]
-df_ghg_bio = df_ghg_bio.rename(columns=col_map)
+df_bio = df_bio[[col for col in df_bio.columns if col in col_map]]
+df_bio = df_bio.rename(columns=col_map)
 # %%
 
 # --- 参数 ---
@@ -187,13 +189,13 @@ for ax in axes[len(cols_list):]:  # len(cols_list) == 15
 for idx, col in enumerate(cols_list):
     if 'GHG' in col:
         sns_two_df_comparison(ax=axes[idx], df1=df_ghg, df2=None, col=col, label1='Emission targets',
-                              label2='Emission & biodiversity targets')
+                              label2='Emission & biodiversity targets \n- emission targets')
     elif 'Biodiversity' in col:
-        sns_two_df_comparison(ax=axes[idx], df1=None, df2=df_ghg_bio, col=col, label1='Emission targets',
-                              label2='Emission & biodiversity targets')
+        sns_two_df_comparison(ax=axes[idx], df1=None, df2=df_bio, col=col, label1='Emission targets',
+                              label2='Emission & biodiversity targets \n- emission targets')
     else:
-        sns_two_df_comparison(ax=axes[idx], df1=df_ghg, df2=df_ghg_bio, col=col, label1='Emission targets',
-                              label2='Emission & biodiversity targets')
+        sns_two_df_comparison(ax=axes[idx], df1=df_ghg, df2=df_bio, col=col, label1='Emission targets',
+                              label2='Emission & biodiversity targets \n- emission targets')
 
 # --- 全局微调间距 ---
 plt.subplots_adjust(left=0.1,  # 图像左边界（0 = 最左，1 = 最右）
