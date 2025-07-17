@@ -24,19 +24,19 @@ COST_DICT = {
 }
 
 KEY_TO_COLUMN_MAP = {
-    "opportunity_cost": "AG opportunity cost(M$)",
-    "am_net_cost": "AM net Cost(M$)",
-    "non-ag_net_cost": "NON-AG net cost(M$)",
+    "opportunity_cost": "Ag opportunity cost(M$)",
+    "am_net_cost": "AM net cost(M$)",
+    "non-ag_net_cost": "Non-ag net cost(M$)",
     "transition_cost": "Transition cost(M$)",
     "cost": "All cost(M$)",
-    "ghg_ag": "AG carbon sequestration (MtCO2e)",
-    "ghg_am": "AM carbon sequestration (MtCO2e)",
-    "ghg_non-ag": "NON-AG carbon sequestration (MtCO2e)",
-    "ghg_tran": "Transition carbon sequestration (MtCO2e)",
-    "ghg": "Carbon sequestration (MtCO2e)",
-    "bio_ag": "AG biodiversity restoration (Mha)",
+    "ghg_ag": "Ag GHG reductions (MtCO2e)",
+    "ghg_am": "AM GHG reductions and removals (MtCO2e)",
+    "ghg_non-ag": "Non-ag GHG removals (MtCO2e)",
+    "ghg_tran": "Transition GHG reductions (MtCO2e)",
+    "ghg": "GHG reductions and removals (MtCO2e)",
+    "bio_ag": "Ag biodiversity restoration (Mha)",
     "bio_am": "AM biodiversity restoration (Mha)",
-    "bio_non-ag": "NON-AG biodiversity restoration (Mha)",
+    "bio_non-ag": "Non-ag biodiversity restoration (Mha)",
     "bio": "Biodiversity restoration (Mha)",
 }
 
@@ -44,7 +44,7 @@ KEY_TO_COLUMN_MAP = {
 REVENUE_DICT = {key.replace('cost', 'revenue'): value for key, value in COST_DICT.items()}
 
 
-TASK_NAME = "20250705_Paper2_Results"
+TASK_NAME = "20250712_Paper2_Results"
 
 INPUT_FILES = [
     'Run_2_GHG_high_BIO_high',
@@ -62,5 +62,5 @@ NAME_DICT = {
 }
 
 START_YEAR = 2025
-COST_COLUMN = ["AG opportunity cost(M$)", "AM net cost(M$)",  "NON-AG net cost(M$)", "Transition cost(M$)"]
+COST_COLUMN = ["Ag opportunity cost(M$)", "AM net cost(M$)",  "Non-ag net cost(M$)", "Transition cost(M$)"]
 TASK_DIR = f'../../../output/{TASK_NAME}'
