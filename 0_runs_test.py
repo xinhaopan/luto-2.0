@@ -1,5 +1,5 @@
 import os
-os.environ['GRB_LICENSE_FILE'] = r'C:\Users\s222552331\gurobi\gurobi_xp.lic'
+# os.environ['GRB_LICENSE_FILE'] = r'C:\Users\s222552331\gurobi\gurobi_xp.lic'
 import luto.simulation as sim
 import luto.settings as settings
 
