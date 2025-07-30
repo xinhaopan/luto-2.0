@@ -63,6 +63,7 @@ def npy_to_map(input_arr, output_tif, proj_file,
     if lumap.ndim != 1:
         raise ValueError(f"{input_arr} 中的数组不是一维的")
     if len(lumap) != len(nonzeroes[0]):
+        print(f"Warning: {input_arr} 的长度为 {len(lumap)}, proj_file 中有效像元数量为 {len(nonzeroes[0])}.")
         raise ValueError("lumap 的长度与 proj_file 中的有效像元数量不一致")
 
     # 3) 构建全图，并赋值

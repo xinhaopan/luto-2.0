@@ -97,7 +97,7 @@ def download_one(platform, base_name, file_name, local_root):
 
 if __name__ == "__main__":
     platform = "NCI"
-    base_names = ["20250705_Paper1_Results_2"]
+    base_names = ["20250722_Paper2_Results_res13"]
     local_root = "../../output"
 
     for base_name in base_names:
