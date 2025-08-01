@@ -96,8 +96,8 @@ def download_one(platform, base_name, file_name, local_root):
         transport.close()
 
 if __name__ == "__main__":
-    platform = "NCI"
-    base_names = ["20250722_Paper2_Results_res13"]
+    platform = "HPC"
+    base_names = ["20250730_price_task"]
     local_root = "../../output"
 
     for base_name in base_names:
@@ -118,7 +118,7 @@ if __name__ == "__main__":
         s.close(); tr.close()
 
         df = pd.read_csv(local_csv)
-        file_names = [fn.replace('.', '_') for fn in df.columns[1:]]
+        file_names = [fn.replace('.', '.') for fn in df.columns[1:]]
 
         # 2) 并行下载各子目录
         Parallel(n_jobs=9)(
