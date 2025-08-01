@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250730_price_task'],
+    'TASK_NAME': ['20250802_price_task2'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
@@ -57,8 +57,8 @@ settings_name_dict = {
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
-grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
-# grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
+# grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
+grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
 create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 
