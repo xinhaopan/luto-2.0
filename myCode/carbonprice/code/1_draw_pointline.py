@@ -1,233 +1,209 @@
 import os
-
-import tools.config as config
-
+import math
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
-from matplotlib.ticker import MaxNLocator
 import matplotlib as mpl
-import math
+from matplotlib.ticker import FuncFormatter, MaxNLocator
+import tools.config as config
 
-sns.set_theme(style="ticks")
+# ------------------- Style -------------------
+# 先设 darkgrid 背景
+sns.set_theme(style="darkgrid")
+plt.rcParams.update({
+    "xtick.bottom": True, "ytick.left": True,   # 打开刻度
+    "xtick.top": False,  "ytick.right": False,  # 需要的话也可开
+    "xtick.direction": "out", "ytick.direction": "out",
+    "xtick.major.size": 4, "ytick.major.size": 4,
+    "xtick.major.width": 1.2, "ytick.major.width": 1.2,
+})
+
 
 def set_plot_style(font_size=12, font_family='Arial'):
-    """
-    设置 matplotlib 的统一字体风格和大小（适用于 ax 和 fig.text）
-
-    参数:
-    - font_size: int，字体大小
-    - font_family: str，字体名称，如 'Arial', 'DejaVu Sans', 'Times New Roman'
-    """
     mpl.rcParams.update({
-        'font.size': font_size,
-        'font.family': font_family,
-        'axes.titlesize': font_size,
-        'axes.labelsize': font_size,
-        'xtick.labelsize': font_size,
-        'ytick.labelsize': font_size,
-        'legend.fontsize': font_size,
-        'figure.titlesize': font_size
+        'font.size': font_size, 'font.family': font_family,
+        'axes.titlesize': font_size, 'axes.labelsize': font_size,
+        'xtick.labelsize': font_size, 'ytick.labelsize': font_size,
+        'legend.fontsize': font_size, 'figure.titlesize': font_size
     })
 
+set_plot_style(font_size=12, font_family='Arial')
 
-# ====== 使用方法 ======
-set_plot_style(font_size=12, font_family='Arial')  # 你可以换成你想要的字体
-# def sns_two_df_comparison(ax, df1, df2, col, colors=('#ffb216', '#6db50a'),
-#                           label1='DF1', label2='DF2', y_thousands=True, tick_length=4, border_width=1.5):
-#     """
-#     在给定 `ax` 上画 df1 与 df2 指定列的对比折线图，统一字体、刻度样式、边框加粗、去掉图例与网格。
-#     """
-#     # 画 DF1（如果有）
-#     if df1 is not None and col in df1.columns:
-#         sns.lineplot(x=df1.index, y=df1[col], ax=ax,
-#                      color=colors[0], markersize=6, linewidth=1.5, marker='o',
-#                      markeredgecolor=colors[0], label=label1)
-#         df = df1  # 这里 df1 是主要数据源
-#
-#     # 画 DF2（如果有）
-#     if df2 is not None and col in df2.columns:
-#         sns.lineplot(x=df2.index, y=df2[col], ax=ax,
-#                      color=colors[1], markersize=6, linewidth=1.5, marker='o',
-#                      markeredgecolor=colors[1], label=label2)
-#         df = df2  # 如果 df2 存在，则覆盖 df1 的数据源
-#
-#     ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
-#     ylim = ax.get_ylim()
-#     if abs(ylim[1] - ylim[0]) < 3:
-#         ax.yaxis.set_major_formatter(
-#             FuncFormatter(lambda x, _: f'{x:.2f}')
-#         )
-#     else:
-#         if y_thousands:
-#             ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
-#
-#     x = df.index.values.astype(float)
-#     ax.set_xlim(x.min(), x.max())
-#     start, end = int(df.index.min()), int(df.index.max())
-#     ax.set_xticks(range(start, end + 1, 5))
-#     # 标题、坐标轴标签
-#     ax.set_title(col, pad=6)
-#     ax.set_xlabel('')
-#     ax.set_ylabel('')
-#
-#     # 刻度字体和方向
-#     ax.tick_params(axis='both', direction='out', length=tick_length, width=1.2, color='black')
-#
-#     # 去网格
-#     ax.grid(False)
-#
-#     # 去图例
-#     legend = ax.get_legend()
-#     if legend is not None:
-#         legend.remove()
-#
-#     # 加粗边框
-#     for spine in ax.spines.values():
-#         spine.set_color('black')  # 边框颜色
-#         spine.set_linewidth(border_width)
+# 原始列名 -> 展示标题（并据此分组）
+COLUMNS_NAME = [
+    "cost_ag(M$)", "cost_am(M$)", "cost_non-ag(M$)", "cost_transition_ag2ag(M$)",
+    "cost_amortised_transition_ag2non-ag(M$)", "revenue_ag(M$)", "revenue_am(M$)", "revenue_non-ag(M$)",
+    "GHG_ag(MtCOe2)", "GHG_am(MtCOe2)", "GHG_non-ag(MtCOe2)", "GHG_transition(MtCOe2)",
+    "BIO_ag(M ha)", "BIO_am(M ha)", "BIO_non-ag(M ha)"
+]
+TITLE_NAME = [
+    "Ag cost", "AM cost", "Non-ag cost", "Transition cost (AG→AG)",
+    "Amortised transition cost (AG→Non-ag)", "Ag revenue", "AM revenue", "Non-ag revenue",
+    "Ag GHG emissions", "AM GHG emissions", "Non-ag GHG emissions", "Transition GHG emissions",
+    "Ag biodiversity", "AM biodiversity", "Non-ag biodiversity"
+]
+COL_MAP = dict(zip(COLUMNS_NAME, TITLE_NAME))
 
-
-def sns_two_df_comparison(ax, df1, df2, col, colors=('#ffb216', '#6db50a'),
-                          label1='DF1', label2='DF2', y_thousands=True,
-                          tick_length=4, border_width=1.5):
-    # 画 DF1（如果有）
-    if df1 is not None and col in df1.columns:
-        sns.lineplot(x=df1.index, y=df1[col], ax=ax,
-                     color=colors[0], markersize=6, linewidth=1.5, marker='o',
-                     markeredgecolor=colors[0], label=label1)
-        df = df1  # 这里 df1 是主要数据源
-
-    # 画 DF2（如果有）
-    if df2 is not None and col in df2.columns:
-        sns.lineplot(x=df2.index, y=df2[col], ax=ax,
-                     color=colors[1], markersize=6, linewidth=1.5, marker='o',
-                     markeredgecolor=colors[1], label=label2)
-        df = df2  # 如果 df2 存在，则覆盖 df1 的数据源
-
+def _format_yaxis(ax):
     ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
-    ylim = ax.get_ylim()
-    if abs(ylim[1] - ylim[0]) < 3:
-        ax.yaxis.set_major_formatter(
-            FuncFormatter(lambda x, _: f'{x:.2f}')
-        )
+    y0, y1 = ax.get_ylim()
+    if abs(y1 - y0) < 3:
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x:.2f}"))
     else:
-        if y_thousands:
-            ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x:,.0f}"))
 
-    x = df.index.values.astype(float)
-    ax.set_xlim(x.min()-0.5, x.max()+0.5)
-    start, end = int(df.index.min()), int(df.index.max())
-    ax.set_xticks(range(start, end + 1, 5))
+def plot_data(df0, df1, df2, name0, name1, name2):
+    """三套数据对比的多子图 + 底部统一图例 + 左侧单位标签"""
+    start_year = getattr(config, "START_YEAR", None)
+    if start_year is not None:
+        df0 = df0[df0["Year"] >= start_year]
+        df1 = df1[df1["Year"] >= start_year]
+        df2 = df2[df2["Year"] >= start_year]
+    # 只保留需要的列，并按既定顺序排列（便于单位分组）
+    keep = [c for c in COLUMNS_NAME if c in df0.columns]
+    y_columns = [c for c in keep if c != "Year"]
 
-    # —— 美化部分 —— #
-    # 1) 设背景色
-    ax.set_facecolor('#E4E4E4')  # 浅灰
-    #
-    # # 2) 添加白色网格线（只要主刻度）
-    ax.grid(True, color='white', linewidth=2)
-    #
-    # 3) 加粗主刻度线，让它们更显眼
-    ax.tick_params(which='major', length=tick_length, width=1.5, color='black')
-    ax.set_title(col, pad=6)
+    # 展示标题列表（等长于 y_columns）
+    y_titles = [COL_MAP.get(c, c) for c in y_columns]
 
-    ax.set_xlabel('')
-    ax.set_ylabel('')
+    n_cols = 4
+    n_rows = (len(y_columns) + n_cols - 1) // n_cols
+    fig, axes = plt.subplots(n_rows, n_cols,
+                             figsize=(4.0 * n_cols, 3.2 * n_rows + 0.6),
+                             constrained_layout=False)
+    axes = axes.flatten()
 
-    # # 5) 坐标轴标签依旧留空，轴线加粗为白色
-    for spine in ax.spines.values():
-        spine.set_linewidth(border_width)
-        spine.set_edgecolor('black')
+    series = [
+        {"df": df0, "label": name0, "color": "#e74c3c", "marker": "o"},
+        {"df": df1, "label": name1, "color": "#ffb216", "marker": "s"},
+        {"df": df2, "label": name2, "color": "#6db50a", "marker": "^"},
+    ]
 
-    # 最后移除图例、网格外的其它装饰时，如有需要，可再微调
-    legend = ax.get_legend()
-    if legend:
-        legend.remove()
+    legend_handles, legend_labels = [], []
 
-
-
-
-columns_name = ["cost_ag(M$)", "cost_am(M$)", "cost_non-ag(M$)", "cost_transition_ag2ag(M$)",
-                "cost_amortised_transition_ag2non-ag(M$)", "revenue_ag(M$)", "revenue_am(M$)", "revenue_non-ag(M$)",
-                "GHG_ag(MtCOe2)", "GHG_am(MtCOe2)", "GHG_non-ag(MtCOe2)", "GHG_transition(MtCOe2)",
-                "BIO_ag(M ha)", "BIO_am(M ha)", "BIO_non-ag(M ha)"]
-title_name = ["Ag cost", "AM cost", "Non-ag cost", "Transition cost (AG to AG)",
-              "Amortised transition cost (AG to NON-AG)", "Ag revenue", "AM revenue", "Non-ag revenue",
-              "Ag GHG emission", "AM GHG emission", "Non-ag GHG emission", "Transition GHG emission",
-              "Ag biodiversity", "AM biodiversity", "Non-ag biodiversity "]
-col_map = dict(zip(columns_name, title_name))
-df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/01_origin_{config.INPUT_FILES[1]}.xlsx", index_col=0)
-df_ghg_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/01_origin_{config.INPUT_FILES[0]}.xlsx", index_col=0)
-df_bio = df_ghg_bio-df_ghg
-df_bio.to_excel(f"{config.TASK_DIR}/carbon_price/excel/01_origin_bio.xlsx")
-
-df_ghg = df_ghg.loc[df_ghg.index >= config.START_YEAR].copy()
-df_bio = df_bio.loc[df_bio.index >= config.START_YEAR].copy()
-# 只保留匹配的列，并重命名
-df_ghg = df_ghg[[col for col in df_ghg.columns if col in col_map]]
-df_ghg = df_ghg.rename(columns=col_map)
-
-df_bio = df_bio[[col for col in df_bio.columns if col in col_map]]
-df_bio = df_bio.rename(columns=col_map)
-# %%
-
-# --- 参数 ---
-n_cols = 4
-cols_list = df_ghg.columns  # 需要绘制的列
-n_rows = math.ceil(len(cols_list) / n_cols)  # 不包括图例行
-
-# --- 建立画布 ---
-fig, axes = plt.subplots(n_rows, n_cols,
-                         figsize=(4 * n_cols, 3.2 * (n_rows)),
-                         constrained_layout=False)
-axes = axes.flatten()
-# 把多余的 Axes 关掉（不显示坐标轴、不占空间）
-for ax in axes[len(cols_list):]:  # len(cols_list) == 15
-    ax.axis('off')
-# --- 逐列作图 ---
-for idx, col in enumerate(cols_list):
-    if 'GHG' in col:
-        sns_two_df_comparison(ax=axes[idx], df1=df_ghg, df2=None, col=col, label1='Emission targets',
-                              label2='Emission & biodiversity targets \n- emission targets')
-    elif 'Biodiversity' in col:
-        sns_two_df_comparison(ax=axes[idx], df1=None, df2=df_bio, col=col, label1='Emission targets',
-                              label2='Emission & biodiversity targets \n- emission targets')
+    # 起止年用于设 tick
+    if "Year" in df0.columns:
+        years_all = df0["Year"].dropna()
+        xmin, xmax = int(years_all.min()), int(years_all.max())
     else:
-        sns_two_df_comparison(ax=axes[idx], df1=df_ghg, df2=df_bio, col=col, label1='Emission targets',
-                              label2='Emission & biodiversity targets \n- emission targets')
+        raise ValueError("Input dataframes must contain a 'Year' column.")
 
-# --- 全局微调间距 ---
-plt.subplots_adjust(left=0.1,  # 图像左边界（0 = 最左，1 = 最右）
-                    right=0.95,  # 图像右边界
-                    top=0.95,  # 图像上边界
-                    bottom=0.05,  # 图像下边界
-                    hspace=0.32,  # 子图上下间距
-                    wspace=0.25)  # 子图左右间距
+    for i, (col, title) in enumerate(zip(y_columns, y_titles)):
+        ax = axes[i]
 
-# --- 添加图例 ---
-# 从第一个有效 ax 提取 legend（这里假设第一个图是双线图）
-handles, labels = axes[0].get_legend_handles_labels()
+        for s in series:
+            d = s["df"]
+            if col not in d.columns or d[col].isna().all():
+                continue
+            p = sns.lineplot(
+                data=d, x="Year", y=col, ax=ax,
+                linewidth=1.6, marker=s["marker"], markersize=6,
+                color=s["color"], markeredgecolor=s["color"], label=s["label"]
+            )
+            # 收集唯一图例
+            if s["label"] not in legend_labels:
+                legend_handles.append(p.lines[-1])
+                legend_labels.append(s["label"])
 
-# 添加一个新子图用于图例
-legend_ax = fig.add_axes([0.77, 0.08, 0.15, 0.12])  # [left, bottom, width, height]
-legend_ax.axis('off')
-legend_ax.legend(handles, labels, loc='center', frameon=False)
+        # 轴格式
+        ax.set_title(title, pad=6)
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        ax.set_xlim(xmin - 0.5, xmax + 0.5)
+        ax.set_xticks(range(xmin, xmax + 1, 5))
+        _format_yaxis(ax)
 
-fig.text(0.05, 0.75, 'Million AU$',
-         rotation='vertical',
-         va='center', ha='center')
+        # # 视觉样式
+        # ax.set_facecolor("#E4E4E4")
+        # ax.grid(True, color="white", linewidth=2)
+        ax.tick_params(bottom=True, left=True)
+        # 设置绘图区四条边框（spines）的样式
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.5)
+            spine.set_edgecolor("black")
 
-fig.text(0.075, 0.38, 'tCO2e',
-         rotation='vertical',
-         va='center', ha='center')
+        # 去局部图例
+        leg = ax.get_legend()
+        if leg:
+            leg.remove()
 
-fig.text(0.07, 0.15, 'mha',
-         rotation='vertical',
-         va='center', ha='center')
+    # 关闭空轴
+    for k in range(len(y_columns), len(axes)):
+        axes[k].axis("off")
 
-# --- 保存或显示 ---
-output_path = f'{config.TASK_DIR}/carbon_price/Paper_figure'
-os.makedirs(output_path, exist_ok=True)  # 确保输出目录存在
-fig.savefig(f'{output_path}/01_origin_output.png', dpi=300)
+    # 底部统一图例
+    if len(y_columns) < len(axes):
+        legend_ax = axes[len(y_columns)]  # 右下空白轴
+        legend_ax.axis("off")
+        if legend_handles:
+            legend_ax.legend(
+                legend_handles, legend_labels,
+                loc="center", frameon=False,
+                handlelength=2.0
+            )
+
+    # ------- 按类别添加左侧单位标签 -------
+    # 找到每一类的“第一张图”的行号，用该行的轴位置确定文字的 y 坐标
+    def row_center_y(row_idx):
+        # 该行有效轴的 bbox 求中位
+        row_axes = [axes[row_idx * n_cols + j] for j in range(n_cols)
+                    if row_idx * n_cols + j < len(y_columns)]
+        y0 = min(ax.get_position().y0 for ax in row_axes)
+        y1 = max(ax.get_position().y1 for ax in row_axes)
+        return (y0 + y1) / 2.0
+
+    # 按标题判断类别位置
+    first_cost = next((i for i, t in enumerate(y_titles) if "cost" in t.lower() or "revenue" in t.lower()), None)
+    first_ghg  = next((i for i, t in enumerate(y_titles) if "ghg"  in t.lower()), None)
+    first_bio  = next((i for i, t in enumerate(y_titles) if "biodiversity" in t.lower()), None)
+
+    if first_cost is not None:
+        rc = first_cost // n_cols
+        fig.text(0.05, row_center_y(rc), "Cost (Million AU$)", rotation="vertical", va="center", ha="center")
+    if first_ghg is not None:
+        rg = first_ghg // n_cols
+        fig.text(0.05, row_center_y(rg), "GHG emission (tCO2e)", rotation="vertical", va="center", ha="center")
+    if first_bio is not None:
+        rb = first_bio // n_cols
+        fig.text(0.05, row_center_y(rb), "Biodiversity restoration (Mha)", rotation="vertical", va="center", ha="center")
+
+    # 布局
+    plt.subplots_adjust(left=0.1, right=0.95, top=0.95, bottom=0.12,
+                        hspace=0.32, wspace=0.25)
+    return fig
+
+# ------------------- Load & merge -------------------
+input_files = config.INPUT_FILES
+name0, name1, name2 = input_files[2], input_files[1], input_files[0]
+excel_path = f"{config.TASK_DIR}/carbon_price/excel"
+
+df0 = pd.read_excel(os.path.join(excel_path, f"01_origin_{name0}.xlsx"))
+df1 = pd.read_excel(os.path.join(excel_path, f"01_origin_{name1}.xlsx"))
+df2 = pd.read_excel(os.path.join(excel_path, f"01_origin_{name2}.xlsx"))
+df2 = df2.drop(columns=df2.columns[df2.columns.str.contains('GHG_')])
+# 合并 process 文件（若存在）
+def merge_process(df, name, usecols=range(5)):
+    proc = os.path.join(excel_path, f"02_process_{name}.xlsx")
+    if os.path.exists(proc):
+        df_proc = pd.read_excel(proc, usecols=usecols)
+        df = df.merge(df_proc, on="Year", how="left")
+    return df
+
+df0 = merge_process(df0, name0)
+df1 = merge_process(df1, name1)
+df2 = merge_process(df2, name2)
+
+# 如需置空某些列（按你之前的索引需求，做存在性检查）
+if df0.shape[1] >= 17:
+    df0.iloc[:, 10:17] = None
+if df1.shape[1] >= 17:
+    df1.iloc[:, 14:17] = None
+
+# ------------------- Plot & save -------------------
+fig = plot_data(df0, df1, df2, 'Counterfactual', 'GHG', 'GHG & Biodiversity')
+
+outdir = f"{config.TASK_DIR}/carbon_price/Paper_figure"
+os.makedirs(outdir, exist_ok=True)
+fig.savefig(os.path.join(outdir, "01_point_line.png"),
+            dpi=300, bbox_inches="tight")
 plt.show()

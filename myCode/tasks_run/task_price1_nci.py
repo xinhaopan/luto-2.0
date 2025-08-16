@@ -10,12 +10,12 @@ grid_search = {
     'NUMERIC_FOCUS': [0],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['112GB'],
-    'NCPUS': ['7'],
+    'NCPUS': ['28'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['72:00:00'],
+    'TIME': ['48:00:00'],
 
-    'GHG_percent': [0,0.2,0.4,0.6,0.8,1],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [0,10,20,30,40,50],
+    'GHG_percent': [0.4],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
@@ -57,8 +57,8 @@ settings_name_dict = {
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
-# grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
-grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
-create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
+grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
+# grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
+create_task_runs(task_root_dir, grid_search_settings_df, platform="NCI", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 

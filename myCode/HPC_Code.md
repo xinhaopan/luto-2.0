@@ -3,7 +3,7 @@
 cd /home/remote/s222552331/LUTO2_XH/LUTO2
 ```
 ```
-rm -rf output/20250620*/
+rm -rf output/20250812*/
 ```
 查询作业状态
 ```

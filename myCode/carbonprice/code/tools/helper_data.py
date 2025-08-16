@@ -454,8 +454,8 @@ def calculate_cost(input_files):
                                        ],
                                       "GHG_am_cost", year, row_data)
         row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_0}/am_profit_{year}", '+'),
-                                                  (f"{path_name_1}/am_profit_{year}", '-'),
+                                                 [(f"{path_name_0}/non-ag_profit_{year}", '+'),
+                                                  (f"{path_name_1}/non-ag_profit_{year}", '-'),
                                                   ],
                                                  "GHG_non-ag_cost", year, row_data)
         row_data = process_files_with_operations('.', save_path,
@@ -485,8 +485,8 @@ def calculate_cost(input_files):
                                                   ],
                                                  "BIO_am_cost", year, row_data)
         row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_1}/am_profit_{year}", '+'),
-                                                  (f"{path_name_2}/am_profit_{year}", '-'),
+                                                 [(f"{path_name_1}/non-ag_profit_{year}", '+'),
+                                                  (f"{path_name_2}/non-ag_profit_{year}", '-'),
                                                   ],
                                                  "BIO_non-ag_cost", year, row_data)
         row_data = process_files_with_operations('.', save_path,

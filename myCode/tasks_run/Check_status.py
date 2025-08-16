@@ -1,18 +1,6 @@
 import os
 import re
 import pandas as pd
-import argparse
-
-def parse_filename(filename):
-    # 匹配 GHG 是小数（支持带小数点）和 BIO 是整数
-    match = re.search(r'Run_\d+_GHG_([\d.]+)_BIO_(\d+)', filename)
-    if match:
-        ghg_value = float(match.group(1))  # 例如 '0.2'
-        bio_value = int(match.group(2))    # 例如 '30'
-        return ghg_value, bio_value
-    else:
-        print(f"{filename} No match found.")
-        return None, None
 
 def get_first_subfolder(output_dir):
     # 获取 output/ 目录下的第一个子文件夹
@@ -40,7 +28,7 @@ def get_endyear(output_dir, first_subfolder):
 
 
 # 获取指定目录下的 Run_*/output/ 目录
-base_dir = '../../output/20250730_price_task'
+base_dir = '../../output/20250812_price_task'
 df = pd.read_csv(os.path.join(base_dir, 'grid_search_template.csv'), index_col=0)
 run_dirs = [os.path.join(base_dir, d) for d in df.columns if d.startswith('Run_')]
 data = []
@@ -51,17 +39,14 @@ for run_dir in run_dirs:
     if not os.path.exists(output_dir):
         continue
 
-    ghg, bio = parse_filename(name)
-    if ghg is None or bio is None:
-        continue
-
     first_subfolder = get_first_subfolder(output_dir)
     status = check_status(output_dir, first_subfolder)
     endyear = get_endyear(output_dir, first_subfolder) if status == 'End' else None
 
-    data.append([name, ghg, bio, status, endyear])
+    data.append([name, status, endyear])
 
-# 创建表格并保存为 CSV
-df = pd.DataFrame(data, columns=['name', 'GHG', 'BIO', 'Status', 'Endyear'])
-df.to_csv(f'{base_dir}/output_table.csv', index=False)
+# 创建表格并保存为 CSV（不包含 GHG 和 BIO）
+df_out = pd.DataFrame(data, columns=['name', 'Status', 'Endyear'])
+df_out.to_csv(f'{base_dir}/output_table.csv', index=False)
+print(df_out)
 print("表格已保存至 output_table.csv")

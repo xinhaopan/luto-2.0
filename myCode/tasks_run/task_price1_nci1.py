@@ -10,12 +10,12 @@ grid_search = {
     'NUMERIC_FOCUS': [0],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['112GB'],
-    'NCPUS': ['7'],
+    'NCPUS': ['28'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['72:00:00'],
+    'TIME': ['48:00:00'],
 
-    'GHG_percent': [0.2,0.4,0.6,0.8,1],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [10,20,30,40,50],
+    'GHG_percent': [0.4],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
