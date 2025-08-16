@@ -4,33 +4,35 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250730_price_task'],
+    'TASK_NAME': ['20250812_price_task'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['112GB'],
-    'NCPUS': ['7'],
+    'MEM': ['35GB'],
+    'NCPUS': ['3'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['72:00:00'],
+    'TIME': ['15:00:00'],
 
-    'GHG_percent': [0,0.2,0.4,0.6,0.8,1],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [0,10,20,30,40,50],
+    'GHG_EMISSIONS_LIMITS': ['high','off'],
+    'BIODIVERSITY_TARGET_GBF_2': ['high','off'],
+    'GHG_percent': [0.2,0.4,0.6,0.8,1],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [10,20,30,40,50],
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [3],
-    'SIM_YEARS': [[i for i in range(2010,2051,1)]],
+    'RESFACTOR': [5],
+    'SIM_YEARS': [[i for i in range(2010,2051,5)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['high'],
+
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSITY_TARGET_GBF_2': ['high'],
+
     'GBF2_CONSTRAINT_TYPE': ['hard'],
     'GBF2_TARGETS_DICT': [{
         'low': {2030: 0, 2050: 0, 2100: 0},
@@ -52,13 +54,41 @@ grid_search = {
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
 }
 settings_name_dict = {
-    'GHG_percent':'GHG',
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT':'BIO',
+    'GHG_EMISSIONS_LIMITS': 'GHG',
+    'GHG_percent':'GHG_percent',
+    'BIODIVERSITY_TARGET_GBF_2': 'BIO',
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT':'CUT',
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
 grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
-# grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
+
+import re
+grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
+
+def drop_if_percent_not_one(col: str) -> bool:
+    # 匹配 GHG_off_GHG_percent_ 和 _BIO_ 之间的内容
+    m = re.search(r"GHG_off_GHG_percent_([^_]+)_BIO_", col)
+    if not m:
+        return False
+    s = m.group(1)
+    try:
+        return float(s) != 1.0  # 只保留恰好等于 1（含 1.0、1.00 等）
+    except ValueError:
+        return True  # 不是数字就当作“不等于 1”，删除
+
+def drop_if_cut_not_50(col: str) -> bool:
+    # 匹配 BIO_off_CUT_ 后紧跟的数字（遇到非数字停止）
+    m = re.search(r"BIO_off_CUT_([0-9]+)", col)
+    if not m:
+        return False
+    return int(m.group(1)) != 50  # 只保留等于 50
+
+cols_to_drop = [c for c in grid_search_settings_df.columns if drop_if_percent_not_one(c) or drop_if_cut_not_50(c)]
+
+# 删除列
+grid_search_settings_df = grid_search_settings_df.drop(columns=cols_to_drop)
+grid_search_settings_df.to_csv(os.path.join(task_root_dir, 'grid_search_template.csv'))
 create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 

@@ -1,0 +1,84 @@
+name: geomap
+channels:
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/
+dependencies:
+  - python=3.10
+
+  # 基础数据与绘图
+  - matplotlib
+  - numpy
+  - pandas
+  - seaborn
+  - plotnine
+  - statsmodels
+  - scikit-learn
+  - scipy
+
+  # 地理绘图/空间分析核心
+  - geopandas
+  - cartopy
+  - pyproj
+  - shapely
+  - fiona
+  - rasterio
+  - gdal
+  - rtree
+  - h5py
+  - netcdf4
+  - pyogrio
+  - xarray
+  - pointpats
+  - mapclassify
+  - pysal
+  - rasterstats
+  - momepy
+  - spaghetti
+  - mgwr
+  - spreg
+  - spopt
+  - spvcm
+  - segregation
+  - libpysal
+  - mercantile
+  - geographiclib
+  - geopy
+  - tobler
+
+  # 高级可视化与交互扩展
+  - geoviews
+  - holoviews
+  - bokeh
+  - hvplot
+  - plotly
+  - pyqt
+  - folium
+  - xyzservices
+
+  # 地图配色/色板
+  - colormaps
+  - cmaps
+
+  # Jupyter/交互/辅助
+  - ipython
+  - ipykernel
+  - jupyterlab
+  - jupyter
+  - notebook
+
+  # 其他常用依赖
+  - pillow
+  - openpyxl
+  - xlrd
+  - requests
+  - tqdm
+
+  # pip 安装比例尺等工具和其它补充包
+  - pip
+  - pip:
+      - matplotlib-scalebar
+      - matplotlib-map-utils
+      - contextily
+      - cartopy_offlinedata
+      - geopandas-view
+

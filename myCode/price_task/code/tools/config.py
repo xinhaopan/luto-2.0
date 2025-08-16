@@ -44,16 +44,7 @@ KEY_TO_COLUMN_MAP = {
 REVENUE_DICT = {key.replace('cost', 'revenue'): value for key, value in COST_DICT.items()}
 
 
-TASK_NAME = "20250712_Paper2_Results"
-
-INPUT_FILES = [
-    'Run_2_GHG_high_BIO_high',
-    'Run_1_GHG_high_BIO_off',
-    'Run_1_GHG_off_BIO_off',
-    # 'Run_3_off_on',
-    # 'Run_4_off_off',
-]
-
+TASK_NAME = "20250812_price_task"
 
 NAME_DICT = {
     "cp": {"title": "Carbon Price", "unit": "(AU$/tCO2e)"},
@@ -65,5 +56,17 @@ NAME_DICT = {
 START_YEAR = 2025
 COLUMN_NAME = ["Ag", "AM",  "Non-ag", "Transition(ag2ag)","Transition(ag2non-ag)"]
 TASK_DIR = f'../../../output/{TASK_NAME}'
+
+# INPUT_FILES = [
+#     'Run_2_GHG_high_BIO_high',
+#     'Run_1_GHG_high_BIO_off',
+#     'Run_1_GHG_off_BIO_off',
+#     # 'Run_3_off_on',
+#     # 'Run_4_off_off',
+# ]
+import os
+INPUT_FILES = [d for d in os.listdir(TASK_DIR) if os.path.isdir(os.path.join(TASK_DIR, d))]
+
+period=5  # 5年一周期
 
 
