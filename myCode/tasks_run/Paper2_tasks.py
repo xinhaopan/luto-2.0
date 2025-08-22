@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250728_Paper2_Results'],
+    'TASK_NAME': ['20250822_Paper2_Results'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
@@ -24,12 +24,12 @@ grid_search = {
     'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['off'],
+    'GHG_EMISSIONS_LIMITS': ['high, off'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSITY_TARGET_GBF_2': ['off'],
+    'BIODIVERSITY_TARGET_GBF_2': ['high, off'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
     'GBF2_TARGETS_DICT': [{
         'low': {2030: 0, 2050: 0, 2100: 0},
