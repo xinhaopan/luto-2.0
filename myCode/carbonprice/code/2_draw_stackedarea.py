@@ -112,12 +112,15 @@ set_plot_style(font_size=12, font_family='Arial')
 # Load data
 df_all = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/03_cost.xlsx", index_col=0)
 # 按列索引拆分
-df_ghg = df_all.iloc[:, 0:5]       # 第1到第5列
-df_bio = df_all.iloc[:, 6:11]      # 第7到第12列
-df_ghg = df_ghg.loc[df_ghg.index >= config.START_YEAR].copy()
-df_bio = df_bio.loc[df_bio.index >= config.START_YEAR].copy()
-df_ghg.columns = ['Ag','AM','Non-ag','Transition(ag→ag)','Transition(ag→non-ag)']
-df_bio.columns = ['Ag','AM','Non-ag','Transition(ag→ag)','Transition(ag→non-ag)']
+df_ghg_cost = df_all.iloc[:, 0:5]       # 第1到第5列
+df_bio_cost = df_all.iloc[:, 6:11]      # 第7到第12列
+df_ghg_cost = df_ghg_cost.loc[df_ghg_cost.index >= config.START_YEAR].copy()
+df_bio_cost = df_bio_cost.loc[df_bio_cost.index >= config.START_YEAR].copy()
+df_ghg_cost.columns = ['Ag','AM','Non-ag','Transition(ag→ag)','Transition(ag→non-ag)']
+df_bio_cost.columns = ['Ag','AM','Non-ag','Transition(ag→ag)','Transition(ag→non-ag)']
+
+df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_1_GHG_high_BIO_off.xlsx", index_col=0)
+df_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_2_GHG_high_BIO_high.xlsx", index_col=0)
 
 # Set up parameters for 1 row, 2 columns
 n_cols = 2
@@ -128,9 +131,9 @@ fig, axes = plt.subplots(n_rows, n_cols, figsize=(4.5 * n_cols, 4 * n_rows), con
 axes = axes.flatten()
 
 # Plot only GHG cost and Biodiversity restoration cost
-stacked_area_pos_neg(axes[0], df_ghg, colors=['#f39b8b', '#9A8AB3', '#6eabb1', '#eb9132','#84a374'],
+stacked_area_pos_neg(axes[0], df_ghg_cost, colors=['#f39b8b', '#9A8AB3', '#6eabb1', '#eb9132','#84a374'],
                      title_name='GHG reductions and removals cost', ylabel='Cost (Million AU$)')
-stacked_area_pos_neg(axes[1], df_bio, colors=['#f39b8b', '#9A8AB3', '#6eabb1', '#eb9132','#84a374'],
+stacked_area_pos_neg(axes[1], df_bio_cost, colors=['#f39b8b', '#9A8AB3', '#6eabb1', '#eb9132','#84a374'],
                      title_name='Biodiversity restoration cost', ylabel='')
 
 # Draw legend for the first plot
