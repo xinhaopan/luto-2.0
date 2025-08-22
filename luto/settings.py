@@ -55,7 +55,7 @@ RAW_DATA = '../raw_data'
 # Scenario parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
 
-# Climate change assumptions. Options include '126', '245', '360', '585'
+# Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
@@ -103,7 +103,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2010,2051,5)) # range(2020,2050)
+SIM_YEARS = list(range(2020,2051,5)) # range(2020,2050)
 
 
 # Define the objective function
@@ -295,7 +295,7 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 
 
 # ---------------------------------------------------------------------------- #
-# Agricultural management parameters
+# Agricultural Management parameters
 # ---------------------------------------------------------------------------- #
 
 
@@ -473,14 +473,15 @@ The weight of the deviations from target in the objective function.
 
 
 # Water use yield and parameters *******************************
-WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+WATER_LIMITS = 'on'                     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off climate change impact on water yields.
 
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 """
     Water net yield targets: the value represents the proportion of the historical water yields
     that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
@@ -505,9 +506,6 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 """
 
 WATER_STRESS = 0.6                                      # Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield
-WATER_USE_SHARE_AG = 0.7                                # Ag share is 70% across all catchments, could be updated for each specific catchment based on actual data
-WATER_USE_SHARE_DOMESTIC  = 1 - WATER_USE_SHARE_AG      # Domestic share is 30% across all catchments, could be updated for each specific catchment based on actual data
-
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water can cause infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1
