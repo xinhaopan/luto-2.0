@@ -219,6 +219,7 @@ def draw_combined_plots(df_left, df_right, y_label_left, y_label_right,
         # 在中心位置添加Y轴标签
         fig.text(right_left_pos, center_y, y_label_right, va='center', rotation='vertical',
                  fontfamily='Arial')
+    # plt.subplots_adjust(left=0.1, right=0.95, top=0.95, bottom=0.12)
     plt.savefig(f"{config.TASK_DIR}/carbon_price/Paper_figure/03_price.png", dpi=300)
     plt.show()
     return fig, (left_axes, right_axes)
@@ -239,12 +240,12 @@ def _draw_single_plot(df, median, q25, q75, y_label, line_color, area_color,
 
     # 绘制统计信息（注意绘制顺序和裁剪）
     fill = ax.fill_between(df.index, q25, q75, color=area_color, alpha=0.6,
-                           label='25%-75%', zorder=5)
+                           label='Interquartile range', zorder=5)
     if clip_fill:
         # 裁剪填充区域，避免超出轴范围
         fill.set_clip_box(ax.bbox)
 
-    ax.plot(df.index, median, color=line_color, label='Median', linewidth=2, zorder=10)
+    ax.plot(df.index, median, color=line_color, label='Price', linewidth=2, zorder=10)
 
     # 添加标签（智能避免重叠）
     _add_smart_labels(ax, df, other_color, single_plot=True)
@@ -288,11 +289,11 @@ def _draw_dual_plot(df, median, q25, q75, y_label, line_color, area_color,
     # 绘制上图
     _plot_data_lines(ax_top, df, other_color)
     fill_top = ax_top.fill_between(df.index, q25, q75, color=area_color, alpha=0.6,
-                                   label='25%-75%', zorder=5)
+                                   label='Interquartile range', zorder=5)
     if clip_fill:
         fill_top.set_clip_box(ax_top.bbox)
 
-    ax_top.plot(df.index, median, color=line_color, label='Median', linewidth=2, zorder=10)
+    ax_top.plot(df.index, median, color=line_color, label='Price', linewidth=2, zorder=10)
     ax_top.set_ylim(*ylims[1])
     ax_top.grid(True, alpha=0.3)
 
@@ -428,7 +429,7 @@ def _add_smart_labels(ax, df, color, single_plot=False, upper_plot=None, ylims=N
                     xy=(x_end, original_y),  # 线起点（数据坐标）
                     xytext=(x_end + x_offset, adjusted_y),  # 文字位置（数据坐标，不变）
                     va='center', ha='left',
-                    color=label_color, fontsize=8, fontfamily='Arial',
+                    color=label_color, fontsize=12, fontfamily='Arial',
                     arrowprops=dict(
                         arrowstyle='-',
                         color=label_color,
@@ -446,7 +447,7 @@ def _add_smart_labels(ax, df, color, single_plot=False, upper_plot=None, ylims=N
                 ax.text(x_end + x_offset, adjusted_y, col,
                         va='center', ha='left',
                         color=label_color,
-                        fontsize=8,
+                        fontsize=12,
                         fontfamily='Arial',
                         clip_on=False,
                         zorder=20)
@@ -459,7 +460,7 @@ def _add_smart_labels(ax, df, color, single_plot=False, upper_plot=None, ylims=N
                 ax.text(x_end + x_offset, adjusted_y, col,
                         va='center', ha='left',
                         color=label_color,
-                        fontsize=8,
+                        fontsize=12,
                         clip_on=False,
                         zorder=20)
                 print(f"Added backup label: {col}")
@@ -579,17 +580,48 @@ def analyze_masked_arrays_by_path(years, arr_path, arr1_name, arr2_name, percent
 
     return pd.DataFrame(stats).set_index("Year"), arr_dict
 
+import pandas as pd
+
+def add_summary_cols(df: pd.DataFrame, out_path: str) -> pd.DataFrame:
+    """
+    按行计算中位数、25%、75%，并作为新列追加到 DataFrame 右侧。
+    同时保存到 Excel。
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        输入的 DataFrame
+    out_path : str
+        输出 Excel 文件路径
+
+    Returns
+    -------
+    pd.DataFrame
+        包含新列的 DataFrame
+    """
+    df_out = df.copy()
+    df_out["Median"] = df.median(axis=1)
+    df_out["Q25"] = df.quantile(0.25, axis=1)
+    df_out["Q75"] = df.quantile(0.75, axis=1)
+
+    # 保存到 Excel
+    df_out.to_excel(out_path, index=True)
+
+    return df_out
+
+
 years = list(range(2025, 2051))
 arr_path = f"{config.TASK_DIR}/carbon_price/data"
 
 percentile = list(range(90, 100))
 df_carbon,cp_arrs = analyze_masked_arrays_by_path(years, arr_path, "carbon_price", "ghg",percentile)
-df_carbon.to_excel(f"{config.TASK_DIR}/carbon_price/excel/05_uniform_carbon_price.xlsx")
+add_summary_cols(df_carbon,f"{config.TASK_DIR}/carbon_price/excel/05_uniform_carbon_price.xlsx")
+
 df_bio,bp_arrs = analyze_masked_arrays_by_path(years, arr_path, "bio_price", "bio",percentile)
-df_bio.to_excel(f"{config.TASK_DIR}/carbon_price/excel/05_uniform_bio_price.xlsx")
+add_summary_cols(df_bio,f"{config.TASK_DIR}/carbon_price/excel/05_uniform_bio_price.xlsx")
 
 left_params = {
-    'ylims': ((0, 600), (600, 3500)),
+    'ylims': ((0, 300), (300, 1600)),
     'ratio': (3, 1),
     'line_color': '#58abc1',
     'area_color': '#c4e4f4',
@@ -606,8 +638,8 @@ right_params = {
 
 draw_combined_plots(
     df_carbon, df_bio,
-    y_label_left=r"AUD$\ \mathrm{CO}_{2}\,\mathrm{e}^{-1}$",
-    y_label_right=r"AUD$\,\mathrm{ha}^{-1}$",
+    y_label_left=r"AU\$ CO$_2$e$^{-1}$",
+    y_label_right=r"AU\$ ha$^{-1}$",
     left_params=left_params,
     right_params=right_params
 )

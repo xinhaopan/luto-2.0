@@ -65,7 +65,10 @@ TASK_DIR = f'../../../output/{TASK_NAME}'
 #     # 'Run_4_off_off',
 # ]
 import os
-INPUT_FILES = [d for d in os.listdir(TASK_DIR) if os.path.isdir(os.path.join(TASK_DIR, d))]
+INPUT_FILES = [
+    d for d in os.listdir(TASK_DIR)
+    if os.path.isdir(os.path.join(TASK_DIR, d)) and d.startswith("Run")
+]
 
 period=5  # 5年一周期
 
