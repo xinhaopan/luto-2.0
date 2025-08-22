@@ -69,12 +69,12 @@ class SolverInputData:
     non_ag_q_crk: np.ndarray                                            # Non-agricultural yield matrix.
     non_ag_lb_rk: np.ndarray                                            # Non-agricultural lower bound matrices.
 
-    ag_man_g_mrj: dict                                                  # Agricultural management options' GHG emission effects.
-    ag_man_w_mrj: dict                                                  # Agricultural management options' water yield effects.
-    ag_man_b_mrj: dict                                                  # Agricultural management options' biodiversity effects.
-    ag_man_q_mrp: dict                                                  # Agricultural management options' quantity effects.
-    ag_man_limits: dict                                                 # Agricultural management options' adoption limits.
-    ag_man_lb_mrj: dict                                                 # Agricultural management options' lower bounds.
+    ag_man_g_mrj: dict                                                  # Agricultural Management options' GHG emission effects.
+    ag_man_w_mrj: dict                                                  # Agricultural Management options' water yield effects.
+    ag_man_b_mrj: dict                                                  # Agricultural Management options' biodiversity effects.
+    ag_man_q_mrp: dict                                                  # Agricultural Management options' quantity effects.
+    ag_man_limits: dict                                                 # Agricultural Management options' adoption limits.
+    ag_man_lb_mrj: dict                                                 # Agricultural Management options' lower bounds.
 
     water_region_indices: dict[int, np.ndarray]                         # Water region indices -> dict. Key: region.
     water_region_names: dict[int, str]                                  # Water yield for the BASE_YR based on historical water yield layers.
@@ -398,9 +398,9 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
 
 def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, ag_t_mrj):
     print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
-    non_ag_t_mrj = non_ag_transition.get_transition_matrix_ag2nonag(
+    non_ag_t_mrj = non_ag_transition.get_transition_matrix_ag2nonag( 
         data, 
-        target_index,
+        target_index, 
         data.lumaps[base_year], 
         data.lmmaps[base_year]
     ).astype(np.float32)
@@ -678,18 +678,15 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         limits['demand_rescale'] = limits['demand'] / resale_factors['Demand']
     
     if settings.WATER_LIMITS == 'on':
-        limits['water'] = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
-        # limits['water_rescale'] = {k: round(v / resale_factors['Water'], settings.ROUND_DECMIALS) for k, v in limits['water'].items()}
+        limits['water'] = data.WATER_YIELD_TARGETS
         limits['water_rescale'] = {k: v / resale_factors['Water'] for k, v in limits['water'].items()}
         
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[yr_cal]
-        # limits['ghg_rescale'] = round(limits['ghg'] / resale_factors['GHG'],settings.ROUND_DECMIALS)
         limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
 
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limits["GBF2"] = data.get_GBF2_target_for_yr_cal(yr_cal)
-        # limits["GBF2_rescale"] = round(limits["GBF2"] / resale_factors['GBF2'], settings.ROUND_DECMIALS)
         limits["GBF2_rescale"] = limits["GBF2"] / resale_factors['GBF2']
 
     if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
@@ -699,7 +696,7 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
         limits["GBF4_SNES"] = data.get_GBF4_SNES_target_inside_LUTO_by_year(yr_cal)
         limits["GBF4_SNES_rescale"] = limits["GBF4_SNES"] / resale_factors['GBF4_SNES']
-
+        
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
         limits["GBF4_ECNES"] = data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)
         limits["GBF4_ECNES_rescale"] = limits["GBF4_ECNES"] / resale_factors['GBF4_ECNES']
@@ -784,14 +781,21 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     
 
     ag_g_mrj = get_ag_g_mrj(data, target_index)
-    ag_w_mrj = get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)                             # Calculate water net yield matrices based on historical water yield layers
+    ag_w_mrj = (
+        get_ag_w_mrj(data, target_index) if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on' 
+        else get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+    )
     ag_b_mrj = get_ag_b_mrj(data)
     ag_x_mrj = get_ag_x_mrj(data, base_year)
     ag_q_mrp = get_ag_q_mrp(data, target_index)
     ag_ghg_t_mrj = get_ag_ghg_t_mrj(data, base_year)
 
     non_ag_g_rk = get_non_ag_g_rk(data, ag_g_mrj, base_year)
-    non_ag_w_rk = get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)  # Calculate non-ag water yield matrices based on historical water yield layers
+    non_ag_w_rk = (
+        get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year)   
+        if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on' 
+        else get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+    )
     non_ag_b_rk = get_non_ag_b_rk(data, ag_b_mrj, base_year)
     non_ag_x_rk = get_non_ag_x_rk(data, base_year)
     non_ag_q_crk = get_non_ag_q_crk(data, ag_q_mrp, base_year)
@@ -832,9 +836,9 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         "Demand":        rescale_solver_input_data([ag_q_mrp, non_ag_q_crk, ag_man_q_mrp]),
         "Biodiversity":  rescale_solver_input_data([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj]),
         "GHG":(
-          rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
-          if settings.GHG_EMISSIONS_LIMITS != 'off' 
-          else 1.0  
+            rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
+            if settings.GHG_EMISSIONS_LIMITS != 'off' 
+            else 1.0  
         ),        
         "Water":(
             rescale_solver_input_data([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj])

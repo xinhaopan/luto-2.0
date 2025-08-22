@@ -23,12 +23,14 @@
 Pure helper functions and other tools.
 """
 
+import gc
 import sys
 import os.path
 import threading
 import time
 import traceback
 import functools
+import tracemalloc
 
 import pandas as pd
 import numpy as np
@@ -49,6 +51,7 @@ import luto.economics.non_agricultural.water as non_ag_water
 def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
+        
     with open(timestamp_path, 'w') as f: f.write(timestamp)
     return timestamp
 
@@ -324,7 +327,7 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
     
     w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)     # <unit: ML/CELL>
     w_req_r = (w_req_mrj * l_mrj).sum(axis=0).sum(axis=1)
-    w_yield_r = non_ag_water.get_w_net_yield_matrix_env_planting(data, yr_idx)  # <unit: ML/CELL>
+    w_yield_r = non_ag_water.get_w_net_yield_env_planting(data, yr_idx)  # <unit: ML/CELL>
     w_delta_r = - (w_req_r + w_yield_r)
     
     w_license_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>
@@ -538,141 +541,23 @@ def plot_t_mat(t_mat:xr.DataArray):
                 rect = patches.Rectangle((j - 0.5, i - 0.5), 1, 1, hatch='////', fill=False, edgecolor='gray', linewidth=0.0)
                 ax.add_patch(rect)
 
+def set_path() -> str:
+        """Create a folder for storing outputs and return folder name."""
+        years = [i for i in settings.SIM_YEARS]
+        path = f"{settings.OUTPUT_DIR}/{read_timestamp()}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
+        paths = (
+            [path]
+            + [f"{path}/out_{yr}" for yr in years]
+            + [f"{path}/out_{yr}/lucc_separate" for yr in years[1:]]
+        )
 
-def get_out_resfactor(dvar_path:str):
-    # Get the number of pixels in the output decision variable
-    dvar = np.load(dvar_path)
-    dvar_size = dvar.shape[1]
-
-    # Get the number of pixels in full resolution LUMASK
-    full_lumap = pd.read_hdf(os.path.join(settings.INPUT_DIR, "lumap.h5")).to_numpy() 
-    full_size = (full_lumap > 0).sum()
-
-    # Return the resfactor
-    return round((full_size/dvar_size)**0.5)
-
-
-    
-def calc_water(
-    data, 
-    ind:np.ndarray, 
-    ag_w_mrj:np.ndarray, 
-    non_ag_w_rk:np.ndarray, 
-    ag_man_w_mrj:np.ndarray, 
-    ag_dvar:np.ndarray, 
-    non_ag_dvar:np.ndarray, 
-    am_dvar:np.ndarray
-) -> pd.DataFrame:
-    
-    '''
-    Note
-        This function is only used for the `write_water` in the `luto.tools.write` module.
-        Calculate water yields for year given the index. 
-    
-    Return
-     pd.DataFrame, the water yields for year and region.
-    '''
-    
-    # Calculate water yields for year and region.
-    index_levels = ['Landuse Type','Landuse subtype', 'Landuse', 'Water_supply',  'Water Net Yield (ML)']
-
-    # Agricultural contribution
-    ag_mrj = ag_w_mrj[:, ind, :] * ag_dvar[:, ind, :]
-    ag_jm = np.einsum('mrj->jm', ag_mrj)
-    ag_df = pd.DataFrame(
-        ag_jm.reshape(-1).tolist(),
-        index=pd.MultiIndex.from_product(
-            [['Agricultural Landuse'],
-             ['Agricultural Landuse'],
-                data.AGRICULTURAL_LANDUSES,
-                data.LANDMANS])).reset_index()
-    ag_df.columns = index_levels
-
-    # Non-agricultural contribution
-    non_ag_rk = non_ag_w_rk[ind, :] * non_ag_dvar[ind, :]  # Non-agricultural contribution
-    non_ag_k = np.einsum('rk->k', non_ag_rk)                             # Sum over cells
-    non_ag_df = pd.DataFrame(
-        non_ag_k,
-        index= pd.MultiIndex.from_product([
-                ['Non-agricultural Landuse'],
-                ['Non-Agricultural Landuse'],
-                settings.NON_AG_LAND_USES.keys() ,
-                ['dry']  # non-agricultural land is always dry
-    ])).reset_index()
-    non_ag_df.columns = index_levels
-
-    # Agricultural managements contribution
-    AM_dfs = []
-    for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
-        am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
-        am_mrj = ag_man_w_mrj[am][:, ind, :] * am_dvar[am][:, ind, :][:, :, am_j]
-        am_jm = np.einsum('mrj->jm', am_mrj)
-        # water yields for each agricultural management in long dataframe format
-        df_am = pd.DataFrame(
-            am_jm.reshape(-1).tolist(),
-            index=pd.MultiIndex.from_product([
-                ['Agricultural Management'],
-                [am],
-                am_lus,
-                data.LANDMANS
-                ])).reset_index()
-        df_am.columns = index_levels
-        AM_dfs.append(df_am)
-    AM_df = pd.concat(AM_dfs)
-    
-    return pd.concat([ag_df, non_ag_df, AM_df])
-
-
-def calc_major_vegetation_group_ag_area_for_year(
-    GBF3_raw_MVG_area_vr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
-) -> dict[int, float]:
-    prod_data = {}
-
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in biodiv_contr_ag_rj.items()}
-
-    # Numpy magic
-    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
-    
-    for v in range(GBF3_raw_MVG_area_vr.shape[0]):
-        prod_data[v] = GBF3_raw_MVG_area_vr[v, :] * ag_biodiv_degr_r
-
-    return prod_data
-
-
-def calc_species_ag_area_for_year(
-    GBF8_raw_species_area_sr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
-) -> dict[int, float]:
-    prod_data = {}
-
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in biodiv_contr_ag_rj.items()}
-
-    # Numpy magic
-    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
-    
-    for s in range(GBF8_raw_species_area_sr.shape[0]):
-        prod_data[s] = GBF8_raw_species_area_sr[s, :] * ag_biodiv_degr_r
-
-    return prod_data
-
-
-def calc_nes_ag_area_for_year(
-    nes_xr: np.ndarray, lumap: np.ndarray, ag_biodiv_degr_j: dict[int, float]
-) -> dict[int, float]:
-    prod_data = {}
-
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in ag_biodiv_degr_j.items()}
-
-    # Numpy magic
-    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
-    
-    for x in range(nes_xr.shape[0]):
-        prod_data[x] = nes_xr[x, :] * ag_biodiv_degr_r
-
-    return prod_data
-
+        for p in paths:
+            if not os.path.exists(p):
+                os.mkdir(p)
+  
 
 class LogToFile:
-    def __init__(self, log_path, mode:str='w'):
+    def __init__(self, log_path, mode:str='a'):
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
         self.mode = mode
@@ -680,7 +565,6 @@ class LogToFile:
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # Open files for writing here, ensuring they're only created upon function call
             with open(self.log_path_stdout, self.mode) as file_stdout, open(self.log_path_stderr, self.mode) as file_stderr:
                 original_stdout = sys.stdout
                 original_stderr = sys.stderr
@@ -727,7 +611,7 @@ class LogToFile:
 
 def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_event=None):
     '''
-    Log the memory usage of the current process to a file.
+    Log the memory usage of the current process to a file with enhanced accuracy.
     Parameters
         output_dir (str): The directory to save the memory log file.
         mode (str): The mode to open the file. Default is 'a' (append).
@@ -738,39 +622,134 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
         while not stop_event.is_set():
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             process = psutil.Process(os.getpid())
-            memory_usage = process.memory_info().rss
-            children = process.children(recursive=True)
-            # Include the memory usage of the child processes to get accurate memory usage under parallel processing
-            if children:
-                memory_usage += sum(child.memory_info().rss for child in children)
-            memory_usage /= (1024 * 1024 * 1024)
-            file.write(f'{timestamp}\t{memory_usage:.2f}\n')
-            file.flush()  # Ensure data is written to the file immediately
-            time.sleep(interval)
             
+            # Get working set memory (most accurate) - ensure consistency across all processes
+            memory_info = process.memory_info()
+            
+            # Check if working set is available on this system
+            has_wset = hasattr(memory_info, 'wset')
+            
+            if has_wset:
+                wset_memory = memory_info.wset
+            else:
+                wset_memory = memory_info.rss
+            
+            # Include child processes using the SAME metric type
+            children = process.children(recursive=True)
+            if children:
+                for child in children:
+                    try:
+                        child_memory_info = child.memory_info()
+                        if has_wset and hasattr(child_memory_info, 'wset'):
+                            wset_memory += child_memory_info.wset
+                        else:
+                            # Use RSS for consistency if wset not available
+                            wset_memory += child_memory_info.rss
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+            
+            # Write working set memory info (most accurate)
+            wset_gb = wset_memory / (1024 * 1024 * 1024)
+            
+            file.write(f'{timestamp}\t{wset_gb:.3f}\n')
+            file.flush()
+            time.sleep(interval)
 
-# Memory monitoring helper functions            
-# memory_log = []
-# monitoring = False  # Flag to control monitoring
-# monitor_thread = None
 
-# def monitor_memory(interval=0.01):
-#     """Runs in a thread, logs memory usage every `interval` seconds."""
-#     process = psutil.Process(os.getpid())
-#     while monitoring:
-#         mem_mb = process.memory_info().rss / 1024 ** 2
-#         memory_log.append((time.time(), mem_mb))
-#         time.sleep(interval)
+# Enhanced memory monitoring helper functions            
+memory_log = []
+monitoring = False
+monitor_thread = None
+baseline_memory = 0  # Store the baseline memory at start
 
-# def start_memory_monitor():
-#     global monitoring, monitor_thread
-#     memory_log.clear()  # Clear previous log
-#     monitoring = True
-#     monitor_thread = threading.Thread(target=monitor_memory)
-#     monitor_thread.start()
+def monitor_memory(interval=0.01):
+    """
+    Memory monitoring focused on Working Set delta from baseline.
+    Runs in a thread, logs memory usage every `interval` seconds.
+    """
+    process = psutil.Process(os.getpid())
+    
+    while monitoring:
+        try:
+            memory_info = process.memory_info()
+            
+            # Check if working set is available and use consistently
+            has_wset = hasattr(memory_info, 'wset')
+            
+            if has_wset:
+                current_wset_mb = memory_info.wset / 1024 ** 2
+            else:
+                current_wset_mb = memory_info.rss / 1024 ** 2
+            
+            # Calculate delta from baseline
+            delta_mb = current_wset_mb - baseline_memory
+            
+            # Store delta memory info
+            memory_log.append({
+                'time': time.time(),
+                'wset_mb': current_wset_mb,
+                'delta_mb': delta_mb
+            })
+            
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            break
+            
+        time.sleep(interval)
 
-# def stop_memory_monitor():
-#     global monitoring
-#     monitoring = False
-#     if monitor_thread:
-#         monitor_thread.join()
+def start_memory_monitor():
+    """
+    Start Working Set memory monitoring with baseline measurement.
+    Clears previous logs and starts monitoring from current memory usage.
+    """
+    global monitoring, monitor_thread, baseline_memory
+    
+    # Clear previous log
+    memory_log.clear()
+    
+    # Force garbage collection to get clean baseline
+    gc.collect()
+    
+    # Get baseline memory usage
+    process = psutil.Process(os.getpid())
+    memory_info = process.memory_info()
+    
+    has_wset = hasattr(memory_info, 'wset')
+    if has_wset:
+        baseline_memory = memory_info.wset / 1024 ** 2
+    else:
+        baseline_memory = memory_info.rss / 1024 ** 2
+        
+    # Start monitoring
+    monitoring = True
+    monitor_thread = threading.Thread(target=monitor_memory, daemon=True)
+    monitor_thread.start()
+    
+    print("Delta memory monitoring started")
+
+def stop_memory_monitor():
+    """
+    Stop memory monitoring and return delta analysis.
+    Returns a plot showing only the incremental memory usage.
+    """
+    global monitoring
+    
+    monitoring = False
+    if monitor_thread:
+        monitor_thread.join()
+    
+    if not memory_log:
+        print("No memory data collected")
+        return None
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(memory_log)
+    df['Time'] = df['time'] - df['time'].min()
+
+    # Delta memory plot (main focus)
+    plt.plot(df['Time'], df['delta_mb'])
+    plt.xlabel('Time (s)')
+    plt.ylabel('Delta Memory (MB)')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    return plt
