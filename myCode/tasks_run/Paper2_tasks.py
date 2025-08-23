@@ -12,7 +12,7 @@ grid_search = {
     'MEM': ['120GB'],
     'NCPUS': ['30'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['72:00:00'],
+    'TIME': ['48:00:00'],
 
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     # ---------------------------------- Model settings ------------------------------
@@ -24,12 +24,12 @@ grid_search = {
     'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['high, off'],
+    'GHG_EMISSIONS_LIMITS': ['high', 'off'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSITY_TARGET_GBF_2': ['high, off'],
+    'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
     'GBF2_TARGETS_DICT': [{
         'low': {2030: 0, 2050: 0, 2100: 0},
@@ -45,6 +45,7 @@ grid_search = {
     'WATER_LIMITS': ['on'],
     'WATER_CONSTRAINT_TYPE': ['hard'],
     'INCLUDE_WATER_LICENSE_COSTS': [1],
+    'WATER_REGION_DEF': ['Drainage Division'],
 
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
@@ -55,8 +56,8 @@ settings_name_dict = {
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
-# grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
-grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
-create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
+grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
+# grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
+create_task_runs(task_root_dir, grid_search_settings_df, platform="NCI", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 
