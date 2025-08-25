@@ -6,18 +6,53 @@ import rasterio
 import tools.config as config
 
 
-def get_year(path_name):
-    # 列出目录中的所有文件
-    for file_name in os.listdir(path_name):
-        if file_name.startswith("begin_end_compare_"):
-            # 使用正则表达式提取年份
-            match = re.search(r'(\d{4})_(\d{4})', file_name)
-            if match:
-                year_start, year_end = map(int, match.groups())
-                return list(range(year_start, year_end + 1))
-    return []
+def get_year(parent_dir):
+    """
+    遍历指定目录，找到所有以 "out_" 开头的文件夹，并提取年份。
+
+    Args:
+        parent_dir (str): 要搜索的父目录的路径。
+
+    Returns:
+        list[int]: 一个包含所有有效年份的整数列表，并按升序排序。
+                   如果目录不存在或没有找到匹配的文件夹，则返回一个空列表。
+    """
+    # 检查父目录是否存在
+    if not os.path.isdir(parent_dir):
+        print(f"错误: 目录 '{parent_dir}' 不存在或不是一个有效的目录。")
+        return []
+
+    years_list = []
+    # 遍历父目录下的所有项目（文件和文件夹）
+    for item_name in os.listdir(parent_dir):
+        # 构造完整的项目路径
+        full_path = os.path.join(parent_dir, item_name)
+
+        # 检查该项目是否是一个文件夹，并且其名称是否以 "out_" 开头
+        if os.path.isdir(full_path) and item_name.startswith("out_"):
+            # 提取 "out_" 后面的部分作为年份字符串
+            # "out_" 长度为 4，所以我们从第5个字符开始切片
+            year_str = item_name[4:]
+
+            # 尝试将提取的字符串转换为整数，以确保它是一个有效的年份
+            # 如果转换失败（例如，文件夹名为 "out_final"），则忽略它
+            try:
+                year_int = int(year_str)
+                years_list.append(year_int)
+            except ValueError:
+                # 转换失败，说明 "out_" 后面的不是纯数字，静默忽略
+                print(f"提示: 忽略无效格式的文件夹 '{item_name}'")
+                continue
+
+    # 返回排序后的年份列表，使其更加整洁
+    return sorted(years_list)
 
 def get_path(path_name):
+    """
+    获取指定路径下的输出子目录。
+    - path_name: 任务名称或路径名称
+    - 返回: 输出子目录的完整路径
+    """
     output_path = f"{config.TASK_DIR}/{path_name}/output"
     try:
         if os.path.exists(output_path):

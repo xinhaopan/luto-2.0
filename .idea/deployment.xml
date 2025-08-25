@@ -1,46 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="NCI" deleteMissingItems="true" createEmptyFolders="true" exclude=".svn;.cvs;.idea;.DS_Store;.git;.hg;*.hprof;*.pyc;~$*;*.sync.*;" confirmBeforeUploading="false" confirmBeforeDeletion="false" autoUploadExternalChanges="true">
+  <component name="PublishConfigData" autoUpload="Always" serverName="s222552331@hpclogin.deakingpuhpc.deakin.edu.au:22 agent" deleteMissingItems="true" createEmptyFolders="true" exclude=".svn;.cvs;.idea;.DS_Store;.git;.hg;*.hprof;*.pyc;~$*;*.sync.*;" confirmBeforeUploading="false" confirmBeforeDeletion="false" autoUploadExternalChanges="true">
     <option name="confirmBeforeDeletion" value="false" />
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
-      <paths name="HPC">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/home/remote/s222552331/LUTO2_XH/LUTO2" local="$PROJECT_DIR$" web="/" />
-          </mappings>
-          <excludedPaths>
-            <excludedPath local="true" path="$PROJECT_DIR$/output" />
-          </excludedPaths>
-        </serverdata>
-      </paths>
-      <paths name="NCI">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" web="/" />
-          </mappings>
-          <excludedPaths>
-            <excludedPath local="true" path="$PROJECT_DIR$/output" />
-          </excludedPaths>
-        </serverdata>
-      </paths>
-      <paths name="s222552331@hpclogin.deakingpuhpc.deakin.edu.au:22 password">
+      <paths name="s222552331@hpclogin.deakingpuhpc.deakin.edu.au:22 agent">
         <serverdata>
           <mappings>
             <mapping deploy="/home/remote/s222552331/LUTO2_XH/LUTO2" local="$PROJECT_DIR$" />
           </mappings>
           <excludedPaths>
-            <excludedPath local="true" path="$PROJECT_DIR$/output" />
+            <excludedPath local="true" path="//school-les-m.shares.deakin.edu.au/school-les-m/Planet-A/LUF-Modelling/LUTO2_XH/LUTO2/output" />
           </excludedPaths>
         </serverdata>
       </paths>
-      <paths name="xp7241@gadi.nci.org.au:22 password">
+      <paths name="xp7241@gadi.nci.org.au:22 agent (2)">
         <serverdata>
           <mappings>
-            <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" />
+            <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
           <excludedPaths>
-            <excludedPath local="true" path="$PROJECT_DIR$/output" />
+            <excludedPath local="true" path="//school-les-m.shares.deakin.edu.au/school-les-m/Planet-A/LUF-Modelling/LUTO2_XH/LUTO2/output" />
           </excludedPaths>
         </serverdata>
       </paths>
