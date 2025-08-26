@@ -113,12 +113,16 @@ else:
 all_costs_ds.close()
 print("✅ 所有源文件句柄已关闭。")
 
-for y in valid_years:
-    out_dir = os.path.join(target_path_name, f"{y}")
+sorted_years = sorted(total_amortized_costs.year.values.tolist())
+for y in sorted_years:
+    out_dir = os.path.join(target_path_name, f"{valid_years[y]}")
     os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{y}.nc")
+    out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{valid_years[y]}.nc")
     print(f"  - 正在处理年份 {y} -> {out_path}")
+
+    # 明确使用 .sel 来选择该年的 amortized cost
     da_y = total_amortized_costs.sel(year=y)
+
     save2nc(da_y, out_path)
 
 
