@@ -66,59 +66,45 @@ annual_payments = xr.apply_ufunc(
     dask="parallelized",
     output_dtypes=[np.float32],
 ).astype('float32')
-annual_payments.name = 'annual_payment'
-annual_payments = annual_payments.chunk({'year': 1})
 
-# 2. 准备一个列表来收集所有独立的“摊销计划”
-payment_schedules = []
+# 新结构：每年一个独立的 amortized cost 图层（提前准备好空容器）
+amortized_by_year = {int(y): None for y in pv_values_all_years.year.values}
 all_years = pv_values_all_years.year.values
 
-print("  - 步骤2: 为每个成本年份创建独立的摊销计划...")
-for cost_year in all_years:
-    # 提取这一年产生的年金值
-    payment_from_this_year = annual_payments.sel(year=cost_year)
+print("  - 步骤2: 为每个成本年份分摊年金到对应年份...")
 
-    # 确定该年金影响的年份范围
+for cost_year in all_years:
+    # 年金值（不含年份坐标）
+    payment_from_this_year = annual_payments.sel(year=cost_year)
     start_year = cost_year
     end_year = cost_year + horizon - 1
+
+    # 这笔年金分摊到的年份（在 all_years 范围内）
     affected_years = [y for y in all_years if start_year <= y <= end_year]
 
-    if not affected_years:
-        continue
+    for y in affected_years:
+        # 创建一个只有当前年份 y 的 xarray，用于填入年金值
+        y_da = xr.zeros_like(pv_values_all_years.sel(year=[y]), dtype=np.float32)
+        y_da.loc[dict(year=[y])] = payment_from_this_year
+        # print(f"Year {y} after assignment: min={y_da.min().values}, max={y_da.max().values}")
+        if amortized_by_year[cost_year] is None:
+            amortized_by_year[cost_year] = y_da
+        else:
+            amortized_by_year[cost_year] = amortized_by_year[cost_year] + y_da  # dask 会合并任务图
 
-    # 创建一个全尺寸的零数组作为当前计划的模板
-    # 使用 .data 可以避免继承不必要的坐标
-    schedule_template = xr.zeros_like(pv_values_all_years.sel(year=affected_years), dtype=np.float32)
+# 合并所有年份的结果（list → concat）
+print("  - 步骤3: 拼接所有年份的摊销结果...")
 
-    # 将年金值填充到受影响的年份
-    # .loc 在这里是安全的，因为它作用于一个临时的、非Dask累加的变量上
-    schedule_template.loc[dict(year=affected_years)] = payment_from_this_year.drop_vars(
-        'year')  # drop_vars避免坐标冲突
+amortized_list = [amortized_by_year[y] for y in all_years if amortized_by_year[y] is not None]
+total_amortized_costs = xr.concat(amortized_list, dim='year')
 
-    # 将这个构建好的、独立的摊销计划（一个Dask数组）添加到列表中
-    payment_schedules.append(schedule_template)
+# 确保年份顺序一致
+total_amortized_costs = total_amortized_costs.sortby('year')
+total_amortized_costs.name = 'data'
+print("starting to compute...")
+total_amortized_costs = total_amortized_costs.chunk({'year': 1, 'cell': 1024}).compute()
+print("✅ 所有年份的摊销计算已完成。")
 
-# 3. 对列表中的所有摊销计划求和
-#    这是整个计算的核心，Dask会在这里构建一个高效的、宽阔的求和图
-print("  - 步骤3: 对所有摊销计划进行求和以构建最终计算图...")
-if not payment_schedules:
-    # 如果列表为空，返回一个零数组
-    total_amortized_costs = xr.zeros_like(pv_values_all_years, dtype=np.float32)
-else:
-    # sum() 是将列表中的 xarray 对象相加的最直接方式
-    total_amortized_costs = sum(payment_schedules)
-
-# 2. 【关键修复 - 第二步】
-# 手动关闭所有源文件，彻底释放文件句柄
+# 关闭句柄
 all_costs_ds.close()
 print("✅ 所有源文件句柄已关闭。")
-
-for y in valid_years:
-    out_dir = os.path.join(target_path_name, f"{y}")
-    os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{y}.nc")
-    print(f"  - 正在处理年份 {y} -> {out_path}")
-    da_y = total_amortized_costs.sel(year=y)
-    save2nc(da_y, out_path)
-
-
