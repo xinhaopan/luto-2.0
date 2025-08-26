@@ -23,127 +23,104 @@ def get_main_data_variable_name(ds: xr.Dataset) -> str:
         raise ValueError(f"错误：数据集中包含多个数据变量: {data_vars_list}。")
 
 
-def amortize_costs(origin_path_name, target_path_name, amortize_file, years, n_jobs=0, rate=0.07, horizon=30):
+def amortize_costs(origin_path_name, target_path_name, amortize_file, years, njobs=0, rate=0.07, horizon=30):
     """
     【最终修复版 - 逐年输出】计算成本均摊，并为每一年生成一个累计成本文件。
     1. 使用 Dask 构建完整的计算图，计算出所有年份的累计摊销成本。
     2. 在保存阶段，通过循环和切片，为每一年单独触发计算并保存一个文件。
     """
     print(f"开始计算 '{amortize_file}' 的摊销成本... (逐年输出模式)")
-
     # --- 1. 数据加载与预处理 (与之前版本完全相同) ---
     file_paths = [os.path.join(origin_path_name, f'out_{year}', f'{amortize_file}_{year}.nc') for year in years]
-    try:
-        existing_files = [p for p in file_paths if os.path.exists(p)]
-        if not existing_files: raise FileNotFoundError(
-            f"在路径 {origin_path_name} 下找不到任何与 '{amortize_file}' 相关的文件。")
-        valid_years = sorted([int(path.split('_')[-1].split('.')[0]) for path in existing_files])
+    existing_files = [p for p in file_paths if os.path.exists(p)]
+    if not existing_files: raise FileNotFoundError(
+        f"在路径 {origin_path_name} 下找不到任何与 '{amortize_file}' 相关的文件。")
+    valid_years = sorted([int(path.split('_')[-1].split('.')[0]) for path in existing_files])
 
-        all_costs_ds = xr.open_mfdataset(
-            existing_files, combine='nested', concat_dim='year', parallel=True, chunks='auto'
-        ).assign_coords(year=valid_years)
-    except Exception as e:
-        print(f"❌ 数据加载失败: {e}");
-        return
+    all_costs_ds = xr.open_mfdataset(
+        existing_files,
+        engine="h5netcdf",  # 推荐后端
+        combine="nested",
+        concat_dim="year",
+        parallel=False,  # 关键：避免句柄并发问题
+        # chunks={ "cell", "year": -1}  # year 整块、cell 分块
+    ).assign_coords(year=valid_years)
 
-    # --- 2. 核心计算逻辑 (与之前版本完全相同) ---
-    print("\n数据加载完毕，开始构建Dask计算图...")
-    try:
-        cost_variable_name = get_main_data_variable_name(all_costs_ds)
-        pv_values_all_years = all_costs_ds[cost_variable_name]
+    cost_variable_name = get_main_data_variable_name(all_costs_ds)
+    pv_values_all_years = all_costs_ds[cost_variable_name]
 
-        annual_payments = xr.apply_ufunc(
-            lambda x: -1 * npf.pmt(rate, horizon, pv=x, fv=0, when='begin'),
-            pv_values_all_years, dask="parallelized", output_dtypes=[pv_values_all_years.dtype]
-        )
+    annual_payments = xr.apply_ufunc(
+        lambda x: -1 * npf.pmt(rate, horizon, pv=x.astype(np.float64), fv=0, when='begin'),
+        pv_values_all_years,
+        dask="parallelized",
+        output_dtypes=[np.float32],
+    ).astype('float32')
 
-        n_years = len(valid_years)
-        influence_matrix = np.zeros((n_years, n_years))
-        for i in range(n_years):
-            influence_matrix[i, i:min(i + horizon, n_years)] = 1
-        influence_da = xr.DataArray(
-            influence_matrix, dims=['year', 'target_year'],
-            coords={'year': valid_years, 'target_year': valid_years}
-        )
+    # 新结构：每年一个独立的 amortized cost 图层（提前准备好空容器）
+    amortized_by_year = {int(y): None for y in pv_values_all_years.year.values}
+    all_years = pv_values_all_years.year.values
 
-        annual_payments_rechunked = annual_payments.chunk({"year": -1})
+    for cost_year in all_years:
+        # 年金值（不含年份坐标）
+        payment_from_this_year = annual_payments.sel(year=cost_year).drop_vars('year')  # shape = [cell, ...]
+        start_year = cost_year
+        end_year = cost_year + horizon - 1
 
-        total_amortized_costs = xr.apply_ufunc(
-            lambda x, y: np.einsum('...y,yz->...z', x, y),
-            annual_payments_rechunked, influence_da,
-            input_core_dims=[['year'], ['year', 'target_year']],
-            output_core_dims=[['target_year']],
-            dask="parallelized", output_dtypes=[annual_payments.dtype], keep_attrs=True
-        ).rename({'target_year': 'year'})
+        # 这笔年金分摊到的年份（在 all_years 范围内）
+        affected_years = [y for y in all_years if start_year <= y <= end_year]
 
-        print("触发 Dask 计算，将所有年份结果加载到内存... 这可能需要很长时间。")
-        total_amortized_costs = total_amortized_costs.load()
-        print("✅ 计算完成，数据已在内存中。")
+        for y in affected_years:
+            # 创建一个只有当前年份 y 的 xarray，用于填入年金值
+            y_da = xr.zeros_like(pv_values_all_years.sel(year=[y]), dtype=np.float32)
+            y_da.loc[dict(year=[y])] = payment_from_this_year
 
-        # 2. 【关键修复 - 第二步】
-        # 手动关闭所有源文件，彻底释放文件句柄
-        all_costs_ds.close()
-        print("✅ 所有源文件句柄已关闭。")
+            if amortized_by_year[y] is None:
+                amortized_by_year[y] = y_da
+            else:
+                amortized_by_year[y] = amortized_by_year[y] + y_da  # dask 会合并任务图
 
-    except Exception as e:
-        print(f"❌ 在核心计算环节发生错误: {e}");
-        traceback.print_exc();
-        return
+    amortized_list = [amortized_by_year[y] for y in all_years if amortized_by_year[y] is not None]
+    total_amortized_costs = xr.concat(amortized_list, dim='year')
 
-    if n_jobs != 0:
-        # ==================================================================
-        # 2. 使用 Joblib 并行触发计算和保存
-        # ==================================================================
-        print(f"\n开始并行处理 {len(valid_years)} 个年份的计算和保存...")
+    # 确保年份顺序一致
+    total_amortized_costs = total_amortized_costs.sortby('year')
+    total_amortized_costs.name = 'data'
+    print(f"Starting to compute {origin_path_name}...")
+    total_amortized_costs = total_amortized_costs.chunk({'year': 1, 'cell': 1024}).compute()
+    print("End compute.")
+    # 关闭句柄
+    all_costs_ds.close()
 
-        # 定义一个轻量级函数来处理单个年份（这是并行化必需的）
-        def process_year_task(year_to_process, base_path, file_prefix, dask_array, save_function):
-            """
-            这个任务函数负责处理单个年份。
-            它会从Dask数组中选择数据，触发计算，然后保存到文件。
-            """
+    if njobs and njobs > 0:
+        # 线程并行：共享内存，避免把 total_amortized_costs 复制到多个进程
+        def _save_one_year(y: int):
             try:
-                # 构造该年份的输出文件路径
-                output_folder = os.path.join(base_path, f'{year_to_process}')
-                os.makedirs(output_folder, exist_ok=True)
-                target_file_path = os.path.join(output_folder, f'{file_prefix}_amortised_{year_to_process}.nc')
-
-                print(f"  - [进程 {os.getpid()}] 开始处理年份 {year_to_process} -> {target_file_path}")
-
-                # 从Dask计算图中选择当前年份的数据
-                yearly_result_da = dask_array.sel(year=year_to_process)
-
-                # 调用保存函数，这将触发Dask对该年份数据的实际计算
-                save_function(yearly_result_da, target_file_path)
-
-                return f"✅ 年份 {year_to_process} 已成功保存。"
+                out_dir = os.path.join(target_path_name, f"{y}")
+                os.makedirs(out_dir, exist_ok=True)
+                out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{y}.nc")
+                print(f"  - [thread] 保存年份 {y} -> {out_path}")
+                # 直接使用闭包中的 total_amortized_costs（已 .load() 在内存）
+                da_y = total_amortized_costs.sel(year=y)
+                save2nc(da_y, out_path)  # 这里只做 I/O，不再触发大计算
+                return f"✅ 年份 {y} 已保存"
             except Exception as e:
-                return f"❌ 年份 {year_to_process} 处理失败: {e}"
+                return f"❌ 年份 {y} 失败: {e}"
 
-        # 使用 joblib 的 Parallel 和 delayed 来并行执行任务
-        # n_jobs=-1 表示使用所有可用的CPU核心
-        results = Parallel(n_jobs=n_jobs)(
-            delayed(process_year_task)(
-                year_to_save,  # 第一个参数：要处理的年份
-                target_path_name,  # 后续参数：需要传递给任务函数的所有变量
-                amortize_file,
-                total_amortized_costs,  # 将包含Dask计算图的数组传递进去
-                save2nc
-            ) for year_to_save in valid_years
+        results = Parallel(n_jobs=njobs, backend="threading")(
+            delayed(_save_one_year)(y) for y in valid_years
         )
+        for msg in results:
+            print(msg)
 
-    elif n_jobs == 0:
-        for year_to_save in valid_years:
-            output_path = os.path.join(target_path_name, f'{year_to_save}')
-            os.makedirs(output_path, exist_ok=True)
-            target_file_path = os.path.join(output_path, f'{amortize_file}_amortised_{year_to_save}.nc')
-            print(f"  - 正在处理年份 {year_to_save} -> {target_file_path}")
-
-            # 从完整的“计算计划”中，只选择当前年份的数据
-            yearly_result_da = total_amortized_costs.sel(year=year_to_save)
-
-            # 触发计算并保存当前年份的文件
-            save2nc(yearly_result_da, target_file_path)
+    else:
+        # 顺序写盘（最稳，最省内存）
+        for y in valid_years:
+            out_dir = os.path.join(target_path_name, f"{y}")
+            os.makedirs(out_dir, exist_ok=True)
+            out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{y}.nc")
+            print(f"  - 正在处理年份 {y} -> {out_path}")
+            da_y = total_amortized_costs.sel(year=y)
+            save2nc(da_y, out_path)
 
     print(f"\n✅ 任务完成: '{amortize_file}' 的所有年份摊销成本已成功计算并逐年保存。")
 
@@ -235,6 +212,7 @@ def calculate_profit_for_run(year, run_path, run_name, cost_basename, revenue_ba
     """
     为单个情景(Run)和单个类别计算利润。
     """
+    print(f"{run_path}/{run_name}/{year}: 计算利润...")
     try:
         # 构建输入文件路径
         cost_file = os.path.join(run_path, run_name, str(year), f'{cost_basename}_{year}.nc')
@@ -275,6 +253,7 @@ def calculate_policy_cost(year, output_path, run_names, cost_category, policy_ty
     基于利润差计算政策成本 (Carbon 或 Bio)。
     policy_type: 'carbon' 或 'bio'
     """
+    print(f"{output_path}: 计算政策成本 {policy_type}/{cost_category}...")
     try:
         if policy_type == 'carbon':
             # Carbon Cost = Profit_Run0 - Profit_Run1
@@ -319,6 +298,7 @@ def calculate_transition_cost_diff(year, output_path, run_names, tran_cost_file,
     - Carbon: Run1 - Run0
     - Bio: Run2 - Run1
     """
+    print(f"{output_path}: 计算转型成本差值 {policy_type}/{tran_cost_file}...")
     try:
         # 根据 policy_type 选择正确的路径对和输出目录
         if policy_type == 'carbon':
@@ -357,6 +337,7 @@ def aggregate_and_save_cost(year, output_path, cost_type):
     """
     【最终版】聚合单个年份的成本文件，使用一个精确的文件列表。
     """
+    print(f"Starting aggregation all cost for '{cost_type}' files for year {year}...")
     # 1. 【关键修改】根据传入的列表构建完整的文件路径
     data_type_names = ['xr_cost_ag', 'xr_cost_agricultural_management', 'xr_cost_non_ag',
                        'xr_cost_transition_ag2ag_diff']
@@ -449,6 +430,7 @@ def aggregate_and_save_summary(year, output_path, data_type, data_type_names, in
     """
     【最终版】聚合单个年份的成本文件，使用一个精确的文件列表。
     """
+    print(f"Starting aggregation for '{data_type}' files for year {year}...")
     try:
         # 1. 【关键修改】根据传入的列表构建完整的文件路径
         file_dir = os.path.join(output_path, f'{input_files_name}', str(year))
@@ -490,7 +472,7 @@ def aggregate_and_save_summary(year, output_path, data_type, data_type_names, in
         # 5. 保存
         final_dir = os.path.join(output_path, data_type, str(year))
         os.makedirs(final_dir, exist_ok=True)
-        final_path = os.path.join(final_dir, f'{data_type}_{year}.nc')
+        final_path = os.path.join(final_dir, f'xr_total_{data_type}_{year}.nc')
         save2nc(total_sum_ds, final_path)
         # total_sum_ds.to_netcdf(final_path)
 
@@ -505,13 +487,12 @@ def process_all_years_serially(years, origin_path_name, target_path_name, copy_f
     辅助函数：按顺序处理所有年份。
     这个函数本身是串行的，因为它内部的年份之间有依赖关系。
     """
-    print("信息：开始串行处理所有年份 (process_all_years_serially)...")
+    print("信息：开始copy and diff 任务...")
     try:
         if n_jobs == 0:
             for year in years:
                 # 您原来的 process_single_year 调用保持不变
                 process_single_year(year, years, origin_path_name, target_path_name, copy_files, diff_files)
-            print("✅ 成功：所有年份已串行处理完毕。")
         else:
             Parallel(n_jobs=n_jobs)(
                 delayed(process_single_year)(
@@ -528,8 +509,8 @@ def process_all_years_serially(years, origin_path_name, target_path_name, copy_f
 
 if __name__ == "__main__":
     # ============================================================================
-    task_name = '20250823_Paper2_Results_RES13'
-    njobs = 7  # 设置为0表示串行处理，其他值表示并行处理的作业数
+    task_name = '20250823_Paper2_Results_RES13_1'
+    njobs = 41
     task_dir = f'../../../output/{task_name}'
     input_files = config.INPUT_FILES
     path_name_0 = get_path(task_name, input_files[0])
@@ -559,14 +540,12 @@ if __name__ == "__main__":
     start_time = time.time()
 
     print("=" * 80)
-    print("开始按顺序处理所有任务 (已移除并行和摊销)")
-    print("=" * 80)
 
     # --- 第一批任务 (拆分为两个独立的组) ---
-    # for i in range(3):
-    #     origin_path_name = get_path(task_name, input_files[i])
-    #     target_path_name = os.path.join(output_path, input_files[i])
-    #     amortize_costs(origin_path_name, target_path_name, amortize_files[0], years, n_jobs=njobs)
+    for i in range(3):
+        origin_path_name = get_path(task_name, input_files[i])
+        target_path_name = os.path.join(output_path, input_files[i])
+        amortize_costs(origin_path_name, target_path_name, amortize_files[0], years, njobs=njobs)
     print("✅ 第一批任务 (摊销成本计算) 完成!")
     # ----------------------------------------------------------------------------
     # ===========================================================================
@@ -602,15 +581,21 @@ if __name__ == "__main__":
             aggregate_and_save_summary(year, output_path, 'carbon', carbon_files_diff, input_files[1])
             aggregate_and_save_summary(year, output_path, 'bio', bio_files_diff, input_files[2])
     else:
-        Parallel(n_jobs=njobs)(aggregate_and_save_summary(year, output_path, 'carbon', carbon_files, input_files[1]) for year in years[1:])
-        Parallel(n_jobs=njobs)(aggregate_and_save_summary(year, output_path, 'bio', bio_files, input_files[2]) for year in years[1:])
+        # --- 正确的代码 ---
+        Parallel(n_jobs=njobs)(
+            delayed(aggregate_and_save_summary)(year, output_path, 'carbon', carbon_files, input_files[1])
+            for year in years[1:]
+        )
+        Parallel(n_jobs=njobs)(
+            delayed(aggregate_and_save_summary)(year, output_path, 'bio', bio_files, input_files[2])
+            for year in years[1:]
+        )
 
 
     print(f"✅ 第2批任务完成! ")
 
     # --- 阶段 3: 利润计算 ---
     print("\n--- 阶段 3: 利润计算 ---")
-    batch_3_tasks_count = 0
     profit_categories = zip(cost_files, revenue_files)
     for cost_base, rev_base in profit_categories:
         if njobs == 0:
@@ -619,7 +604,6 @@ if __name__ == "__main__":
                     for year in years:
                         # 直接调用
                         calculate_profit_for_run(year, output_path, run_name, cost_base, rev_base)
-                        batch_3_tasks_count += 1
         else:
             for i, run_name in enumerate(run_names):
                 Parallel(n_jobs=njobs)(
@@ -696,5 +680,5 @@ if __name__ == "__main__":
     total_time = end_time - start_time
     print("\n" + "=" * 80)
     print("所有任务已按顺序执行完毕")
-    print(f"总执行时间: {total_time:.2f} 秒")
+    print(f"总执行时间: {total_time / 60 / 60:.2f} 小时 )")
     print("=" * 80)

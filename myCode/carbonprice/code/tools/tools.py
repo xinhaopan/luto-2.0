@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import re
 import rasterio
+import xarray as xr
 import tools.config as config
 
 
@@ -47,13 +48,72 @@ def get_year(parent_dir):
     # 返回排序后的年份列表，使其更加整洁
     return sorted(years_list)
 
-def get_path(path_name):
+
+import xarray as xr
+import os
+
+
+def save2nc(in_xr, save_path: str):
+    """
+    【最终修正版】
+    - 自动处理单变量 Dataset。
+    - 健壮地处理分块和非分块的 DataArray，不再产生 chunksizes 错误。
+    """
+    # 确保保存路径的目录存在
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    # --- 1. 统一输入为 DataArray ---
+    if isinstance(in_xr, xr.Dataset):
+        if len(in_xr.data_vars) == 1:
+            # 如果是单变量 Dataset，提取出 DataArray
+            var_name = list(in_xr.data_vars)[0]
+            da_to_save = in_xr[var_name]
+        else:
+            raise ValueError(f"输入 Dataset 包含 {len(in_xr.data_vars)} 个变量, 此函数只为单变量设计。")
+    elif isinstance(in_xr, xr.DataArray):
+        da_to_save = in_xr
+        var_name = da_to_save.name or 'data'  # 如果没名字，默认叫 'data'
+    else:
+        raise TypeError("输入必须是 xarray.DataArray 或 xarray.Dataset 类型。")
+
+    # --- 2. 正确构造编码 (Encoding) ---
+    # 这一步至关重要。我们先定义不含 chunksizes 的编码。
+    encoding = {var_name: {
+        'dtype': 'float32',
+        'zlib': True,
+        'complevel': 4,
+    }}
+
+    # 【关键修复】只有当数据确实是分块的时候，才添加 'chunksizes'
+    # hasattr 检查确保 .data.chunks 属性存在
+    if hasattr(da_to_save.data, 'chunks') and da_to_save.data.chunks is not None:
+        # 如果是分块的，直接使用 xarray 推荐的 .chunks 属性
+        encoding[var_name]['chunksizes'] = da_to_save.chunks
+
+    # --- 3. 准备并保存数据 ---
+    # 确保 DataArray 有正确的名字
+    if da_to_save.name != var_name:
+        da_to_save = da_to_save.rename(var_name)
+
+    # 移除所有非维度的坐标，生成更干净的文件
+    coords_to_drop = set(da_to_save.coords) - set(da_to_save.dims)
+    if coords_to_drop:
+        da_to_save = da_to_save.drop_vars(coords_to_drop, errors='ignore')
+
+    da_to_save.astype('float32').to_netcdf(
+        path=save_path,
+        encoding=encoding,
+        compute=True
+    )
+
+
+def get_path(task_name, path_name):
     """
     获取指定路径下的输出子目录。
     - path_name: 任务名称或路径名称
     - 返回: 输出子目录的完整路径
     """
-    output_path = f"{config.TASK_DIR}/{path_name}/output"
+    output_path = f"../../../output/{task_name}/{path_name}/output"
     try:
         if os.path.exists(output_path):
             subdirectories = os.listdir(output_path)

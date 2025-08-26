@@ -64,6 +64,5 @@ NAME_DICT = {
 
 START_YEAR = 2025
 COLUMN_NAME = ["Ag", "AM",  "Non-ag", "Transition(ag2ag)","Transition(ag2non-ag)"]
-TASK_DIR = f'../../../output/{TASK_NAME}'
 
 
