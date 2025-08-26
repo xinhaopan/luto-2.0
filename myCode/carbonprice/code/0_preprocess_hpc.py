@@ -6,9 +6,9 @@ import shutil
 #  配置区域 (已大幅简化)
 # ==============================================================================
 
-CPU_CORES = 45
-MEMORY_GB = "720G"
-TIME_LIMIT = "0-24:00:00"
+CPU_CORES = 60
+MEMORY_GB = "960G"
+TIME_LIMIT = "0-72:00:00"
 
 # 要运行的Python脚本
 PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"

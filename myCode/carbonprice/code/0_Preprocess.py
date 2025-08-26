@@ -56,40 +56,41 @@ def amortize_costs(origin_path_name, target_path_name, amortize_file, years, njo
         output_dtypes=[np.float32],
     ).astype('float32')
 
-    # 新结构：每年一个独立的 amortized cost 图层（提前准备好空容器）
-    amortized_by_year = {int(y): None for y in pv_values_all_years.year.values}
     all_years = pv_values_all_years.year.values
+    # 提前准备每个来源年份的摊销图层（包含 affects_year 维度）
+    template = pv_values_all_years.sel(year=all_years[0]).drop_vars('year')
 
+    total_amortized_costs = xr.concat(
+        [
+            xr.concat(
+                [xr.zeros_like(template, dtype=np.float32) for _ in all_years],
+                dim=xr.DataArray(all_years, dims='affects_year', name='affects_year')
+            )
+            for _ in all_years
+        ],
+        dim=xr.DataArray(all_years, dims='source_year', name='source_year')
+    )
+
+    # 逐个 source_year 计算影响年份并填值
     for cost_year in all_years:
-        # 年金值（不含年份坐标）
-        payment_from_this_year = annual_payments.sel(year=cost_year).drop_vars('year')  # shape = [cell, ...]
-        start_year = cost_year
-        end_year = cost_year + horizon - 1
+        payment = annual_payments.sel(year=cost_year).drop_vars('year')
 
-        # 这笔年金分摊到的年份（在 all_years 范围内）
-        affected_years = [y for y in all_years if start_year <= y <= end_year]
+        for affect_year in all_years:
+            if cost_year <= affect_year <= cost_year + horizon - 1:
+                total_amortized_costs.loc[dict(source_year=cost_year, affects_year=affect_year)] = payment
 
-        for y in affected_years:
-            # 创建一个只有当前年份 y 的 xarray，用于填入年金值
-            y_da = xr.zeros_like(pv_values_all_years.sel(year=[y]), dtype=np.float32)
-            y_da.loc[dict(year=[y])] = payment_from_this_year
-
-            if amortized_by_year[y] is None:
-                amortized_by_year[y] = y_da
-            else:
-                amortized_by_year[y] = amortized_by_year[y] + y_da  # dask 会合并任务图
-
-    amortized_list = [amortized_by_year[y] for y in all_years if amortized_by_year[y] is not None]
-    total_amortized_costs = xr.concat(amortized_list, dim='year')
-
-    # 确保年份顺序一致
-    total_amortized_costs = total_amortized_costs.sortby('year')
+    # 汇总所有 source_year → 每个 affects_year 的摊销值
+    # 得到结果维度为 (affects_year, cell, ...)
+    total_amortized_costs = total_amortized_costs.sum(dim='source_year')
     total_amortized_costs.name = 'data'
-    print(f"Starting to compute {origin_path_name}...")
-    total_amortized_costs = total_amortized_costs.chunk({'year': 1, 'cell': 1024}).compute()
-    print("End compute.")
+
+    print("开始计算总摊销成本数据集...")
+    total_amortized_costs = total_amortized_costs.chunk({'affects_year': 1, 'cell': 1024}).compute()
+    print("✅ 总摊销成本数据集计算完成。")
+
     # 关闭句柄
     all_costs_ds.close()
+    print("✅ 所有源文件句柄已关闭。")
 
     if njobs and njobs > 0:
         # 线程并行：共享内存，避免把 total_amortized_costs 复制到多个进程
@@ -100,26 +101,25 @@ def amortize_costs(origin_path_name, target_path_name, amortize_file, years, njo
                 out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{y}.nc")
                 print(f"  - [thread] 保存年份 {y} -> {out_path}")
                 # 直接使用闭包中的 total_amortized_costs（已 .load() 在内存）
-                da_y = total_amortized_costs.sel(year=y)
+                da_y = total_amortized_costs.sel(affects_year=y).expand_dims(year=[y])
                 save2nc(da_y, out_path)  # 这里只做 I/O，不再触发大计算
                 return f"✅ 年份 {y} 已保存"
             except Exception as e:
                 return f"❌ 年份 {y} 失败: {e}"
 
         results = Parallel(n_jobs=njobs, backend="threading")(
-            delayed(_save_one_year)(y) for y in valid_years
+            delayed(_save_one_year)(y) for y in all_years
         )
         for msg in results:
             print(msg)
 
     else:
         # 顺序写盘（最稳，最省内存）
-        for y in valid_years:
+        for y in all_years:
             out_dir = os.path.join(target_path_name, f"{y}")
             os.makedirs(out_dir, exist_ok=True)
             out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{y}.nc")
-            print(f"  - 正在处理年份 {y} -> {out_path}")
-            da_y = total_amortized_costs.sel(year=y)
+            da_y = total_amortized_costs.sel(affects_year=y).expand_dims(year=[y])
             save2nc(da_y, out_path)
 
     print(f"\n✅ 任务完成: '{amortize_file}' 的所有年份摊销成本已成功计算并逐年保存。")
@@ -509,8 +509,8 @@ def process_all_years_serially(years, origin_path_name, target_path_name, copy_f
 
 if __name__ == "__main__":
     # ============================================================================
-    task_name = '20250823_Paper2_Results_RES13'
-    njobs = 21
+    task_name = '20250823_Paper2_Results1'
+    njobs = 41
     task_dir = f'../../../output/{task_name}'
     input_files = config.INPUT_FILES
     path_name_0 = get_path(task_name, input_files[0])
