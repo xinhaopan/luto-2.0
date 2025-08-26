@@ -85,7 +85,7 @@ def amortize_costs(origin_path_name, target_path_name, amortize_file, years, njo
     total_amortized_costs.name = 'data'
 
     print("开始计算总摊销成本数据集...")
-    total_amortized_costs = total_amortized_costs.chunk({'affects_year': 1, 'cell': 1024}).compute()
+    total_amortized_costs = total_amortized_costs.chunk({'affects_year': 1, 'cell': 'auto'}).compute()
     print("✅ 总摊销成本数据集计算完成。")
 
     # 关闭句柄
