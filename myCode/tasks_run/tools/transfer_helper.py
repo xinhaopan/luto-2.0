@@ -45,7 +45,7 @@ def find_all_data_gz(sftp, remote_base_dir):
                         except FileNotFoundError:
                             continue
     except Exception as e:
-        print(f"[错误] {remote_base_dir}出错: {e}")
+        tprint(f"[错误] {remote_base_dir}出错: {e}")
     return result
 
 def download_file(sftp, remote_path, local_path):
