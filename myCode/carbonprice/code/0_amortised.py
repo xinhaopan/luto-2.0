@@ -61,76 +61,56 @@ def amortize_costs(origin_path_name, target_path_name, amortize_file, years, njo
         output_dtypes=[np.float32],
     ).astype('float32')
 
-    # 新结构：每年一个独立的 amortized cost 图层（提前准备好空容器）
-    amortized_by_year = {int(y): None for y in pv_values_all_years.year.values}
     all_years = pv_values_all_years.year.values
+    amortized_by_affect_year = {y: [] for y in all_years}
 
-    print("  - 步骤2: 为每个成本年份分摊年金到对应年份...")
+    # 计算每个 source_year 对哪些 affect_year 有影响
+    for source_year in all_years:
+        # 获取该年的年金数据，移除 year 坐标
+        payment = annual_payments.sel(year=source_year).drop_vars('year')
 
-    for cost_year in all_years:
-        # 年金值（不含年份坐标）
-        payment_from_this_year = annual_payments.sel(year=cost_year).drop_vars('year')  # shape = [cell, ...]
-        start_year = cost_year
-        end_year = cost_year + horizon - 1
-
-        # 这笔年金分摊到的年份（在 all_years 范围内）
-        affected_years = [y for y in all_years if start_year <= y <= end_year]
-
-        for y in affected_years:
-            # 创建一个只有当前年份 y 的 xarray，用于填入年金值
-            y_da = xr.zeros_like(pv_values_all_years.sel(year=[y]), dtype=np.float32)
-            y_da.loc[dict(year=[y])] = payment_from_this_year
-
-            if amortized_by_year[y] is None:
-                amortized_by_year[y] = y_da
-            else:
-                amortized_by_year[y] = amortized_by_year[y] + y_da  # dask 会合并任务图
-
-    amortized_list = [amortized_by_year[y] for y in all_years if amortized_by_year[y] is not None]
-    total_amortized_costs = xr.concat(amortized_list, dim='year')
-
-    # 确保年份顺序一致
-    total_amortized_costs = total_amortized_costs.sortby('year')
-    total_amortized_costs.name = 'data'
-    print("starting to compute...")
-    total_amortized_costs = total_amortized_costs.chunk({'year': 1, 'cell': 1024}).compute()
-    print("✅ 所有年份的摊销计算已完成。")
+        # 计算该 payment 影响到的年份区间
+        for affect_year in all_years:
+            if source_year <= affect_year <= source_year + horizon - 1:
+                amortized_by_affect_year[affect_year].append(payment)
 
     # 关闭句柄
     all_costs_ds.close()
     print("✅ 所有源文件句柄已关闭。")
 
-    if njobs and njobs > 0:
-        # 线程并行：共享内存，避免把 total_amortized_costs 复制到多个进程
-        def _save_one_year(y: int):
-            try:
-                out_dir = os.path.join(target_path_name, f"{y}")
-                os.makedirs(out_dir, exist_ok=True)
-                out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{y}.nc")
-                print(f"  - [thread] 保存年份 {y} -> {out_path}")
-                # 直接使用闭包中的 total_amortized_costs（已 .load() 在内存）
-                da_y = total_amortized_costs.sel(year=y)
-                save2nc(da_y, out_path)  # 这里只做 I/O，不再触发大计算
-                return f"✅ 年份 {y} 已保存"
-            except Exception as e:
-                return f"❌ 年份 {y} 失败: {e}"
+    # === 保存函数 ===
+    def _save_one_year(y: int):
+        try:
+            if not amortized_by_affect_year[y]:
+                return f"⚠️ 年份 {y} 无摊销内容，跳过"
 
-        results = Parallel(n_jobs=njobs, backend="threading")(
-            delayed(_save_one_year)(y) for y in valid_years
-        )
-        for msg in results:
-            print(msg)
+            summed = xr.concat(amortized_by_affect_year[y], dim="temp_concat_dim").sum(dim="temp_concat_dim")
+            summed = xr.DataArray(
+                data=summed.values,  # 获取实际数据值
+                coords=summed.coords,
+                dims=summed.dims,
+                name=summed.name
+            )
 
-    else:
-        # 顺序写盘（最稳，最省内存）
-        for y in valid_years:
             out_dir = os.path.join(target_path_name, f"{y}")
             os.makedirs(out_dir, exist_ok=True)
             out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{y}.nc")
-            print(f"  - 正在处理年份 {y} -> {out_path}")
-            da_y = total_amortized_costs.sel(year=y)
-            save2nc(da_y, out_path)
+            print(f"  - 保存年份 {y} -> {out_path}")
+            save2nc(summed, out_path)
+            return f"✅ 年份 {y} 保存完成"
+        except Exception as e:
+            return f"❌ 年份 {y} 失败: {e}"
 
+    # === 并行或顺序保存 ===
+    if njobs and njobs > 0:
+        results = Parallel(n_jobs=njobs, backend='threading')(
+            delayed(_save_one_year)(y) for y in all_years
+        )
+        for msg in results:
+            print(msg)
+    else:
+        for y in all_years:
+            print(_save_one_year(y))
     print(f"\n✅ 任务完成: '{amortize_file}' 的所有年份摊销成本已成功计算并逐年保存。")
 
 
