@@ -409,7 +409,7 @@ GHG_TARGETS_DICT = {
     'medium':   '1.5C (50%) excl. avoided emis SCOPE1',
     'high':     '1.5C (67%) excl. avoided emis SCOPE1',
 }
-
+GHG_PERCENT = 100
 # Greenhouse gas emissions limits and parameters *******************************
 GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
 '''
