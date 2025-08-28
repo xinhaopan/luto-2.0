@@ -261,40 +261,35 @@ def calculate_policy_cost(year, output_path, run_names, cost_category, policy_ty
     policy_type: 'carbon' 或 'bio'
     """
     # tprint(f"{output_path}: 计算政策成本 {policy_type}/{cost_category}...")
-    try:
-        if policy_type == 'carbon':
-            # Carbon Cost = Profit_Run0 - Profit_Run1
-            run_A_name, run_B_name = run_names[0], run_names[1]
-            output_dir = os.path.join(output_path, 'carbon', str(year))
-        elif policy_type == 'bio':
-            # Bio Cost = Profit_Run1 - Profit_Run2
-            run_A_name, run_B_name = run_names[1], run_names[2]
-            output_dir = os.path.join(output_path, 'bio', str(year))
-        else:
-            return f"❌ Policy Error: Invalid policy_type '{policy_type}'"
+    if policy_type == 'carbon':
+        # Carbon Cost = Profit_Run0 - Profit_Run1
+        run_A_name, run_B_name = run_names[0], run_names[1]
+        output_dir = os.path.join(output_path, 'carbon', str(year))
+    elif policy_type == 'bio':
+        # Bio Cost = Profit_Run1 - Profit_Run2
+        run_A_name, run_B_name = run_names[1], run_names[2]
+        output_dir = os.path.join(output_path, 'bio', str(year))
+    else:
+        return f"❌ Policy Error: Invalid policy_type '{policy_type}'"
 
-        # 构建利润文件路径 (由 Stage 1 生成)
-        profit_file_basename = f'xr_profit_{cost_category}_{year}.nc'
-        profit_file_A = os.path.join(output_path, run_A_name, str(year), profit_file_basename)
-        profit_file_B = os.path.join(output_path, run_B_name, str(year), profit_file_basename)
+    # 构建利润文件路径 (由 Stage 1 生成)
+    profit_file_basename = f'xr_profit_{cost_category}_{year}.nc'
+    profit_file_A = os.path.join(output_path, run_A_name, str(year), profit_file_basename)
+    profit_file_B = os.path.join(output_path, run_B_name, str(year), profit_file_basename)
 
-        with xr.open_dataset(profit_file_A) as ds_profit_A, \
-                xr.open_dataset(profit_file_B) as ds_profit_B:
+    tprint(f"Calculating policy cost for {policy_type}/{cost_category} in year {year}...")
+    with xr.open_dataset(profit_file_A) as ds_profit_A, \
+            xr.open_dataset(profit_file_B) as ds_profit_B:
 
-            policy_cost = ds_profit_A - ds_profit_B
+        policy_cost = ds_profit_A - ds_profit_B
 
-            os.makedirs(output_dir, exist_ok=True)
-            output_filename = f'xr_cost_{cost_category}_{policy_type}_{year}.nc'
-            save2nc(policy_cost, os.path.join(output_dir, output_filename))
-            # policy_cost.to_netcdf(os.path.join(output_dir, output_filename))
+        os.makedirs(output_dir, exist_ok=True)
+        output_filename = f'xr_cost_{cost_category}_{policy_type}_{year}.nc'
+        save2nc(policy_cost, os.path.join(output_dir, output_filename))
+        # policy_cost.to_netcdf(os.path.join(output_dir, output_filename))
 
-            return f"✅ Policy Cost: Calculated {policy_type}/{cost_category} for year {year}"
-        tprint(f"Saved policy cost to {os.path.join(output_dir, output_filename)}")
+        return f"✅ Policy Cost: Calculated {policy_type}/{cost_category} for year {year}"
 
-    except FileNotFoundError as e:
-        return f"❌ Policy Cost Error (File Not Found) for {policy_type}/{cost_category} year {year}: {e.filename}"
-    except Exception as e:
-        return f"❌ Policy Cost Error (Calculation Failed) for {policy_type}/{cost_category} year {year}: {e}"
 
 
 # ==============================================================================
@@ -495,7 +490,7 @@ def process_all_years_serially(years, origin_path_name, target_path_name, copy_f
 if __name__ == "__main__":
     # ============================================================================
     task_name = '20250823_Paper2_Results'
-    njobs = 41
+    njobs = 3
     task_dir = f'../../../output/{task_name}'
     input_files = config.INPUT_FILES
     path_name_0 = get_path(task_name, input_files[0])
@@ -526,98 +521,98 @@ if __name__ == "__main__":
 
     tprint("=" * 80)
 
-    # --- 第一批任务 (拆分为两个独立的组) ---
-    for i in range(3):
-        origin_path_name = get_path(task_name, input_files[i])
-        target_path_name = os.path.join(output_path, input_files[i])
-        amortize_costs(origin_path_name, target_path_name, amortize_files[0], years, njobs=njobs)
-    tprint("✅ 第一批任务 (摊销成本计算) 完成!")
-    # ----------------------------------------------------------------------------
-    # ===========================================================================
-    # --- 阶段 1: 文件处理 ---
-    tprint("\n--- 阶段 1: 文件处理 ---")
-    # 直接定义并执行任务，不再使用 delayed
-    file_processing_tasks_count = 0
-    for i in range(3):
-        origin_path_name = get_path(task_name, input_files[i])
-        target_path_name = os.path.join(output_path, input_files[i])
-        if i == 0:
-            copy_files = cost_files + revenue_files
-            diff_files = []
-        elif i == 1:
-            copy_files = cost_files + revenue_files + carbon_files
-            diff_files = ['xr_GHG_ag']
-        elif i == 2:
-            copy_files = cost_files + revenue_files + carbon_files + bio_files
-            diff_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_GHG_ag']
-        else:
-            copy_files = []
-
-        tprint(f"  -> 正在处理: {input_files[i]}")
-        # 直接调用函数，而不是用 delayed 包装
-        process_all_years_serially(years, origin_path_name, target_path_name, copy_files, diff_files, n_jobs=njobs)
-    tprint(f"✅ 文件处理任务完成!")
-
-    # --- 阶段 2: 独立汇总计算 ---
-    tprint("\n--- 阶段 2: 独立汇总计算 ---")
-    if njobs == 0:
-        for year in years[1:]:
-            # 直接调用
-            aggregate_and_save_summary(year, output_path, 'carbon', carbon_files_diff, input_files[1])
-            aggregate_and_save_summary(year, output_path, 'bio', bio_files_diff, input_files[2])
-    else:
-        # --- 正确的代码 ---
-        Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_summary)(year, output_path, 'carbon', carbon_files, input_files[1])
-            for year in years[1:]
-        )
-        Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_summary)(year, output_path, 'bio', bio_files, input_files[2])
-            for year in years[1:]
-        )
-
-
-    tprint(f"✅ 第2批任务完成! ")
-
-    # --- 阶段 3: 利润计算 ---
-    tprint("\n--- 阶段 3: 利润计算 ---")
-    profit_categories = zip(cost_files, revenue_files)
-    for cost_base, rev_base in profit_categories:
-        if njobs == 0:
-            for cost_base, rev_base in profit_categories:
-                for i, run_name in enumerate(run_names):
-                    for year in years:
-                        # 直接调用
-                        calculate_profit_for_run(year, output_path, run_name, cost_base, rev_base)
-        else:
-            for i, run_name in enumerate(run_names):
-                Parallel(n_jobs=njobs)(
-                    delayed(calculate_profit_for_run)(year, output_path, run_name, cost_base, rev_base)
-                    for year in years
-                )
-    tprint(f"✅ 第3批任务完成!")
+    # # --- 第一批任务 (拆分为两个独立的组) ---
+    # for i in range(3):
+    #     origin_path_name = get_path(task_name, input_files[i])
+    #     target_path_name = os.path.join(output_path, input_files[i])
+    #     amortize_costs(origin_path_name, target_path_name, amortize_files[0], years, njobs=njobs)
+    # tprint("✅ 第一批任务 (摊销成本计算) 完成!")
+    # # ----------------------------------------------------------------------------
+    # # ===========================================================================
+    # # --- 阶段 1: 文件处理 ---
+    # tprint("\n--- 阶段 1: 文件处理 ---")
+    # # 直接定义并执行任务，不再使用 delayed
+    # file_processing_tasks_count = 0
+    # for i in range(3):
+    #     origin_path_name = get_path(task_name, input_files[i])
+    #     target_path_name = os.path.join(output_path, input_files[i])
+    #     if i == 0:
+    #         copy_files = cost_files + revenue_files
+    #         diff_files = []
+    #     elif i == 1:
+    #         copy_files = cost_files + revenue_files + carbon_files
+    #         diff_files = ['xr_GHG_ag']
+    #     elif i == 2:
+    #         copy_files = cost_files + revenue_files + carbon_files + bio_files
+    #         diff_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_GHG_ag']
+    #     else:
+    #         copy_files = []
+    #
+    #     tprint(f"  -> 正在处理: {input_files[i]}")
+    #     # 直接调用函数，而不是用 delayed 包装
+    #     process_all_years_serially(years, origin_path_name, target_path_name, copy_files, diff_files, n_jobs=njobs)
+    # tprint(f"✅ 文件处理任务完成!")
+    #
+    # # --- 阶段 2: 独立汇总计算 ---
+    # tprint("\n--- 阶段 2: 独立汇总计算 ---")
+    # if njobs == 0:
+    #     for year in years[1:]:
+    #         # 直接调用
+    #         aggregate_and_save_summary(year, output_path, 'carbon', carbon_files_diff, input_files[1])
+    #         aggregate_and_save_summary(year, output_path, 'bio', bio_files_diff, input_files[2])
+    # else:
+    #     # --- 正确的代码 ---
+    #     Parallel(n_jobs=njobs)(
+    #         delayed(aggregate_and_save_summary)(year, output_path, 'carbon', carbon_files, input_files[1])
+    #         for year in years[1:]
+    #     )
+    #     Parallel(n_jobs=njobs)(
+    #         delayed(aggregate_and_save_summary)(year, output_path, 'bio', bio_files, input_files[2])
+    #         for year in years[1:]
+    #     )
+    #
+    #
+    # tprint(f"✅ 第2批任务完成! ")
+    #
+    # # --- 阶段 3: 利润计算 ---
+    # tprint("\n--- 阶段 3: 利润计算 ---")
+    # profit_categories = zip(cost_files, revenue_files)
+    # for cost_base, rev_base in profit_categories:
+    #     if njobs == 0:
+    #         for cost_base, rev_base in profit_categories:
+    #             for i, run_name in enumerate(run_names):
+    #                 for year in years:
+    #                     # 直接调用
+    #                     calculate_profit_for_run(year, output_path, run_name, cost_base, rev_base)
+    #     else:
+    #         for i, run_name in enumerate(run_names):
+    #             Parallel(n_jobs=njobs)(
+    #                 delayed(calculate_profit_for_run)(year, output_path, run_name, cost_base, rev_base)
+    #                 for year in years
+    #             )
+    # tprint(f"✅ 第3批任务完成!")
 
     # --- 阶段 4: 政策成本计算 ---
-    tprint("\n--- 阶段 4: 政策成本计算 ---")
-    batch_4_tasks_count = 0
-    category_costs = ['ag', 'agricultural_management', 'non_ag']
-    for category in category_costs:
-        if njobs == 0:
-            for year in years[1:]:
-                # 直接调用
-                calculate_policy_cost(year, output_path, run_names, category, 'carbon')
-                calculate_policy_cost(year, output_path, run_names, category, 'bio')
-        else:
-            Parallel(n_jobs=njobs)(
-                delayed(calculate_policy_cost)(year, output_path, run_names, category, 'carbon')
-                for year in years[1:]
-            )
-            Parallel(n_jobs=njobs)(
-                delayed(calculate_policy_cost)(year, output_path, run_names, category, 'bio')
-                for year in years[1:]
-            )
-    tprint(f"✅ 第4批任务完成! ")
-    #
+    # tprint("\n--- 阶段 4: 政策成本计算 ---")
+    # batch_4_tasks_count = 0
+    # category_costs = ['ag', 'agricultural_management', 'non_ag']
+    # for category in category_costs:
+    #     if njobs == 0:
+    #         for year in years[1:]:
+    #             # 直接调用
+    #             calculate_policy_cost(year, output_path, run_names, category, 'carbon')
+    #             calculate_policy_cost(year, output_path, run_names, category, 'bio')
+    #     else:
+    #         Parallel(n_jobs=njobs)(
+    #             delayed(calculate_policy_cost)(year, output_path, run_names, category, 'carbon')
+    #             for year in years[1:]
+    #         )
+    #         Parallel(n_jobs=njobs)(
+    #             delayed(calculate_policy_cost)(year, output_path, run_names, category, 'bio')
+    #             for year in years[1:]
+    #         )
+    # tprint(f"✅ 第4批任务完成! ")
+
     # --- 阶段 5: 转型成本差值计算 (仅独立部分) ---
     tprint("\n--- 阶段 5: 转型成本差值计算 ---")
     batch_5a_tasks_count = 0
