@@ -4,15 +4,15 @@ from tools.helpers import create_grid_search_template,create_task_runs
 import re
 
 grid_search = {
-    'TASK_NAME': ['20250828_Price_Task'],
+    'TASK_NAME': ['20250828_Price_Task_RES13'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['48GB'],
+    'MEM': ['12GB'],
     'NCPUS': ['3'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['24:00:00'],
+    'TIME': ['3:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['high','off'],
     'BIODIVERSITY_TARGET_GBF_2': ['high','off'],
@@ -22,7 +22,7 @@ grid_search = {
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [5],
+    'RESFACTOR': [13],
     'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
@@ -85,5 +85,3 @@ cols_to_drop = [c for c in grid_search_settings_df.columns if drop_if_percent_no
 grid_search_settings_df = grid_search_settings_df.drop(columns=cols_to_drop)
 grid_search_settings_df.to_csv(os.path.join(task_root_dir, 'grid_search_template.csv'))
 create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
-
-
