@@ -40,8 +40,11 @@ def main():
         write_log(f"Data loaded. Peak memory usage: {load_data_memory:.2f} GB")
 
         # 监控运行模拟
-        _, run_memory = monitor_memory(sim.run, data=data)
-        write_log(f"Simulation completed. Peak memory usage: {run_memory:.2f} GB")
+        try:
+            _, run_memory = monitor_memory(sim.run, data=data)
+            write_log(f"Simulation completed. Peak memory usage: {run_memory:.2f} GB")
+        from luto.tools.write_0 import write_outputs
+        write_outputs(data)
 
         # 总结束时间
         overall_end_time = time.time()

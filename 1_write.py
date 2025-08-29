@@ -62,5 +62,6 @@ else:
     data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
     print_with_time("Writing outputs...")
+    from luto.tools.write_0 import write_outputs
     write_outputs(data)
     print_with_time("Data processed successfully.")

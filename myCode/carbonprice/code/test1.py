@@ -1,112 +1,95 @@
-import xarray as xr
 import os
-import numpy_financial as npf
-import time
-from tools.tools import get_path, get_year, save2nc
-import tools.config as config
-import numpy as np
+import xarray as xr
+from joblib import Parallel, delayed
 
 
-def get_main_data_variable_name(ds: xr.Dataset) -> str:
-    """自动从 xarray.Dataset 中获取唯一的数据变量名。"""
-    data_vars_list = list(ds.data_vars)
-    if len(data_vars_list) == 1:
-        return data_vars_list[0]
-    elif len(data_vars_list) == 0:
-        raise ValueError("错误：数据集中不包含任何数据变量。")
-    else:
-        raise ValueError(f"错误：数据集中包含多个数据变量: {data_vars_list}。")
+def process_file(file_path, year_idx, cat):
+    """处理单个文件：加载、应用掩码、求和、添加 year 维度"""
+    print(f"Processing {file_path}")
+    ds_one = xr.open_dataset(file_path, chunks='auto')
+    main_var = next(iter(ds_one.data_vars))
+    da = ds_one[main_var]
+    s = da.sum(dim=list(da.dims))
+    return xr.Dataset({cat: xr.DataArray([s], dims=["year"], coords={"year": [year_idx]})})
+
+def create_cost_year_series(
+    years, base_path, env_category,
+    year_chunk=-1, parallel=True,
+    cost_categories=("cost_ag", "cost_agricultural_management", "cost_non_ag",
+                     "cost_transition_ag2ag_diff", "transition_cost_ag2non_ag_diff"),
+    finalize="compute"   # "lazy" | "persist" | "compute"
+):
+    """
+    对每个 cost_category:
+      - 逐文件打开，预处理时把所有非 year 维度求和成标量
+      - 沿 year 维拼接出 1D 序列
+    合并所有 cost_category，并追加 TOTAL。
+
+    返回：
+      ds_year: Dataset，变量为各 cost_category（1D: year）
+      da_year: DataArray，维度为 (cost_category, year)，含 'TOTAL'
+    """
+
+    # 处理 mask：仅允许 DataArray/单变量 Dataset；转换为 bool
+
+    per_cat_ds = []   # 每个元素都是 1 个变量（变量名=cat）的 Dataset，维度为 year
 
 
-task_name = '20250823_Paper2_Results_RES13'
-njobs = 7
-task_dir = f'../../../output/{task_name}'
-input_files = config.INPUT_FILES
-path_name_0 = get_path(task_name, input_files[0])
-path_name_1 = get_path(task_name, input_files[1])
-path_name_2 = get_path(task_name, input_files[2])
-years = get_year(path_name_0)
-run_names = [input_files[0], input_files[1], input_files[2]]
-run_paths = [path_name_0, path_name_1, path_name_2]
-amortize_files = ['xr_transition_cost_ag2non_ag']
+    for cat in cost_categories:
+        # 生成文件路径
+        paths = [os.path.join(base_path, str(env_category), str(y), f"xr_{cat}_{env_category}_{y}.nc")
+                 for y in years]
+        exist = [p for p in paths if os.path.exists(p)]
+        if not exist:
+            raise FileNotFoundError(f"未找到 {cat} 的 NetCDF 文件。")
 
-output_path = f'{task_dir}/carbon_price/0_base_data'
-target_path_name = os.path.join(output_path, input_files[0])
+        # 保证文件和年份一一对应
+        valid_years = [int(os.path.basename(p).split("_")[-1].split(".")[0]) for p in exist]
 
-rate = 0.07
-horizon = 30
+        # 并行或串行处理文件
+        if parallel:
+            ds_list = Parallel(n_jobs=-1, backend="loky")(
+                delayed(process_file)(file_path, valid_years[idx], cat)
+                for idx, file_path in enumerate(exist)
+            )
+        else:
+            ds_list = [process_file(file_path, valid_years[idx], cat)
+                       for idx, file_path in enumerate(exist)]
 
-output_path = f'{task_dir}/carbon_price/0_base_data'
+        # 沿 year 维度拼接
+        ds_cat = xr.concat(ds_list, dim="year").assign_coords(year=valid_years)
+        if year_chunk > 0 and finalize != "compute":
+            ds_cat = ds_cat.chunk({"year": year_chunk})
+        per_cat_ds.append(ds_cat)
 
-amortize_file = amortize_files[0]
-origin_path_name = get_path(task_name, input_files[0])
-file_paths = [os.path.join(origin_path_name, f'out_{year}', f'{amortize_file}_{year}.nc') for year in years]
+    # 合并所有 cost_category
+    ds_year = xr.merge(per_cat_ds, compat="override", join="exact")
 
-print(f"正在处理文件: {amortize_file}，路径: {origin_path_name}")
-existing_files = [p for p in file_paths if os.path.exists(p)]
-if not existing_files: raise FileNotFoundError(
-    f"在路径 {origin_path_name} 下找不到任何与 '{amortize_file}' 相关的文件。")
-valid_years = sorted([int(path.split('_')[-1].split('.')[0]) for path in existing_files])
+    # to_array 得到 (cost_category, year)
+    da_year = ds_year.to_array(dim="cost_category")  # shape: (cost_category, year)
 
-all_costs_ds = xr.open_mfdataset(
-    existing_files,
-    engine="h5netcdf",  # 推荐后端
-    combine="nested",
-    concat_dim="year",
-    parallel=False,  # 关键：避免句柄并发问题
-    # chunks={ "cell", "year": -1}  # year 整块、cell 分块
-).assign_coords(year=valid_years)
+    # 若 year 为坐标不是维度，需保证 year 是维度
+    if "year" not in da_year.dims:
+        da_year = da_year.expand_dims(year=da_year.coords["year"])
 
-cost_variable_name = get_main_data_variable_name(all_costs_ds)
-pv_values_all_years = all_costs_ds[cost_variable_name]
+    # 强制排序保证 (cost_category, year)
+    da_year = da_year.transpose("cost_category", "year")
 
-annual_payments = xr.apply_ufunc(
-    lambda x: -1 * npf.pmt(rate, horizon, pv=x.astype(np.float64), fv=0, when='begin'),
-    pv_values_all_years,
-    dask="parallelized",
-    output_dtypes=[np.float32],
-).astype('float32')
+    # 追加 total（每年所有 cost_category 求和）
+    da_total = da_year.sum(dim="cost_category", skipna=True)
+    da_total = da_total.expand_dims(cost_category=["TOTAL"])
+    da_year = xr.concat([da_year, da_total], dim="cost_category")
 
-all_years = annual_payments.year.values  # e.g., np.arange(2010, 2051)
-base_shape = annual_payments.sel(year=all_years[0]).drop_vars('year').shape
-n_years = len(all_years)
-# 初始化 numpy array，用于累加所有影响
-amortized_matrix = np.zeros((n_years,) + base_shape, dtype=np.float32)
+    # 是否立刻计算
+    if finalize == "compute":
+        return da_year.compute()
+    if finalize == "persist":
+        return da_year.persist()
+    return da_year
 
-
-for source_year in all_years:
-    payment = annual_payments.sel(year=source_year).drop_vars('year').values
-    payment = np.nan_to_num(payment, nan=0.0)
-    for offset in range(horizon):
-        affect_year = source_year + offset
-        if affect_year in all_years:
-            affect_idx = affect_year - all_years[0]
-            amortized_matrix[affect_idx] += payment
-
-# 构建 xarray.DataArray，添加坐标信息
-coords = {k: v for k, v in annual_payments.coords.items() if k != 'year'}
-coords['year'] = all_years
-
-dims = ('year',) + tuple(d for d in annual_payments.dims if d != 'year')
-
-amortized_by_affect_year = xr.DataArray(
-    data=amortized_matrix,
-    dims=dims,
-    coords=coords,
-    name='data'
-)
-
-print("start compute...")
-amortized_by_affect_year.compute()
-print("compute done.")
-# 关闭句柄
-all_costs_ds.close()
-print("✅ 所有源文件句柄已关闭。")
-for y in all_years:
-    out_dir = os.path.join(target_path_name, f"{y}")
-    os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{y}.nc")
-    print(f"  - 保存年份 {y} -> {out_path}")
-    da_y = amortized_by_affect_year.sel(year=y)
-    ds_y = xr.Dataset({'data': da_y})
-    save2nc(ds_y, out_path)
+task_name = '20250823_Paper2_Results_RES13_1'
+base_path = f"../../../output/{task_name}/carbon_price/0_base_data"
+env_category = "carbon"
+years = list(range(2011, 2051))
+xr_carbon_cost_series = create_cost_year_series(years, base_path, env_category)
+print(xr_carbon_cost_series)

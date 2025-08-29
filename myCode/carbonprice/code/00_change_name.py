@@ -74,6 +74,6 @@ if __name__ == "__main__":
     # 你也可以指定一个绝对路径来确保正确性，例如:
     # target_directory = 'D:/my_data'  # Windows 示例
     # target_directory = '/home/xinhaopan/data' # Linux/macOS 示例
-    target_directory = 'output/20250823_Paper2_Results'
+    target_directory = '../../../output/20250829_Price_Task_RES13'
 
     rename_ghg_files(target_directory)
