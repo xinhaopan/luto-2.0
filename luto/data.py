@@ -1116,7 +1116,7 @@ class Data:
                 os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
             )
             self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
-            self.GHG_TARGETS.update({k: v * float(settings.GHG_PERCENT) for k, v in self.GHG_TARGETS.items()})
+            self.GHG_TARGETS.update({k: v * float(settings.GHG_PERCENT / 100) for k, v in self.GHG_TARGETS.items()})
 
 
         ###############################################################
