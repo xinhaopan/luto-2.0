@@ -43,8 +43,12 @@ def main():
         try:
             _, run_memory = monitor_memory(sim.run, data=data)
             write_log(f"Simulation completed. Peak memory usage: {run_memory:.2f} GB")
-        from luto.tools.write_0 import write_outputs
-        write_outputs(data)
+        except Exception as e:
+            write_log(f"Simulation failed with error: {e}")
+        finally:
+            from luto.tools.write_0 import write_outputs
+            # 无论成功或失败都会执行
+            write_outputs(data)
 
         # 总结束时间
         overall_end_time = time.time()
