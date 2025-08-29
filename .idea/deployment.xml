@@ -11,6 +11,7 @@
           </mappings>
           <excludedPaths>
             <excludedPath local="true" path="$PROJECT_DIR$/output" />
+            <excludedPath path="/home/remote/s222552331/LUTO2_XH/LUTO2/output" />
           </excludedPaths>
         </serverdata>
       </paths>
@@ -20,6 +21,7 @@
             <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" web="/" />
           </mappings>
           <excludedPaths>
+            <excludedPath path="/g/data/jk53/LUTO_XH/LUTO2/output" />
             <excludedPath local="true" path="$PROJECT_DIR$/output" />
           </excludedPaths>
         </serverdata>
@@ -27,19 +29,32 @@
       <paths name="s222552331@hpclogin.deakingpuhpc.deakin.edu.au:22 password">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/remote/s222552331/LUTO2_XH/LUTO2" local="$PROJECT_DIR$" />
+            <mapping deploy="/home/remote/s222552331/LUTO2_XH/LUTO2" local="$PROJECT_DIR$" web="/" />
           </mappings>
           <excludedPaths>
             <excludedPath local="true" path="$PROJECT_DIR$/output" />
+            <excludedPath path="/home/remote/s222552331/LUTO2_XH/LUTO2/output" />
           </excludedPaths>
         </serverdata>
       </paths>
       <paths name="xp7241@gadi.nci.org.au:22 password">
         <serverdata>
           <mappings>
+            <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/output" />
+            <excludedPath path="/g/data/jk53/LUTO_XH/LUTO2/output" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+      <paths name="xp7241@gadi.nci.org.au:22 password (2)">
+        <serverdata>
+          <mappings>
             <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" />
           </mappings>
           <excludedPaths>
+            <excludedPath path="/g/data/jk53/LUTO_XH/LUTO2/output" />
             <excludedPath local="true" path="$PROJECT_DIR$/output" />
           </excludedPaths>
         </serverdata>
