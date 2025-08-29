@@ -70,7 +70,7 @@ def write_outputs(data: Data):
         memory_thread.start()
         try:
             write_data(data)
-            create_report(data)
+            # create_report(data)
         except Exception as e:
             print(f"An error occurred while writing outputs: {e}")
             raise e
