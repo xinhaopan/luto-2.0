@@ -4,7 +4,7 @@ from tools.helpers import create_grid_search_template,create_task_runs
 import re
 
 grid_search = {
-    'TASK_NAME': ['20250828_Price_Task_RES13'],
+    'TASK_NAME': ['20250829_Price_Task_RES13'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -84,4 +84,5 @@ cols_to_drop = [c for c in grid_search_settings_df.columns if drop_if_percent_no
 # 删除列
 grid_search_settings_df = grid_search_settings_df.drop(columns=cols_to_drop)
 grid_search_settings_df.to_csv(os.path.join(task_root_dir, 'grid_search_template.csv'))
-create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
+# grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
+create_task_runs(task_root_dir, grid_search_settings_df, platform="Denethor", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
