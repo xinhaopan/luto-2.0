@@ -44,12 +44,12 @@ KEY_TO_COLUMN_MAP = {
 REVENUE_DICT = {key.replace('cost', 'revenue'): value for key, value in COST_DICT.items()}
 
 
-TASK_NAME = "20250712_Paper2_Results"
+TASK_NAME = "20250823_Paper2_Results"
 
 INPUT_FILES = [
-    'Run_2_GHG_high_BIO_high',
-    'Run_1_GHG_high_BIO_off',
-    'Run_1_GHG_off_BIO_off',
+    'Run_4_GHG_off_BIO_off',
+    'Run_2_GHG_high_BIO_off',
+    'Run_1_GHG_high_BIO_high',
     # 'Run_3_off_on',
     # 'Run_4_off_off',
 ]
@@ -64,6 +64,5 @@ NAME_DICT = {
 
 START_YEAR = 2025
 COLUMN_NAME = ["Ag", "AM",  "Non-ag", "Transition(ag2ag)","Transition(ag2non-ag)"]
-TASK_DIR = f'../../../output/{TASK_NAME}'
 
 
