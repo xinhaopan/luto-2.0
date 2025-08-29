@@ -1,10 +1,12 @@
+
 import os
 import numpy as np
 import pandas as pd
+
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250829_Paper2_Results_RES13'],
+    'TASK_NAME': ['20250829_Paper2_Results_RES13_1'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
