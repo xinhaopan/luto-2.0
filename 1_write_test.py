@@ -2,7 +2,7 @@ import dill
 import gzip
 import os
 from datetime import datetime
-from luto.tools.write import write_outputs
+from luto.tools.write_0 import write_outputs
 
 def print_with_time(message):
     """打印带有时间戳的信息"""
