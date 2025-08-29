@@ -73,6 +73,7 @@ def save_report_data(raw_data_dir:str):
     files.drop(files[files['path'].str.contains('quantity_production_kt_separate')].index, inplace=True)
     files.drop(files[files['path'].str.contains('biodiversity_separate')].index, inplace=True)
     files.drop(files[files['path'].str.contains('biodiversity_targets')].index, inplace=True)
+    files.drop(files[files['path'].str.contains('xr_')].index, inplace=True)
 
     files['Year'] = files['Year'].astype(int)
     files = files.query('Year.isin(@years)')
