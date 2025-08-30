@@ -3,13 +3,13 @@ from tools.helpers import create_grid_search_template,create_task_runs
 import re
 
 grid_search = {
-    'TASK_NAME': ['20250830_Price_Task'],
+    'TASK_NAME': ['20250831_Price_Task_NCI'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['40GB'],
-    'NCPUS': ['3'],
+    'NCPUS': ['10'],
     'WRITE_THREADS': ['2'],
     'TIME': ['48:00:00'],
 

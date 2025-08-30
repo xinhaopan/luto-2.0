@@ -53,58 +53,88 @@ import xarray as xr
 import os
 
 
-def save2nc(in_xr, save_path: str):
+import os
+import xarray as xr
+from filelock import FileLock, Timeout
+
+def save2nc(
+    in_xr,
+    save_path: str,
+    *,
+    engine: str = "h5netcdf",     # netCDF 后端；并行更稳
+    allow_overwrite: bool = True, # 已存在时是否允许覆盖
+    compress: bool = True,        # 是否压缩(zlib)
+    lock_timeout: int = 600,      # 获取锁的最长等待秒数
+    lock_path: str | None = None, # 自定义锁文件路径；默认 <save_path>.lock
+    compute_before_write: bool = True  # 写前是否先 .load()
+):
     """
-    【最终修正版】
-    - 自动处理单变量 Dataset。
-    - 健壮地处理分块和非分块的 DataArray，不再产生 chunksizes 错误。
+    并发安全保存到 NetCDF：
+      - DataArray/Dataset（仅单变量）都支持；
+      - 写前可选 .load()，避免写入阶段触发 dask 计算；
+      - 用 filelock 对 <save_path> 加文件锁，避免多进程同时写坏文件；
+      - 仅在数据确有分块时写入 chunksizes，防止编码报错。
     """
-    # 确保保存路径的目录存在
+
+    # 目录
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-    # --- 1. 统一输入为 DataArray ---
+    # 处理 Dataset / DataArray
     if isinstance(in_xr, xr.Dataset):
-        if len(in_xr.data_vars) == 1:
-            # 如果是单变量 Dataset，提取出 DataArray
-            var_name = list(in_xr.data_vars)[0]
-            da_to_save = in_xr[var_name]
-        else:
-            raise ValueError(f"输入 Dataset 包含 {len(in_xr.data_vars)} 个变量, 此函数只为单变量设计。")
+        if len(in_xr.data_vars) != 1:
+            raise ValueError(f"输入 Dataset 含 {len(in_xr.data_vars)} 个变量，需单变量才可写 NetCDF（或请自行拆分）。")
+        var_name = next(iter(in_xr.data_vars))
+        da = in_xr[var_name]
     elif isinstance(in_xr, xr.DataArray):
-        da_to_save = in_xr
-        var_name = da_to_save.name or 'data'  # 如果没名字，默认叫 'data'
+        da = in_xr
+        var_name = da.name or "data"
     else:
-        raise TypeError("输入必须是 xarray.DataArray 或 xarray.Dataset 类型。")
+        raise TypeError("in_xr 必须是 xarray.DataArray 或 单变量 xarray.Dataset")
 
-    # --- 2. 正确构造编码 (Encoding) ---
-    # 这一步至关重要。我们先定义不含 chunksizes 的编码。
-    encoding = {var_name: {
-        'dtype': 'float32',
-        'zlib': True,
-        'complevel': 4,
-    }}
+    # 统一变量名
+    if da.name != var_name:
+        da = da.rename(var_name)
 
-    # 【关键修复】只有当数据确实是分块的时候，才添加 'chunksizes'
-    # hasattr 检查确保 .data.chunks 属性存在
-    if hasattr(da_to_save.data, 'chunks') and da_to_save.data.chunks is not None:
-        # 如果是分块的，直接使用 xarray 推荐的 .chunks 属性
-        encoding[var_name]['chunksizes'] = da_to_save.chunks
-
-    # --- 3. 准备并保存数据 ---
-    # 确保 DataArray 有正确的名字
-    if da_to_save.name != var_name:
-        da_to_save = da_to_save.rename(var_name)
-
-    # 移除所有非维度的坐标，生成更干净的文件
-    coords_to_drop = set(da_to_save.coords) - set(da_to_save.dims)
+    # 去掉非维度坐标（更干净，避免写坐标冲突）
+    coords_to_drop = set(da.coords) - set(da.dims)
     if coords_to_drop:
-        da_to_save = da_to_save.drop_vars(coords_to_drop, errors='ignore')
+        da = da.drop_vars(coords_to_drop, errors="ignore")
 
-    da_to_save.astype('float32').to_netcdf(
-        path=save_path,
-        encoding=encoding,
-        compute=True
-    )
+    # 写前可选计算（强烈建议 True：更稳定）
+    if compute_before_write:
+        da = da.load()
+
+    # 编码
+    enc = {var_name: {"dtype": "float32"}}
+    if compress:
+        enc[var_name].update({"zlib": True, "complevel": 4})
+    # 只有确实 chunked 才写 chunksizes
+    if hasattr(da.data, "chunks") and da.data.chunks is not None:
+        enc[var_name]["chunksizes"] = da.chunks
+
+    # 已存在文件的策略
+    if os.path.exists(save_path) and not allow_overwrite:
+        raise FileExistsError(f"目标已存在且不允许覆盖：{save_path}")
+
+    # 文件锁（避免并发写同一目标）
+    lockfile = lock_path or (save_path + ".lock")
+    lock = FileLock(lockfile)
+
+    try:
+        with lock.acquire(timeout=lock_timeout):
+            # 再次二次检查（锁内）是否允许覆盖
+            if os.path.exists(save_path) and not allow_overwrite:
+                raise FileExistsError(f"目标已存在且不允许覆盖：{save_path}")
+
+            # 写入
+            da.astype("float32").to_netcdf(
+                path=save_path,
+                engine=engine,
+                encoding=enc,
+                compute=True,
+            )
+    except Timeout:
+        raise TimeoutError(f"获取写锁超时（{lock_timeout}s）：{lockfile}")
 
 
 def get_path(task_name, path_name):
