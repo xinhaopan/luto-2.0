@@ -2456,22 +2456,50 @@ def write_bio_score_npy(data: Data, yr_cal, path):
     save_map_to_npy(data, priority_am_r, 'PBIO_am', yr_cal, path)
     save_map_to_npy(data, priority_non_ag_r, 'PBIO_non-ag', yr_cal, path)
 
-def save2nc(in_xr:xr.DataArray, save_path:str):
-    encoding = {'data':{
+import tempfile
+
+
+def save2nc(in_xr: xr.DataArray, save_path: str):
+    """
+    原子写入NetCDF文件，避免并行写入时产生半完成文件。
+    使用 shutil.move 替代 os.rename，自动处理文件覆盖。
+    """
+    encoding = {'data': {
         'dtype': 'float32',
         'zlib': True,
         'complevel': 4,
         'chunksizes': [v[0] for k, v in in_xr.chunksizes.items()]
     }}
+
     in_xr.name = 'data'
     in_xr = in_xr.drop_vars(set(in_xr.coords) - set(in_xr.dims))
-    in_xr.astype('float32').to_netcdf(save_path, encoding=encoding, compute=True)
+
+    # 获取目标目录
+    save_dir = os.path.dirname(save_path) or '.'
+
+    # 使用 tempfile 创建临时文件（在同一目录下）
+    with tempfile.NamedTemporaryFile(dir=save_dir, suffix='.tmp', delete=False) as tmp_file:
+        temp_path = tmp_file.name
+
+    try:
+        # 写入临时文件
+        in_xr.astype('float32').to_netcdf(temp_path, encoding=encoding, compute=True)
+
+        # 使用 shutil.move 进行原子移动（自动处理覆盖）
+        shutil.move(temp_path, save_path)
+
+    except Exception as e:
+        # 如果出错，清理临时文件
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        raise e
 
 def write_xr_data(data:Data, yr_cal, path, yr_cal_sim_pre=None):
     """Calculate agricultural revenue. Takes a simulation object, a target calendar
            year (e.g., 2030), and an output path as input."""
-
-
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
                                            ).chunk({'cell': min(1024, data.NCELLS)})
@@ -2611,7 +2639,7 @@ def write_xr_data(data:Data, yr_cal, path, yr_cal_sim_pre=None):
     save2nc(xr_revenue_non_ag, os.path.join(path, f'xr_revenue_non_ag_{yr_cal}.nc'))
     save2nc(xr_cost_non_ag, os.path.join(path, f'xr_cost_non_ag_{yr_cal}.nc'))
 
-    """Calculate transition cost."""
+    """Calculate transition ag2non_ag cost."""
 
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = sorted(list(data.lumaps.keys()))
@@ -2622,11 +2650,12 @@ def write_xr_data(data:Data, yr_cal, path, yr_cal_sim_pre=None):
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
     # Get the non-agricultural decision variable
-    ag_dvar_base = tools.ag_mrj_to_xr(data, tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]))
-    non_ag_dvar_target = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]))
+    # ag_dvar_base = tools.ag_mrj_to_xr(data, tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]))
+    # ag_dvar_base = ag_dvar_base.rename({'lm': 'From water-supply', 'lu': 'From land-use'}).chunk({'cell': min(1024, data.NCELLS)})
 
-    ag_dvar_base = ag_dvar_base.rename({'lm': 'From water-supply', 'lu': 'From land-use'}).chunk(
-        {'cell': min(1024, data.NCELLS)})
+    ag_dvar_base = (tools.ag_mrj_to_xr(data,tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])).rename({'lm': 'From water-supply', 'lu': 'From land-use'}).chunk({'cell': min(1024, data.NCELLS)}))
+    # non_ag_dvar_target = (tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]).rename({'lu': 'To land-use'}).chunk({'cell': min(1024, data.NCELLS)}))
+    non_ag_dvar_target = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]))
     non_ag_dvar_target = non_ag_dvar_target.rename({'lu': 'To land-use'}).chunk({'cell': min(1024, data.NCELLS)})
 
     # Get the transition cost matirces for non-agricultural land-use

@@ -373,7 +373,7 @@ def calculate_transition_cost_diff(year, output_path, run_all_names, tran_cost_f
         save2nc(tran_cost_diff, output_path_full)
 
 
-def aggregate_and_save_cost(year, output_path,cost_type, cost_names):
+def aggregate_and_save_cost(year, output_path, cost_names):
     """
     【最终版】聚合单个年份的成本文件，使用一个精确的文件列表。
     """
@@ -439,7 +439,7 @@ def aggregate_and_save_cost(year, output_path,cost_type, cost_names):
 
             # 5) 保存：根据是否包含 'amortised' 判定 am_type
             am_type = 'amortised' if 'amortised' in add_name else 'original'
-            final_path = os.path.join(file_dir, f'xr_total_cost_{cost_type}_{am_type}_{year}.nc')
+            final_path = os.path.join(file_dir, f'xr_total_cost_{cost_names[i]}_{am_type}_{year}.nc')
 
             if "save2nc" in globals():
                 save2nc(total_sum_ds, final_path)
@@ -449,13 +449,10 @@ def aggregate_and_save_cost(year, output_path,cost_type, cost_names):
             tprint(f"Saved aggregated total cost to {final_path}")
 
 
-def aggregate_and_save_summary(year, output_path, data_type, data_type_names, input_files_names, output_file_names):
-    """
-    【最终版】聚合单个年份的成本文件，使用一个精确的文件列表。
-    """
-    tprint(f"Starting aggregation for '{data_type}' files for year {year}...")
+def aggregate_and_save_summary(year, output_path, data_type_names, input_files_names, output_file_names):
     # 1. 【关键修改】根据传入的列表构建完整的文件路径
     for i in range(len(input_files_names)):
+        tprint(f"Aggregating summary for {input_files_names[i]} in year {year}...")
         input_files_name = input_files_names[i]
         output_file_name = output_file_names[i]
         file_dir = os.path.join(output_path, f'{input_files_name}', str(year))
@@ -482,13 +479,13 @@ def aggregate_and_save_summary(year, output_path, data_type, data_type_names, in
                 tprint(f"  - Warning: File not found and will be skipped: {file_path}")
                 continue
         # 4. 后续处理
-        if data_type == 'carbon':
+        if 'carbon' in output_file_name:
             total_sum_ds = -total_sum_ds
 
         # 5. 保存
         final_dir = os.path.join(output_path, output_file_name, str(year))
         os.makedirs(final_dir, exist_ok=True)
-        final_path = os.path.join(final_dir, f'xr_total_{data_type}_{year}.nc')
+        final_path = os.path.join(final_dir, f'xr_total_{output_file_name}_{year}.nc')
         save2nc(total_sum_ds, final_path)
         # total_sum_ds.to_netcdf(final_path)
 
@@ -496,7 +493,7 @@ def aggregate_and_save_summary(year, output_path, data_type, data_type_names, in
 
 if __name__ == "__main__":
     # ============================================================================
-    task_name = '20250831_Price_Task_RES13'
+    task_name = '20250831_Price_Task_NCI'
     njobs = 41
     task_dir = f'../../../output/{task_name}'
     input_files_0 = ['Run_100_GHG_off_PERCENT_100_BIO_off_CUT_50']
@@ -617,16 +614,16 @@ if __name__ == "__main__":
     if njobs == 0:
         for year in years[1:]:
             # 直接调用
-            aggregate_and_save_summary(year, output_path, 'carbon', carbon_files_diff, input_files_1,carbon_names)
-            aggregate_and_save_summary(year, output_path, 'bio', bio_files_diff, input_files_2, bio_names)
+            aggregate_and_save_summary(year, output_path, carbon_files_diff, input_files_1,carbon_names)
+            aggregate_and_save_summary(year, output_path, bio_files_diff, input_files_2, bio_names)
     else:
         # --- 正确的代码 ---
         Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_summary)(year, output_path, 'carbon', carbon_files, input_files_1, carbon_names)
+            delayed(aggregate_and_save_summary)(year, output_path, carbon_files, input_files_1, carbon_names)
             for year in years[1:]
         )
         Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_summary)(year, output_path, 'bio', bio_files, input_files_2, bio_names)
+            delayed(aggregate_and_save_summary)(year, output_path, bio_files, input_files_2, bio_names)
             for year in years[1:]
         )
 
@@ -701,15 +698,15 @@ if __name__ == "__main__":
     if njobs == 0:
         for year in years[1:]:
             # 直接调用
-            aggregate_and_save_cost(year, output_path, 'carbon', carbon_names)
-            aggregate_and_save_cost(year, output_path,'bio', bio_names)
+            aggregate_and_save_cost(year, output_path,  carbon_names)
+            aggregate_and_save_cost(year, output_path,bio_names)
     else:
         Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_cost)(year, output_path, 'carbon', carbon_names)
+            delayed(aggregate_and_save_cost)(year, output_path, carbon_names)
             for year in years[1:]
         )
         Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_cost)(year, output_path, 'bio', bio_names)
+            delayed(aggregate_and_save_cost)(year, output_path, bio_names)
             for year in years[1:]
         )
 

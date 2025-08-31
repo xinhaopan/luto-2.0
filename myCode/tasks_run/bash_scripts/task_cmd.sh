@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "[$(date '+%F %T')] Script started"
+script_name="$1"
+echo "script_name: $script_name"
 # Read the settings_bash file ==> JOB_NAME, QUEUE, NCPUS, MEM, TIME
 source luto/settings_bash.py
 
@@ -22,7 +25,7 @@ cat << EOF > $SCRIPT_PBS
 #PBS -l walltime=${TIME}
 #PBS -l wd="$(dirname "$0")"
 
-${PYTHON} python_script.py
+${PYTHON} ${script_name}
 EOF
 
 # Submit the job to PBS

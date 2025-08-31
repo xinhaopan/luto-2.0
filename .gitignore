@@ -38,7 +38,6 @@ gurobi.log
 # Xinhao's personal settings
 .idea/
 temp*
-*.ipynb
 *.gitignore
 myCode/draw_all/output/
 myCode/Map/Assets/basemap.tif
