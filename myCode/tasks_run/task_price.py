@@ -3,15 +3,15 @@ from tools.helpers import create_grid_search_template,create_task_runs
 import re
 
 grid_search = {
-    'TASK_NAME': ['20250828_Price_Task'],
+    'TASK_NAME': ['20250831_Price_Task_NCI'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['48GB'],
-    'NCPUS': ['3'],
+    'MEM': ['40GB'],
+    'NCPUS': ['10'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['24:00:00'],
+    'TIME': ['48:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['high','off'],
     'BIODIVERSITY_TARGET_GBF_2': ['high','off'],
@@ -45,7 +45,7 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [10,20,30,40,50],
 
     # ----------------------------------- Water settings --------------------------------
-    'WATER_STRESS': [0.8],
+    'WATER_STRESS': [0.6],
     'WATER_LIMITS': ['on'],
     'WATER_CONSTRAINT_TYPE': ['hard'],
     'INCLUDE_WATER_LICENSE_COSTS': [1],

@@ -8,8 +8,6 @@ import re
 from collections import defaultdict
 from tqdm import tqdm
 import time
-from datetime import datetime
-
 
 def tprint(*args, **kwargs):
     """打印带时间戳的内容，自动换行，支持所有print参数。"""
@@ -17,31 +15,13 @@ def tprint(*args, **kwargs):
     print(f"{timestamp}   ", *args, **kwargs)
 
 
-import os
-
-
-def find_file_by_prefix(dir_path, target_prefix):
+def dir_has_target_file(dir_path, target_filename):
     """
-    判断并返回该目录及其所有子目录下，第一个以指定前缀开头的文件路径。
-
-    Args:
-        dir_path (str): 要搜索的根目录路径。
-        target_prefix (str): 目标文件名的前缀。
-
-    Returns:
-        str: 如果找到，返回第一个匹配文件的完整路径。
-        None: 如果没有找到任何匹配的文件。
+    判断该目录及其所有子目录下是否有目标文件
     """
-    # os.walk 会深度遍历所有子目录
     for root, dirs, files in os.walk(dir_path):
-        # 遍历当前目录下的所有文件名
-        for filename in files:
-            # 使用 startswith() 方法进行前缀匹配
-            if filename.startswith(target_prefix):
-                # 如果找到，立即返回拼接好的完整路径
-                return os.path.join(root, filename)
-
-    # 如果遍历完所有文件都没有找到，则返回 None
+        if target_filename in files:
+            return os.path.join(root, target_filename)
     return None
 
 
@@ -55,7 +35,7 @@ def find_data_with_solution_all_subdirs(task_root_dir, n_jobs=3):
     dirs = [os.path.join(task_root_dir, f) for f in files if os.path.isdir(os.path.join(task_root_dir, f))]
 
     results = Parallel(n_jobs=n_jobs)(
-        delayed(find_file_by_prefix)(d, 'Data_RES') for d in dirs
+        delayed(dir_has_target_file)(d, 'data_with_solution.gz') for d in dirs
     )
     found_paths = [res for res in results if res]
     not_found_dirs = [files[i] for i, res in enumerate(results) if not res]
@@ -65,11 +45,9 @@ def find_data_with_solution_all_subdirs(task_root_dir, n_jobs=3):
 def process_target(run_path, script_path, gz_path):
     tprint(f"PID {os.getpid()} is working on {run_path}")
     update_luto_code(run_path)
-    # 1. 在脚本开始时，生成一个唯一的时间戳字符串
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # 例如: "20250823_084633"
     try:
-        with open(os.path.join(run_path, f'output/write_stdout_{timestamp}.log'), 'a') as std_file, \
-             open(os.path.join(run_path, f'output/write_stderr_{timestamp}.log'), 'a') as err_file:
+        with open(os.path.join(run_path, 'write_stdout.log'), 'a') as std_file, \
+             open(os.path.join(run_path, 'write_stderr.log'), 'a') as err_file:
             subprocess.run(
                 ['python', script_path, gz_path],
                 cwd=run_path,
@@ -111,7 +89,7 @@ def update_luto_code(run_path):
         else:
             shutil.copy2(src_item, dst_item)
 
-def write_repeat(task_root_dir,n_jobs=4,force=False, write_threads=2):
+def write_repeat(task_root_dir,n_jobs=9,force=False, write_threads=2):
     found, not_found = find_data_with_solution_all_subdirs(task_root_dir, n_jobs)
     tprint("有解:")
     for p in found:
@@ -125,7 +103,7 @@ def write_repeat(task_root_dir,n_jobs=4,force=False, write_threads=2):
     without_htmls = []
     for file_path in found:
         folder_path = os.path.dirname(file_path)
-        html_path = os.path.join(folder_path, 'DATA_REPORT/data/map_layers/map_water_yield_NonAg.js')
+        html_path = os.path.join(folder_path, 'DATA_REPORT', 'REPORT_HTML', 'pages', 'production.html')
         if os.path.exists(html_path):
             with_htmls.append(folder_path)
         else:
@@ -187,7 +165,7 @@ write_outputs(data)
 
         for target_dir in targets:
             parts = target_dir.split(os.sep)
-            gz_path = os.path.join(os.sep.join(parts[5:]), 'Data_RES3.gz')
+            gz_path = os.path.join(os.sep.join(parts[5:]), 'data_with_solution.gz')
             all_jobs.append((run_path, script_name, gz_path))
 
     success_list, failed_list = [], []
