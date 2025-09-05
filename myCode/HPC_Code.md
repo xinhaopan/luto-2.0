@@ -53,6 +53,8 @@ END {
 git fetch origin
 
 git reset --hard origin/master
+
+git reset --hard origin/paper2
 ```
 
 Res = 15, timeseries, 8GB,2CPU, 2h
