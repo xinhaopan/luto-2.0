@@ -9,11 +9,6 @@ window.MapService = {
       'Ag Mgt': { 'path': 'data/map_layers/map_area_Am.js', 'name': 'map_area_Am' },
       'Non-Ag': { 'path': 'data/map_layers/map_area_NonAg.js', 'name': 'map_area_NonAg' },
     },
-    'Production': {
-      'Ag': { 'path': 'data/map_layers/map_quantities_Ag.js', 'name': 'map_quantities_Ag' },
-      'Ag Mgt': { 'path': 'data/map_layers/map_quantities_Am.js', 'name': 'map_quantities_Am' },
-      'Non-Ag': { 'path': 'data/map_layers/map_quantities_NonAg.js', 'name': 'map_quantities_NonAg' },
-    },
     'Biodiversity': {
       'overall': {
         'Ag': { 'path': 'data/map_layers/map_bio_overall_Ag.js', 'name': 'map_bio_overall_Ag' },
@@ -43,10 +38,21 @@ window.MapService = {
       'Ag Mgt': { 'path': 'data/map_layers/map_GHG_Am.js', 'name': 'map_GHG_Am' },
       'Non-Ag': { 'path': 'data/map_layers/map_GHG_NonAg.js', 'name': 'map_GHG_NonAg' },
     },
+    'Production': {
+      'Ag': { 'path': 'data/map_layers/map_quantities_Ag.js', 'name': 'map_quantities_Ag' },
+      'Ag Mgt': { 'path': 'data/map_layers/map_quantities_Am.js', 'name': 'map_quantities_Am' },
+      'Non-Ag': { 'path': 'data/map_layers/map_quantities_NonAg.js', 'name': 'map_quantities_NonAg' },
+    },
     'Water': {
       'Ag': { 'path': 'data/map_layers/map_water_yield_Ag.js', 'name': 'map_water_yield_Ag' },
       'Ag Mgt': { 'path': 'data/map_layers/map_water_yield_Am.js', 'name': 'map_water_yield_Am' },
       'Non-Ag': { 'path': 'data/map_layers/map_water_yield_NonAg.js', 'name': 'map_water_yield_NonAg' },
+    },
+    'Dvar': {
+      'Ag': { 'path': 'data/map_layers/map_dvar_Ag.js', 'name': 'map_dvar_Ag' },
+      'Ag Mgt': { 'path': 'data/map_layers/map_dvar_Am.js', 'name': 'map_dvar_Am' },
+      'Non-Ag': { 'path': 'data/map_layers/map_dvar_NonAg.js', 'name': 'map_dvar_NonAg' },
+      'Mosaic': { 'path': 'data/map_layers/map_dvar_mosaic.js', 'name': 'map_dvar_mosaic' },
     }
   }
 }

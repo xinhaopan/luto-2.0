@@ -2,264 +2,297 @@ window.ProductionView = {
   setup() {
     const { ref, onMounted, inject, computed, watch, nextTick } = Vue;
 
-    // Global selection state
-    const selectYear = ref(2020);
-    const selectRegion = inject('globalSelectedRegion');
-    const yearIndex = ref(0);
+    // Data|Map service
+    const chartRegister = window.DataService.chartCategories["Production"];
+    const mapRegister = window.MapService.mapCategories["Production"];
+    const loadScript = window.loadScript;
 
-    // Global variables
+    // Global selection state
+    const yearIndex = ref(0);
+    const selectYear = ref(2020);
+    const selectRegion = inject("globalSelectedRegion");
+
+    // Available variables
     const availableYears = ref([]);
-    const availableCategories = ref(['Ag', 'Ag Mgt', 'Non-Ag']);
+    const availableUnit = {
+      Area: "Hectares",
+      Economics: "AUD",
+      GHG: "Mt CO2e",
+      Water: "ML",
+      Production: "Tonnes",
+      Biodiversity: "Relative Percentage (Pre-1750 = 100%)",
+    };
+
+    // Available selections - Production now has Area-like structure
+    const availableCategories = ["Ag", "Ag Mgt", "Non-Ag"];
+    const availableAgMgt = ref([]);
+    const availableWater = ref([]);
+    const availableLanduse = ref([]);
+
+    // Map selection state - now like Area
+    const selectCategory = ref("");
+    const selectAgMgt = ref("");
+    const selectWater = ref("");
+    const selectLanduse = ref("");
+
+    // Previous selections memory
+    const previousSelections = ref({
+      "Ag": { water: "", landuse: "" },
+      "Ag Mgt": { agMgt: "", water: "", landuse: "" },
+      "Non-Ag": { landuse: "" }
+    });
+
+    // UI state
     const dataLoaded = ref(false);
     const isDrawerOpen = ref(false);
-
-    // Data selection and visualization state
-    const selectChartDataset = ref({});
-
-    // Base map selection state
-    const mapVarName = ref('');
-    const mapVarPath = ref([]);
-
-    // Data|Map service
-    const MapRegister = window.MapService.mapCategories['Production'];     // MapService was registered in the index.html
-    const dataConstructor = new window.DataConstructor();
-
-    // Map selection state
-    const selectMapCategory = ref('Ag');
-    const selectMapAgMgt = ref('Asparagopsis taxiformis');
-    const selectMapCommodity = ref('apples');
-
-    // Chart selection state
-    const selectChartLevel = ref('Agricultural');
-
-    // Function to load data for current category
-    const loadDataForCategory = (category) => {
-      if (!window[MapRegister[category]['name']]) return;
-      dataConstructor.loadData(window[MapRegister[category]['name']]);
-    };
-
-    // Computed properties using DataConstructor
-    const availableMapCommodities = computed(() => {
-      // Load and return commodities specific to the current category
-      if (selectMapCategory.value === 'Ag') {
-        if (window[MapRegister['Ag']['name']]) {
-          dataConstructor.loadData(window[MapRegister['Ag']['name']]);
-          return dataConstructor.getAvailableKeysAtNextLevel({});
-        }
-      } else if (selectMapCategory.value === 'Ag Mgt') {
-        if (window[MapRegister['Ag Mgt']['name']]) {
-          dataConstructor.loadData(window[MapRegister['Ag Mgt']['name']]);
-          return dataConstructor.getAvailableKeysAtNextLevel({});
-        }
-      } else if (selectMapCategory.value === 'Non-Ag') {
-        if (window[MapRegister['Non-Ag']['name']]) {
-          dataConstructor.loadData(window[MapRegister['Non-Ag']['name']]);
-          return dataConstructor.getAvailableKeysAtNextLevel({});
-        }
+    const mapReady = computed(() => {
+      if (!selectCategory.value || !selectLanduse.value) {
+        return false;
       }
-      return [];
+      if (selectCategory.value === "Non-Ag") {
+        // Non-Ag: Landuse > Year (no Water level)
+        const dataName = mapRegister[selectCategory.value]?.["name"];
+        return dataName && window[dataName];
+      }
+      if (!selectWater.value) {
+        return false;
+      }
+      if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
+        return false;
+      }
+      const dataName = mapRegister[selectCategory.value]?.["name"];
+      return dataName && window[dataName];
+    });
+    const chartReady = computed(() => {
+      if (!selectCategory.value || !selectRegion.value) {
+        return false;
+      }
+      if (selectCategory.value === "Non-Ag") {
+        // Non-Ag is simple: Region > [series]
+        const dataName = chartRegister[selectCategory.value]?.["name"];
+        return dataName && window[dataName] && window[dataName][selectRegion.value];
+      }
+      if (!selectWater.value) {
+        return false;
+      }
+      if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
+        return false;
+      }
+      const dataName = chartRegister[selectCategory.value]?.["name"];
+      return dataName && window[dataName] && window[dataName][selectRegion.value];
     });
 
-    const availableMapAgMgt = computed(() => {
-      if (selectMapCategory.value !== 'Ag Mgt') return [];
-
-      const fixedLevels = {};
-      if (selectMapCommodity.value) {
-        fixedLevels.level_1 = selectMapCommodity.value;
+    // Reactive data - Production now follows Area pattern
+    const mapData = computed(() => window[mapRegister[selectCategory.value]["name"]]);
+    const chartData = computed(() => window[chartRegister[selectCategory.value]["name"]][selectRegion.value]);
+    const selectMapData = computed(() => {
+      if (!mapReady.value) {
+        return {};
       }
-      return dataConstructor.getAvailableKeysAtNextLevel(fixedLevels);
+      if (selectCategory.value === "Ag") {
+        // Ag: Water > Landuse > Year
+        return mapData.value[selectWater.value][selectLanduse.value][selectYear.value];
+      }
+      else if (selectCategory.value === "Ag Mgt") {
+        // Ag Mgt: AgMgt > Water > Landuse > Year
+        return mapData.value?.[selectAgMgt.value][selectWater.value][selectLanduse.value][selectYear.value];
+      }
+      else if (selectCategory.value === "Non-Ag") {
+        // Non-Ag: Landuse > Year (no Water level)
+        return mapData.value[selectLanduse.value][selectYear.value];
+      }
     });
-
-    const availableChartAg = computed(() => getChartOptionsForLevel('ag'));
-    const availableChartAgMgt = computed(() => getChartOptionsForLevel('agMgt'));
-    const availableChartNonAg = computed(() => getChartOptionsForLevel('nonag'));
-
-
-
-    // Centralized function to navigate nested data structure based on current selections
-    const getChartOptionsForLevel = (level) => {
-      if (level === 'ag') {
-        if (selectMapCategory.value !== 'Ag') return [];
-        return ['Agricultural', 'Overview', 'Commodity', 'Type'];
+    const selectChartData = computed(() => {
+      if (!chartReady.value) {
+        return {};
       }
-      if (level === 'agMgt') {
-        if (selectMapCategory.value !== 'Ag Mgt') return [];
-        return ['Agricultural Management', 'Overview', 'Commodity', 'Type'];
+      let seriesData;
+      if (selectCategory.value === "Ag") {
+        // Production_Ag: Region > Water > [series]
+        seriesData = chartData.value[selectWater.value];
       }
-      if (level === 'nonag') {
-        if (selectMapCategory.value !== 'Non-Ag') return [];
-        return ['Non-Agricultural', 'Overview', 'Commodity', 'Type'];
+      else if (selectCategory.value === "Ag Mgt") {
+        // Production_Am: Region > AgMgt > Water > [series]
+        seriesData = chartData.value[selectAgMgt.value]?.[selectWater.value];
+      } else if (selectCategory.value === "Non-Ag") {
+        // Production_NonAg: Region > [series] (direct series array)
+        seriesData = chartData.value;
       }
-      return [];
-    };
 
-    const getChartData = () => {
-      // Map the visible "Chart level" label to the loaded dataset key
-      const chartKeyMap = {
-        'Ag': {
-          'Agricultural': 'Production_LUTO_1_Agricultural',
-          'Overview': 'Production_achive_percent',
-          'Commodity': 'Production_sum_1_Commodity',
-          'Type': 'Production_sum_2_Type',
+      return {
+        ...window["Chart_default_options"],
+        chart: {
+          height: 440,
         },
-        'Ag Mgt': {
-          'Agricultural Management': 'Production_LUTO_3_Agricultural_Management',
-          'Overview': 'Production_achive_percent',
-          'Commodity': 'Production_sum_1_Commodity',
-          'Type': 'Production_sum_2_Type',
+        yAxis: {
+          title: {
+            text: availableUnit["Production"],
+          },
         },
-        'Non-Ag': {
-          'Non-Agricultural': 'Production_LUTO_2_Non-Agricultural',
-          'Overview': 'Production_achive_percent',
-          'Commodity': 'Production_sum_1_Commodity',
-          'Type': 'Production_sum_2_Type',
-        },
+        series: seriesData || [],
+        colors: window["Supporting_info"].colors,
       };
-      return chartKeyMap[selectMapCategory.value]?.[selectChartLevel.value] || 'Production_LUTO_1_Agricultural';
-    };
-
+    });
 
     onMounted(async () => {
+      await loadScript("./data/Supporting_info.js", "Supporting_info");
+      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options");
 
-      await loadScript("./data/Supporting_info.js", 'Supporting_info');
-      await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options');
+      // Load data
+      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"]);
+      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"]);
+      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"]);
+      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"]);
+      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"]);
+      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"]);
 
-      // Load map data for all categories
-      await loadScript(MapRegister['Ag']['path'], MapRegister['Ag']['name']);
-      await loadScript(MapRegister['Ag Mgt']['path'], MapRegister['Ag Mgt']['name']);
-      await loadScript(MapRegister['Non-Ag']['path'], MapRegister['Non-Ag']['name']);
-
-      // Chart data
-      await loadScript("./data/Production_LUTO_1_Agricultural.js", 'Production_LUTO_1_Agricultural');
-      await loadScript("./data/Production_LUTO_2_Non-Agricultural.js", 'Production_LUTO_2_Non-Agricultural');
-      await loadScript("./data/Production_LUTO_3_Agricultural_Management.js", 'Production_LUTO_3_Agricultural_Management');
-      await loadScript("./data/Production_achive_percent.js", 'Production_achive_percent');
-      await loadScript("./data/Production_sum_1_Commodity.js", 'Production_sum_1_Commodity');
-      await loadScript("./data/Production_sum_2_Type.js", 'Production_sum_2_Type');
-
+      // Initial selections
       availableYears.value = window.Supporting_info.years;
-      availableCategories.value = Object.keys(window.MapService.mapCategories['Production']);
+      selectCategory.value = availableCategories[0];
 
-      // Load initial data for the default category
-      loadDataForCategory(selectMapCategory.value);
-
-      updateMapOverlay();
-      updateChartSeries();
-
-      nextTick(() => { dataLoaded.value = true; });
+      await nextTick(() => {
+        dataLoaded.value = true;
+      });
     });
 
-    // Watch for category changes to reload data
-    watch(selectMapCategory, (newCategory) => {
-      loadDataForCategory(newCategory);
-    });
-
-    // Watch for changes to validate selections using DataConstructor
-    watch([selectMapCategory, selectMapCommodity, selectMapAgMgt, selectYear], () => {
-      // Reset values if they're no longer valid options using DataConstructor
-      const validCommodityOptions = dataConstructor.getAvailableKeysAtNextLevel({});
-      if (validCommodityOptions.length > 0 && !validCommodityOptions.includes(selectMapCommodity.value)) {
-        selectMapCommodity.value = validCommodityOptions[0];
-      }
-
-      if (selectMapCategory.value === 'Ag Mgt') {
-        const agMgtFixedLevels = {};
-        if (selectMapCommodity.value) {
-          agMgtFixedLevels.level_1 = selectMapCommodity.value;
-        }
-        const validAgMgtOptions = dataConstructor.getAvailableKeysAtNextLevel(agMgtFixedLevels);
-        if (validAgMgtOptions.length > 0 && !validAgMgtOptions.includes(selectMapAgMgt.value)) {
-          selectMapAgMgt.value = validAgMgtOptions[0];
-        }
-      }
-
-      // Set map configuration based on category
-      updateMapOverlay();
-    });
-
-    // Refresh chart when category/level/region change
-    watch([selectMapCategory, selectChartLevel, selectRegion], () => {
-      updateChartSeries();
-    });
-
+    // Watchers and methods
     const toggleDrawer = () => {
       isDrawerOpen.value = !isDrawerOpen.value;
     };
 
-    const updateChartSeries = () => {
-      const dsKey = getChartData();
-      selectChartDataset.value = {
-        ...window.Chart_default_options,
-        chart: { height: 500 },
-        yAxis: {
-          title: {
-            text: "tonnes/kilolitre",
-          },
-        },
-        series: window[dsKey][selectRegion.value],
-      };
-    };
+    watch(yearIndex, (newIndex) => {
+      selectYear.value = availableYears.value[newIndex];
+    });
 
-    const updateMapOverlay = () => {
-      if (selectMapCategory.value === 'Ag') {
-        mapVarName.value = MapRegister["Ag"]["name"];
-        mapVarPath.value = [selectMapCommodity.value, selectYear.value] || [];
-      } else if (selectMapCategory.value === 'Ag Mgt') {
-        mapVarName.value = MapRegister["Ag Mgt"]["name"];
-        mapVarPath.value = [selectMapCommodity.value, selectMapAgMgt.value, selectYear.value] || [];
-      } else if (selectMapCategory.value === 'Non-Ag') {
-        mapVarName.value = MapRegister["Non-Ag"]["name"];
-        mapVarPath.value = [selectMapCommodity.value, selectYear.value] || [];
+    // Progressive selection chain watchers - now like Area
+    watch(selectCategory, (newCategory, oldCategory) => {
+      // Save previous selections before switching
+      if (oldCategory) {
+        if (oldCategory === "Ag") {
+          previousSelections.value["Ag"] = { water: selectWater.value, landuse: selectLanduse.value };
+        } else if (oldCategory === "Ag Mgt") {
+          previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectLanduse.value };
+        } else if (oldCategory === "Non-Ag") {
+          previousSelections.value["Non-Ag"] = { landuse: selectLanduse.value };
+        }
       }
-    };
+
+      // Handle ALL downstream variables with cascading pattern
+      if (newCategory === "Ag Mgt") {
+        availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
+        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
+        selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
+        
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
+        const prevWater = previousSelections.value["Ag Mgt"].water;
+        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+        
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {});
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      } else if (newCategory === "Ag") {
+        // Clear Ag Mgt data when switching to Ag
+        availableAgMgt.value = [];
+        selectAgMgt.value = '';
+        availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
+        const prevWater = previousSelections.value["Ag"].water;
+        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+        
+        availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {});
+        const prevLanduse = previousSelections.value["Ag"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      } else if (newCategory === "Non-Ag") {
+        // Non-Ag has no Water level - clear both Ag Mgt and Water data
+        availableAgMgt.value = [];
+        selectAgMgt.value = '';
+        availableWater.value = [];
+        selectWater.value = '';
+        availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
+        const prevLanduse = previousSelections.value["Non-Ag"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      }
+    });
+
+    watch(selectAgMgt, (newAgMgt) => {
+      // Save current agMgt selection
+      if (selectCategory.value === "Ag Mgt") {
+        previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
+        
+        // Handle ALL downstream variables with cascading pattern
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
+        const prevWater = previousSelections.value["Ag Mgt"].water;
+        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+        
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      }
+    });
+
+    watch(selectWater, (newWater) => {
+      // Save current water selection
+      if (selectCategory.value === "Ag") {
+        previousSelections.value["Ag"].water = newWater;
+      } else if (selectCategory.value === "Ag Mgt") {
+        previousSelections.value["Ag Mgt"].water = newWater;
+      }
+
+      // Handle downstream variables
+      if (selectCategory.value === "Ag") {
+        availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {});
+        const prevLanduse = previousSelections.value["Ag"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      } else if (selectCategory.value === "Ag Mgt") {
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {});
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      }
+    });
+
+    watch(selectLanduse, (newLanduse) => {
+      // Save current landuse selection
+      if (selectCategory.value === "Ag") {
+        previousSelections.value["Ag"].landuse = newLanduse;
+      } else if (selectCategory.value === "Ag Mgt") {
+        previousSelections.value["Ag Mgt"].landuse = newLanduse;
+      } else if (selectCategory.value === "Non-Ag") {
+        previousSelections.value["Non-Ag"].landuse = newLanduse;
+      }
+    });
 
     return {
       yearIndex,
-      isDrawerOpen,
-      toggleDrawer,
-      dataLoaded,
+      selectYear,
+      selectRegion,
 
       availableYears,
       availableCategories,
+      availableAgMgt,
+      availableWater,
+      availableLanduse,
 
-      availableMapAgMgt,
-      availableMapCommodities,
+      selectCategory,
+      selectAgMgt,
+      selectWater,
+      selectLanduse,
 
-      availableChartAg,
-      availableChartAgMgt,
-      availableChartNonAg,
+      selectMapData,
+      selectChartData,
 
-      selectChartLevel,
-
-      selectRegion,
-      selectChartDataset,
-
-      selectMapCategory,
-      selectMapAgMgt,
-      selectMapCommodity,
-      selectYear,
-
-      mapVarPath,
-      mapVarName,
+      dataLoaded,
+      isDrawerOpen,
+      toggleDrawer,
     };
   },
   template: `
     <div class="relative w-full h-screen">
 
-      <!-- Drawer toggle button - Controls visibility of the chart panel -->
-      <button 
-        @click="toggleDrawer"
-        class="absolute top-5 z-[1001] p-2.5 bg-white border border-gray-300 rounded cursor-pointer transition-all duration-300 ease-in-out"
-        :class="isDrawerOpen ? 'right-[420px]' : 'right-5'">
-        {{ isDrawerOpen ? '→' : '←' }}
-      </button>
-
-      <!-- Region selection dropdown - Uses FilterableDropdown component -->
+      <!-- Region selection dropdown -->
       <div class="absolute w-[262px] top-32 left-[20px] z-50 bg-white/70 rounded-lg shadow-lg max-w-xs z-[9999]">
         <filterable-dropdown></filterable-dropdown>
       </div>
 
-      <!-- Year slider - Allows selection of different years in the dataset -->
+      <!-- Year slider -->
       <div class="absolute top-[200px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
         <p class="text-[0.8rem]">Year: <strong>{{ selectYear }}</strong></p>
         <el-slider
@@ -276,8 +309,7 @@ window.ProductionView = {
         />
       </div>
 
-
-      <!-- Data selection controls container - Categories, AgMgt, Commodity selections -->
+      <!-- Data selection controls container -->
       <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
         <!-- Category buttons (always visible) -->
@@ -285,80 +317,79 @@ window.ProductionView = {
           <div class="flex space-x-1">
             <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
             <button v-for="(val, key) in availableCategories" :key="key"
-              @click="selectMapCategory = val"
+              @click="selectCategory = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-              :class="{'bg-sky-500 text-white': selectMapCategory === val}">
+              :class="{'bg-sky-500 text-white': selectCategory === val}">
               {{ val }}
             </button>
           </div>
         </div>
 
-        <!-- Commodity options -->
-        <div v-if="dataLoaded" class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="!isDrawerOpen && availableMapCommodities.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Commodity:</span>
-            <button v-for="(val, key) in availableMapCommodities" :key="key"
-              @click="selectMapCommodity = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectMapCommodity === val}">
-              {{ val }}
-            </button>
-          </div>
-          <div v-else-if="dataLoaded && isDrawerOpen && (selectMapCategory === 'Ag' || selectMapCategory === 'Non-Ag')" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Chart level:</span>
-            <button v-if="selectMapCategory === 'Ag'" v-for="(val, key) in availableChartAg" :key="key"
-              @click="selectChartLevel = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectChartLevel === val}">
-              {{ val }}
-            </button>
-            <button v-if="selectMapCategory === 'Non-Ag'" v-for="(val, key) in availableChartNonAg" :key="key"
-              @click="selectChartLevel = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectChartLevel === val}">
-              {{ val }}
-            </button>
-          </div>
-        </div>
-
-        <!-- Ag Mgt options (only for Ag Mgt category when drawer is closed) -->
-        <div v-if="dataLoaded && selectMapCategory === 'Ag Mgt'" class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="!isDrawerOpen && availableMapAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+        <!-- Ag Mgt options (only for Ag Mgt category) -->
+        <div 
+          class="flex items-start border-t border-white/10 pt-1">
+          <div v-if="dataLoaded && selectCategory === 'Ag Mgt' && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
             <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
-            <button v-for="(val, key) in availableMapAgMgt" :key="key"
-              @click="selectMapAgMgt = val"
+            <button v-for="(val, key) in availableAgMgt" :key="key"
+              @click="selectAgMgt = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectMapAgMgt === val}">
-              {{ val }}
-            </button>
-          </div>
-          <div v-else-if="isDrawerOpen && availableChartAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Chart level:</span>
-            <button v-for="(val, key) in availableChartAgMgt" :key="key"
-              @click="selectChartLevel = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectChartLevel === val}">
+              :class="{'bg-sky-500 text-white': selectAgMgt === val}">
               {{ val }}
             </button>
           </div>
         </div>
 
+        <!-- Water options (for Ag and Ag Mgt) -->
+        <div 
+          class="flex items-start border-t border-white/10 pt-1">
+          <div v-if="dataLoaded && (selectCategory === 'Ag' || selectCategory === 'Ag Mgt') && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+            <button v-for="(val, key) in availableWater" :key="key"
+              @click="selectWater = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectWater === val}">
+              {{ val }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Landuse options -->
+        <div 
+          class="flex items-start border-t border-white/10 pt-1">
+          <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+            <button v-for="(val, key) in availableLanduse" :key="key"
+              @click="selectLanduse = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectLanduse === val}">
+              {{ val }}
+            </button>
+          </div>
+        </div>
       </div>
 
-      
-      <!-- Map container with slide-out chart drawer - Main visualization area -->
+      <!-- Map container with slide-out chart drawer -->
       <div style="position: relative; width: 100%; height: 100%; overflow: hidden;">
+
         <!-- Map component takes full space -->
         <regions-map 
-          :mapName="mapVarName"
-          :mapPath="mapVarPath"
+          :mapData="selectMapData"
           style="width: 100%; height: 100%;">
         </regions-map>
+
+        <!-- Drawer toggle button -->
+        <button
+          @click="toggleDrawer"
+          class="absolute top-5 z-[1001] p-2.5 bg-white border border-gray-300 rounded cursor-pointer transition-all duration-300 ease-in-out"
+          :class="isDrawerOpen ? 'right-[420px]' : 'right-5'">
+          {{ isDrawerOpen ? '→' : '←' }}
+        </button>
         
         <!-- Chart drawer positioned relative to map -->
         <div 
           :style="{
             position: 'absolute',
+            height: '50px',
             top: '10px',
             bottom: '10px',
             right: isDrawerOpen ? '0px' : '-100%',
@@ -370,7 +401,8 @@ window.ProductionView = {
             boxSizing: 'border-box'
           }">
           <chart-container 
-            :chartData="selectChartDataset" 
+            :chartData="selectChartData" 
+            :selectedLanduse="selectLanduse"
             :draggable="true"
             :zoomable="true"
             style="width: 100%; height: 200px;">
@@ -378,8 +410,6 @@ window.ProductionView = {
         </div>
       </div>
 
-      
-
     </div>
-  `
+  `,
 };
