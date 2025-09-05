@@ -705,18 +705,18 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
 def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
-
-    # GHG abatement from Land Use Change
+    
+    # GHG abatement from Land Use Change 
     for j_idx, lu in enumerate(land_uses):
         g_mrj_effect[:, :, j_idx] -= (
-            data.CO2E_STOCK_UNALL_NATURAL
+            data.CO2E_STOCK_UNALL_NATURAL      
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
             * data.REAL_AREA
-            / settings.HIR_EFFECT_YEARS
+            / settings.HIR_EFFECT_YEARS    
         )
 
     # GHG abatement from livestock density reduction
-    for lm_idx, lm in enumerate(data.LANDMANS):
+    for lm_idx, lm in enumerate(data.LANDMANS):         
         for j_idx, lu in enumerate(land_uses):
             g_mrj_effect[lm_idx, :, j_idx] -= get_ghg_lvstk(data, lu, lm, yr_idx, True) * settings.HIR_PRODUCTIVITY_CONTRIBUTION
 
@@ -726,16 +726,16 @@ def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
 def get_sheep_hir_effect_g_mrj(data: Data, yr_idx):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
-
+    
     # GHG abatement from Land Use Change
     for j_idx, lu in enumerate(land_uses):
         g_mrj_effect[:, :, j_idx] -= (
-            data.CO2E_STOCK_UNALL_NATURAL
+            data.CO2E_STOCK_UNALL_NATURAL      
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
             * data.REAL_AREA
             / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full growth span of a tree
         )
-
+        
     # GHG abatement from livestock density reduction
     for lm_idx, lm in enumerate(data.LANDMANS):
         for j_idx, lu in enumerate(land_uses):
@@ -764,8 +764,8 @@ def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.
     sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data)                         
     agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx)                         
     biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx)                             
-    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data, yr_idx)
-    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data, yr_idx)
+    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data, yr_idx)                                   
+    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data, yr_idx)                                 
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,

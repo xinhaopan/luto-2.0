@@ -61,7 +61,7 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
 
     if separate:
         return {'Establishment cost (Ag2Non-Ag)': est_costs_r,
-                'Transition cost (Ag2Non-Ag)': ag_to_ep_t_r,
+                'Transition cost (Ag2Non-Ag)': ag_to_ep_t_r, 
                 'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig_cost_r}
     else:   
         return est_costs_r + ag_to_ep_t_r + w_rm_irrig_cost_r
@@ -140,7 +140,7 @@ def get_sheep_agroforestry_transitions_from_ag(
     est_costs_r = tools.amortise(data.AF_EST_COST_HA * data.REAL_AREA * data.EST_COST_MULTS[yr_cal]).astype(np.float32)
     est_costs_r[~cells] = 0.0
     est_costs_r *= settings.AF_PROPORTION  
-
+    
     # Transition costs
     ag_to_agroforestry_j = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep Agroforestry').values
     ag_to_agroforestry_t_r = np.vectorize(dict(enumerate(ag_to_agroforestry_j)).get, otypes=['float32'])(lumap)
@@ -148,7 +148,7 @@ def get_sheep_agroforestry_transitions_from_ag(
     ag_to_agroforestry_t_r = tools.amortise(ag_to_agroforestry_t_r * data.REAL_AREA)
     ag_to_agroforestry_t_r[~cells] = 0.0
     ag_to_agroforestry_t_r *= settings.AF_PROPORTION
-
+    
     ag_to_sheep_j = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep - modified land').values    # Only consider ag to sheep-modified land here; Ag to sheep-natural is handled in the destocked-natural module
     ag_to_sheep_t_r = np.vectorize(dict(enumerate(ag_to_sheep_j)).get, otypes=['float32'])(lumap)
     ag_to_sheep_t_r = np.nan_to_num(ag_to_sheep_t_r)
@@ -194,7 +194,7 @@ def get_beef_agroforestry_transitions_from_ag(
     dict
         (separate = True) Dict of separated transition costs.
     """
-
+    
     yr_cal = data.YR_CAL_BASE + yr_idx
     cells = np.isin(lumap, np.array(list(data.AGLU2DESC.keys())))
 
@@ -293,7 +293,7 @@ def get_sheep_carbon_plantings_belt_from_ag(
     dict
         (separate = True) Dict of separated transition costs.
     """
-
+    
     yr_cal = data.YR_CAL_BASE + yr_idx
     cells = np.isin(lumap, np.array(list(data.AGLU2DESC.keys())))
 
@@ -309,13 +309,13 @@ def get_sheep_carbon_plantings_belt_from_ag(
     ag_to_cp_t_r = tools.amortise(ag_to_cp_t_r * data.REAL_AREA)
     ag_to_cp_t_r[~cells] = 0.0
     ag_to_cp_t_r *= settings.CP_BELT_PROPORTION
-
+    
     ag_to_sheep_j = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep - modified land').values    # Only consider sheep-modified land here; Ag to sheep-natural is handled in the destocked-natural module
     ag_to_sheep_t_r = np.vectorize(dict(enumerate(ag_to_sheep_j)).get, otypes=['float32'])(lumap)
     ag_to_sheep_t_r = np.nan_to_num(ag_to_sheep_t_r)
     ag_to_sheep_t_r = tools.amortise(ag_to_sheep_t_r * data.REAL_AREA)
     ag_to_sheep_t_r[~cells] = 0.0
-    ag_to_sheep_t_r *= (1 - settings.CP_BELT_PROPORTION)
+    ag_to_sheep_t_r *= (1 - settings.CP_BELT_PROPORTION)  
     
     # Water costs; Assume CP is dryland
     w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
@@ -354,7 +354,7 @@ def get_beef_carbon_plantings_belt_from_ag(
     dict
         (separate = True) Dict of separated transition costs.
     """
-
+    
     yr_cal = data.YR_CAL_BASE + yr_idx
     cells = np.isin(lumap, np.array(list(data.AGLU2DESC.keys())))
 
@@ -433,7 +433,7 @@ def get_destocked_from_ag(
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
     cells = np.isin(lumap, data.LU_LVSTK_NATURAL)
-
+    
     # Establishment costs; If destocking brings 30% of bio/GHG benefits, then it takes 30% of establishment costs as Environmental Plantings
     HCAS_benefit_mult = {lu:1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu] for lu in data.LU_LVSTK_NATURAL}
     est_costs_r = np.vectorize(HCAS_benefit_mult.get, otypes=[np.float32])(lumap) * data.EP_EST_COST_HA
@@ -446,7 +446,7 @@ def get_destocked_from_ag(
     # ag_to_destock_t_r = np.nan_to_num(ag_to_destock_t_r)
     # ag_to_destock_t_r = tools.amortise(ag_to_destock_t_r * data.REAL_AREA)
     # ag_to_destock_t_r[~cells] = 0.0
-
+    
     # Water costs; Assume destocked land is dryland
     w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
     w_rm_irrig_cost_r[~cells] = 0.0
@@ -962,14 +962,13 @@ def get_beccs_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndar
         return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
     else:
         return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
+    
 
-
-def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.ndarray,
-                        separate: bool = False) -> np.ndarray:
+def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.ndarray, separate: bool = False) -> np.ndarray:
     """
     Get transition costs from destocked land to agricultural land uses for each cell.
     Transition costs are based on the transition costs of unallocated natural land to agricultural land.
-
+    
     Returns
     -------
     np.ndarray
@@ -982,7 +981,7 @@ def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.nd
     destocked_cells = tools.get_destocked_land_cells(lumap)
     if destocked_cells.size == 0 and separate == False:
         return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
-
+    
     # Get transition costs from destocked cells by using transition costs from unallocated land
     unallocated_t_mrj = ag_transitions.get_transition_matrices_ag2ag(
         data, yr_idx, all_unallocated_lumap, all_dry_lmmap, separate=separate
@@ -992,7 +991,7 @@ def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.nd
         destocked_t_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
         destocked_t_mrj[:, destocked_cells, :] = unallocated_t_mrj[:, destocked_cells, :]
         return destocked_t_mrj
-
+    
     elif separate == True:
         sep_destocked_trans = {k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)) for k in unallocated_t_mrj}
         if destocked_cells.size == 0:

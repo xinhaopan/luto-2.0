@@ -82,7 +82,7 @@ def get_grid_search_param_df(grid_dict:dict) -> None:
     print(f'Grid search template has been created with {len(permutations_df)} permutations!')
     for k, v in grid_dict.items():
         if len(v) > 1:
-            print(f'    {k:<30} : {len(v)} values')
+            print(f'    {k:<50} : {len(v)} values')
     
     return permutations_df
     
@@ -96,7 +96,6 @@ def update_settings(settings_dict:dict, job_name:str):
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
     settings_dict['RAW_DATA'] = os.path.abspath(settings_dict['RAW_DATA']).replace('\\','/')
     settings_dict['THREADS'] = settings_dict['NCPUS']
-    settings_dict['KEEP_OUTPUTS'] = eval(settings_dict['KEEP_OUTPUTS'])  # Convert string to boolean
 
     return settings_dict
 
@@ -364,7 +363,7 @@ def get_report_df(json_dir_path, run_paras):
 
 
 
-def process_task_root_dirs(task_root_dir, n_workers=5):
+def process_task_root_dirs(task_root_dir, n_workers=10):
     
     grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters_unique.csv")
     run_dirs = [i for i in os.listdir(task_root_dir) if os.path.isdir(os.path.join(task_root_dir, i))]

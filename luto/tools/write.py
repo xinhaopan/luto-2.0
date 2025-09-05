@@ -195,12 +195,12 @@ def write_files(data: Data, yr_cal, path):
     dvar_ag = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
     dvar_non_ag = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
     dvar_ag_man = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
-
+    
     # Expand dimension
     dvar_ag = xr.concat([dvar_ag, dvar_ag.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     dvar_ag_man = xr.concat([dvar_ag_man, dvar_ag_man.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     dvar_ag_man = xr.concat([dvar_ag_man, dvar_ag_man.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-
+    
     save2nc(dvar_ag, os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))
     save2nc(dvar_non_ag, os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))
     save2nc(dvar_ag_man, os.path.join(path, f'xr_dvar_ag_man_{yr_cal}.nc'))
@@ -215,7 +215,7 @@ def write_files(data: Data, yr_cal, path):
 
 
 def write_mosaic_map(data: Data, yr_cal, path):
-
+    
     # Individual maps
     ag_map = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).sum('lm').chunk({'cell': min(1024, data.NCELLS)})
     non_ag_map = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
@@ -229,7 +229,7 @@ def write_mosaic_map(data: Data, yr_cal, path):
     # Reindex to ensure all land-uses/managements (even excluded in settings) are present
     ag_map = ag_map.where(ag_mask[:, None]).reindex(lu=data.AGRICULTURAL_LANDUSES)
     non_ag_map = non_ag_map.where(non_ag_mask[:, None]).reindex(lu=settings.NON_AG_LAND_USES, fill_value=0)
-    am_map = am_map.where(am_mask[:, None]).reindex(am=settings.AG_MANAGEMENTS, fill_value=0)
+    am_map = am_map.where(am_mask[:, None]).reindex(am=settings.AG_MANAGEMENTS, fill_value=0)   
 
     save2nc(ag_map, os.path.join(path, f'xr_map_ag_{yr_cal}.nc'))
     save2nc(non_ag_map, os.path.join(path, f'xr_map_non_ag_{yr_cal}.nc'))
@@ -386,7 +386,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr, ag_man_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr, ag_man_q_mrp_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
 
-    # Calculate the commodity production
+    # Calculate the commodity production 
     ag_q_rc = (((ag_X_mrj_xr * lu2pr_xr).sum(dim=['lu']) * ag_q_mrp_xr) * pr2cm_xr).sum(dim='product')
     non_ag_p_rc = (non_ag_X_rk_xr * non_ag_crk_xr).sum(dim=['lu'])
     am_p_rc = (((ag_man_X_mrj_xr * lu2pr_xr).sum(['lu']) * ag_man_q_mrp_xr) * pr2cm_xr).sum('product')
@@ -413,7 +413,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
         ).assign(Year=yr_cal
         ).replace({'dry':'Dryland', 'irr':'Irrigated'})
-
+    
     # Australia level aggregation
     ag_q_rc_df_AUS = ag_q_rc.sum('cell'
         ).to_dataframe('Production (t/KL)'
@@ -433,7 +433,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
         ).assign(Year=yr_cal, region='AUSTRALIA'
         ).replace({'dry':'Dryland', 'irr':'Irrigated'})
-
+    
     # Save the production dataframes to csv
     quantity_df_AUS = pd.concat([ag_q_rc_df_AUS, non_ag_p_rc_df_AUS, am_p_rc_df_AUS], ignore_index=True).query('`Production (t/KL)` > 1e-2')
     quantity_df_region = pd.concat([ag_q_rc_df_region, non_ag_p_rc_df_region, am_p_rc_df_region], ignore_index=True).query('`Production (t/KL)` > 1e-2')
@@ -540,7 +540,7 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
             'dry': 'Dryland',
             'irr': 'Irrigated'
         }).assign(Year=yr_cal, region='AUSTRALIA')
-
+        
     # Save to disk
     pd.concat([ag_rev_jms_AUS, ag_rev_jms_region]).to_csv(os.path.join(path, f'revenue_ag_{yr_cal}.csv'), index=False)
     pd.concat([ag_cost_jms_AUS, ag_cost_jms_region]).to_csv(os.path.join(path, f'cost_ag_{yr_cal}.csv'), index=False)
@@ -568,7 +568,7 @@ def write_revenue_cost_ag_man(data: Data, yr_cal, path):
     ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
     am_revenue_mat = tools.am_mrj_to_xr(data, ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx))
     am_cost_mat = tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx))
-
+    
     # Expand dimension
     am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
@@ -934,7 +934,7 @@ def write_dvar_area(data: Data, yr_cal, path):
     am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).assign_coords({'region': ('cell', data.REGION_NRM_NAME)}
         ).chunk({'cell': min(1024, data.NCELLS)})
-
+        
     # Expand dimension
     ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
@@ -971,7 +971,7 @@ def write_dvar_area(data: Data, yr_cal, path):
         ).assign(Year=yr_cal
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).query('`Area (ha)` > 1e-6')
-
+        
     # Australia level aggregation
     df_ag_area_AUS = area_ag.sum(dim='cell'
         ).to_dataframe('Area (ha)'
@@ -993,7 +993,7 @@ def write_dvar_area(data: Data, yr_cal, path):
         ).assign(Year=yr_cal, region='AUSTRALIA'
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).query('`Area (ha)` > 1e-6')
-
+                                 
 
     pd.concat([df_ag_area_AUS, df_ag_area_region]).to_csv(os.path.join(path, f'area_agricultural_landuse_{yr_cal}.csv'), index = False)
     pd.concat([df_non_ag_area_AUS, df_non_ag_area_region]).to_csv(os.path.join(path, f'area_non_agricultural_landuse_{yr_cal}.csv'), index = False)
@@ -1169,14 +1169,14 @@ def write_ghg_separate(data: Data, yr_cal, path):
     mindex_coords = xr.Coordinates.from_pandas_multiindex(mindex, 'variable')
     ag_g_rsmj = ag_g_xr.to_dataarray().assign_coords(mindex_coords).chunk({'cell': min(1024, data.NCELLS)}).unstack()
     ag_g_rsmj['GHG_source'] = ag_g_rsmj['GHG_source'].to_series().replace(GHG_NAMES)
-
+    
     # Expand dimension
     ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_g_rsmj = xr.concat([ag_g_rsmj, ag_g_rsmj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_g_rsmj = xr.concat([ag_g_rsmj, ag_g_rsmj.sum(dim='GHG_source', keepdims=True).assign_coords(GHG_source=['ALL'])], dim='GHG_source')
 
-    ghg_e = ag_g_rsmj * ag_dvar_mrj
-
+    ghg_e = ag_g_rsmj * ag_dvar_mrj 
+    
     # Regional level aggregation
     ghg_df_region = ghg_e.groupby('region'
         ).sum('cell'
@@ -1194,12 +1194,12 @@ def write_ghg_separate(data: Data, yr_cal, path):
         ).rename(columns={'lu':'Land-use', 'lm':'Water_supply', 'GHG_source':'Source'}
         ).assign(Year=yr_cal, Type='Agricultural land-use', region='AUSTRALIA'
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('abs(`Value (t CO2e)`) > 1e-3')
-
+        ).query('abs(`Value (t CO2e)`) > 1e-3') 
+    
     # Save table to disk
     pd.concat([ghg_df_AUS, ghg_df_region]).to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'), index=False)
 
-    save2nc(ghg_e, os.path.join(path, f'xr_GHG_ag_{yr_cal}.nc'))
+    save2nc(ghg_e, os.path.join(path, 'xr_GHG_ag.nc'))
 
 
     # -----------------------------------------------------------#
@@ -1232,7 +1232,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
         ).assign(Year=yr_cal, Type='Non-Agricultural land-use'
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).query('abs(`Value (t CO2e)`) > 1e-3') 
-
+        
     # Australia level aggregation
     ghg_df_AUS = xr_ghg_non_ag.sum('cell'
         ).to_dataframe('Value (t CO2e)'
@@ -1240,8 +1240,8 @@ def write_ghg_separate(data: Data, yr_cal, path):
         ).rename(columns={'lu': 'Land-use'}
         ).assign(Year=yr_cal, Type='Non-Agricultural land-use', region='AUSTRALIA'
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
-        ).query('abs(`Value (t CO2e)`) > 1e-3')
-
+        ).query('abs(`Value (t CO2e)`) > 1e-3') 
+        
     # Save table to disk
     pd.concat([ghg_df_AUS, ghg_df_region]).to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{yr_cal}.csv'), index=False)
     
@@ -1289,8 +1289,8 @@ def write_ghg_separate(data: Data, yr_cal, path):
         ).rename(columns={'lm': 'Water_supply', 'lu': 'Land-use', 'am': 'Agricultural Management Type'}
         ).assign(Year=yr_cal, Type='Agricultural Management', region='AUSTRALIA'
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
-        ).query('abs(`Value (t CO2e)`) > 1e-3')
-
+        ).query('abs(`Value (t CO2e)`) > 1e-3') 
+        
     # Save table to disk
     pd.concat([ghg_df_AUS, ghg_df_region]).to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{yr_cal}.csv'), index=False)
     
@@ -1390,7 +1390,7 @@ def write_water(data: Data, yr_cal, path):
     am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(1024, data.NCELLS)})
-
+        
     # Get water target and domestic use
     w_limit_inside_luto = xr.DataArray(
         list(data.WATER_YIELD_TARGETS.values()),
@@ -1411,32 +1411,32 @@ def write_water(data: Data, yr_cal, path):
 
     # ------------------------------- Get water yield without CCI -----------------------------------
 
-    # Get water yield matrix
+    # Get water yield matrix 
     if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on':
         ag_w_mrj = tools.ag_mrj_to_xr(
-            data,
+            data, 
             ag_water.get_water_net_yield_matrices(data, yr_idx)
         )
         non_ag_w_rk = tools.non_ag_rk_to_xr(
-            data,
+            data, 
             non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, data.lumaps[yr_cal], yr_idx)
         )
         ag_man_w_mrj = tools.am_mrj_to_xr(  # Ag-man water yield only related to water requirement, that not affected by climate change
-            data,
-            ag_water.get_agricultural_management_water_matrices(data, yr_idx)
+            data, 
+            ag_water.get_agricultural_management_water_matrices(data, yr_idx) 
         )
     elif settings.WATER_CLIMATE_CHANGE_IMPACT == 'off':
         ag_w_mrj = tools.ag_mrj_to_xr(
-            data,
+            data, 
             ag_water.get_water_net_yield_matrices(data, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
         )
         non_ag_w_rk = tools.non_ag_rk_to_xr(
-            data,
+            data, 
             non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, data.lumaps[yr_cal], yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
         )
         ag_man_w_mrj = tools.am_mrj_to_xr(  # Ag-man water yield only related to water requirement, that not affected by climate change
-            data,
-            ag_water.get_agricultural_management_water_matrices(data, yr_idx)
+            data, 
+            ag_water.get_agricultural_management_water_matrices(data, yr_idx) 
         )
     else:
         raise ValueError("Invalid setting for WATER_CLIMATE_CHANGE_IMPACT, only 'on' or 'off' allowed.")
@@ -1508,9 +1508,9 @@ def write_water(data: Data, yr_cal, path):
 
 
 
-    # Calculate water net yield (delta) under CCI;
-    #   we use BASE_YEAR (2010) dvar_mrj to calculate CCI,
-    #   because the CCI calculated with base year (previouse year)
+    # Calculate water net yield (delta) under CCI; 
+    #   we use BASE_YEAR (2010) dvar_mrj to calculate CCI, 
+    #   because the CCI calculated with base year (previouse year) 
     #   dvar_mrj includes wny from land-use change
     xr_ag_dvar_BASE = tools.ag_mrj_to_xr(data, data.AG_L_MRJ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME))
     xr_ag_dvar_BASE = xr.concat([xr_ag_dvar_BASE, xr_ag_dvar_BASE.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
@@ -1638,7 +1638,7 @@ def write_biodiversity_overall_quanlity_scores(data: Data, yr_cal, path):
 
     # Calculate the biodiversity scores
     base_yr_score = np.einsum('mrj,mrj->', bio_ag_priority_mrj, data.AG_L_MRJ)
-
+    
     # Expand dimension
     ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_mam_dvar_mrj = xr.concat([ag_mam_dvar_mrj, ag_mam_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
@@ -1790,19 +1790,19 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).assign(Relative_Contribution_Percentage = lambda x:(x['Area Weighted Score (ha)'] / total_priority_degraded_area * 100)
-        ).assign(Type='Non-Agricultural land-use', Year=yr_cal, region='Australia')
+        ).assign(Type='Non-Agricultural land-use', Year=yr_cal, region='Australia')  
     GBF2_score_am_AUS = xr_gbf2_am.sum(['cell','lm'], skipna=False
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
         ).T.drop_duplicates(
         ).T.assign(Relative_Contribution_Percentage = lambda x:(x['Area Weighted Score (ha)'] / total_priority_degraded_area * 100)
         ).assign(Type='Agricultural Management', Year=yr_cal, region='Australia')
-
+        
     # Combine regional and Australia level data
     GBF2_score_ag = pd.concat([GBF2_score_ag_region, GBF2_score_ag_AUS], axis=0)
     GBF2_score_non_ag = pd.concat([GBF2_score_non_ag_region, GBF2_score_non_ag_AUS], axis=0)
     GBF2_score_am = pd.concat([GBF2_score_am_region, GBF2_score_am_AUS], axis=0)
-
+        
     # Fill nan to empty dataframes
     if GBF2_score_ag.empty:
         GBF2_score_ag.loc[0] = 0
@@ -1862,7 +1862,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-
+    
     # Expand dimension
     ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
@@ -2016,7 +2016,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-
+    
     # Expand dimension
     ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
@@ -2103,7 +2103,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Landuse', Year=yr_cal, region='Australia')
-
+        
     GBF4_score_am_AUS = xr_gbf4_snes_am.sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
         ).T.drop_duplicates(
@@ -2111,7 +2111,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).astype({'Area Weighted Score (ha)': 'float', 'BASE_TOTAL_SCORE': 'float'}
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Management', Year=yr_cal, region='Australia')
-
+        
     GBF4_score_non_ag_AUS = xr_gbf4_snes_non_ag.sum(['cell']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
@@ -2123,8 +2123,8 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     GBF4_score_ag = pd.concat([GBF4_score_ag_region, GBF4_score_ag_AUS], axis=0)
     GBF4_score_am = pd.concat([GBF4_score_am_region, GBF4_score_am_AUS], axis=0)
     GBF4_score_non_ag = pd.concat([GBF4_score_non_ag_region, GBF4_score_non_ag_AUS], axis=0)
-
-
+        
+    
     # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
     base_yr_score = base_yr_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area'
         ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
@@ -2172,7 +2172,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-
+    
     # Expand dimension
     ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
@@ -2325,7 +2325,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-
+    
     # Expand dimension
     ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
@@ -2409,7 +2409,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Landuse', Year=yr_cal, region='Australia')
-
+        
     GBF8_scores_groups_am_AUS = xr_gbf8_groups_am.sum(['cell', 'lm']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
@@ -2418,7 +2418,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         ).astype({'Area Weighted Score (ha)': 'float', 'BASE_TOTAL_SCORE': 'float'}
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Management', Year=yr_cal, region='Australia')
-
+        
     GBF8_scores_groups_non_ag_AUS = xr_gbf8_groups_non_ag.sum(['cell']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
@@ -2477,7 +2477,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-
+    
     # Expand dimension
     ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
