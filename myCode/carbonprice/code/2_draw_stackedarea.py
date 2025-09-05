@@ -6,12 +6,14 @@ import seaborn as sns
 import matplotlib.patches as mpatches
 import matplotlib as mpl
 from matplotlib.lines import Line2D
+import xarray as xr
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 from matplotlib.patches import Patch
 import re
+
 
 sns.set_theme(style="darkgrid")
 plt.rcParams.update({
@@ -109,18 +111,26 @@ def draw_legend(ax, bbox_to_anchor=(0.98, 0.69), ncol=6):
 # Main script
 set_plot_style(font_size=12, font_family='Arial')
 
+xr_dir_cost = f'../../../output/{config.TASK_NAME}/carbon_price/0_base_data/Results'
+xr_carbon_cost_series = xr.open_dataset(f'{xr_dir_cost}/xr_carbon_cost_series.nc')
+df_ghg_cost =  xr_carbon_cost_series['data'].T.to_pandas() / 1e6
 # Load data
-df_all = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/03_cost.xlsx", index_col=0)
+xr_bio_cost_series = xr.open_dataset(f'{xr_dir_cost}/xr_bio_cost_series.nc')
+df_bio_cost =  xr_carbon_cost_series['data'].T.to_pandas() / 1e6
 # 按列索引拆分
-df_ghg_cost = df_all.iloc[:, 0:5]       # 第1到第5列
-df_bio_cost = df_all.iloc[:, 6:11]      # 第7到第12列
+df_ghg_cost = df_ghg_cost.iloc[:, :-1]       # 第1到第5列
+df_bio_cost = df_bio_cost.iloc[:, :-1]      # 第7到第12列
 df_ghg_cost = df_ghg_cost.loc[df_ghg_cost.index >= config.START_YEAR].copy()
 df_bio_cost = df_bio_cost.loc[df_bio_cost.index >= config.START_YEAR].copy()
-df_ghg_cost.columns = ['Ag','AM','Non-ag','Transition(ag→ag)','Transition(ag→non-ag)']
-df_bio_cost.columns = ['Ag','AM','Non-ag','Transition(ag→ag)','Transition(ag→non-ag)']
+df_ghg_cost.columns = ['Ag','AgMgt','Non-ag','Transition(ag→ag)','Transition(ag→non-ag)']
+df_bio_cost.columns = ['Ag','AgMgt','Non-ag','Transition(ag→ag)','Transition(ag→non-ag)']
 
-df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_1_GHG_high_BIO_off.xlsx", index_col=0)
-df_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_2_GHG_high_BIO_high.xlsx", index_col=0)
+# df_ghg = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_1_GHG_high_BIO_off.xlsx", index_col=0)
+# df_bio = pd.read_excel(f"{config.TASK_DIR}/carbon_price/excel/02_process_Run_2_GHG_high_BIO_high.xlsx", index_col=0)
+#
+# xr_env_dir = f'../../../output/{config.TASK_NAME}/carbon_price/0_base_data/carbon_100/2050'
+# xr_carbon = xr.open_dataset(f'{xr_env_dir}/xr_carbon_cost_series.nc')
+
 
 # Set up parameters for 1 row, 2 columns
 n_cols = 2
@@ -143,6 +153,7 @@ draw_legend(axes[0], bbox_to_anchor=(0.08, 0.15))
 plt.subplots_adjust(left=0.1, right=0.95, top=0.9, bottom=0.2, wspace=0.3)
 
 # Save and show the figure
-os.makedirs(f"{config.TASK_DIR}/carbon_price/Paper_figure", exist_ok=True)
-plt.savefig(f"{config.TASK_DIR}/carbon_price/Paper_figure/02_draw_stackedarea.png", dpi=300, bbox_inches='tight')
-fig.show()
+output_dir = f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure"
+os.makedirs(output_dir, exist_ok=True)
+plt.savefig(f"{output_dir}/02_draw_stackedarea.png", dpi=300, bbox_inches='tight')
+plt.show()

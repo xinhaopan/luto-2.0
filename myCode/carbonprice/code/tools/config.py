@@ -23,6 +23,9 @@ COST_DICT = {
     ]
 }
 
+
+
+
 KEY_TO_COLUMN_MAP = {
     "ag_profit": "Ag profit(M$)",
     "am_profit": "AM profit(M$)",
@@ -44,15 +47,7 @@ KEY_TO_COLUMN_MAP = {
 REVENUE_DICT = {key.replace('cost', 'revenue'): value for key, value in COST_DICT.items()}
 
 
-TASK_NAME = "20250823_Paper2_Results"
-
-INPUT_FILES = [
-    'Run_4_GHG_off_BIO_off',
-    'Run_2_GHG_high_BIO_off',
-    'Run_1_GHG_high_BIO_high',
-    # 'Run_3_off_on',
-    # 'Run_4_off_off',
-]
+TASK_NAME = "20250831_Price_Task_NCI"
 
 
 NAME_DICT = {

@@ -304,33 +304,34 @@ def calculate_policy_cost(year, output_path, run_all_names, cost_category, polic
     """
     # tprint(f"{output_path}: 计算政策成本 {policy_type}/{cost_category}...")
     for i in range(5):
-        if policy_type == 'carbon':
-            # Carbon Cost = Profit_Run0 - Profit_Run1
-            run_A_name, run_B_name = run_all_names[0][0], run_all_names[1][i]
-            output_subdir = cost_names[i]
-        elif policy_type == 'bio':
-            # Bio Cost = Profit_Run1 - Profit_Run2
-            run_A_name, run_B_name = run_all_names[1][i], run_all_names[2][i]
-            output_subdir = cost_names[i]
-        else:
-            return f"❌ Policy Error: Invalid policy_type '{policy_type}'"
+        for j in range(5):
+            if policy_type == 'carbon':
+                # Carbon Cost = Profit_Run0 - Profit_Run1
+                run_A_name, run_B_name = run_all_names[0][0], run_all_names[1][i]
+                output_subdir = cost_names[i]
+            elif policy_type == 'bio':
+                # Bio Cost = Profit_Run1 - Profit_Run2
+                run_A_name, run_B_name = run_all_names[1][i], run_all_names[2][i*5+j]
+                output_subdir = cost_names[i*5+j]
+            else:
+                return f"❌ Policy Error: Invalid policy_type '{policy_type}'"
 
-        output_dir = os.path.join(output_path, output_subdir, str(year))
-        # 构建利润文件路径 (由 Stage 1 生成)
-        profit_file_basename = f'xr_profit_{cost_category}_{year}.nc'
-        profit_file_A = os.path.join(output_path, run_A_name, str(year), profit_file_basename)
-        profit_file_B = os.path.join(output_path, run_B_name, str(year), profit_file_basename)
+            output_dir = os.path.join(output_path, output_subdir, str(year))
+            # 构建利润文件路径 (由 Stage 1 生成)
+            profit_file_basename = f'xr_profit_{cost_category}_{year}.nc'
+            profit_file_A = os.path.join(output_path, run_A_name, str(year), profit_file_basename)
+            profit_file_B = os.path.join(output_path, run_B_name, str(year), profit_file_basename)
 
-        tprint(f"Calculating policy cost for {i} {output_subdir} {policy_type} {cost_category} in year {year}...")
-        with xr.open_dataset(profit_file_A) as ds_profit_A, \
-                xr.open_dataset(profit_file_B) as ds_profit_B:
+            tprint(f"Calculating policy cost for {i} {output_subdir} {policy_type} {cost_category} in year {year}...")
+            with xr.open_dataset(profit_file_A) as ds_profit_A, \
+                    xr.open_dataset(profit_file_B) as ds_profit_B:
 
-            policy_cost = ds_profit_A - ds_profit_B
+                policy_cost = ds_profit_A - ds_profit_B
 
-            os.makedirs(output_dir, exist_ok=True)
-            output_filename = f'xr_cost_{cost_category}_{output_subdir}_{year}.nc'
-            save2nc(policy_cost, os.path.join(output_dir, output_filename))
-            # policy_cost.to_netcdf(os.path.join(output_dir, output_filename))
+                os.makedirs(output_dir, exist_ok=True)
+                output_filename = f'xr_cost_{cost_category}_{output_subdir}_{year}.nc'
+                save2nc(policy_cost, os.path.join(output_dir, output_filename))
+                # policy_cost.to_netcdf(os.path.join(output_dir, output_filename))
 
 
 
@@ -346,31 +347,32 @@ def calculate_transition_cost_diff(year, output_path, run_all_names, tran_cost_f
     if policy_type not in ("carbon", "bio"):
         raise ValueError(f"Invalid policy_type '{policy_type}'. Use 'carbon' or 'bio'.")
     for i in range(5):
-        # 选择路径与输出子目录
-        if policy_type == "carbon":
-            # Run0 -> A, Run1 -> B
-            path_A = os.path.join(output_path, run_all_names[0][0], str(year), f"{tran_cost_file}_{year}.nc")
-            path_B = os.path.join(output_path, run_all_names[1][i], str(year), f"{tran_cost_file}_{year}.nc")
-            output_subdir =   cost_names[i]
-        else:  # policy_type == "bio"
-            # Run1 -> A, Run2 -> B
-            path_A = os.path.join(output_path, run_all_names[1][i], str(year), f"{tran_cost_file}_{year}.nc")
-            path_B = os.path.join(output_path, run_all_names[2][i], str(year), f"{tran_cost_file}_{year}.nc")
-            output_subdir = cost_names[i]
+        for j in range(5):
+            # 选择路径与输出子目录
+            if policy_type == "carbon":
+                # Run0 -> A, Run1 -> B
+                path_A = os.path.join(output_path, run_all_names[0][0], str(year), f"{tran_cost_file}_{year}.nc")
+                path_B = os.path.join(output_path, run_all_names[1][i], str(year), f"{tran_cost_file}_{year}.nc")
+                output_subdir =   cost_names[i]
+            else:  # policy_type == "bio"
+                # Run1 -> A, Run2 -> B
+                path_A = os.path.join(output_path, run_all_names[1][i], str(year), f"{tran_cost_file}_{year}.nc")
+                path_B = os.path.join(output_path, run_all_names[2][i*5+j], str(year), f"{tran_cost_file}_{year}.nc")
+                output_subdir = cost_names[i*5+j]
 
 
-        # 读取并计算差值（B - A）
-        tprint(f"Calculating {tran_cost_file} {output_subdir} in year {year}...")
-        with xr.open_dataset(path_B) as ds_B, xr.open_dataset(path_A) as ds_A:
-            tran_cost_diff = ds_B - ds_A
+            # 读取并计算差值（B - A）
+            tprint(f"Calculating {tran_cost_file} {output_subdir} in year {year}...")
+            with xr.open_dataset(path_B) as ds_B, xr.open_dataset(path_A) as ds_A:
+                tran_cost_diff = ds_B - ds_A
 
-        # 输出
-        output_dir = os.path.join(output_path, output_subdir, str(year))
-        os.makedirs(output_dir, exist_ok=True)
-        output_filename = f"{tran_cost_file}_diff_{output_subdir}_{year}.nc"
-        output_path_full = os.path.join(output_dir, output_filename)
+            # 输出
+            output_dir = os.path.join(output_path, output_subdir, str(year))
+            os.makedirs(output_dir, exist_ok=True)
+            output_filename = f"{tran_cost_file}_diff_{output_subdir}_{year}.nc"
+            output_path_full = os.path.join(output_dir, output_filename)
 
-        save2nc(tran_cost_diff, output_path_full)
+            save2nc(tran_cost_diff, output_path_full)
 
 
 def aggregate_and_save_cost(year, output_path, cost_names):
@@ -389,7 +391,7 @@ def aggregate_and_save_cost(year, output_path, cost_names):
         'xr_transition_cost_ag2non_ag_amortised_diff',
         'xr_transition_cost_ag2non_ag_diff',
     ]
-    for i in range(5):
+    for i in range(len(cost_names)):
         file_dir = os.path.join(output_path, f'{cost_names[i]}', str(year))
 
         for add_name in add_variants:
@@ -457,36 +459,30 @@ def aggregate_and_save_summary(year, output_path, data_type_names, input_files_n
         output_file_name = output_file_names[i]
         file_dir = os.path.join(output_path, f'{input_files_name}', str(year))
 
-        full_file_paths = [
-            os.path.join(file_dir, f'{basename}_{year}.nc')
-            for basename in data_type_names
-        ]
+        final_dir = os.path.join(output_path, output_file_name, str(year))
+        os.makedirs(final_dir, exist_ok=True)
 
         # 2. 初始化累加器
         total_sum_ds = None
 
         # 3. 循环处理每一个文件
-        for file_path in full_file_paths:
-            try:
-                with xr.open_dataset(file_path) as ds:
-                    summed_single_ds = ds.sum(dim=[d for d in ds.dims if d != 'cell'])
-                    if total_sum_ds is None:
-                        total_sum_ds = summed_single_ds
-                    else:
-                        total_sum_ds += summed_single_ds
-            except FileNotFoundError:
-                # 如果列表中的某个文件不存在，打印警告并跳过
-                tprint(f"  - Warning: File not found and will be skipped: {file_path}")
-                continue
-        # 4. 后续处理
-        if 'carbon' in output_file_name:
-            total_sum_ds = -total_sum_ds
+        for basename in data_type_names:
+            file_path = os.path.join(file_dir, f'{basename}_{year}.nc')
+            with xr.open_dataset(file_path) as ds:
+                summed_single_ds = ds.sum(dim=[d for d in ds.dims if d != 'cell'])
+                if 'bio' not in output_file_name:
+                    summed_single_ds = -summed_single_ds
+                if total_sum_ds is None:
+                    total_sum_ds = summed_single_ds
+                else:
+                    total_sum_ds += summed_single_ds
+
+            save2nc(summed_single_ds, os.path.join(final_dir, f'{basename}_{year}.nc'))
 
         # 5. 保存
-        final_dir = os.path.join(output_path, output_file_name, str(year))
-        os.makedirs(final_dir, exist_ok=True)
         final_path = os.path.join(final_dir, f'xr_total_{output_file_name}_{year}.nc')
         save2nc(total_sum_ds, final_path)
+
         # total_sum_ds.to_netcdf(final_path)
 
 
@@ -496,22 +492,10 @@ if __name__ == "__main__":
     task_name = '20250831_Price_Task_NCI'
     njobs = 41
     task_dir = f'../../../output/{task_name}'
-    input_files_0 = ['Run_100_GHG_off_PERCENT_100_BIO_off_CUT_50']
-    input_files_1 = ['Run_030_GHG_high_PERCENT_20_BIO_off_CUT_50','Run_035_GHG_high_PERCENT_40_BIO_off_CUT_50',
-                     'Run_040_GHG_high_PERCENT_60_BIO_off_CUT_50','Run_045_GHG_high_PERCENT_80_BIO_off_CUT_50',
-                     'Run_050_GHG_high_PERCENT_100_BIO_off_CUT_50']
-    input_files_2 = ['Run_005_GHG_high_PERCENT_20_BIO_high_CUT_50', 'Run_010_GHG_high_PERCENT_40_BIO_high_CUT_50',
-                     'Run_015_GHG_high_PERCENT_60_BIO_high_CUT_50', 'Run_020_GHG_high_PERCENT_80_BIO_high_CUT_50',
-                     'Run_025_GHG_high_PERCENT_100_BIO_high_CUT_50']
-
-    input_files = input_files_0 + input_files_1 + input_files_2
-
-    tprint(f"任务目录: {task_dir}")
-    years = get_year(get_path(task_name, input_files[0]))
-    run_all_names = [input_files_0, input_files_1, input_files_2]
 
     output_path = f'{task_dir}/carbon_price/0_base_data'
     os.makedirs(output_path, exist_ok=True)
+    tprint(f"任务目录: {task_dir}")
 
     cost_files = ['xr_cost_ag', 'xr_cost_agricultural_management', 'xr_cost_non_ag', 'xr_cost_transition_ag2ag',
                   'xr_transition_cost_ag2non_ag']
@@ -525,8 +509,41 @@ if __name__ == "__main__":
     bio_files_diff = ['xr_biodiversity_GBF2_priority_ag_diff', 'xr_biodiversity_GBF2_priority_ag_management',
                       'xr_biodiversity_GBF2_priority_non_ag']
 
+    input_files_0 = ['Run_100_GHG_off_PERCENT_100_BIO_off_CUT_50']
+    input_files_1 = ['Run_030_GHG_high_PERCENT_20_BIO_off_CUT_50', 'Run_035_GHG_high_PERCENT_40_BIO_off_CUT_50',
+                     'Run_040_GHG_high_PERCENT_60_BIO_off_CUT_50', 'Run_045_GHG_high_PERCENT_80_BIO_off_CUT_50',
+                     'Run_050_GHG_high_PERCENT_100_BIO_off_CUT_50']
+    input_files_2 = ['Run_001_GHG_high_PERCENT_20_BIO_high_CUT_10', 'Run_002_GHG_high_PERCENT_20_BIO_high_CUT_20',
+                     'Run_003_GHG_high_PERCENT_20_BIO_high_CUT_30', 'Run_004_GHG_high_PERCENT_20_BIO_high_CUT_40',
+                     'Run_005_GHG_high_PERCENT_20_BIO_high_CUT_50',
+                     'Run_006_GHG_high_PERCENT_40_BIO_high_CUT_10', 'Run_007_GHG_high_PERCENT_40_BIO_high_CUT_20',
+                     'Run_008_GHG_high_PERCENT_40_BIO_high_CUT_30', 'Run_009_GHG_high_PERCENT_40_BIO_high_CUT_40',
+                     'Run_010_GHG_high_PERCENT_40_BIO_high_CUT_50',
+                     'Run_011_GHG_high_PERCENT_60_BIO_high_CUT_10', 'Run_012_GHG_high_PERCENT_60_BIO_high_CUT_20',
+                     'Run_013_GHG_high_PERCENT_60_BIO_high_CUT_30', 'Run_014_GHG_high_PERCENT_60_BIO_high_CUT_40',
+                     'Run_015_GHG_high_PERCENT_60_BIO_high_CUT_50',
+                     'Run_016_GHG_high_PERCENT_80_BIO_high_CUT_10', 'Run_017_GHG_high_PERCENT_80_BIO_high_CUT_20',
+                     'Run_018_GHG_high_PERCENT_80_BIO_high_CUT_30', 'Run_019_GHG_high_PERCENT_80_BIO_high_CUT_40',
+                     'Run_020_GHG_high_PERCENT_80_BIO_high_CUT_50',
+                     'Run_021_GHG_high_PERCENT_100_BIO_high_CUT_10', 'Run_022_GHG_high_PERCENT_100_BIO_high_CUT_20',
+                     'Run_023_GHG_high_PERCENT_100_BIO_high_CUT_30', 'Run_024_GHG_high_PERCENT_100_BIO_high_CUT_40',
+                     'Run_025_GHG_high_PERCENT_100_BIO_high_CUT_50']
+
     carbon_names = ['carbon_20', 'carbon_40', 'carbon_60', 'carbon_80', 'carbon_100']
-    bio_names = ['bio_10', 'bio_20', 'bio_30', 'bio_40', 'bio_50']
+    carbon_bio_names = ['carbon_20_bio_10', 'carbon_20_bio_20', 'carbon_20_bio_30', 'carbon_20_bio_40',
+                        'carbon_20_bio_50',
+                        'carbon_40_bio_10', 'carbon_40_bio_20', 'carbon_40_bio_30', 'carbon_40_bio_40',
+                        'carbon_40_bio_50',
+                        'carbon_60_bio_10', 'carbon_60_bio_20', 'carbon_60_bio_30', 'carbon_60_bio_40',
+                        'carbon_60_bio_50',
+                        'carbon_80_bio_10', 'carbon_80_bio_20', 'carbon_80_bio_30', 'carbon_80_bio_40',
+                        'carbon_80_bio_50',
+                        'carbon_100_bio_10', 'carbon_100_bio_20', 'carbon_100_bio_30', 'carbon_100_bio_40',
+                        'carbon_100_bio_50']
+
+    input_files = input_files_0 + input_files_1 + input_files_2
+    years = get_year(get_path(task_name, input_files[0]))
+    run_all_names = [input_files_0, input_files_1, input_files_2]
     # ============================================================================
     # 第一批：数据预处理阶段 (摊销成本计算 + 文件复制/差异计算)
     # ============================================================================
@@ -615,15 +632,15 @@ if __name__ == "__main__":
         for year in years[1:]:
             # 直接调用
             aggregate_and_save_summary(year, output_path, carbon_files_diff, input_files_1,carbon_names)
-            aggregate_and_save_summary(year, output_path, bio_files_diff, input_files_2, bio_names)
+            aggregate_and_save_summary(year, output_path, bio_files_diff, input_files_2, carbon_bio_names)
     else:
         # --- 正确的代码 ---
         Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_summary)(year, output_path, carbon_files, input_files_1, carbon_names)
+            delayed(aggregate_and_save_summary)(year, output_path, carbon_files_diff, input_files_1, carbon_names)
             for year in years[1:]
         )
         Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_summary)(year, output_path, bio_files, input_files_2, bio_names)
+            delayed(aggregate_and_save_summary)(year, output_path, bio_files_diff, input_files_2, carbon_bio_names)
             for year in years[1:]
         )
 
@@ -658,14 +675,14 @@ if __name__ == "__main__":
             for year in years[1:]:
                 # 直接调用
                 calculate_policy_cost(year, output_path, run_all_names, category, 'carbon',carbon_names)
-                calculate_policy_cost(year, output_path, run_all_names, category, 'bio', bio_names)
+                calculate_policy_cost(year, output_path, run_all_names, category, 'bio', carbon_bio_names)
         else:
             Parallel(n_jobs=njobs)(
                 delayed(calculate_policy_cost)(year, output_path, run_all_names, category, 'carbon', carbon_names)
                 for year in years[1:]
             )
             Parallel(n_jobs=njobs)(
-                delayed(calculate_policy_cost)(year, output_path, run_all_names, category, 'bio', bio_names)
+                delayed(calculate_policy_cost)(year, output_path, run_all_names, category, 'bio', carbon_bio_names)
                 for year in years[1:]
             )
     tprint(f"✅ 第4批任务完成! ")
@@ -680,14 +697,14 @@ if __name__ == "__main__":
             for year in years[1:]:
                 # 直接调用
                 calculate_transition_cost_diff(year, output_path, run_all_names, tran_file, 'carbon', carbon_names)
-                calculate_transition_cost_diff(year, output_path, run_all_names, tran_file, 'bio', bio_names)
+                calculate_transition_cost_diff(year, output_path, run_all_names, tran_file, 'bio', carbon_bio_names)
         else:
             Parallel(n_jobs=njobs)(
                 delayed(calculate_transition_cost_diff)(year, output_path, run_all_names, tran_file, 'carbon', carbon_names)
                 for year in years[1:]
             )
             Parallel(n_jobs=njobs)(
-                delayed(calculate_transition_cost_diff)(year, output_path, run_all_names, tran_file, 'bio', bio_names)
+                delayed(calculate_transition_cost_diff)(year, output_path, run_all_names, tran_file, 'bio', carbon_bio_names)
                 for year in years[1:]
             )
     tprint(f"✅ 第5批 (独立部分) 任务完成! (共 {batch_5a_tasks_count} 个)")
@@ -698,15 +715,15 @@ if __name__ == "__main__":
     if njobs == 0:
         for year in years[1:]:
             # 直接调用
-            aggregate_and_save_cost(year, output_path,  carbon_names)
-            aggregate_and_save_cost(year, output_path,bio_names)
+            aggregate_and_save_cost(year, output_path,carbon_names)
+            aggregate_and_save_cost(year, output_path,carbon_bio_names)
     else:
         Parallel(n_jobs=njobs)(
             delayed(aggregate_and_save_cost)(year, output_path, carbon_names)
             for year in years[1:]
         )
         Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_cost)(year, output_path, bio_names)
+            delayed(aggregate_and_save_cost)(year, output_path, carbon_bio_names)
             for year in years[1:]
         )
 
