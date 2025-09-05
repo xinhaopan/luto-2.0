@@ -1,0 +1,91 @@
+. 2025-08-23 14:05:15.329 --------------------------------------------------------------------------
+. 2025-08-23 14:05:15.329 WinSCP Version 6.3.6 (Build 15073 2024-11-25) (OS 10.0.22631 – Windows 10 Enterprise)
+. 2025-08-23 14:05:15.329 Configuration: HKCU\Software\Martin Prikryl\WinSCP 2\
+. 2025-08-23 14:05:15.333 Log level: Normal
+. 2025-08-23 14:05:15.334 Local account: DESKTOP-JRK700U\Xinhao
+. 2025-08-23 14:05:15.334 Working directory: Z:\Planet-A\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\from_HPC
+. 2025-08-23 14:05:15.334 Process ID: 28144
+. 2025-08-23 14:05:15.366 Ancestor processes: WinSCP, pythonw, cmd, cmd, pythonw, ...
+. 2025-08-23 14:05:15.366 Command-line: "C:\Program Files (x86)\WinSCP\WinSCP.exe" /console=6.3.6 /consoleinstance=_26108_930 "/script=Z:\Planet-A\LUF-Modelling\LUTO2_XH\LUTO2\myCode\tasks_run\rsync\from_HPC\temp_winscp_script.txt" "/log=temp_3_sync_log.txt" 
+. 2025-08-23 14:05:15.367 Time zone: Current: GMT+10, Standard: GMT+10 (AUS Eastern Standard Time), DST: GMT+11 (AUS Eastern Summer Time), DST Start: 2025/10/5, DST End: 2025/4/6
+. 2025-08-23 14:05:15.368 Login time: 2025年8月23日 14:05:15
+. 2025-08-23 14:05:15.368 --------------------------------------------------------------------------
+. 2025-08-23 14:05:15.368 Script: Retrospectively logging previous script records:
+> 2025-08-23 14:05:15.369 Script: open scp://s222552331@hpclogin.deakingpuhpc.deakin.edu.au/ -privatekey="C:\Users\s222552331\.ssh\Denethor_HPC_key.ppk"
+. 2025-08-23 14:05:15.369 --------------------------------------------------------------------------
+. 2025-08-23 14:05:15.369 Session name: s222552331@hpclogin.deakingpuhpc.deakin.edu.au (Ad-Hoc site)
+. 2025-08-23 14:05:15.370 Host name: hpclogin.deakingpuhpc.deakin.edu.au (Port: 22)
+. 2025-08-23 14:05:15.370 User name: s222552331 (Password: No, Key file: Yes, Passphrase: No)
+. 2025-08-23 14:05:15.370 Tunnel: No
+. 2025-08-23 14:05:15.371 Transfer Protocol: SCP
+. 2025-08-23 14:05:15.371 Ping type: Off, Ping interval: 30 sec; Timeout: 15 sec
+. 2025-08-23 14:05:15.371 Disable Nagle: No
+. 2025-08-23 14:05:15.372 Proxy: None
+. 2025-08-23 14:05:15.372 Send buffer: 262144
+. 2025-08-23 14:05:15.372 Compression: No
+. 2025-08-23 14:05:15.373 Bypass authentication: No
+. 2025-08-23 14:05:15.373 Try agent: Yes; Agent forwarding: No; KI: Yes; GSSAPI: Yes
+. 2025-08-23 14:05:15.373 GSSAPI: KEX: No; Forwarding: No; Libs: gssapi32,sspi,custom; Custom: 
+. 2025-08-23 14:05:15.373 Ciphers: aes,chacha20,aesgcm,3des,WARN,des,blowfish,arcfour; Ssh2DES: No
+. 2025-08-23 14:05:15.374 KEX: ntru-curve25519,ecdh,dh-gex-sha1,dh-group18-sha512,dh-group17-sha512,dh-group16-sha512,dh-group15-sha512,dh-group14-sha1,rsa,WARN,dh-group1-sha1
+. 2025-08-23 14:05:15.374 SSH Bugs: Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto
+. 2025-08-23 14:05:15.374 Simple channel: Yes
+. 2025-08-23 14:05:15.375 Return code variable: Autodetect; Lookup user groups: Auto
+. 2025-08-23 14:05:15.375 Shell: default
+. 2025-08-23 14:05:15.375 EOL: LF, UTF: Auto
+. 2025-08-23 14:05:15.376 Clear aliases: Yes, Unset nat.vars: Yes, Resolve symlinks: Yes; Follow directory symlinks: No
+. 2025-08-23 14:05:15.376 LS: ls -la, Ign LS warn: Yes, Scp1 Comp: No; Exit code 1 is error: No
+. 2025-08-23 14:05:15.376 Local directory: default, Remote directory: home, Update: Yes, Cache: Yes
+. 2025-08-23 14:05:15.376 Cache directory changes: Yes, Permanent: Yes
+. 2025-08-23 14:05:15.376 Recycle bin: Delete to: No, Overwritten to: No, Bin path: 
+. 2025-08-23 14:05:15.377 DST mode: Unix;Timezone offset: 0h 0m
+. 2025-08-23 14:05:15.377 --------------------------------------------------------------------------
+< 2025-08-23 14:05:15.378 Script: Searching for host...
+. 2025-08-23 14:05:15.379 Looking up host "hpclogin.deakingpuhpc.deakin.edu.au" for SSH connection
+. 2025-08-23 14:05:15.384 Connecting to 10.136.177.2 port 22
+. 2025-08-23 14:05:15.386 Connected to 10.136.177.2
+< 2025-08-23 14:05:15.387 Script: Connecting to host...
+. 2025-08-23 14:05:15.388 We claim version: SSH-2.0-WinSCP_release_6.3.6
+. 2025-08-23 14:05:15.388 Connected to 10.136.177.2
+. 2025-08-23 14:05:15.396 Remote version: SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.10
+. 2025-08-23 14:05:15.396 Using SSH protocol version 2
+. 2025-08-23 14:05:15.400 Enabling strict key exchange semantics
+. 2025-08-23 14:05:15.401 Doing NTRU Prime / Curve25519 hybrid key exchange, using hash SHA-512 (unaccelerated)
+. 2025-08-23 14:05:15.494 Server also has ecdsa-sha2-nistp256/rsa-sha2-512/rsa-sha2-256 host keys, but we don't know any of them
+. 2025-08-23 14:05:15.495 Host key fingerprint is:
+. 2025-08-23 14:05:15.496 ssh-ed25519 255 SHA256:75JAe2y+odRlIuQFJlbi3XgmA9yotviIsxzfmPGOe7I
+< 2025-08-23 14:05:15.497 Script: Authenticating...
+. 2025-08-23 14:05:15.503 Asking user:
+. 2025-08-23 14:05:15.504 **Continue connecting to an unknown server and add its host key to a cache?**
+. 2025-08-23 14:05:15.504 
+. 2025-08-23 14:05:15.504 The host key is not cached for this server:
+. 2025-08-23 14:05:15.505 hpclogin.deakingpuhpc.deakin.edu.au (port 22)
+. 2025-08-23 14:05:15.505 
+. 2025-08-23 14:05:15.505 You have no guarantee that the server is the computer you think it is.
+. 2025-08-23 14:05:15.505 
+. 2025-08-23 14:05:15.506     The ssh-ed25519 key fingerprint is:
+. 2025-08-23 14:05:15.506     ssh-ed25519 255 75JAe2y+odRlIuQFJlbi3XgmA9yotviIsxzfmPGOe7I
+. 2025-08-23 14:05:15.506 
+. 2025-08-23 14:05:15.507 If you trust this host, select Accept to add the key to WinSCP's cache and carry on connecting.
+. 2025-08-23 14:05:15.507 If you want to carry on connecting just once, without adding the key to the cache, select Connect Once.
+. 2025-08-23 14:05:15.507 If you do not trust this host, select Cancel to abandon the connection.
+. 2025-08-23 14:05:15.508 
+. 2025-08-23 14:05:15.508 In scripting, you should use a -hostkey switch to configure the expected host key. ()
+< 2025-08-23 14:05:15.509 Script: Continue connecting to an unknown server and add its host key to a cache?
+< 2025-08-23 14:05:15.511 The host key is not cached for this server:
+< 2025-08-23 14:05:15.511 hpclogin.deakingpuhpc.deakin.edu.au (port 22)
+< 2025-08-23 14:05:15.511 You have no guarantee that the server is the computer you think it is.
+< 2025-08-23 14:05:15.512     The ssh-ed25519 key fingerprint is:
+< 2025-08-23 14:05:15.512     ssh-ed25519 255 75JAe2y+odRlIuQFJlbi3XgmA9yotviIsxzfmPGOe7I
+< 2025-08-23 14:05:15.512 If you trust this host, select Accept to add the key to WinSCP's cache and carry on connecting.
+< 2025-08-23 14:05:15.513 If you want to carry on connecting just once, without adding the key to the cache, select Connect Once.
+< 2025-08-23 14:05:15.513 If you do not trust this host, select Cancel to abandon the connection.
+< 2025-08-23 14:05:15.513 In scripting, you should use a -hostkey switch to configure the expected host key.
+. 2025-08-23 14:05:26.098 Answer: Cancel
+. 2025-08-23 14:05:26.101 Attempt to close connection due to fatal exception:
+* 2025-08-23 14:05:26.102 Host key fingerprint is ssh-ed25519 255 75JAe2y+odRlIuQFJlbi3XgmA9yotviIsxzfmPGOe7I.
+* 2025-08-23 14:05:26.102 (Exception) **Host key wasn't verified!**
+. 2025-08-23 14:05:26.102 Closing connection.
+< 2025-08-23 14:05:26.104 Script: Host key wasn't verified!
+< 2025-08-23 14:05:26.105 Host key fingerprint is ssh-ed25519 255 75JAe2y+odRlIuQFJlbi3XgmA9yotviIsxzfmPGOe7I.
+< 2025-08-23 14:05:26.105 Authentication failed.
