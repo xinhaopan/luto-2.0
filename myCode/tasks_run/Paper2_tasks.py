@@ -4,32 +4,32 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250831_Paper2_Results_NCI'],
+    'TASK_NAME': ['20250906_Paper2_Results_NCI'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['128GB'],
-    'NCPUS': ['32'],
+    'MEM': ['48GB'],
+    'NCPUS': ['12'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['30:00:00'],
+    'TIME': ['15:00:00'],
 
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
+    'GHG_EMISSIONS_LIMITS': ['high', 'low', 'off'],
+    'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50,40,30,20,10],
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [3],
+    'RESFACTOR': [5],
     'SIM_YEARS': [[i for i in range(2010,2051,5)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['high', 'off'],
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
 
     # ----------------------------- Biodiversity settings -------------------------------
-    'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
     'GBF2_TARGETS_DICT': [{
         'low': {2030: 0, 2050: 0, 2100: 0},
@@ -51,14 +51,38 @@ grid_search = {
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
 }
+
+conditional_rules = [
+    # 最具体的规则优先
+    {
+        'conditions': {'GHG_EMISSIONS_LIMITS': ['off'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
+        'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
+    },
+    {
+        'conditions': {'GHG_EMISSIONS_LIMITS': ['high'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
+        'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
+    },
+    {
+        'conditions': {'GHG_EMISSIONS_LIMITS': ['low'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
+        'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
+    },
+    {
+        'conditions': {'GHG_EMISSIONS_LIMITS': ['off'], 'BIODIVERSITY_TARGET_GBF_2': ['high']},
+        'restrictions': {}
+    }
+]
+
+
 settings_name_dict = {
     'GHG_EMISSIONS_LIMITS':'GHG',
     'BIODIVERSITY_TARGET_GBF_2':'BIO',
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT':'CUT'
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
-grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict)
+grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
+print(grid_search_settings_df.columns)
 # grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
-create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
+# create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 

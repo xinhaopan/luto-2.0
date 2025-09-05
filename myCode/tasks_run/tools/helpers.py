@@ -370,59 +370,6 @@ def recommend_resources(df):
         print(f"  - Current MEM: {mem} GB, Recommended CPU {rec_cpu}")
         break
 
-
-
-def create_grid_search_template(grid_dict, settings_name_dict=None, use_date=False) -> pd.DataFrame:
-    task_root_dir = f'../../output/{grid_dict['TASK_NAME'][0]}'
-    os.makedirs(os.path.dirname(task_root_dir), exist_ok=True)
-    grid_search_param_df = get_settings_df(task_root_dir)
-
-    # get_grid_search_param_df
-    template_grid_search = grid_search_param_df.copy()
-    # Create a list of dictionaries with all possible permutations
-    grid_dict = {k: [str(i) for i in v] for k, v in grid_dict.items()}
-    keys, values = zip(*grid_dict.items())
-    permutations = [dict(zip(keys, v)) for v in itertools.product(*values)]
-
-    # Save the grid search parameters to the root task folder
-
-    permutations_df = pd.DataFrame(permutations)
-    permutations_df.insert(0, 'run_idx', [i for i in range(1, len(permutations_df) + 1)])
-    permutations_df.to_csv(f'{task_root_dir}/grid_search_parameters.csv', index=False)
-
-    # Report the grid search parameters
-    print(f'Grid search template has been created with {len(permutations_df)} permutations!')
-    for k, v in grid_dict.items():
-        if len(v) > 1:
-            print(f'    {k:<30} : {len(v)} values')
-
-    # get_grid_search_settings_df
-    grid_search_param_df = permutations_df.copy()
-    run_settings_dfs = []
-    total = len(grid_search_param_df)
-    for idx, (_, row) in enumerate(grid_search_param_df.iterrows()):
-        settings_dict = template_grid_search.set_index('Name')['Default_run'].to_dict()
-        settings_dict.update(row.to_dict())
-
-        run_name = generate_run_name(row, idx, total, settings_name_dict, use_date=use_date)
-        settings_dict = update_settings(settings_dict,run_name)
-        run_settings_dfs.append(pd.Series(settings_dict, name=run_name))
-
-    # grid_search_param_df = update_permutations(pd.DataFrame(run_settings_dfs)) # update the permutations
-    template_grid_search = pd.concat(run_settings_dfs, axis=1).reset_index(names='Name')
-    template_grid_search.index = template_grid_search['Name'].values
-
-    print(template_grid_search.columns)
-    template_grid_search.to_csv(f'{task_root_dir}/grid_search_template.csv', index=False)
-
-    grid_search_param_df = grid_search_param_df.loc[:, grid_search_param_df.nunique() > 1]
-    grid_search_param_df.to_csv(f'{task_root_dir}/grid_search_parameters_unique.csv', index=False)
-
-    total_cost = calculate_total_cost(template_grid_search)
-    print(f"Job Cost: {total_cost}k")
-    recommend_resources(template_grid_search)
-    return template_grid_search
-
 def generate_run_name(row, idx, total, settings_name_dict, use_date=True):
     """
     生成如 20240521_Run_01_GHG_Low_BIO_Low 这样格式的run_id，编号宽度根据实验总数自动调整。
@@ -439,4 +386,156 @@ def generate_run_name(row, idx, total, settings_name_dict, use_date=True):
             if k in row:
                 parts.append(f"{settings_name_dict[k]}_{row[k]}")
     return "_".join(parts)
+
+
+def create_conditional_combinations(grid_dict, conditional_rules=None):
+    """
+    根据条件规则创建网格搜索组合
+    """
+    if conditional_rules is None:
+        conditional_rules = []
+
+    # 转换为字符串格式
+    grid_dict_str = {k: [str(i) for i in v] for k, v in grid_dict.items()}
+
+    # 生成所有可能的组合
+    keys, values = zip(*grid_dict_str.items())
+    all_combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
+
+    # 应用条件规则过滤
+    filtered_combinations = []
+
+    for combo in all_combinations:
+        # 检查是否需要应用任何条件规则
+        rule_applied = False
+
+        for rule in conditional_rules:
+            if matches_conditions(combo, rule['conditions']):
+                # 如果restrictions为空，表示排除该组合
+                if not rule['restrictions']:
+                    # 排除组合，不添加到结果中
+                    rule_applied = True
+                    break
+                # 如果有restrictions，检查是否满足限制条件
+                elif satisfies_restrictions(combo, rule['restrictions']):
+                    # 满足限制条件，添加组合
+                    filtered_combinations.append(combo)
+                    rule_applied = True
+                    break
+                else:
+                    # 不满足限制条件，排除组合
+                    rule_applied = True
+                    break
+
+        # 如果没有规则匹配，保留原组合
+        if not rule_applied:
+            filtered_combinations.append(combo)
+
+    return filtered_combinations
+
+
+def matches_conditions(combo, conditions):
+    """
+    检查组合是否匹配所有条件
+    """
+    for param, values in conditions.items():
+        if combo.get(param) not in [str(v) for v in values]:
+            return False
+    return True
+
+
+def satisfies_restrictions(combo, restrictions):
+    """
+    检查组合是否满足所有限制条件
+    """
+    for param, allowed_values in restrictions.items():
+        if combo.get(param) not in [str(v) for v in allowed_values]:
+            return False
+    return True
+
+
+def create_grid_search_template(grid_dict, settings_name_dict=None, use_date=False,
+                                conditional_rules=None) -> pd.DataFrame:
+    """
+    创建基于条件规则的网格搜索模板
+
+    Parameters:
+    - grid_dict: 参数字典
+    - settings_name_dict: 设置名称映射字典
+    - use_date: 是否使用日期
+    - conditional_rules: 条件规则列表
+    """
+    task_root_dir = f'../../output/{grid_dict["TASK_NAME"][0]}'
+    os.makedirs(os.path.dirname(task_root_dir), exist_ok=True)
+    grid_search_param_df = get_settings_df(task_root_dir)
+
+    # get_grid_search_param_df
+    template_grid_search = grid_search_param_df.copy()
+
+    # 使用条件规则创建组合
+    permutations = create_conditional_combinations(grid_dict, conditional_rules)
+
+    # 转换为DataFrame
+    permutations_df = pd.DataFrame(permutations)
+    permutations_df.insert(0, 'run_idx', [i for i in range(1, len(permutations_df) + 1)])
+
+    # 保存参数到根任务文件夹
+    permutations_df.to_csv(f'{task_root_dir}/grid_search_parameters.csv', index=False)
+
+    # 报告网格搜索参数
+    original_total = 1
+    grid_dict_str = {k: [str(i) for i in v] for k, v in grid_dict.items()}
+    for k, v in grid_dict_str.items():
+        if len(v) > 1:
+            original_total *= len(v)
+
+    print(f'条件网格搜索模板已创建！')
+    print(f'原始笛卡尔积组合数: {original_total}')
+    print(f'优化后组合数: {len(permutations_df)}')
+
+    if conditional_rules:
+        print('应用的条件规则:')
+        for i, rule in enumerate(conditional_rules, 1):
+            conditions_str = ' & '.join([f"{k}={v}" for k, v in rule['conditions'].items()])
+            restrictions_str = ' & '.join([f"{k}={v}" for k, v in rule['restrictions'].items()])
+            print(f'  规则{i}: 当 {conditions_str} 时，限制 {restrictions_str}')
+
+    print('参数详情:')
+    for k, v in grid_dict_str.items():
+        if len(v) > 1:
+            print(f'    {k:<40} : {len(v)} values')
+
+    # get_grid_search_settings_df - 保持原有逻辑
+    grid_search_param_df = permutations_df.copy()
+    run_settings_dfs = []
+    total = len(grid_search_param_df)
+
+    for idx, (_, row) in enumerate(grid_search_param_df.iterrows()):
+        settings_dict = template_grid_search.set_index('Name')['Default_run'].to_dict()
+        settings_dict.update(row.to_dict())
+
+        run_name = generate_run_name(row, idx, total, settings_name_dict, use_date=use_date)
+        settings_dict = update_settings(settings_dict, run_name)
+        run_settings_dfs.append(pd.Series(settings_dict, name=run_name))
+
+    template_grid_search = pd.concat(run_settings_dfs, axis=1).reset_index(names='Name')
+    template_grid_search.index = template_grid_search['Name'].values
+
+    print(f'生成的运行配置列数: {len(template_grid_search.columns) - 1}')  # -1 因为有Name列
+    template_grid_search.to_csv(f'{task_root_dir}/grid_search_template.csv', index=False)
+
+    # 保存只包含变化参数的版本
+    grid_search_param_df = grid_search_param_df.loc[:, grid_search_param_df.nunique() > 1]
+    grid_search_param_df.to_csv(f'{task_root_dir}/grid_search_parameters_unique.csv', index=False)
+
+    # 计算成本和推荐资源
+    total_cost = calculate_total_cost(template_grid_search)
+    print(f"作业成本: {total_cost}k")
+    recommend_resources(template_grid_search)
+
+    return template_grid_search
+
+
+
+
 
