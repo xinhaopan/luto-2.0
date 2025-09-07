@@ -54,33 +54,34 @@ def get_year(parent_dir):
     return sorted(years_list)
 
 
+import os
+import shutil
+import time
+import random
+import xarray as xr
+from filelock import FileLock, Timeout
+import tempfile
+
 
 def save2nc(
         in_xr,
         save_path: str,
         *,
-        engine: str = "h5netcdf",  # netCDF 后端；并行更稳
-        allow_overwrite: bool = True,  # 已存在时是否允许覆盖
-        compress: bool = True,  # 是否压缩(zlib)
-        lock_timeout: int = 600,  # 获取锁的最长等待秒数
-        lock_path: str | None = None,  # 自定义锁文件路径；默认 <save_path>.lock
-        compute_before_write: bool = True  # 写前是否先 .load()
+        engine: str = "h5netcdf",
+        allow_overwrite: bool = True,
+        compress: bool = True,
+        lock_timeout: int = 600,
+        lock_path: str | None = None,
+        compute_before_write: bool = True,
+        max_retries: int = 5,  # 新增：最大重试次数
+        retry_delay: float = 1.0  # 新增：初始重试延迟（秒）
 ):
-    """
-    【原子写入 + 文件锁】并发安全保存到 NetCDF：
-      - 使用临时文件 + 原子重命名，避免半完成文件
-      - 用 filelock 对 <save_path> 加文件锁，避免多进程同时写坏文件
-      - DataArray/Dataset（仅单变量）都支持
-      - 写前可选 .load()，避免写入阶段触发 dask 计算
-      - 仅在数据确有分块时写入 chunksizes，防止编码报错
-    """
-    # 创建目录
+    # 1. 准备数据和路径（与你之前的代码相同）
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-    # 处理 Dataset / DataArray
     if isinstance(in_xr, xr.Dataset):
         if len(in_xr.data_vars) != 1:
-            raise ValueError(f"输入 Dataset 含 {len(in_xr.data_vars)} 个变量，需单变量才可写 NetCDF（或请自行拆分）。")
+            raise ValueError(f"输入 Dataset 含 {len(in_xr.data_vars)} 个变量，需单变量。")
         var_name = next(iter(in_xr.data_vars))
         da = in_xr[var_name]
     elif isinstance(in_xr, xr.DataArray):
@@ -89,68 +90,63 @@ def save2nc(
     else:
         raise TypeError("in_xr 必须是 xarray.DataArray 或 单变量 xarray.Dataset")
 
-    # 统一变量名
     if da.name != var_name:
         da = da.rename(var_name)
 
-    # 去掉非维度坐标（更干净，避免写坐标冲突）
     coords_to_drop = set(da.coords) - set(da.dims)
     if coords_to_drop:
         da = da.drop_vars(coords_to_drop, errors="ignore")
 
-    # 写前可选计算（强烈建议 True：更稳定）
     if compute_before_write:
         da = da.load()
 
-    # 编码设置
+    # 2. 设置编码和文件锁（与你之前的代码相同）
     enc = {var_name: {"dtype": "float32"}}
     if compress:
         enc[var_name].update({"zlib": True, "complevel": 4})
-
-    # 只有确实 chunked 才写 chunksizes
     if hasattr(da.data, "chunks") and da.data.chunks is not None:
         enc[var_name]["chunksizes"] = da.chunks
 
-    # 已存在文件的策略检查
-    if os.path.exists(save_path) and not allow_overwrite:
-        raise FileExistsError(f"目标已存在且不允许覆盖：{save_path}")
-
-    # 文件锁设置
     lockfile = lock_path or (save_path + ".lock")
     lock = FileLock(lockfile)
-
-    # 获取目标目录用于临时文件
     save_dir = os.path.dirname(save_path) or '.'
 
+    # 3. 核心逻辑：获取锁并执行带重试的写入/移动操作
+    # --------------------------------------------------
     try:
         with lock.acquire(timeout=lock_timeout):
-            # 锁内二次检查是否允许覆盖
+            # 锁内二次检查
             if os.path.exists(save_path) and not allow_overwrite:
                 raise FileExistsError(f"目标已存在且不允许覆盖：{save_path}")
 
-            # 创建临时文件（在同一目录下，确保原子重命名可行）
-            with tempfile.NamedTemporaryFile(dir=save_dir, suffix='.tmp', delete=False) as tmp_file:
+            # 使用 tempfile 创建唯一的临时文件
+            with tempfile.NamedTemporaryFile(dir=save_dir, suffix='.nc', delete=False) as tmp_file:
                 temp_path = tmp_file.name
 
             try:
-                # 写入临时文件
-                da.astype("float32").to_netcdf(
-                    path=temp_path,
-                    engine=engine,
-                    encoding=enc,
-                    compute=True,
-                )
+                # 步骤 A: 写入临时文件
+                da.astype("float32").to_netcdf(path=temp_path, engine=engine, encoding=enc)
 
-                # 原子移动到目标位置（自动覆盖）
-                shutil.move(temp_path, save_path)
+                # 步骤 B: 带重试的原子移动
+                for attempt in range(max_retries):
+                    try:
+                        shutil.move(temp_path, save_path)
+                        # 成功移动，直接跳出重试循环
+                        break
+                    except PermissionError:
+                        if attempt < max_retries - 1:
+                            # 指数退避 + 随机抖动
+                            sleep_time = retry_delay * (1.5 ** attempt) + random.uniform(0, 0.5)
+                            print(f"⚠️ 移动文件时权限被拒绝，将在 {sleep_time:.2f}s 后重试...")
+                            time.sleep(sleep_time)
+                        else:
+                            # 所有重试失败后，抛出原始异常
+                            raise
 
             except Exception as e:
-                # 如果出错，清理临时文件
+                # 如果在写入或移动过程中发生任何其他错误，确保清理临时文件
                 if os.path.exists(temp_path):
-                    try:
-                        os.remove(temp_path)
-                    except:
-                        pass
+                    os.remove(temp_path)
                 raise e
 
     except Timeout:

@@ -1,4 +1,10 @@
-N_JOBS = -1
+import math
+
+N_JOBS = math.ceil(41 / 41)
+TASK_NAME = "20250906_Paper2_Results_NCI"
+
+
+
 COST_DICT = {
     'cost_am': [
         'Asparagopsis taxiformis',
@@ -45,9 +51,6 @@ KEY_TO_COLUMN_MAP = {
 
 # 创建 revenue_dict，主键从 cost 换成 revenue
 REVENUE_DICT = {key.replace('cost', 'revenue'): value for key, value in COST_DICT.items()}
-
-
-TASK_NAME = "20250831_Price_Task_NCI"
 
 
 NAME_DICT = {

@@ -132,7 +132,7 @@ def create_report(data: Data):
         print(' --| Creating chart data...')
         save_report_data(data.path)
         print(' --| Creating map data...')
-        save_report_layer(data, data.path)
+        save_report_layer(data)
         print(' --| Report created successfully!')
     
     return _create_report()
@@ -780,8 +780,10 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
     # Get the non-agricultural decision variable
-    ag_dvar_base = tools.ag_mrj_to_xr(data, tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME)))
+    # ag_dvar_base = tools.ag_mrj_to_xr(data, tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
+    #     ).assign_coords(region=('cell', data.REGION_NRM_NAME)))
+    ag_dvar_base = (
+        tools.ag_mrj_to_xr(data, tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])).assign_coords(region=('cell', data.REGION_NRM_NAME)))
     non_ag_dvar_target = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
@@ -1199,7 +1201,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # Save table to disk
     pd.concat([ghg_df_AUS, ghg_df_region]).to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'), index=False)
 
-    save2nc(ghg_e, os.path.join(path, 'xr_GHG_ag.nc'))
+    save2nc(ghg_e, os.path.join(path, f'xr_GHG_ag_{yr_cal}.nc'))
 
 
     # -----------------------------------------------------------#

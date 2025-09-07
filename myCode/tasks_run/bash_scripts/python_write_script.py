@@ -3,6 +3,7 @@ import gzip
 import os
 import time
 from datetime import datetime
+import glob
 from luto.tools.write import write_outputs
 
 def print_with_time(message):
@@ -24,8 +25,11 @@ def get_first_subfolder_name(output_path="output"):
         # subfolders = [f for f in os.listdir(output_path) if os.path.isdir(os.path.join(output_path, f))]
         subfolders = [f for f in os.listdir(output_path) if
                       os.path.isdir(os.path.join(output_path, f)) and '2010-2050' in f]
-        html_path = os.path.join(output_path, subfolders[0],"DATA_REPORT","REPORT_HTML","pages","production.html")
-        # html_path = os.path.join(output_path, subfolders[0], "out_2050", "quantity_production_kt_separate_2050.csv")
+        html_path = os.path.join(output_path, subfolders[0],"DATA_REPORT","data","map_layers","map_water_yield_NonAg.js")
+
+        pattern = os.path.join(os.path.join(output_path, subfolders[0]), "Data_RES*.gz")
+        found_file = glob.glob(pattern)[0]
+
         if not subfolders:
             print(f"No subfolders found in '{output_path}'.")
             return None
@@ -35,7 +39,7 @@ def get_first_subfolder_name(output_path="output"):
         # 返回拼接后的路径
         else:
             # return os.path.join(output_path, subfolders[0], 'data_with_solution.pkl')
-            return os.path.join(output_path, subfolders[0], 'data_with_solution.gz')
+            return found_file
     except FileNotFoundError:
         print(f"Error: Directory '{output_path}' does not exist.")
         return None

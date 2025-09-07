@@ -45,7 +45,7 @@ def get_first_subfolder_name(output_path="output"):
 
 # 调用函数并加载数据
 # pkl_path = get_first_subfolder_name("output")
-pkl_path = 'output/2025_08_22__11_29_06_RF13_2020-2050/Data_RES13.gz'
+pkl_path = 'output/2025_09_06__01_41_06_RF13_2020-2050/Data_RES13.gz'
 print_with_time(f"PKL file path: {pkl_path}")
 if not pkl_path or not os.path.exists(pkl_path):
     raise FileNotFoundError(f"PKL file does not exist at path: {pkl_path}")
@@ -62,6 +62,6 @@ else:
     data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
     print_with_time("Writing outputs...")
-    from luto.tools.write_0 import write_outputs
+    from luto.tools.write import write_outputs
     write_outputs(data)
     print_with_time("Data processed successfully.")
