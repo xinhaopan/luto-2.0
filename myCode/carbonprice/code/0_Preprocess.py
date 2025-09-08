@@ -568,13 +568,22 @@ def main(task_dir, njobs):
                       'xr_biodiversity_GBF2_priority_non_ag']
 
     input_files_0 = ['Run_13_GHG_off_BIO_off_CUT_50']
-    input_files_1 = ['Run_06_GHG_high_BIO_off_CUT_50','Run_12_GHG_low_BIO_off_CUT_50']
-    input_files_2 = ['Run_01_GHG_high_BIO_high_CUT_50','Run_02_GHG_high_BIO_high_CUT_40','Run_03_GHG_high_BIO_high_CUT_30','Run_04_GHG_high_BIO_high_CUT_20','Run_05_GHG_high_BIO_high_CUT_10',
-                     'Run_07_GHG_low_BIO_high_CUT_50', 'Run_08_GHG_low_BIO_high_CUT_40', 'Run_09_GHG_low_BIO_high_CUT_30', 'Run_10_GHG_low_BIO_high_CUT_20', 'Run_11_GHG_low_BIO_high_CUT150']
+    # input_files_1 = ['Run_06_GHG_high_BIO_off_CUT_50','Run_12_GHG_low_BIO_off_CUT_50']
+    # input_files_2 = ['Run_01_GHG_high_BIO_high_CUT_50','Run_02_GHG_high_BIO_high_CUT_40','Run_03_GHG_high_BIO_high_CUT_30','Run_04_GHG_high_BIO_high_CUT_20','Run_05_GHG_high_BIO_high_CUT_10',
+    #                  'Run_07_GHG_low_BIO_high_CUT_50', 'Run_08_GHG_low_BIO_high_CUT_40', 'Run_09_GHG_low_BIO_high_CUT_30', 'Run_10_GHG_low_BIO_high_CUT_20', 'Run_11_GHG_low_BIO_high_CUT150']
+    #
+    # carbon_names = ['carbon_high', 'carbon_low']
+    # carbon_bio_names = ['carbon_high_bio_50', 'carbon_high_bio_40', 'carbon_high_bio_30', 'carbon_high_bio_20', 'carbon_high_bio_10',
+    #                     'carbon_low_bio_50', 'carbon_low_bio_40', 'carbon_low_bio_30', 'carbon_low_bio_20', 'carbon_low_bio_10']
 
-    carbon_names = ['carbon_high', 'carbon_low']
-    carbon_bio_names = ['carbon_high_bio_50', 'carbon_high_bio_40', 'carbon_high_bio_30', 'carbon_high_bio_20', 'carbon_high_bio_10',
-                        'carbon_low_bio_50', 'carbon_low_bio_40', 'carbon_low_bio_30', 'carbon_low_bio_20', 'carbon_low_bio_10']
+    input_files_1 = ['Run_12_GHG_low_BIO_off_CUT_50']
+    input_files_2 = ['Run_07_GHG_low_BIO_high_CUT_50', 'Run_08_GHG_low_BIO_high_CUT_40',
+                     'Run_09_GHG_low_BIO_high_CUT_30', 'Run_10_GHG_low_BIO_high_CUT_20',
+                     'Run_11_GHG_low_BIO_high_CUT150']
+
+    carbon_names = ['carbon_low']
+    carbon_bio_names = ['carbon_low_bio_50', 'carbon_low_bio_40', 'carbon_low_bio_30', 'carbon_low_bio_20',
+                        'carbon_low_bio_10']
 
     input_files = input_files_0 + input_files_1 + input_files_2
     years = get_year(get_path(task_name, input_files[0]))
@@ -799,7 +808,7 @@ def run(task_dir, njobs):
 
 if __name__ == "__main__":
     task_name = config.TASK_NAME
-    njobs = math.ceil(41 / 41)
+    njobs = math.ceil(41 / 3)
     task_dir = f'../../../output/{task_name}'
 
     run(task_dir, njobs)

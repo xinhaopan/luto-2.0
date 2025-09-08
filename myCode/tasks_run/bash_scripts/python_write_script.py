@@ -66,7 +66,7 @@ else:
         data = dill.load(f)
 
     # Update the timestamp
-    data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
+    # data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
     print_with_time("Writing outputs...")
     write_outputs(data)

@@ -4,15 +4,15 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250908_Paper2_Results_NCI'],
+    'TASK_NAME': ['20250908_Paper2_Results_NCI_num2'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['48GB'],
     'NCPUS': ['12'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['15:00:00'],
+    'TIME': ['20:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['high', 'low', 'off'],
     'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],
@@ -82,9 +82,9 @@ settings_name_dict = {
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
-grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
-print(grid_search_settings_df.columns)
-# grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
+# grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
+# print(grid_search_settings_df.columns)
+grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
 create_task_runs(task_root_dir, grid_search_settings_df, platform="NCI", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
 
 

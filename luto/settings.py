@@ -100,10 +100,10 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 5      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2020,2051,5)) # range(2020,2050)
+SIM_YEARS = list(range(2020,2051,1)) # range(2020,2050)
 
 
 # Define the objective function
@@ -192,7 +192,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
  - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'NON_AG_UNIFORM'    # 'off', 'on', 'NON_AG_UNIFORM'
+REGIONAL_ADOPTION_CONSTRAINTS = 'off'    # 'off', 'on', 'NON_AG_UNIFORM'
 REGIONAL_ADOPTION_NON_AG_UNIFORM = 15                # None or numbers between 0-100 (both inclusive); Only work under 'NON_AG_UNIFORM'!
                                                     #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
 REGIONAL_ADOPTION_ZONE = 'NRM_CODE'                 # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
@@ -475,7 +475,7 @@ The weight of the deviations from target in the objective function.
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'                     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
-WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off climate change impact on water yields.
+WATER_CLIMATE_CHANGE_IMPACT = 'off'      # 'on' or 'off'. 'off' will turn off climate change impact on water yields.
 
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
@@ -550,7 +550,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 50
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 

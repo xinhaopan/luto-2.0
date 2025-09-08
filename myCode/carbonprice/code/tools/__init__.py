@@ -73,7 +73,7 @@ class LogToFile:
 
             # Write to the log file
             self.file.write(formatted_buf)
-            self.file.flush()
+            # self.file.flush()
 
         def flush(self):
             # Ensure content is written to disk

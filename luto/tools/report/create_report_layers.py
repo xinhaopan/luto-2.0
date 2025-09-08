@@ -201,6 +201,13 @@ def map2base64_float(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|No
     
 
 def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=settings.WRITE_THREADS) -> dict:
+    if files_df.empty:
+        # 如果为空，说明没有找到任何需要处理的文件。
+        # 打印一条警告信息，方便调试时了解情况。
+        print(
+            f"Warning: No files found to generate report layer. Skipping creation of '{os.path.basename(save_path)}'.")
+        # 直接退出函数，后续的代码将不会被执行。
+        return
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
     template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_map_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
