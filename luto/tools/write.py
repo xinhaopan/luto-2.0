@@ -35,7 +35,6 @@ from luto import tools
 from luto.data import Data
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.report.data_tools.parameters import GHG_NAMES
-from luto.tools.spatializers import create_2d_map
 from luto.tools.report.create_report_layers import save_report_layer
 from luto.tools.report.create_report_data import save_report_data
 
@@ -159,7 +158,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         os.mkdir(path_yr)
         
     tasks = [
-        delayed(write_files)(data, yr_cal, path_yr),
+        delayed(write_decision_variables)(data, yr_cal, path_yr),
         delayed(write_mosaic_map)(data, yr_cal, path_yr),
         delayed(write_dvar_area)(data, yr_cal, path_yr),
         delayed(write_crosstab)(data, yr_cal, path_yr),
@@ -189,7 +188,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
 
 
 
-def write_files(data: Data, yr_cal, path):
+def write_decision_variables(data: Data, yr_cal, path):
     
     # Write raw dvars
     dvar_ag = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
@@ -205,12 +204,6 @@ def write_files(data: Data, yr_cal, path):
     save2nc(dvar_non_ag, os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))
     save2nc(dvar_ag_man, os.path.join(path, f'xr_dvar_ag_man_{yr_cal}.nc'))
 
-    # Write out raw xarrays for land-use and land management
-    lumap_xr = arr_to_xr(data, data.lumaps[yr_cal]).chunk('auto')
-    lmmap_xr = arr_to_xr(data, data.lmmaps[yr_cal]).chunk('auto')
-    lumap_xr.to_netcdf(os.path.join(path, f'xr_map_lumap_{yr_cal}.nc'))
-    lmmap_xr.to_netcdf(os.path.join(path, f'xr_map_lmmap_{yr_cal}.nc'))
-    
     return f"Decision variables written for year {yr_cal}"
 
 
@@ -247,6 +240,13 @@ def write_mosaic_map(data: Data, yr_cal, path):
     ag_map_argmax.to_netcdf(os.path.join(path, f'xr_map_ag_argmax_{yr_cal}.nc'))            # Save directly to netcdf to keep the crs
     non_ag_map_argmax.to_netcdf(os.path.join(path, f'xr_map_non_ag_argmax_{yr_cal}.nc'))
     am_argmax.to_netcdf(os.path.join(path, f'xr_map_am_argmax_{yr_cal}.nc'))
+
+
+    # Write out raw xarrays for land-use and land management
+    lumap_xr = arr_to_xr(data, data.lumaps[yr_cal]).chunk('auto')
+    lmmap_xr = arr_to_xr(data, data.lmmaps[yr_cal]).chunk('auto')
+    lumap_xr.to_netcdf(os.path.join(path, f'xr_map_lumap_{yr_cal}.nc'))
+    lmmap_xr.to_netcdf(os.path.join(path, f'xr_map_lmmap_{yr_cal}.nc'))
 
     return f"Mosaic maps written for year {yr_cal}"
 
@@ -368,12 +368,14 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     )
 
     ag_man_q_mrp_xr = xr.DataArray(
-        np.stack([arr for arr in ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp_xr, yr_idx).values()]),
+        np.stack(list(ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp_xr, yr_idx).values())),
         dims=['am', 'lm', 'cell', 'product'],
-        coords={'am': data.AG_MAN_DESC,
-                'lm': data.LANDMANS,
-                'cell': np.arange(data.NCELLS),
-                'product': data.PRODUCTS}
+        coords={
+            'am': data.AG_MAN_DESC,
+            'lm': data.LANDMANS,
+            'cell': np.arange(data.NCELLS),
+            'product': data.PRODUCTS
+        }
     ).assign_coords(
         region=('cell', data.REGION_NRM_NAME),
     )
@@ -382,6 +384,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     ag_X_mrj_xr = xr.concat([ag_X_mrj_xr, ag_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+
     ag_q_mrp_xr = xr.concat([ag_q_mrp_xr, ag_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr, ag_man_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr, ag_man_q_mrp_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
@@ -435,8 +438,8 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         ).replace({'dry':'Dryland', 'irr':'Irrigated'})
     
     # Save the production dataframes to csv
-    quantity_df_AUS = pd.concat([ag_q_rc_df_AUS, non_ag_p_rc_df_AUS, am_p_rc_df_AUS], ignore_index=True).query('`Production (t/KL)` > 1e-2')
-    quantity_df_region = pd.concat([ag_q_rc_df_region, non_ag_p_rc_df_region, am_p_rc_df_region], ignore_index=True).query('`Production (t/KL)` > 1e-2')
+    quantity_df_AUS = pd.concat([ag_q_rc_df_AUS, non_ag_p_rc_df_AUS, am_p_rc_df_AUS], ignore_index=True).query('abs(`Production (t/KL)`) > 1')
+    quantity_df_region = pd.concat([ag_q_rc_df_region, non_ag_p_rc_df_region, am_p_rc_df_region], ignore_index=True).query('abs(`Production (t/KL)`) > 1')
     pd.concat([quantity_df_AUS, quantity_df_region]).to_csv(os.path.join(path, f'quantity_production_t_separate_{yr_cal}.csv'), index=False)
     
     save2nc(ag_q_rc, os.path.join(path, f'xr_quantities_agricultural_{yr_cal}.nc'))
@@ -718,7 +721,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
     # Get the decision variables for agricultural land-use
-    ag_dvar_mrj_target = tools.ag_mrj_to_xr(data, tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).assign_coords(region=('cell', data.REGION_NRM_NAME)))
+    ag_dvar_mrj_target = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).assign_coords(region=('cell', data.REGION_NRM_NAME))
     ag_dvar_mrj_base = tools.ag_mrj_to_xr(data, (tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])))
 
     ag_dvar_mrj_target = ag_dvar_mrj_target.rename({'lm': 'To water-supply', 'lu': 'To land-use'}
@@ -753,7 +756,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).reset_index(
         ).assign(
             Year=yr_cal
-        ).query('`Cost ($)` > 0')
+        ).query('abs(`Cost ($)`) > 0')
                 
 
     # Save the cost DataFrames
@@ -780,10 +783,8 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
     # Get the non-agricultural decision variable
-    # ag_dvar_base = tools.ag_mrj_to_xr(data, tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-    #     ).assign_coords(region=('cell', data.REGION_NRM_NAME)))
-    ag_dvar_base = (
-        tools.ag_mrj_to_xr(data, tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])).assign_coords(region=('cell', data.REGION_NRM_NAME)))
+    ag_dvar_base = tools.ag_mrj_to_xr(data, (tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]))
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     non_ag_dvar_target = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
@@ -825,7 +826,7 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
             ).reset_index(
             ).assign(
                 Year=yr_cal
-            ).query('`Cost ($)` > 0')
+            ).query('abs(`Cost ($)`) > 0')
     cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})    
     cost_df.to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{yr_cal}.csv'), index=False)
     
@@ -957,14 +958,14 @@ def write_dvar_area(data: Data, yr_cal, path):
         ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
         ).assign(Year=yr_cal
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('`Area (ha)` > 1e-6')
+        ).query('abs(`Area (ha)`) > 1e-6')
     df_non_ag_area_region = area_non_ag.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
         ).rename(columns={'lu': 'Land-use'}
         ).assign(Year=yr_cal
-        ).query('`Area (ha)` > 1e-6')
+        ).query('abs(`Area (ha)`) > 1e-6')
     df_am_area_region = area_am.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Area (ha)'
@@ -972,7 +973,7 @@ def write_dvar_area(data: Data, yr_cal, path):
         ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply', 'am': 'Type'}
         ).assign(Year=yr_cal
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('`Area (ha)` > 1e-6')
+        ).query('abs(`Area (ha)`) > 1e-6')
         
     # Australia level aggregation
     df_ag_area_AUS = area_ag.sum(dim='cell'
@@ -981,20 +982,20 @@ def write_dvar_area(data: Data, yr_cal, path):
         ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
         ).assign(Year=yr_cal, region='AUSTRALIA'
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('`Area (ha)` > 1e-6')
+        ).query('abs(`Area (ha)`) > 1e-6')
     df_non_ag_area_AUS = area_non_ag.sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
         ).rename(columns={'lu': 'Land-use'}
         ).assign(Year=yr_cal, region='AUSTRALIA'
-        ).query('`Area (ha)` > 1e-6')
+        ).query('abs(`Area (ha)`) > 1e-6')
     df_am_area_AUS = area_am.sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
         ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply', 'am': 'Type'}
         ).assign(Year=yr_cal, region='AUSTRALIA'
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('`Area (ha)` > 1e-6')
+        ).query('abs(`Area (ha)`) > 1e-6')
                                  
 
     pd.concat([df_ag_area_AUS, df_ag_area_region]).to_csv(os.path.join(path, f'area_agricultural_landuse_{yr_cal}.csv'), index = False)
@@ -1503,7 +1504,7 @@ def write_water(data: Data, yr_cal, path):
     elif settings.WATER_CLIMATE_CHANGE_IMPACT == 'off':
         ag_w_mrj_base = tools.ag_mrj_to_xr(data, ag_water.get_water_net_yield_matrices(data, 0, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR))
         ag_w_mrj_base = xr.concat([ag_w_mrj_base, ag_w_mrj_base.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-        wny_outside_luto_study_area_base = np.array(list(data.WATER_OUTSIDE_LUTO_HIST.to_dict().values()))
+        wny_outside_luto_study_area_base = np.array(list(data.WATER_OUTSIDE_LUTO_HIST.values()))
 
     ag_w_mrj_CCI = ag_w_mrj - ag_w_mrj_base
     wny_outside_luto_study_area_CCI = wny_outside_luto_study_area - wny_outside_luto_study_area_base
@@ -1987,7 +1988,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
             'group':'Vegetation Group',
             'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'}
         ).reset_index(drop=True
-        ).query('`Area Weighted Score (ha)` > 0'
+        ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF3_scores_{yr_cal}.csv'), index=False)
         
     # Save xarray data to netCDF
@@ -2141,7 +2142,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
             'am':'Agri-Management',
             'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)',
             'Target_by_Percent':'Target by Percent (%)'}).reset_index(drop=True
-        ).query('`Area Weighted Score (ha)` > 0'
+        ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF4_SNES_scores_{yr_cal}.csv'), index=False)
             
     # Save xarray data to netCDF
@@ -2294,7 +2295,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
             'Relative_Contribution_Percentage': 'Contribution Relative to Pre-1750 Level (%)',
             'Target_by_Percent': 'Target by Percent (%)'}
         ).reset_index(drop=True
-        ).query('`Area Weighted Score (ha)` > 0'
+        ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF4_ECNES_scores_{yr_cal}.csv'), index=False)
         
     # Save xarray data to netCDF
@@ -2447,7 +2448,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
             'am': 'Agri-Management',
             'Relative_Contribution_Percentage': 'Contribution Relative to Pre-1750 Level (%)'}
         ).reset_index(drop=True
-        ).query('`Area Weighted Score (ha)` > 0'
+        ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF8_groups_scores_{yr_cal}.csv'), index=False)
 
     # Save xarray data to netCDF
@@ -2601,7 +2602,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
             'am': 'Agri-Management',
             'Relative_Contribution_Percentage': 'Contribution Relative to Pre-1750 Level (%)'}
         ).reset_index(drop=True
-        ).query('`Area Weighted Score (ha)` > 0'
+        ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF8_species_scores_{yr_cal}.csv'), index=False)
         
     # Save xarray data to netCDF
