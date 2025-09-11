@@ -35,7 +35,7 @@ def find_data_with_solution_all_subdirs(task_root_dir, n_jobs=3):
     dirs = [os.path.join(task_root_dir, f) for f in files if os.path.isdir(os.path.join(task_root_dir, f))]
 
     results = Parallel(n_jobs=n_jobs)(
-        delayed(dir_has_target_file)(d, 'data_with_solution.gz') for d in dirs
+        delayed(dir_has_target_file)(d, 'Data_RES5.gz') for d in dirs
     )
     found_paths = [res for res in results if res]
     not_found_dirs = [files[i] for i, res in enumerate(results) if not res]
@@ -89,7 +89,7 @@ def update_luto_code(run_path):
         else:
             shutil.copy2(src_item, dst_item)
 
-def write_repeat(task_root_dir,n_jobs=9,force=False, write_threads=2):
+def write_repeat(task_root_dir,n_jobs=2,force=False, write_threads=2):
     found, not_found = find_data_with_solution_all_subdirs(task_root_dir, n_jobs)
     tprint("有解:")
     for p in found:
@@ -103,7 +103,7 @@ def write_repeat(task_root_dir,n_jobs=9,force=False, write_threads=2):
     without_htmls = []
     for file_path in found:
         folder_path = os.path.dirname(file_path)
-        html_path = os.path.join(folder_path, 'DATA_REPORT', 'REPORT_HTML', 'pages', 'production.html')
+        html_path = os.path.join(folder_path, 'DATA_REPORT',"data","map_layers","map_water_yield_NonAg.js")
         if os.path.exists(html_path):
             with_htmls.append(folder_path)
         else:
@@ -120,7 +120,7 @@ def write_repeat(task_root_dir,n_jobs=9,force=False, write_threads=2):
     for target_dir in without_htmls:
         norm_path = os.path.normpath(target_dir)
         parts = norm_path.split(os.sep)
-        run_path = os.sep.join(parts[:5])
+        run_path = os.sep.join(parts[:-2])
         run_path_to_targets[run_path].append(norm_path)
 
     tprint("\nStart write output.......")
@@ -158,14 +158,20 @@ import luto.settings as settings
 gz_path = sys.argv[1]
 with gzip.open(gz_path, 'rb') as f:
     data = dill.load(f)
-write_outputs(data)
+# write_outputs(data)
+
+from luto.tools.report.create_report_layers import save_report_layer
+from luto.tools.report.create_report_data import save_report_data
+save_report_data(data.path)
+save_report_layer(data)
+
     '''
         with open(script_path, 'w', encoding='utf-8') as f:
             f.write(script_content)
 
         for target_dir in targets:
             parts = target_dir.split(os.sep)
-            gz_path = os.path.join(os.sep.join(parts[5:]), 'data_with_solution.gz')
+            gz_path = os.path.join(os.sep.join(parts[-2:]), 'Data_RES5.gz')
             all_jobs.append((run_path, script_name, gz_path))
 
     success_list, failed_list = [], []
@@ -197,7 +203,7 @@ if __name__ == "__main__":
     # Main execution
     import time
     # time.sleep(60*60*5)
-    task_root_dir = '../../../output/20250608_Paper1_results_windows_BIO3'
+    task_root_dir = '../../../output/20250908_Paper2_Results_NCI_1'
     write_repeat(task_root_dir)
 
 

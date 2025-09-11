@@ -31,4 +31,4 @@ for task in tasks:
         for col in grid_search_settings_df.columns:
             grid_search_settings_df.at[name, col] = new_value
 
-    create_task_runs(task_root_dir, grid_search_settings_df, platform, n_workers=min(len(grid_search_settings_df.columns), 4),use_parallel=True,model_name='Write')
+    create_task_runs(task_root_dir, grid_search_settings_df, platform, n_workers=min(len(grid_search_settings_df.columns), 2),use_parallel=True,model_name='Report')

@@ -73,6 +73,8 @@ def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI'
         script_name = 'python_script.py'
     elif model_name == 'Write':
         script_name = 'python_write_script.py'
+    elif model_name == 'Report':
+        script_name = 'python_report_script.py'
     else:
         raise ValueError('model_name must be either "Run" or "Write"!')
     shutil.copyfile(f'bash_scripts/{script_name}', f'{task_root_dir}/{col}/{script_name}')
@@ -251,7 +253,7 @@ def create_task_runs(
     n_workers:int=4,
     max_concurrent_tasks:int=300,
     use_parallel:bool=True,
-    model_name:Literal['Run','Write']='Run'
+    model_name:Literal['Run','Write','Report']='Run'
 ) -> None:
     check_platform_system(platform)
     if platform == 'NCI':
