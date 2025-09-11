@@ -25,7 +25,6 @@ window.Highchart = {
     const chartElement = ref(null);
     const isLoading = ref(true);
     const ChartInstance = ref(null);
-    const chartColor = ref(null);
     const position = ref({ x: 0, y: 0 });
     const isDragging = ref(false);
     const dragStartPos = ref({ x: 0, y: 0 });
@@ -58,10 +57,11 @@ window.Highchart = {
     // Function to handle dataset loading and chart creation
     const createChart = () => {
       isLoading.value = true;
-
-      // Store colors first to prevent mutations
-      if (props.chartData?.colors) {
-        chartColor.value = JSON.parse(JSON.stringify(props.chartData.colors));
+      
+      // CRITICAL: Destroy existing chart before creating new one
+      if (ChartInstance.value) {
+        ChartInstance.value.destroy();
+        ChartInstance.value = null;
       }
 
       // Apply highlighting to chart data before creating chart
@@ -72,11 +72,9 @@ window.Highchart = {
         chartElement.value,
         {
           ...processedChartData,
-          colors: chartColor.value,
           chart: (processedChartData.chart || {}),
         }
       );
-
       isLoading.value = false;
     };
 
@@ -168,8 +166,11 @@ window.Highchart = {
       }
 
       // Apply our stored colors LAST to prevent them being overwritten
-      if (chartColor.value) {
-        chart.update({ colors: chartColor.value }, true);
+      if (props.chartData.colors) {
+        chart.series.forEach((series, index) => {
+          const colorIndex = index % props.chartData.colors.length;
+          series.update({ color: props.chartData.colors[colorIndex] }, false);
+        });
       }
 
       // Final redraw to apply all changes with animation
@@ -184,6 +185,13 @@ window.Highchart = {
     });
 
     onUnmounted(() => {
+      // CRITICAL: Destroy Highcharts instance to prevent memory leaks
+      if (ChartInstance.value) {
+        ChartInstance.value.destroy();
+        ChartInstance.value = null;
+      }
+      
+      // Remove event listeners
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', onDrag);
       window.removeEventListener('mouseup', stopDrag);
@@ -198,11 +206,6 @@ window.Highchart = {
       }
 
       isUpdating = true;
-
-      // First, store a fresh copy of colors before any chart updates
-      if (newValue?.colors) {
-        chartColor.value = JSON.parse(JSON.stringify(newValue.colors));
-      }
 
       // Then update the chart
       updateChart(ChartInstance.value, newValue);

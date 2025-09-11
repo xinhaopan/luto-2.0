@@ -140,8 +140,22 @@ window.DataService = {
         name: "GHG_NonAg",
       },
       overview: {
-        path: "data/GHG_overview.js",
-        name: "GHG_overview",
+        sum: {
+          path: "data/GHG_overview_sum.js",
+          name: "GHG_overview_sum",
+        },
+        Ag: {
+          path: "data/GHG_overview_Ag.js",
+          name: "GHG_overview_Ag",
+        },
+        "Ag Mgt": {
+          path: "data/GHG_overview_Am.js",
+          name: "GHG_overview_Am",
+        },
+        "Non-Ag": {
+          path: "data/GHG_overview_NonAg.js",
+          name: "GHG_overview_NonAg",
+        },
       },
       ranking: {
         path: "data/GHG_ranking.js",
@@ -167,9 +181,29 @@ window.DataService = {
           name: "Production_overview_AUS_achive_percent",
         },
         sum: {
-          path: "data/Production_overview_sum.js",
-          name: "Production_overview_sum",
+          path: "data/Production_overview_demand_type.js",
+          name: "Production_overview_demand_type",
         },
+        'Domestic': {
+          path: "data/Production_overview_Domestic.js",
+          name: "Production_overview_Domestic",
+        },
+        'Exports': {
+          path: "data/Production_overview_Exports.js",
+          name: "Production_overview_Exports",
+        },
+        'Imports': {
+          path: "data/Production_overview_Imports.js",
+          name: "Production_overview_Imports",
+        },
+        'Feed': {
+          path: "data/Production_overview_Feed.js",
+          name: "Production_overview_Feed",
+        },
+      },
+      ranking: {
+        path: "data/Production_ranking.js",
+        name: "Production_ranking",
       },
     },
     Water: {
@@ -187,9 +221,21 @@ window.DataService = {
           name: "Water_NonAg_NRM",
         },
         overview: {
-          Type: {
-            path: "data/Water_overview_NRM_Type.js",
-            name: "Water_overview_NRM_Type",
+          Ag: {
+            path: "data/Water_overview_NRM_Ag.js",
+            name: "Water_overview_NRM_Ag",
+          },
+          "Ag Mgt": {
+            path: "data/Water_overview_NRM_Am.js",
+            name: "Water_overview_NRM_Am",
+          },
+          "Non-Ag": {
+            path: "data/Water_overview_NRM_NonAg.js",
+            name: "Water_overview_NRM_NonAg",
+          },
+          'sum': {
+            path: "data/Water_overview_NRM_sum.js",
+            name: "Water_overview_NRM_sum",
           },
         },
         ranking: {

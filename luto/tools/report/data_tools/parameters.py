@@ -33,8 +33,40 @@ COMMODITIES_ON_LAND = [
     'Vegetables','Winter cereals','Winter legumes','Winter oilseeds'
 ]
 
-COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
+COMMIDOTY_GROUP = {
+   "Beef meat": "Animal Products",
+   "Sheep meat": "Animal Products",
+   "Dairy": "Animal Products",
+   "Beef live export": "Animal Products",
+   "Sheep live export": "Animal Products",
+   "Sheep wool": "Animal Products",
+   "Apples": "Fruits",
+   "Citrus": "Fruits",
+   "Grapes": "Fruits",
+   "Plantation fruit": "Fruits",
+   "Stone fruit": "Fruits",
+   "Tropical stone fruit": "Fruits",
+   "Pears": "Fruits",
+   "Nuts": "Fruits",
+   "Summer cereals": "Grains/Legumes",
+   "Winter cereals": "Grains/Legumes",
+   "Rice": "Grains/Legumes",
+   "Summer legumes": "Grains/Legumes",
+   "Winter legumes": "Grains/Legumes",
+   "Vegetables": "Crops",
+   "Summer oilseeds": "Crops",
+   "Winter oilseeds": "Crops",
+   "Cotton": "Crops",
+   "Sugar": "Crops",
+   "Other non-cereal crops": "Crops",
+   "Hay": "Hay",
+   "Aquaculture": "Off-land Products",
+   "Chicken": "Off-land Products",
+   "Eggs": "Off-land Products",
+   "Pork": "Off-land Products"
+}
 
+COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
 COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
 
 

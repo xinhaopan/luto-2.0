@@ -2,11 +2,14 @@ window.HomeView = {
 
   setup() {
 
-    const { ref, onMounted, watch, computed, inject, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, watch, computed, inject, nextTick } = Vue;
 
     // Data service
     const chartRegister = window.DataService.chartCategories;   // DataService has been registered in index.html      [DataService.js]
-    const loadScript = window.loadScript;                       // DataConstructor has been registered in index.html  [helpers.js]
+    const loadScript = window.loadScriptWithTracking;
+    
+    // View identification for memory management
+    const VIEW_NAME = "Home";                       // DataConstructor has been registered in index.html  [helpers.js]
 
     // Global variables
     const selectRegion = inject('globalSelectedRegion');
@@ -24,6 +27,7 @@ window.HomeView = {
       'GHG': 'Mt CO2e',
       'Water': 'ML',
       'Biodiversity': 'Relative Percentage (Pre-1750 = 100%)',
+      'Production': 'Tonnes or KL',
     };
     const RankSubcategoriesRename = {
       'Agricultural Landuse': 'Ag',
@@ -44,9 +48,16 @@ window.HomeView = {
 
     //  Reactive data
     const selectChartData = computed(() => {
-      const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value];
-      const seriesData = originalData ? JSON.parse(JSON.stringify(originalData)) : [];
-      const seriesColors = seriesData.map(serie => serie.color).filter(color => color);
+
+      let seriesData, yAxisTitle = null;
+      const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value] || [];
+      seriesData = JSON.parse(JSON.stringify(originalData));
+
+      if (selectChartSubCategory.value === 'Off-target achievement') {
+        yAxisTitle = 'Achievement (%)';
+      }
+
+      const seriesColors = seriesData.map(serie => serie.color).filter(color => color) || [];
       const colors = seriesColors.length > 0 ? seriesColors : window['Supporting_info']?.colors || [];
       return {
         ...window['Chart_default_options'],
@@ -55,7 +66,7 @@ window.HomeView = {
         },
         yAxis: {
           title: {
-            text: availableUnit[selectChartCategory.value]
+            text: yAxisTitle || availableUnit[selectChartCategory.value]
           }
         },
         series: seriesData,
@@ -111,71 +122,105 @@ window.HomeView = {
     onMounted(async () => {
 
       // Load required data
-      await loadScript("./data/Supporting_info.js", 'Supporting_info');
-      await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options');
-      await loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS');
+      await loadScript("./data/Supporting_info.js", 'Supporting_info', VIEW_NAME);
+      await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options', VIEW_NAME);
+      await loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS', VIEW_NAME);
 
       // Overview chart data
       const chartOverview_area = chartRegister['Area']['overview'];
-      const chartOverview_economics = chartRegister['Economics']['overview'];
-      const chartOverview_economics_ag = chartRegister['Economics']['Ag'];
-      const chartOverview_economics_agMgt = chartRegister['Economics']['Ag Mgt'];
-      const chartOverview_economics_Nonag = chartRegister['Economics']['Non-Ag'];
-      const chartOverview_ghg = chartRegister['GHG']['overview'];
-      const chartOverview_ghg_ag = chartRegister['GHG']['Ag'];
-      const chartOverview_ghg_agMgt = chartRegister['GHG']['Ag Mgt'];
-      const chartOverview_ghg_Nonag = chartRegister['GHG']['Non-Ag'];
-      const chartOverview_water = chartRegister['Water']['NRM']['overview'];
       const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview'];
+      const chartOverview_economics_sum = chartRegister['Economics']['overview']['sum'];
+      const chartOverview_economics_ag = chartRegister['Economics']['overview']['Ag'];
+      const chartOverview_economics_agMgt = chartRegister['Economics']['overview']['Ag Mgt'];
+      const chartOverview_economics_Nonag = chartRegister['Economics']['overview']['Non-Ag'];
+      const chartOverview_ghg_sum = chartRegister['GHG']['overview']['sum'];
+      const chartOverview_ghg_ag = chartRegister['GHG']['overview']['Ag'];
+      const chartOverview_ghg_agMgt = chartRegister['GHG']['overview']['Ag Mgt'];
+      const chartOverview_ghg_Nonag = chartRegister['GHG']['overview']['Non-Ag'];
+      const chartOverview_prod_achieve = chartRegister['Production']['overview']['achieve'];
+      const chartOverview_prod_overview = chartRegister['Production']['overview']['sum'];
+      const chartOverview_prod_domestic = chartRegister['Production']['overview']['Domestic'];
+      const chartOverview_prod_export = chartRegister['Production']['overview']['Exports'];
+      const chartOverview_prod_import = chartRegister['Production']['overview']['Imports'];
+      const chartOverview_prod_feed = chartRegister['Production']['overview']['Feed'];
+      const chartOverview_water_sum = chartRegister['Water']['NRM']['overview']['sum'];
+      const chartOverview_water_ag = chartRegister['Water']['NRM']['overview']['Ag'];
+      const chartOverview_water_agMgt = chartRegister['Water']['NRM']['overview']['Ag Mgt'];
+      const chartOverview_water_Nonag = chartRegister['Water']['NRM']['overview']['Non-Ag'];
+      // Ranking chart data
+
       const rankingArea = chartRegister['Area']['ranking'];
       const rankingEconomics = chartRegister['Economics']['ranking'];
       const rankingGHG = chartRegister['GHG']['ranking'];
+      const rankingProduction = chartRegister['Production']['ranking'];
       const rankingWater = chartRegister['Water']['NRM']['ranking'];
       const rankingBiodiversity = chartRegister['Biodiversity']['ranking'];
 
-      await loadScript(chartOverview_area['Source']['path'], chartOverview_area['Source']['name']);
-      await loadScript(chartOverview_area['Category']['path'], chartOverview_area['Category']['name']);
-      await loadScript(chartOverview_area['Land-use']['path'], chartOverview_area['Land-use']['name']);
-      await loadScript(chartOverview_economics['sum']['path'], chartOverview_economics['sum']['name']);
-      await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name']);
-      await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name']);
-      await loadScript(chartOverview_economics_Nonag['path'], chartOverview_economics_Nonag['name']);
-      await loadScript(chartOverview_ghg['path'], chartOverview_ghg['name']);
-      await loadScript(chartOverview_ghg_ag['path'], chartOverview_ghg_ag['name']);
-      await loadScript(chartOverview_ghg_agMgt['path'], chartOverview_ghg_agMgt['name']);
-      await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name']);
-      await loadScript(chartOverview_water['Type']['path'], chartOverview_water['Type']['name']);
-      await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name']);
-      await loadScript(rankingArea['path'], rankingArea['name']);
-      await loadScript(rankingEconomics['path'], rankingEconomics['name']);
-      await loadScript(rankingGHG['path'], rankingGHG['name']);
-      await loadScript(rankingWater['path'], rankingWater['name']);
-      await loadScript(rankingBiodiversity['path'], rankingBiodiversity['name']);
+      await loadScript(chartOverview_area['Source']['path'], chartOverview_area['Source']['name'], VIEW_NAME);
+      await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name'], VIEW_NAME);
+      await loadScript(chartOverview_area['Category']['path'], chartOverview_area['Category']['name'], VIEW_NAME);
+      await loadScript(chartOverview_area['Land-use']['path'], chartOverview_area['Land-use']['name'], VIEW_NAME);
+      await loadScript(chartOverview_economics_sum['path'], chartOverview_economics_sum['name'], VIEW_NAME);
+      await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name'], VIEW_NAME);
+      await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name'], VIEW_NAME);
+      await loadScript(chartOverview_economics_Nonag['path'], chartOverview_economics_Nonag['name'], VIEW_NAME);
+      await loadScript(chartOverview_ghg_sum['path'], chartOverview_ghg_sum['name'], VIEW_NAME);
+      await loadScript(chartOverview_ghg_ag['path'], chartOverview_ghg_ag['name'], VIEW_NAME);
+      await loadScript(chartOverview_ghg_agMgt['path'], chartOverview_ghg_agMgt['name'], VIEW_NAME);
+      await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_achieve['path'], chartOverview_prod_achieve['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_overview['path'], chartOverview_prod_overview['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_domestic['path'], chartOverview_prod_domestic['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_export['path'], chartOverview_prod_export['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_import['path'], chartOverview_prod_import['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_feed['path'], chartOverview_prod_feed['name'], VIEW_NAME);
+      await loadScript(chartOverview_water_sum['path'], chartOverview_water_sum['name'], VIEW_NAME);
+      await loadScript(chartOverview_water_ag['path'], chartOverview_water_ag['name'], VIEW_NAME);
+      await loadScript(chartOverview_water_agMgt['path'], chartOverview_water_agMgt['name'], VIEW_NAME);
+      await loadScript(chartOverview_water_Nonag['path'], chartOverview_water_Nonag['name'], VIEW_NAME);
+
+      await loadScript(rankingArea['path'], rankingArea['name'], VIEW_NAME);
+      await loadScript(rankingEconomics['path'], rankingEconomics['name'], VIEW_NAME);
+      await loadScript(rankingGHG['path'], rankingGHG['name'], VIEW_NAME);
+      await loadScript(rankingProduction['path'], rankingProduction['name'], VIEW_NAME);
+      await loadScript(rankingWater['path'], rankingWater['name'], VIEW_NAME);
+      await loadScript(rankingBiodiversity['path'], rankingBiodiversity['name'], VIEW_NAME);
 
 
       ChartData.value = {
         'Area': {
-          'Source': window[chartOverview_area['Source']['name']],
+          'Overview': window[chartOverview_area['Source']['name']],
           'Category': window[chartOverview_area['Category']['name']],
           'Land-use': window[chartOverview_area['Land-use']['name']],
         },
+        'Biodiversity': {
+          'GBF2': window[chartOverview_bio_GBF2['name']],
+        },
         'Economics': {
-          'Overview': window[chartOverview_economics['sum']['name']],
+          'Overview': window[chartOverview_economics_sum['name']],
           'Ag': window[chartOverview_economics_ag['name']],
           'Ag Mgt': window[chartOverview_economics_agMgt['name']],
           'Non-Ag': window[chartOverview_economics_Nonag['name']],
         },
         'GHG': {
-          'Overview': window[chartOverview_ghg['name']],
+          'Overview': window[chartOverview_ghg_sum['name']],
           'Ag': window[chartOverview_ghg_ag['name']],
           'Ag Mgt': window[chartOverview_ghg_agMgt['name']],
           'Non-Ag': window[chartOverview_ghg_Nonag['name']],
         },
-        'Water': {
-          'Type': window[chartOverview_water['Type']['name']],
+        'Production': {
+          'Off-target achievement': window[chartOverview_prod_achieve['name']],
+          'Overview': window[chartOverview_prod_overview['name']],
+          'Domestic': window[chartOverview_prod_domestic['name']],
+          'Exports': window[chartOverview_prod_export['name']],
+          'Imports': window[chartOverview_prod_import['name']],
+          'Feed': window[chartOverview_prod_feed['name']],
         },
-        'Biodiversity': {
-          'GBF2': window[chartOverview_bio_GBF2['name']],
+        'Water': {
+          'Overview': window[chartOverview_water_sum['name']],
+          'Ag': window[chartOverview_water_ag['name']],
+          'Ag Mgt': window[chartOverview_water_agMgt['name']],
+          'Non-Ag': window[chartOverview_water_Nonag['name']],
         },
       };
 
@@ -183,6 +228,7 @@ window.HomeView = {
         'Area': window[rankingArea['name']],
         'Economics': window[rankingEconomics['name']],
         'GHG': window[rankingGHG['name']],
+        'Production': window[rankingProduction['name']],
         'Water': window[rankingWater['name']],
         'Biodiversity': window[rankingBiodiversity['name']],
       };
@@ -226,6 +272,12 @@ window.HomeView = {
           values?.[newSubCategory]?.['color']?.[newYear] || {}
         ])
       );
+
+    });
+
+    // Memory cleanup on component unmount
+    onUnmounted(() => {
+      window.MemoryService.cleanupViewData(VIEW_NAME);
     });
 
     return {
@@ -288,7 +340,7 @@ window.HomeView = {
               <div class="flex items-center space-x-1 justify-end p-2">
                 <button v-for="(data, key) in availableChartCategories" :key="key"
                   @click="selectChartCategory = data"
-                  class="bg-[#e8eaed] text-[#1f1f1f] text-[0.8rem] px-1 py-1 rounded"
+                  class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-1 py-1 rounded"
                   :class="{'bg-sky-500 text-white': selectChartCategory === data}">
                   {{ data }}
                 </button>
@@ -353,12 +405,13 @@ window.HomeView = {
             <div class="absolute flex flex-row space-x-1 mr-4 top-[9px] left-[10px] z-10">
               <button v-for="cat in availableChartSubCategories" :key="cat"
                 @click="selectChartSubCategory = cat"
-                class="bg-[#e8eaed] text-[#1f1f1f] text-[0.8rem] px-1 py-1 rounded"
+                class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-1 py-1 rounded"
                 :class="{'bg-sky-500 text-white': selectChartSubCategory === cat}">
                 {{ cat }}
               </button>
             </div>
 
+            <!-- Chart -->
             <chart-container
               class="w-full h-full pt-[50px]"
               :chartData="selectChartData">
