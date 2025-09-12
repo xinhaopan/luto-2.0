@@ -199,312 +199,92 @@ def map2base64_float(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|No
         return attrs, array_to_base64(arr_4band, bbox, [float(max_val), float(min_val)])
 
 
+import os
+import json
+import pandas as pd
+import xarray as xr
+from joblib import Parallel, delayed
+
+
 def get_map_obj_float(data: Data, files_df: pd.DataFrame, save_path: str,
                       workers: int = settings.WRITE_THREADS) -> dict:
-    # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
+    # 用于map2base64_float的空间模板
     template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_map_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
 
+    # 1. 获取“结构”模板（无论df是否为空）
     if files_df.empty:
-        # 如果为空，创建全零数据但仍然运行完整流程
-        print(
-            f"Warning: No files found to generate report layer. Creating zero-filled '{os.path.basename(save_path)}'.")
-
-        # 创建一个虚拟的全零数据集来保持输出结构一致
-        try:
-            with xr.open_dataarray(template_xr) as template:
-                # 创建基本维度信息，假设常见的维度结构
-                # 可以根据你的实际数据结构调整这些维度
-                default_dims = {
-                    'am': ['Beef', 'Dairy', 'Sheep', 'Crops'],  # 示例农业管理类型
-                    'lm': ['Irrigated', 'Dryland'],  # 示例土地管理类型
-                    'lu': ['Beef', 'Dairy', 'Sheep', 'Crops'],  # 示例土地利用类型
-                    'Commodity': ['Beef', 'Dairy', 'Sheep', 'Wheat']  # 示例商品类型
-                }
-
-                # 为每个模拟年份和维度组合创建零值任务
-                task = []
-                for year in sorted(settings.SIM_YEARS):
-                    # 创建所有可能的维度组合
-                    dim_combinations = []
-                    if default_dims:
-                        from itertools import product
-
-                        # 选择实际需要的维度（可根据实际情况调整）
-                        active_dims = ['am', 'lm']  # 或其他你需要的维度组合
-                        dim_values = [default_dims[dim] for dim in active_dims if dim in default_dims]
-
-                        if dim_values:
-                            for combo in product(*dim_values):
-                                dim_dict = dict(zip(active_dims, combo))
-                                # 创建零值数组
-                                zero_arr = xr.zeros_like(template.isel(cell=slice(None)))
-
-                                # 创建重命名字典
-                                sel_rename = {}
-                                if 'am' in dim_dict:
-                                    sel_rename['am'] = RENAME_AM_NON_AG.get(dim_dict['am'], dim_dict['am'])
-                                if 'lm' in dim_dict:
-                                    sel_rename['lm'] = {'irr': 'Irrigated', 'dry': 'Dryland'}.get(dim_dict['lm'],
-                                                                                                  dim_dict['lm'])
-                                if 'lu' in dim_dict:
-                                    sel_rename['lu'] = RENAME_AM_NON_AG.get(dim_dict['lu'], dim_dict['lu'])
-                                if 'Commodity' in dim_dict:
-                                    commodity = dim_dict['Commodity'].capitalize()
-                                    sel_rename['Commodity'] = {
-                                        'Sheep lexp': 'Sheep live export',
-                                        'Beef lexp': 'Beef live export'
-                                    }.get(commodity, commodity)
-
-                                task.append(
-                                    delayed(map2base64_float)(template_xr, zero_arr,
-                                                              tuple(list(sel_rename.values()) + [year]))
-                                )
-                    else:
-                        # 如果没有维度信息，至少创建一个基本的零值条目
-                        zero_arr = xr.zeros_like(template.isel(cell=slice(None)))
-                        task.append(
-                            delayed(map2base64_float)(template_xr, zero_arr, tuple(['Default', year]))
-                        )
-
-        except Exception as e:
-            print(f"Warning: Could not create zero-filled data structure: {e}")
-            # 如果无法创建零值结构，创建一个最小的空输出
-            output = {}
-
-            # 确保输出目录存在
-            if not os.path.exists(os.path.dirname(save_path)):
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-            # 保存空的 JSON 文件
-            with open(save_path, 'w') as f:
-                filename = os.path.basename(save_path).replace('.js', '')
-                f.write(f'window["{filename}"] = ')
-                json.dump(output, f, separators=(',', ':'), indent=2)
-                f.write(';\n')
-
-            return output
-
-    else:
-        # 正常处理逻辑：当 files_df 不为空时
-        # Get dim info from the first file
-        with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
+        # 用另一个已知存在的单变量nc文件作为结构模板
+        template_xr_create = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_quantities_agricultural_{sorted(settings.SIM_YEARS)[0]}.nc'
+        with xr.open_dataarray(template_xr_create) as arr_eg:
             loop_dims = set(arr_eg.dims) - set(['cell', 'y', 'x'])
-
             dim_vals = pd.MultiIndex.from_product(
                 [arr_eg[dim].values for dim in loop_dims],
                 names=loop_dims
             ).to_list()
-
             loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
+            # 准备全0的xr_arr
+            xr_arr = xr.zeros_like(arr_eg).load()
+        # 虚拟出一个files_df，年份可以按settings.SIM_YEARS遍历
+        years = sorted(list(set(settings.SIM_YEARS)))
+        files_df_virtual = pd.DataFrame({'Year': years})
+        file_iter = files_df_virtual.iterrows()
+        arr_source = 'virtual'  # 标记一下
+    else:
+        with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
+            loop_dims = set(arr_eg.dims) - set(['cell', 'y', 'x'])
+            dim_vals = pd.MultiIndex.from_product(
+                [arr_eg[dim].values for dim in loop_dims],
+                names=loop_dims
+            ).to_list()
+            loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
+        file_iter = files_df.iterrows()
+        arr_source = 'real'
 
-        # Loop through each year
-        task = []
-        for _, row in files_df.iterrows():
-            try:
-                xr_arr = xr.load_dataarray(row['path'])
-                _year = row['Year']
+    # 2. 构建任务
+    task = []
+    for idx, row in file_iter:
+        if arr_source == 'real':
+            xr_arr = xr.load_dataarray(row['path'])
+            _year = row['Year']
+        else:
+            _year = row['Year']  # 虚拟年份，xr_arr用全0
 
-                for sel in loop_sel:
-                    arr_sel = xr_arr.sel(**sel)
+        for sel in loop_sel:
+            arr_sel = xr_arr.sel(**sel)
+            sel_rename = {}
+            if 'am' in sel:
+                sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
+            if 'lm' in sel:
+                sel_rename['lm'] = {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
+            if 'lu' in sel:
+                sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
+            if 'Commodity' in sel:
+                commodity = sel['Commodity'].capitalize()
+                sel_rename['Commodity'] = {
+                    'Sheep lexp': 'Sheep live export',
+                    'Beef lexp': 'Beef live export'
+                }.get(commodity, commodity)
 
-                    # Rename keys; also serve as reordering the keys
-                    sel_rename = {}
-                    if 'am' in sel:
-                        sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
-                    if 'lm' in sel:
-                        sel_rename['lm'] = {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
-                    if 'lu' in sel:
-                        sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
-                    if 'Commodity' in sel:
-                        commodity = sel['Commodity'].capitalize()
-                        sel_rename['Commodity'] = {
-                            'Sheep lexp': 'Sheep live export',
-                            'Beef lexp': 'Beef live export'
-                        }.get(commodity, commodity)
+            task.append(
+                delayed(map2base64_float)(template_xr, arr_sel, tuple(list(sel_rename.values()) + [_year]))
+            )
 
-                    task.append(
-                        delayed(map2base64_float)(template_xr, arr_sel, tuple(list(sel_rename.values()) + [_year]))
-                    )
-
-            except Exception as e:
-                print(f"Warning: Could not process file {row['path']}: {e}")
-                continue
-
-    # Gather results and save to JSON
+    # 3. 并行执行
     output = {}
-    try:
-        for res in Parallel(n_jobs=workers, return_as='generator')(task):
-            if res is None:
-                continue
-            attr, val = res
-            output[attr] = val
-    except Exception as e:
-        print(f"Warning: Error during parallel processing: {e}")
-        # 如果并行处理失败，创建空输出
-        output = {}
+    for res in Parallel(n_jobs=workers, return_as='generator')(task):
+        if res is None: continue
+        attr, val = res
+        output[attr] = val
 
-    # To nested dict
-    try:
-        output = tuple_dict_to_nested(output)
-    except Exception as e:
-        print(f"Warning: Could not convert to nested dict: {e}")
-        # 保持原始字典结构
-        pass
-
-    # 确保输出目录存在
+    output = tuple_dict_to_nested(output)
     if not os.path.exists(os.path.dirname(save_path)):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-    # 保存结果
-    try:
-        with open(save_path, 'w') as f:
-            filename = os.path.basename(save_path).replace('.js', '')
-            f.write(f'window["{filename}"] = ')
-            json.dump(output, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
-
-        print(f"Successfully saved {filename} with {len(output)} entries.")
-
-    except Exception as e:
-        print(f"Error: Could not save file {save_path}: {e}")
-        # 尝试保存一个最小的有效文件
-        try:
-            with open(save_path, 'w') as f:
-                filename = os.path.basename(save_path).replace('.js', '')
-                f.write(f'window["{filename}"] = {{}};\n')
-        except Exception as e2:
-            print(f"Critical error: Could not even save empty file: {e2}")
-
-    return output
-
-
-# 如果你需要更灵活的零值数据创建，可以使用这个辅助函数
-def create_zero_data_structure(template_xr, years, dim_structure=None):
-    """
-    创建零值数据结构的辅助函数
-
-    Parameters:
-    -----------
-    template_xr : str
-        模板文件路径
-    years : list
-        年份列表
-    dim_structure : dict, optional
-        维度结构定义，如果为None则使用默认结构
-
-    Returns:
-    --------
-    list : 延迟任务列表
-    """
-    if dim_structure is None:
-        dim_structure = {
-            'am': ['Beef', 'Dairy', 'Sheep', 'Crops'],
-            'lm': ['Irrigated', 'Dryland'],
-        }
-
-    task = []
-
-    try:
-        with xr.open_dataarray(template_xr) as template:
-            for year in years:
-                if dim_structure:
-                    from itertools import product
-
-                    dim_names = list(dim_structure.keys())
-                    dim_values = [dim_structure[dim] for dim in dim_names]
-
-                    for combo in product(*dim_values):
-                        # 创建零值数组
-                        zero_arr = xr.zeros_like(template.isel(cell=slice(None)))
-
-                        # 创建标签
-                        labels = list(combo) + [year]
-
-                        task.append(
-                            delayed(map2base64_float)(template_xr, zero_arr, tuple(labels))
-                        )
-                else:
-                    # 简单的零值条目
-                    zero_arr = xr.zeros_like(template.isel(cell=slice(None)))
-                    task.append(
-                        delayed(map2base64_float)(template_xr, zero_arr, tuple(['Default', year]))
-                    )
-
-    except Exception as e:
-        print(f"Error creating zero data structure: {e}")
-        return []
-
-    return task
-
-# def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=settings.WRITE_THREADS) -> dict:
-#     if files_df.empty:
-#         # 如果为空，说明没有找到任何需要处理的文件。
-#         # 打印一条警告信息，方便调试时了解情况。
-#         print(
-#             f"Warning: No files found to generate report layer. Skipping creation of '{os.path.basename(save_path)}'.")
-#         # 直接退出函数，后续的代码将不会被执行。
-#         return
-#
-#     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
-#     template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_map_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
-#
-#     # Get dim info
-#     with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
-#         loop_dims = set(arr_eg.dims) - set(['cell', 'y', 'x'])
-#
-#         dim_vals = pd.MultiIndex.from_product(
-#             [arr_eg[dim].values for dim in loop_dims],
-#             names=loop_dims
-#         ).to_list()
-#
-#         loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
-#
-#     # Loop through each year
-#     task = []
-#     for _,row in files_df.iterrows():
-#         xr_arr = xr.load_dataarray(row['path'])
-#         _year = row['Year']
-#
-#         for sel in loop_sel:
-#             arr_sel = xr_arr.sel(**sel)
-#
-#             # Rename keys; also serve as reordering the keys
-#             sel_rename = {}
-#             if 'am' in sel:
-#                 sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
-#             if 'lm' in sel:
-#                 sel_rename['lm'] =  {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
-#             if 'lu' in sel:
-#                 sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
-#             if 'Commodity' in sel:
-#                 commodity = sel['Commodity'].capitalize()
-#                 sel_rename['Commodity'] = {
-#                     'Sheep lexp': 'Sheep live export',
-#                     'Beef lexp': 'Beef live export'
-#                 }.get(commodity, commodity)
-#
-#             task.append(
-#                 delayed(map2base64_float)(template_xr, arr_sel, tuple(list(sel_rename.values()) + [_year]))
-#             )
-#
-#     # Gather results and save to JSON
-#     output = {}
-#     for res in Parallel(n_jobs=workers, return_as='generator')(task):
-#         if res is None:continue
-#         attr, val = res
-#         output[attr] = val
-#
-#     # To nested dict
-#     output = tuple_dict_to_nested(output)
-#
-#     if not os.path.exists(os.path.dirname(save_path)):
-#         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-#
-#     with open(save_path, 'w') as f:
-#         filename = os.path.basename(save_path).replace('.js', '')
-#         f.write(f'window["{filename}"] = ')
-#         json.dump(output, f, separators=(',', ':'), indent=2)
-#         f.write(';\n')
+    with open(save_path, 'w') as f:
+        filename = os.path.basename(save_path).replace('.js', '')
+        f.write(f'window["{filename}"] = ')
+        json.dump(output, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
         
 
 def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, workers:int=settings.WRITE_THREADS) -> dict:

@@ -1759,6 +1759,27 @@ def save_report_data(raw_data_dir:str):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
+    else:
+        print("GHG emissions limits are 'off'. Generating empty placeholder files.")
+
+        def write_empty_js(filename, empty_data):
+            # 确保目录存在
+            if not os.path.exists(SAVE_DIR):
+                os.makedirs(SAVE_DIR)
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(empty_data, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
+
+        # 为所有JS文件创建空的骨架
+        write_empty_js('GHG_overview_sum', {"AUSTRALIA": []})
+        write_empty_js('GHG_overview_Ag', {"AUSTRALIA": []})
+        write_empty_js('GHG_overview_Am', {"AUSTRALIA": []})
+        write_empty_js('GHG_overview_NonAg', {"AUSTRALIA": []})
+        write_empty_js('GHG_ranking', {"AUSTRALIA": {}})
+        write_empty_js('GHG_Ag', {"AUSTRALIA": {}})
+        write_empty_js('GHG_NonAg', {"AUSTRALIA": []})
+        write_empty_js('GHG_Am', {"AUSTRALIA": {}})
 
         
 
@@ -2737,7 +2758,39 @@ def save_report_data(raw_data_dir:str):
                 f.write(f'window["{filename}"] = ')
                 json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
-        
+    else:
+        print("Biodiversity target (GBF2) is 'off'. Generating empty placeholder files.")
+
+        # 定义一个辅助函数，用于创建和写入空的JS文件
+        def write_empty_js(filename, empty_data):
+            # 确保目录存在
+            if not os.path.exists(SAVE_DIR):
+                os.makedirs(SAVE_DIR)
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(empty_data, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
+
+        # 定义一个通用的空数据结构，适用于所有文件
+        # 结构: { "REGION_NAME": [] }
+        empty_data_structure = {"AUSTRALIA": []}
+
+        # 1. 为 (GBF2) overview 文件创建空骨架
+        # 原代码中 group_cols = ['Type']
+        write_empty_js('BIO_GBF2_overview_1_Type', empty_data_structure)
+
+        # 2. 为 (GBF2) Agricultural Landuse 文件创建空骨架
+        # 原代码中 group_cols = ['Landuse']
+        write_empty_js('BIO_GBF2_split_Ag_1_Landuse', empty_data_structure)
+
+        # 3. 为 (GBF2) Agricultural Management 文件创建空骨架
+        # 原代码中 group_cols = ['Landuse', 'Agri-Management']
+        write_empty_js('BIO_GBF2_split_Am_1_Landuse', empty_data_structure)
+        write_empty_js('BIO_GBF2_split_Am_2_Agri-Management', empty_data_structure)
+
+        # 4. 为 (GBF2) Non-Agricultural land-use 文件创建空骨架
+        # 原代码中 group_cols = ['Landuse']
+        write_empty_js('BIO_GBF2_split_NonAg_1_Landuse', empty_data_structure)
    
             
     

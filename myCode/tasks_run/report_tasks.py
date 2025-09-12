@@ -5,7 +5,7 @@ from tools.helpers import create_task_runs
 import time
 # time.sleep(60*60*5)
 platform = "Denethor"  # 可选值: 'HPC', 'Denethor', 'NCI'
-tasks = ['20250908_Paper2_Results_NCI']
+tasks = ['20250912_Price_Task_RES13_year5']
 input_path_dict = {"HPC": "/home/remote/s222552331/LUTO2_XH/LUTO2/input",
                     "Denethor": "N:/LUF-Modelling/LUTO2_XH/LUTO2/input",
                     "NCI": "/g/data/jk53/LUTO_XH/LUTO2/input"}
@@ -31,4 +31,4 @@ for task in tasks:
         for col in grid_search_settings_df.columns:
             grid_search_settings_df.at[name, col] = new_value
 
-    create_task_runs(task_root_dir, grid_search_settings_df, platform, n_workers=min(len(grid_search_settings_df.columns), 2),use_parallel=True,model_name='Report')
+    create_task_runs(task_root_dir, grid_search_settings_df, platform, n_workers=min(len(grid_search_settings_df.columns), 4),use_parallel=True,model_name='Report')

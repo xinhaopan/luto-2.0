@@ -4,7 +4,7 @@ from tools.helpers import create_grid_search_template,create_task_runs
 import re
 
 grid_search = {
-    'TASK_NAME': ['20250831_Price_Task_RES13'],
+    'TASK_NAME': ['20250912_Price_Task_RES13_year5'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -23,13 +23,12 @@ grid_search = {
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [13],
-    'SIM_YEARS': [[i for i in range(2010,2051,1)]],
+    'SIM_YEARS': [[i for i in range(2010,2051,5)]],
 
     # ----------------------------------- GHG settings --------------------------------
 
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
-    'GHG_PERCENT': [20,40,60,80,100],
 
     # ----------------------------- Biodiversity settings -------------------------------
 
@@ -43,7 +42,7 @@ grid_search = {
     'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],
     'BIODIVERSTIY_TARGET_GBF_8': ['off'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [10,20,30,40,50],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
 
     # ----------------------------------- Water settings --------------------------------
     'WATER_STRESS': [0.6],
@@ -83,6 +82,6 @@ cols_to_drop = [c for c in grid_search_settings_df.columns if drop_if_percent_no
 
 # 删除列
 grid_search_settings_df = grid_search_settings_df.drop(columns=cols_to_drop)
-grid_search_settings_df.to_csv(os.path.join(task_root_dir, 'grid_search_template.csv'))
+grid_search_settings_df.to_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index=False)
 # grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
 create_task_runs(task_root_dir, grid_search_settings_df, platform="Denethor", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
