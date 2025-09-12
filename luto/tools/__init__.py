@@ -23,24 +23,35 @@
 Pure helper functions and other tools.
 """
 
+import gc
 import sys
 import os.path
+import threading
+import time
 import traceback
 import functools
+import tracemalloc
 
 import pandas as pd
 import numpy as np
+import psutil
 import xarray as xr
 import numpy_financial as npf
-import luto.settings as settings
+import matplotlib.patches as patches
 
 from typing import Tuple
 from datetime import datetime
+from matplotlib import pyplot as plt
+
+import luto.settings as settings
+import luto.economics.agricultural.water as ag_water
+import luto.economics.non_agricultural.water as non_ag_water
 
 
 def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
+        
     with open(timestamp_path, 'w') as f: f.write(timestamp)
     return timestamp
 
@@ -55,8 +66,10 @@ def read_timestamp():
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
     """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
-    if settings.AMORTISE_UPFRONT_COSTS: return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
-    else: return cost
+    if settings.AMORTISE_UPFRONT_COSTS: 
+        return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
+    else: 
+        return cost
 
 
 def lumap2ag_l_mrj(lumap, lmmap):
@@ -197,6 +210,13 @@ def get_beccs_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 7)[0]
 
 
+def get_destocked_land_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all destocked land cells
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 8)[0]
+
+
 def get_unallocated_natural_lu_cells(data, lumap) -> np.ndarray:
     """
     Gets all cells being used for unallocated natural land uses.
@@ -226,7 +246,7 @@ def get_ag_and_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
 
 def get_ag_cells(lumap) -> np.ndarray:
     """
-    Get an array containing the index of all non-agricultural cells
+    Get an array containing the index of all agricultural cells
     """
     return np.nonzero(lumap < settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
 
@@ -296,30 +316,24 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
      lmmap (numpy.ndarray): Land management map.
     
     Returns
-     w_license_cost_r (numpy.ndarray) : Water license cost for each cell.
      w_rm_irrig_cost_r (numpy.ndarray) : Cost of removing irrigation for each cell.
      
      
     """
-    import luto.economics.agricultural.water as ag_water
-    import luto.economics.non_agricultural.water as non_ag_water
+    
     yr_cal = data.YR_CAL_BASE + yr_idx
     l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     non_ag_cells = get_non_ag_cells(lumap)
     
     w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)     # <unit: ML/CELL>
     w_req_r = (w_req_mrj * l_mrj).sum(axis=0).sum(axis=1)
-    w_yield_r = non_ag_water.get_w_net_yield_matrix_env_planting(data, yr_idx)  # <unit: ML/CELL>
+    w_yield_r = non_ag_water.get_w_net_yield_env_planting(data, yr_idx)  # <unit: ML/CELL>
     w_delta_r = - (w_req_r + w_yield_r)
     
     w_license_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>
     w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA                   # <unit: $/CELL>
-    
-    # Amortise upfront costs to annualised costs
-    w_license_cost_r = amortise(w_license_cost_r)
-    w_rm_irrig_cost_r = amortise(w_rm_irrig_cost_r)
-    
-    return w_license_cost_r, w_rm_irrig_cost_r
+
+    return w_rm_irrig_cost_r
 
 
 def am_name_snake_case(am_name):
@@ -403,6 +417,35 @@ def get_beef_code(data):
     """
     return data.DESC2AGLU['Beef - modified land']
 
+
+def get_natural_sheep_code(data):
+    """
+    Get the land use code (j) for 'Sheep - natural land'
+    """
+    return data.DESC2AGLU['Sheep - natural land']
+
+
+def get_natural_beef_code(data):
+    """
+    Get the land use code (j) for 'Beef - modified land'
+    """
+    return data.DESC2AGLU['Beef - natural land']
+
+
+def get_unallocated_natural_land_code(data):
+    """
+    Get the land use code (j) for 'Unallocated - natural land'
+    """
+    return data.DESC2AGLU['Unallocated - natural land']
+
+
+def get_cells_using_ag_landuse(lumap: np.ndarray, j: int) -> np.ndarray:
+    """
+    Gets the cells in the given 'lumap' using the land use indexed by 'j'
+    """
+    return np.where(lumap == j)[0]
+
+
 def ag_mrj_to_xr(data, arr):
     return xr.DataArray(
         arr,
@@ -422,15 +465,15 @@ def non_ag_rk_to_xr(data, arr):
 
 def am_mrj_to_xr(data, am_mrj_dict):
     emp_arr_xr = xr.DataArray(
-        np.full((len(settings.AG_MANAGEMENTS_TO_LAND_USES), len(data.LANDMANS), data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), np.nan),
+        np.full((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), np.nan),
         dims=['am', 'lm', 'cell', 'lu'],
-        coords={'am': list(settings.AG_MANAGEMENTS_TO_LAND_USES.keys()),
+        coords={'am': data.AG_MAN_DESC,
                 'lm': data.LANDMANS,
                 'cell': np.arange(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES}
     )
 
-    for am,lu in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
+    for am,lu in data.AG_MAN_LU_DESC.items():
         if emp_arr_xr.loc[am, :, :, lu].shape == am_mrj_dict[am].shape:
             # If the shape is the same, just assign the value
             emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am]  
@@ -462,140 +505,55 @@ def map_desc_to_dvar_index(category: str,
     return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
 
 
-def get_out_resfactor(dvar_path:str):
-    # Get the number of pixels in the output decision variable
-    dvar = np.load(dvar_path)
-    dvar_size = dvar.shape[1]
-
-    # Get the number of pixels in full resolution LUMASK
-    full_lumap = pd.read_hdf(os.path.join(settings.INPUT_DIR, "lumap.h5")).to_numpy() 
-    full_size = (full_lumap > 0).sum()
-
-    # Return the resfactor
-    return round((full_size/dvar_size)**0.5)
-
-
-    
-def calc_water(
-    data, 
-    ind:np.ndarray, 
-    ag_w_mrj:np.ndarray, 
-    non_ag_w_rk:np.ndarray, 
-    ag_man_w_mrj:np.ndarray, 
-    ag_dvar:np.ndarray, 
-    non_ag_dvar:np.ndarray, 
-    am_dvar:np.ndarray
-) -> pd.DataFrame:
+def plot_t_mat(t_mat:xr.DataArray):
     
     '''
-    Note
-        This function is only used for the `write_water` in the `luto.tools.write` module.
-        Calculate water yields for year given the index. 
+    Plot the transition matrix with hatched rectangles for NaN values.
     
-    Return
-     pd.DataFrame, the water yields for year and region.
+    Parameters
+    ----------
+    t_mat : xr.DataArray
+        The transition matrix to plot.
+        
     '''
-    
-    # Calculate water yields for year and region.
-    index_levels = ['Landuse Type','Landuse subtype', 'Landuse', 'Water_supply',  'Water Net Yield (ML)']
+ 
+    # Set up plot
+    fig, ax = plt.subplots(figsize=(8, 8))
 
-    # Agricultural contribution
-    ag_mrj = ag_w_mrj[:, ind, :] * ag_dvar[:, ind, :]   
-    ag_jm = np.einsum('mrj->jm', ag_mrj)                             
-    ag_df = pd.DataFrame(
-        ag_jm.reshape(-1).tolist(),
-        index=pd.MultiIndex.from_product(
-            [['Agricultural Landuse'],
-             ['Agricultural Landuse'],
-                data.AGRICULTURAL_LANDUSES,
-                data.LANDMANS])).reset_index()
-    ag_df.columns = index_levels
+    # Plot with imshow for correct alignment
+    im = ax.imshow(t_mat.values, cmap='viridis', origin='upper')
 
-    # Non-agricultural contribution
-    non_ag_rk = non_ag_w_rk[ind, :] * non_ag_dvar[ind, :]  # Non-agricultural contribution
-    non_ag_k = np.einsum('rk->k', non_ag_rk)                             # Sum over cells
-    non_ag_df = pd.DataFrame(
-        non_ag_k, 
-        index= pd.MultiIndex.from_product([
-                ['Non-agricultural Landuse'],
-                ['Non-Agricultural Landuse'],
-                settings.NON_AG_LAND_USES.keys() ,
-                ['dry']  # non-agricultural land is always dry
-    ])).reset_index()
-    non_ag_df.columns = index_levels
+    # Set tick positions and labels
+    ax.set_xticks(np.arange(len(t_mat.coords['to_lu'])))
+    ax.set_yticks(np.arange(len(t_mat.coords['from_lu'])))
+    ax.set_xticklabels(t_mat.coords['to_lu'].values, rotation=90)
+    ax.set_yticklabels(t_mat.coords['from_lu'].values)
 
-    # Agricultural managements contribution
-    AM_dfs = []
-    for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
-        am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
-        am_mrj = ag_man_w_mrj[am][:, ind, :] * am_dvar[am][:, ind, :][:, :, am_j]
-        am_jm = np.einsum('mrj->jm', am_mrj)
-        # water yields for each agricultural management in long dataframe format
-        df_am = pd.DataFrame(
-            am_jm.reshape(-1).tolist(),
-            index=pd.MultiIndex.from_product([
-                ['Agricultural Management'],
-                [am],
-                am_lus,
-                data.LANDMANS
-                ])).reset_index()
-        df_am.columns = index_levels
-        AM_dfs.append(df_am)
-    AM_df = pd.concat(AM_dfs)
-    
-    return pd.concat([ag_df, non_ag_df, AM_df])
+    # Move x labels to top
+    ax.xaxis.set_label_position('top')
+    ax.xaxis.tick_top()
 
+    # Draw hatched rectangles over NaNs
+    nrows, ncols = t_mat.shape
+    for i in range(nrows):
+        for j in range(ncols):
+            if np.isnan(t_mat[i, j]):
+                rect = patches.Rectangle((j - 0.5, i - 0.5), 1, 1, hatch='////', fill=False, edgecolor='gray', linewidth=0.0)
+                ax.add_patch(rect)
 
-def calc_major_vegetation_group_ag_area_for_year(
-    GBF3_raw_MVG_area_vr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
-) -> dict[int, float]:
-    prod_data = {}
-
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in biodiv_contr_ag_rj.items()}
-
-    # Numpy magic
-    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
-    
-    for v in range(GBF3_raw_MVG_area_vr.shape[0]):
-        prod_data[v] = GBF3_raw_MVG_area_vr[v, :] * ag_biodiv_degr_r
-
-    return prod_data
-
-
-def calc_species_ag_area_for_year(
-    GBF8_raw_species_area_sr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
-) -> dict[int, float]:
-    prod_data = {}
-
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in biodiv_contr_ag_rj.items()}
-
-    # Numpy magic
-    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
-    
-    for s in range(GBF8_raw_species_area_sr.shape[0]):
-        prod_data[s] = GBF8_raw_species_area_sr[s, :] * ag_biodiv_degr_r
-
-    return prod_data
-
-
-def calc_nes_ag_area_for_year(
-    nes_xr: np.ndarray, lumap: np.ndarray, ag_biodiv_degr_j: dict[int, float]
-) -> dict[int, float]:
-    prod_data = {}
-
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in ag_biodiv_degr_j.items()}
-
-    # Numpy magic
-    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
-    
-    for x in range(nes_xr.shape[0]):
-        prod_data[x] = nes_xr[x, :] * ag_biodiv_degr_r
-
-    return prod_data
-
+def set_path() -> str:
+        """Create a folder for storing outputs and return folder name."""
+        years = [i for i in settings.SIM_YEARS]
+        path = f"{settings.OUTPUT_DIR}/{read_timestamp()}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
+        paths = [path] + [f"{path}/out_{yr}" for yr in years]
+        
+        for p in paths:
+            if not os.path.exists(p):
+                os.mkdir(p)
+  
 
 class LogToFile:
-    def __init__(self, log_path, mode:str='w'):
+    def __init__(self, log_path, mode:str='a'):
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
         self.mode = mode
@@ -603,7 +561,6 @@ class LogToFile:
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # Open files for writing here, ensuring they're only created upon function call
             with open(self.log_path_stdout, self.mode) as file_stdout, open(self.log_path_stderr, self.mode) as file_stderr:
                 original_stdout = sys.stdout
                 original_stderr = sys.stderr
@@ -645,3 +602,150 @@ class LogToFile:
         def flush(self):
             # Ensure content is written to disk
             self.file.flush()
+            
+            
+
+def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_event=None):
+    '''
+    Log the memory usage of the current process to a file with enhanced accuracy.
+    Parameters
+        output_dir (str): The directory to save the memory log file.
+        mode (str): The mode to open the file. Default is 'a' (append).
+        interval (int): The interval in seconds to log the memory usage.
+    '''
+    
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
+        while not stop_event.is_set():
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            process = psutil.Process(os.getpid())
+            
+            # Get working set memory (most accurate) - ensure consistency across all processes
+            memory_info = process.memory_info()
+            
+            # Check if working set is available on this system
+            has_wset = hasattr(memory_info, 'wset')
+            
+            if has_wset:
+                wset_memory = memory_info.wset
+            else:
+                wset_memory = memory_info.rss
+            
+            # Include child processes using the SAME metric type
+            children = process.children(recursive=True)
+            if children:
+                for child in children:
+                    try:
+                        child_memory_info = child.memory_info()
+                        if has_wset and hasattr(child_memory_info, 'wset'):
+                            wset_memory += child_memory_info.wset
+                        else:
+                            # Use RSS for consistency if wset not available
+                            wset_memory += child_memory_info.rss
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+            
+            # Write working set memory info (most accurate)
+            wset_gb = wset_memory / (1024 * 1024 * 1024)
+            
+            file.write(f'{timestamp}\t{wset_gb:.3f}\n')
+            file.flush()
+            time.sleep(interval)
+
+
+# Enhanced memory monitoring helper functions            
+memory_log = []
+monitoring = False
+monitor_thread = None
+baseline_memory = 0  # Store the baseline memory at start
+
+def monitor_memory(interval=0.01):
+    """
+    Memory monitoring focused on Working Set delta from baseline.
+    Runs in a thread, logs memory usage every `interval` seconds.
+    """
+    process = psutil.Process(os.getpid())
+    
+    while monitoring:
+        try:
+            memory_info = process.memory_info()
+            
+            # Check if working set is available and use consistently
+            has_wset = hasattr(memory_info, 'wset')
+            
+            if has_wset:
+                current_wset_mb = memory_info.wset / 1024 ** 2
+            else:
+                current_wset_mb = memory_info.rss / 1024 ** 2
+            
+            # Calculate delta from baseline
+            delta_mb = current_wset_mb - baseline_memory
+            
+            # Store delta memory info
+            memory_log.append({
+                'time': time.time(),
+                'wset_mb': current_wset_mb,
+                'delta_mb': delta_mb
+            })
+            
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            break
+            
+        time.sleep(interval)
+
+def start_memory_monitor():
+    """
+    Start Working Set memory monitoring with baseline measurement.
+    Clears previous logs and starts monitoring from current memory usage.
+    """
+    global monitoring, monitor_thread, baseline_memory
+    
+    # Clear previous log
+    memory_log.clear()
+    
+    # Force garbage collection to get clean baseline
+    gc.collect()
+    
+    # Get baseline memory usage
+    process = psutil.Process(os.getpid())
+    memory_info = process.memory_info()
+    
+    has_wset = hasattr(memory_info, 'wset')
+    if has_wset:
+        baseline_memory = memory_info.wset / 1024 ** 2
+    else:
+        baseline_memory = memory_info.rss / 1024 ** 2
+        
+    # Start monitoring
+    monitoring = True
+    monitor_thread = threading.Thread(target=monitor_memory, daemon=True)
+    monitor_thread.start()
+    
+    print("Delta memory monitoring started")
+
+def stop_memory_monitor():
+    """
+    Stop memory monitoring and return delta analysis.
+    Returns a plot showing only the incremental memory usage.
+    """
+    global monitoring
+    
+    monitoring = False
+    if monitor_thread:
+        monitor_thread.join()
+    
+    if not memory_log:
+        print("No memory data collected")
+        return None
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(memory_log)
+    df['Time'] = df['time'] - df['time'].min()
+
+    # Delta memory plot (main focus)
+    plt.plot(df['Time'], df['delta_mb'])
+    plt.xlabel('Time (s)')
+    plt.ylabel('Delta Memory (MB)')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    return plt

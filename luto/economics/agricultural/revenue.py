@@ -25,15 +25,13 @@ Pure functions to calculate economic profit from land use.
 
 import numpy as np
 import pandas as pd
+import luto.settings as settings 
 
-from typing import Dict
-from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
-from luto import settings
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
 from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
 
-def get_rev_crop( data: Data   # Data object.
+def get_rev_crop( data:Data         # Data object.
                 , lu           # Land use.
                 , lm           # Land management.
                 , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
@@ -63,9 +61,9 @@ def get_rev_crop( data: Data   # Data object.
                 ).values
     
     # Return revenue as MultiIndexed DataFrame.
-    return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
+    return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_tuples([(lu, lm, 'Crop')]))
 
-def get_rev_lvstk( data: Data   # Data object.
+def get_rev_lvstk( data:Data   # Data object.
                  , lu           # Land use.
                  , lm           # Land management.
                  , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
@@ -149,17 +147,19 @@ def get_rev_lvstk( data: Data   # Data object.
         raise KeyError(f"Unknown {lvstype} livestock type. Check `lvstype`.")   
 
     # Put the revenues into a MultiIndex DataFrame
-    rev_seperate = pd.DataFrame(np.stack((rev_meat, rev_wool, rev_lexp, rev_milk), axis=1), 
-                                columns=pd.MultiIndex.from_product([[lu], [lm], ['Meat', 'Wool', 'Live Exports', 'Milk']]))
+    rev_seperate = pd.DataFrame(
+        np.stack((rev_meat, rev_wool, rev_lexp, rev_milk), axis=1), 
+        columns=pd.MultiIndex.from_product([[lu], [lm], ['Meat', 'Wool', 'Live Exports', 'Milk']])
+    )
 
     # Revenue so far in AUD/ha. Now convert to AUD/cell including resfactor.
-    rev_seperate = rev_seperate * data.REAL_AREA.reshape(-1,1) # Convert to AUD/cell
+    rev_seperate = rev_seperate * data.REAL_AREA.reshape(-1, 1) # Convert to AUD/cell
 
     # Return revenue as numpy array.
     return rev_seperate
 
 
-def get_rev( data: Data    # Data object.
+def get_rev( data:Data    # Data object.
             , lu           # Land use.
             , lm           # Land management.
             , yr_idx       # Number of years post base-year ('YR_CAL_BASE')
@@ -179,27 +179,34 @@ def get_rev( data: Data    # Data object.
         return get_rev_lvstk(data, lu, lm, yr_idx)
 
     elif lu in data.AGRICULTURAL_LANDUSES:
-        return  pd.DataFrame(np.zeros((data.NCELLS, 1)).astype(np.float32),
-                             columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
-
+        return pd.DataFrame(
+            np.zeros((data.NCELLS, 1)).astype(np.float32),
+            columns=pd.MultiIndex.from_tuples([(lu, lm, 'Unallocated Land')])
+        )
     else:
         raise KeyError(f"Land-use '{lu}' not found in data.LANDUSES")
 
 
-def get_rev_matrix(data: Data, lm, yr_idx):
+def get_rev_matrix(data:Data, lm, yr_idx):
     """Return r_rj matrix of revenue/cell per lu under `lm` in `yr_idx`."""
     
     # Concatenate the revenue from each land use into a single Multiindex DataFrame.
-    r_rjs = pd.concat([get_rev(data, lu, lm, yr_idx) for lu in data.AGRICULTURAL_LANDUSES], axis=1)
+    r_rjs = pd.concat(
+        [get_rev(data, lu, lm, yr_idx) for lu in data.AGRICULTURAL_LANDUSES], 
+        axis=1
+    )
     r_rjs = r_rjs.fillna(0)
     return r_rjs
 
 
-def get_rev_matrices(data: Data, yr_idx, aggregate:bool = True):
+def get_rev_matrices(data:Data, yr_idx, aggregate:bool = True):
     """Return r_mrj matrix of revenue per cell as 3D Numpy array."""
 
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
-    rev_rjms = pd.concat([get_rev_matrix(data, lm, yr_idx) for lm in data.LANDMANS], axis=1)
+    rev_rjms = pd.concat(
+        [get_rev_matrix(data, lm, yr_idx) for lm in data.LANDMANS], 
+        axis=1
+    )
 
     if not aggregate:
         # Concatenate the revenue from each land management into a single Multiindex DataFrame.
@@ -210,19 +217,49 @@ def get_rev_matrices(data: Data, yr_idx, aggregate:bool = True):
     return np.einsum('jmr->mrj', arr_jmr)
 
 
-def get_asparagopsis_effect_r_mrj(data: Data, r_mrj, yr_idx):
+def get_commodity_prices(data: Data) -> np.ndarray:
+    '''
+    Get the prices of commodities in the base year. These prices will be used as multiplier
+    to weight deviatios of commodity production from the target.
+    '''
+    
+    commodity_lookup = {
+        ('P1','BEEF'): 'beef meat',
+        ('P3','BEEF'): 'beef lexp',
+        ('P1','SHEEP'): 'sheep meat',
+        ('P2','SHEEP'): 'sheep wool',
+        ('P3','SHEEP'): 'sheep lexp',
+        ('P1','DAIRY'): 'dairy',
+    }
+
+    commodity_prices = {}
+
+    # Get the median price of each commodity
+    for names, commodity in commodity_lookup.items():
+        prices = np.nanpercentile(data.AGEC_LVSTK[names[0], names[1]], 50)
+        prices = prices * 1000 if commodity == 'dairy' else prices # convert to per tonne for dairy
+        commodity_prices[commodity] = prices
+
+    # Get the median price of each crop; here need to use 'irr' because dry-Rice does exist in the data
+    for name, col in data.AGEC_CROPS['P1','irr'].items():
+        commodity_prices[name.lower()] = np.nanpercentile(col, 50)
+
+    return np.array([commodity_prices[k] for k in data.COMMODITIES])
+
+
+def get_asparagopsis_effect_r_mrj(data:Data, r_mrj, yr_idx):
     """
     Applies the effects of using asparagopsis to the revenue data
     for all relevant agr. land uses.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    if not AG_MANAGEMENTS['Asparagopsis taxiformis']:
+    if not settings.AG_MANAGEMENTS['Asparagopsis taxiformis']:
         return new_r_mrj
 
     # Update values in the new matrix using the correct multiplier for each LU
@@ -237,19 +274,19 @@ def get_asparagopsis_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_precision_agriculture_effect_r_mrj(data: Data, r_mrj, yr_idx):
+def get_precision_agriculture_effect_r_mrj(data:Data, r_mrj, yr_idx):
     """
     Applies the effects of using precision agriculture to the revenue data
     for all relevant agr. land uses.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    if not AG_MANAGEMENTS['Precision Agriculture']:
+    if not settings.AG_MANAGEMENTS['Precision Agriculture']:
         return new_r_mrj
 
     # Update values in the new matrix using the correct multiplier for each LU
@@ -262,19 +299,19 @@ def get_precision_agriculture_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_ecological_grazing_effect_r_mrj(data: Data, r_mrj, yr_idx):
+def get_ecological_grazing_effect_r_mrj(data:Data, r_mrj, yr_idx):
     """
     Applies the effects of using ecologiacl grazing to the revenue data
     for all relevant agr. land uses.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    if not AG_MANAGEMENTS['Ecological Grazing']:
+    if not settings.AG_MANAGEMENTS['Ecological Grazing']:
         return new_r_mrj
 
     # Update values in the new matrix using the correct multiplier for each LU
@@ -287,7 +324,7 @@ def get_ecological_grazing_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_savanna_burning_effect_r_mrj(data: Data, yr_idx: int):
+def get_savanna_burning_effect_r_mrj(data:Data, yr_idx: int):
     """
     Applies the effects of using EDS savanna burning to the revenue data
     for all relevant agr. land uses.
@@ -298,19 +335,19 @@ def get_savanna_burning_effect_r_mrj(data: Data, yr_idx: int):
     return ghg_effect * data.get_carbon_price_by_yr_idx(yr_idx)
 
 
-def get_agtech_ei_effect_r_mrj(data: Data, r_mrj, yr_idx):
+def get_agtech_ei_effect_r_mrj(data:Data, r_mrj, yr_idx):
     """
     Applies the effects of using AgTech EI to the revenue data
     for all relevant agr. land uses.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    if not AG_MANAGEMENTS['AgTech EI']:
+    if not settings.AG_MANAGEMENTS['AgTech EI']:
         return new_r_mrj
 
     # Update values in the new matrix using the correct multiplier for each LU
@@ -323,19 +360,19 @@ def get_agtech_ei_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_biochar_effect_r_mrj(data: Data, r_mrj, yr_idx):
+def get_biochar_effect_r_mrj(data:Data, r_mrj, yr_idx):
     """
     Applies the effects of using Biochar to the revenue data
     for all relevant agr. land uses.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    if not AG_MANAGEMENTS['Biochar']:
+    if not settings.AG_MANAGEMENTS['Biochar']:
         return new_r_mrj
 
     # Update values in the new matrix using the correct multiplier for each LU
@@ -348,7 +385,50 @@ def get_biochar_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
+
+def get_beef_hir_effect_r_mrj(data: Data, r_mrj):
+    """
+    Applies the effects of using HIR to the beef revenue data
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+
+    # Set up the effects matrix
+    r_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['HIR - Beef']:
+        return r_mrj_effect
+    
+    # Update values in the new matrix    
+    for lu_idx in range(len(land_uses)):
+        j = lu_codes[lu_idx]
+        r_mrj_effect[:, :, lu_idx] = r_mrj[:, :, j] * (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1)
+
+    return r_mrj_effect
+
+
+def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
+    """
+    Applies the effects of using HIR to the sheep revenue data
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+
+    # Set up the effects matrix
+    r_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['HIR - Sheep']:
+        return r_mrj_effect
+    
+    # Update values in the new matrix    
+    for lu_idx in range(len(land_uses)):
+        j = lu_codes[lu_idx]
+        r_mrj_effect[:, :, lu_idx] = r_mrj[:, :, j] * (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1)
+
+    return r_mrj_effect
+
+
+def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx) -> dict[str, np.ndarray]:
     """
     Calculate the revenue matrices for different agricultural management practices.
 
@@ -362,18 +442,15 @@ def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> D
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 
     """
-    asparagopsis_data = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
-    precision_agriculture_data = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Precision Agriculture'] else 0
-    eco_grazing_data = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_data = get_savanna_burning_effect_r_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
-    agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
-    biochar_data = get_biochar_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
+    ag_mam_r_mrj = {}
 
-    return {
-        'Asparagopsis taxiformis': asparagopsis_data,
-        'Precision Agriculture': precision_agriculture_data,
-        'Ecological Grazing': eco_grazing_data,
-        'Savanna Burning': sav_burning_data,
-        'AgTech EI': agtech_ei_data,
-        'Biochar': biochar_data,
-    }
+    ag_mam_r_mrj['Asparagopsis taxiformis'] = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx)           
+    ag_mam_r_mrj['Precision Agriculture'] = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx)  
+    ag_mam_r_mrj['Ecological Grazing'] = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx)          
+    ag_mam_r_mrj['Savanna Burning'] = get_savanna_burning_effect_r_mrj(data, yr_idx)                       
+    ag_mam_r_mrj['AgTech EI'] = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)                            
+    ag_mam_r_mrj['Biochar'] = get_biochar_effect_r_mrj(data, r_mrj, yr_idx)                                
+    ag_mam_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj)                                    
+    ag_mam_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)                                  
+
+    return ag_mam_r_mrj

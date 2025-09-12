@@ -29,14 +29,14 @@ import itertools
 import numpy as np
 import pandas as pd
 
-import luto.settings as settings
 from luto.data import Data
+import luto.settings as settings
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
 
 
-def get_cost_crop(data: Data, lu, lm, yr_idx):
+def get_cost_crop(data:Data, lu, lm, yr_idx):
     """Return crop production cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
 
     Args:
@@ -60,71 +60,35 @@ def get_cost_crop(data: Data, lu, lm, yr_idx):
     if lu not in data.AGEC_CROPS['AC', lm].columns:
         costs_t = np.zeros((data.NCELLS))
         # The column name is irrelevant and only used to make the out df the same shape as the rest of crops.
-        return pd.DataFrame(costs_t,
-                            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost']]))
+        return pd.DataFrame(
+            costs_t,
+            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost']])
+        )
 
     else: # Calculate the total costs 
         yr_cal = data.YR_CAL_BASE + yr_idx
-        # Variable costs (quantity costs and area costs)        
         
-        qc_multiplier = 1
-        if lu in data.QC_COST_MULTS.columns:
-            qc_multiplier = data.QC_COST_MULTS.loc[yr_cal, lu]
-        else:
-            print(
-                f"WARNING: Multiplier for {lu} not found in the 'QC_multiplier' sheet of "
-                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-            
-        # Quantity costs (calculated as cost per tonne x tonne per cell x resfactor)
-        costs_q = ( data.AGEC_CROPS['QC', lm, lu] 
-                    * qc_multiplier
-                    * get_quantity(data, lu.upper(), lm, yr_idx))  # lu.upper() only for crops as needs to be in product format in get_quantity().  
+        # Quantity costs
+        costs_q = (
+            data.AGEC_CROPS['QC', lm, lu] 
+            * data.QC_COST_MULTS.loc[yr_cal, lu]
+            * get_quantity(data, lu.upper(), lm, yr_idx)
+        )  # lu.upper() only for crops as needs to be in product format in get_quantity().  
 
         # Area costs.
-        ac_multiplier = 1
-        if lu in data.AC_COST_MULTS.columns:
-            ac_multiplier = data.AC_COST_MULTS.loc[yr_cal, lu]
-        else:
-            print(
-                f"WARNING: Multiplier for {lu} not found in the 'AC_multiplier' sheet of "
-                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-        costs_a = data.AGEC_CROPS['AC', lm, lu] * ac_multiplier
+        costs_a = data.AGEC_CROPS['AC', lm, lu] * data.AC_COST_MULTS.loc[yr_cal, lu]  # Area costs per hectare.
 
         # Fixed costs
-        flc_multiplier = 1
-        if lu in data.FLC_COST_MULTS.columns:
-            flc_multiplier = data.FLC_COST_MULTS.loc[yr_cal, lu]
-        else:
-            print(
-                f"WARNING: Multiplier for {lu} not found in the 'FLC_multiplier' sheet of "
-                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-            
-        foc_multiplier = 1
-        if lu in data.FOC_COST_MULTS.columns:
-            foc_multiplier = data.FOC_COST_MULTS.loc[yr_cal, lu]
-        else:
-            print(
-                f"WARNING: Multiplier for {lu} not found in the 'FOC_multiplier' sheet of "
-                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-            
-        fdc_multiplier = 1
-        if lu in data.FDC_COST_MULTS.columns:
-            fdc_multiplier = data.FDC_COST_MULTS.loc[yr_cal, lu]
-        else:
-            print(
-                f"WARNING: Multiplier for {lu} not found in the 'FDC_multiplier' sheet of "
-                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-            
-        costs_f = ( data.AGEC_CROPS['FLC', lm, lu] * flc_multiplier    # Fixed labour costs.
-                    + data.AGEC_CROPS['FOC', lm, lu] * foc_multiplier    # Fixed operating costs.
-                    + data.AGEC_CROPS['FDC', lm, lu] * fdc_multiplier )  # Fixed depreciation costs.
+        costs_flc = data.AGEC_CROPS['FLC', lm, lu] * data.FLC_COST_MULTS.loc[yr_cal, lu]  # Fixed labour costs.
+        costs_foc = data.AGEC_CROPS['FOC', lm, lu] * data.FOC_COST_MULTS.loc[yr_cal, lu]  # Fixed operating costs.
+        costs_fdc = data.AGEC_CROPS['FDC', lm, lu] * data.FDC_COST_MULTS.loc[yr_cal, lu]  # Fixed depreciation costs.
 
         # Water costs as water required in ML per hectare x delivery price per ML.
         if lm == 'irr':
             costs_w = (
-                data.AGEC_CROPS['WR', lm, lu] 
-                * data.AGEC_CROPS['WP', lm, lu] 
-                * data.WP_COST_MULTS[yr_cal]
+            data.AGEC_CROPS['WR', lm, lu] 
+            * data.AGEC_CROPS['WP', lm, lu] 
+            * data.WP_COST_MULTS[yr_cal]
             )
         elif lm == 'dry':
             costs_w = 0
@@ -133,17 +97,30 @@ def get_cost_crop(data: Data, lu, lm, yr_idx):
 
         # Convert to $/cell including resfactor.
         # Quantity costs which has already been adjusted for REAL_AREA/resfactor via get_quantity
-        costs_a, costs_f, costs_w = costs_a * data.REAL_AREA, costs_f * data.REAL_AREA, costs_w * data.REAL_AREA
+        costs_q *= 1
+        costs_a *= data.REAL_AREA
+        costs_flc *= data.REAL_AREA
+        costs_foc *= data.REAL_AREA
+        costs_fdc *= data.REAL_AREA
+        costs_w *= data.REAL_AREA
 
-        costs_t = np.stack([(costs_a), (costs_f), (costs_w), (costs_q)]).T
-
+        costs_t = np.stack([costs_q, costs_a, costs_flc, costs_foc, costs_fdc, costs_w]).T
 
         # Return costs as numpy array.
-        return pd.DataFrame(costs_t,
-                            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))
+        return pd.DataFrame(
+            costs_t,
+            columns=pd.MultiIndex.from_product(
+                [
+                    [lu], 
+                    [lm], 
+                    ['Quantity cost', 'Area cost', 'Fixed labour cost', 'Fixed operating cost', 'Fixed depreciation cost', 'Water cost']
+                ]
+            )
+        )
 
 
-def get_cost_lvstk(data: Data, lu, lm, yr_idx):
+
+def get_cost_lvstk(data:Data, lu, lm, yr_idx):
     """Return lvstk prodution cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
 
     Args:
@@ -175,9 +152,9 @@ def get_cost_lvstk(data: Data, lu, lm, yr_idx):
     costs_a = data.AGEC_LVSTK['AC', lvstype] * data.AC_COST_MULTS.loc[yr_cal, lvstype_capital]
 
     # Fixed costs
-    costs_f = ( data.AGEC_LVSTK['FOC', lvstype] * data.FOC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed operating costs.
-              + data.AGEC_LVSTK['FLC', lvstype] * data.FLC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed labour costs.
-              + data.AGEC_LVSTK['FDC', lvstype] * data.FDC_COST_MULTS.loc[yr_cal, lvstype_capital] ) # Fixed depreciation costs.
+    costs_flc = data.AGEC_LVSTK['FLC', lvstype] * data.FLC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed labour costs.
+    costs_foc = data.AGEC_LVSTK['FOC', lvstype] * data.FOC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed operating costs.
+    costs_fdc = data.AGEC_LVSTK['FDC', lvstype] * data.FDC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed depreciation costs.
 
     # Water costs in $/ha calculated as water requirements (ML/head) x heads per hectare x delivery price ($/ML)
     if lm == 'irr': # Irrigation water if required.
@@ -192,17 +169,29 @@ def get_cost_lvstk(data: Data, lu, lm, yr_idx):
     costs_w *= data.WATER_DELIVERY_PRICE * data.WP_COST_MULTS[yr_cal]  # $/ha
 
     # Convert costs to $ per cell including resfactor.
-    cost_a, cost_f, cost_w, cost_q = costs_a*data.REAL_AREA, costs_f*data.REAL_AREA,\
-                                     costs_w*data.REAL_AREA, costs_q*data.REAL_AREA
+    costs_a *= data.REAL_AREA
+    costs_flc *= data.REAL_AREA
+    costs_foc *= data.REAL_AREA
+    costs_fdc *= data.REAL_AREA
+    costs_w *= data.REAL_AREA
+    costs_q *= data.REAL_AREA
 
-    costs = np.stack([(cost_a), (cost_f), (cost_w), (cost_q)]).T
+    costs = np.stack([costs_a, costs_flc, costs_foc, costs_fdc, costs_w, costs_q]).T
 
     # Return costs as numpy array.
-    return  pd.DataFrame(costs,
-                         columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))
+    return pd.DataFrame(
+        costs,
+        columns=pd.MultiIndex.from_product(
+            [
+                [lu], 
+                [lm], 
+                ['Area cost', 'Fixed labour cost', 'Fixed operating cost', 'Fixed depreciation cost', 'Water cost', 'Quantity cost']
+            ]
+        )
+    )
 
 
-def get_cost(data: Data, lu, lm, yr_idx):
+def get_cost(data:Data, lu, lm, yr_idx):
     """Return production cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
 
     Args:
@@ -225,14 +214,16 @@ def get_cost(data: Data, lu, lm, yr_idx):
         return get_cost_lvstk(data, lu, lm, yr_idx)
 
     elif lu in data.AGRICULTURAL_LANDUSES:
-        return pd.DataFrame(np.zeros(data.NCELLS),
-                            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost']]))
+        return pd.DataFrame(
+            np.zeros(data.NCELLS),
+            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost']])
+        )
 
     else:
         raise KeyError(f"Land use '{lu}' not found in any LANDUSES")
 
 
-def get_cost_matrix(data: Data, lm, yr_idx):
+def get_cost_matrix(data:Data, lm, yr_idx):
     """
     Return agricultural c_rj matrix <unit: $/cell> per lu under `lm` in `yr_idx`.
     
@@ -251,7 +242,7 @@ def get_cost_matrix(data: Data, lm, yr_idx):
     return cost.fillna(0)
 
 
-def get_cost_matrices(data: Data, yr_idx, aggregate=True):
+def get_cost_matrices(data:Data, yr_idx, aggregate=True):
     """
     Return agricultural c_mrj matrix <unit: $/cell> as 3D Numpy array.
 
@@ -280,7 +271,7 @@ def get_cost_matrices(data: Data, yr_idx, aggregate=True):
 
 
 
-def get_asparagopsis_effect_c_mrj(data: Data, yr_idx):
+def get_asparagopsis_effect_c_mrj(data:Data, yr_idx):
     """
     Applies the effects of using asparagopsis to the cost data
     for all relevant agricultural land uses.
@@ -308,18 +299,18 @@ def get_asparagopsis_effect_c_mrj(data: Data, yr_idx):
     # Update values in the new matrix
     for lm in data.LANDMANS:
         m = 0 if lm == 'dry' else 1
-        for lu_idx, lu in enumerate(land_uses):
+        for j_idx, lu in enumerate(land_uses):
             lvstype, vegtype = lvs_veg_types(lu)
             yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
             cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Annual Cost Per Animal (A$2010/yr)']
             cost_per_cell = cost_per_animal * yield_pot * data.REAL_AREA
 
-            new_c_mrj[m, :, lu_idx] = cost_per_cell
+            new_c_mrj[m, :, j_idx] = cost_per_cell
 
     return new_c_mrj
 
 
-def get_precision_agriculture_effect_c_mrj(data: Data, yr_idx):
+def get_precision_agriculture_effect_c_mrj(data:Data, yr_idx):
     """
     Applies the effects of using precision agriculture to the cost data
     for all relevant agr. land uses.
@@ -341,14 +332,14 @@ def get_precision_agriculture_effect_c_mrj(data: Data, yr_idx):
         return new_c_mrj
 
     for m in range(data.NLMS):
-        for lu_idx, lu in enumerate(land_uses):
+        for j_idx, lu in enumerate(land_uses):
             cost_per_ha = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
-            new_c_mrj[m, :, lu_idx] = cost_per_ha * data.REAL_AREA
+            new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA
 
     return new_c_mrj
 
 
-def get_ecological_grazing_effect_c_mrj(data: Data, yr_idx):
+def get_ecological_grazing_effect_c_mrj(data:Data, yr_idx):
     """
     Applies the effects of using ecological grazing to the cost data
     for all relevant agr. land uses.
@@ -370,7 +361,7 @@ def get_ecological_grazing_effect_c_mrj(data: Data, yr_idx):
     if not AG_MANAGEMENTS['Ecological Grazing']:
         return new_c_mrj
 
-    for lu_idx, lu in enumerate(land_uses):
+    for j_idx, lu in enumerate(land_uses):
         lvstype, _ = lvs_veg_types(lu)
 
         # Get effects on operating costs
@@ -385,12 +376,12 @@ def get_ecological_grazing_effect_c_mrj(data: Data, yr_idx):
         total_c_effect = operating_c_effect + labour_c_effect
 
         for m in range(data.NLMS):
-            new_c_mrj[m, :, lu_idx] = total_c_effect
+            new_c_mrj[m, :, j_idx] = total_c_effect
 
     return new_c_mrj
 
 
-def get_savanna_burning_effect_c_mrj(data: Data, yr_idx: int):
+def get_savanna_burning_effect_c_mrj(data:Data, yr_idx: int):
     """
     Applies the effects of using LDS Savanna Burning to the cost data
     for all relevant agr. land uses.
@@ -419,7 +410,7 @@ def get_savanna_burning_effect_c_mrj(data: Data, yr_idx: int):
     return new_c_mrj
 
 
-def get_agtech_ei_effect_c_mrj(data: Data, yr_idx):
+def get_agtech_ei_effect_c_mrj(data:Data, yr_idx):
     """
     Applies the effects of using AgTech EI to the cost data
     for all relevant agr. land uses.
@@ -441,14 +432,14 @@ def get_agtech_ei_effect_c_mrj(data: Data, yr_idx):
         return new_c_mrj
 
     for m in range(data.NLMS):
-        for lu_idx, lu in enumerate(land_uses):
+        for j_idx, lu in enumerate(land_uses):
             cost_per_ha = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
-            new_c_mrj[m, :, lu_idx] = cost_per_ha * data.REAL_AREA
+            new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA
 
     return new_c_mrj
 
 
-def get_biochar_effect_c_mrj(data: Data, yr_idx: int):
+def get_biochar_effect_c_mrj(data:Data, yr_idx: int):
     """
     Applies the effects of using Biochar to the cost data
     for all relevant agr. land uses.
@@ -470,11 +461,70 @@ def get_biochar_effect_c_mrj(data: Data, yr_idx: int):
         return new_c_mrj
 
     for m in range(data.NLMS):
-        for lu_idx, lu in enumerate(land_uses):
+        for j_idx, lu in enumerate(land_uses):
             cost_per_ha = data.BIOCHAR_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
-            new_c_mrj[m, :, lu_idx] = cost_per_ha * data.REAL_AREA
+            new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA
 
     return new_c_mrj
+
+
+def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
+    """
+    Applies the effects of using HIR for beef to the cost data
+    for all relevant agr. land uses.
+    
+    Parameters
+    - data: The data object containing the necessary information.
+    - yr_idx: The index of the year.
+    
+    Returns
+    - c_mrj_effects: The updated cost data <unit: $/cell>.
+    """
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
+    c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Cost reduction due to reduced livestock density
+    for m, lm in enumerate(data.LANDMANS):
+        for j_idx, lu in enumerate(land_uses):
+            # Quantity costs are reduced by `HIR_PRODUCTIVITY_CONTRIBUTION` under HIR
+            lvstype, vegtype = lvs_veg_types(lu)
+            lvstype_capital = lvstype.capitalize()
+            yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+
+            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
+            c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
+
+    return c_mrj_effects + (settings.BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
+
+
+def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
+    """
+    Applies the effects of using HIR for sheep to the cost data
+    for all relevant agr. land uses.
+    
+    Parameters
+    - data: The data object containing the necessary information.
+    - yr_idx: The index of the year.
+    
+    Returns
+    - c_mrj_effects: The updated cost data <unit: $/cell>.
+    """
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
+    c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    for m, lm in enumerate(data.LANDMANS):
+        for j_idx, lu in enumerate(land_uses):
+            # Quantity costs are reduced by 50% under HIR
+            lvstype, vegtype = lvs_veg_types(lu)
+            lvstype_capital = lvstype.capitalize()
+            yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+
+            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
+            c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
+
+    return c_mrj_effects + (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
 
 
 def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
@@ -490,18 +540,15 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
         dict: A dictionary containing the cost matrices for different agricultural management practices.
             The keys are the names of the practices and the values are the corresponding cost matrices.
     """
-    asparagopsis_data = get_asparagopsis_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
-    precision_agriculture_data = get_precision_agriculture_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Precision Agriculture'] else 0
-    eco_grazing_data = get_ecological_grazing_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_data = get_savanna_burning_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
-    agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
-    biochar_data = get_biochar_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
+    ag_mam_c_mrj = {}
 
-    return {
-        'Asparagopsis taxiformis': asparagopsis_data,
-        'Precision Agriculture': precision_agriculture_data,
-        'Ecological Grazing': eco_grazing_data,
-        'Savanna Burning': sav_burning_data,
-        'AgTech EI': agtech_ei_data,
-        'Biochar': biochar_data,
-    }
+    ag_mam_c_mrj['Asparagopsis taxiformis'] = get_asparagopsis_effect_c_mrj(data, yr_idx)           
+    ag_mam_c_mrj['Precision Agriculture'] = get_precision_agriculture_effect_c_mrj(data, yr_idx)    
+    ag_mam_c_mrj['Ecological Grazing'] = get_ecological_grazing_effect_c_mrj(data, yr_idx)          
+    ag_mam_c_mrj['Savanna Burning'] = get_savanna_burning_effect_c_mrj(data, yr_idx)                
+    ag_mam_c_mrj['AgTech EI'] = get_agtech_ei_effect_c_mrj(data, yr_idx)                            
+    ag_mam_c_mrj['Biochar'] = get_biochar_effect_c_mrj(data, yr_idx)                                
+    ag_mam_c_mrj['HIR - Beef'] = get_beef_hir_effect_c_mrj(data, yr_idx)                            
+    ag_mam_c_mrj['HIR - Sheep'] = get_sheep_hir_effect_c_mrj(data, yr_idx)                          
+
+    return ag_mam_c_mrj

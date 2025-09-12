@@ -17,44 +17,87 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
+from itertools import cycle
 import luto.settings as settings
 
 
 # Get the root directory of the data
 YR_BASE = 2010
 
-# Define crop-lvstk land uses
-LU_CROPS = ['Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal crops',
-            'Pears','Plantation fruit','Rice','Stone fruit','Sugar','Summer cereals',
-            'Summer legumes','Summer oilseeds','Tropical stone fruit','Vegetables',
-            'Winter cereals','Winter legumes','Winter oilseeds']
-
-LVSTK_NATURAL = ['Beef - natural land','Dairy - natural land','Sheep - natural land']
-
-LVSTK_MODIFIED = ['Beef - modified land','Dairy - modified land','Sheep - modified land']
-
-LU_LVSTKS = LVSTK_NATURAL + LVSTK_MODIFIED
-
-LU_UNALLOW = ['Unallocated - modified land','Unallocated - natural land']
-
-
-LU_NATURAL = ['Beef - natural land',
-              'Dairy - natural land',
-              'Sheep - natural land',
-              'Unallocated - natural land']
-
-
 # Define the commodity categories
-COMMODITIES_ON_LAND = ['Apples','Beef live export','Beef meat','Citrus','Cotton','Dairy','Grapes',
-                       'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',
-                       'Rice', 'Sheep live export', 'Sheep meat', 'Sheep wool', 'Stone fruit', 'Sugar',
-                       'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
-                       'Vegetables','Winter cereals','Winter legumes','Winter oilseeds']
+COMMODITIES_ON_LAND = [
+    'Apples','Beef live export','Beef meat','Citrus','Cotton','Dairy','Grapes',
+    'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',
+    'Rice', 'Sheep live export', 'Sheep meat', 'Sheep wool', 'Stone fruit', 'Sugar',
+    'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
+    'Vegetables','Winter cereals','Winter legumes','Winter oilseeds'
+]
+
+COMMIDOTY_GROUP = {
+   "Beef meat": "Animal Products",
+   "Sheep meat": "Animal Products",
+   "Dairy": "Animal Products",
+   "Beef live export": "Animal Products",
+   "Sheep live export": "Animal Products",
+   "Sheep wool": "Animal Products",
+   "Apples": "Fruits",
+   "Citrus": "Fruits",
+   "Grapes": "Fruits",
+   "Plantation fruit": "Fruits",
+   "Stone fruit": "Fruits",
+   "Tropical stone fruit": "Fruits",
+   "Pears": "Fruits",
+   "Nuts": "Fruits",
+   "Summer cereals": "Grains/Legumes",
+   "Winter cereals": "Grains/Legumes",
+   "Rice": "Grains/Legumes",
+   "Summer legumes": "Grains/Legumes",
+   "Winter legumes": "Grains/Legumes",
+   "Vegetables": "Crops",
+   "Summer oilseeds": "Crops",
+   "Winter oilseeds": "Crops",
+   "Cotton": "Crops",
+   "Sugar": "Crops",
+   "Other non-cereal crops": "Crops",
+   "Hay": "Hay",
+   "Aquaculture": "Off-land Products",
+   "Chicken": "Off-land Products",
+   "Eggs": "Off-land Products",
+   "Pork": "Off-land Products"
+}
 
 COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
-
 COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
 
+
+LU_CROPS = [
+    'Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal crops',
+    'Pears','Plantation fruit','Rice','Stone fruit','Sugar','Summer cereals',
+    'Summer legumes','Summer oilseeds','Tropical stone fruit','Vegetables',
+    'Winter cereals','Winter legumes','Winter oilseeds'
+]
+
+LU_LVSTKS = [
+    'Beef - natural land','Dairy - natural land','Sheep - natural land',
+    'Beef - modified land','Dairy - modified land','Sheep - modified land'
+]
+
+LU_UNALLOW = ['Unallocated - modified land', 'Unallocated - natural land']
+
+
+
+
+# Define land use code for am and non-ag land uses
+AM_SELECT = [i for i in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[i]]
+AM_DESELECT = [i for i in settings.AG_MANAGEMENTS if not settings.AG_MANAGEMENTS[i]]
+AM_MAP_CODES = {i:(AM_SELECT.index(i) + 1) for i in AM_SELECT}
+
+NON_AG_SELECT = [i for i in settings.NON_AG_LAND_USES if settings.NON_AG_LAND_USES[i]]
+NON_AG_DESELECT = [i for i in settings.NON_AG_LAND_USES if not settings.NON_AG_LAND_USES[i]]
+NON_AG_MAP_CODES = {i:(NON_AG_SELECT.index(i) + 1) for i in NON_AG_SELECT}
+
+AM_NON_AG_CODES = {**AM_MAP_CODES, **NON_AG_MAP_CODES}
+AM_NON_AG_REMOVED_DESC = AM_DESELECT + NON_AG_DESELECT
 
 
 # Define the file name patterns for each category
@@ -78,6 +121,10 @@ RENAME_AM = {
     "Ecological Grazing": "Regenerative agriculture (livestock)", 
     "Savanna Burning": "Early dry-season savanna burning",
     "AgTech EI": "Agricultural technology (energy)",
+    'Biochar': "Biochar (soil amendment)",
+    'HIR - Beef': "Human-induced regeneration (Beef)",
+    'HIR - Sheep': "Human-induced regeneration (Sheep)",
+
 }
 
 RENAME_NON_AG = {
@@ -88,7 +135,8 @@ RENAME_NON_AG = {
     "Carbon Plantings (Block)": "Carbon plantings (monoculture)",
     "Sheep Carbon Plantings (Belt)": "Farm forestry (hardwood timber + sheep)",
     "Beef Carbon Plantings (Belt)": "Farm forestry (hardwood timber + beef)",
-    "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)"
+    "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)",
+    "Destocked - natural land": "Destocked - natural land",
 }
 
 RENAME_AM_NON_AG = {**RENAME_AM, **RENAME_NON_AG}
@@ -109,11 +157,12 @@ SPATIAL_MAP_DICT = {
 
 # Get the non-agricultural land uses raw names
 NON_AG_LANDUSE_RAW = list(settings.NON_AG_LAND_USES.keys())
+NON_AG_LANDUSE_RAW = [i for i in NON_AG_LANDUSE_RAW if settings.NON_AG_LAND_USES[i]]
 
 
 # Merge the land uses
 LANDUSE_ALL_RAW = AG_LANDUSE + NON_AG_LANDUSE_RAW
-LANDUSE_ALL_RENAMED = AG_LANDUSE + list(RENAME_NON_AG.values()) 
+LANDUSE_ALL_RENAMED = ['Agri-Management'] + AG_LANDUSE + list(RENAME_NON_AG.values())  + ['Outside LUTO study area'] 
 
 
 
@@ -153,12 +202,71 @@ GHG_NAMES = {
     'TCO2E_AgTech EI': 'AgTech EI',
 }
 
-GHG_CATEGORY = {'Agricultural soils: Animal production, dung and urine': {"CH4":0.5,"CO2":0.5},
-                'Livestock Enteric Fermentation (biogenic)':{'CH4':1},
-                'Agricultural soils: Direct Soil Emissions (biogenic)':{"N2O":1},
-                
-                'Asparagopsis taxiformis':{'Asparagopsis taxiformis':1},
-                'Precision Agriculture':{'Precision Agriculture':1},
-                'Ecological Grazing':{'Ecological Grazing':1}}
+GHG_CATEGORY = {
+    'Agricultural soils: Animal production, dung and urine': {"CH4":0.5,"CO2":0.5},
+    'Livestock Enteric Fermentation (biogenic)':{'CH4':1},
+    'Agricultural soils: Direct Soil Emissions (biogenic)':{"N2O":1},
+    
+    'Asparagopsis taxiformis':{'Asparagopsis taxiformis':1},
+    'Precision Agriculture':{'Precision Agriculture':1},
+    'Ecological Grazing':{'Ecological Grazing':1}
+}
 
 
+
+# Colors for reporting HTML to loop through
+COLORS = [
+    "#8085e9",
+    "#f15c80",
+    "#e4d354",
+    "#2b908f",
+    "#f45b5b",
+    "#7cb5ec",
+    "#434348",
+    "#90ed7d",
+    "#f7a35c",
+    "#91e8e1",
+]
+
+COLORS_RANK = {
+    '1-10': "#ff8f5e",
+    '11-20': "#d5e5a3",
+    '>=21': "#91e8e1",
+    'N.A.': "#e8eaed",
+}
+
+pattern_path = {
+    'path': 
+        {
+            'd': "M 0 0 L 10 10 M 10 0 L 0 10", 
+            'stroke': "#cccccc", 
+            'strokeWidth': 1,
+        },
+    'width': 10,
+    'height': 10,
+}
+
+COLORS_LU = dict(zip(LANDUSE_ALL_RENAMED, cycle(COLORS)))
+COLORS_LU.update({'Outside LUTO study area': "#C7BFBF"})
+COLORS_LU.update({'Agri-Management': "#D5F100"})
+COLORS_LM = dict(zip(['Dryland', 'Irrigated'], ["#f7a35c", "#7cb5ec"]))
+COLORS_COMMODITIES = dict(zip(COMMODITIES_ALL, cycle(COLORS)))
+COLORS_AM_NONAG = dict(zip(list(RENAME_AM_NON_AG.values()) + ['ALL'], cycle(COLORS)))
+COLORS_GHG = dict(zip(GHG_NAMES.values(), cycle(COLORS)))
+
+COLORS_ECONOMY_TYPE = dict(zip(
+    [
+        'Live Exports', 'Meat', 'Milk', 'Wool', 'Crop', 'Area cost',
+        'Fixed depreciation cost', 'Fixed labour cost', 'Fixed operating cost',
+        'Quantity cost', 'Water cost', 'ALL'
+    ],
+     cycle(COLORS)
+))
+
+
+PATTERNS_LU = {k:{'pattern':{**pattern_path, 'backgroundColor': v} } for k,v in COLORS_LU.items()}
+PATTERNS_LM = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_LM.items()}
+PATTERNS_COMMODITIES = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_COMMODITIES.items()}
+PATTERNS_AM_NONAG = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_AM_NONAG.items()}
+PATTERNS_GHG = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_GHG.items()}
+PATTERNS_ECONOMY_TYPE = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_ECONOMY_TYPE.items()}

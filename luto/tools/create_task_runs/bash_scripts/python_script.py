@@ -19,35 +19,39 @@
 
 import os
 import shutil
+import zipfile
 import luto.simulation as sim
 import luto.settings as settings
 
 
+
 # Run the simulation
 data = sim.load_data()
-sim.run(data=data, base_year=2010, target_year=2050, step_size=settings.STEP_SIZE)
+sim.run(data=data)
 
-# Remove all files except the report directory if settings.KEEP_OUTPUTS is False
-'''
-KEEP_OUTPUTS is not originally defined in the settings, but will be added in the `luto/tools/create_task_runs/create_running_tasks.py` file.
-'''
 
-if settings.KEEP_OUTPUTS:
-    
-    # Save the data object to disk
-    sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_{settings.MODE}_RES{settings.RESFACTOR}.gz")
-    
-else:
-    report_dir = f"{data.path}/DATA_REPORT"
-    destination_dir ='./DATA_REPORT'
-    shutil.move(report_dir, destination_dir)
+# Set up report directory and archive path
+report_dir = f"{data.path}"
+archive_path ='./Run_Archive.zip'
 
-    for item in os.listdir('.'):
-        if item != 'DATA_REPORT':
-            try:
-                if os.path.isfile(item) or os.path.islink(item):
-                    os.unlink(item)  # Remove the file or link
-                elif os.path.isdir(item):
-                    shutil.rmtree(item)  # Remove the directory
-            except Exception as e:
-                print(f"Failed to delete {item}. Reason: {e}")
+
+# Zip the output directory, and remove the original directory
+with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    for root, dirs, files in os.walk(report_dir):
+        for file in files:
+            abs_path = os.path.join(root, file)
+            rel_path = os.path.relpath(abs_path, start=report_dir)
+            zipf.write(abs_path, arcname=rel_path)
+
+
+# Remove all files after archiving
+for item in os.listdir('.'):
+    if item != 'Run_Archive.zip':
+        try:
+            if os.path.isfile(item) or os.path.islink(item):
+                os.unlink(item)  
+            elif os.path.isdir(item):
+                shutil.rmtree(item) 
+        except Exception as e:
+            print(f"Failed to delete {item}. Reason: {e}")
+            
