@@ -4,8 +4,8 @@ import pandas as pd
 from tools.helpers import create_task_runs
 import time
 # time.sleep(60*60*5)
-platform = "Denethor"  # 可选值: 'HPC', 'Denethor', 'NCI'
-tasks = ['20250912_Price_Task_RES13_year5']
+platform = "NCI"  # 可选值: 'HPC', 'Denethor', 'NCI'
+tasks = ['20250908_Paper2_Results_NCI']
 input_path_dict = {"HPC": "/home/remote/s222552331/LUTO2_XH/LUTO2/input",
                     "Denethor": "N:/LUF-Modelling/LUTO2_XH/LUTO2/input",
                     "NCI": "/g/data/jk53/LUTO_XH/LUTO2/input"}
@@ -15,9 +15,9 @@ for task in tasks:
 
     update_values = {
         'WRITE_THREADS': 2,
-        'MEM': '48GB',
-        'NCPUS': 12,
-        'TIME': '02:00:00',
+        'MEM': '52GB',
+        'NCPUS': 13,
+        'TIME': '05:00:00',
         'INPUT_DIR': input_path_dict[platform],  # 根据平台选择输入路径
         'RAW_DATA': f"{input_path_dict[platform]}/raw_data",
         'NO_GO_VECTORS': {
@@ -31,4 +31,4 @@ for task in tasks:
         for col in grid_search_settings_df.columns:
             grid_search_settings_df.at[name, col] = new_value
 
-    create_task_runs(task_root_dir, grid_search_settings_df, platform, n_workers=min(len(grid_search_settings_df.columns), 4),use_parallel=True,model_name='Write')
+    create_task_runs(task_root_dir, grid_search_settings_df, platform, n_workers=min(len(grid_search_settings_df.columns), 100),use_parallel=True,model_name='Write')
