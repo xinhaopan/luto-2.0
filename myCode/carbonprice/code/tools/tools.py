@@ -8,6 +8,7 @@ import os
 import tempfile
 import shutil
 from filelock import FileLock, Timeout
+from typing import Union
 
 import tools.config as config
 
@@ -225,3 +226,31 @@ def npy_to_map(input_arr, output_tif, proj_file,
         dst.write(themap.astype(dtype), 1)
 
     return output_tif
+
+
+def filter_all_from_dims(ds: Union[xr.Dataset, xr.DataArray]) -> Union[xr.Dataset, xr.DataArray]:
+    """
+    从 xarray 对象的所有维度中筛选并移除值为 'ALL' 的坐标。
+
+    该函数会遍历对象的所有维度，检查其坐标是否包含字符串 'ALL'。
+    如果包含，则只选择不等于 'ALL' 的部分。
+
+    Args:
+        ds (Union[xr.Dataset, xr.DataArray]): 需要进行筛选的 xarray 数据集或数据数组。
+
+    Returns:
+        Union[xr.Dataset, xr.DataArray]: 一个新的、经过筛选的 xarray 对象。
+    """
+    # 将输入对象作为筛选的起点
+    filtered_ds = ds
+
+    # 遍历所有维度名称
+    for dim_name in ds.dims:
+        # 安全检查：确保维度有关联的坐标，并且坐标是字符串类型
+        if dim_name in ds.coords and ds[dim_name].dtype.kind in ['U', 'S', 'O']:
+            # 检查坐标值中是否含有 'ALL'
+            if np.isin(ds[dim_name].values, ['ALL']).any():
+                # 使用 .sel() 和布尔索引来选择不等于 'ALL' 的部分
+                filtered_ds = filtered_ds.sel({dim_name: filtered_ds[dim_name] != 'ALL'})
+
+    return filtered_ds

@@ -1,3 +1,5 @@
+import time
+
 import paramiko
 import os
 import pandas as pd
@@ -96,8 +98,9 @@ def download_one(platform, base_name, file_name, local_root):
         transport.close()
 
 if __name__ == "__main__":
-    platform = "HPC"
-    base_names = ["20250730_price_task"]
+    time.sleep(60*60*5) # 延时 5 小时，给你时间去提交作业
+    platform = "NCI"
+    base_names = ["20250908_Paper2_Results_NCI"]
     local_root = "../../output"
 
     for base_name in base_names:
@@ -121,7 +124,7 @@ if __name__ == "__main__":
         file_names = [fn.replace('.', '.') for fn in df.columns[1:]]
 
         # 2) 并行下载各子目录
-        Parallel(n_jobs=9)(
+        Parallel(n_jobs=7)(
             delayed(download_one)(
                 platform, base_name, fn, local_root
             )
