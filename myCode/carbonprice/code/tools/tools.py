@@ -254,3 +254,36 @@ def filter_all_from_dims(ds: Union[xr.Dataset, xr.DataArray]) -> Union[xr.Datase
                 filtered_ds = filtered_ds.sel({dim_name: filtered_ds[dim_name] != 'ALL'})
 
     return filtered_ds
+
+
+def create_xarray(years, base_path, env_category, env_name, mask=None,
+                  engine="h5netcdf",
+                  cell_dim="cell", cell_chunk="auto",
+                  year_chunk=1, parallel=False):
+    """
+    以 year 维度拼接多个年度 NetCDF，懒加载+分块，避免过多文件句柄。
+    """
+    file_paths = [
+        os.path.join(base_path, str(env_category), str(y), f"xr_{env_name}_{y}.nc")
+        for y in years
+    ]
+    missing = [p for p in file_paths if not os.path.exists(p)]
+    if missing:
+        raise FileNotFoundError(f"以下文件未找到:\n" + "\n".join(missing))
+
+    # 从文件名提取实际年份，确保坐标与文件顺序一致
+    valid_years = [int(os.path.basename(p).split("_")[-1].split(".")[0]) for p in file_paths]
+
+    ds = xr.open_mfdataset(
+        file_paths,
+        engine=engine,
+        combine="nested",  # 明确“按给定顺序拼接”
+        concat_dim="year",  # 新增 year 维度
+        parallel=parallel,  # 一般 False 更稳，避免句柄并发
+        chunks={cell_dim: cell_chunk, "year": year_chunk}  # year=1，cell 分块
+    ).assign_coords(year=valid_years)
+
+    if mask is not None:
+        ds = ds.where(mask, other=0)  # 使用掩码，非掩码区域设为 0
+
+    return ds
