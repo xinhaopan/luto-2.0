@@ -8,11 +8,9 @@ CPU_CORES = 45
 MEMORY_GB = "1400GB"          # PBS 用 GB
 TIME_LIMIT = "24:00:00"       # 一天
 PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"
-CONDA_ENV_NAME = "xpluto-fixed"
+CONDA_ENV_NAME = "xpluto"
 SUBMISSION_SCRIPT_NAME = "submit_preprocess.pbs"
 
-# 可选：NCI 项目代码（必须按你自己的项目修改，如 'ub8'）
-PROJECT_CODE = "your_project_code"   # TODO: 改成你的 NCI 项目号，如 "ub8"
 
 def create_and_submit_hpc_job():
     """
@@ -29,7 +27,9 @@ def create_and_submit_hpc_job():
 #PBS -o pbs_output_$PBS_JOBID.out
 #PBS -e pbs_error_$PBS_JOBID.err
 #PBS -l wd
-#PBS -P {PROJECT_CODE}
+
+# === 关键：声明项目与存储资源 ===
+#PBS -l storage=gdata/jk53
 
 echo "========================================================="
 echo "JobID: $PBS_JOBID"
