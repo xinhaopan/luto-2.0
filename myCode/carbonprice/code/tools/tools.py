@@ -187,8 +187,8 @@ def npy_to_map(input_arr, output_tif, proj_file,
     - shift: 在写入前对数据统一加的偏移量
     - dtype: 输出栅格的数据类型
     """
-    if not input_arr.lower().endswith(".npy"):
-        return
+    # if not input_arr.lower().endswith(".npy"):
+    #     return
 
     # 1) 读取参考栅格
     with rasterio.open(proj_file) as src:

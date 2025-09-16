@@ -1,110 +1,179 @@
-import xarray as xr
-import os
-import numpy_financial as npf
-import time
-from tools.tools import get_path, get_year,save2nc
+import matplotlib.pyplot as plt
 import tools.config as config
-import numpy as np
+import xarray as xr
+import seaborn as sns
+import os
+import time
+# 引入 joblib
+from joblib import Parallel, delayed
 
-def get_main_data_variable_name(ds: xr.Dataset) -> str:
-    """自动从 xarray.Dataset 中获取唯一的数据变量名。"""
-    data_vars_list = list(ds.data_vars)
-    if len(data_vars_list) == 1:
-        return data_vars_list[0]
-    elif len(data_vars_list) == 0:
-        raise ValueError("错误：数据集中不包含任何数据变量。")
-    else:
-        raise ValueError(f"错误：数据集中包含多个数据变量: {data_vars_list}。")
+sns.set_theme(style="whitegrid")
 
-task_name = '20250823_Paper2_Results_RES13'
-njobs = 7
-task_dir =  f'../../../output/{task_name}'
-input_files = config.INPUT_FILES
-path_name_0 = get_path(task_name, input_files[0])
-path_name_1 = get_path(task_name, input_files[1])
-path_name_2 = get_path(task_name, input_files[2])
-years = get_year(path_name_0)
-run_names = [input_files[0], input_files[1], input_files[2]]
-run_paths = [path_name_0, path_name_1, path_name_2]
-amortize_files = ['xr_transition_cost_ag2non_ag']
-
-output_path = f'{task_dir}/carbon_price/0_base_data'
-target_path_name = os.path.join(output_path, input_files[0])
-
-rate=0.07
-horizon=30
-
-output_path = f'{task_dir}/carbon_price/0_base_data'
-
-amortize_file = amortize_files[0]
-origin_path_name = get_path(task_name, input_files[0])
-file_paths = [os.path.join(origin_path_name, f'out_{year}', f'{amortize_file}_{year}.nc') for year in years]
+def create_mask(years, base_path, env_category, env_name, chunks="auto"):
+    masks = []
+    for y in years:
+        data_tmpl = f"{base_path}/{env_category}/{y}/xr_total_{env_category}_{y}.nc"
+        data_xr = xr.open_dataarray(data_tmpl.format(year=y), chunks=chunks)
+        cost_tml = f"{base_path}/{env_category}/{y}/xr_{env_name}_{y}.nc"
+        cost_xr = xr.open_dataarray(cost_tml.format(year=y), chunks=chunks)
+        m = (abs(data_xr) >= 1)  # & (abs(cost_xr >= 1))
+        masks.append(m.expand_dims(year=[y]))
+    mask = xr.concat(masks, dim="year")
+    mask.name = "mask"
+    mask.attrs["description"] = "True if both env and cost >= 1, else False"
+    return mask
 
 
-existing_files = [p for p in file_paths if os.path.exists(p)]
-if not existing_files: raise FileNotFoundError(
-    f"在路径 {origin_path_name} 下找不到任何与 '{amortize_file}' 相关的文件。")
-valid_years = sorted([int(path.split('_')[-1].split('.')[0]) for path in existing_files])
+def create_xarray(years, base_path, env_category, env_name, mask=None,
+                  engine="h5netcdf",
+                  cell_dim="cell", cell_chunk="auto",
+                  year_chunk=1, parallel=False):
+    """
+    以 year 维度拼接多个年度 NetCDF，懒加载+分块，避免过多文件句柄。
+    """
+    file_paths = [
+        os.path.join(base_path, str(env_category), str(y), f"xr_{env_name}_{y}.nc")
+        for y in years
+    ]
+    missing = [p for p in file_paths if not os.path.exists(p)]
+    if missing:
+        raise FileNotFoundError(f"以下文件未找到:\n" + "\n".join(missing))
 
-all_costs_ds = xr.open_mfdataset(
-    existing_files,
-    engine="h5netcdf",            # 推荐后端
-    combine="nested",
-    concat_dim="year",
-    parallel=False,               # 关键：避免句柄并发问题
-    # chunks={ "cell", "year": -1}  # year 整块、cell 分块
-).assign_coords(year=valid_years)
+    # 从文件名提取实际年份，确保坐标与文件顺序一致
+    valid_years = [int(os.path.basename(p).split("_")[-1].split(".")[0]) for p in file_paths]
+
+    ds = xr.open_mfdataset(
+        file_paths,
+        engine=engine,
+        combine="nested",  # 明确“按给定顺序拼接”
+        concat_dim="year",  # 新增 year 维度
+        parallel=parallel,  # 一般 False 更稳，避免句柄并发
+        chunks={cell_dim: cell_chunk, "year": year_chunk}  # year=1，cell 分块
+    ).assign_coords(year=valid_years)
+
+    if mask is not None:
+        ds = ds.where(mask, other=0)  # 使用掩码，非掩码区域设为 0
+
+    return ds
+
+# prepare_data_for_plot 和 draw_prepared_data_on_ax 函数与之前完全相同
+def prepare_data_for_plot(env_category, env_category_name):
+    """
+    重量级函数：读取、聚合(求和)和加载数据。将被并行执行。
+    """
+    print(f"开始准备数据和求和: {env_category}")
+    # 1. 懒加载方式打开数据
+    xr_bio = create_xarray(years, base_path, env_category, env_category_name)
+    da = xr_bio["data"]
+
+    # 2. 对 cell 维度进行求和。这步操作是懒加载的，速度极快。
+    #    'cell' 是 create_xarray 函数中的默认 cell_dim
+    summed_da = da.sum(dim='cell')
+
+    # 3. 获取年份坐标
+    year_values = summed_da["year"].values
+
+    # 4. 触发计算(包括求和)并将结果加载到内存
+    #    现在加载的是一个 (40,) 的小数组，而不是 (40, 168778) 的大数组
+    data_values = summed_da.load().values
+
+    print(f"数据准备完成: {env_category}, 最终数据形状: {data_values.shape}")
+    return year_values, data_values
 
 
+def draw_prepared_data_on_ax(ax, year_vals, data_vals, title_name, unit, label):
+    """轻量级函数，只负责绘图。"""
+    ax.plot(year_vals, data_vals, marker="o", linestyle="-", label=label)
+    ax.set_title(title_name)
+    ax.set_ylabel(unit)
 
-cost_variable_name = get_main_data_variable_name(all_costs_ds)
-pv_values_all_years = all_costs_ds[cost_variable_name]
 
-annual_payments = xr.apply_ufunc(
-    lambda x: -1 * npf.pmt(rate, horizon, pv=x.astype(np.float64), fv=0, when='begin'),
-    pv_values_all_years,
-    dask="parallelized",
-    output_dtypes=[np.float32],
-).astype('float32')
+# --- 脚本主干 ---
+# (路径和列表定义与之前相同)
+task_name = config.TASK_NAME
+base_path = f"../../../output/{task_name}/carbon_price/0_base_data"
+# ... 其他路径和列表定义 ...
+env_category_lists = [
+    ["carbon_low_bio_10", "carbon_low_bio_20", "carbon_low_bio_30", "carbon_low_bio_40", "carbon_low_bio_50"],
+    ["carbon_high_bio_10", "carbon_high_bio_20", "carbon_high_bio_30", "carbon_high_bio_40", "carbon_high_bio_50"]
+]
 
-# 新结构：每年一个独立的 amortized cost 图层（提前准备好空容器）
-amortized_by_year = {int(y): None for y in pv_values_all_years.year.values}
-all_years = pv_values_all_years.year.values
+title_name_lists = [
+    [
+        '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{10}}$',
+        '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{20}}$',
+        '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{30}}$',
+        '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{40}}$',
+        '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{50}}$'
+    ],
+    [
+        '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{10}}$',
+        '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{20}}$',
+        '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{30}}$',
+        '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{40}}$',
+        '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$'
+    ]
+]
 
-print("  - 步骤2: 为每个成本年份分摊年金到对应年份...")
+years = list(range(2011, 2051))
 
-for cost_year in all_years:
-    # 年金值（不含年份坐标）
-    payment_from_this_year = annual_payments.sel(year=cost_year)
-    start_year = cost_year
-    end_year = cost_year + horizon - 1
+fig2, axes2 = plt.subplots(nrows=2, ncols=5, figsize=(25, 10), sharey=True)
+fig2.suptitle('Biodiversity original cost', fontsize=18)
 
-    # 这笔年金分摊到的年份（在 all_years 范围内）
-    affected_years = [y for y in all_years if start_year <= y <= end_year]
+# --- 使用 joblib 并行准备数据 ---
+start_time = time.time()
 
-    for y in affected_years:
-        # 创建一个只有当前年份 y 的 xarray，用于填入年金值
-        y_da = xr.zeros_like(pv_values_all_years.sel(year=[y]), dtype=np.float32)
-        y_da.loc[dict(year=[y])] = payment_from_this_year
-        # print(f"Year {y} after assignment: min={y_da.min().values}, max={y_da.max().values}")
-        if amortized_by_year[cost_year] is None:
-            amortized_by_year[cost_year] = y_da
-        else:
-            amortized_by_year[cost_year] = amortized_by_year[cost_year] + y_da  # dask 会合并任务图
+# 1. 准备要执行的任务列表
+tasks = []
+for row in range(2):
+    for col in range(5):
+        env_cat = env_category_lists[row][col]
+        task = delayed(prepare_data_for_plot)(
+            env_cat,
+            f'total_cost_{env_cat}_original'
+        )
+        tasks.append(task)
 
-# 合并所有年份的结果（list → concat）
-print("  - 步骤3: 拼接所有年份的摊销结果...")
+# 2. 并行执行
+# n_jobs=-1 表示使用所有可用的CPU核心作为线程数
+# backend='threading' 是关键！这告诉 joblib 使用线程而不是进程。
+print("--- 开始使用 joblib (threading backend) 并行准备数据 ---")
+results = Parallel(n_jobs=-1, backend='threading')(tasks)
 
-amortized_list = [amortized_by_year[y] for y in all_years if amortized_by_year[y] is not None]
-total_amortized_costs = xr.concat(amortized_list, dim='year')
+data_prep_time = time.time()
+print(f"\n--- 数据并行准备耗时: {data_prep_time - start_time:.2f} 秒 ---\n")
 
-# 确保年份顺序一致
-total_amortized_costs = total_amortized_costs.sortby('year')
-total_amortized_costs.name = 'data'
-print("starting to compute...")
-total_amortized_costs = total_amortized_costs.chunk({'year': 1, 'cell': 1024}).compute()
-print("✅ 所有年份的摊销计算已完成。")
+# --- 串行快速绘图 ---
+# joblib 返回一个列表，我们需要根据顺序把它放回正确的位置
+task_index = 0
+for row in range(2):
+    for col in range(5):
+        ax = axes2[row, col]
+        title = title_name_lists[row][col]
 
-# 关闭句柄
-all_costs_ds.close()
-print("✅ 所有源文件句柄已关闭。")
+        year_vals, data_vals = results[task_index]
+
+        draw_prepared_data_on_ax(
+            ax=ax,
+            year_vals=year_vals,
+            data_vals=data_vals,
+            title_name=title,
+            unit="AU$ ha-1",
+            label=env_category_lists[row][col]
+        )
+
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+
+        task_index += 1
+
+# (设置Y轴标签和布局的代码与之前相同)
+axes2[0, 0].set_ylabel('Cost (AU$)', fontsize=12)
+axes2[1, 0].set_ylabel('Cost (AU$)', fontsize=12)
+fig2.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+plot_time = time.time()
+print(f"--- 绘图及布局耗时: {plot_time - data_prep_time:.2f} 秒 ---")
+print(f"--- 总耗时: {plot_time - start_time:.2f} 秒 ---")
+plt.savefig(f"biodiversity_original_cost.png", dpi=300)
+plt.show()

@@ -118,19 +118,19 @@ title_name_lists = [
 years = list(range(2011, 2051))
 
 fig2, axes2 = plt.subplots(nrows=2, ncols=5, figsize=(25, 10), sharey=True)
-fig2.suptitle('Biodiversity benefit', fontsize=18)
+fig2.suptitle('Biodiversity amortised cost', fontsize=18)
 
 # --- 使用 joblib 并行准备数据 ---
 start_time = time.time()
 
 # 1. 准备要执行的任务列表
 tasks = []
-for row in range(2):
-    for col in range(5):
+for row in range(1):
+    for col in range(1):
         env_cat = env_category_lists[row][col]
         task = delayed(prepare_data_for_plot)(
             env_cat,
-            f'total_{env_cat}'
+            f'total_cost_{env_cat}_amortised'
         )
         tasks.append(task)
 
@@ -146,9 +146,9 @@ print(f"\n--- 数据并行准备耗时: {data_prep_time - start_time:.2f} 秒 --
 # --- 串行快速绘图 ---
 # joblib 返回一个列表，我们需要根据顺序把它放回正确的位置
 task_index = 0
-for row in range(2):
-    for col in range(5):
-        print(f"绘制子图: 行 {row+1}, 列 {col+1}")
+for row in range(1):
+    for col in range(1):
+        print(f"绘制图表: 行 {row+1}, 列 {col+1}")
         ax = axes2[row, col]
         title = title_name_lists[row][col]
 
@@ -159,7 +159,7 @@ for row in range(2):
             year_vals=year_vals,
             data_vals=data_vals,
             title_name=title,
-            unit="ha",
+            unit="AU$",
             label=env_category_lists[row][col]
         )
 
@@ -169,12 +169,12 @@ for row in range(2):
         task_index += 1
 
 # (设置Y轴标签和布局的代码与之前相同)
-axes2[0, 0].set_ylabel('ha', fontsize=12)
-axes2[1, 0].set_ylabel('ha', fontsize=12)
+axes2[0, 0].set_ylabel('Cost (AU$)', fontsize=12)
+axes2[1, 0].set_ylabel('Cost (AU$)', fontsize=12)
 fig2.tight_layout(rect=[0, 0.03, 1, 0.95])
 
 plot_time = time.time()
 print(f"--- 绘图及布局耗时: {plot_time - data_prep_time:.2f} 秒 ---")
 print(f"--- 总耗时: {plot_time - start_time:.2f} 秒 ---")
-plt.savefig(f'biodiversity.png', dpi=300)
+plt.savefig(f'biodiversity_amortised_cost.png', dpi=300)
 plt.show()
