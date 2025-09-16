@@ -100,7 +100,7 @@ def sum_dims_if_exist(
         return res
     return out
 
-def amortize_costs(data_path_name, amortize_file, years, njobs=0, rate=0.07, horizon=30):
+def amortize_costs(data_path_name, amortize_file, years, njobs=0, rate=0.07, horizon=91):
     """
     【最终修复版 - 逐年输出】计算成本均摊，并为每一年生成一个累计成本文件。
     1. 使用 Dask 构建完整的计算图，计算出所有年份的累计摊销成本。
@@ -266,6 +266,7 @@ def copy_single_file(
         return da
 
     with xr.open_dataset(src_file, engine=engine, chunks=chunks) as ds:
+        ds = filter_all_from_dims(ds)
         ds_filled = ds.fillna(0)
         out = ds_filled.map(_reduce_one).load()
         save2nc(out, dst_file)
@@ -379,8 +380,8 @@ def calculate_policy_cost(year, output_path, run_all_names, cost_category, polic
         output_filename = f'xr_cost_{cost_category}_{output_subdir}_{year}.nc'
 
         with xr.open_dataset(profit_file_A,chunks='auto') as ds_A, xr.open_dataset(profit_file_B,chunks='auto') as ds_B:
-            filtered_da = filter_all_from_dims(ds_A)
-            filtered_da = filter_all_from_dims(ds_B)
+            ds_A = filter_all_from_dims(ds_A)
+            ds_B = filter_all_from_dims(ds_B)
 
             policy_cost = ds_A - ds_B
             save2nc(policy_cost, os.path.join(output_dir, output_filename))
@@ -620,10 +621,10 @@ def main(task_dir, njobs):
                 for f in copy_files:
                     if njobs == 0:
                         for year in years:
-                            copy_single_file(origin_path_name, target_path_name, f, year,dims_to_sum=())
+                            copy_single_file(origin_path_name, target_path_name, f, year,dims_to_sum=('source'))
                     else:
                         Parallel(n_jobs=njobs)(
-                            delayed(copy_single_file)(origin_path_name, target_path_name, f, year,dims_to_sum=())
+                            delayed(copy_single_file)(origin_path_name, target_path_name, f, year,dims_to_sum=('source'))
                             for year in years
                         )
 
@@ -657,7 +658,7 @@ def main(task_dir, njobs):
             data_path_name = os.path.join(output_path, input_files[i])
             amortize_costs(data_path_name, amortize_files[0], years, njobs=njobs)
     else:
-        Parallel(n_jobs=2, backend="loky")(
+        Parallel(n_jobs=7, backend="loky")(
             delayed(amortize_costs)(
                 os.path.join(output_path, run_name),  # data_path_name
                 amortize_files[0],  # 你的第二个参数
