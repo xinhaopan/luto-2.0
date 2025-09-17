@@ -92,4 +92,8 @@ input_files_2 = [
 ]
 input_files = input_files_0 + input_files_1 + input_files_2
 
-
+carbon_names = ['carbon_low', 'carbon_high']
+carbon_bio_names = [
+        'carbon_low_bio_10', 'carbon_low_bio_20', 'carbon_low_bio_30', 'carbon_low_bio_40', 'carbon_low_bio_50',
+        'carbon_high_bio_10', 'carbon_high_bio_20', 'carbon_high_bio_30', 'carbon_high_bio_40', 'carbon_high_bio_50'
+    ]

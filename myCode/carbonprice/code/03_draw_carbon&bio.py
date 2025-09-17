@@ -99,7 +99,7 @@ def create_profit(excel_path: str) -> pd.DataFrame:
 
 def stacked_area_pos_neg(
         ax, df, colors=None, alpha=0.60,
-        title_name='', ylabel='',
+        title_name='', ylabel='', n_bins=5,
         add_line=True, n_col=1, show_legend=False, bbox_to_anchor=(0.5, -0.25)
 ):
     """
@@ -162,7 +162,7 @@ def stacked_area_pos_neg(
         cum_neg += neg
 
     # ---- 5. 轴和外观 ----
-    ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=n_bins, prune='both'))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
     ax.set_xlim(df.index.min(), df.index.max())
 
@@ -239,32 +239,62 @@ def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0):
                )
 
 
+def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0):
+    """
+    绘制调整过布局的图例。
+    - bbox_to_anchor 控制整体位置 (x=0.85 使其左移)。
+    - ncol=2 设置为两列。
+    - column_spacing=1.0 减小列间距。
+    """
+    fig = ax.get_figure()
+    handles, labels = ax.get_legend_handles_labels()
+
+    # ... (创建 new_handles 的代码保持不变) ...
+    new_handles = []
+    for h in handles:
+        if isinstance(h, Patch):
+            new_handles.append(
+                Patch(facecolor=h.get_facecolor(), edgecolor=h.get_edgecolor(), linewidth=h.get_linewidth()))
+        elif isinstance(h, Line2D):
+            new_handles.append(Line2D([0], [0], color=h.get_color(), linestyle=h.get_linestyle(),
+                                      linewidth=h.get_linewidth(), marker=h.get_marker(),
+                                      markersize=h.get_markersize(), markerfacecolor=h.get_markerfacecolor(),
+                                      markeredgecolor=h.get_markeredgecolor()))
+        else:
+            new_handles.append(h)
+
+    # 关键修改：应用新的布局参数
+    fig.legend(handles=new_handles, labels=labels, loc='upper center',
+               bbox_to_anchor=bbox_to_anchor,
+               ncol=ncol,
+               frameon=False,
+               handlelength=1.0,
+               handleheight=1.0,
+               handletextpad=0.4,
+               labelspacing=0.3,
+               columnspacing=column_spacing  # <--- 控制列间距
+               )
+
+
 task_name = config.TASK_NAME
 base_path = f"../../../output/{task_name}/carbon_price/0_base_data"
 excel_path = f"../../../output/{task_name}/carbon_price/1_excel"
 figure_path = f"../../../output/{task_name}/carbon_price/3_Paper_figure"
 
-input_files_0 = config.input_files_0
 input_files_1 = config.input_files_1
 input_files_2 = config.input_files_2
 
-carbon_names = ['carbon_low', 'carbon_high']
-carbon_bio_names = [
-        'carbon_low_bio_10', 'carbon_low_bio_20', 'carbon_low_bio_30', 'carbon_low_bio_40', 'carbon_low_bio_50',
-        'carbon_high_bio_10', 'carbon_high_bio_20', 'carbon_high_bio_30', 'carbon_high_bio_40', 'carbon_high_bio_50'
-    ]
-
-title_names = [
-    # --- Low Group ---
+title_carbon_names = [
     '$\mathrm{GHG}_{\mathrm{low}}$',
+    '$\mathrm{GHG}_{\mathrm{high}}$']
+
+title_bio_names = [
     '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{10}}$',
     '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{20}}$',
     '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{30}}$',
     '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{40}}$',
     '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{50}}$',
 
-    # --- High Group ---
-    '$\mathrm{GHG}_{\mathrm{high}}$',
     '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{10}}$',
     '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{20}}$',
     '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{30}}$',
@@ -272,90 +302,84 @@ title_names = [
     '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$'
 ]
 
-profit_0_list = []
-for input_file in input_files_0:
-    # 在实际使用中，取消下面的注释
-    profit_0_list.append(create_profit(os.path.join(excel_path, f'0_Origin_economic_{input_file}.xlsx')))
-profit_1_list = []
+all_carbon = []
 for input_file in input_files_1:
-    # 在实际使用中，取消下面的注释
-    profit_1_list.append(create_profit(os.path.join(excel_path, f'0_Origin_economic_{input_file}.xlsx')))
-profit_2_list = []
-for input_file in input_files_2:
-    # 在实际使用中，取消下面的注释
-    profit_2_list.append(create_profit(os.path.join(excel_path, f'0_Origin_economic_{input_file}.xlsx')))
-
-
-all_dfs = []
-bio_nums = int(len(input_files_2)/len(input_files_1))
-for i in range(len(input_files_1)):
-    df = profit_0_list[0] - profit_1_list[i]
-    df.columns = df.columns.str.replace('profit', '')
-    df['Total'] = df.sum(axis=1)
-    df.to_excel(os.path.join(excel_path, f'1_Cost_{carbon_names[i]}.xlsx'))
+    df = pd.read_excel(os.path.join(excel_path, f'1_Processed_carbon_{input_file}.xlsx'), index_col=0)
     df = df.loc[df.index >= config.START_YEAR].copy()
-    all_dfs.append(df / 1e3)
-    for j in range(bio_nums):
-        df = profit_1_list[i] - profit_2_list[i*bio_nums+j]
-        df.columns = df.columns.str.replace('profit', 'cost')
-        df['Total'] = df.sum(axis=1)
-        df.to_excel(os.path.join(excel_path, f'1_Cost_{carbon_bio_names[i*bio_nums+j]}.xlsx'))
-        df = df.loc[df.index >= config.START_YEAR].copy()
-        all_dfs.append(df / 1e3)
+    all_carbon.append(df)
 
-set_plot_style(font_size=30)
-global_ymin = float('inf')
-global_ymax = float('-inf')
+all_bio = []
+for input_file in input_files_2:
+    df = pd.read_excel(os.path.join(excel_path, f'1_Processed_bio_{input_file}.xlsx'), index_col=0)
+    df = df.loc[df.index >= config.START_YEAR].copy()
+    all_bio.append(df)
 
-for df in all_dfs:
-    # 假设您的函数是基于正负值堆叠的
-    positive_sum = df[df > 0].sum(axis=1).max() / 2
-    negative_sum = df[df < 0].sum(axis=1).min() / 2
-    if positive_sum > global_ymax:
-        global_ymax = positive_sum
-    if negative_sum < global_ymin:
-        global_ymin = negative_sum
+colors_carbon = ['#f8e17e', '#f5825c', '#4da5a8', '#b44384']
+carbon_ymin = min(df['Total'].min() for df in all_carbon)
+carbon_ymax = max(df['Total'].max() for df in all_carbon)
 
-# 为了美观，可以稍微扩大范围
-y_buffer = (global_ymax - global_ymin) * 0.05
-global_ymin -= y_buffer
-global_ymax += y_buffer
+colors_bio = ['#f8e17e', '#f5825c', '#4da5a8']
+bio_ymin = min(df['Total'].min() for df in all_bio)
+bio_ymax = max(df['Total'].max() for df in all_bio)
 
-# --- 3. 创建复杂的子图布局 ---
-fig = plt.figure(figsize=(22, 8))
-# 调整 gridspec 参数以给左侧的Y轴标题留出空间
-gs = gridspec.GridSpec(2, 6, figure=fig, hspace=0.3, wspace=0.1, left=0.1, right=0.98, top=0.9, bottom=0.2)
-colors = ['#f39b8b', '#9A8AB3', '#6eabb1', '#eb9132', '#84a374']
-axes = [fig.add_subplot(gs[i, j]) for i in range(2) for j in range(6)]
+# --- 4. 创建 3x5 子图布局 ---
+set_plot_style(font_size=24)
+fig = plt.figure(figsize=(20, 12))
 
-# --- 4. 循环绘制并应用格式化 ---
-for i, (ax, df, title) in enumerate(zip(axes, all_dfs, title_names)):
-    stacked_area_pos_neg(
-        ax, df, colors=colors,
-        title_name=title,
-        ylabel='',  # ylabel 将由全局标题处理
-        show_legend=False
-    )
+# 步骤 1: 创建一个 3x5 的主网格
+gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.5, wspace=0.2)
 
-    # **核心步骤：设置统一的Y轴和控制刻度标签**
+# --- 绘制 Carbon 图 (第一行前两个) ---
+ax_carbon_list = []
+for i in range(2):
+    ax = fig.add_subplot(gs[0, i])
+    stacked_area_pos_neg(ax, all_carbon[i], colors_carbon, title_name=title_carbon_names[i])
+    ax.set_ylim(carbon_ymin, carbon_ymax)
+    x_data = all_bio[i].index
+    start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
+    tick_positions = [start_tick, middle_tick, end_tick]
+    ax.tick_params(axis='x', labelbottom=False)
+    ax_carbon_list.append(ax)
 
-    # 1. 设置统一的Y轴范围
-    ax.set_ylim(global_ymin, global_ymax)
+# 设置共享Y轴，并控制刻度标签
+# 修改 GHGhigh 图的 Y 轴刻度
+ax_carbon_list[1].set_yticks([0, 100, 200, 300, 400])
+ax_carbon_list[0].sharey(ax_carbon_list[1])
+ax_carbon_list[1].tick_params(axis='y', labelleft=False)  # 只让最左边的显示Y刻度
 
-    # 2. 控制Y轴刻度标签：只有第0列的图显示
-    # i % 6 计算的是当前子图所在的列索引
-    if i % 6 != 0:
-        ax.tick_params(axis='y', which='both', labelleft=False)
+# --- 创建图例区域 (第一行后三个合并) ---
+legend_ax = fig.add_subplot(gs[0, 2:])  # 使用切片 gs[0, 2:] 来合并单元格
+legend_ax.axis('off')  # 关闭坐标轴
 
-    # 3. 控制X轴刻度标签：只有最下面一行（第1行）的图显示
-    # i // 6 计算的是当前子图所在的行索引
+# --- 绘制 Bio 图 (后两行) ---
+ax_bio_list = []
+shared_bio_ax = None  # 用于共享Y轴的参考轴
 
-    x_data = df.index
+for i in range(10):
+    row = i // 5 + 1  # +1 让行号从 1 和 2 开始 (主网格的第二、三行)
+    col = i % 5
+
+    # 共享Y轴的设置
+    if shared_bio_ax is None:
+        ax = fig.add_subplot(gs[row, col])
+        shared_bio_ax = ax  # 第一个bio图作为共享Y轴的基准
+    else:
+        ax = fig.add_subplot(gs[row, col], sharey=shared_bio_ax)
+
+    stacked_area_pos_neg(ax, all_bio[i], colors_bio, title_name=title_bio_names[i])
+    # set_ylim 会被 sharey 覆盖，所以只需在基准轴上设置一次即可
+
+    # 控制Y轴刻度：只在最左边一列 (col==0) 显示
+    if col != 0:
+        ax.tick_params(axis='y', labelleft=False)
+
+    # 控制X轴刻度：只在最下面一行 (row==2) 显示
+    x_data = all_bio[i].index
     start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
     tick_positions = [start_tick, middle_tick, end_tick]
 
     ax.set_xticks(tick_positions)
-    if i // 6 == 1:
+    if row == 2:
         # 如果是，则设置三个刻度并微调对齐方式
 
         ax.tick_params(axis='x')  # 在这里设置您想要的字体大小
@@ -369,10 +393,18 @@ for i, (ax, df, title) in enumerate(zip(axes, all_dfs, title_names)):
         # **关键补充**：如果不是最下面一行，则明确地隐藏X轴的刻度标签
         ax.tick_params(axis='x', labelbottom=False)
 
-# --- 5. 添加全局Y轴标题 ---
-# 使用 fig.supylabel() 可以方便地在整个图表的左侧添加一个居中的标题
-fig.supylabel('Cost (Billion AU$)', x=0.04, fontsize=30)
+    ax_bio_list.append(ax)
 
-draw_legend(axes[0], bbox_to_anchor=(0.5, 0.18), ncol=3, column_spacing=1.0)
-plt.savefig(os.path.join(figure_path, '04_Cost_all_scenarios.png'), dpi=300)
+# 在基准轴上设置Y轴范围
+# shared_bio_ax.set_ylim(bio_ymin, bio_ymax)
+shared_bio_ax.set_ylim(0, 90)
+shared_bio_ax.set_yticks([0, 30, 60, 90])
+
+# --- 5. 添加全局Y轴标签 ---
+ax_carbon_list[0].set_ylabel(r"Carbon benefit (tCO$_2$e$^{-1}$)", y=0.4)
+ax_bio_list[0].set_ylabel(r"Biodiversity benefit (ha$^{-1}$)", y=-0.2)
+fig.align_ylabels([ax_carbon_list[0], ax_bio_list[0]])
+
+draw_legend(ax_carbon_list[0], bbox_to_anchor=(0.55, 0.85), ncol=2)
+plt.savefig(os.path.join(figure_path, '05_Carbon&bio.png'), dpi=300, bbox_inches='tight')
 plt.show()

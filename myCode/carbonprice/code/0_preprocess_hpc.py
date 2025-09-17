@@ -3,19 +3,15 @@ import subprocess
 import shutil
 
 # ==============================================================================
-#  配置区域 (已大幅简化)
+#  配置区域
 # ==============================================================================
-
-CPU_CORES = 96
+CPU_CORES = 96             # 如需更稳，可改 36~40；不改也行，下面会用 LOKY_MAX_CPU_COUNT 限制
 MEMORY_GB = "1500G"
 TIME_LIMIT = "0-720:00:00"
 
-# 要运行的Python脚本
 PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"
-# 要激活的Conda环境名称
 CONDA_ENV_NAME = "xpluto-fixed"
 
-# 生成的提交脚本名称
 SUBMISSION_SCRIPT_NAME = "submit_preprocess.sh"
 
 # ==============================================================================
@@ -23,13 +19,11 @@ SUBMISSION_SCRIPT_NAME = "submit_preprocess.sh"
 def create_and_submit_hpc_job():
     """
     动态创建Slurm提交脚本并使用sbatch提交作业。
-    【采纳您的建议】: 使用 `source ~/.bashrc` 来初始化环境，简单可靠。
+    重点：加入并行/临时目录/句柄数等保护，缓解 joblib/loky 报错（_SemLock FileNotFound 等）。
     """
-    print("--- HPC作业启动脚本 (根据您的建议优化) ---")
+    print("--- HPC作业启动脚本（增强稳健性） ---")
 
-    # 1. 定义Slurm提交脚本的内容
     slurm_script_content = f"""#!/bin/bash
-
 #SBATCH --job-name=carbon_preprocess
 #SBATCH --partition=mem
 #SBATCH --nodelist=hpc-fc-b-1
@@ -39,43 +33,74 @@ def create_and_submit_hpc_job():
 #SBATCH --time={TIME_LIMIT}
 #SBATCH --output=slurm_output_%j.out
 #SBATCH --error=slurm_error_%j.err
+# 可选：如果集群支持，避免 SMT 线程干扰
+##SBATCH --hint=nomultithread
 
 echo "========================================================="
 echo "作业ID: $SLURM_JOB_ID"
+echo "节点  : $(hostname)"
 echo "开始时间: $(date)"
+echo "CPUs  : $SLURM_CPUS_PER_TASK"
+echo "TMPDIR: ${SLURM_TMPDIR:-/tmp}"
 echo "========================================================="
 
-# --- 步骤 1: 加载您的个人 shell 配置文件 (推荐方法) ---
-# 这会加载 Conda 初始化以及您所有的个人设置。
-echo "正在加载用户的 shell 配置文件: source ~/.bashrc"
-source ~/.bashrc
-if [ $? -ne 0 ]; then
-    echo "警告: 'source ~/.bashrc' 执行时遇到问题，但这可能不影响后续步骤。"
-fi
+# --- 环境保护：限制内部库并行、设置本地临时目录、提升句柄上限 ---
+# 这些变量能显著降低 joblib/loky 出错概率（SemLock丢失/进程被杀）
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export NUMBA_NUM_THREADS=1
+export MKL_DYNAMIC=FALSE
 
-# --- 步骤 2: 激活您的 xpluto 环境 ---
-echo "正在激活 Conda 环境: {CONDA_ENV_NAME}"
+# joblib 临时文件与 memmap 放到节点本地盘，避免 NFS 竞争
+export JOBLIB_TEMP_FOLDER="{{${{SLURM_TMPDIR}}:-/tmp}}"
+export TMPDIR="{{${{SLURM_TMPDIR}}:-/tmp}}"
+
+# 告诉 loky 不要超配核数
+export LOKY_MAX_CPU_COUNT="${{SLURM_CPUS_PER_TASK}}"
+
+# （可选）允许更多打开文件句柄（大量 memmap 时有用）
+ulimit -n 65535 2>/dev/null || true
+
+# 打印可用内存与磁盘，便于排障
+command -v free >/dev/null 2>&1 && free -h || true
+df -h "$JOBLIB_TEMP_FOLDER" "$TMPDIR" 2>/dev/null || true
+
+# --- 步骤 1: 加载你的 shell 配置（含 conda 初始化） ---
+echo "source ~/.bashrc"
+source ~/.bashrc || echo "警告: source ~/.bashrc 失败（继续执行）"
+
+# --- 步骤 2: 激活 Conda 环境 ---
+echo "conda activate {CONDA_ENV_NAME}"
 conda activate {CONDA_ENV_NAME}
 if [ $? -ne 0 ]; then
-    echo "错误: 无法激活 Conda 环境 '{CONDA_ENV_NAME}'。"
-    echo "请确认 'conda init' 已在您的 ~/.bashrc 文件中正确配置。"
+    echo "错误: 无法激活 Conda 环境 '{CONDA_ENV_NAME}'"
     exit 1
 fi
 
-echo "Conda 环境已激活。当前 Python 路径: $(which python)"
+echo "Python: $(which python)"
+python --version
 echo "---------------------------------------------------------"
 
-# --- 步骤 3: 运行您的 Python 脚本 ---
-echo "开始执行 Python 脚本: {PYTHON_SCRIPT_TO_RUN}"
+# （可选）若 0_Preprocess.py 使用 joblib：
+#   - 请读取环境变量 n_jobs = min(int(os.getenv("LOKY_MAX_CPU_COUNT", 1))-5, 40)
+#   - Parallel(..., max_nbytes="256M", temp_folder=os.getenv("JOBLIB_TEMP_FOLDER"))
+#   - 避免内外层并行叠加，内层库线程保持 1（已在上面环境变量限制）
+
+# --- 步骤 3: 执行 Python 脚本 ---
+echo "运行: python {PYTHON_SCRIPT_TO_RUN}"
 python {PYTHON_SCRIPT_TO_RUN}
+rc=$?
 
 echo "========================================================="
-echo "Python 脚本执行完毕。"
 echo "结束时间: $(date)"
+echo "退出码: $rc"
 echo "========================================================="
+exit $rc
 """
 
-    # 2. 创建并提交作业 (这部分逻辑不变)
     try:
         with open(SUBMISSION_SCRIPT_NAME, "w") as f:
             f.write(slurm_script_content)
