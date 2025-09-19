@@ -4,13 +4,13 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250908_Paper2_Results_NCI'],
+    'TASK_NAME': ['20250919_Paper2_Results_NCI'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['48GB'],
-    'NCPUS': ['12'],
+    'MEM': ['60GB'],
+    'NCPUS': ['15'],
     'WRITE_THREADS': ['2'],
     'TIME': ['15:00:00'],
 

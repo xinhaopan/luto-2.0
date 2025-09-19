@@ -686,20 +686,20 @@ def main(task_dir, njobs):
                             for year in years[1:]
                         )
 
-    if njobs == 0:
-        for i in range(len(input_files)):
-            data_path_name = os.path.join(output_path, input_files[i])
-            amortize_costs(data_path_name, amortize_files[0], years, njobs=njobs)
-    else:
-        Parallel(n_jobs=7, backend="loky")(
-            delayed(amortize_costs)(
-                os.path.join(output_path, run_name),  # data_path_name
-                amortize_files[0],  # 你的第二个参数
-                years,
-                njobs=math.ceil(njobs/7)  # 传给内部的并行参数（若有）
-            )
-            for run_name in input_files
-        )
+    # if njobs == 0:
+    #     for i in range(len(input_files)):
+    #         data_path_name = os.path.join(output_path, input_files[i])
+    #         amortize_costs(data_path_name, amortize_files[0], years, njobs=njobs)
+    # else:
+    #     Parallel(n_jobs=7, backend="loky")(
+    #         delayed(amortize_costs)(
+    #             os.path.join(output_path, run_name),  # data_path_name
+    #             amortize_files[0],  # 你的第二个参数
+    #             years,
+    #             njobs=math.ceil(njobs/7)  # 传给内部的并行参数（若有）
+    #         )
+    #         for run_name in input_files
+    #     )
     tprint("摊销成本计算 完成!")
     #
     ##--- 阶段 2: 独立汇总计算 ---

@@ -216,13 +216,10 @@ os.makedirs(excel_path, exist_ok=True)
 njobs = math.ceil(41/2)
 task_dir = f'../../../output/{config.TASK_NAME}/carbon_price/0_base_data'
 years = list(range(2011,2051,1))
-for input_file in input_files_1:
+for input_file in input_files:
     print(f"carbon: {input_file}")
     df = summarize_netcdf_to_excel(input_file, years, carbon_files,njobs,'carbon')
-for input_file in input_files_2:
-    print(f"carbon: {input_file}")
-    df = summarize_netcdf_to_excel(input_file, years, carbon_files,njobs,'carbon')
-for input_file in input_files_2:
+for input_file in input_files:
     print(f"biodiversity: {input_file}")
     df = summarize_netcdf_to_excel(input_file, years, bio_files,njobs,'biodiversity')
 for input_file in input_files:
@@ -264,7 +261,7 @@ for i in range(bio_nums):
 
 
 # -----------------------------------make excel 1_processed carbon/bio---------------------------------------
-for input_file in input_files_1:
+for input_file in input_files:
     df = pd.read_excel(os.path.join(excel_path, f'0_Origin_carbon_{input_file}.xlsx'), index_col=0)
     df.columns = df.columns.str.replace(' GHG', '')
     new_rows_list = []
@@ -290,7 +287,7 @@ for input_file in input_files_1:
     new_df['Total'] = new_df.sum(axis=1)
     new_df.to_excel(os.path.join(excel_path, f'1_Processed_carbon_{input_file}.xlsx'))
 
-for input_file in input_files_2:
+for input_file in input_files:
     df = pd.read_excel(os.path.join(excel_path, f'0_Origin_biodiversity_{input_file}.xlsx'), index_col=0)
     df.columns = df.columns.str.replace(' biodiversity', '')
     new_rows_list = []
@@ -313,31 +310,6 @@ for input_file in input_files_2:
     new_df.index = df.index[1:]
     new_df['Total'] = new_df.sum(axis=1)
     new_df.to_excel(os.path.join(excel_path, f'1_Processed_bio_{input_file}.xlsx'))
-    # -----------------------------------------------------------------------------------------------------------
-    df = pd.read_excel(os.path.join(excel_path, f'0_Origin_carbon_{input_file}.xlsx'), index_col=0)
-    df.columns = df.columns.str.replace(' GHG', '')
-    new_rows_list = []
-
-    # 从第二行开始循环 (索引 i 从 1 到 df 的末尾)
-    for i in range(1, len(df)):
-        # 取出当前行并取负
-        new_row = df.iloc[i].copy()
-        new_row = new_row * -1
-
-        # 关键步骤：新行的第一列 = (原值取负) + (原df中上一行第一列的值)
-        new_row.iloc[0] = -df.iloc[i, 0] + df.iloc[i - 1, 0]
-
-        # 将计算出的新行（这是一个 Series）添加到列表中
-        new_rows_list.append(new_row)
-
-    # 使用收集到的行列表一次性创建新的 DataFrame
-    # 这样做比在循环中反复 concat 更高效
-    new_df = pd.DataFrame(new_rows_list)
-
-    # 将新 DataFrame 的索引设置为与原数据对应（从 1 开始）
-    new_df.index = df.index[1:]
-    new_df['Total'] = new_df.sum(axis=1)
-    new_df.to_excel(os.path.join(excel_path, f'1_Processed_carbon_{input_file}.xlsx'))
 
 # -----------------------------------make excel 2_cost & carbon/bio & average price---------------------------------------
 colnames = ["GHG benefits (Mt CO2e)", "Carbon cost (M AUD$)", "Average Carbon price (AUD$/t CO2e)"]
