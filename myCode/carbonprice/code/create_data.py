@@ -122,9 +122,11 @@ base_path = f"../../../output/{task_name}/carbon_price/0_base_data"
 
 years = list(range(2011, 2051))
 
+env_names = config.carbon_names + config.carbon_bio_names
 cost_category = ['xr_cost_ag', 'xr_cost_agricultural_management', 'xr_cost_non_ag','xr_cost_transition_ag2ag_diff','xr_transition_cost_ag2non_ag_amortised_diff']
-suffix = 'carbon_high'
-xr_carbon_cost_category = load_sum_series(base_path,years,cost_category,suffix)
+for env_name in env_names:
+    for cost_category in env_names:
+        xr_carbon_cost_category = load_sum_series(base_path,years,cost_category,suffix)
 
 cost_category = ['xr_cost_ag', 'xr_cost_agricultural_management', 'xr_cost_non_ag','xr_cost_transition_ag2ag_diff','xr_transition_cost_ag2non_ag_amortised_diff']
 suffix = 'carbon_high_bio_50'
@@ -132,15 +134,15 @@ xr_bio_cost_category = load_sum_series(base_path,years,cost_category,suffix)
 save2nc(xr_carbon_cost_category,os.path.join(base_path, 'Results', "xr_carbon_cost_category.nc"))
 save2nc(xr_bio_cost_category,os.path.join(base_path, 'Results', "xr_bio_cost_category.nc"))
 
-xr_carbon_cost_tn = create_xarray(years, base_path,'carbon_high','transition_cost_ag2non_ag_amortised_diff_carbon_high')
-xr_carbon_cost_tn = xr_carbon_cost_tn.sum(dim=['From land-use','cell'])
-save2nc(xr_carbon_cost_tn,os.path.join(base_path, 'Results', "xr_carbon_cost_tn.nc"))
-
-xr_carbon_cost_tn = create_xarray(years, base_path,'carbon_high','transition_cost_ag2non_ag_amortised_diff_carbon_high')
-xr_carbon_cost_tn = xr_carbon_cost_tn.sum(dim=['From land-use','cell'])
-save2nc(xr_carbon_cost_tn,os.path.join(base_path, 'Results', "xr_carbon_cost_tn.nc"))
-
-xr_carbon_cost_tn = create_xarray(years, base_path,'carbon_high_bio_50','transition_cost_ag2non_ag_amortised_diff_carbon_high_bio_50')
-xr_carbon_cost_tn = xr_carbon_cost_tn.sum(dim=['From land-use','cell'])
-save2nc(xr_carbon_cost_tn,os.path.join(base_path, 'Results', "xr_bio_cost_tn.nc"))
+# xr_carbon_cost_tn = create_xarray(years, base_path,'carbon_high','transition_cost_ag2non_ag_amortised_diff_carbon_high')
+# xr_carbon_cost_tn = xr_carbon_cost_tn.sum(dim=['From land-use','cell'])
+# save2nc(xr_carbon_cost_tn,os.path.join(base_path, 'Results', "xr_carbon_cost_tn.nc"))
+#
+# xr_carbon_cost_tn = create_xarray(years, base_path,'carbon_high','transition_cost_ag2non_ag_amortised_diff_carbon_high')
+# xr_carbon_cost_tn = xr_carbon_cost_tn.sum(dim=['From land-use','cell'])
+# save2nc(xr_carbon_cost_tn,os.path.join(base_path, 'Results', "xr_carbon_cost_tn.nc"))
+#
+# xr_carbon_cost_tn = create_xarray(years, base_path,'carbon_high_bio_50','transition_cost_ag2non_ag_amortised_diff_carbon_high_bio_50')
+# xr_carbon_cost_tn = xr_carbon_cost_tn.sum(dim=['From land-use','cell'])
+# save2nc(xr_carbon_cost_tn,os.path.join(base_path, 'Results', "xr_bio_cost_tn.nc"))
 

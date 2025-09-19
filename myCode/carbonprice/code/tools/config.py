@@ -97,3 +97,6 @@ carbon_bio_names = [
         'carbon_low_bio_10', 'carbon_low_bio_20', 'carbon_low_bio_30', 'carbon_low_bio_40', 'carbon_low_bio_50',
         'carbon_high_bio_10', 'carbon_high_bio_20', 'carbon_high_bio_30', 'carbon_high_bio_40', 'carbon_high_bio_50'
     ]
+counter_carbon_bio_names = ['Counterfactual_carbon_low_bio_10', 'Counterfactual_carbon_low_bio_20', 'Counterfactual_carbon_low_bio_30', 'Counterfactual_carbon_low_bio_40', 'Counterfactual_carbon_low_bio_50',
+        'Counterfactual_carbon_high_bio_10', 'Counterfactual_carbon_high_bio_20', 'Counterfactual_carbon_high_bio_30', 'Counterfactual_carbon_high_bio_40', 'Counterfactual_carbon_high_bio_50'
+    ]

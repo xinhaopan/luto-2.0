@@ -175,7 +175,7 @@ def create_summary(env_category, years, base_path, colnames):
     return df
 
 def create_profit_for_cost(excel_dir,input_file: str) -> pd.DataFrame:
-    os.path.join(excel_dir, f'0_Origin_economic_{input_file}.xlsx')
+    excel_path = os.path.join(excel_dir, f'0_Origin_economic_{input_file}.xlsx')
     original_df = pd.read_excel(excel_path, index_col=0)
     profit_df = pd.DataFrame()
 
@@ -212,10 +212,10 @@ carbon_bio_names = [
 
 base_path = f"../../../output/{config.TASK_NAME}/carbon_price/0_base_data"
 excel_path = f"../../../output/{config.TASK_NAME}/carbon_price/1_excel"
-figure_path = f"../../../output/{config.TASK_NAME}/carbon_price/2_figure"
+os.makedirs(excel_path, exist_ok=True)
 
 # ---------------------------------------make excel 0_origin economic/carbon/bio---------------------------------------
-njobs = math.ceil(41 / 8)
+njobs = math.ceil(41/2)
 task_dir = f'../../../output/{config.TASK_NAME}/carbon_price/0_base_data'
 years = list(range(2011,2051,1))
 # for input_file in input_files_1:
@@ -224,9 +224,9 @@ years = list(range(2011,2051,1))
 # for input_file in input_files_2:
 #     print(f"biodiversity: {input_file}")
 #     df = summarize_netcdf_to_excel(input_file, years, bio_files,njobs,'biodiversity')
-for input_file in input_files:
-    print(f"economic: {input_file}")
-    df = summarize_netcdf_to_excel(input_file, years, economic_files,njobs,'economic')
+# for input_file in input_files:
+#     print(f"economic: {input_file}")
+#     df = summarize_netcdf_to_excel(input_file, years, economic_files,njobs,'economic')
 
 # ---------------------------------------make excel 1_cost---------------------------------------
 profit_0_list = []
@@ -242,13 +242,20 @@ for input_file in input_files_2:
     # 在实际使用中，取消下面的注释
     profit_2_list.append(create_profit_for_cost(excel_path, input_file))
 
-all_dfs = []
 bio_nums = int(len(input_files_2)/len(input_files_1))
 for i in range(len(input_files_1)):
     df = profit_0_list[0] - profit_1_list[i]
     df.columns = df.columns.str.replace('profit', '')
     df['Total'] = df.sum(axis=1)
     df.to_excel(os.path.join(excel_path, f'1_Cost_{carbon_names[i]}.xlsx'))
+for i in range(len(input_files_1)):
+    for j in range(bio_nums):
+        idx = i * bio_nums + j
+        df = profit_1_list[i] - profit_2_list[idx]
+        df.columns = df.columns.str.replace('profit', '')
+        df['Total'] = df.sum(axis=1)
+        df.to_excel(os.path.join(excel_path, f'1_Cost_{carbon_bio_names[idx]}.xlsx'))
+
 
 # -----------------------------------make excel 1_processed carbon/bio---------------------------------------
 for input_file in input_files_1:
@@ -302,10 +309,10 @@ for input_file in input_files_2:
     new_df.to_excel(os.path.join(excel_path, f'1_Processed_bio_{input_file}.xlsx'))
 
 # -----------------------------------make excel 2_cost & carbon/bio & average price---------------------------------------
-colnames = ["GHG benefits (Mt CO2e)", "Carbon cost (M AUD$)", "Average Carbon price (AUD$/t CO2e)"]
-for carbon_name in carbon_names:
-    create_summary(carbon_name, years, base_path, colnames)
-
-colnames = ["Biodiversity benefits (Mt CO2e)", "Biodiversity cost (M AUD$)", "Average Biodiversity price (AUD$/t CO2e)"]
-for bio_name in carbon_bio_names:
-    create_summary(bio_name, years, base_path, colnames)
+# colnames = ["GHG benefits (Mt CO2e)", "Carbon cost (M AUD$)", "Average Carbon price (AUD$/t CO2e)"]
+# for carbon_name in carbon_names:
+#     create_summary(carbon_name, years, base_path, colnames)
+#
+# colnames = ["Biodiversity benefits (Mt CO2e)", "Biodiversity cost (M AUD$)", "Average Biodiversity price (AUD$/t CO2e)"]
+# for bio_name in carbon_bio_names:
+#     create_summary(bio_name, years, base_path, colnames)

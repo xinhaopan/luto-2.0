@@ -166,51 +166,69 @@ class StretchHighLowNormalize(mcolors.Normalize):
 
 def efficient_tif_plot(
         ax,
-        # ==== 栅格参数 ====
-        tif_file,  # GeoTIFF 路径
-        cmap='terrain',  # 栅格颜色映射
-        interpolation='nearest',  # 栅格插值方式
-
-        # ==== 色条参数 ====
-        title_name='',  # 图标题
-        unit_name='',  # 色条单位
-
-        # ==== 矢量参数 ====
-        shp=None,  # 矢量文件路径或 GeoDataFrame
-        line_color='black',  # 矢量线颜色
-        line_width=1,  # 矢量线宽
-
-        # ==== 图例（色条）参数 ====
+        tif_file,
+        cmap='terrain',
+        interpolation='nearest',
+        title_name='',
+        unit_name='',
+        shp=None, line_color='black', line_width=1,
         legend_width="55%", legend_height="6%",
-        legend_loc='lower left',
-        legend_bbox_to_anchor=(0, 0, 1, 1),
-        legend_borderpad=1,
-        legend_nbins=5,
-        char_ticks_length=3,  # 色条刻度标签长度
-        char_ticks_pad=1,  # 色条刻度标签与色条的距离
-
-        # ==== 标题位置 ====
-        title_y=1,
-        unit_labelpad=3,
-
-        # ==== 新增参数：拉伸方式和小数位 ====
-        normalization='hist_eq',  # 'hist_eq', 'log', 'linear', 'stretch'
-        stretch_factor=5,  # StretchHighLowNormalize 的拉伸因子
-        decimal_places=None,  # 小数位数，None则自动判断
-        clip_percent=None,  # 分位裁剪，例如 (2, 98)
-        custom_tick_values=False,  # 自定义刻度值，例如 [0, 0.26, 0.28, 1]
+        legend_loc='lower left', legend_bbox_to_anchor=(0, 0, 1, 1),
+        legend_borderpad=1, legend_nbins=5,
+        char_ticks_length=3, char_ticks_pad=1,
+        title_y=1, unit_labelpad=3,
+        normalization='hist_eq', stretch_factor=5,
+        decimal_places=None, clip_percent=None,
+        custom_tick_values=False,
 ):
-    # === 读取栅格 ===
+    # --- 读取为 MaskedArray，并按 nodata 掩膜 ---
     with rasterio.open(tif_file) as src:
         bounds = src.bounds
-        data = src.read(1, masked=True)
-        extent = (bounds.left, bounds.right, bounds.bottom, bounds.top)
+        raw_data = src.read(1)  # 先读取原始数据，不使用masked=True
+        nodata = src.nodata
         raster_crs = src.crs
+        extent = (bounds.left, bounds.right, bounds.bottom, bounds.top)
 
-    # CRS 转换
+
+    # ✅ 关键修改1：手动创建更严格的掩膜
+    mask = np.zeros(raw_data.shape, dtype=bool)
+
+    # 掩膜 nodata 值
+    if nodata is not None:
+        mask |= (raw_data == nodata)
+
+    # 掩膜 NaN 和无穷值
+    mask |= ~np.isfinite(raw_data)
+
+    # ✅ 关键修改2：掩膜极小值（可能是填充的0值）
+    mask |= (raw_data <= 0)  # 根据您的数据特点，成本应该>0
+
+    # 调试信息
+    print(f"Raw data range: {raw_data.min()} to {raw_data.max()}")
+    print(f"Raw data unique values (first 10): {np.unique(raw_data)[:10]}")
+    print(f"Mask percentage: {mask.sum() / mask.size * 100:.1f}%")
+
+    # 创建MaskedArray
+    data = np.ma.masked_array(raw_data, mask=mask)
+
+    # ✅ 关键修改2：检查数据有效性
+    if np.ma.is_masked(data) and data.count() == 0:
+        print("Warning: All data is masked/invalid!")
+        return None, None
+
+    # ✅ 关键修改3：确保只有有限的有效值参与计算
+    valid_data = data.compressed()  # 获取未被掩膜的数据
+    if len(valid_data) == 0:
+        print("Warning: No valid data found!")
+        return None, None
+
+    print(f"Valid data range: {valid_data.min():.6f} to {valid_data.max():.6f}")
+    print(f"Valid pixel count: {len(valid_data)} / {data.size}")
+
+    # CRS
     data_crs = _cartopy_crs_from_raster_crs(raster_crs)
 
-    # 绘制矢量
+    # 矢量
     if shp is not None:
         gdf = gpd.read_file(shp) if isinstance(shp, str) else shp
         gdf = gdf.to_crs(raster_crs)
@@ -218,113 +236,229 @@ def efficient_tif_plot(
         minx, miny, maxx, maxy = gdf.total_bounds
         pad_x = (maxx - minx) * 0.02 or 1e-4
         pad_y = (maxy - miny) * 0.02 or 1e-4
-        west, east = minx - pad_x, maxx + pad_x
-        south, north = miny - pad_y, maxy + pad_y
-        ax.set_extent((west, east, south, north), crs=data_crs)
+        ax.set_extent((minx - pad_x, maxx + pad_x, miny - pad_y, maxy + pad_y), crs=data_crs)
 
-    # 设置标题
     ax.set_title(title_name, y=0.95)
     ax.set_axis_off()
 
-    # ==== 根据选择的归一化方法设置 norm ====
+    # --- 归一化：使用有效数据计算范围 ---
     if normalization == 'log':
-        # LogNorm归一化
-        data_safe = np.clip(data, 1e-6, None)
-        vmin = float(np.nanmin(data_safe))
-        vmax = float(np.nanmax(data_safe))
+        # log 需要正数：把 <=0 的值也掩掉
+        data_safe = np.ma.masked_less_equal(data, 0)
+        if data_safe.count() == 0:
+            print("Warning: No positive values for log normalization!")
+            return None, None
+        vmin = float(np.ma.min(data_safe))
+        vmax = float(np.ma.max(data_safe))
         norm = LogNorm(vmin=vmin, vmax=vmax)
         data_to_plot = data_safe
     elif normalization == 'linear':
-        # 线性归一化
-        vmin = float(np.nanmin(data))
-        vmax = float(np.nanmax(data))
+        vmin = float(np.ma.min(data))
+        vmax = float(np.ma.max(data))
         norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         data_to_plot = data
     elif normalization == 'stretch':
-        # 高低值拉伸归一化
-        vmin = float(np.nanmin(data))
-        vmax = float(np.nanmax(data))
+        vmin = float(np.ma.min(data))
+        vmax = float(np.ma.max(data))
         norm = StretchHighLowNormalize(vmin=vmin, vmax=vmax, stretch=stretch_factor)
         data_to_plot = data
-    else:  # 默认 'hist_eq'
-        # 直方图均衡化
-        norm = make_hist_eq_norm(data, mask=None, bins=256, clip_percent=clip_percent)
+    else:  # 'hist_eq'
+        valid_mask = ~np.ma.getmaskarray(data)
+        norm = make_hist_eq_norm(data, mask=valid_mask, bins=256, clip_percent=clip_percent)
         data_to_plot = data
 
-    # ==== 绘制栅格 ====
+    # --- ✅ 关键修改4：正确设置colormap的透明处理 ---
+    if isinstance(cmap, str):
+        cmap_obj = mpl.colormaps.get_cmap(cmap).copy()
+    else:
+        cmap_obj = cmap.copy()
+
+    # 设置无效值（掩膜/NaN）为完全透明
+    cmap_obj.set_bad(color=(0, 0, 0, 0))  # RGBA: 完全透明
+
+    # --- ✅ 关键修改5：强制设置透明并使用alpha通道 ---
+    # 创建一个RGBA数组，直接控制透明度
+    from matplotlib.colors import Normalize
+
+    # 先将数据标准化
+    if normalization == 'log':
+        norm_for_rgba = LogNorm(vmin=vmin, vmax=vmax)
+    elif normalization == 'linear':
+        norm_for_rgba = Normalize(vmin=vmin, vmax=vmax)
+    elif normalization == 'stretch':
+        norm_for_rgba = norm
+    else:  # hist_eq
+        norm_for_rgba = norm
+
+    # 将数据转换为0-1范围
+    normalized_data = norm_for_rgba(data_to_plot.filled(np.nan))
+
+    # 获取colormap
+    if isinstance(cmap, str):
+        cmap_func = mpl.colormaps.get_cmap(cmap)
+    else:
+        cmap_func = cmap
+
+    # 转换为RGBA
+    rgba_data = cmap_func(normalized_data)
+
+    # 设置掩膜区域为完全透明
+    mask_2d = np.ma.getmaskarray(data_to_plot)
+    rgba_data[mask_2d] = [0, 0, 0, 0]  # 完全透明
+
+    # 绘制RGBA数组
     im = ax.imshow(
-        data_to_plot,
+        rgba_data,
         origin='upper',
         extent=extent,
         transform=data_crs,
-        cmap=cmap,
-        norm=norm,
         interpolation=interpolation
     )
 
-    # === 色带/色条 ===
-    sm = mpl.cm.ScalarMappable(norm=norm, cmap=mpl.cm.get_cmap(cmap))
-    sm.set_array([])
-
-    # 用线性 Normalize 构造"只给图例用"的 mappable（均匀使用色带）
-    linear_sm = mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 1), cmap=cmap)
-
+    # --- 色条：沿用"均匀色带"的线性 mappable ---
+    linear_sm = mpl.cm.ScalarMappable(norm=mcolors.Normalize(0, 1), cmap=cmap_obj)
     cax = inset_axes(
-        ax,
-        width=legend_width,
-        height=legend_height,
-        loc=legend_loc,
-        borderpad=legend_borderpad,
-        bbox_to_anchor=legend_bbox_to_anchor,
+        ax, width=legend_width, height=legend_height, loc=legend_loc,
+        borderpad=legend_borderpad, bbox_to_anchor=legend_bbox_to_anchor,
         bbox_transform=ax.transAxes,
     )
-
-    cbar = plt.colorbar(
-        linear_sm, cax=cax, orientation='horizontal',
-        extend='both', extendfrac=0.1, extendrect=False
+    cbar = mpl.pyplot.colorbar(
+        linear_sm, cax=cax, orientation='horizontal', extend='both',
+        extendfrac=0.1, extendrect=False
     )
 
-    # ==== 设置刻度和标签 ====
+    # 刻度
     if custom_tick_values is not False:
-        # 使用自定义刻度值
         tick_vals_nice = custom_tick_values
-        # 映射到0-1区间
         ticks_01_nice = _forward_map_values(tick_vals_nice, norm, normalization)
     else:
-        # 均匀放置若干 tick（色带均匀）
-        if legend_nbins == 2:
-            eps = 1e-6
-            ticks_01 = np.array([eps, 1 - eps])
-        elif legend_nbins == 3:
-            ticks_01 = np.linspace(0, 1, 3)
-        else:
-            ticks_01 = np.linspace(0, 1, legend_nbins)
-
-        # 反映射为数据值
+        ticks_01 = np.linspace(0, 1, legend_nbins if legend_nbins >= 2 else 2)
         tick_vals = _inverse_map_values(ticks_01, norm, normalization)
-
-        # 数值优化
         tick_vals_nice = nice_round(tick_vals)
-
-        # 重新映射到0-1区间
         ticks_01_nice = _forward_map_values(tick_vals_nice, norm, normalization)
 
-    # 格式化标签
     tick_labels = _format_tick_labels(tick_vals_nice, decimal_places)
-
     cbar.set_ticks(ticks_01_nice)
     cbar.set_ticklabels(tick_labels)
-
-    # 其他外观设置
     cbar.outline.set_visible(False)
     cbar.ax.xaxis.set_label_position('top')
     cbar.ax.tick_params(length=char_ticks_length, pad=char_ticks_pad)
-
     if unit_name:
         cbar.set_label(unit_name, labelpad=unit_labelpad, family='Arial')
 
     ax.set_title(title_name, y=title_y, fontfamily='Arial', weight='bold')
     return im, cbar
+
+# def efficient_tif_plot(
+#         ax,
+#         tif_file,
+#         cmap='terrain',
+#         interpolation='nearest',
+#         title_name='',
+#         unit_name='',
+#         shp=None, line_color='black', line_width=1,
+#         legend_width="55%", legend_height="6%",
+#         legend_loc='lower left', legend_bbox_to_anchor=(0, 0, 1, 1),
+#         legend_borderpad=1, legend_nbins=5,
+#         char_ticks_length=3, char_ticks_pad=1,
+#         title_y=1, unit_labelpad=3,
+#         normalization='hist_eq', stretch_factor=5,
+#         decimal_places=None, clip_percent=None,
+#         custom_tick_values=False,
+# ):
+#     # --- 读取为 MaskedArray，并按 nodata 掩膜 ---
+#     with rasterio.open(tif_file) as src:
+#         bounds = src.bounds
+#         data = src.read(1, masked=True)      # MaskedArray（GDAL内部mask会带上）
+#         nodata = src.nodata
+#         if nodata is not None:
+#             data = np.ma.masked_equal(data, nodata)  # 再确保 -9999 等被掩掉
+#         raster_crs = src.crs
+#         extent = (bounds.left, bounds.right, bounds.bottom, bounds.top)
+#
+#     # CRS
+#     data_crs = _cartopy_crs_from_raster_crs(raster_crs)
+#
+#     # 矢量
+#     if shp is not None:
+#         gdf = gpd.read_file(shp) if isinstance(shp, str) else shp
+#         gdf = gdf.to_crs(raster_crs)
+#         gdf.plot(ax=ax, edgecolor=line_color, linewidth=line_width, facecolor='none')
+#         minx, miny, maxx, maxy = gdf.total_bounds
+#         pad_x = (maxx - minx) * 0.02 or 1e-4
+#         pad_y = (maxy - miny) * 0.02 or 1e-4
+#         ax.set_extent((minx - pad_x, maxx + pad_x, miny - pad_y, maxy + pad_y), crs=data_crs)
+#
+#     ax.set_title(title_name, y=0.95)
+#     ax.set_axis_off()
+#
+#     # --- 归一化：始终使用 np.ma.xxx，保持 MaskedArray ---
+#     if normalization == 'log':
+#         # log 需要正数：把 <=0 的值也掩掉
+#         data_safe = np.ma.masked_less_equal(data, 0)
+#         vmin = float(np.ma.min(data_safe))
+#         vmax = float(np.ma.max(data_safe))
+#         norm = LogNorm(vmin=vmin, vmax=vmax)
+#         data_to_plot = data_safe
+#     elif normalization == 'linear':
+#         vmin = float(np.ma.min(data))
+#         vmax = float(np.ma.max(data))
+#         norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+#         data_to_plot = data
+#     elif normalization == 'stretch':
+#         vmin = float(np.ma.min(data))
+#         vmax = float(np.ma.max(data))
+#         norm = StretchHighLowNormalize(vmin=vmin, vmax=vmax, stretch=stretch_factor)
+#         data_to_plot = data
+#     else:  # 'hist_eq'
+#         valid_mask = ~np.ma.getmaskarray(data)
+#         norm = make_hist_eq_norm(data, mask=valid_mask, bins=256, clip_percent=clip_percent)
+#         data_to_plot = data
+#
+#     # --- 让掩膜透明 ---
+#     cmap_obj = mpl.colormaps.get_cmap(cmap).copy()
+#     cmap_obj.set_bad((0, 0, 0, 0))   # 掩膜/NaN 透明
+#
+#     # --- 绘制 ---
+#     # data_to_plot = data_to_plot.filled(np.nan)
+#     im = ax.imshow(
+#         data_to_plot, origin='upper', extent=extent, transform=data_crs,
+#         cmap=cmap_obj, norm=norm, interpolation=interpolation
+#     )
+#
+#     # --- 色条：沿用“均匀色带”的线性 mappable（不影响透明） ---
+#     linear_sm = mpl.cm.ScalarMappable(norm=mcolors.Normalize(0, 1), cmap=cmap_obj)
+#     cax = inset_axes(
+#         ax, width=legend_width, height=legend_height, loc=legend_loc,
+#         borderpad=legend_borderpad, bbox_to_anchor=legend_bbox_to_anchor,
+#         bbox_transform=ax.transAxes,
+#     )
+#     cbar = mpl.pyplot.colorbar(
+#         linear_sm, cax=cax, orientation='horizontal', extend='both',
+#         extendfrac=0.1, extendrect=False
+#     )
+#
+#     # 刻度
+#     if custom_tick_values is not False:
+#         tick_vals_nice = custom_tick_values
+#         ticks_01_nice = _forward_map_values(tick_vals_nice, norm, normalization)
+#     else:
+#         ticks_01 = np.linspace(0, 1, legend_nbins if legend_nbins >= 2 else 2)
+#         tick_vals = _inverse_map_values(ticks_01, norm, normalization)
+#         tick_vals_nice = nice_round(tick_vals)
+#         ticks_01_nice = _forward_map_values(tick_vals_nice, norm, normalization)
+#
+#     tick_labels = _format_tick_labels(tick_vals_nice, decimal_places)
+#     cbar.set_ticks(ticks_01_nice)
+#     cbar.set_ticklabels(tick_labels)
+#     cbar.outline.set_visible(False)
+#     cbar.ax.xaxis.set_label_position('top')
+#     cbar.ax.tick_params(length=char_ticks_length, pad=char_ticks_pad)
+#     if unit_name:
+#         cbar.set_label(unit_name, labelpad=unit_labelpad, family='Arial')
+#
+#     ax.set_title(title_name, y=title_y, fontfamily='Arial', weight='bold')
+#     return im, cbar
 
 
 def _forward_map_values(values, norm, normalization):
@@ -484,7 +618,7 @@ def _crs_for_cartopy(rio_crs):
         return ccrs.PlateCarree(), False
 
 
-def add_binary_gray_layer(ax, tif_file, gray_hex="#808080", alpha=0.6, zorder=10, debug=False):
+def add_binary_gray_layer(ax, tif_file, gray_hex="#808080", alpha=1, zorder=10, debug=False):
     """
     将 tif 中 ==1 的像元画成灰色(可调透明度)，其它(0或NoData)透明。
     """
@@ -658,12 +792,13 @@ def add_north_arrow(fig, x, y, size=0.1, img_path='../Map/north_arrow.png', tran
 
 # ====================== 示例使用代码 ======================
 if __name__ == "__main__":
-    base_dir = f"../../../output/{config.TASK_NAME}/carbon_price/0_base_data"
+    base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
     legend_nbins = 3
 
-    tif_file = "xr_total_cost_carbon_100_amortised_2050.tif"
-    env_category = 'carbon_100'
-    arr_path = f"{base_dir}/map_data"
+
+    env_category = 'carbon_high'
+    tif_file = f"xr_total_cost_{env_category}_2050.tif"
+    arr_path = f"{base_dir}/4_tif"
     ref_tif = f"{arr_path}/{tif_file}"
     src_tif = f'{arr_path}/public_area.tif'
     aligned_tif = f'{arr_path}/public_area_aligned.tif'
@@ -680,24 +815,21 @@ if __name__ == "__main__":
     # ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
     #
     # from matplotlib.colors import LinearSegmentedColormap
-    #
     # cost_cmap = LinearSegmentedColormap.from_list("cost", ["#FFFEC2", "#FA4F00", "#A80000"])
-    #
-    #
     #
     # efficient_tif_plot(
     #     ax1, f"{arr_path}/{tif_file}", cmap=cost_cmap,
     #     shp="../Map/AUS_line1.shp", line_width=0.3,
     #     title_name=title, unit_name=unit, legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9),
     #     legend_nbins=3, title_y=0.95, char_ticks_length=1,
-    #     unit_labelpad=1, normalization='log', decimal_places=2,custom_tick_values = [0, 0.02, 220]
+    #     unit_labelpad=1, normalization='log', decimal_places=2
     # )
-    # add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=0.6, zorder=15)
-    # plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title}.png", dpi=300,
+    # add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
+    # plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png", dpi=300,
     #             pad_inches=0.1, transparent=True)
     #
-    # env_names = ['xr_cost_ag', 'xr_cost_agricultural_management', 'xr_cost_non_ag', 'xr_cost_transition_ag2ag_diff',
-    #              'xr_transition_cost_ag2non_ag_amortised_diff']
+    # env_names = ['cost_ag', 'cost_agricultural_management', 'cost_non_ag', 'cost_transition_ag2ag_diff',
+    #              'transition_cost_ag2non_ag_amortised_diff']
     # title_names = ['Agriculture cost', 'Agricultural management cost', 'Non-agriculture cost', 'Transition(ag→ag) cost',
     #                'Transition(ag→non-ag) cost']
     #
@@ -706,20 +838,20 @@ if __name__ == "__main__":
     #     # 画图（两者像元网格完全一致了）
     #     fig = plt.figure(figsize=(6, 6), dpi=300, constrained_layout=False)
     #     ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-    #     tif_file = f"{env}_{env_category}_2050.tif"
+    #     tif_file = f"xr_{env}_{env_category}_2050.tif"
     #
     #     ticks = False
     #     decimal_places = 3
-    #     if env == 'xr_cost_ag':
-    #         decimal_places = 2
-    #     if env == 'xr_cost_agricultural_management':
-    #         ticks = [0,0.01,50]
-    #         decimal_places = 2
-    #     elif env == 'xr_cost_non_ag':
-    #         ticks = [0,0.001,0.3]
-    #     elif 'ag2ag' in env:
-    #         decimal_places = 2
-    #         ticks = [0, 0.01, 70]
+    #     # if env == 'xr_cost_ag':
+    #     #     decimal_places = 2
+    #     # if env == 'xr_cost_agricultural_management':
+    #     #     ticks = [0,0.01,50]
+    #     #     decimal_places = 2
+    #     # elif env == 'xr_cost_non_ag':
+    #     #     ticks = [0,0.001,0.3]
+    #     # elif 'ag2ag' in env:
+    #     #     decimal_places = 2
+    #     #     ticks = [0, 0.01, 70]
     #
     #
     #     efficient_tif_plot(
@@ -729,110 +861,111 @@ if __name__ == "__main__":
     #         legend_nbins=3, title_y=0.95, char_ticks_length=1, unit_labelpad=1,normalization='log',
     #         decimal_places=decimal_places, custom_tick_values=ticks
     #     )
-    #     add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=0.6, zorder=15)
-    #     plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title}.png", dpi=300,
-    #                 pad_inches=0.1, transparent=True)
-    #
-    #     plt.show()
-    #
-    # env_category = 'carbon_100_bio_50'
-    # title = 'Total cost'
-    # unit = 'MAU$'
-    # # 画图（两者像元网格完全一致了）
-    # fig = plt.figure(figsize=(6,6), dpi=300,constrained_layout=False)
-    # ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-    # tif_file = f"xr_total_cost_{env_category}_amortised_2050.tif"
-    # from matplotlib.colors import LinearSegmentedColormap
-    # cost_cmap = LinearSegmentedColormap.from_list("cost", ["#FFFEC2", "#FA4F00", "#A80000"])
-    # efficient_tif_plot(
-    #         ax1, f"{arr_path}/{tif_file}", cmap=cost_cmap,
-    #         shp="../Map/AUS_line1.shp", line_width=0.3,
-    #         title_name=title, unit_name=unit,
-    #         legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9), legend_nbins=4, title_y=0.95,
-    #         char_ticks_length=1, unit_labelpad=1,  decimal_places=1,custom_tick_values = [0, 0.4,1,150]
-    #     )
-    # add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=0.6, zorder=15)
-    # plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png", dpi=300, pad_inches=0.1,transparent=True)
-    # plt.show()
-    #
-    # env_names = [ 'xr_cost_ag','xr_cost_agricultural_management','xr_cost_non_ag','xr_cost_transition_ag2ag_diff','xr_transition_cost_ag2non_ag_amortised_diff']
-    # title_names = ['Agriculture cost','Agricultural management cost','Non-agriculture cost','Transition(ag→ag) cost','Transition(ag→non-ag) cost']
-    # for env, title in zip(env_names, title_names):
-    #     unit = 'MAU$'
-    #     # 画图（两者像元网格完全一致了）
-    #     fig = plt.figure(figsize=(6, 6), dpi=300, constrained_layout=False)
-    #     ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-    #     tif_file = f"{env}_{env_category}_2050.tif"
-    #
-    #     decimal_places = 2
-    #     ticks = False
-    #     if env == 'xr_cost_ag':
-    #         ticks = [0,0.1,0.3,90]
-    #         decimal_places =1
-    #     elif 'agricultural_management' in env:
-    #         print('xr_cost_agricultural_management')
-    #         ticks = [0, 0.1, 0.2, 90]
-    #         decimal_places =1
-    #     elif 'ag2ag' in env:
-    #         decimal_places = 2
-    #         ticks = [0, 0.15,16,60]
-    #     elif 'ag2non_ag' in env:
-    #         decimal_places = 2
-    #         ticks = [0, 0.7,1,30]
-    #
-    #
-    #     efficient_tif_plot(
-    #         ax1, f"{arr_path}/{tif_file}", cmap=cost_cmap,
-    #         shp="../Map/AUS_line1.shp", line_width=0.3, title_name=title, unit_name=unit,
-    #         legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9), legend_nbins=4,
-    #         title_y=0.95, char_ticks_length=1, unit_labelpad=1,decimal_places=decimal_places, custom_tick_values=ticks
-    #     )
-    #     add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=0.6, zorder=15)
+    #     add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
     #     plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png", dpi=300,
     #                 pad_inches=0.1, transparent=True)
     #
     #     plt.show()
-#---------------------------------------------------ENV------------------------------------------------------------------------------------------------
-    env_category = 'carbon_100'
-    title = 'GHG reductions and removals'
-    unit = r"CO$_2$e$^{-1}$"
-    # 画图（两者像元网格完全一致了）
-    fig = plt.figure(figsize=(6,6), dpi=300,constrained_layout=False)
-    ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-    tif_file = f"xr_total_{env_category}_2050.tif"
 
-    efficient_tif_plot(
-            ax1, f"{arr_path}/{tif_file}", cmap="summer_r",
-            shp="../Map/AUS_line1.shp", line_width=0.3,
-            title_name=title, unit_name=unit,
-            legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9), legend_nbins=3, title_y=0.95,
-            char_ticks_length=1, unit_labelpad=1,  decimal_places=2, custom_tick_values=[1,750,240000]
-        )
-    add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=0.6, zorder=15)
-    plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png", dpi=300, pad_inches=0.1,transparent=True)
-    plt.show()
+#     env_category = 'carbon_high_bio_50'
+#     title = 'Total cost'
+#     unit = 'MAU$'
+#     # 画图（两者像元网格完全一致了）
+#     fig = plt.figure(figsize=(6,6), dpi=300,constrained_layout=False)
+#     ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+#     tif_file = f"xr_total_cost_{env_category}_2050.tif"
+#     from matplotlib.colors import LinearSegmentedColormap
+#     cost_cmap = LinearSegmentedColormap.from_list("cost", ["#FFFEC2", "#FA4F00", "#A80000"])
+#
+#     efficient_tif_plot(
+#             ax1, f"{arr_path}/{tif_file}", cmap=cost_cmap,
+#             shp="../Map/AUS_line1.shp", line_width=0.3,
+#             title_name=title, unit_name=unit,legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9),
+#             legend_nbins=3, title_y=0.95,
+#             char_ticks_length=1, unit_labelpad=1,  decimal_places=2
+#         )
+#     add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
+#     plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png", dpi=300, pad_inches=0.1,transparent=True)
+#     plt.show()
+#
+#     env_names = [ 'cost_ag','cost_agricultural_management','cost_non_ag','cost_transition_ag2ag_diff','transition_cost_ag2non_ag_amortised_diff']
+#     title_names = ['Agriculture cost','Agricultural management cost','Non-agriculture cost','Transition(ag→ag) cost','Transition(ag→non-ag) cost']
+#     for env, title in zip(env_names, title_names):
+#         unit = 'MAU$'
+#         # 画图（两者像元网格完全一致了）
+#         fig = plt.figure(figsize=(6, 6), dpi=300, constrained_layout=False)
+#         ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+#         tif_file = f"xr_{env}_{env_category}_2050.tif"
+#
+#         decimal_places = 2
+#         ticks = False
+#         # if env == 'xr_cost_ag':
+#         #     ticks = [0,0.1,0.3,90]
+#         #     decimal_places =1
+#         # elif 'agricultural_management' in env:
+#         #     print('xr_cost_agricultural_management')
+#         #     ticks = [0, 0.1, 0.2, 90]
+#         #     decimal_places =1
+#         # elif 'ag2ag' in env:
+#         #     decimal_places = 2
+#         #     ticks = [0, 0.15,16,60]
+#         # elif 'ag2non_ag' in env:
+#         #     decimal_places = 2
+#         #     ticks = [0, 0.7,1,30]
+#
+#         efficient_tif_plot(
+#             ax1, f"{arr_path}/{tif_file}", cmap=cost_cmap,
+#             shp="../Map/AUS_line1.shp", line_width=0.3, title_name=title, unit_name=unit,
+#             legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9), legend_nbins=3,
+#             title_y=0.95, char_ticks_length=1, unit_labelpad=1,decimal_places=decimal_places, custom_tick_values=ticks
+#         )
+#         add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
+#         plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png", dpi=300,
+#                     pad_inches=0.1, transparent=True)
+#
+#         plt.show()
+# #---------------------------------------------------ENV------------------------------------------------------------------------------------------------
+#     env_category = 'carbon_high'
+#     title = 'GHG benefit'
+#     unit = r"tCO$_2$e"
+#     # 画图（两者像元网格完全一致了）
+#     fig = plt.figure(figsize=(6,6), dpi=300,constrained_layout=False)
+#     ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+#     tif_file = f"xr_total_{env_category}_2050.tif"
+#
+#     efficient_tif_plot(
+#             ax1, f"{arr_path}/{tif_file}", cmap="summer_r",
+#             shp="../Map/AUS_line1.shp", line_width=0.3,
+#             title_name=title, unit_name=unit,
+#             legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9), legend_nbins=3, title_y=0.95,
+#             char_ticks_length=1, unit_labelpad=1,  decimal_places=2
+#         )
+#     add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
+#     plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png", dpi=300, pad_inches=0.1,transparent=True)
+#     plt.show()
+#
+#     env_category = 'carbon_high_bio_50'
+#     title = 'Biodiversity benefit'
+#     unit = "ha"
+#     # 画图（两者像元网格完全一致了）
+#     fig = plt.figure(figsize=(6, 6), dpi=300, constrained_layout=False)
+#     ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+#     tif_file = f"xr_total_{env_category}_2050.tif"
+#
+#     efficient_tif_plot(
+#         ax1, f"{arr_path}/{tif_file}", cmap="summer_r",
+#         shp="../Map/AUS_line1.shp", line_width=0.3,
+#         title_name=title, unit_name=unit,
+#         legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9), legend_nbins=3, title_y=0.95,
+#         char_ticks_length=1, unit_labelpad=1, decimal_places=2
+#     )
+#     add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
+#     plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png",
+#                 dpi=300, pad_inches=0.1, transparent=True)
+#     plt.show()
+# # ---------------------------------------------------Price----------------------------
 
-    env_category = 'carbon_100_bio_50'
-    title = 'Biodiversity restoration'
-    unit = "ha"
-    # 画图（两者像元网格完全一致了）
-    fig = plt.figure(figsize=(6, 6), dpi=300, constrained_layout=False)
-    ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-    tif_file = f"xr_total_{env_category}_2050.tif"
-
-    efficient_tif_plot(
-        ax1, f"{arr_path}/{tif_file}", cmap="summer_r",
-        shp="../Map/AUS_line1.shp", line_width=0.3,
-        title_name=title, unit_name=unit,
-        legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9), legend_nbins=3, title_y=0.95,
-        char_ticks_length=1, unit_labelpad=1, decimal_places=2,custom_tick_values=[1,2500,5000]
-    )
-    add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=0.6, zorder=15)
-    plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png",
-                dpi=300, pad_inches=0.1, transparent=True)
-    plt.show()
-# ---------------------------------------------------Price----------------------------
-
+    env_category = 'carbon_high'
     price_cmap = LinearSegmentedColormap.from_list("cost", ["#00ffff","#ff00ff"])
 
     title = 'Carbon price'
@@ -840,26 +973,26 @@ if __name__ == "__main__":
     # 画图（两者像元网格完全一致了）
     fig = plt.figure(figsize=(6,6), dpi=300,constrained_layout=False)
     ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-    tif_file = f"xr_carbon_price_2050.tif"
+    tif_file = f"xr_price_{env_category}_2050.tif"
 
     efficient_tif_plot(
             ax1, f"{arr_path}/{tif_file}", cmap=price_cmap,
             shp="../Map/AUS_line1.shp", line_width=0.3,
             title_name=title, unit_name=unit,
             legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9), legend_nbins=3, title_y=0.95,
-            char_ticks_length=1, unit_labelpad=1,  decimal_places=2,custom_tick_values=[1,50,103]
+            char_ticks_length=1, unit_labelpad=1,  decimal_places=2
         )
-    add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=0.6, zorder=15)
+    add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
     plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png", dpi=300, pad_inches=0.1,transparent=True)
     plt.show()
 
-    env_category = 'carbon_100_bio_50'
+    env_category = 'carbon_high_bio_50'
     title = 'Biodiversity price'
-    unit = "AU\$ ha$^{-1}$"
+    unit = r"AU\$ ha$^{-1}$"
     # 画图（两者像元网格完全一致了）
     fig = plt.figure(figsize=(6, 6), dpi=300, constrained_layout=False)
     ax1 = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-    tif_file = f"xr_bio_price_2050.tif"
+    tif_file = f"xr_price_{env_category}_2050.tif"
 
     efficient_tif_plot(
         ax1, f"{arr_path}/{tif_file}", cmap=price_cmap,
@@ -868,7 +1001,7 @@ if __name__ == "__main__":
         legend_bbox_to_anchor=(0.1, 0.10, 0.8, 0.9), legend_nbins=3, title_y=0.95,
         char_ticks_length=1, unit_labelpad=1, decimal_places=2
     )
-    add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=0.6, zorder=15)
+    add_binary_gray_layer(ax1, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
     plt.savefig(f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/map {title} {env_category}.png",
                 dpi=300, pad_inches=0.1, transparent=True)
     plt.show()

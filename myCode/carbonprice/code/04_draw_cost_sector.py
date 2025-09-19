@@ -246,85 +246,110 @@ figure_path = f"../../../output/{task_name}/carbon_price/3_Paper_figure"
 
 carbon_names = config.carbon_names
 carbon_bio_names = config.carbon_bio_names
-all_names = carbon_names + carbon_bio_names
 
-title_names = [
-    # --- Low Group ---
-    '$\mathrm{GHG}_{\mathrm{low}}$',
-    '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{10}}$',
-    '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{20}}$',
-    '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{30}}$',
-    '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{40}}$',
-    '$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{50}}$',
+title_carbon_names = [
+    r'$\mathrm{GHG}_{\mathrm{low}}$',
+    r'$\mathrm{GHG}_{\mathrm{high}}$']
 
-    # --- High Group ---
-    '$\mathrm{GHG}_{\mathrm{high}}$',
-    '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{10}}$',
-    '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{20}}$',
-    '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{30}}$',
-    '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{40}}$',
-    '$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$'
+title_bio_names = [
+    r'$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{10}}$',
+    r'$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{20}}$',
+    r'$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{30}}$',
+    r'$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{40}}$',
+    r'$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{50}}$',
+
+    r'$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{10}}$',
+    r'$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{20}}$',
+    r'$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{30}}$',
+    r'$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{40}}$',
+    r'$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$'
 ]
 
-all_dfs = []
-for name in all_names:
+all_carbon = []
+for name in carbon_names:
     df = pd.read_excel(os.path.join(excel_path, f'1_Cost_{name}.xlsx'), index_col=0)
     df = df.loc[df.index >= config.START_YEAR].copy()
-    all_dfs.append(df / 1e3)
+    all_carbon.append(df / 1e3)
 
-set_plot_style(font_size=30)
-global_ymin = float('inf')
-global_ymax = float('-inf')
+all_bio = []
+for name in carbon_bio_names:
+    df = pd.read_excel(os.path.join(excel_path, f'1_Cost_{name}.xlsx'), index_col=0)
+    df = df.loc[df.index >= config.START_YEAR].copy()
+    all_bio.append(df / 1e3)
 
-for df in all_dfs:
-    # 假设您的函数是基于正负值堆叠的
-    positive_sum = df[df > 0].sum(axis=1).max() / 2
-    negative_sum = df[df < 0].sum(axis=1).min() / 2
-    if positive_sum > global_ymax:
-        global_ymax = positive_sum
-    if negative_sum < global_ymin:
-        global_ymin = negative_sum
-
-# 为了美观，可以稍微扩大范围
-y_buffer = (global_ymax - global_ymin) * 0.05
-global_ymin -= y_buffer
-global_ymax += y_buffer
-
-# --- 3. 创建复杂的子图布局 ---
-fig = plt.figure(figsize=(22, 8))
-# 调整 gridspec 参数以给左侧的Y轴标题留出空间
-gs = gridspec.GridSpec(2, 6, figure=fig, hspace=0.3, wspace=0.1, left=0.1, right=0.98, top=0.9, bottom=0.2)
 colors = ['#f39b8b', '#9A8AB3', '#6eabb1', '#eb9132', '#84a374']
-axes = [fig.add_subplot(gs[i, j]) for i in range(2) for j in range(6)]
+carbon_ymin = min(df['Total'].min() for df in all_carbon)
+carbon_ymax = max(df['Total'].max() for df in all_carbon)
 
-# --- 4. 循环绘制并应用格式化 ---
-for i, (ax, df, title) in enumerate(zip(axes, all_dfs, title_names)):
+bio_ymin = min(df['Total'].min() for df in all_bio)
+bio_ymax = max(df['Total'].max() for df in all_bio)
+
+set_plot_style(font_size=24)
+
+fig = plt.figure(figsize=(20, 12))
+
+# 步骤 1: 创建一个 3x5 的主网格
+gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.5, wspace=0.2)
+
+# --- 绘制 Carbon 图 (第一行前两个) ---
+ax_carbon_list = []
+for i in range(2):
+    ax = fig.add_subplot(gs[0, i])
     stacked_area_pos_neg(
-        ax, df, colors=colors,
-        title_name=title,
+        ax, all_carbon[i], colors=colors,
+        title_name=title_carbon_names[i],
         ylabel='',  # ylabel 将由全局标题处理
         show_legend=False
     )
+    ax.set_ylim(carbon_ymin, carbon_ymax)
+    x_data = all_bio[i].index
+    start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
+    tick_positions = [start_tick, middle_tick, end_tick]
+    ax.tick_params(axis='x', labelbottom=False)
+    ax_carbon_list.append(ax)
 
-    # **核心步骤：设置统一的Y轴和控制刻度标签**
+# 设置共享Y轴，并控制刻度标签
+ax_carbon_list[0].sharey(ax_carbon_list[1])
+ax_carbon_list[1].tick_params(axis='y', labelleft=False)
 
-    # 1. 设置统一的Y轴范围
-    ax.set_ylim(global_ymin, global_ymax)
+ax_carbon_list[0].set_ylim(carbon_ymin, carbon_ymax)                         # 设置范围
+ax_carbon_list[0].yaxis.set_major_locator(plt.MaxNLocator(4))  # 自动 4 个刻度
 
-    # 2. 控制Y轴刻度标签：只有第0列的图显示
-    # i % 6 计算的是当前子图所在的列索引
-    if i % 6 != 0:
-        ax.tick_params(axis='y', which='both', labelleft=False)
 
-    # 3. 控制X轴刻度标签：只有最下面一行（第1行）的图显示
-    # i // 6 计算的是当前子图所在的行索引
 
-    x_data = df.index
+# --- 创建图例区域 (第一行后三个合并) ---
+legend_ax = fig.add_subplot(gs[0, 2:])  # 使用切片 gs[0, 2:] 来合并单元格
+legend_ax.axis('off')  # 关闭坐标轴
+
+# --- 绘制 Bio 图 (后两行) ---
+ax_bio_list = []
+shared_bio_ax = None  # 用于共享Y轴的参考轴
+
+for i in range(len(all_bio)):
+    row = i // 5 + 1  # +1 让行号从 1 和 2 开始 (主网格的第二、三行)
+    col = i % 5
+
+    # 共享Y轴的设置
+    if shared_bio_ax is None:
+        ax = fig.add_subplot(gs[row, col])
+        shared_bio_ax = ax  # 第一个bio图作为共享Y轴的基准
+    else:
+        ax = fig.add_subplot(gs[row, col], sharey=shared_bio_ax)
+
+    stacked_area_pos_neg(ax, all_bio[i], colors, title_name=title_bio_names[i])
+    # set_ylim 会被 sharey 覆盖，所以只需在基准轴上设置一次即可
+
+    # 控制Y轴刻度：只在最左边一列 (col==0) 显示
+    if col != 0:
+        ax.tick_params(axis='y', labelleft=False)
+
+    # 控制X轴刻度：只在最下面一行 (row==2) 显示
+    x_data = all_bio[i].index
     start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
     tick_positions = [start_tick, middle_tick, end_tick]
 
     ax.set_xticks(tick_positions)
-    if i // 6 == 1:
+    if row == 2:
         # 如果是，则设置三个刻度并微调对齐方式
 
         ax.tick_params(axis='x')  # 在这里设置您想要的字体大小
@@ -338,10 +363,20 @@ for i, (ax, df, title) in enumerate(zip(axes, all_dfs, title_names)):
         # **关键补充**：如果不是最下面一行，则明确地隐藏X轴的刻度标签
         ax.tick_params(axis='x', labelbottom=False)
 
+    ax_bio_list.append(ax)
+
+# 在基准轴上设置Y轴范围
+# shared_bio_ax.set_ylim(0, 600)
+# shared_bio_ax.set_yticks([0, 200,400,600])
+shared_bio_ax.set_ylim(bio_ymin, bio_ymax)
+locator = MaxNLocator(nbins=5, prune=None, min_n_ticks=5)
+shared_bio_ax.yaxis.set_major_locator(locator)
+
+
 # --- 5. 添加全局Y轴标题 ---
 # 使用 fig.supylabel() 可以方便地在整个图表的左侧添加一个居中的标题
-fig.supylabel('Cost (Billion AU$)', x=0.04, fontsize=30)
+fig.supylabel('Cost (Billion AU$)', x=0.08, fontsize=24)
 
-draw_legend(axes[0], bbox_to_anchor=(0.5, 0.18), ncol=3, column_spacing=1.0)
+draw_legend(ax_carbon_list[0], bbox_to_anchor=(0.68, 0.85), ncol=2)
 plt.savefig(os.path.join(figure_path, '04_Cost_all_scenarios.png'), dpi=300)
 plt.show()

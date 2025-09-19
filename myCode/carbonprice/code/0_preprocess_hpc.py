@@ -9,7 +9,7 @@ CPU_CORES = 96             # 如需更稳，可改 36~40；不改也行，下面
 MEMORY_GB = "1500G"
 TIME_LIMIT = "0-720:00:00"
 
-PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"
+PYTHON_SCRIPT_TO_RUN = "01_make_excel.py"
 CONDA_ENV_NAME = "xpluto-fixed"
 
 SUBMISSION_SCRIPT_NAME = "submit_preprocess.sh"
@@ -41,7 +41,7 @@ echo "作业ID: $SLURM_JOB_ID"
 echo "节点  : $(hostname)"
 echo "开始时间: $(date)"
 echo "CPUs  : $SLURM_CPUS_PER_TASK"
-echo "TMPDIR: ${SLURM_TMPDIR:-/tmp}"
+echo "TMPDIR: ${{SLURM_TMPDIR:-/tmp}}"
 echo "========================================================="
 
 # --- 环境保护：限制内部库并行、设置本地临时目录、提升句柄上限 ---

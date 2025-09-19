@@ -202,41 +202,41 @@ def stacked_area_pos_neg(
     return ax
 
 
-def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0):
-    """
-    绘制调整过布局的图例。
-    - bbox_to_anchor 控制整体位置 (x=0.85 使其左移)。
-    - ncol=2 设置为两列。
-    - column_spacing=1.0 减小列间距。
-    """
-    fig = ax.get_figure()
-    handles, labels = ax.get_legend_handles_labels()
-
-    # ... (创建 new_handles 的代码保持不变) ...
-    new_handles = []
-    for h in handles:
-        if isinstance(h, Patch):
-            new_handles.append(
-                Patch(facecolor=h.get_facecolor(), edgecolor=h.get_edgecolor(), linewidth=h.get_linewidth()))
-        elif isinstance(h, Line2D):
-            new_handles.append(Line2D([0], [0], color=h.get_color(), linestyle=h.get_linestyle(),
-                                      linewidth=h.get_linewidth(), marker=h.get_marker(),
-                                      markersize=h.get_markersize(), markerfacecolor=h.get_markerfacecolor(),
-                                      markeredgecolor=h.get_markeredgecolor()))
-        else:
-            new_handles.append(h)
-
-    # 关键修改：应用新的布局参数
-    fig.legend(handles=new_handles, labels=labels, loc='upper center',
-               bbox_to_anchor=bbox_to_anchor,
-               ncol=ncol,
-               frameon=False,
-               handlelength=1.0,
-               handleheight=1.0,
-               handletextpad=0.4,
-               labelspacing=0.3,
-               columnspacing=column_spacing  # <--- 控制列间距
-               )
+# def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0):
+#     """
+#     绘制调整过布局的图例。
+#     - bbox_to_anchor 控制整体位置 (x=0.85 使其左移)。
+#     - ncol=2 设置为两列。
+#     - column_spacing=1.0 减小列间距。
+#     """
+#     fig = ax.get_figure()
+#     handles, labels = ax.get_legend_handles_labels()
+#
+#     # ... (创建 new_handles 的代码保持不变) ...
+#     new_handles = []
+#     for h in handles:
+#         if isinstance(h, Patch):
+#             new_handles.append(
+#                 Patch(facecolor=h.get_facecolor(), edgecolor=h.get_edgecolor(), linewidth=h.get_linewidth()))
+#         elif isinstance(h, Line2D):
+#             new_handles.append(Line2D([0], [0], color=h.get_color(), linestyle=h.get_linestyle(),
+#                                       linewidth=h.get_linewidth(), marker=h.get_marker(),
+#                                       markersize=h.get_markersize(), markerfacecolor=h.get_markerfacecolor(),
+#                                       markeredgecolor=h.get_markeredgecolor()))
+#         else:
+#             new_handles.append(h)
+#
+#     # 关键修改：应用新的布局参数
+#     fig.legend(handles=new_handles, labels=labels, loc='upper center',
+#                bbox_to_anchor=bbox_to_anchor,
+#                ncol=ncol,
+#                frameon=False,
+#                handlelength=1.0,
+#                handleheight=1.0,
+#                handletextpad=0.4,
+#                labelspacing=0.3,
+#                columnspacing=column_spacing  # <--- 控制列间距
+#                )
 
 
 def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0):
@@ -401,8 +401,8 @@ shared_bio_ax.set_ylim(0, 90)
 shared_bio_ax.set_yticks([0, 30, 60, 90])
 
 # --- 5. 添加全局Y轴标签 ---
-ax_carbon_list[0].set_ylabel(r"Carbon benefit (tCO$_2$e$^{-1}$)", y=0.4)
-ax_bio_list[0].set_ylabel(r"Biodiversity benefit (ha$^{-1}$)", y=-0.2)
+ax_carbon_list[0].set_ylabel(r"Carbon benefit (tCO$_2$e)", y=0.4)
+ax_bio_list[0].set_ylabel(r"Biodiversity benefit (ha)", y=-0.2)
 fig.align_ylabels([ax_carbon_list[0], ax_bio_list[0]])
 
 draw_legend(ax_carbon_list[0], bbox_to_anchor=(0.55, 0.85), ncol=2)
