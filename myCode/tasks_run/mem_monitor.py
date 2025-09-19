@@ -124,6 +124,22 @@ class TailFollower:
         return pd.DataFrame({"time": list(t), "value": list(v)})
 
 
+# 在本机启动网页服务
+# 访问 http://127.0.0.1:8050
+# ============ 必填：连接 & 文件配置 ============
+platform = "HPC"  # "HPC" 或 "NCI"
+mem_path = "20250908_Paper2_Results_NCI/carbon_price/mem_log.txt"
+
+cfg = ssh_config(platform)
+SSH_HOST = cfg["linux_host"]
+SSH_PORT = cfg["linux_port"]
+SSH_USER = cfg["linux_username"]
+PRIVATE_KEY_PATH = cfg["private_key_path"]
+OUTPUT_DIR = cfg["project_dir"]
+PRIVATE_KEY_PASSPHRASE = None  # 如有口令填这里，否则 None
+REMOTE_FILE = f"{OUTPUT_DIR}/{mem_path}"
+SEP = "\t"  # 日志分隔符（你的示例是 TAB）
+
 # 启动后台 tail 线程
 tail = TailFollower()
 tail.start()
@@ -131,12 +147,12 @@ atexit.register(tail.stop)
 
 # Dash 应用
 app = Dash(__name__)
-app.title = "Live Memory Monitor"
+app.title = f"Live Memory Monitor in {platform}"
 
 app.layout = html.Div(
     style={"maxWidth": "1000px", "margin": "20px auto", "fontFamily": "Arial, sans-serif"},
     children=[
-        html.H3("Live Memory Monitor (Remote via SSH)"),
+        html.H3(f"Live Memory Monitor in {platform} (Remote via SSH)"),
         html.Div(id="max-label", style={"fontWeight": "bold", "marginBottom": "8px"}),
         dcc.Graph(id="mem-graph", config={"displayModeBar": True}),
         dcc.Interval(id="tick", interval=REFRESH_MS, n_intervals=0),
@@ -159,7 +175,7 @@ def update_graph(_):
 
     if df.empty:
         fig = go.Figure()
-        fig.update_layout(template="plotly_white", xaxis_title="Time", yaxis_title="Value")
+        fig.update_layout(template="plotly_white", xaxis_title="Time", yaxis_title="GB")
         return fig, "Max: -"
 
     idxmax = df["value"].idxmax()
@@ -167,30 +183,10 @@ def update_graph(_):
     max_ts = df.loc[idxmax, "time"]
 
     fig = go.Figure(go.Scatter(x=df["time"], y=df["value"], mode="lines", name="Memory"))
-    fig.update_layout(template="plotly_white", xaxis_title="Time", yaxis_title="Value")
+    fig.update_layout(template="plotly_white", xaxis_title="Time", yaxis_title="GB")
     fig.update_xaxes(tickformat="%Y-%m-%d %H:%M:%S", showgrid=True)
     fig.update_yaxes(showgrid=True)
 
     return fig, f"Max: {max_val:.3f} @ {max_ts.strftime('%Y-%m-%d %H:%M:%S')}"
 
-
-
-if __name__ == "__main__":
-    # 在本机启动网页服务
-    # 访问 http://127.0.0.1:8050
-    # ============ 必填：连接 & 文件配置 ============
-    platform = "HPC"  # "HPC" 或 "NCI"
-    mem_path = "20250908_Paper2_Results_NCI/carbon_price/mem_log.txt"
-
-    cfg = ssh_config(platform)
-    SSH_HOST = cfg["linux_host"]
-    SSH_PORT = cfg["linux_port"]
-    SSH_USER = cfg["linux_username"]
-    PRIVATE_KEY_PATH = cfg["private_key_path"]
-    OUTPUT_DIR = cfg["project_dir"]
-    PRIVATE_KEY_PASSPHRASE = None  # 如有口令填这里，否则 None
-    REMOTE_FILE = f"{OUTPUT_DIR}/{mem_path}"
-    SEP = "\t"  # 日志分隔符（你的示例是 TAB）
-
-
-    app.run_server(debug=False, host="127.0.0.1", port=8050)
+app.run_server(debug=False, host="127.0.0.1", port=8050)

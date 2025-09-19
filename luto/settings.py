@@ -100,10 +100,10 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 5      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2020,2051,1)) # range(2020,2050)
+SIM_YEARS = list(range(2020,2051,10)) # range(2020,2050)
 
 
 # Define the objective function
@@ -412,7 +412,7 @@ GHG_TARGETS_DICT = {
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
+GHG_EMISSIONS_LIMITS = 'off'        # 'off', 'low', 'medium', or 'high'
 '''
 `GHG_EMISSIONS_LIMITS` options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
@@ -538,7 +538,7 @@ GBF2_TARGETS_DICT = {
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSITY_TARGET_GBF_2 = 'high'            # 'off', 'low', 'medium', or 'high'
+BIODIVERSITY_TARGET_GBF_2 = 'off'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,

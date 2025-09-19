@@ -645,73 +645,61 @@ def main(task_dir, njobs):
     # --- 阶段 1: 文件处理 ---
     tprint("\n--- 阶段 1: 文件copy ---")
 
-    # for i in range(len(run_all_names)):
-    #     run_names = run_all_names[i]
-    #     for j in range(len(run_names)):
-    #         origin_path_name = get_path(task_name, run_names[j])
-    #         target_path_name = os.path.join(output_path, run_names[j])
-    #         tprint(f"  -> 正在copy: {origin_path_name}")
-    #         if i == 0:
-    #             copy_files = cost_files + revenue_files
-    #         elif i == 1:
-    #             copy_files = cost_files + revenue_files + carbon_files
-    #         elif i == 2:
-    #             copy_files = cost_files + revenue_files + carbon_files + bio_files
-    #         else:
-    #             copy_files = []
-    #         # 直接调用函数，而不是用 delayed 包装
-    #
-    #         # --- 1. 并行化文件复制 (逻辑不变) ---
-    #         if copy_files:
-    #             for f in copy_files:
-    #                 if njobs == 0:
-    #                     for year in years:
-    #                         copy_single_file(origin_path_name, target_path_name, f, year,dims_to_sum=('source'))
-    #                 else:
-    #                     Parallel(n_jobs=njobs)(
-    #                         delayed(copy_single_file)(origin_path_name, target_path_name, f, year,dims_to_sum=('source'))
-    #                         for year in years
-    #                     )
-    #
+    for i in range(len(run_all_names)):
+        run_names = run_all_names[i]
+        for j in range(len(run_names)):
+            origin_path_name = get_path(task_name, run_names[j])
+            target_path_name = os.path.join(output_path, run_names[j])
+            tprint(f"  -> 正在copy: {origin_path_name}")
+            copy_files = cost_files + revenue_files + carbon_files + bio_files
+            # 直接调用函数，而不是用 delayed 包装
+
+            # --- 1. 并行化文件复制 (逻辑不变) ---
+            if copy_files:
+                for f in copy_files:
+                    if njobs == 0:
+                        for year in years:
+                            copy_single_file(origin_path_name, target_path_name, f, year,dims_to_sum=('source'))
+                    else:
+                        Parallel(n_jobs=njobs)(
+                            delayed(copy_single_file)(origin_path_name, target_path_name, f, year,dims_to_sum=('source'))
+                            for year in years
+                        )
+
     tprint(f"✅ 文件处理任务完成!")
 
-    # --- 1. 并行化文件diff in two years for GHG/BIO ag benefit ---
-    # for i in range(len(run_all_names)):
-    #     run_names = run_all_names[i]
-    #     for j in range(len(run_names)):
-    #         data_path_name = os.path.join(output_path, run_names[j])
-    #         if i == 1:
-    #             diff_files = ['xr_GHG_ag']
-    #         elif i == 2:
-    #             diff_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_GHG_ag']
-    #         else:
-    #             diff_files = []
-    #
-    #         if diff_files:
-    #             for diff_file in diff_files:
-    #                 if njobs == 0:
-    #                     for year in years[1:]:
-    #                         calculate_and_save_single_diff(diff_file, year, data_path_name)
-    #                 else:
-    #                     Parallel(n_jobs=njobs)(
-    #                         delayed(calculate_and_save_single_diff)(diff_file, year, data_path_name)
-    #                         for year in years[1:]
-    #                     )
-    #
-    # if njobs == 0:
-    #     for i in range(len(input_files)):
-    #         data_path_name = os.path.join(output_path, input_files[i])
-    #         amortize_costs(data_path_name, amortize_files[0], years, njobs=njobs)
-    # else:
-    #     Parallel(n_jobs=7, backend="loky")(
-    #         delayed(amortize_costs)(
-    #             os.path.join(output_path, run_name),  # data_path_name
-    #             amortize_files[0],  # 你的第二个参数
-    #             years,
-    #             njobs=njobs  # 传给内部的并行参数（若有）
-    #         )
-    #         for run_name in input_files
-    #     )
+    ## --- 1. 并行化文件diff in two years for GHG/BIO ag benefit ---
+    for i in range(len(run_all_names)):
+        run_names = run_all_names[i]
+        for j in range(len(run_names)):
+            data_path_name = os.path.join(output_path, run_names[j])
+            diff_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_GHG_ag']
+
+            if diff_files:
+                for diff_file in diff_files:
+                    if njobs == 0:
+                        for year in years[1:]:
+                            calculate_and_save_single_diff(diff_file, year, data_path_name)
+                    else:
+                        Parallel(n_jobs=njobs)(
+                            delayed(calculate_and_save_single_diff)(diff_file, year, data_path_name)
+                            for year in years[1:]
+                        )
+
+    if njobs == 0:
+        for i in range(len(input_files)):
+            data_path_name = os.path.join(output_path, input_files[i])
+            amortize_costs(data_path_name, amortize_files[0], years, njobs=njobs)
+    else:
+        Parallel(n_jobs=7, backend="loky")(
+            delayed(amortize_costs)(
+                os.path.join(output_path, run_name),  # data_path_name
+                amortize_files[0],  # 你的第二个参数
+                years,
+                njobs=math.ceil(njobs/7)  # 传给内部的并行参数（若有）
+            )
+            for run_name in input_files
+        )
     tprint("摊销成本计算 完成!")
     #
     ##--- 阶段 2: 独立汇总计算 ---
@@ -719,7 +707,10 @@ def main(task_dir, njobs):
     if njobs == 0:
         for year in years[1:]:
             # 直接调用
+            aggregate_and_save_summary(year, output_path, carbon_files_diff, input_files_0,carbon_names,'carbon')
+            aggregate_and_save_summary(year, output_path, bio_files_diff, input_files_0,carbon_names,'bio')
             aggregate_and_save_summary(year, output_path, carbon_files_diff, input_files_1,carbon_names,'carbon')
+            aggregate_and_save_summary(year, output_path, bio_files_diff, input_files_1,carbon_names,'bio')
             aggregate_and_save_summary(year, output_path, carbon_files_diff, input_files_2, carbon_bio_names, 'carbon')
             aggregate_and_save_summary(year, output_path, bio_files_diff, input_files_2, carbon_bio_names,'bio')
             aggregate_and_save_summary(year, output_path, carbon_files_diff, input_files_2, counter_carbon_bio_names,'carbon')
@@ -727,7 +718,19 @@ def main(task_dir, njobs):
     else:
         # --- 正确的代码 ---
         Parallel(n_jobs=njobs)(
+            delayed(aggregate_and_save_summary)(year, output_path, carbon_files_diff, input_files_0, carbon_names,'carbon')
+            for year in years[1:]
+        )
+        Parallel(n_jobs=njobs)(
+            delayed(aggregate_and_save_summary)(year, output_path, bio_files_diff, input_files_0, carbon_names,'bio')
+            for year in years[1:]
+        )
+        Parallel(n_jobs=njobs)(
             delayed(aggregate_and_save_summary)(year, output_path, carbon_files_diff, input_files_1, carbon_names,'carbon')
+            for year in years[1:]
+        )
+        Parallel(n_jobs=njobs)(
+            delayed(aggregate_and_save_summary)(year, output_path, bio_files_diff, input_files_1, carbon_names,'bio')
             for year in years[1:]
         )
         Parallel(n_jobs=njobs)(

@@ -9,7 +9,7 @@ CPU_CORES = 96             # 如需更稳，可改 36~40；不改也行，下面
 MEMORY_GB = "1500G"
 TIME_LIMIT = "0-720:00:00"
 
-PYTHON_SCRIPT_TO_RUN = "01_make_excel.py"
+PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"
 CONDA_ENV_NAME = "xpluto-fixed"
 
 SUBMISSION_SCRIPT_NAME = "submit_preprocess.sh"
