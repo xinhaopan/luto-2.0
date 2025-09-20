@@ -2723,6 +2723,32 @@ def write_GHG_BIO_xr(data: Data, yr_cal, path):
     # Save xarray data to netCDF
     save2nc(xr_ghg_ag_man, os.path.join(path, f'xr_GHG_ag_management_{yr_cal}.nc'))
 
+    simulated_year_list = sorted(list(data.lumaps.keys()))
+    yr_idx_sim = simulated_year_list.index(yr_cal)
+
+    # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
+    if yr_cal == data.YR_CAL_BASE:
+        pass
+    else:
+        yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
+        ghg_t_dict = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[yr_cal_sim_pre], separate=True)
+        ghg_t_smrj = xr.DataArray(
+            np.stack(list(ghg_t_dict.values()), axis=0),
+            dims=['Type', 'lm', 'cell', 'lu'],
+            coords={
+                'Type': list(ghg_t_dict.keys()),
+                'lm': data.LANDMANS,
+                'cell': range(data.NCELLS),
+                'lu': data.AGRICULTURAL_LANDUSES
+            }
+        )
+
+        # Calculate GHG emissions for transition penalties
+        xr_ghg_transition = ghg_t_smrj * ag_dvar_mrj
+
+        # Save xarray data to netCDF
+        save2nc(xr_ghg_transition, os.path.join(path, f'xr_transition_GHG_{yr_cal}.nc'))
+
     # -----------------------------------------------------------#
 
     # Unpack the ag managements and land uses
