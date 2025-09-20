@@ -55,105 +55,6 @@ def get_year(parent_dir):
     return sorted(years_list)
 
 
-import os
-import shutil
-import time
-import random
-import xarray as xr
-from filelock import FileLock, Timeout
-import tempfile
-
-
-# def save2nc(
-#         in_xr,
-#         save_path: str,
-#         *,
-#         engine: str = "h5netcdf",
-#         allow_overwrite: bool = True,
-#         compress: bool = True,
-#         lock_timeout: int = 600,
-#         lock_path: str | None = None,
-#         compute_before_write: bool = True,
-#         max_retries: int = 5,  # 新增：最大重试次数
-#         retry_delay: float = 1.0  # 新增：初始重试延迟（秒）
-# ):
-#     # 1. 准备数据和路径（与你之前的代码相同）
-#     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-#
-#     if isinstance(in_xr, xr.Dataset):
-#         if len(in_xr.data_vars) != 1:
-#             raise ValueError(f"输入 Dataset 含 {len(in_xr.data_vars)} 个变量，需单变量。")
-#         var_name = next(iter(in_xr.data_vars))
-#         da = in_xr[var_name]
-#     elif isinstance(in_xr, xr.DataArray):
-#         da = in_xr
-#         var_name = da.name or "data"
-#     else:
-#         raise TypeError("in_xr 必须是 xarray.DataArray 或 单变量 xarray.Dataset")
-#
-#     if da.name != var_name:
-#         da = da.rename(var_name)
-#
-#     coords_to_drop = set(da.coords) - set(da.dims)
-#     if coords_to_drop:
-#         da = da.drop_vars(coords_to_drop, errors="ignore")
-#
-#     if compute_before_write:
-#         da = da.load()
-#
-#     # 2. 设置编码和文件锁（与你之前的代码相同）
-#     enc = {var_name: {"dtype": "float32"}}
-#     if compress:
-#         enc[var_name].update({"zlib": True, "complevel": 4})
-#     if hasattr(da.data, "chunks") and da.data.chunks is not None:
-#         enc[var_name]["chunksizes"] = da.chunks
-#
-#     lockfile = lock_path or (save_path + ".lock")
-#     lock = FileLock(lockfile)
-#     save_dir = os.path.dirname(save_path) or '.'
-#
-#     # 3. 核心逻辑：获取锁并执行带重试的写入/移动操作
-#     # --------------------------------------------------
-#     try:
-#         with lock.acquire(timeout=lock_timeout):
-#             # 锁内二次检查
-#             if os.path.exists(save_path) and not allow_overwrite:
-#                 raise FileExistsError(f"目标已存在且不允许覆盖：{save_path}")
-#
-#             # 使用 tempfile 创建唯一的临时文件
-#             with tempfile.NamedTemporaryFile(dir=save_dir, suffix='.nc', delete=False) as tmp_file:
-#                 temp_path = tmp_file.name
-#
-#             try:
-#                 # 步骤 A: 写入临时文件
-#                 da.astype("float32").to_netcdf(path=temp_path, engine=engine, encoding=enc)
-#
-#                 # 步骤 B: 带重试的原子移动
-#                 for attempt in range(max_retries):
-#                     try:
-#                         shutil.move(temp_path, save_path)
-#                         # 成功移动，直接跳出重试循环
-#                         break
-#                     except PermissionError:
-#                         if attempt < max_retries - 1:
-#                             # 指数退避 + 随机抖动
-#                             sleep_time = retry_delay * (1.5 ** attempt) + random.uniform(0, 0.5)
-#                             print(f"⚠️ 移动文件时权限被拒绝，将在 {sleep_time:.2f}s 后重试...")
-#                             time.sleep(sleep_time)
-#                         else:
-#                             # 所有重试失败后，抛出原始异常
-#                             raise
-#
-#             except Exception as e:
-#                 # 如果在写入或移动过程中发生任何其他错误，确保清理临时文件
-#                 if os.path.exists(temp_path):
-#                     os.remove(temp_path)
-#                 raise e
-#
-#     except Timeout:
-#         raise TimeoutError(f"获取写锁超时（{lock_timeout}s）：{lockfile}")
-
-
 def get_path(task_name, path_name):
     """
     获取指定路径下的输出子目录。
@@ -172,7 +73,8 @@ def get_path(task_name, path_name):
             raise FileNotFoundError(f"The specified output path does not exist: {output_path}")
     except (IndexError, FileNotFoundError) as e:
         print(f"Error occurred while getting path for {path_name}: {e}")
-        print(f"Current directory content for {output_path}: {os.listdir(output_path) if os.path.exists(output_path) else 'Directory not found'}")
+        print(
+            f"Current directory content for {output_path}: {os.listdir(output_path) if os.path.exists(output_path) else 'Directory not found'}")
 
 
 # def npy_to_map(input_arr, output_tif, proj_file,
@@ -232,18 +134,19 @@ import numpy as np
 import xarray as xr
 from filelock import FileLock, Timeout
 
+
 def save2nc(
-    in_xr,
-    save_path: str,
-    *,
-    engine: str = "h5netcdf",
-    allow_overwrite: bool = True,
-    compress: bool = True,
-    lock_timeout: int = 600,
-    lock_path: str | None = None,
-    compute_before_write: bool = True,
-    max_retries: int = 5,
-    retry_delay: float = 1.0
+        in_xr,
+        save_path: str,
+        *,
+        engine: str = "h5netcdf",
+        allow_overwrite: bool = True,
+        compress: bool = True,
+        lock_timeout: int = 600,
+        lock_path: str | None = None,
+        compute_before_write: bool = True,
+        max_retries: int = 5,
+        retry_delay: float = 1.0
 ):
     # 目录
     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
@@ -279,13 +182,17 @@ def save2nc(
     if hasattr(da.data, "chunks") and da.data.chunks is not None:
         enc[var_name]["chunksizes"] = da.chunks
 
-    # 锁
+    # ✅ 关键修改：锁文件管理
     lockfile = lock_path or (save_path + ".lock")
     save_dir = os.path.dirname(save_path) or "."
 
+    # ✅ 修改1：创建FileLock对象但不立即使用
+    file_lock = FileLock(lockfile, timeout=lock_timeout)
+
     try:
-        # ✅ 正确的上下文写法：FileLock(...) 作为 with
-        with FileLock(lockfile, timeout=lock_timeout):
+        # ✅ 修改2：使用acquire()和release()方法
+        file_lock.acquire()
+        try:
             # 二次检查
             if os.path.exists(save_path) and not allow_overwrite:
                 raise FileExistsError(f"目标已存在且不允许覆盖：{save_path}")
@@ -317,8 +224,111 @@ def save2nc(
                     except Exception:
                         pass
                 raise
+        finally:
+            # ✅ 修改3：确保释放锁
+            try:
+                file_lock.release()
+            except Exception as e:
+                print(f"警告：释放锁时出错: {e}")
     except Timeout:
         raise TimeoutError(f"获取写锁超时（{lock_timeout}s）：{lockfile}")
+    finally:
+        # ✅ 修改4：强制清理锁文件
+        try:
+            if os.path.exists(lockfile):
+                os.remove(lockfile)
+                print(f"已清理锁文件: {lockfile}")
+        except Exception as e:
+            print(f"警告：清理锁文件失败 {lockfile}: {e}")
+
+
+# def save2nc(
+#     in_xr,
+#     save_path: str,
+#     *,
+#     engine: str = "h5netcdf",
+#     allow_overwrite: bool = True,
+#     compress: bool = True,
+#     lock_timeout: int = 600,
+#     lock_path: str | None = None,
+#     compute_before_write: bool = True,
+#     max_retries: int = 5,
+#     retry_delay: float = 1.0
+# ):
+#     # 目录
+#     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+
+#     # 统一为 DataArray
+#     if isinstance(in_xr, xr.Dataset):
+#         if len(in_xr.data_vars) != 1:
+#             raise ValueError(f"输入 Dataset 含 {len(in_xr.data_vars)} 个变量，需单变量。")
+#         var_name = next(iter(in_xr.data_vars))
+#         da = in_xr[var_name]
+#     elif isinstance(in_xr, xr.DataArray):
+#         da = in_xr
+#         var_name = da.name or "data"
+#     else:
+#         raise TypeError("in_xr 必须是 xarray.DataArray 或 单变量 xarray.Dataset")
+
+#     if da.name != var_name:
+#         da = da.rename(var_name)
+
+#     # 仅保留维度坐标，剔除非维度坐标（避免写出失败）
+#     coords_to_drop = set(da.coords) - set(da.dims)
+#     if coords_to_drop:
+#         da = da.drop_vars(coords_to_drop, errors="ignore")
+
+#     # 预先计算，避免写出时仍有 dask 依赖
+#     if compute_before_write:
+#         da = da.load()
+
+#     # 编码
+#     enc = {var_name: {"dtype": "float32"}}
+#     if compress:
+#         enc[var_name].update({"zlib": True, "complevel": 4})
+#     if hasattr(da.data, "chunks") and da.data.chunks is not None:
+#         enc[var_name]["chunksizes"] = da.chunks
+
+#     # 锁
+#     lockfile = lock_path or (save_path + ".lock")
+#     save_dir = os.path.dirname(save_path) or "."
+
+#     try:
+#         # ✅ 正确的上下文写法：FileLock(...) 作为 with
+#         with FileLock(lockfile, timeout=lock_timeout):
+#             # 二次检查
+#             if os.path.exists(save_path) and not allow_overwrite:
+#                 raise FileExistsError(f"目标已存在且不允许覆盖：{save_path}")
+
+#             # 独立临时文件路径（先关闭句柄，避免 Windows 上无法 move）
+#             with tempfile.NamedTemporaryFile(dir=save_dir, suffix=".nc", delete=False) as tmp_file:
+#                 temp_path = tmp_file.name
+
+#             try:
+#                 # 写入临时文件（xarray 会在函数返回时关闭句柄）
+#                 da.astype("float32").to_netcdf(path=temp_path, engine=engine, encoding=enc)
+
+#                 # 原子移动（带重试，处理偶发 PermissionError/杀毒软件扫描占用等）
+#                 for attempt in range(max_retries):
+#                     try:
+#                         shutil.move(temp_path, save_path)
+#                         break
+#                     except PermissionError:
+#                         if attempt < max_retries - 1:
+#                             sleep_time = retry_delay * (1.5 ** attempt) + random.uniform(0, 0.5)
+#                             print(f"⚠️ 移动时权限被拒绝，{sleep_time:.2f}s 后重试...")
+#                             time.sleep(sleep_time)
+#                         else:
+#                             raise
+#             except Exception:
+#                 if os.path.exists(temp_path):
+#                     try:
+#                         os.remove(temp_path)
+#                     except Exception:
+#                         pass
+#                 raise
+#     except Timeout:
+#         raise TimeoutError(f"获取写锁超时（{lock_timeout}s）：{lockfile}")
 
 
 def filter_all_from_dims(ds: Union[xr.Dataset, xr.DataArray]) -> Union[xr.Dataset, xr.DataArray]:
@@ -381,9 +391,11 @@ def create_xarray(years, base_path, env_category, env_name, mask=None,
 
     return ds
 
+
 import numpy as np
 import rasterio
 import os
+
 
 def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0):
     # 仅支持 1D 'cell'
@@ -417,10 +429,10 @@ def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0):
         count=1,
         dtype="float32",
         nodata=nodata_value,
-        compress="deflate",   # 可选：压缩
-        predictor=3,          # 浮点预测器
-        tiled=True,           # 平铺
-        blockxsize=256,       # 块大小（可按需）
+        compress="deflate",  # 可选：压缩
+        predictor=3,  # 浮点预测器
+        tiled=True,  # 平铺
+        blockxsize=256,  # 块大小（可按需）
         blockysize=256,
     )
 
