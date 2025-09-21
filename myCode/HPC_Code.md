@@ -59,6 +59,6 @@ git reset --hard origin/paper2
 
 Res = 15, timeseries, 8GB,2CPU, 2h
 
-Res = 5, 35GB, 15h
+Res = 5, 60GB, 24h
 
 

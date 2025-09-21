@@ -143,7 +143,7 @@ The LUTO reporting system uses Vue.js 3 with a progressive selection pattern for
 
 All reporting views follow the progressive selection pattern:
 
-1. **Data Loading**: Use `chartRegister`/`mapRegister` from `DataService`/`MapService`
+1. **Data Loading**: Use `chartRegister`/`mapRegister` from `ChartService`/`MapService`
 2. **Progressive Buttons**: Dynamic buttons generated from data structure keys
 3. **Cascading Watchers**: Downstream selections auto-update when upstream changes
 4. **Reactive Data**: `selectMapData`/`selectChartData` computed properties
@@ -211,20 +211,45 @@ All reporting views follow the progressive selection pattern:
   - `map_water_yield_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}` (AgMgt first, then Water)
   - `map_water_yield_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
 
-#### BIODIVERSITY MODULE
-- **Chart Data**:
-  - `BIO_GBF2_overview_1_Type`: `Region → [series]` (simplified overview - Agricultural Landuse, Agricultural Management, Non-Agricultural land-use)
-  - `BIO_GBF2_split_Ag_1_Landuse`: `Region → [series]` (simplified, no Water/AgMgt levels)
-  - `BIO_GBF2_split_Am_1_Landuse`: `Region → [series]` (simplified, no Water/AgMgt levels) 
-  - `BIO_GBF2_split_Am_2_Agri-Management`: `Region → [series]` with AgMgt categories: `"ALL"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`
-  - `BIO_GBF2_split_NonAg_1_Landuse`: `Region → [series]` (simplified)
-  - `BIO_quality_overview_1_Type`: `Region → [series]` (simplified overview)
-  - `BIO_quality_split_*`: Similar structure to GBF2 files
-- **Map Data**: 
-  - `map_bio_GBF2_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}` (standard pattern)
-  - `map_bio_GBF2_Am`: `Water → Landuse → Year → {img_str, bounds, min_max}` (standard pattern)
-  - `map_bio_GBF2_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified, no Water level)
-  - `map_bio_overall_*`: Similar structures for overview maps
+#### BIODIVERSITY MODULE (Dynamic/Conditional Loading)
+- **Dynamic ChartData Structure**: Biodiversity data is conditionally loaded based on scenario settings
+  - **Conditional Loading Logic**: Only load GBF scripts when corresponding targets are not 'off':
+    - `BIODIVERSITY_TARGET_GBF_2 !== 'off'` → loads GBF2 data
+    - `BIODIVERSITY_TARGET_GBF_3 !== 'off'` → loads GBF3 data
+    - `BIODIVERSITY_TARGET_GBF_4_SNES !== 'off'` → loads GBF4 (SNES) data
+    - `BIODIVERSITY_TARGET_GBF_4_ECNES !== 'off'` → loads GBF4 (ECNES) data
+    - `BIODIVERSITY_TARGET_GBF_8 !== 'off'` → loads GBF8 (SPECIES & GROUP) data
+- **Dynamic ChartData Construction**: Base structure created first, then GBF data added conditionally:
+  ```javascript
+  // Base structure always includes Quality data
+  ChartData.value['Biodiversity'] = {
+    'Quality': window[chartOverview_bio_quality['name']]
+  };
+  // Then conditionally add GBF data based on scenario settings
+  if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
+    ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
+  }
+  // ... similar pattern for GBF3, GBF4, GBF8
+  ```
+- **Chart Data** (when loaded):
+  - `BIO_quality_overview_1_Type`: `Region → [series]` (always loaded - simplified overview)
+  - `BIO_GBF2_overview_1_Type`: `Region → [series]` (conditional - Agricultural Landuse, Agricultural Management, Non-Agricultural Land-use)
+  - `BIO_GBF2_split_Ag_1_Landuse`: `Region → [series]` (conditional - simplified, no Water/AgMgt levels)
+  - `BIO_GBF2_split_Am_1_Landuse`: `Region → [series]` (conditional - simplified, no Water/AgMgt levels)
+  - `BIO_GBF2_split_Am_2_Agri-Management`: `Region → [series]` (conditional - with AgMgt categories: `"ALL"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`)
+  - `BIO_GBF2_split_NonAg_1_Landuse`: `Region → [series]` (conditional - simplified)
+  - `BIO_GBF3_*`, `BIO_GBF4_*`, `BIO_GBF8_*`: Similar structures for other GBF targets (conditional loading)
+- **Map Data**:
+  - `map_bio_quality_*`: Always available (quality data always loaded)
+  - `map_bio_GBF2_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}` (conditional - standard pattern)
+  - `map_bio_GBF2_Am`: `Water → Landuse → Year → {img_str, bounds, min_max}` (conditional - standard pattern)
+  - `map_bio_GBF2_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (conditional - simplified, no Water level)
+  - `map_bio_GBF3_*`, `map_bio_GBF4_*`, `map_bio_GBF8_*`: Similar structures for other GBF targets (conditional loading)
+- **Implementation Notes**:
+  - **Script Loading Order**: Conditional GBF scripts loaded after base scripts but before ChartData construction
+  - **Error Handling**: Views must handle cases where expected GBF data may not be available
+  - **UI Adaptation**: Biodiversity view buttons/options should adapt to available data structure
+  - **Memory Optimization**: Only loads necessary data files based on scenario configuration
 
 #### DVAR MODULE (Decision Variables - Map-Only Module)
 - **Map Data (Simplified Hierarchy)**:
@@ -236,7 +261,7 @@ All reporting views follow the progressive selection pattern:
     - `"Water-supply"`: `Year → {img_str, bounds, min_max}` 
     - `"Agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
     - `"Agricultural Management"`: `Year → {img_str, bounds, min_max}`
-    - `"Non-agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
+    - `"Non-Agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
 - **Composite Structure**: Map.js creates combined structure:
   - Categories: `"Land-use"`, `"Water-supply"`, `"Ag"`, `"Ag Mgt"`, `"Non-Ag"`
   - Each category combines "ALL" from mosaic + individual items from specific files
@@ -270,7 +295,7 @@ All reporting views follow the progressive selection pattern:
 3. **Special Cases**:
    - Economics: Handle dual Cost/Revenue series in same array with combined watcher pattern
    - NonAg: Handle simplified structures without Water/AgMgt levels
-   - Biodiversity: Mixed structures - most use simplified `Region → [series]`, but `BIO_*_Am_2_Agri-Management` files have AgMgt categories; map data follows standard patterns with some NonAg files simplified
+   - Biodiversity: **Dynamic/Conditional Loading** - GBF data conditionally loaded based on scenario settings; Quality data always available; mixed structures where most use simplified `Region → [series]`, but `BIO_*_Am_2_Agri-Management` files have AgMgt categories; map data follows standard patterns with some NonAg files simplified; views must adapt to potentially missing GBF data
 4. **UI Conditions**: Use proper `v-if` conditions based on category selections
 5. **Data Access**: Use optional chaining (`?.`) for safe property access
 6. **Code Consistency**: All views must follow the same cascade watcher pattern for maintainability
@@ -436,5 +461,5 @@ watch([selectCostRevenue, selectCategory], ([newCostRevenue, newCategory], [oldC
 - **Views**: `/luto/tools/report/VUE_modules/views/` - Main view components
 - **Chart Data**: `/luto/tools/report/VUE_modules/data/` - Chart data files (68 total)
 - **Map Data**: `/luto/tools/report/VUE_modules/data/map_layers/` - Map layer files
-- **Services**: `/luto/tools/report/VUE_modules/services/` - DataService/MapService registrations
+- **Services**: `/luto/tools/report/VUE_modules/services/` - ChartService/MapService registrations
 - **Routes**: `/luto/tools/report/VUE_modules/routes/route.js` - Vue router configuration

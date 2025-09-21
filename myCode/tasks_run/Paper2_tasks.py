@@ -4,15 +4,15 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250919_Paper2_Results_NCI'],
+    'TASK_NAME': ['20250922_Paper2_Results'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['60GB'],
     'NCPUS': ['15'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['15:00:00'],
+    'TIME': ['72:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['high', 'low', 'off'],
     'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],
@@ -36,10 +36,11 @@ grid_search = {
         'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
         'high': {2030: 0.30, 2050: 0.50, 2100: 0.50},
     }],
-    'BIODIVERSTIY_TARGET_GBF_3': ['off'],
-    'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],
-    'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],
-    'BIODIVERSTIY_TARGET_GBF_8': ['off'],
+
+    'BIODIVERSITY_TARGET_GBF_3': ['off'],
+    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],
+    'BIODIVERSITY_TARGET_GBF_8': ['off'],
 
     # ----------------------------------- Water settings --------------------------------
     'WATER_STRESS': [0.6],
@@ -85,6 +86,4 @@ task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
 grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
 print(grid_search_settings_df.columns)
 # grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
-create_task_runs(task_root_dir, grid_search_settings_df, platform="NCI", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)
-
-
+create_task_runs(task_root_dir, grid_search_settings_df, platform="HPC", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)

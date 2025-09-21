@@ -376,25 +376,25 @@ os.makedirs(output_dir, exist_ok=True)
 
 origin_path = f"../../../output/{task_name}/carbon_price/0_base_data"
 
-# input_files_1 = config.carbon_names
-# results_t = build_tables_from_process(origin_path, input_files_1, years,xr_name='xr_transition_cost_ag2non_ag_amortised_diff',keep_dim='To land-use', strict=True, n_jobs=n_jobs)
-# save_dict_pickle(results_t, os.path.join(output_dir, 'cost_GHG_tn.pkl'))
-#
-# results_mgt = build_tables_from_process(origin_path, input_files_1, years,xr_name='xr_cost_agricultural_management',keep_dim='am',  strict=True, n_jobs=n_jobs)
-# save_dict_pickle(results_mgt, os.path.join(output_dir, 'cost_GHG_mgt.pkl'))
-#
-# results_nonag = build_tables_from_process(origin_path, input_files_1, years,xr_name='xr_cost_non_ag',keep_dim='lu', strict=True, n_jobs=n_jobs)
-# save_dict_pickle(results_nonag, os.path.join(output_dir, 'cost_GHG_nonag_lu.pkl'))
-#
-# input_files_2 = config.carbon_bio_names
-# results_t = build_tables_from_process(origin_path, input_files_2, years,xr_name='xr_transition_cost_ag2non_ag_amortised_diff',keep_dim='To land-use', strict=True, n_jobs=n_jobs)
-# save_dict_pickle(results_t, os.path.join(output_dir, 'cost_bio_tn.pkl'))
-#
-# results_mgt = build_tables_from_process(origin_path, input_files_2, years,xr_name='xr_cost_agricultural_management',keep_dim='am',  strict=True, n_jobs=n_jobs)
-# save_dict_pickle(results_mgt, os.path.join(output_dir, 'cost_bio_mgt.pkl'))
-#
-# results_nonag = build_tables_from_process(origin_path, input_files_2, years,xr_name='xr_cost_non_ag',keep_dim='lu', strict=True, n_jobs=n_jobs)
-# save_dict_pickle(results_nonag, os.path.join(output_dir, 'cost_bio_nonag_lu.pkl'))
+input_files_1 = config.carbon_names
+results_t = build_tables_from_process(origin_path, input_files_1, years,xr_name='xr_transition_cost_ag2non_ag_amortised_diff',keep_dim='To land-use', strict=True, n_jobs=n_jobs)
+save_dict_pickle(results_t, os.path.join(output_dir, 'cost_GHG_tn.pkl'))
+
+results_mgt = build_tables_from_process(origin_path, input_files_1, years,xr_name='xr_cost_agricultural_management',keep_dim='am',  strict=True, n_jobs=n_jobs)
+save_dict_pickle(results_mgt, os.path.join(output_dir, 'cost_GHG_mgt.pkl'))
+
+results_nonag = build_tables_from_process(origin_path, input_files_1, years,xr_name='xr_cost_non_ag',keep_dim='lu', strict=True, n_jobs=n_jobs)
+save_dict_pickle(results_nonag, os.path.join(output_dir, 'cost_GHG_nonag_lu.pkl'))
+
+input_files_2 = config.carbon_bio_names
+results_t = build_tables_from_process(origin_path, input_files_2, years,xr_name='xr_transition_cost_ag2non_ag_amortised_diff',keep_dim='To land-use', strict=True, n_jobs=n_jobs)
+save_dict_pickle(results_t, os.path.join(output_dir, 'cost_bio_tn.pkl'))
+
+results_mgt = build_tables_from_process(origin_path, input_files_2, years,xr_name='xr_cost_agricultural_management',keep_dim='am',  strict=True, n_jobs=n_jobs)
+save_dict_pickle(results_mgt, os.path.join(output_dir, 'cost_bio_mgt.pkl'))
+
+results_nonag = build_tables_from_process(origin_path, input_files_2, years,xr_name='xr_cost_non_ag',keep_dim='lu', strict=True, n_jobs=n_jobs)
+save_dict_pickle(results_nonag, os.path.join(output_dir, 'cost_bio_nonag_lu.pkl'))
 
 
 title_ghg_names = [r'$\mathrm{GHG}_{\mathrm{low}}$', r'$\mathrm{GHG}_{\mathrm{high}}$']
