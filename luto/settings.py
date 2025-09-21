@@ -193,7 +193,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
 '''
 
 REGIONAL_ADOPTION_CONSTRAINTS = 'off'    # 'off', 'on', 'NON_AG_UNIFORM'
-REGIONAL_ADOPTION_NON_AG_UNIFORM = 15                # None or numbers between 0-100 (both inclusive); Only work under 'NON_AG_UNIFORM'!
+REGIONAL_ADOPTION_NON_AG_UNIFORM = 15               # None or numbers between 0-100 (both inclusive); Only work under 'NON_AG_UNIFORM'!
                                                     #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
 REGIONAL_ADOPTION_ZONE = 'NRM_CODE'                 # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
@@ -475,7 +475,7 @@ The weight of the deviations from target in the objective function.
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'                     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
-WATER_CLIMATE_CHANGE_IMPACT = 'off'      # 'on' or 'off'. 'off' will turn off climate change impact on water yields.
+WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off climate change impact on water yields.
 
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
