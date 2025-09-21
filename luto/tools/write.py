@@ -1722,11 +1722,6 @@ def write_biodiversity_overall_quality_scores(data: Data, yr_cal, path):
 
 def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     ''' Biodiversity GBF2 only being written to disk when `BIODIVERSITY_TARGET_GBF_2` is not 'off' '''
-
-    # Do nothing if biodiversity limits are off and no need to report
-    # if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
-    #     return 'Skipped: Biodiversity GBF2 scores not written as `BIODIVERSITY_TARGET_GBF_2` is set to "off"'
-
         
     # Unpack the ag managements and land uses
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
@@ -1783,6 +1778,15 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     xr_gbf2_ag = priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
     xr_gbf2_non_ag = priority_degraded_area_score_r * non_ag_impact_k * non_ag_dvar_rk
     xr_gbf2_am = priority_degraded_area_score_r * am_impact_raj * am_dvar_amrj
+
+    # Save xarray data to netCDF
+    save2nc(xr_gbf2_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_{yr_cal}.nc'))
+    save2nc(xr_gbf2_non_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_non_ag_{yr_cal}.nc'))
+    save2nc(xr_gbf2_am, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_management_{yr_cal}.nc'))
+
+    # Do nothing if biodiversity limits are off and no need to report
+    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
+        return 'Skipped: Biodiversity GBF2 scores not written as `BIODIVERSITY_TARGET_GBF_2` is set to "off"'
 
     # Regional level aggregation
     GBF2_score_ag_region = xr_gbf2_ag.groupby('region'
@@ -1858,10 +1862,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).to_csv(os.path.join(path, f'biodiversity_GBF2_priority_scores_{yr_cal}.csv'), index=False)
 
-    # Save xarray data to netCDF
-    save2nc(xr_gbf2_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf2_non_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_non_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf2_am, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_management_{yr_cal}.nc'))
+
     
     return f"Biodiversity GBF2 priority scores written for year {yr_cal}"
 
