@@ -8,6 +8,7 @@ import xarray as xr
 from joblib import Parallel, delayed
 import pandas as pd
 from typing import List, Dict, Any
+from contextlib import suppress
 from pathlib import Path
 import math
 
@@ -16,104 +17,114 @@ from tools.tools import get_path, get_year, save2nc, filter_all_from_dims
 from tools.tools import get_path,get_year,filter_all_from_dims
 import tools.config as config
 
+
 def summarize_to_type(
-        scenarios: List[str],
-        years: List[int],
-        file: str,
-        keep_dim: str,                     # 需要保留为 type 维度的那个维（例如 'am'）
-        output_file: str,
-        var_name: str = "data",
-        scale: float = 1e6,
-        dtype: str = "float32",
-        chunks: Optional[Dict[str, int]] = None,  # 传入则使用 dask 分块（并行）
-) -> xr.DataArray:
-    """
-    汇总 (scenario, year) 下的 {file}_{year}.nc：
-    - 对除 keep_dim 外的所有维度求和，保留 keep_dim（作为最终的 'type' 维）
-    - 除以 scale（例如 1e6）
-    - 组合成 DataArray，维度为 (scenario, year, type)
-    - 写出 NetCDF 并返回该 DataArray（dask 延迟计算，到 to_netcdf 时触发）
-    """
+        scenarios,
+        years,
+        file,
+        keep_dim,
+        output_file,
+        var_name="data",
+        scale=1e6,
+        dtype="float32",
+        chunks='auto',
+):
+    print(f"Summarizing to type from {file}, keep_dim={keep_dim}...")
+    base_dir = f'../../../output/{config.TASK_NAME}/carbon_price'
 
-    base_dir = f'../../../output/{config.TASK_NAME}/carbon_price/0_base_data'
-
-    # ---------- 1) 先找一个示例文件，确定 type 维度的坐标 ----------
-    sample_da = None
-    sample_path = None
+    # 1) 收集文件
+    file_paths, file_scenarios, file_years = [], [], []
     for s in scenarios:
         for y in years:
-            p = os.path.join(base_dir, s, f"{years[-1]}/{file}_{y}.nc")
+            p = os.path.join(base_dir, '0_base_data', s, str(y), f"{file}_{s}_{y}.nc")
             if os.path.exists(p):
-                sample_path = p
-                break
-        if sample_path:
-            break
+                file_paths.append(p)
+                file_scenarios.append(s)
+                file_years.append(y)
+    if not file_paths:
+        raise RuntimeError("未找到任何有效文件")
 
-    if sample_path is None:
-        raise FileNotFoundError("未找到任何可用的输入文件，无法确定 type 坐标。")
+    print(f"Found {len(file_paths)} files, opening with mfdataset (chunks={chunks})...")
 
-    with xr.open_dataarray(sample_path, chunks=chunks) as da0:
-        da0 = filter_all_from_dims(da0)
-        if keep_dim not in da0.dims:
-            raise ValueError(f"示例文件中不包含 keep_dim='{keep_dim}'，实际维度为 {da0.dims}")
-        type_coord = da0.coords[keep_dim].values
+    # 2) 先探测目标变量
+    probe = xr.open_dataset(file_paths[0], engine="netcdf4", decode_cf=False, mask_and_scale=False)
+    try:
+        numeric_vars = [k for k, v in probe.data_vars.items() if np.issubdtype(v.dtype, np.number)]
+        if not numeric_vars:
+            raise RuntimeError("数据集中没有数值变量可用于汇总")
+        target_var = numeric_vars[0] if var_name == "data" else var_name
+        if target_var not in probe.data_vars:
+            target_var = numeric_vars[0]
 
-    # ---------- 2) 逐个 (scenario, year) 构造 dask-backed 的部分并拼接 ----------
-    per_scenario = []
-    for s in scenarios:
-        per_year = []
-        for y in years:
-            path = os.path.join(base_dir, s, str(y), f"{file}_{y}.nc")
-            if not os.path.exists(path):
-                raise ValueError(f"文件不存在: {path}")
+        if keep_dim not in probe[target_var].dims:
+            raise ValueError(f"变量 '{target_var}' 中不包含 keep_dim='{keep_dim}'，实际维度: {probe[target_var].dims}")
+        if keep_dim in probe.coords:
+            type_coord = probe.coords[keep_dim].values
+        else:
+            type_coord = np.arange(probe[target_var].sizes[keep_dim])
+    finally:
+        with suppress(Exception):
+            probe.close()
 
-            da = xr.open_dataarray(path, chunks=chunks)  # 不加 with，延迟直到计算
-            da = filter_all_from_dims(da)
+    # 3) 只读目标变量
+    def _preprocess(ds):
+        return ds[[target_var]]
 
-            # 求和保留 keep_dim -> 只剩 keep_dim 这个维度
-            sum_dims = [d for d in da.dims if d != keep_dim]
-            da_am = da.sum(dim=sum_dims, keep_attrs=False) / scale
+    ds = xr.open_mfdataset(
+        file_paths,
+        engine="netcdf4",
+        combine='nested',
+        concat_dim='file_idx',
+        preprocess=_preprocess,
+        decode_cf=False,
+        mask_and_scale=False,
+        chunks=chunks,
+        parallel=True,
+    )
 
-            # 统一重命名 keep_dim -> 'type'
-            if keep_dim != "type":
-                da_am = da_am.rename({keep_dim: "type"})
-            # 强制对齐到 sample 的 type 顺序（防止不同文件顺序不同）
-            da_am = da_am.sel(type=type_coord)
+    try:
+        da = ds[target_var]
+        print(f"Loaded data shape: {da.shape}, dims: {da.dims}")
 
-            # 添加 year 维
-            da_am = da_am.expand_dims({"year": [y]})
-            da_am.name = var_name
-            per_year.append(da_am)
+        da = filter_all_from_dims(da)
 
-        # 按 year 拼
-        if len(per_year) == 0:
-            continue
-        da_year = xr.concat(per_year, dim="year")
-        # 添加 scenario 维
-        da_year = da_year.expand_dims({"scenario": [s]})
-        per_scenario.append(da_year)
+        sum_dims = [d for d in da.dims if d not in [keep_dim, 'file_idx']]
+        print(f"Summing over dimensions: {sum_dims}, keeping: [{keep_dim}, 'file_idx']")
+        da_summed = (da if not sum_dims else da.sum(dim=sum_dims, keep_attrs=False)) / scale
 
-    if len(per_scenario) == 0:
-        raise RuntimeError("所有场景均为空，无法生成结果。")
+        if keep_dim != "type":
+            da_summed = da_summed.rename({keep_dim: "type"})
+        try:
+            da_summed = da_summed.sel(type=type_coord)
+        except Exception:
+            da_summed = da_summed.assign_coords(type=("type", type_coord))
 
-    # 按 scenario 拼
-    out_da = xr.concat(per_scenario, dim="scenario")
-    # 确保维度顺序
-    out_da = out_da.transpose("scenario", "year", "type")
+        da_summed = da_summed.assign_coords(
+            scenario=('file_idx', file_scenarios),
+            Year=('file_idx', file_years)
+        )
+        da_indexed = da_summed.set_index(file_idx=['scenario', 'Year'])
+        da_final = da_indexed.unstack('file_idx')
 
-    # 设定坐标类型、名称
-    out_da.name = var_name
-    out_da = out_da.astype(dtype, copy=False)
+        da_final = da_final.transpose("scenario", "Year", "type")
+        da_final.name = ("data" if var_name == "data" else var_name)
+        da_final = da_final.astype(dtype, copy=False)
 
-    # ---------- 3) 写 NetCDF（此处会触发 dask 计算） ----------
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    save2nc(out_da, output_file)
+        print(f"Final data shape: {da_final.shape}")
 
-    print(f"✅ Saved to {output_file}")
+        output_dir = os.path.join(base_dir, '1_draw_data')
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, f'{output_file}.nc')
+        print("Starting computation and saving...")
+        save2nc(da_final, output_path)
+        print(f"✅ Saved to {output_path}")
 
-    return out_da
+    finally:
+        with suppress(Exception):
+            ds.close()
 
-# from your_module import filter_all_from_dims
+    return da_final
+
 
 def summarize_to_category(
         scenarios: List[str],
@@ -134,12 +145,12 @@ def summarize_to_category(
     - type: files (用 KEY_TO_COLUMN_MAP 替换后的名称)
     """
 
-    base_dir = f'../../../output/{config.TASK_NAME}/carbon_price/0_base_data'
+    base_dir = f'../../../output/{config.TASK_NAME}/carbon_price'
     years_sorted = sorted(years)
     type_names = [config.KEY_TO_COLUMN_MAP.get(f, f) for f in files]
 
     def _sum_single(scenario: str, year: int, file: str) -> float | None:
-        input_path = os.path.join(base_dir, scenario)
+        input_path = os.path.join(base_dir,'0_base_data', scenario)
         nc_path = os.path.join(input_path, f'{year}', f'{file}_{year}.nc')
         if not os.path.exists(nc_path):
             return np.nan
@@ -178,12 +189,10 @@ def summarize_to_category(
         da = da.chunk(chunks)
 
     output_dir = os.path.join(
-        f'../../../output/{config.TASK_NAME}',
-        'carbon_price',
+        base_dir,
         '1_draw_data')
     out_nc = os.path.join(
-        f'{output_dir}',
-        'carbon_price',
+        base_dir,
         '1_draw_data',
         f'{output_file}.nc'
     )
@@ -209,7 +218,6 @@ def build_profit_and_cost_nc(
       'Non-ag revenue','Non-ag cost','Transition(ag→ag) cost',
       'Transition(ag→non-ag) amortised cost'
     """
-    # 修正：这里原来少了 f
     out_dir = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
     os.makedirs(out_dir, exist_ok=True)
 
@@ -226,27 +234,31 @@ def build_profit_and_cost_nc(
     if missing:
         raise ValueError(f"economic_da 缺少必要 type: {missing}")
 
-    def g(name):  # 便捷选择
-        return economic_da.sel(type=name)
+    def pick(name: str) -> xr.DataArray:
+        # 选中一个类型 -> 去掉原来的 type 维度，避免后续按坐标对齐
+        da = economic_da.sel(type=name).squeeze(drop=True)
+        # 现在 da 的维度里已经没有 type 了（只剩 scenario/year 等）
+        return da
 
-    profit_vars = {
-        "Ag profit": g("Ag revenue") - g("Ag cost"),
-        "Agmgt profit": g("Agmgt revenue") - g("Agmgt cost"),
-        "Non-ag profit": g("Non-ag revenue") - g("Non-ag cost"),
-        "Transition(ag→ag) profit": - g("Transition(ag→ag) cost"),
-        "Transition(ag→non-ag) amortised profit": - g("Transition(ag→non-ag) amortised cost"),
-    }
-    profit_da = xr.concat(list(profit_vars.values()), dim="type").assign_coords(
-        type=list(profit_vars.keys())
-    )
+    profit_list = [
+        (pick("Ag revenue") - pick("Ag cost")).expand_dims(type=["Ag profit"]),
+        (pick("Agmgt revenue") - pick("Agmgt cost")).expand_dims(type=["Agmgt profit"]),
+        (pick("Non-ag revenue") - pick("Non-ag cost")).expand_dims(type=["Non-ag profit"]),
+        (-pick("Transition(ag→ag) cost")).expand_dims(type=["Transition(ag→ag) profit"]),
+        (-pick("Transition(ag→non-ag) amortised cost")).expand_dims(type=["Transition(ag→non-ag) amortised profit"]),
+    ]
+
+    profit_da = xr.concat(profit_list, dim="type")
+    profit_da.name = "data"
+
+    # 如果需要固定维度顺序（比如 scenario, year, type）：
+    want = [d for d in ["scenario", "Year", "type"] if d in profit_da.dims]
+    profit_da = profit_da.transpose(*want)
     profit_da.name = "data"
 
     # 存 profit（修正：encoding 的 key 要用当前 name）
-    profit_nc = os.path.join(out_dir, "profit.nc")
-    profit_da.astype("float32").to_netcdf(
-        profit_nc,
-        encoding={"data": {"dtype": "float32", "zlib": True, "complevel": 4}}
-    )
+    profit_nc = os.path.join(out_dir, "xr_profit.nc")
+    save2nc(profit_da, profit_nc)
 
     # ---------- 2) 构造三个差值 DataArray ----------
     baseline = input_files_0[0]
@@ -271,7 +283,7 @@ def build_profit_and_cost_nc(
 
     # C) counter：input_files_2 的前 bio_nums 个与 baseline
     diffs = []
-    for i in range(bio_nums):
+    for i in range(len(counter_carbon_bio_names)):
         scen2 = input_files_2[i]
         diffs.append(profit_da.sel(scenario=scen2) - profit_da.sel(scenario=baseline))
     counter_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(counter_carbon_bio_names))
@@ -493,9 +505,9 @@ def create_xarray(years, base_path, env_category, env_name, mask=None,
         file_paths,
         engine=engine,
         combine="nested",  # 明确“按给定顺序拼接”
-        concat_dim="year",  # 新增 year 维度
+        concat_dim="Year",  # 新增 year 维度
         parallel=parallel,  # 一般 False 更稳，避免句柄并发
-        chunks={cell_dim: cell_chunk, "year": year_chunk}  # year=1，cell 分块
+        chunks={cell_dim: cell_chunk, "Year": year_chunk}  # year=1，cell 分块
     ).assign_coords(year=valid_years)
 
     if mask is not None:
@@ -535,9 +547,9 @@ def create_summary(env_category, years, base_path, colnames):
     # 计算指标
     xr_carbon_price_ave_a = (xr_carbon_cost_a.sum(dim="cell") /
                              xr_carbon.sum(dim="cell"))
-    da_price = xr_carbon_price_ave_a["data"].sortby("year")
-    da_benefits = (xr_carbon.sum(dim="cell")["data"] / 1e6).sortby("year")
-    da_cost = (xr_carbon_cost_a.sum(dim="cell")["data"] / 1e6).sortby("year")
+    da_price = xr_carbon_price_ave_a["data"].sortby("Year")
+    da_benefits = (xr_carbon.sum(dim="cell")["data"] / 1e6).sortby("Year")
+    da_cost = (xr_carbon_cost_a.sum(dim="cell")["data"] / 1e6).sortby("Year")
 
     # 检查列名长度
     if len(colnames) != 3:
@@ -545,11 +557,11 @@ def create_summary(env_category, years, base_path, colnames):
 
     # 组装 DataFrame
     df = pd.DataFrame({
-        "year": da_price["year"].values,
+        "Year": da_price["Year"].values,
         colnames[0]: da_benefits.values,
         colnames[1]: da_cost.values,
         colnames[2]: da_price.values
-    }).set_index("year")
+    }).set_index("Year")
 
     excel_path = base_path.replace("0_base_data", "1_excel")
     output_path = os.path.join(excel_path, f"2_{env_category}_cost_series.xlsx")

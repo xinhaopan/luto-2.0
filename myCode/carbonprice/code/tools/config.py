@@ -1,7 +1,7 @@
 import math
 
-N_JOBS = math.ceil(41 / 41)
-TASK_NAME = "20250922_Paper2_Results_HPC_test"
+N_JOBS = math.ceil(41 / 1)
+TASK_NAME = "20250922_Paper2_Results_NCI"
 
 
 

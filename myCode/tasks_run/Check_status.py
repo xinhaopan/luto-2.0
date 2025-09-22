@@ -88,7 +88,7 @@ def parse_running_year(runing_file):
 
 
 if __name__ == "__main__":
-    base_dir = '../../output/20250922_Paper2_Results_HPC_NUM0'
+    base_dir = '../../output/20250922_Paper2_Results_HPC'
     # base_dir = '../../output/20250921_Paper2_Results'
     target_year = 2050
 
