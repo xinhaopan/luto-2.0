@@ -100,19 +100,8 @@ def main():
         # 记录错误到日志文件
         error_message = f"An error occurred during simulation:\n{str(e)}\n{traceback.format_exc()}"
         write_log(error_message, file=error_log_file)
-
-        # 保存数据并监控内存
-        years = [i for i in settings.SIM_YEARS if i <= data.last_year]
-        data.set_path(years)
-        pkl_path = f'{data.path}/data_with_solution.gz'
-        write_log("Start saving data with solution...")
-        _, save_data_memory = monitor_memory(sim.save_data_to_disk, data, pkl_path)
-        write_log(f"Data with solution saved in {data.path}. Peak memory usage: {save_data_memory:.2f} GB")
-        # 监控write_output
-        write_log("Start writing output...")
-        from luto.tools.write import write_outputs
-        _, write_output_memory = monitor_memory(write_outputs, data)
-        write_log(f"Output written. Peak memory usage: {write_output_memory:.2f} GB")
+        write_log(f"Run failed.")
+        write_log(f"Model finished in {data.last_year}")
 
         # 打印错误信息，便于调试
         print(f"Error in simulation: {e}")

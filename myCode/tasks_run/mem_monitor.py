@@ -128,7 +128,8 @@ class TailFollower:
 # 访问 http://127.0.0.1:8050
 # ============ 必填：连接 & 文件配置 ============
 platform = "HPC"  # "HPC" 或 "NCI"
-mem_path = "20250908_Paper2_Results_NCI/carbon_price/mem_log.txt"
+mem_file = "20250919_Paper2_Results"
+mem_path = f"{mem_file}/carbon_price/mem_log.txt"
 
 cfg = ssh_config(platform)
 SSH_HOST = cfg["linux_host"]
@@ -152,7 +153,7 @@ app.title = f"Live Memory Monitor in {platform}"
 app.layout = html.Div(
     style={"maxWidth": "1000px", "margin": "20px auto", "fontFamily": "Arial, sans-serif"},
     children=[
-        html.H3(f"Live Memory Monitor in {platform} (Remote via SSH)"),
+        html.H3(f"Live Memory Monitor in {platform} {mem_file} (Remote via SSH)"),
         html.Div(id="max-label", style={"fontWeight": "bold", "marginBottom": "8px"}),
         dcc.Graph(id="mem-graph", config={"displayModeBar": True}),
         dcc.Interval(id="tick", interval=REFRESH_MS, n_intervals=0),

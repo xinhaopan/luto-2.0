@@ -4,8 +4,8 @@ import pandas as pd
 from tools.helpers import create_task_runs
 import time
 # time.sleep(60*60*5)
-platform = "Denethor"  # 可选值: 'HPC', 'Denethor', 'NCI'
-tasks = ['20250912_Price_Task_RES13_year5']
+platform = "HPC"  # 可选值: 'HPC', 'Denethor', 'NCI'
+tasks = ['20250919_Paper2_Results']
 input_path_dict = {"HPC": "/home/remote/s222552331/LUTO2_XH/LUTO2/input",
                     "Denethor": "N:/LUF-Modelling/LUTO2_XH/LUTO2/input",
                     "NCI": "/g/data/jk53/LUTO_XH/LUTO2/input"}
@@ -15,9 +15,9 @@ for task in tasks:
 
     update_values = {
         'WRITE_THREADS': 2,
-        'MEM': '48GB',
-        'NCPUS': 12,
-        'TIME': '02:00:00',
+        'MEM': '60GB',
+        'NCPUS': 15,
+        'TIME': '10:00:00',
         'INPUT_DIR': input_path_dict[platform],  # 根据平台选择输入路径
         'RAW_DATA': f"{input_path_dict[platform]}/raw_data",
         'NO_GO_VECTORS': {
