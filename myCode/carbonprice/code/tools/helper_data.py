@@ -1,1032 +1,579 @@
-import numpy as np
-import numpy_financial as npf
 import os
-import pandas as pd
-import re
-from joblib import Parallel, delayed
-from tqdm import *
+from typing import List, Dict, Any, Optional
+import numpy as np
+import xarray as xr
 
-from .tools import get_path, get_year, npy_to_map
+import os
+import xarray as xr
+from joblib import Parallel, delayed
+import pandas as pd
+from typing import List, Dict, Any
+from pathlib import Path
+import math
+
+
+from tools.tools import get_path, get_year, save2nc, filter_all_from_dims
+from tools.tools import get_path,get_year,filter_all_from_dims
 import tools.config as config
 
-
-def apply_operations_on_files(path_dir, files_with_ops):
+def summarize_to_type(
+        scenarios: List[str],
+        years: List[int],
+        file: str,
+        keep_dim: str,                     # 需要保留为 type 维度的那个维（例如 'am'）
+        output_file: str,
+        var_name: str = "data",
+        scale: float = 1e6,
+        dtype: str = "float32",
+        chunks: Optional[Dict[str, int]] = None,  # 传入则使用 dask 分块（并行）
+) -> xr.DataArray:
     """
-    读取给定路径下的多个 .npy 文件，并根据指定操作（+ 或 -）进行加减运算。
-
-    :param path_dir: 文件所在的目录
-    :param files_with_ops: 包含 (文件名, 操作) 的元组列表，操作为 '+' 或 '-'
-    :return: 所有文件内容的加减总和
-    """
-    total_sum = None
-
-    for file, operation in files_with_ops:
-        file_path = os.path.join(path_dir, file)
-        if "restored" not in file_path:
-            if os.path.exists(file_path):
-                if file_path.endswith('.npy'):
-                    # 读取 .npy 文件
-                    # print(f"Loading file: {file_path}")
-                    data = np.load(file_path)
-                    data = np.nan_to_num(data, nan=0.0)
-                    # 如果是第一次加载数据，初始化 total_sum
-                    if total_sum is None:
-                        total_sum = data if operation == '+' else -data
-                    else:
-                        if operation == '+':
-                            total_sum += data
-                        elif operation == '-':
-                            total_sum -= data
-
-            else:
-                print(f"File not found: {file_path}")
-                # 如果文件不存在，将值补充为 0
-                if total_sum is None:
-                    total_sum = np.zeros(1) if operation == '+' else -np.zeros(1)
-                else:
-                    if operation == '+':
-                        total_sum += np.zeros(1)
-                    elif operation == '-':
-                        total_sum -= np.zeros(1)
-
-    return total_sum
-
-
-def apply_sum_on_files_with_prefix(path_dir, file_prefix):
-    """
-    对路径下所有以指定前缀开头的文件进行加法运算。
-
-    :param path_dir: 文件所在的目录
-    :param file_prefix: 文件名前缀（如 'cost_non-ag'）
-    :return: 所有以指定前缀开头的文件内容的总和
-    """
-    # 获取目录下所有以指定前缀开头的文件名
-    # 创建一个包含 cost_dict 和 revenue_dict 的字典
-    combined_dict = {
-        'cost_am': config.COST_DICT.get('cost_am', []),
-        'cost_non-ag': config.COST_DICT.get('cost_non-ag', []),
-        'revenue_am': config.REVENUE_DICT.get('revenue_am', []),
-        'revenue_non-ag': config.REVENUE_DICT.get('revenue_non-ag', [])
-    }
-
-    # 优化后的逻辑
-    files_with_ops = []
-    if file_prefix in combined_dict:
-        for file in os.listdir(path_dir):
-            # 遍历 combined_dict[file_prefix] 中的每一个元素
-            for prefix in combined_dict[file_prefix]:
-                # 检查文件名是否以 file_prefix + "_" + prefix 开头
-                if file.startswith(file_prefix + "_" + prefix):
-                    files_with_ops.append((file, '+'))  # 如果匹配则加入列表
-    else:
-        files_with_ops = [(file, '+') for file in os.listdir(path_dir) if file.startswith(file_prefix)]
-
-    if not files_with_ops:
-        print(f"No files found starting with '{file_prefix}'")
-        return None
-
-    # 调用 apply_operations_on_files 函数
-    total_sum = apply_operations_on_files(path_dir, files_with_ops)
-
-    return total_sum
-
-
-def process_and_save(path_dir, save_path, prefix, year, rows_nums):
-    """
-    对指定前缀的文件进行求和，保存结果，并将结果加入 rows_nums。
-
-    :param path_dir: 文件所在的目录
-    :param save_path: 保存 .npy 文件的路径
-    :param prefix: 文件名前缀（如 'cost_ag', 'cost_non-ag' 等）
-    :param year: 当前年份，用于命名保存的文件
-    :param rows_nums: 用于存储各项结果的列表
-    :return: 更新后的 rows_nums
-    """
-    arr = apply_sum_on_files_with_prefix(path_dir, prefix)
-    if arr is None:
-        print(f"No valid data found for {path_dir}: {prefix} in year {year}")
-        # proj_file = os.path.join(get_path(config.INPUT_FILES[1]), "out_2050", "ammap_2050.tiff")
-        year = __import__('re').search(r"out_(\d{4})", path_dir).group(1)
-        arr = np.zeros_like(np.load(os.path.join(path_dir, f"am_map_{year}.npy")))
-
-    rows_nums.append(np.sum(arr) / 1000000)
-    if prefix.endswith('_'):
-        prefix = prefix[:-1]
-    save_data(os.path.join(save_path, f"{prefix}_{year}.npy"), arr)
-    return rows_nums
-
-
-def process_files_with_operations(path_dir, save_path, files_with_ops, file_prefix, year, row_data, negate=False):
-    """
-    处理文件加减操作，将结果保存为 .npy 文件并更新 row_data 字典。
-
-    :param path_dir: 文件所在的目录
-    :param save_path: 保存 .npy 文件的路径
-    :param files_with_ops: 包含 (文件名, 操作符) 的元组列表，操作符为 '+' 或 '-'
-    :param file_prefix: 保存文件的前缀
-    :param year: 当前年份，用于命名保存的文件
-    :param row_data: 用于存储各项结果的字典
-    :param negate: 是否对结果进行取负操作
-    :return: 更新后的 row_data
-    """
-    files_with_ops = [(file + ".npy", op) for file, op in files_with_ops]
-
-    # 处理文件加减操作
-    arr = apply_operations_on_files(path_dir, files_with_ops)
-
-    if arr is None:
-        print(f"No valid data found for {path_dir} {file_prefix} in year {year}")
-        row_data[file_prefix] = 0
-        return row_data
-
-    # 如果需要取负操作，则取负
-    if negate:
-        arr = -arr
-
-    # 保存结果到 .npy 文件
-    if file_prefix.endswith('_'):
-        file_prefix = file_prefix[:-1]
-    os.makedirs(save_path, exist_ok=True)  # 确保保存路径存在
-    # np.save(os.path.join(save_path, f"{file_prefix}_{year}.npy"), arr)
-    save_data(os.path.join(save_path, f"{file_prefix}_{year}.npy"), arr)
-    # 将结果添加到 row_data 字典，按百万单位
-    arr = np.nan_to_num(arr, nan=0.0)
-    row_data[file_prefix] = np.sum(arr) / 1000000
-
-    return row_data
-
-def list_files_with_prefix(directory, prefix):
-    """
-    列出给定目录中以指定前缀开头并以.npy结尾的所有文件。
-
-    参数:
-    directory (str): 要搜索文件的目录。
-    prefix (str): 要匹配文件名的前缀。
-
-    返回:
-    list: 以指定前缀开头并以.npy结尾的文件名列表。
-    """
-    try:
-        files = [f for f in os.listdir(directory) if f.startswith(prefix) and f.endswith('.npy')]
-        return files
-    except FileNotFoundError:
-        return f"Error: The directory '{directory}' does not exist."
-    except Exception as e:
-        return f"An error occurred: {e}"
-
-def process_year_data(year, path, categories, column_keywords):
-    """处理每一年的数据"""
-    year_data = {'Year': year}
-    for category, files in categories.items():
-        total_sum = 0
-        for file in files:
-            file_path = f'{path}/out_{year}/{file}_{year}.csv'
-            data = pd.read_csv(file_path)
-            # 使用文件名确定关键字
-            keyword = column_keywords.get(file, column_keywords['default'])
-            # print(file,keyword)
-            value_columns = data.filter(like=keyword)
-            total_sum += value_columns.sum().sum()
-        year_data[category] = total_sum
-    return year_data
-
-def amortize_costs(input_file, file_name = "cost_transition_ag2non-ag", rate=0.07, horizon=30):
-    """
-    计算成本均摊并保存新的成本数组。
-
-    参数：
-    path_name: str - 文件路径
-    file_name: str - 文件名
-    rate: float - 利率，默认为0.07
-    horizon: int - 时间跨度，默认为30年
-    """
-    # 初始化一个空字典来存储所有年份的成本数据
-    print("Start to calculate cost amortize.")
-    costs = {}
-    path_name = get_path(input_file)
-    years = get_year(path_name)
-    start_year = min(years)
-    end_year = max(years)
-
-    for year in trange(years[0], years[-1] + 1):
-        full_file_name = os.path.join(path_name, f"out_{year}/data_for_carbon_price/{file_name}_{year}.npy")
-        costs[year] = np.load(full_file_name)
-
-    # 初始化新的成本数组字典
-    new_costs = {year: np.zeros_like(costs[start_year]) for year in years}
-
-    # 计算每个年份的均摊成本，并加到相应年份上
-    for year in years:
-        pv_values = costs[year]
-        annual_payment = -1 * npf.pmt(rate, horizon, pv=pv_values, fv=0, when='begin')
-        for offset in range(horizon):
-            target_year = year + offset
-            if target_year <= end_year:
-                new_costs[target_year] += annual_payment
-
-    # 保存新的成本数组到新的.npy文件
-    for year in years:
-        file_name_with_amortised = file_name.replace("cost", "cost_amortised", 1)
-        output_file_name = os.path.join(path_name, f"out_{year}/data_for_carbon_price/{file_name_with_amortised}_{year}.npy")
-        # np.save(output_file_name, new_costs[year])
-        save_data(output_file_name, new_costs[year])
-
-
-def calculate_baseline_costs(input_file, use_parallel=False,output=True):
-    print("Start jobs to calculate cost_revenue.")
-    path_name = get_path(input_file)
-    years=get_year(path_name)
-    # 初始化结果列表
-
-    columns_name = ["Year", "cost_ag(M$)", "cost_am(M$)", "cost_non-ag(M$)", "cost_transition_ag2ag(M$)","cost_transition_ag2non-ag(M$)",
-                    "cost_amortised_transition_ag2non-ag(M$)","revenue_ag(M$)","revenue_am(M$)","revenue_non-ag(M$)",
-                    "GHG_ag(MtCOe2)", "GHG_am(MtCOe2)", "GHG_non-ag(MtCOe2)", "GHG_transition(MtCOe2)",
-                    "BIO_ag(M ha)", "BIO_am(M ha)", "BIO_non-ag(M ha)"]
-
-    save_path = os.path.join(path_name, "origin_carbon_price_arr")
-    os.makedirs(save_path, exist_ok=True)
-
-    prefixes = columns_name[1:]
-
-    # 生成所有 (year, prefix) 任务
-    tasks = [(year, re.match(r"([^\(]+)", prefix).group(1).strip())
-        for year in range(years[0], years[-1] + 1)
-        for prefix in prefixes
-    ]
-
-    # 并行执行 process_and_save，并收集结果
-    if use_parallel:
-        # 并行执行 process_and_save，并收集结果
-        results = Parallel(n_jobs=config.N_JOBS)(
-            delayed(process_and_save)(
-                os.path.join(path_name, f"out_{year}/data_for_carbon_price"),
-                save_path,
-                prefix,
-                year,
-                [year]  # 每个任务初始化自己的 rows_nums
-            )
-            for year, prefix in tasks
-        )
-    else:
-        # 顺序执行 process_and_save，并使用 tqdm 显示进度条
-        results = []
-        for year, prefix in tqdm(tasks, desc="Processing tasks"):
-            result = process_and_save(
-                os.path.join(path_name, f"out_{year}/data_for_carbon_price"),
-                save_path,
-                prefix,
-                year,
-                [year]  # 每个任务初始化自己的 rows_nums
-            )
-            results.append(result)
-
-    # 转换为 DataFrame
-    df_results = pd.DataFrame(results).groupby(0)[1].agg(list).reset_index().apply(lambda x: [x[0]] + list(x[1]), axis=1).apply(
-        pd.Series).set_axis(columns_name, axis=1)
-
-    if output:
-        output_dir = f"{config.TASK_DIR}/carbon_price/excel"
-        os.makedirs(output_dir, exist_ok=True)
-        output_excel_path = os.path.join(output_dir, f"01_origin_{input_file}.xlsx")
-        df_results.to_excel(output_excel_path, index=False)
-    return df_results
-
-
-def compute_unit_prices(input_file):
-    path_name = get_path(input_file)
-    years = get_year(path_name)
-    path_dir = os.path.join(path_name, "origin_carbon_price_arr")
-    save_path = os.path.join(path_name, "carbon_price_arr")
-    print("Start to calculate unit price.")
-
-    results = []
-
-    for year in trange(years[0], years[-1] + 1):
-        row_data = {"Year": year}
-
-        # 使用 process_files_with_operations 更新 row_data 字典
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("revenue_ag_" + str(year), '-'), ("cost_ag_" + str(year), '+')],
-                                                 "ag_profit", year, row_data, negate=True)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("revenue_am_" + str(year), '-'), ("cost_am_" + str(year), '+')],
-                                                 "am_profit", year, row_data, negate=True)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("revenue_non-ag_" + str(year), '-'),
-                                                  ("cost_non-ag_" + str(year), '+')],
-                                                 "non-ag_profit", year, row_data, negate=True)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("cost_transition_ag2ag_" + str(year), '+')],
-                                                 "transition(ag2ag)_profit", year, row_data, negate=True)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("cost_amortised_transition_ag2non-ag_" + str(year), '+')],
-                                                 "transition(ag2non-ag)_profit", year, row_data, negate=True)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("GHG_ag_" + str(year), '+'), ("GHG_ag_" + str(year - 1), '-')],
-                                                 "ghg_ag", year, row_data, negate=True)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("GHG_am_" + str(year), '+')],
-                                                 "ghg_am", year, row_data, negate=True)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("GHG_non-ag_" + str(year), '+')],
-                                                 "ghg_non-ag", year, row_data, negate=True)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("GHG_transition_" + str(year), '+')],
-                                                 "ghg_tran", year, row_data, negate=True)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("GHG_ag_" + str(year), '+'), ("GHG_ag_" + str(year - 1), '-'),
-                                                  ("GHG_am_" + str(year), '+'), ("GHG_non-ag_" + str(year), '+'),
-                                                  ("GHG_transition_" + str(year), '+')],
-                                                 "ghg", year, row_data, negate=True)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("BIO_ag_" + str(year), '+'),("BIO_ag_" + str(year - 1), '-')],
-                                                 "bio_ag", year, row_data, negate=False)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("BIO_am_" + str(year), '+')],
-                                                 "bio_am", year, row_data, negate=False)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("BIO_non-ag_" + str(year), '+')],
-                                                 "bio_non-ag", year, row_data, negate=False)
-
-        row_data = process_files_with_operations(path_dir, save_path,
-                                                 [("BIO_ag_" + str(year), '+'),("BIO_ag_" + str(year - 1), '-'),
-                                                  ("BIO_am_" + str(year), '+'), ("BIO_non-ag_" + str(year), '+')],
-                                                 "bio", year, row_data, negate=False)
-
-        # 将字典结果追加到列表
-        results.append(row_data)
-
-    # 创建 DataFrame
-    df_results = pd.DataFrame(results)
-    
-    # 映射键到列名，确保顺序
-    df_results.rename(columns=config.KEY_TO_COLUMN_MAP, inplace=True)
-    columns_name = ["Year"] + list(config.KEY_TO_COLUMN_MAP.values())
-    df_results = df_results[columns_name]
-    output_dir = f"{config.TASK_DIR}/carbon_price/excel"
-    os.makedirs(output_dir, exist_ok=True)
-    output_excel_path = os.path.join(output_dir,f"02_process_{input_file}.xlsx")
-    df_results.to_excel(output_excel_path, index=False)
-    return df_results
-
-
-
-
-
-def calculate_year_data(year, ghg_bio_path, ghg_path):
-    """
-    计算单年的生物多样性和碳排放数据，并返回结果。
-    """
-    try:
-        # 加载数据
-        cost_all = np.load(os.path.join(ghg_bio_path, f"cost_{year}.npy"))
-        cost_ghg = np.load(os.path.join(ghg_path, f"cost_{year}.npy"))
-        cost_bio = cost_all - cost_ghg
-
-        ghg_arr = np.load(os.path.join(ghg_path, f"ghg_{year}.npy"))
-        bio_arr = np.load(os.path.join(ghg_bio_path, f"bio_{year}.npy"))
-
-        # 计算价格
-        price_bio = cost_bio / bio_arr
-        price_carbon = cost_ghg / ghg_arr
-
-        # 保存每年的中间数据
-        output_dir = os.path.join(config.TASK_DIR, "carbon_price","data")
-        os.makedirs(output_dir, exist_ok=True)
-        save_data(f"{output_dir}/bio_cost_{year}.npy", cost_bio)
-        save_data(f"{output_dir}/carbon_cost_{year}.npy", cost_ghg)
-        save_data(f"{output_dir}/bio_price_{year}.npy", price_bio)
-        save_data(f"{output_dir}/carbon_price_{year}.npy", price_carbon)
-        save_data(f"{output_dir}/bio_{year}.npy", bio_arr)
-        save_data(f"{output_dir}/ghg_{year}.npy", ghg_arr)
-
-        # 返回计算结果
-        return {
-            "Year": year,
-            "Carbon cost(M$)": cost_ghg.sum() / 1e6,
-            "Biodiversity cost(M$)": cost_bio.sum() / 1e6,
-            "Carbon sequestration (MtCO2e)": ghg_arr.sum() / 1e6,
-            "Biodiversity restoration (Mha)": bio_arr.sum() / 1e6,
-            "Carbon price($/tCO2e)": cost_ghg.sum() / ghg_arr.sum(),
-            "Biodiversity price($/ha)": cost_bio.sum() / bio_arr.sum()
-        }
-
-    except Exception as e:
-        print(f"Error processing year {year}: {e}")
-        return None
-
-def calculate_cost(input_files):
-    print("Start to calculate cost.")
-    path_name_0 = os.path.join(get_path(input_files[2]), "carbon_price_arr")
-    path_name_1 = os.path.join(get_path(input_files[1]), "carbon_price_arr")
-    path_name_2 = os.path.join(get_path(input_files[0]), "carbon_price_arr")
-
-    years = get_year(get_path(input_files[2]))
-    save_path = f"{config.TASK_DIR}/carbon_price/data"
-    os.makedirs(save_path, exist_ok=True)
-
-    results = []
-
-    for year in trange(years[0], years[-1] + 1):
-        row_data = {"Year": year}
-
-        # 使用 process_files_with_operations 更新 row_data 字典
-        row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_0}/ag_profit_{year}", '+'),
-                                                              (f"{path_name_1}/ag_profit_{year}", '-'),
-                                                  ],
-                                                 "GHG_ag_cost", year, row_data)
-        row_data = process_files_with_operations('.', save_path,
-                                      [(f"{path_name_0}/am_profit_{year}", '+'),
-                                       (f"{path_name_1}/am_profit_{year}", '-'),
-                                       ],
-                                      "GHG_am_cost", year, row_data)
-        row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_0}/non-ag_profit_{year}", '+'),
-                                                  (f"{path_name_1}/non-ag_profit_{year}", '-'),
-                                                  ],
-                                                 "GHG_non-ag_cost", year, row_data)
-        row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_0}/transition(ag2ag)_profit_{year}", '+'),
-                                                  (f"{path_name_1}/transition(ag2ag)_profit_{year}", '-'),
-                                                  ],
-                                                 "GHG_transition(ag2ag)_cost", year, row_data)
-        row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_0}/transition(ag2non-ag)_profit_{year}", '+'),
-                                                  (f"{path_name_1}/transition(ag2non-ag)_profit_{year}", '-'),
-                                                  ],
-                                                 "GHG_transition(ag2non-ag)_cost", year, row_data)
-        row_data = process_files_with_operations(save_path, save_path,
-                                                 [("GHG_ag_cost_" + str(year), '+'), ("GHG_am_cost_" + str(year), '+')
-                                                  , ("GHG_non-ag_cost_" + str(year), '+'), ("GHG_transition(ag2ag)_cost_" + str(year), '+'),
-                                                  ("GHG_transition(ag2non-ag)_cost_" + str(year), '+')],
-                                                 "GHG_cost", year, row_data)
-        # -------------------------------------------------------------------------------------------------------------------------
-        row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_1}/ag_profit_{year}", '+'),
-                                                  (f"{path_name_2}/ag_profit_{year}", '-'),
-                                                  ],
-                                                 "BIO_ag_cost", year, row_data)
-        row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_1}/am_profit_{year}", '+'),
-                                                  (f"{path_name_2}/am_profit_{year}", '-'),
-                                                  ],
-                                                 "BIO_am_cost", year, row_data)
-        row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_1}/non-ag_profit_{year}", '+'),
-                                                  (f"{path_name_2}/non-ag_profit_{year}", '-'),
-                                                  ],
-                                                 "BIO_non-ag_cost", year, row_data)
-        row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_1}/transition(ag2ag)_profit_{year}", '+'),
-                                                  (f"{path_name_2}/transition(ag2ag)_profit_{year}", '-'),
-                                                  ],
-                                                 "BIO_transition(ag2ag)_cost", year, row_data)
-        row_data = process_files_with_operations('.', save_path,
-                                                 [(f"{path_name_1}/transition(ag2non-ag)_profit_{year}", '+'),
-                                                  (f"{path_name_2}/transition(ag2non-ag)_profit_{year}", '-'),
-                                                  ],
-                                                 "BIO_transition(ag2non-ag)_cost", year, row_data)
-        row_data = process_files_with_operations(save_path, save_path,
-                                                 [("BIO_ag_cost_" + str(year), '+'), ("BIO_am_cost_" + str(year), '+')
-                                                     , ("BIO_non-ag_cost_" + str(year), '+'),
-                                                  ("BIO_transition(ag2ag)_cost_" + str(year), '+'),
-                                                  ("BIO_transition(ag2non-ag)_cost_" + str(year), '+')],
-                                                 "BIO_cost", year, row_data)
-        # 将字典结果追加到列表
-        results.append(row_data)
-
-    # 创建 DataFrame
-    df_results = pd.DataFrame(results)
-    output_dir = f"{config.TASK_DIR}/carbon_price/excel"
-    output_excel_path = os.path.join(output_dir,"03_cost.xlsx")
-    df_results.to_excel(output_excel_path, index=False)
-    return df_results
-
-
-def calculate_price(input_files):
-    print("Start to calculate price.")
-    path_name_0 = os.path.join(get_path(input_files[2]), "carbon_price_arr")
-    path_name_1 = os.path.join(get_path(input_files[1]), "carbon_price_arr")
-    path_name_2 = os.path.join(get_path(input_files[0]), "carbon_price_arr")
-
-    years = get_year(get_path(input_files[2]))
-    save_path = f"{config.TASK_DIR}/carbon_price/data"
-
-    results = []
-
-    for year in trange(years[0], years[-1] + 1):
-        ghg_arr = np.load(os.path.join(path_name_1, f"ghg_{year}.npy"))
-        bio_arr = np.load(os.path.join(path_name_2, f"bio_{year}.npy"))
-
-        cost_ghg = np.load(os.path.join(save_path, f"GHG_cost_{year}.npy"))
-        cost_bio = np.load(os.path.join(save_path, f"BIO_cost_{year}.npy"))
-
-        # 计算价格
-        price_carbon = cost_ghg / ghg_arr
-        price_bio = cost_bio / bio_arr
-
-        # 保存每年的中间数据
-        output_dir = os.path.join(config.TASK_DIR, "carbon_price", "data")
-        os.makedirs(output_dir, exist_ok=True)
-        save_data(f"{output_dir}/bio_cost_{year}.npy", cost_bio)
-        save_data(f"{output_dir}/carbon_cost_{year}.npy", cost_ghg)
-        save_data(f"{output_dir}/bio_price_{year}.npy", price_bio)
-        save_data(f"{output_dir}/carbon_price_{year}.npy", price_carbon)
-        save_data(f"{output_dir}/bio_{year}.npy", bio_arr)
-        save_data(f"{output_dir}/ghg_{year}.npy", ghg_arr)
-
-        results.append({
-            "Year": year,
-            "Carbon cost(M$)": cost_ghg.sum() / 1e6,
-            "Biodiversity cost(M$)": cost_bio.sum() / 1e6,
-            "GHG reductions and removals (MtCO2e)": ghg_arr.sum() / 1e6,
-            "Biodiversity restoration (Mha)": bio_arr.sum() / 1e6,
-            "Carbon price($/tCO2e)": cost_ghg.sum() / ghg_arr.sum(),
-            "Biodiversity price($/ha)": cost_bio.sum() / bio_arr.sum()
-        })
-    # 转换为 DataFrame
-    df_results = pd.DataFrame(results)
-    output_dir = f"{config.TASK_DIR}/carbon_price/excel"
-    os.makedirs(output_dir, exist_ok=True)
-    output_excel_path = os.path.join(output_dir, "04_price.xlsx")
-    df_results.to_excel(output_excel_path, index=False)
-
-
-
-def save_data(file_path, data):
-    """
-    保存中间数据，增加异常处理。
-    """
-    np.save(file_path, data)
-    output_tif = file_path.replace(".npy", ".tif")
-    proj_file = os.path.join(get_path(config.INPUT_FILES[1]), "out_2050", "ammap_2050.tiff")
-    npy_to_map(file_path, output_tif, proj_file)
-
-def calculate_shadow_price(input_file,percentile_num=95,mask_use=True, output=True):
-    print("Start to calculate Uniform carbon price.")
-    path_name = get_path(input_file)
-    years = get_year(path_name)
-    results = []
-
-    for year in trange(years[1], years[-1] + 1):
-        # 加载每年的 .npy 文件
-        payment_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"cost_{year}.npy"))
-
-        # GHG
-        ghg_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"ghg_{year}.npy"))
-        cp_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"cp_{year}.npy"))
-
-        # 使用 mask 过滤掉 ghg_arr < 1的值
-        if mask_use:
-            mask = ghg_arr >= 1
-            cp_arr1 = cp_arr[mask]
-
-        # 计算所需的值
-        carbon_price_uniform = np.percentile(cp_arr1, percentile_num)
-        total_emissions_abatement = np.sum(ghg_arr)
-        total_ghg_uniform = carbon_price_uniform * total_emissions_abatement
-        total_ghg_discriminatory = np.sum(cp_arr * ghg_arr)
-        carbon_price_discriminatory_avg = total_ghg_discriminatory / total_emissions_abatement if total_emissions_abatement != 0 else 0
-
-        # BIO
-        bio_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"bio_{year}.npy"))
-        bp_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"bp_{year}.npy"))
-
-        if mask_use:
-            mask = bio_arr >= 1
-            bp_arr1 = bp_arr[mask]
-            bio_price_uniform = np.percentile(bp_arr1, percentile_num)
-        else:
-            bio_price_uniform = np.percentile(bp_arr, percentile_num)
-        total_bio = np.sum(bio_arr)
-        total_bio_uniform = bio_price_uniform * total_bio
-        total_bio_discriminatory = np.sum(bp_arr * bio_arr)
-        bio_price_discriminatory_avg = total_bio_discriminatory / total_bio if total_bio != 0 else 0
-
-
-            # 将计算结果添加到列表中
-        results.append({
-            "Year": year,
-            "Total emissions abatement (MtCO2e)": total_emissions_abatement / 1000000,
-            "Total cost for ghg Uniform Payment (M$)": total_ghg_uniform / 1000000,
-            "Total cost for ghg Discriminatory Payment (M$)": total_ghg_discriminatory / 1000000,
-            "Carbon price for Uniform Payment ($/tCO2e)": carbon_price_uniform,
-            "Carbon Price for Discriminatory Payment average ($/tCO2e)": carbon_price_discriminatory_avg,
-
-            "Total bio (Mha)": total_bio / 1000000,
-            "Total cost for bio Uniform Payment (M$)": total_bio_uniform / 1000000,
-            "Total cost for bio Discriminatory Payment (M$)": total_bio_discriminatory / 1000000,
-            "BIO price for Uniform Payment ($/tCO2e)": bio_price_uniform,
-            "BIO Price for Discriminatory Payment average ($/tCO2e)": bio_price_discriminatory_avg
-        })
-
-    # 创建DataFrame
-    df_results = pd.DataFrame(results)
-
-    # 保存结果到CSV文件
-    if output:
-        output_excel_path = os.path.join(f"../output/03_{input_file}_shadow_price.xlsx")
-        df_results.to_excel(output_excel_path, index=False)
-    return df_results
-
-def calculate_carbonprice_compare(path_name,percentiles = [100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84, 83, 82, 81, 80]):
-    print("Start to calculate carbon price.")
-    path_name = "output/" + path_name
-    # 定义分位数列表
-    # percentiles = [100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84, 83, 82, 81, 80]
-
-    # 初始化表格字典
-    folder_name = next((f for f in os.listdir(path_name) if
-                        os.path.isdir(os.path.join(path_name, f)) and f.startswith("begin_end_compare_")), None)
-    years = [int(year) for year in re.findall(r'\d{4}', folder_name)]
-
-    carbon_price_with_mask = {year: [] for year in range(years[0] + 1, years[1] + 1)}
-    ghg_max_cp_with_mask = {year: [] for year in range(years[0] + 1, years[1] + 1)}
-    cost_max_cp_with_mask = {year: [] for year in range(years[0] + 1, years[1] + 1)}
-
-    carbon_price_without_mask = {year: [] for year in range(years[0] + 1, years[1] + 1)}
-    ghg_max_cp_without_mask = {year: [] for year in range(years[0] + 1, years[1] + 1)}
-    cost_max_cp_without_mask = {year: [] for year in range(years[0] + 1, years[1] + 1)}
-
-    # 循环每个年份
-    for year in trange(years[0] + 1, years[1] + 1):
-        # 加载每年的 .npy 文件
-        payment_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"cost_{year}.npy"))
-        ghg_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"ghg_{year}.npy"))
-        cp_arr = np.load(os.path.join(path_name, "data_for_carbon_price", f"cp_{year}.npy"))
-
-        # 不使用 mask 直接使用原始数组
-        filtered_cp_arr_without_mask = cp_arr
-        filtered_ghg_arr_without_mask = ghg_arr
-        filtered_payment_arr_without_mask = payment_arr
-
-        # 使用 mask 过滤掉 ghg_arr < 1的值
-        mask = ghg_arr >= 1
-        filtered_cp_arr_with_mask = cp_arr[mask]
-        filtered_ghg_arr_with_mask = ghg_arr[mask]
-        filtered_payment_arr_with_mask = payment_arr[mask]
-
-        # 循环每个分位数
-        for percentile_num in percentiles:
-            # 计算使用 mask 的值
-            carbon_price_uniform_with_mask = np.percentile(filtered_cp_arr_with_mask, percentile_num)
-            # total_emissions_abatement_with_mask = np.sum(filtered_ghg_arr_with_mask)
-            # total_cost_uniform_with_mask = carbon_price_uniform_with_mask * total_emissions_abatement_with_mask
-
-            # 找到分位数所在位置对应的索引
-            percentile_value_with_mask = np.percentile(filtered_cp_arr_with_mask, percentile_num)
-            max_index_with_mask = np.unravel_index(np.argmax(filtered_cp_arr_with_mask >= percentile_value_with_mask),
-                                                   filtered_cp_arr_with_mask.shape)
-
-            # 获取对应位置的 ghg_arr 和 payment_arr 的值
-            ghg_value_at_max_cp_with_mask = filtered_ghg_arr_with_mask[max_index_with_mask]
-            cost_value_at_max_cp_with_mask = filtered_payment_arr_with_mask[max_index_with_mask]
-
-            carbon_price_with_mask[year].append(carbon_price_uniform_with_mask)
-            ghg_max_cp_with_mask[year].append(ghg_value_at_max_cp_with_mask)
-            cost_max_cp_with_mask[year].append(cost_value_at_max_cp_with_mask)
-
-            # 计算不使用 mask 的值
-            carbon_price_uniform_without_mask = np.percentile(filtered_cp_arr_without_mask, percentile_num)
-            # total_emissions_abatement_without_mask = np.sum(filtered_ghg_arr_without_mask)
-            # total_cost_uniform_without_mask = carbon_price_uniform_without_mask * total_emissions_abatement_without_mask
-
-            # 找到分位数所在位置对应的索引
-            percentile_value_without_mask = np.percentile(filtered_cp_arr_without_mask, percentile_num)
-            max_index_without_mask = np.unravel_index(
-                np.argmax(filtered_cp_arr_without_mask >= percentile_value_without_mask),
-                filtered_cp_arr_without_mask.shape)
-
-            # 获取对应位置的 ghg_arr 和 payment_arr 的值
-            ghg_value_at_max_cp_without_mask = filtered_ghg_arr_without_mask[max_index_without_mask]
-            cost_value_at_max_cp_without_mask = filtered_payment_arr_without_mask[max_index_without_mask]
-
-            carbon_price_without_mask[year].append(carbon_price_uniform_without_mask)
-            ghg_max_cp_without_mask[year].append(ghg_value_at_max_cp_without_mask)
-            cost_max_cp_without_mask[year].append(cost_value_at_max_cp_without_mask)
-
-    # 创建DataFrame
-    df_carbon_price_with_mask = pd.DataFrame(carbon_price_with_mask).T
-    df_ghg_max_cp_with_mask = pd.DataFrame(ghg_max_cp_with_mask).T
-    df_cost_max_cp_with_mask = pd.DataFrame(cost_max_cp_with_mask).T
-
-    df_carbon_price_without_mask = pd.DataFrame(carbon_price_without_mask).T
-    df_ghg_max_cp_without_mask = pd.DataFrame(ghg_max_cp_without_mask).T
-    df_cost_max_cp_without_mask = pd.DataFrame(cost_max_cp_without_mask).T
-
-    # 设置列名为百分位数
-    df_carbon_price_with_mask.columns = percentiles
-    df_ghg_max_cp_with_mask.columns = percentiles
-    df_cost_max_cp_with_mask.columns = percentiles
-
-    df_carbon_price_without_mask.columns = percentiles
-    df_ghg_max_cp_without_mask.columns = percentiles
-    df_cost_max_cp_without_mask.columns = percentiles
-
-    # 保存结果到Excel文件
-    output_excel_path = os.path.join(r"output\Carbon_Price", path_name.split("/")[1] + "_carbon_price_comparison1.xlsx")
-    with pd.ExcelWriter(output_excel_path) as writer:
-        df_carbon_price_with_mask.to_excel(writer, sheet_name='Carbon Price with Mask', index_label='Year')
-        df_ghg_max_cp_with_mask.to_excel(writer, sheet_name='Ghg Max Cp with Mask', index_label='Year')
-        df_cost_max_cp_with_mask.to_excel(writer, sheet_name='Cost Max Cp with Mask', index_label='Year')
-
-        df_carbon_price_without_mask.to_excel(writer, sheet_name='Carbon Price without Mask', index_label='Year')
-        df_ghg_max_cp_without_mask.to_excel(writer, sheet_name='Ghg Max Cp without Mask', index_label='Year')
-        df_cost_max_cp_without_mask.to_excel(writer, sheet_name='Cost Max Cp without Mask', index_label='Year')
-
-    print(f"Results saved to {output_excel_path}")
-
-import numpy as np
-import rasterio
-import os
-
-def compute_and_save_class_metrics(output_dir='../Hexagon'):
-    def read_tif(filename):
-        with rasterio.open(filename) as src:
-            arr = src.read(1)
-            nodata_value = src.nodata
-            nan_mask = (arr == nodata_value) if nodata_value is not None else np.isnan(arr)
-            return arr, src.profile, nan_mask
-
-    # 读取数据
-    class_arr, profile, nan_mask = read_tif(os.path.join(output_dir, "Hexagonal.tif"))
-    ghg, _, _  = read_tif(os.path.join("../data", "ghg_2050.tif"))
-    carbon_cost, _, _ = read_tif(os.path.join("../data", "carbon_cost_2050.tif"))
-    bio, _, _ = read_tif(os.path.join("../data", "bio_2050.tif"))
-    bio_cost, _, _ = read_tif(os.path.join("../data", "bio_cost_2050.tif"))
-
-    n_rows, n_cols = class_arr.shape
-
-    # 初始化输出数组
-    total_carbon_cost_raster = np.zeros_like(class_arr, dtype=np.float32)
-    total_bio_cost_raster = np.zeros_like(class_arr, dtype=np.float32)
-    carbon_price_raster = np.zeros_like(class_arr, dtype=np.float32)
-    bio_price_raster = np.zeros_like(class_arr, dtype=np.float32)
-
-    unique_classes = np.unique(class_arr)
-    unique_classes = unique_classes[unique_classes != 0]
-
-    for cls in unique_classes:
-        # 找到这一类所有坐标位置
-        indices = np.argwhere(class_arr == cls)
-
-        # 有效索引：确保不越界 & bio 和 bio_cost 不是 nan
-        valid_rows = []
-        valid_cols = []
-
-        for row, col in indices:
-            if row < bio.shape[0] and col < bio.shape[1]:
-                b = bio[row, col]
-                bc = bio_cost[row, col]
-                if not np.isnan(b) and not np.isnan(bc):
-                    valid_rows.append(row)
-                    valid_cols.append(col)
-
-        if not valid_rows:
-            continue  # 无有效数据，跳过
-
-        valid_rows = np.array(valid_rows)
-        valid_cols = np.array(valid_cols)
-
-        # 提取有效值
-        ghg_vals = ghg[valid_rows, valid_cols]
-        bio_vals = bio[valid_rows, valid_cols]
-        carbon_cost_vals = carbon_cost[valid_rows, valid_cols]
-        bio_cost_vals = bio_cost[valid_rows, valid_cols]
-
-        # 计算总量与价格
-        ghg_sum = np.sum(ghg_vals)
-        bio_sum = np.sum(bio_vals)
-        carbon_cost_sum = np.sum(carbon_cost_vals)
-        bio_cost_sum = np.sum(bio_cost_vals)
-
-        carbon_price = carbon_cost_sum / ghg_sum if ghg_sum != 0 else 0
-        bio_price = bio_cost_sum / bio_sum if bio_sum != 0 else 0
-
-        # 所有属于该类的像元赋相同值
-        class_mask = (class_arr == cls)
-        total_carbon_cost_raster[class_mask] = carbon_cost_sum
-        total_bio_cost_raster[class_mask] = bio_cost_sum
-        carbon_price_raster[class_mask] = carbon_price
-        bio_price_raster[class_mask] = bio_price
-
-    # 将 class_arr 中为 NaN 的位置，设为 NaN
-    total_carbon_cost_raster[nan_mask] = np.nan
-    total_bio_cost_raster[nan_mask] = np.nan
-    carbon_price_raster[nan_mask] = np.nan
-    bio_price_raster[nan_mask] = np.nan
-
-    def write_tif(filename, array, profile):
-        profile.update(dtype=rasterio.float32, count=1, nodata=np.nan)
-        with rasterio.open(filename, 'w', **profile) as dst:
-            dst.write(array, 1)
-
-    write_tif(os.path.join(output_dir, "total_carbon_cost.tif"), total_carbon_cost_raster, profile)
-    write_tif(os.path.join(output_dir, "total_bio_cost.tif"), total_bio_cost_raster, profile)
-    write_tif(os.path.join(output_dir, "carbon_price.tif"), carbon_price_raster, profile)
-    write_tif(os.path.join(output_dir, "bio_price.tif"), bio_price_raster, profile)
-
-    print("✅ All output files saved to", output_dir)
-
-
-import numpy as np
-import rasterio
-import geopandas as gpd
-from rasterio.features import rasterize
-import os
-
-
-def compute_class_metrics_from_shapefile(shapefile_path, ref_raster_path, output_dir):
-    """
-    从 shapefile 中计算每个区域的 bio, bio_cost, carbon_price, ghg 等指标，并生成对应的 TIF 文件。
-
-    参数:
-        shapefile_path (str): 输入的 shapefile 文件路径。
-        ref_raster_path (str): 参考栅格路径，用于确定输出 TIF 文件的形状和投影。
-        output_dir (str): 输出 TIF 文件保存目录。
-
-    输出:
-        生成的 4 个 TIF 文件，分别为 total_carbon_cost.tif、total_bio_cost.tif、carbon_price.tif 和 bio_price.tif。
+    汇总 (scenario, year) 下的 {file}_{year}.nc：
+    - 对除 keep_dim 外的所有维度求和，保留 keep_dim（作为最终的 'type' 维）
+    - 除以 scale（例如 1e6）
+    - 组合成 DataArray，维度为 (scenario, year, type)
+    - 写出 NetCDF 并返回该 DataArray（dask 延迟计算，到 to_netcdf 时触发）
     """
 
-    # 1. 读取参考栅格（用于确定 shape、transform、crs 等信息）
-    with rasterio.open(ref_raster_path) as ref:
-        ref_shape = ref.shape
-        ref_transform = ref.transform
-        ref_crs = ref.crs
-        ref_profile = ref.profile
+    base_dir = f'../../../output/{config.TASK_NAME}/carbon_price/0_base_data'
 
-    # 2. 读取生物和碳数据
-    def read_tif(path):
-        with rasterio.open(path) as src:
-            arr = src.read(1)
-            return arr
+    # ---------- 1) 先找一个示例文件，确定 type 维度的坐标 ----------
+    sample_da = None
+    sample_path = None
+    for s in scenarios:
+        for y in years:
+            p = os.path.join(base_dir, s, f"{years[-1]}/{file}_{y}.nc")
+            if os.path.exists(p):
+                sample_path = p
+                break
+        if sample_path:
+            break
 
-    ghg = read_tif("../data/ghg_2050.tif")
-    carbon_cost = read_tif("../data/carbon_cost_2050.tif")
-    bio = read_tif("../data/bio_2050.tif")
-    bio_cost = read_tif("../data/bio_cost_2050.tif")
+    if sample_path is None:
+        raise FileNotFoundError("未找到任何可用的输入文件，无法确定 type 坐标。")
 
-    # 3. 读取 shapefile
-    gdf = gpd.read_file(shapefile_path)
+    with xr.open_dataarray(sample_path, chunks=chunks) as da0:
+        da0 = filter_all_from_dims(da0)
+        if keep_dim not in da0.dims:
+            raise ValueError(f"示例文件中不包含 keep_dim='{keep_dim}'，实际维度为 {da0.dims}")
+        type_coord = da0.coords[keep_dim].values
 
-    # 栅格化：将每个 polygon 的 id 字段 rasterize 到栅格中
-    print("Rasterizing shapefile...")
-    shapes = [(geom, fid) for geom, fid in zip(gdf.geometry, gdf['id'])]
-    class_arr = rasterize(
-        shapes=shapes,
-        out_shape=ref_shape,
-        transform=ref_transform,
-        fill=0,
-        dtype=np.int32
+    # ---------- 2) 逐个 (scenario, year) 构造 dask-backed 的部分并拼接 ----------
+    per_scenario = []
+    for s in scenarios:
+        per_year = []
+        for y in years:
+            path = os.path.join(base_dir, s, str(y), f"{file}_{y}.nc")
+            if not os.path.exists(path):
+                raise ValueError(f"文件不存在: {path}")
+
+            da = xr.open_dataarray(path, chunks=chunks)  # 不加 with，延迟直到计算
+            da = filter_all_from_dims(da)
+
+            # 求和保留 keep_dim -> 只剩 keep_dim 这个维度
+            sum_dims = [d for d in da.dims if d != keep_dim]
+            da_am = da.sum(dim=sum_dims, keep_attrs=False) / scale
+
+            # 统一重命名 keep_dim -> 'type'
+            if keep_dim != "type":
+                da_am = da_am.rename({keep_dim: "type"})
+            # 强制对齐到 sample 的 type 顺序（防止不同文件顺序不同）
+            da_am = da_am.sel(type=type_coord)
+
+            # 添加 year 维
+            da_am = da_am.expand_dims({"year": [y]})
+            da_am.name = var_name
+            per_year.append(da_am)
+
+        # 按 year 拼
+        if len(per_year) == 0:
+            continue
+        da_year = xr.concat(per_year, dim="year")
+        # 添加 scenario 维
+        da_year = da_year.expand_dims({"scenario": [s]})
+        per_scenario.append(da_year)
+
+    if len(per_scenario) == 0:
+        raise RuntimeError("所有场景均为空，无法生成结果。")
+
+    # 按 scenario 拼
+    out_da = xr.concat(per_scenario, dim="scenario")
+    # 确保维度顺序
+    out_da = out_da.transpose("scenario", "year", "type")
+
+    # 设定坐标类型、名称
+    out_da.name = var_name
+    out_da = out_da.astype(dtype, copy=False)
+
+    # ---------- 3) 写 NetCDF（此处会触发 dask 计算） ----------
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    save2nc(out_da, output_file)
+
+    print(f"✅ Saved to {output_file}")
+
+    return out_da
+
+# from your_module import filter_all_from_dims
+
+def summarize_to_category(
+        scenarios: List[str],
+        years: List[int],
+        files: List[str],
+        output_file: str,
+        n_jobs: int = 41,
+        var_name: str = "data",
+        scale: float = 1e6,
+        dtype: str = "float32",
+        chunks: Dict[str, int] | None = None,
+) -> xr.DataArray:
+    """
+    同时处理多个 input_files，返回一个 (scenario, Year, type) 的 DataArray 并保存为 NetCDF。
+
+    - scenario: input_files
+    - Year: 指定的年份
+    - type: files (用 KEY_TO_COLUMN_MAP 替换后的名称)
+    """
+
+    base_dir = f'../../../output/{config.TASK_NAME}/carbon_price/0_base_data'
+    years_sorted = sorted(years)
+    type_names = [config.KEY_TO_COLUMN_MAP.get(f, f) for f in files]
+
+    def _sum_single(scenario: str, year: int, file: str) -> float | None:
+        input_path = os.path.join(base_dir, scenario)
+        nc_path = os.path.join(input_path, f'{year}', f'{file}_{year}.nc')
+        if not os.path.exists(nc_path):
+            return np.nan
+        with xr.open_dataarray(nc_path) as da:
+            filtered = filter_all_from_dims(da).load()
+            return filtered.sum().item()
+
+    # 并行计算：三重循环 scenario × year × type
+    results_flat = Parallel(n_jobs=n_jobs)(
+        delayed(_sum_single)(scenario, year, file)
+        for scenario in scenarios
+        for year in years_sorted
+        for file in files
     )
 
-    # 4. 初始化输出栅格
-    total_carbon_cost_raster = np.zeros(ref_shape, dtype=np.float32)
-    total_bio_cost_raster = np.zeros(ref_shape, dtype=np.float32)
-    carbon_price_raster = np.zeros(ref_shape, dtype=np.float32)
-    bio_price_raster = np.zeros(ref_shape, dtype=np.float32)
+    # reshape -> (scenario, Year, type)
+    values = np.array(results_flat, dtype="float64").reshape(
+        len(scenarios), len(years_sorted), len(files)
+    )
 
-    # 获取唯一的区域 ID
-    unique_ids = np.unique(class_arr)
-    unique_ids = unique_ids[unique_ids != 0]  # 去掉背景值
+    if scale:
+        values = values / scale
 
-    # 5. 遍历每个区域 ID，计算指标并赋值
-    print("Processing unique IDs...")
-    for uid in unique_ids:
-        mask = (class_arr == uid)
+    da = xr.DataArray(
+        values.astype(dtype),
+        coords={
+            "scenario": scenarios,
+            "Year": years_sorted,
+            "type": type_names,
+        },
+        dims=("scenario", "Year", "type"),
+        name=var_name,
+    )
 
-        # 去除 bio 或 bio_cost 是 nan 的像元
-        valid_mask = mask & ~np.isnan(bio) & ~np.isnan(bio_cost)
+    if chunks:
+        da = da.chunk(chunks)
 
-        if not np.any(valid_mask):
-            continue
+    output_dir = os.path.join(
+        f'../../../output/{config.TASK_NAME}',
+        'carbon_price',
+        '1_draw_data')
+    out_nc = os.path.join(
+        f'{output_dir}',
+        'carbon_price',
+        '1_draw_data',
+        f'{output_file}.nc'
+    )
+    os.makedirs(os.path.dirname(output_dir), exist_ok=True)
+    save2nc(da, out_nc)
 
-        # 获取有效区域的值
-        ghg_vals = ghg[valid_mask]
-        bio_vals = bio[valid_mask]
-        carbon_cost_vals = carbon_cost[valid_mask]
-        bio_cost_vals = bio_cost[valid_mask]
+    print(f"✅ 保存 NetCDF: {out_nc} | shape={da.shape} dims={da.dims}")
+    return da
 
-        # 计算总量和价格
-        ghg_sum = np.sum(ghg_vals)
-        bio_sum = np.sum(bio_vals)
-        carbon_cost_sum = np.sum(carbon_cost_vals)
-        bio_cost_sum = np.sum(bio_cost_vals)
-
-        carbon_price = carbon_cost_sum / ghg_sum if ghg_sum != 0 else 0
-        bio_price = bio_cost_sum / bio_sum if bio_sum != 0 else 0
-
-        # 将计算结果写入对应栅格
-        total_carbon_cost_raster[mask] = carbon_cost_sum
-        total_bio_cost_raster[mask] = bio_cost_sum
-        carbon_price_raster[mask] = carbon_price
-        bio_price_raster[mask] = bio_price
-
-    # 6. 写出结果到 TIF 文件
-    def write_tif(filename, array):
-        profile = ref_profile.copy()
-        profile.update(dtype=rasterio.float32, count=1, nodata=np.nan)
-        with rasterio.open(os.path.join(output_dir, filename), 'w', **profile) as dst:
-            dst.write(array, 1)
-
-    print("Writing output TIF files...")
-    write_tif("total_carbon_cost.tif", total_carbon_cost_raster)
-    write_tif("total_bio_cost.tif", total_bio_cost_raster)
-    write_tif("carbon_price.tif", carbon_price_raster)
-    write_tif("bio_price.tif", bio_price_raster)
-
-    print("Processing completed. TIF files saved to:", output_dir)
-
-import geopandas as gpd
-from rasterstats import zonal_stats
-import numpy as np
-import os
-
-def compute_zonal_stats_to_shp(
-    shapefile_path,
-    raster_paths,  # dict: {"ghg": ..., "carbon_cost": ..., ...}
-    output_shp_path,
-    id_field='id'
+def build_profit_and_cost_nc(
+    economic_da: xr.DataArray,
+    input_files_0,              # baseline 列表（用第 0 个）
+    input_files_1,              # 碳情景列表
+    input_files_2,              # 碳+生物多样性 列表
+    carbon_names,               # 与 input_files_1 对齐的输出名
+    carbon_bio_names,           # 与 input_files_2 对齐的输出名
+    counter_carbon_bio_names,   # 与 input_files_2 对齐的输出名
+    add_total=False,            # 是否把 Total 作为额外的 type 写入
 ):
-    gdf = gpd.read_file(shapefile_path)
-    assert id_field in gdf.columns, f"Shapefile must contain '{id_field}' field"
+    """
+    economic_da 维度必须是 (scenario, Year, type) 且 type 名包含：
+      'Ag revenue','Ag cost','Agmgt revenue','Agmgt cost',
+      'Non-ag revenue','Non-ag cost','Transition(ag→ag) cost',
+      'Transition(ag→non-ag) amortised cost'
+    """
+    # 修正：这里原来少了 f
+    out_dir = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
+    os.makedirs(out_dir, exist_ok=True)
 
-    stats = {}
-    for name, path in raster_paths.items():
-        zs = zonal_stats(shapefile_path, path, stats=["sum"], nodata=np.nan)
-        stats[name + "_sum"] = [s["sum"] if s["sum"] is not None else 0 for s in zs]
+    # ---------- 1) 计算 profit(scenario, Year, type) ----------
+    required_types = [
+        "Ag revenue", "Ag cost",
+        "Agmgt revenue", "Agmgt cost",
+        "Non-ag revenue", "Non-ag cost",
+        "Transition(ag→ag) cost",
+        "Transition(ag→non-ag) amortised cost",
+    ]
+    type_names = set(economic_da.coords["type"].astype(str).values)
+    missing = [t for t in required_types if t not in type_names]
+    if missing:
+        raise ValueError(f"economic_da 缺少必要 type: {missing}")
 
-    for k, v in stats.items():
-        gdf[k] = v
+    def g(name):  # 便捷选择
+        return economic_da.sel(type=name)
 
-    # 计算价格字段
-    gdf["carbon_price"] = gdf["carbon_cost_sum"] / gdf["ghg_sum"]
-    gdf["bio_price"] = gdf["bio_cost_sum"] / gdf["bio_sum"]
+    profit_vars = {
+        "Ag profit": g("Ag revenue") - g("Ag cost"),
+        "Agmgt profit": g("Agmgt revenue") - g("Agmgt cost"),
+        "Non-ag profit": g("Non-ag revenue") - g("Non-ag cost"),
+        "Transition(ag→ag) profit": - g("Transition(ag→ag) cost"),
+        "Transition(ag→non-ag) amortised profit": - g("Transition(ag→non-ag) amortised cost"),
+    }
+    profit_da = xr.concat(list(profit_vars.values()), dim="type").assign_coords(
+        type=list(profit_vars.keys())
+    )
+    profit_da.name = "data"
 
-    # 替换 inf 和 nan 为 0（可选）
-    gdf = gdf.replace([np.inf, -np.inf], np.nan)
-    gdf = gdf.fillna(0)
+    # 存 profit（修正：encoding 的 key 要用当前 name）
+    profit_nc = os.path.join(out_dir, "profit.nc")
+    profit_da.astype("float32").to_netcdf(
+        profit_nc,
+        encoding={"data": {"dtype": "float32", "zlib": True, "complevel": 4}}
+    )
 
-    # 保存为新的 shapefile
-    gdf.to_file(output_shp_path)
-    print(f"✅ Zonal stats written to {output_shp_path}")
+    # ---------- 2) 构造三个差值 DataArray ----------
+    baseline = input_files_0[0]
 
-import rasterio
-from rasterio.features import rasterize
-from rasterio.transform import from_bounds
-import numpy as np
+    # A) carbon：baseline - input_files_1[i]  ->  (policy, Year, type)
+    diffs = []
+    for scen in input_files_1:
+        diffs.append(profit_da.sel(scenario=baseline) - profit_da.sel(scenario=scen))
+    carbon_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(carbon_names))
 
-def rasterize_fields_from_shp(
-    shapefile_path,
-    output_dir,
-    fields,         # list of fields to rasterize
-    resolution=1000 # 输出分辨率（单位：米）
-):
-    os.makedirs(output_dir, exist_ok=True)
-    gdf = gpd.read_file(shapefile_path)
+    # B) carbon_bio：input_files_1[i] - input_files_2[idx]
+    if len(input_files_2) % len(input_files_1) != 0:
+        raise ValueError("len(input_files_2) 必须是 len(input_files_1) 的整数倍，用于分组匹配。")
+    bio_nums = len(input_files_2) // len(input_files_1)
 
-    minx, miny, maxx, maxy = gdf.total_bounds
-    width = int(np.ceil((maxx - minx) / resolution))
-    height = int(np.ceil((maxy - miny) / resolution))
-    transform = from_bounds(minx, miny, maxx, maxy, width, height)
+    diffs = []
+    for k, scen2 in enumerate(input_files_2):
+        i = k // bio_nums
+        scen1 = input_files_1[i]
+        diffs.append(profit_da.sel(scenario=scen1) - profit_da.sel(scenario=scen2))
+    carbon_bio_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(carbon_bio_names))
 
-    profile = {
-        "driver": "GTiff",
-        "height": height,
-        "width": width,
-        "count": 1,
-        "dtype": "float32",
-        "crs": gdf.crs,
-        "transform": transform,
-        "nodata": np.nan
+    # C) counter：input_files_2 的前 bio_nums 个与 baseline
+    diffs = []
+    for i in range(bio_nums):
+        scen2 = input_files_2[i]
+        diffs.append(profit_da.sel(scenario=scen2) - profit_da.sel(scenario=baseline))
+    counter_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(counter_carbon_bio_names))
+
+    # 可选把 Total 作为额外的 type 追加
+    def append_total(da, add_total=add_total):
+        if not add_total:
+            return da
+        total = da.sum(dim="type")
+        total = total.expand_dims({"type": ["Total"]})
+        da2 = xr.concat([da, total], dim="type")
+        return da2
+
+    carbon_cost = append_total(carbon_cost)
+    carbon_bio_cost = append_total(carbon_bio_cost)
+    counter_cost = append_total(counter_cost)
+
+    # ---------- 3) 在“情景维度”上合并三个输出 ----------
+    # 关键点：
+    # - 先把三个 DataArray 的 'policy' 维重命名为 'scenario'
+    # - 再各自添加一个辅助坐标 'category'，用于区分来源
+    # - 最后在 'scenario' 维上 concat 成一个总的 DataArray
+    def tag_and_rename(da, category_name: str) -> xr.DataArray:
+        da2 = da.rename(policy="scenario")
+        da2 = da2.assign_coords(
+            category=("scenario", [category_name] * da2.sizes["scenario"])
+        )
+        return da2
+
+    carbon_cost_sc   = tag_and_rename(carbon_cost,   "carbon")
+    carbon_bio_sc    = tag_and_rename(carbon_bio_cost, "carbon_bio")
+    counter_cost_sc  = tag_and_rename(counter_cost,  "counter_carbon_bio")
+
+    # 合并：(scenario, Year, type)
+    all_cost = xr.concat([carbon_cost_sc, carbon_bio_sc, counter_cost_sc], dim="scenario")
+    all_cost.name = "data"
+
+    # 存一个总的 nc
+    all_nc = os.path.join(out_dir, "xr_total_cost.nc")
+    save2nc(all_cost, all_nc)
+
+    return {
+        "profit": profit_da,
+        "cost_carbon": carbon_cost,
+        "cost_carbon_bio": carbon_bio_cost,
+        "cost_counter_carbon_bio": counter_cost,
+        "cost_all": all_cost,  # 合并后的总结果 (scenario, Year, type) + 辅助坐标 category
     }
 
-    for field in fields:
-        print(f"▶ Rasterizing field: {field}")
-        shapes = [(geom, val) for geom, val in zip(gdf.geometry, gdf[field])]
-        out_arr = rasterize(
-            shapes=shapes,
-            out_shape=(height, width),
-            transform=transform,
-            fill=np.nan,
-            dtype='float32'
-        )
-        out_path = os.path.join(output_dir, f"{field}.tif")
-        with rasterio.open(out_path, 'w', **profile) as dst:
-            dst.write(out_arr, 1)
 
-    print("✅ Raster files saved to", output_dir)
+
+def make_prices_nc(output_names):
+    """
+    从 xr_total_cost.nc / xr_total_carbon.nc / xr_total_bio.nc 读取数据，
+    对每个情景只保留 (scenario, Year)，其余维度（若存在）全部按和聚合；
+    然后计算：
+        carbon_price = total_cost / total_carbon
+        bio_price    = total_cost / total_bio
+    合并所有情景 -> 两个 DataArray：(scenario, Year)，并保存到 out_dir。
+    """
+    out_dir = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
+    base = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
+    cost_da = xr.open_dataarray(os.path.join(base, 'xr_total_cost.nc'))
+    carbon_da = xr.open_dataarray(os.path.join(base, 'xr_total_carbon.nc'))
+    bio_da = xr.open_dataarray(os.path.join(base, 'xr_total_bio.nc'))
+
+    def _collapse_to_year(da_all: xr.DataArray, scen_name: str) -> xr.DataArray:
+        """
+        选中单个情景，除 Year 外的所有维度求和，返回维度仅 (scenario, Year) 的 DataArray。
+        """
+        da = da_all.sel(scenario=scen_name)
+
+        # 需要保留的维度：Year（和 scenario 这个坐标）
+        keep = {'Year'}
+        # 允许有/无 Year 这一坐标（某些数据可能命名不同，必要时在外面改名）
+        sum_dims = [d for d in da.dims if d not in keep]
+
+        if sum_dims:
+            da = da.sum(dim=sum_dims, skipna=True)
+
+        # 确保有 scenario 维度（如果被掉了就补回来）
+        if 'scenario' not in da.dims:
+            da = da.expand_dims({'scenario': [scen_name]})
+        else:
+            # 把单场景的坐标设置为该 scen_name（防止保留了原坐标数组）
+            da = da.assign_coords(scenario=[scen_name])
+
+        # 维度顺序统一成 (scenario, Year)（若 Year 不存在，这里会报错，需保证 Year 维存在）
+        if 'Year' in da.dims:
+            da = da.transpose('scenario', 'Year')
+        return da
+
+    # 聚合每个情景
+    cost_list, car_list, bio_list = [], [], []
+    for scen in output_names:
+        cost_list.append(_collapse_to_year(cost_da, scen))
+        car_list.append(_collapse_to_year(carbon_da, scen))
+        bio_list.append(_collapse_to_year(bio_da, scen))
+
+    # 合并所有情景
+    cost_all = xr.concat(cost_list, dim='scenario')
+    carbon_all = xr.concat(car_list, dim='scenario')
+    bio_all = xr.concat(bio_list, dim='scenario')
+
+    # 安全除法（分母<=0 或 NaN 时返回 NaN）
+    def _safe_div(num: xr.DataArray, den: xr.DataArray) -> xr.DataArray:
+        return xr.where((den > 0) & np.isfinite(den), num / den, np.nan)
+
+    carbon_price = _safe_div(cost_all, carbon_all)
+    bio_price = _safe_div(cost_all, bio_all)
+
+    carbon_price.name = 'carbon_price'
+    bio_price.name = 'biodiversity_price'
+
+    # 保存
+    os.makedirs(out_dir, exist_ok=True)
+    save2nc(carbon_price, os.path.join(out_dir, 'xr_carbon_price.nc'))
+    save2nc(bio_price, os.path.join(out_dir, 'xr_bio_price.nc'))
+
+    return carbon_price, bio_price
+
+def summarize_netcdf_to_excel(
+        input_file: str,
+        years: List[int],
+        files: List[str],
+        n_jobs: int = 41,
+        excel_type: str = "all",
+) -> None:
+    """
+    从指定的目录结构中读取单变量NetCDF文件，计算其总和，并将结果保存到Excel。
+
+    Args:
+        input_path (str): 包含 'output_{year}' 子目录的基础路径。
+        years (List[int]): 需要处理的年份列表。
+        files (List[str]): 文件的基础名称列表 (不含年份和扩展名)。
+        output_excel_path (str, optional): 输出的Excel文件名。
+                                            默认为 "economic_summary.xlsx"。
+    """
+    input_dir = f'../../../output/{config.TASK_NAME}/carbon_price/0_base_data'
+    input_path = os.path.join(input_dir, input_file)
+    # print(f"Start {input_path}...")
+
+    def _process_single_year(
+            year: int,
+            files: List[str],
+            input_path: str,
+            task_name: str,
+    ) -> Dict[str, Any]:
+        """
+        Processes all specified files for a single year.
+        This function is designed to be called in parallel by joblib.
+
+        Returns:
+            A dictionary containing the results for the given year (e.g., {'Year': 2025, 'file1': 123.4, ...}).
+        """
+        # print(f"Processing year: {year}")
+        year_data = {'Year': year}
+
+        for file in files:
+            total_sum = None
+            # Build the full file path based on the file name
+            file_path = os.path.join(
+                input_path,
+                f'{year}',
+                f'{file}_{year}.nc'
+            )
+
+            # Check for file existence before trying to open
+            if os.path.exists(file_path):
+                with xr.open_dataarray(file_path) as da:
+                    filtered_da = filter_all_from_dims(da).load()
+                    total_sum = filtered_da.sum().item()
+            else:
+                print(f"  - WARNING: File '{file_path}' for year {year} does not exist.")
+
+            # Add the result to the dictionary for the current year
+            year_data[file] = total_sum
+
+        return year_data
+
+    all_data = Parallel(n_jobs=n_jobs)(
+        delayed(_process_single_year)(year, files, input_path, config.TASK_NAME)
+        for year in sorted(years)
+    )
+    # 将结果列表转换为 pandas DataFrame
+    results_df = pd.DataFrame(all_data)
+
+    # 将 'Year' 列设为索引
+    results_df = results_df.set_index('Year')
+    results_df = results_df / 1e6
+    results_df = results_df.rename(columns=config.KEY_TO_COLUMN_MAP)
+    output_excel_path = os.path.join(
+        f'../../../output/{config.TASK_NAME}',
+        'carbon_price',
+        '1_excel',
+        f'0_Origin_{excel_type}_{input_file}.xlsx')
+    results_df.to_excel(output_excel_path)
+    return results_df
+
+def create_xarray(years, base_path, env_category, env_name, mask=None,
+                  engine="h5netcdf",
+                  cell_dim="cell", cell_chunk="auto",
+                  year_chunk=1, parallel=False):
+    """
+    以 year 维度拼接多个年度 NetCDF，懒加载+分块，避免过多文件句柄。
+    """
+    file_paths = [
+        os.path.join(base_path, str(env_category), str(y), f"xr_{env_name}_{y}.nc")
+        for y in years
+    ]
+    missing = [p for p in file_paths if not os.path.exists(p)]
+    if missing:
+        raise FileNotFoundError(f"以下文件未找到:\n" + "\n".join(missing))
+
+    # 从文件名提取实际年份，确保坐标与文件顺序一致
+    valid_years = [int(os.path.basename(p).split("_")[-1].split(".")[0]) for p in file_paths]
+
+    ds = xr.open_mfdataset(
+        file_paths,
+        engine=engine,
+        combine="nested",  # 明确“按给定顺序拼接”
+        concat_dim="year",  # 新增 year 维度
+        parallel=parallel,  # 一般 False 更稳，避免句柄并发
+        chunks={cell_dim: cell_chunk, "year": year_chunk}  # year=1，cell 分块
+    ).assign_coords(year=valid_years)
+
+    if mask is not None:
+        ds = ds.where(mask, other=0)  # 使用掩码，非掩码区域设为 0
+
+    return ds
+
+
+
+def create_summary(env_category, years, base_path, colnames):
+    """
+    计算指定 env_category 的 GHG benefits, Carbon cost, Average Carbon price，
+    并返回一个带自定义列名的 DataFrame。
+
+    参数
+    ----
+    env_category : str
+        环境类别，例如 "carbon_high"
+    years : list 或 array
+        年份序列
+    base_path : str
+        数据路径
+    colnames : list of str
+        列名列表，长度必须是 3，依次对应 [GHG benefits, Carbon cost, Average Carbon price]
+
+    返回
+    ----
+    df : pandas.DataFrame
+        索引为 year，列名由 colnames 指定
+    """
+    # 加载数据
+    xr_carbon_cost_a = create_xarray(years, base_path, env_category,
+                                     f"total_cost_{env_category}_amortised")
+    xr_carbon = create_xarray(years, base_path, env_category,
+                              f"total_{env_category}")
+
+    # 计算指标
+    xr_carbon_price_ave_a = (xr_carbon_cost_a.sum(dim="cell") /
+                             xr_carbon.sum(dim="cell"))
+    da_price = xr_carbon_price_ave_a["data"].sortby("year")
+    da_benefits = (xr_carbon.sum(dim="cell")["data"] / 1e6).sortby("year")
+    da_cost = (xr_carbon_cost_a.sum(dim="cell")["data"] / 1e6).sortby("year")
+
+    # 检查列名长度
+    if len(colnames) != 3:
+        raise ValueError("colnames 必须是长度为 3 的列表，顺序为 [GHG benefits, Carbon cost, Average Carbon price]")
+
+    # 组装 DataFrame
+    df = pd.DataFrame({
+        "year": da_price["year"].values,
+        colnames[0]: da_benefits.values,
+        colnames[1]: da_cost.values,
+        colnames[2]: da_price.values
+    }).set_index("year")
+
+    excel_path = base_path.replace("0_base_data", "1_excel")
+    output_path = os.path.join(excel_path, f"2_{env_category}_cost_series.xlsx")
+    df.to_excel(output_path)
+    print(f"已保存: {output_path}")
+    return df
+
+def create_profit_for_cost(excel_dir,input_file: str) -> pd.DataFrame:
+    excel_path = os.path.join(excel_dir, f'0_Origin_economic_{input_file}.xlsx')
+    original_df = pd.read_excel(excel_path, index_col=0)
+    profit_df = pd.DataFrame()
+
+    # 规则 1: Ag profit = Ag revenue - Ag cost
+    profit_df['Ag profit'] = original_df['Ag revenue'] - original_df['Ag cost']
+
+    # 规则 2: Agmgt profit = Agmgt revenue - Agmgt cost
+    profit_df['Agmgt profit'] = original_df['Agmgt revenue'] - original_df['Agmgt cost']
+
+    # 规则 3: Non-ag profit = Non-ag revenue - Non-ag cost
+    profit_df['Non-ag profit'] = original_df['Non-ag revenue'] - original_df['Non-ag cost']
+
+    # 规则 4: Transition(ag→ag) profit = 0 - Transition(ag→ag) cost
+    profit_df['Transition(ag→ag) profit'] = 0 - original_df['Transition(ag→ag) cost']
+
+    # 规则 5: Transition(ag→non-ag) amortised profit = 0 - Transition(ag→non-ag) amortised cost
+    profit_df['Transition(ag→non-ag) amortised profit'] = 0 - original_df['Transition(ag→non-ag) amortised cost']
+    return profit_df

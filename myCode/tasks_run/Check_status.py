@@ -52,6 +52,8 @@ def parse_log(base_dir, run_dir,runing_file):
             line = line.strip()
             if "Warning: Gurobi solver did not find an optimal/suboptimal solution for year" in line:
                 result["Status"] = "Infeasible"
+            if "Infeasible model" in line:
+                result["Status"] = "Infeasible"
 
     return result
 
