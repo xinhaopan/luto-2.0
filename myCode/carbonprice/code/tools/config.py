@@ -100,7 +100,7 @@ counter_carbon_bio_names = ['Counterfactual_carbon_low_bio_10', 'Counterfactual_
     ]
 
 PRICE_TITLE_MAP = {'carbon_low': r'Counterfactual-$\mathrm{GHG}_{\mathrm{low}}$',
-                'carbon_low': r'Counterfactual-$\mathrm{GHG}_{\mathrm{high}}$',
+                'carbon_high': r'Counterfactual-$\mathrm{GHG}_{\mathrm{high}}$',
 
                 'carbon_low_bio_10': r'$\mathrm{GHG}_{\mathrm{low}}$-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{10}}$',
                 'carbon_low_bio_20': r'$\mathrm{GHG}_{\mathrm{low}}$-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{20}}$',

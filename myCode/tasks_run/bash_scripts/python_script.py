@@ -98,10 +98,11 @@ def main():
 
     except Exception as e:
         # 记录错误到日志文件
+        write_log(f"Run failed.", file=log_file)
+        write_log(f"Model finished in {data.last_year}", file=log_file)
+
         error_message = f"An error occurred during simulation:\n{str(e)}\n{traceback.format_exc()}"
         write_log(error_message, file=error_log_file)
-        write_log(f"Run failed.")
-        write_log(f"Model finished in {data.last_year}")
 
         # 打印错误信息，便于调试
         print(f"Error in simulation: {e}")

@@ -100,7 +100,7 @@ def download_one(platform, base_name, file_name, local_root):
 if __name__ == "__main__":
     # time.sleep(60*60*5) # 延时 5 小时，给你时间去提交作业
     platform = "NCI"
-    base_names = ["20250921_Paper2_Results_TEST"]
+    base_names = ["20250922_Paper2_Results_NCI"]
     local_root = "../../output"
 
     for base_name in base_names:
