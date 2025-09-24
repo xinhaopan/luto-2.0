@@ -1739,7 +1739,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
     if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
         priority_degraded_area_score_r = xr.DataArray(
-            data.BIO_PRIORITY_DEGRADED_AREAS_R,
+            np.zeros(data.NCELLS),
             dims=['cell'],
             coords={'cell': range(data.NCELLS)}
         )
