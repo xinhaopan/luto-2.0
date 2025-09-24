@@ -302,16 +302,6 @@ def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0, gho
     fig = ax.get_figure()
     handles, labels = ax.get_legend_handles_labels()
 
-    # ghost legend
-    ghost_handle = Patch(alpha=0)
-    ghost_label = ""
-    if ghost_legend_num:
-        for _ in range(ghost_legend_num):
-            handles.append(ghost_handle)
-            labels.append(ghost_label)
-        if ax.get_legend() is not None:
-            ax.get_legend().remove()
-
     # 分类排序：先线再块再其它
     line_handles = []
     line_labels = []
@@ -330,6 +320,16 @@ def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0, gho
         else:
             other_handles.append(h)
             other_labels.append(l)
+
+    # ghost legend
+    ghost_handle = Patch(alpha=0)
+    ghost_label = ""
+    if ghost_legend_num:
+        for _ in range(ghost_legend_num):
+            handles.append(ghost_handle)
+            labels.append(ghost_label)
+        if ax.get_legend() is not None:
+            ax.get_legend().remove()
 
     # 复制属性（如你原有的 new_handles 代码）
     def clone_handle(handle):
@@ -358,19 +358,19 @@ def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0, gho
                columnspacing=column_spacing
                )
 
-def plot_12_layout(
+def plot_13_layout(
     all_dfs: dict,
     title_map: dict,
     colors: list,
     output_path: str,
     summary_ylim: tuple,
-    bbox_to_anchor,
+    bbox_to_anchor=[0.58, 0.82, 0.4, 0.1],
     stacked_area_pos_neg=stacked_area_pos_neg,
     draw_legend=draw_legend,
     ylabel: str = 'Net economic returns (Billion AU$)',
     dividing_line=0.5,
     ncol=2,
-    column_spacing=-7,
+    column_spacing=1,
     ghost_legend_num=3,
     figsize=(22, 12)
 ):
@@ -448,7 +448,7 @@ def plot_12_layout(
     fig.show()
     print(f"✅ Saved to {output_path}")
 
-def plot_13_layout(
+def plot_12_layout(
     all_carbon: list,
     all_bio: list,
     title_carbon_names: list,
@@ -669,7 +669,7 @@ def plot_22_layout(
     colors: list,
     output_path: str,
     summary_ylim: tuple,
-    bbox_to_anchor,
+    bbox_to_anchor=(0.42, 0.95),
     stacked_area_pos_neg=stacked_area_pos_neg,
     draw_legend=draw_legend,
     ylabel: str = 'Cost (Billion AU$)',
@@ -684,7 +684,7 @@ def plot_22_layout(
     第一行前两列画图，第3-5列合并为图例。其余行每行5张。
     """
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.5, wspace=0.2)
+    gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.3, wspace=0.2)
 
     # 画图例（第一行第3~5列合并）
     legend_ax = fig.add_subplot(gs[0, 2:])
@@ -737,14 +737,14 @@ def plot_22_layout(
     # --- 全局Y轴标题 ---
     first_ax = axes_list[0]  # 第一个 subplot
     pos = first_ax.get_position(fig)  # Bbox, figure坐标
-    x = pos.x0 - 0.05  # 比左侧再左一点，0.02可以自己试
+    x = pos.x0 - 0.12  # 比左侧再左一点，0.02可以自己试
     x = max(x, 0)  # 防止越界到负数
 
     fig.text(x, 0.5, ylabel, va='center', rotation='vertical')
 
     # --- 图例 ---
     draw_legend(axes_list[0], bbox_to_anchor=bbox_to_anchor, ncol=ncol, column_spacing=column_spacing)
-
+    fig.subplots_adjust(left=0.05, right=0.98, top=0.97, bottom=0.03)
     # --- 保存 ---
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))

@@ -33,7 +33,6 @@ for input_file, sheet_name,scale,ylabel,column_spacing in zip(input_files, sheet
         colors=colors,
         output_path=output_path,
         summary_ylim=summary_ylim,
-        bbox_to_anchor=(0.42, 0.89),
         ylabel=ylabel,
         column_spacing=column_spacing
     )

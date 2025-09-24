@@ -28,6 +28,7 @@ def summarize_to_type(
         scale: float = 1e6,
         n_jobs: int = None,
         dtype: str = "float32",
+        scenario_name: bool = True,
         chunks: Optional[Dict[str, int]] = 'auto',
 ) -> xr.DataArray:
     """
@@ -37,8 +38,12 @@ def summarize_to_type(
     base_dir = f'../../../output/{config.TASK_NAME}/carbon_price'
 
     # --- 1) 找一个示例文件确定 type 坐标 ---
-    sample_path = os.path.join(base_dir, '0_base_data', scenarios[-1],
-                               f"{years[-1]}/{file}_{scenarios[-1]}_{years[-1]}.nc")
+    if scenario_name:
+        sample_path = os.path.join(base_dir, '0_base_data', scenarios[-1],
+                                   f"{years[-1]}/{file}_{scenarios[-1]}_{years[-1]}.nc")
+    else:
+        sample_path = os.path.join(base_dir, '0_base_data', scenarios[-1],
+                                   f"{years[-1]}/{file}_{years[-1]}.nc")
     if not os.path.exists(sample_path):
         raise FileNotFoundError(f"未找到{sample_path}，无法确定 type 坐标。")
 
@@ -51,7 +56,10 @@ def summarize_to_type(
     # --- 2) 逐 scenario 处理 ---
 
     def process_single_file(s, y):
-        path = os.path.join(base_dir, '0_base_data', s, str(y), f"{file}_{s}_{y}.nc")
+        if scenario_name:
+            path = os.path.join(base_dir, '0_base_data', s, str(y), f"{file}_{s}_{y}.nc")
+        else:
+            path = os.path.join(base_dir, '0_base_data', s, str(y), f"{file}_{y}.nc")
         if not os.path.exists(path):
             return None
         try:
@@ -111,7 +119,10 @@ def summarize_to_type(
     # --- 4) 写 NetCDF ---
     output_dir = os.path.join(base_dir, '1_draw_data')
     os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, f'{output_file}.nc')
+    if scenario_name:
+        output_path = os.path.join(output_dir, f'{output_file}.nc')
+    else:
+        output_path = os.path.join(output_dir, f'{output_file}_original.nc')
 
     print("Saving to NetCDF...")
     save2nc(out_da, output_path)
@@ -236,6 +247,7 @@ def summarize_to_category(
         var_name: str = "data",
         scale: float = 1e6,
         dtype: str = "float32",
+        scenario_name = True,
         chunks: Dict[str, int] | None = None,
 ) -> xr.DataArray:
     """
@@ -252,7 +264,10 @@ def summarize_to_category(
 
     def _sum_single(scenario: str, year: int, file: str) -> float | None:
         input_path = os.path.join(base_dir,'0_base_data', scenario)
-        nc_path = os.path.join(input_path, f'{year}', f'{file}_{scenario}_{year}.nc')
+        if scenario_name:
+            nc_path = os.path.join(input_path, f'{year}', f'{file}_{scenario}_{year}.nc')
+        else:
+            nc_path = os.path.join(input_path, f'{year}', f'{file}_{year}.nc')
         if not os.path.exists(nc_path):
             raise FileNotFoundError(f"未找到文件: {nc_path}")
         with xr.open_dataarray(nc_path) as da:
@@ -500,15 +515,12 @@ def make_prices_nc(output_names):
     carbon_all = xr.concat(car_list, dim='scenario')
     bio_all = xr.concat(bio_list, dim='scenario')
 
-    # 安全除法（分母<=0 或 NaN 时返回 NaN）
-    def _safe_div(num: xr.DataArray, den: xr.DataArray) -> xr.DataArray:
-        return xr.where((den > 0) & np.isfinite(den), num / den, np.nan)
 
-    carbon_price = _safe_div(cost_all, carbon_all)
-    bio_price = _safe_div(cost_all, bio_all)
+    carbon_price = cost_all / carbon_all
+    bio_price = cost_all / bio_all
 
-    carbon_price.name = 'carbon_price'
-    bio_price.name = 'biodiversity_price'
+    carbon_price.name = 'data'
+    bio_price.name = 'data'
 
     # 保存
     os.makedirs(out_dir, exist_ok=True)
@@ -676,7 +688,7 @@ def create_summary(env_category, years, base_path,env_type, colnames):
     }).set_index("Year")
 
     excel_path = base_path.replace("0_base_data", "1_excel")
-    output_path = os.path.join(excel_path, f"2_{env_category}_cost_series.xlsx")
+    output_path = os.path.join(excel_path, f"2_{env_type}_{env_category}_cost_series.xlsx")
     df.to_excel(output_path)
     print(f"已保存: {output_path}")
     return df

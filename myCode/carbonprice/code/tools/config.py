@@ -48,18 +48,13 @@ KEY_TO_COLUMN_MAP = {
     "xr_GHG_ag_management": "Agmgt GHG",
     "xr_GHG_non_ag": "Non-ag GHG",
     "xr_transition_GHG": "Transition GHG",
+    "xr_GHG_ag_diff": "Ag GHG",
 
     # Biodiversity Files
     "xr_biodiversity_GBF2_priority_ag": "Ag biodiversity",
-    "xr_biodiversity_GBF2_priority_ag_management": "AM biodiversity",
+    "xr_biodiversity_GBF2_priority_ag_management": "Agmgt biodiversity",
     "xr_biodiversity_GBF2_priority_non_ag": "Non-ag biodiversity",
-
-
-    "ag_profit": "Ag profit(M$)",
-    "am_profit": "AM profit(M$)",
-    "non-ag_profit": "Non-ag profit(M$)",
-    "transition(ag2ag)_profit": "Transition(ag→ag) profit(M$)",
-    "transition(ag2non-ag)_profit": "Transition(ag2non→ag) profit(M$)",
+    "xr_biodiversity_GBF2_priority_ag_diff": "Ag biodiversity",
 
 }
 
@@ -99,30 +94,30 @@ counter_carbon_bio_names = ['Counterfactual_carbon_low_bio_10', 'Counterfactual_
         'Counterfactual_carbon_high_bio_10', 'Counterfactual_carbon_high_bio_20', 'Counterfactual_carbon_high_bio_30', 'Counterfactual_carbon_high_bio_40', 'Counterfactual_carbon_high_bio_50'
     ]
 
-PRICE_TITLE_MAP = {'carbon_low': r'Counterfactual-$\mathrm{GHG}_{\mathrm{low}}$',
-                'carbon_high': r'Counterfactual-$\mathrm{GHG}_{\mathrm{high}}$',
+PRICE_TITLE_MAP = {'carbon_low': r'Counterfactual→$\mathrm{GHG}_{\mathrm{low}}$',
+                'carbon_high': r'Counterfactual→$\mathrm{GHG}_{\mathrm{high}}$',
 
-                'carbon_low_bio_10': r'$\mathrm{GHG}_{\mathrm{low}}$-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{10}}$',
-                'carbon_low_bio_20': r'$\mathrm{GHG}_{\mathrm{low}}$-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{20}}$',
-                'carbon_low_bio_30': r'$\mathrm{GHG}_{\mathrm{low}}$-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{30}}$',
-                'carbon_low_bio_40': r'$\mathrm{GHG}_{\mathrm{low}}$-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{40}}$',
-                'carbon_low_bio_50': r'$\mathrm{GHG}_{\mathrm{low}}$-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{50}}$',
-                'carbon_high_bio_10': r'$\mathrm{GHG}_{\mathrm{high}}$-$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{10}}$',
-                'carbon_high_bio_20': r'$\mathrm{GHG}_{\mathrm{high}}$-$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{20}}$',
-                'carbon_high_bio_30': r'$\mathrm{GHG}_{\mathrm{high}}$-$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{30}}$',
-                'carbon_high_bio_40': r'$\mathrm{GHG}_{\mathrm{high}}$-$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{40}}$',
-                'carbon_high_bio_50': r'$\mathrm{GHG}_{\mathrm{high}}$-$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
+                'carbon_low_bio_10': r'$\mathrm{GHG}_{\mathrm{low}}$→$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{10}}$',
+                'carbon_low_bio_20': r'$\mathrm{GHG}_{\mathrm{low}}$→$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{20}}$',
+                'carbon_low_bio_30': r'$\mathrm{GHG}_{\mathrm{low}}$→$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{30}}$',
+                'carbon_low_bio_40': r'$\mathrm{GHG}_{\mathrm{low}}$→$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{40}}$',
+                'carbon_low_bio_50': r'$\mathrm{GHG}_{\mathrm{low}}$→$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{50}}$',
+                'carbon_high_bio_10': r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{10}}$',
+                'carbon_high_bio_20': r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{20}}$',
+                'carbon_high_bio_30': r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{30}}$',
+                'carbon_high_bio_40': r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{40}}$',
+                'carbon_high_bio_50': r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
 
-                'Counterfactual_carbon_low_bio_10': r'Counterfactual-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{10}}$',
-                'Counterfactual_carbon_low_bio_20': r'Counterfactual-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{20}}$',
-                'Counterfactual_carbon_low_bio_30': r'Counterfactual-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{30}}$',
-                'Counterfactual_carbon_low_bio_40': r'Counterfactual-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{40}}$',
-                'Counterfactual_carbon_low_bio_50': r'Counterfactual-$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{50}}$',
-                'Counterfactual_carbon_high_bio_10': r'Counterfactual-$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{10}}$',
-                'Counterfactual_carbon_high_bio_20': r'Counterfactual-$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{20}}$',
-                'Counterfactual_carbon_high_bio_30': r'Counterfactual-$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{30}}$',
-                'Counterfactual_carbon_high_bio_40': r'Counterfactual-$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{40}}$',
-                'Counterfactual_carbon_high_bio_50': r'Counterfactual-$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
+                'Counterfactual_carbon_low_bio_10': r'Counterfactual→$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{10}}$',
+                'Counterfactual_carbon_low_bio_20': r'Counterfactual→$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{20}}$',
+                'Counterfactual_carbon_low_bio_30': r'Counterfactual→$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{30}}$',
+                'Counterfactual_carbon_low_bio_40': r'Counterfactual→$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{40}}$',
+                'Counterfactual_carbon_low_bio_50': r'Counterfactual→$\mathrm{GHG}_{\mathrm{low}}$,$\mathrm{Bio}_{\mathrm{50}}$',
+                'Counterfactual_carbon_high_bio_10': r'Counterfactual→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{10}}$',
+                'Counterfactual_carbon_high_bio_20': r'Counterfactual→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{20}}$',
+                'Counterfactual_carbon_high_bio_30': r'Counterfactual→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{30}}$',
+                'Counterfactual_carbon_high_bio_40': r'Counterfactual→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{40}}$',
+                'Counterfactual_carbon_high_bio_50': r'Counterfactual→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
                 }
 
 ORIGINAL_TITLE_MAP = {'Run_13_GHG_off_BIO_off_CUT_50': 'Counterfactual',

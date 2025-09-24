@@ -31,5 +31,5 @@ def move_and_rename_files(root_path):
 
 # 用法：输入你的路径
 if __name__ == "__main__":
-    input_path = r'output\20250922_Paper2_Results_HPC_test'
+    input_path = r'output\20250922_Paper2_Results_NCI'
     move_and_rename_files(input_path)

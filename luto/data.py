@@ -1171,26 +1171,26 @@ class Data:
         
   
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
-        # if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
+        if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         
-        # Get the mask of 'priority degraded areas' for habitat conservation
-        conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
-        ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+            # Get the mask of 'priority degraded areas' for habitat conservation
+            conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
+            ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
 
-        priority_degraded_areas_mask = bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
+            priority_degraded_areas_mask = bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
 
-        self.BIO_PRIORITY_DEGRADED_AREAS_R = np.where(
-            self.SAVBURN_ELIGIBLE,
-            priority_degraded_areas_mask * self.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-            priority_degraded_areas_mask * self.REAL_AREA
-        )
+            self.BIO_PRIORITY_DEGRADED_AREAS_R = np.where(
+                self.SAVBURN_ELIGIBLE,
+                priority_degraded_areas_mask * self.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+                priority_degraded_areas_mask * self.REAL_AREA
+            )
 
-        self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R = np.einsum(
-            'j,mrj,r->r',
-            np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
-            self.AG_L_MRJ,
-            self.BIO_PRIORITY_DEGRADED_AREAS_R
-        )
+            self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R = np.einsum(
+                'j,mrj,r->r',
+                np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
+                self.AG_L_MRJ,
+                self.BIO_PRIORITY_DEGRADED_AREAS_R
+            )
 
         
         ###############################################################
