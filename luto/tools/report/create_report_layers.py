@@ -197,65 +197,40 @@ def map2base64_float(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|No
 
         # Generate base64 and overlay info
         return attrs, array_to_base64(arr_4band, bbox, [float(max_val), float(min_val)])
+    
+    
 
+def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=max(settings.WRITE_THREADS, 16)) -> dict:
 
-import os
-import json
-import pandas as pd
-import xarray as xr
-from joblib import Parallel, delayed
-
-
-def get_map_obj_float(data: Data, files_df: pd.DataFrame, save_path: str,
-                      workers: int = settings.WRITE_THREADS) -> dict:
-    # 用于map2base64_float的空间模板
+    # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
     template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_map_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
+    
+    # Get dim info
+    with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
+        loop_dims = set(arr_eg.dims) - set(['cell', 'y', 'x'])
+        
+        dim_vals = pd.MultiIndex.from_product(
+            [arr_eg[dim].values for dim in loop_dims],
+            names=loop_dims
+        ).to_list()
 
-    # 1. 获取“结构”模板（无论df是否为空）
-    if files_df.empty:
-        # 用另一个已知存在的单变量nc文件作为结构模板
-        template_xr_create = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_quantities_agricultural_{sorted(settings.SIM_YEARS)[0]}.nc'
-        with xr.open_dataarray(template_xr_create) as arr_eg:
-            loop_dims = set(arr_eg.dims) - set(['cell', 'y', 'x'])
-            dim_vals = pd.MultiIndex.from_product(
-                [arr_eg[dim].values for dim in loop_dims],
-                names=loop_dims
-            ).to_list()
-            loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
-            # 准备全0的xr_arr
-            xr_arr = xr.zeros_like(arr_eg).load()
-        # 虚拟出一个files_df，年份可以按settings.SIM_YEARS遍历
-        years = sorted(list(set(settings.SIM_YEARS)))
-        files_df_virtual = pd.DataFrame({'Year': years})
-        file_iter = files_df_virtual.iterrows()
-        arr_source = 'virtual'  # 标记一下
-    else:
-        with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
-            loop_dims = set(arr_eg.dims) - set(['cell', 'y', 'x'])
-            dim_vals = pd.MultiIndex.from_product(
-                [arr_eg[dim].values for dim in loop_dims],
-                names=loop_dims
-            ).to_list()
-            loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
-        file_iter = files_df.iterrows()
-        arr_source = 'real'
-
-    # 2. 构建任务
+        loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
+        
+    # Loop through each year
     task = []
-    for idx, row in file_iter:
-        if arr_source == 'real':
-            xr_arr = xr.load_dataarray(row['path'])
-            _year = row['Year']
-        else:
-            _year = row['Year']  # 虚拟年份，xr_arr用全0
-
+    for _,row in files_df.iterrows():
+        xr_arr = xr.load_dataarray(row['path'])
+        _year = row['Year']
+        
         for sel in loop_sel:
-            arr_sel = xr_arr.sel(**sel)
+            arr_sel = xr_arr.sel(**sel) 
+            
+            # Rename keys; also serve as reordering the keys
             sel_rename = {}
             if 'am' in sel:
                 sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
             if 'lm' in sel:
-                sel_rename['lm'] = {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
+                sel_rename['lm'] =  {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
             if 'lu' in sel:
                 sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
             if 'Commodity' in sel:
@@ -264,19 +239,21 @@ def get_map_obj_float(data: Data, files_df: pd.DataFrame, save_path: str,
                     'Sheep lexp': 'Sheep live export',
                     'Beef lexp': 'Beef live export'
                 }.get(commodity, commodity)
-
+                
             task.append(
                 delayed(map2base64_float)(template_xr, arr_sel, tuple(list(sel_rename.values()) + [_year]))
-            )
-
-    # 3. 并行执行
+            )    
+            
+    # Gather results and save to JSON
     output = {}
     for res in Parallel(n_jobs=workers, return_as='generator')(task):
-        if res is None: continue
+        if res is None:continue
         attr, val = res
         output[attr] = val
-
+        
+    # To nested dict
     output = tuple_dict_to_nested(output)
+
     if not os.path.exists(os.path.dirname(save_path)):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
@@ -287,7 +264,7 @@ def get_map_obj_float(data: Data, files_df: pd.DataFrame, save_path: str,
         f.write(';\n')
         
 
-def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, workers:int=settings.WRITE_THREADS) -> dict:
+def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, workers:int=max(settings.WRITE_THREADS, 16)) -> dict:
     
     map_mosaic_lumap = files_df.query('base_name == "xr_map_lumap"'
         ).assign(
