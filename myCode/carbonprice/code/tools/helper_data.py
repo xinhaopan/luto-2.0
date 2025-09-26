@@ -338,7 +338,7 @@ def build_profit_and_cost_nc(
 ):
     """
     economic_da 维度必须是 (scenario, Year, type) 且 type 名包含：
-      'Ag revenue','Ag cost','Agmgt revenue','Agmgt cost',
+      'Ag revenue','Ag cost','AgMgt revenue','AgMgt cost',
       'Non-ag revenue','Non-ag cost','Transition(ag→ag) cost',
       'Transition(ag→non-ag) amortised cost'
     """
@@ -348,7 +348,7 @@ def build_profit_and_cost_nc(
     # ---------- 1) 计算 profit(scenario, Year, type) ----------
     required_types = [
         "Ag revenue", "Ag cost",
-        "Agmgt revenue", "Agmgt cost",
+        "AgMgt revenue", "AgMgt cost",
         "Non-ag revenue", "Non-ag cost",
         "Transition(ag→ag) cost",
         "Transition(ag→non-ag) amortised cost",
@@ -366,7 +366,7 @@ def build_profit_and_cost_nc(
 
     profit_list = [
         (pick("Ag revenue") - pick("Ag cost")).expand_dims(type=["Ag profit"]),
-        (pick("Agmgt revenue") - pick("Agmgt cost")).expand_dims(type=["Agmgt profit"]),
+        (pick("AgMgt revenue") - pick("AgMgt cost")).expand_dims(type=["AgMgt profit"]),
         (pick("Non-ag revenue") - pick("Non-ag cost")).expand_dims(type=["Non-ag profit"]),
         (-pick("Transition(ag→ag) cost")).expand_dims(type=["Transition(ag→ag) profit"]),
         (-pick("Transition(ag→non-ag) amortised cost")).expand_dims(type=["Transition(ag→non-ag) amortised profit"]),
@@ -681,7 +681,7 @@ def create_summary(env_category, years, base_path,env_type, colnames):
 
     # 组装 DataFrame
     df = pd.DataFrame({
-        "Year": da_price["Year"].values,
+        "Year": years,
         colnames[0]: da_benefits.values,
         colnames[1]: da_cost.values,
         colnames[2]: da_price.values
@@ -701,8 +701,8 @@ def create_profit_for_cost(excel_dir,input_file: str) -> pd.DataFrame:
     # 规则 1: Ag profit = Ag revenue - Ag cost
     profit_df['Ag profit'] = original_df['Ag revenue'] - original_df['Ag cost']
 
-    # 规则 2: Agmgt profit = Agmgt revenue - Agmgt cost
-    profit_df['Agmgt profit'] = original_df['Agmgt revenue'] - original_df['Agmgt cost']
+    # 规则 2: AgMgt profit = AgMgt revenue - AgMgt cost
+    profit_df['AgMgt profit'] = original_df['AgMgt revenue'] - original_df['AgMgt cost']
 
     # 规则 3: Non-ag profit = Non-ag revenue - Non-ag cost
     profit_df['Non-ag profit'] = original_df['Non-ag revenue'] - original_df['Non-ag cost']

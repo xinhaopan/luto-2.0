@@ -1,20 +1,20 @@
-import xarray as xr
-import pandas as pd
 import os
-import tools.config as config
-import statsmodels.api as sm
 import pandas as pd
 import seaborn as sns
-import matplotlib.patches as mpatches
 import matplotlib as mpl
-from matplotlib.lines import Line2D
 import xarray as xr
-import matplotlib.gridspec as gridspec
 
+from matplotlib import gridspec
+import matplotlib.lines as mlines
+import matplotlib.patches as Patch
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+from pygam import LinearGAM, s
+
 import re
 from typing import List, Optional, Dict
 
@@ -57,7 +57,7 @@ def xarray_to_dict(file_path: str, scale: float = None, add_total: bool = False,
 
 def stacked_area_pos_neg(
         ax, df, colors=None, alpha=0.60,
-        title_name='', ylabel='',
+        title_name='', ylabel='',y_ticks_all=None,
         add_line=True, n_col=1,dividing_line=0.5, show_legend=False, bbox_to_anchor=(0.5, -0.25)
 ):
     """
@@ -67,13 +67,6 @@ def stacked_area_pos_neg(
     df_stack = df.iloc[:, :-1]
     total_col_name = df.columns[-1]
     total_col_data = df.iloc[:, -1]
-
-    # 颜色管理
-    # if colors is None:
-    #     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    # if len(colors) < df_stack.shape[1]:
-    #     num_stack_cols = df_stack.shape[1]
-    #     colors = (colors * (num_stack_cols // len(colors) + 1))[:num_stack_cols]
 
     # 颜色管理
     default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
@@ -119,8 +112,17 @@ def stacked_area_pos_neg(
         )
 
     # 轴和外观
-    ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+    if y_ticks_all is not None:
+        ax.set_ylim(y_ticks_all[0], y_ticks_all[1])
+        ax.set_yticks(y_ticks_all[2])
+    else:
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+    if abs(y_ticks_all[2][-1]) > 1000:
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+    elif abs(y_ticks_all[2][1]) < 1 and y_ticks_all[2][1] != 0:
+        ax.yaxis.set_major_formatter(
+            FuncFormatter(lambda x, _: f'{int(x)}' if abs(x) < 1e-10 else f'{x:.1f}')
+        )
     ax.set_xlim(df.index.min(), df.index.max())
     ax.set_title(title_name, pad=6)
     ax.set_ylabel(ylabel)
@@ -181,13 +183,21 @@ def set_plot_style(font_size=12, font_family='Arial'):
         "xtick.direction": "out", "ytick.direction": "out",
         "xtick.major.size": 4, "ytick.major.size": 4,
         "xtick.major.width": 1.2, "ytick.major.width": 1.2,
-        "font.size": 24,
+
+        "font.size": font_size,
+        'font.family': font_family,
+        'axes.titlesize': font_size * 1.2,
+        'axes.labelsize': font_size,
+        'xtick.labelsize': font_size,
+        'ytick.labelsize': font_size,
+        'legend.fontsize': font_size,
+        'figure.titlesize': font_size * 1.2
     })
 
     mpl.rcParams.update({
-        'font.size': font_size, 'font.family': font_family, 'axes.titlesize': font_size,
+        'font.size': font_size, 'font.family': font_family, 'axes.titlesize': font_size*1.2,
         'axes.labelsize': font_size, 'xtick.labelsize': font_size, 'ytick.labelsize': font_size,
-        'legend.fontsize': font_size, 'figure.titlesize': font_size
+        'legend.fontsize': font_size, 'figure.titlesize': font_size*1.2
     })
 
 
@@ -244,7 +254,7 @@ def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0):
                columnspacing=column_spacing  # <--- 控制列间距
                )
 
-def get_global_ylim(dict_df: Dict[str, pd.DataFrame], offset=0.05) -> tuple:
+def get_global_ylim(dict_df: Dict[str, pd.DataFrame], offset=0.01) -> tuple:
     """Calculate global y-limits (supporting positive and negative stacks). Exclude 'Total' column if present."""
     global_max = float("-inf")
     global_min = float("inf")
@@ -287,8 +297,6 @@ def get_global_ylim(dict_df: Dict[str, pd.DataFrame], offset=0.05) -> tuple:
         span = 1.0
     return (global_min - offset * span, global_max + offset * span)
 
-from matplotlib.patches import Patch
-from matplotlib.lines import Line2D
 
 def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0, ghost_legend_num=None):
     """
@@ -355,7 +363,7 @@ def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0, gho
                handleheight=1.0,
                handletextpad=0.4,
                labelspacing=0.3,
-               columnspacing=column_spacing
+               columnspacing=column_spacing,
                )
 
 def plot_13_layout(
@@ -364,6 +372,8 @@ def plot_13_layout(
     colors: list,
     output_path: str,
     summary_ylim: tuple,
+    desired_ticks: int = 5,
+    add_line=True,
     bbox_to_anchor=[0.58, 0.82, 0.4, 0.1],
     stacked_area_pos_neg=stacked_area_pos_neg,
     draw_legend=draw_legend,
@@ -372,7 +382,8 @@ def plot_13_layout(
     ncol=2,
     column_spacing=1,
     ghost_legend_num=3,
-    figsize=(22, 12)
+    figsize=(22, 12),
+    post_process=None,
 ):
     """
     绘制复杂布局的经济收益图
@@ -387,7 +398,7 @@ def plot_13_layout(
     ylabel: Y轴标签
     """
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.3, wspace=0.3)
+    gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.3, wspace=0.5)
     axes = []
     axes.append(fig.add_subplot(gs[0, 0]))
     axes.append(fig.add_subplot(gs[0, 1], sharey=axes[0]))
@@ -403,6 +414,8 @@ def plot_13_layout(
     legend_handles, legend_labels = None, None
 
     title_names = list(all_dfs.keys())
+    y_ticks_all = get_y_axis_ticks(summary_ylim[0], summary_ylim[1],
+                                                               desired_ticks=desired_ticks)
     for i, (ax, title_key) in enumerate(zip(axes, title_names)):
         df = all_dfs[title_key]
         title = title_map.get(title_key, title_key)
@@ -411,6 +424,8 @@ def plot_13_layout(
             ax, df, colors=colors,
             title_name=title,
             ylabel='' if i != 3 else ylabel,
+            y_ticks_all=y_ticks_all,
+            add_line=add_line,
             show_legend=False,
             dividing_line=dividing_line
         )
@@ -422,10 +437,10 @@ def plot_13_layout(
         ax.set_xticks(tick_positions)
         if i in [8, 9, 10, 11, 12]:
             ax.tick_params(axis='x')
-            x_labels = ax.get_xticklabels()
-            if len(x_labels) >= 3:
-                x_labels[0].set_horizontalalignment('left')
-                x_labels[-1].set_horizontalalignment('right')
+            # x_labels = ax.get_xticklabels()
+            # if len(x_labels) >= 3:
+            #     x_labels[0].set_horizontalalignment('left')
+            #     x_labels[-1].set_horizontalalignment('right')
         else:
             ax.tick_params(axis='x', labelbottom=False)
 
@@ -435,11 +450,14 @@ def plot_13_layout(
         if i == 0:
             legend_handles, legend_labels = ax.get_legend_handles_labels()
 
-    axes[0].set_ylim(*summary_ylim)
+    if post_process:
+        axes = post_process(axes)
+
+
     legend_ax.set_position(bbox_to_anchor)
 
     if legend_handles:
-        draw_legend(axes[0], bbox_to_anchor=bbox_to_anchor, ncol=ncol, column_spacing=column_spacing,ghost_legend_num=ghost_legend_num)
+        draw_legend(axes[-1], bbox_to_anchor=bbox_to_anchor, ncol=ncol, column_spacing=column_spacing,ghost_legend_num=ghost_legend_num)
 
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))
@@ -541,10 +559,10 @@ def plot_12_layout(
         ax.set_xticks(tick_positions)
         if row == 2:
             ax.tick_params(axis='x')
-            x_labels = ax.get_xticklabels()
-            if len(x_labels) >= 3:
-                x_labels[0].set_horizontalalignment('left')
-                x_labels[-1].set_horizontalalignment('right')
+            # x_labels = ax.get_xticklabels()
+            # if len(x_labels) >= 3:
+            #     x_labels[0].set_horizontalalignment('left')
+            #     x_labels[-1].set_horizontalalignment('right')
         else:
             ax.tick_params(axis='x', labelbottom=False)
         ax_bio_list.append(ax)
@@ -669,12 +687,14 @@ def plot_22_layout(
     colors: list,
     output_path: str,
     summary_ylim: tuple,
+    desired_ticks: int = 5,
+    add_line=True,
     bbox_to_anchor=(0.42, 0.95),
     stacked_area_pos_neg=stacked_area_pos_neg,
     draw_legend=draw_legend,
     ylabel: str = 'Cost (Billion AU$)',
     dividing_line=0.5,
-    ncol=2,
+    ncol=1,
     column_spacing=1,
     figsize=(22, 20)
 ):
@@ -684,11 +704,15 @@ def plot_22_layout(
     第一行前两列画图，第3-5列合并为图例。其余行每行5张。
     """
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.3, wspace=0.2)
+    gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.3, wspace=0.4)
 
     # 画图例（第一行第3~5列合并）
     legend_ax = fig.add_subplot(gs[0, 2:])
     legend_ax.axis('off')
+
+    y_ticks_all = get_y_axis_ticks(summary_ylim[0], summary_ylim[1],
+                                   desired_ticks=desired_ticks)
+
 
     keys_ordered = list(all_dfs.keys())
     axes_list = []
@@ -714,22 +738,23 @@ def plot_22_layout(
         stacked_area_pos_neg(
             ax, df, colors=colors,
             title_name=title,
+            y_ticks_all=y_ticks_all,
+            add_line=add_line,
             ylabel='', show_legend=False,
             dividing_line=dividing_line
         )
         if col != 0:
             ax.tick_params(axis='y', labelleft=False)
-        ax.set_ylim(*summary_ylim)
         x_data = df.index
         start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
         tick_positions = [start_tick, middle_tick, end_tick]
         ax.set_xticks(tick_positions)
         if row == 4:
             ax.tick_params(axis='x')
-            x_labels = ax.get_xticklabels()
-            if len(x_labels) >= 3:
-                x_labels[0].set_horizontalalignment('left')
-                x_labels[-1].set_horizontalalignment('right')
+            # x_labels = ax.get_xticklabels()
+            # if len(x_labels) >= 3:
+            #     x_labels[0].set_horizontalalignment('left')
+            #     x_labels[-1].set_horizontalalignment('right')
         else:
             ax.tick_params(axis='x', labelbottom=False)
         axes_list.append(ax)
@@ -752,3 +777,434 @@ def plot_22_layout(
     fig.show()
     plt.close(fig)
     print(f"✅ Saved to {output_path}")
+
+def get_y_axis_ticks(min_value, max_value, desired_ticks=5):
+    """
+    生成Y轴刻度，根据数据范围智能调整刻度间隔和范围。
+    优化版本，提高运行速度，并处理0-100特殊情况。
+    """
+    # 1. 快速处理特殊情况
+    if min_value > 0 and max_value > 0:
+        min_value = 0
+    elif min_value < 0 and max_value < 0:
+        max_value = 0
+
+    range_value = max_value - min_value
+    if range_value <= 0:
+        return (0, 1, [0,0.5,1])
+
+    # 2. 一次性计算间隔
+    ideal_interval = range_value / (desired_ticks - 1)
+    # 根据理想间隔选择“nice”间隔
+    e = math.floor(math.log10(ideal_interval))  # 计算数量级
+    base = 10 ** e
+    normalized_interval = ideal_interval / base
+
+    # 定义“nice”间隔选项
+    nice_intervals = [1, 2, 5, 10]
+    # 选择最接近理想间隔的“nice”值
+    interval = min(nice_intervals, key=lambda x: abs(x - normalized_interval)) * base
+
+    # 3. 整合计算，减少中间变量
+    min_tick = math.floor(min_value / interval) * interval
+    max_tick = math.ceil(max_value / interval) * interval
+
+    # 4. 使用numpy直接生成数组，避免Python列表操作
+    tick_count = int((max_tick - min_tick) / interval) + 1
+    ticks = np.linspace(min_tick, max_tick, tick_count)
+
+    if len(ticks) > desired_ticks+1:
+        # 例如 9→想压到 5：scale = ceil((9-1)/(5-1)) = 2
+        scale = math.ceil((len(ticks) - 1) / (desired_ticks - 1))
+        interval *= scale
+        # 重新对齐边界并重算 ticks
+        min_tick = math.floor(min_value / interval) * interval
+        max_tick = math.ceil(max_value / interval) * interval
+        tick_count = int((max_tick - min_tick) / interval) + 1
+        ticks = np.linspace(min_tick, max_tick, tick_count)
+
+    # 5. 高效处理0的插入
+    if min_value < 0 < max_value and 0 not in ticks:
+        # numpy的searchsorted比Python的排序更高效
+        zero_idx = np.searchsorted(ticks, 0)
+        ticks = np.insert(ticks, zero_idx, 0)
+
+    # 6. 预计算共享变量，避免重复计算
+    close_threshold = 0.3 * interval
+
+    # 7. 简化逻辑，减少条件分支
+    max_v = max_tick
+    min_v = min_tick
+
+    # 处理刻度和范围调整（仅当有足够刻度且最值不是0时）
+    if len(ticks) >= 2:
+        # 处理最大值
+        if ticks[-1] != 0 and (max_value - ticks[-2]) < close_threshold and (ticks[-1] - max_value) > close_threshold:
+            ticks = ticks[:-1]  # 移除最后一个刻度
+            max_v = max_value + 0.1 * interval
+
+        # 处理最小值
+        if ticks[0] != 0 and (ticks[1] - min_value) < close_threshold and (min_value - ticks[0]) > close_threshold:
+            ticks = ticks[1:]  # 移除第一个刻度
+            min_v = min_value - 0.1 * interval
+        elif abs(min_value) < interval:
+            min_v = math.floor(min_value)
+
+    # 8. 特殊情况：当刻度范围是0到100时，使用规则的25间隔
+    if (abs(ticks[0]) < 1e-10 and abs(ticks[-1] - 100) < 1e-10) or (min_tick == 0 and max_tick == 100):
+        ticks = np.array([0, 25, 50, 75, 100])
+        # min_v = 0
+        # max_v = 100
+
+    return (min_v, max_v, ticks.tolist())
+
+def draw_12_price(
+    df,
+    title_map,
+    color,
+    output_path,
+    desired_ticks=5,
+    ylabel_carbon=r"Carbon price (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
+    ylabel_bio=r"Biodiversity cost (AU\$ contribution-weighted area ha$^{-1}$ yr$^{-1}$)",
+    figsize=(24, 16),
+    ci=95,
+):
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.5, wspace=0.2)
+
+    # ------ x轴刻度（所有数据统一） ------
+    x_data = df.index
+    x_min, x_max = x_data.min(), x_data.max()
+    x_middle = x_data[int(len(x_data) // 2)]
+    tick_positions = [x_min, x_middle, x_max]
+
+    # ------ Carbon图（第一行前两个） ------
+    carbon_y = np.concatenate([df.iloc[:, i].values for i in range(2)])
+    y_carbon_all = get_y_axis_ticks(0, np.nanmax(carbon_y), desired_ticks=desired_ticks)
+    ax_carbon_list = []
+    for i in range(2):
+        ax = fig.add_subplot(gs[0, i])
+        df_input = df.iloc[:, i].to_frame()
+        draw_fit_line_ax(
+            ax, df_input, color=color, title_name=title_map.get(df.columns[i]),ci=ci
+        )
+
+        ax.set_ylim(y_carbon_all[0],y_carbon_all[1])
+        ax.set_yticks(y_carbon_all[2])
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x')
+        if i != 0:
+            ax.tick_params(axis='y', labelleft=False)
+        ax_carbon_list.append(ax)
+
+    # ------ 图例区 ------
+    legend_ax = fig.add_subplot(gs[0, 2:])
+    legend_ax.axis('off')
+
+    # ------ Bio图（后两行） ------
+    bio_y = np.concatenate([df.iloc[:, i + 2].values for i in range(10)])
+    y_bio_all = get_y_axis_ticks(0,np.nanmax(bio_y),desired_ticks=desired_ticks)
+    bio_ylim = (y_bio_all[0], y_bio_all[1])
+    ax_bio_list = []
+    for i in range(10):
+        row, col = i // 5 + 1, i % 5
+        ax = fig.add_subplot(gs[row, col])
+        df_input = df.iloc[:, i + 2].to_frame()
+        draw_fit_line_ax(
+            ax, df_input, color=color, title_name=title_map.get(df.columns[i + 2]),ci=ci)
+        ax.set_ylim(*bio_ylim)
+
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x')
+
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+        ax_bio_list.append(ax)
+
+    # ------ Y轴标签 ------
+    ax_carbon_list[0].set_ylabel(ylabel_carbon)
+    ax_bio_list[0].set_ylabel(ylabel_bio)
+    ax_carbon_list[0].yaxis.set_label_coords(-0.3, 0.3)
+    ax_bio_list[0].yaxis.set_label_coords(-0.3, -0.4)
+
+    # ------ 图例 ------
+    if draw_legend:
+        line_handle = mlines.Line2D([], [], color=color, linewidth=2, label="Quadratic fit")
+        if ci is not None and ci > 0:
+            shade_handle = Patch(color=color, alpha=0.25, label="95% CI")
+            leg = fig.legend(
+                handles=[line_handle, shade_handle],
+                loc='upper center',  # 位置类型：可选 'upper center', 'lower right', etc.
+                bbox_to_anchor=(0.55, 0.85),  # (x, y) 坐标，单位是整个图的比例（0~1）
+                ncol=1,  # 两列
+                frameon=False  # 不显示边框
+            )
+        else:
+            leg = fig.legend(
+                handles=[line_handle],
+                loc='upper center',  # 位置类型：可选 'upper center', 'lower right', etc.
+                bbox_to_anchor=(0.55, 0.85),  # (x, y) 坐标，单位是整个图的比例（0~1）
+                ncol=1,  # 两列
+                frameon=False  # 不显示边框
+            )
+
+        leg.get_frame().set_facecolor('none')
+        leg.get_frame().set_edgecolor('none')
+
+    plt.savefig(output_path, dpi=300)
+    plt.show()
+    plt.close(fig)
+
+# def gamplot(
+#     df, x, y, ax,
+#     color=None,
+#     scatter_kws=None,
+#     line_kws=None,
+#     ci=95,                 # 与 seaborn 一样用“百分数”，例如 95
+#     n_splines=25,          # 样条个数：越大越弯
+#     spline_order=3,        # 样条阶数：3 表示三次样条
+#     lam='auto'             # 平滑惩罚：'auto' 用网格搜索；或传入 float
+# ):
+#     scatter_kws = scatter_kws or {}
+#     line_kws = line_kws or {}
+#
+#     X = df[[x]].to_numpy()   # shape (n, 1)
+#     yv = df[y].to_numpy()
+#
+#     # 1) 先画散点（相当于 regplot 的 scatter_kws）
+#     ax.scatter(X.ravel(), yv, color=color, **scatter_kws)
+#
+#     # 2) 拟合 GAM（线性高斯情形）
+#     gam = LinearGAM(s(0, n_splines=n_splines, spline_order=spline_order))
+#     if lam == 'auto':
+#         # 简单网格搜索平滑系数
+#         lam_grid = np.logspace(-3, 3, 7)
+#         gam.gridsearch(X, yv, lam=lam_grid, progress=False)
+#     else:
+#         gam.lam = lam
+#         gam.fit(X, yv)
+#
+#     # 3) 生成平滑曲线和置信区间
+#     xx = np.linspace(X.min(), X.max(), 400)[:, None]
+#     yy = gam.predict(xx)
+#
+#     ax.plot(xx.ravel(), yy, color=color, **line_kws)
+#
+#     if ci is not None and ci > 0:
+#         width = ci / 100.0
+#         lo, hi = gam.prediction_intervals(xx, width=width).T
+#         ax.fill_between(xx.ravel(), lo, hi, alpha=0.2, color=color, linewidth=0)
+#
+#     return gam
+
+def gamplot(
+    df, x, y, ax,
+    color=None,
+    scatter_kws=None,
+    line_kws=None,
+    ci=95,
+    n_splines=25,
+    spline_order=3,
+    lam='auto'
+):
+    scatter_kws = scatter_kws or {}
+    line_kws = line_kws or {}
+
+    X = df[[x]].to_numpy()   # shape (n, 1)
+    yv = df[y].to_numpy()
+
+    # 1) 散点
+    ax.scatter(X.ravel(), yv, color=color, **scatter_kws)
+
+    # 2) GAM 拟合（线性高斯）
+    gam = LinearGAM(s(0, n_splines=n_splines, spline_order=spline_order))
+    if lam == 'auto':
+        lam_grid = np.logspace(-3, 3, 7)
+        gam.gridsearch(X, yv, lam=lam_grid, progress=False)
+    else:
+        gam.lam = lam
+        gam.fit(X, yv)
+
+    # 3) 曲线 + 置信区间
+    xx = np.linspace(X.min(), X.max(), 400)[:, None]
+    yy = gam.predict(xx)
+    ax.plot(xx.ravel(), yy, color=color, **line_kws)
+
+    if ci is not None and ci > 0:
+        width = ci / 100.0
+        lo, hi = gam.prediction_intervals(xx, width=width).T
+        ax.fill_between(xx.ravel(), lo, hi, alpha=0.2, color=color, linewidth=0)
+
+    # === NEW: 计算并打印整体 p 值 ===
+    p = None
+    stats = getattr(gam, "statistics_", None)
+    # 某些版本提供项级 p 值（通常 index 1 是第一个平滑项）
+    if isinstance(stats, dict) and "p_values" in stats:
+        try:
+            pv = np.atleast_1d(stats["p_values"])
+            p = float(pv[1]) if pv.size > 1 else float(pv[0])
+        except Exception:
+            p = None
+    # 否则做空模型 vs GAM 的近似 F 检验
+    if p is None:
+        yhat = gam.predict(X)
+        rss1 = np.sum((yv - yhat)**2)
+        rss0 = np.sum((yv - yv.mean())**2)
+        n = len(yv)
+        edof_per = stats.get("edof_per_term", None) if isinstance(stats, dict) else None
+        edof = stats.get("edof", None) if isinstance(stats, dict) else None
+        if edof_per is not None:
+            df1 = float(np.sum(edof_per))
+        elif edof is not None:
+            df1 = float(edof)
+        else:
+            df1 = 1.0 + getattr(gam.terms[1], "n_coeffs", 1)
+        df0 = 1.0
+        df_num = max(1.0, df1 - df0)
+        df_den = max(1.0, n - df1)
+        denom = rss1 / df_den
+        if denom > 0:
+            F = ((rss0 - rss1) / df_num) / denom
+            if np.isfinite(F):
+                try:
+                    from scipy.stats import f
+                    p = float(f.sf(F, df_num, df_den))
+                except Exception:
+                    p = None
+    print(f"[GAM] overall p = {p:.3g}" if p is not None else "[GAM] overall p = None")
+
+    return gam
+def draw_fit_line_ax(ax, df, color='black', title_name='', order=2, ci=95):
+    """在指定ax上画拟合线，y轴自动"""
+    scatter_kws = dict(s=18)
+    line_kws = dict(linewidth=2)
+    if isinstance(df, pd.Series):
+        x = df.index.values
+        y = df.values
+        y_colname = df.name or "value"
+    else:
+        x = df.index.values
+        y_colname = df.columns[0]
+        y = df.iloc[:, 0].values
+    df_plot = pd.DataFrame({"x": x, "y": y})
+    # sns.regplot(
+    #     data=df_plot,
+    #     x="x",
+    #     y="y",
+    #     order=order,
+    #     ci=ci,
+    #     scatter_kws=scatter_kws,
+    #     line_kws=line_kws,
+    #     color=color,
+    #     ax=ax
+    # )
+    gam = gamplot(
+        df_plot, x="x", y="y", ax=ax,
+        color=color,
+        scatter_kws=scatter_kws,
+        line_kws=line_kws,
+        ci= ci,  # 与 seaborn 一致；None 表示不画 CI
+        n_splines=25,
+        spline_order=3,
+        lam='auto'
+    )
+    ax.set_title(title_name, pad=6)
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+    for spine in ax.spines.values():
+        spine.set_color('black')
+        spine.set_linewidth(1.2)
+
+def draw_10_price(
+    df2,
+    title_map,
+    color,
+    output_path,
+    desired_ticks=4,
+    ylabel=r"Carbon price for GHG and biodiversity (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
+    figsize=(24, 10),
+    legend_label_line="Quadratic fit",
+    legend_label_shade="95% CI",
+    legend_loc="best",
+    legend_on_first_ax=True,
+    ylabel_pos=(-0.3, -0.2),  # (x, y) in axes coords
+    top_space_ratio=0.20,     # y 轴顶部额外空间比例
+    ci=95,
+):
+    """
+    画两行共 10 张子图（df2 的 10 列），每张做拟合并统一坐标与格式。
+    依赖外部函数：draw_fit_line_ax(ax, df_input, color, title_name)
+    """
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(2, 5, figure=fig, hspace=0.5, wspace=0.2)
+
+    # ---- 统一 x 轴刻度 ----
+    x_data = df2.index
+    x_min, x_max = x_data.min(), x_data.max()
+    x_middle = x_data[int(len(x_data) // 2)]
+    tick_positions = [x_min, x_middle, x_max]
+
+    # ---- 统一 y 轴范围（根据全部10列）----
+    bio_y = np.concatenate([df2.iloc[:, i].values for i in range(10)])
+    bio_ymax = np.nanmax(bio_y)
+    y0, y1 = 0.0, float(bio_ymax) * (1.0 + top_space_ratio)
+
+    # 也可用你自己的 get_y_axis_ticks：
+    # y_min, y_max, ticks = get_y_axis_ticks(0, np.nanmax(bio_y), desired_ticks=desired_ticks)
+
+    def _int_fmt(x, pos):
+        return f"{int(x)}"
+    int_formatter = FuncFormatter(_int_fmt)
+
+    axes = []
+    for i in range(10):
+        row, col = divmod(i, 5)
+        ax = fig.add_subplot(gs[row, col])
+        df_input = df2.iloc[:, i].to_frame()
+
+        # 你的拟合画线函数（外部提供）
+        draw_fit_line_ax(
+            ax,
+            df_input,
+            color=color,
+            title_name=title_map.get(df2.columns[i], df2.columns[i]),
+            ci=ci
+        )
+
+        # y 轴范围与刻度
+        ax.set_ylim(y0, y1)
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=desired_ticks, integer=True))
+        ax.yaxis.set_major_formatter(int_formatter)
+
+        # x 轴刻度
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x')
+
+        # 左右对齐首尾 label（可选）
+        x_labels = ax.get_xticklabels()
+        if len(x_labels) >= 3:
+            x_labels[0].set_horizontalalignment('left')
+            x_labels[-1].set_horizontalalignment('right')
+
+        # 非首列不显示 y 轴刻度文本
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+
+        axes.append(ax)
+
+    # y 轴标签放在第一个子图上，并上移
+    axes[0].set_ylabel(ylabel)
+    axes[0].yaxis.set_label_coords(*ylabel_pos)
+
+    # legend：默认只在第一个子图里放，避免重复
+    if legend_on_first_ax:
+        line_handle = mlines.Line2D([], [], color=color, linewidth=2, label=legend_label_line)
+        if ci is not None and ci > 0:
+            shade_handle = Patch(color=color, alpha=0.25, label=legend_label_shade)
+            axes[0].legend(handles=[line_handle, shade_handle], loc=legend_loc, frameon=False)
+        else:
+            axes[0].legend(handles=[line_handle], loc=legend_loc, frameon=False)
+
+    plt.savefig(output_path, dpi=300)
+    plt.show()
+    return fig, axes
