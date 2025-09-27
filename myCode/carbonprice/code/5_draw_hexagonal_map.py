@@ -1,25 +1,20 @@
-
-import os
-import matplotlib.pyplot as plt
 from rasterio.warp import reproject, Resampling
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
 import matplotlib.image as mpimg
-import matplotlib.colors as mcolors
 from matplotlib.colors import LinearSegmentedColormap
-import matplotlib as mpl
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import rasterio
-import geopandas as gpd
-from matplotlib.colors import LogNorm
-import numpy as np
-import pickle
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import cartopy.crs as ccrs
 import os
-import json
-import pylustrator
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from matplotlib.colors import Normalize, LogNorm
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import geopandas as gpd
+import numpy as np
+import math
 from cmcrameri import cm
 import cmocean
 
@@ -30,459 +25,340 @@ import cmocean
 import tools.config as config
 from tools.helper_plot import set_plot_style
 
+# 若你已定义以下函数/类，可直接使用你自己的版本
+# from your_module import make_hist_eq_norm, StretchHighLowNormalize
+# 这里假设它们已在当前作用域中可用
 
-class HistEqNorm(mcolors.Normalize):
-    """
-    直方图均衡化的 Normalize：把原始数值按经验 CDF 映射到 [0,1]。
-    可直接用于 imshow(..., norm=HistEqNorm(...)).
-    """
-
-    def __init__(self, bin_edges, cdf, vmin=None, vmax=None, clip=False):
-        super().__init__(vmin=vmin, vmax=vmax, clip=clip)
-        self._bin_edges = np.asarray(bin_edges, dtype=float)
-        self._cdf = np.asarray(cdf, dtype=float)
-
-    def __call__(self, value, clip=None):
-        # 允许掩膜数组 & NaN
-        val = np.ma.asarray(value)
-        out = np.ma.empty(val.shape, dtype=float)
-
-        # 非有限值保持掩膜/NaN
-        mask = ~np.isfinite(val)
-        valid = ~mask
-
-        if np.any(valid):
-            x = val[valid].astype(float)
-            # 截断到 [vmin, vmax]
-            x = np.clip(x, self.vmin, self.vmax)
-            # 用 CDF 做单调映射（上沿边界对应的 CDF）
-            out_valid = np.interp(x, self._bin_edges[1:], self._cdf, left=0.0, right=1.0)
-            out[valid] = out_valid
-
-        # 无效值设为掩膜
-        out = np.ma.array(out, mask=mask)
-        return out
-
-
-class StretchHighLowNormalize(mcolors.Normalize):
-    """高低值拉伸、中间压缩的归一化"""
-
-    def __init__(self, vmin=None, vmax=None, stretch=5, clip=False):
-        super().__init__(vmin, vmax, clip)
-        self.stretch = stretch
-
-    def __call__(self, value, clip=None):
-        # 线性归一化到 0~1
-        x = (value - self.vmin) / (self.vmax - self.vmin)
-        # S型拉伸：高低值变化快，中间变化慢
-        x_stretched = 0.5 * (np.tanh(self.stretch * (x - 0.5)) + 1)
-        return x_stretched
-
-    def inverse(self, u):
-        # 反归一化映射
-        eps = 1e-6
-        u = np.clip(u, eps, 1 - eps)
-        x = 0.5 * (np.arctanh(2 * u - 1) / self.stretch + 1)
-        return x * (self.vmax - self.vmin) + self.vmin
-
-
-class PercentClipNormalize(mcolors.Normalize):
-    """
-    百分位裁剪拉伸归一化 - 类似ArcGIS的Percent Clip
-    裁剪掉指定百分比的极端值，然后线性拉伸到0-1
-    """
-
-    def __init__(self, data, clip_percent=(2, 98), vmin=None, vmax=None, clip=False):
-        """
-        Parameters:
-        -----------
-        data : array-like
-            用于计算百分位数的数据
-        clip_percent : tuple
-            (low_percent, high_percent) 要裁剪的百分位数，例如(2, 98)表示裁剪掉2%和98%的极值
-        """
-        # 计算百分位数
-        valid_data = np.ma.compressed(np.ma.asarray(data))
-        if len(valid_data) == 0:
-            computed_vmin, computed_vmax = 0.0, 1.0
-        else:
-            computed_vmin, computed_vmax = np.percentile(valid_data, clip_percent)
-
-        # 使用提供的vmin/vmax或计算的值
-        final_vmin = vmin if vmin is not None else computed_vmin
-        final_vmax = vmax if vmax is not None else computed_vmax
-
-        super().__init__(vmin=final_vmin, vmax=final_vmax, clip=clip)
-        self.clip_percent = clip_percent
-
-    def __call__(self, value, clip=None):
-        # 标准线性归一化，但会自动裁剪到vmin-vmax范围
-        if clip is None:
-            clip = self.clip
-
-        if clip:
-            value = np.clip(value, self.vmin, self.vmax)
-
-        # 线性拉伸到0-1
-        return (value - self.vmin) / (self.vmax - self.vmin)
-
-
-class SigmoidNormalize(mcolors.Normalize):
-    """
-    Sigmoid拉伸归一化 - 类似ArcGIS的Sigmoid拉伸
-    使用sigmoid函数进行非线性拉伸，增强中等值的对比度
-    """
-
-    def __init__(self, vmin=None, vmax=None, gain=6, cutoff=0.5, clip=False):
-        """
-        Parameters:
-        -----------
-        gain : float
-            增益参数，控制S曲线的陡峭程度，默认6（类似ArcGIS）
-        cutoff : float
-            截止点，sigmoid曲线的中心点，默认0.5
-        """
-        super().__init__(vmin=vmin, vmax=vmax, clip=clip)
-        self.gain = gain
-        self.cutoff = cutoff
-
-    def __call__(self, value, clip=None):
-        if clip is None:
-            clip = self.clip
-
-        if clip:
-            value = np.clip(value, self.vmin, self.vmax)
-
-        # 先线性归一化到0-1
-        x = (value - self.vmin) / (self.vmax - self.vmin)
-
-        # 应用sigmoid变换
-        # 标准sigmoid公式: 1 / (1 + exp(-gain * (x - cutoff)))
-        sigmoid_x = 1.0 / (1.0 + np.exp(-self.gain * (x - self.cutoff)))
-
-        # 重新缩放到0-1范围（因为sigmoid不会精确到达0和1）
-        sigmoid_min = 1.0 / (1.0 + np.exp(-self.gain * (0 - self.cutoff)))
-        sigmoid_max = 1.0 / (1.0 + np.exp(-self.gain * (1 - self.cutoff)))
-
-        return (sigmoid_x - sigmoid_min) / (sigmoid_max - sigmoid_min)
-
-    def inverse(self, u):
-        """Sigmoid的反变换"""
-        # 重新缩放
-        sigmoid_min = 1.0 / (1.0 + np.exp(-self.gain * (0 - self.cutoff)))
-        sigmoid_max = 1.0 / (1.0 + np.exp(-self.gain * (1 - self.cutoff)))
-
-        sigmoid_u = u * (sigmoid_max - sigmoid_min) + sigmoid_min
-
-        # 反sigmoid变换
-        eps = 1e-10  # 避免log(0)
-        sigmoid_u = np.clip(sigmoid_u, eps, 1 - eps)
-        x = self.cutoff - np.log((1.0 / sigmoid_u) - 1.0) / self.gain
-
-        return x * (self.vmax - self.vmin) + self.vmin
-
-
-
-
-def make_hist_eq_norm(data, mask=None, bins=256, clip_percent=None):
-    """
-    基于 data 的经验直方图，构造直方图均衡化的 Normalize。
-    - data: 2D/ndarray (可为掩膜数组)
-    - mask: 可选，True 表示有效像元（会与 data 的掩膜/NaN 共同作用）
-    - bins: 直方图箱数（越大越精细）
-    - clip_percent: (low, high) 用分位裁剪极端值（例如 (2,98)）
-    返回：norm 对象，可直接用于 imshow(..., norm=norm)
-    """
-    arr = np.ma.asarray(data)
-
-    # 组合有效掩膜：非 NaN/Inf，且可选 mask
-    finite = np.isfinite(arr)
-    if mask is not None:
-        finite = finite & (mask.astype(bool))
-
-    vals = np.asarray(arr[finite], dtype=float)
-
-    if vals.size == 0:
-        # 没有有效数据，退回线性 0..1
-        return mcolors.Normalize(vmin=0.0, vmax=1.0)
-
-    # 分位裁剪（鲁棒，推荐）
-    if clip_percent is not None:
-        lo, hi = clip_percent
-        vmin, vmax = np.percentile(vals, [lo, hi])
-        vals = vals[(vals >= vmin) & (vals <= vmax)]
-    else:
-        vmin, vmax = np.min(vals), np.max(vals)
-
-    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
-        return mcolors.Normalize(vmin=vmin if np.isfinite(vmin) else 0.0,
-                                 vmax=vmax if np.isfinite(vmax) else 1.0)
-
-    # 定义直方图的固定边界（和 ArcGIS 的 equalize 类似，按值域分箱）
-    bin_edges = np.linspace(vmin, vmax, bins + 1)
-    hist, edges = np.histogram(vals, bins=bin_edges)
-
-    # 经验 CDF（上沿边界对应的累计频率），映射到 0..1
-    cdf = hist.cumsum().astype(float)
-    if cdf[-1] == 0:
-        # 所有频次为 0（极端情况），退回线性
-        return mcolors.Normalize(vmin=vmin, vmax=vmax)
-    cdf /= cdf[-1]
-
-    # 构造 Normalize
-    return HistEqNorm(bin_edges=edges, cdf=cdf, vmin=vmin, vmax=vmax)
-
-
-def make_percent_clip_norm(data, clip_percent=(2, 98)):
-    """
-    创建百分位裁剪归一化对象
-    """
-    return PercentClipNormalize(data, clip_percent=clip_percent)
-
-
-def make_sigmoid_norm(data, gain=6, cutoff=0.5):
-    """
-    创建Sigmoid拉伸归一化对象
-
-    Parameters:
-    -----------
-    data : array-like
-        数据数组，用于计算vmin和vmax
-    gain : float
-        增益参数，控制S曲线陡峭程度
-    cutoff : float
-        截止点，sigmoid中心位置
-    """
-    valid_data = np.ma.compressed(np.ma.asarray(data))
-    if len(valid_data) == 0:
-        vmin, vmax = 0.0, 1.0
-    else:
-        vmin, vmax = np.min(valid_data), np.max(valid_data)
-
-    return SigmoidNormalize(vmin=vmin, vmax=vmax, gain=gain, cutoff=cutoff)
-
-
-def efficient_tif_plot(
-        ax,
-        tif_file,
-        cmap='terrain',
-        interpolation='nearest',
-        title_name='',
-        unit_name='',
-        shp=None, line_color='black', line_width=1.5,
-        legend_width="55%", legend_height="6%",
-        legend_loc='lower left', legend_bbox_to_anchor=(0, 0, 1, 1),
-        legend_borderpad=1, legend_nbins=5,
-        char_ticks_length=3, char_ticks_pad=1,
-        title_y=1, unit_labelpad=3,
-        normalization='hist_eq', stretch_factor=5,
-        decimal_places=None, clip_percent=None,
-        custom_tick_values=False,
+def draw_hex_map_agg_linear(
+    ax: plt.Axes | None,
+    shp_path: str,
+    which: str = "sum",                  # "sum" / "mean" 或具体列名（如 "value_sum"）
+    admin_shp: str | None = None,        # 可选：行政边界（只画边线）
+    # —— 标题/单位 & 图例参数（沿用你的接口）——
+    title_name: str = '',
+    unit_name: str = '',
+    line_color: str = 'black',
+    line_width: float = 1.5,
+    legend_width: str = "55%",
+    legend_height: str = "6%",
+    legend_loc: str = 'lower left',
+    legend_bbox_to_anchor=(0, 0, 1, 1),
+    legend_borderpad: float = 1,
+    legend_nbins: int = 4,
+    char_ticks_length: float = 3,
+    char_ticks_pad: float = 1,
+    title_y: float = 1.5,
+    unit_labelpad: float = 4,
+    decimal_places: int | None = None,
+    custom_tick_values=False,            # False 或传入刻度值（原值空间）
+    # —— 绘图外观 ——
+    cmap: str = "viridis",
+    edgecolor: str = "white",
+    linewidth: float = 0.6,
+    # 线性拉伸参数
+    vmax_percentile: float | None = None,
 ):
-    # --- 读取为 MaskedArray，并按 nodata 掩膜 ---
-    with rasterio.open(tif_file) as src:
-        bounds = src.bounds
-        raw_data = src.read(1)  # 先读取原始数据，不使用masked=True
-        nodata = src.nodata
-        raster_crs = src.crs
-        extent = (bounds.left, bounds.right, bounds.bottom, bounds.top)
+    """
+    读取聚合 shp，按 which 选择列着色；使用默认线性拉伸（Normalize）。
+    色条采用线性 mappable + 线性映射到 0..1 的刻度位置。
+    需要你环境里已有：nice_round、_format_tick_labels（若无，可自行替换为简单格式化）。
+    """
+    gdf = gpd.read_file(shp_path)
 
+    # —— 选择列：sum/mean 或具体列名（兼容 *_sum / *_mean）——
+    which_l = which.lower()
+    if which_l in ("sum", "mean"):
+        def _match(col: str) -> bool:
+            cl = col.lower()
+            return cl == which_l or cl.endswith(f"_{which_l}")
+        matches = [c for c in gdf.columns if _match(c)]
+        exact = [c for c in matches if c.lower() == which_l]
+        chosen = exact[0] if exact else (matches[0] if matches else None)
+        if chosen is None:
+            if which in gdf.columns:
+                chosen = which
+            else:
+                raise ValueError(f"未找到列 '{which}'（或 *_{which}）。现有列：{list(gdf.columns)}")
+    else:
+        if which not in gdf.columns:
+            raise ValueError(f"列 '{which}' 不存在。现有列：{list(gdf.columns)}")
+        chosen = which
 
-    # ✅ 关键修改1：手动创建更严格的掩膜
-    mask = np.zeros(raw_data.shape, dtype=bool)
+    gdf = gdf.dropna(subset=[chosen])
+    if gdf.empty:
+        raise ValueError(f"列 {chosen} 全为缺失，无法绘制。")
 
-    # 掩膜 nodata 值
-    if nodata is not None:
-        mask |= (raw_data == nodata)
+    # —— 线性归一化（支持百分位截顶）——
+    vals = gdf[chosen].to_numpy()
+    vmin_real = float(np.nanmin(vals))
+    vmax_real = float(np.nanmax(vals))
 
-    # 掩膜 NaN 和无穷值
-    mask |= ~np.isfinite(raw_data)
+    # 非负数据从 0 起；否则用真实最小值
+    vmin_plot = 0.0 if vmin_real >= 0 else vmin_real
 
-    # ✅ 关键修改2：掩膜极小值（可能是填充的0值）
-    mask |= (raw_data <= 0)  # 根据您的数据特点，成本应该>0
+    if vmax_percentile is not None:
+        # 合法性保护
+        p = float(vmax_percentile)
+        p = min(max(p, 0.0), 100.0)
+        vmax_plot = float(np.nanpercentile(vals, p))
+    else:
+        vmax_plot = vmax_real
 
+    # 夹紧：>vmax_plot 的值统一用最右端颜色，<vmin_plot 用最左端颜色
+    norm = Normalize(vmin=vmin_plot, vmax=vmax_plot, clip=True)
 
-    # 创建MaskedArray
-    data = np.ma.masked_array(raw_data, mask=mask)
+    # 只创建一次 cmap，并可按需定制 under 颜色（clip=True 时基本用不到）
+    cmap_obj = mpl.colormaps.get_cmap(cmap).copy()
+    cmap_obj.set_under(cmap_obj(0.0))
 
-    # ✅ 关键修改2：检查数据有效性
-    if np.ma.is_masked(data) and data.count() == 0:
-        print("Warning: All data is masked/invalid!")
-        return None, None
-
-    # ✅ 关键修改3：确保只有有限的有效值参与计算
-    valid_data = data.compressed()  # 获取未被掩膜的数据
-    if len(valid_data) == 0:
-        print("Warning: No valid data found!")
-        return None, None
-
-    # CRS
-    data_crs = _cartopy_crs_from_raster_crs(raster_crs)
-
-    # 矢量
-    if shp is not None:
-        gdf = gpd.read_file(shp) if isinstance(shp, str) else shp
-        gdf = gdf.to_crs(raster_crs)
-        gdf.plot(ax=ax, edgecolor=line_color, linewidth=line_width, facecolor='none')
-        minx, miny, maxx, maxy = gdf.total_bounds
+    # —— 主图层 ——
+    coll = gdf.plot(column=chosen, cmap=cmap_obj, norm=norm,
+                    edgecolor=edgecolor, linewidth=linewidth, legend=False, ax=ax)
+    # 行政边界（只画边线）
+    main_gdf = gpd.read_file(shp_path)
+    main_crs = main_gdf.crs
+    data_crs = _cartopy_crs_from_raster_crs(main_crs)
+    if admin_shp is not None:
+        gdf_admin = gpd.read_file(admin_shp) if isinstance(admin_shp, str) else admin_shp
+        gdf_admin = gdf_admin.to_crs(main_crs)
+        gdf_admin.plot(ax=ax, edgecolor=line_color, linewidth=line_width, facecolor='none')
+        minx, miny, maxx, maxy = gdf_admin.total_bounds
         pad_x = (maxx - minx) * 0.02 or 1e-4
         pad_y = (maxy - miny) * 0.02 or 1e-4
         ax.set_extent((minx - pad_x, maxx + pad_x, miny - pad_y, maxy + pad_y), crs=data_crs)
 
-    ax.set_title(title_name, y=0.95)
     ax.set_axis_off()
+    if title_name:
+        ax.set_title(title_name, y=title_y, fontfamily='Arial')
 
-    # 归一化处理 - 新增percent_clip和sigmoid方法
-    if normalization == 'log':
-        data_safe = np.ma.masked_less_equal(data, 0)
-        if data_safe.count() == 0:
-            print("Warning: No positive values for log normalization!")
-            return None, None
-        vmin = float(np.ma.min(data_safe))
-        vmax = float(np.ma.max(data_safe))
-        norm = LogNorm(vmin=vmin, vmax=vmax)
-        data_to_plot = data_safe
-
-    elif normalization == 'linear':
-        vmin = float(np.ma.min(data))
-        vmax = float(np.ma.max(data))
-        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
-        data_to_plot = data
-
-    elif normalization == 'stretch':
-        vmin = float(np.ma.min(data))
-        vmax = float(np.ma.max(data))
-        norm = StretchHighLowNormalize(vmin=vmin, vmax=vmax, stretch=stretch_factor)
-        data_to_plot = data
-
-    elif normalization == 'percent_clip':
-        norm = make_percent_clip_norm(data, clip_percent=(5, 95))
-        data_to_plot = data
-
-    elif normalization == 'sigmoid':
-        norm = make_sigmoid_norm(data, gain=8, cutoff=0.4)
-        data_to_plot = data
-
-    else:  # 'hist_eq'
-        valid_mask = ~np.ma.getmaskarray(data)
-        norm = make_hist_eq_norm(data, mask=valid_mask, bins=256, clip_percent=clip_percent)
-        data_to_plot = data
-
-    # --- ✅ 关键修改4：正确设置colormap的透明处理 ---
-    if isinstance(cmap, str):
-        cmap_obj = mpl.colormaps.get_cmap(cmap).copy()
-    else:
-        cmap_obj = cmap.copy()
-
-    # 设置无效值（掩膜/NaN）为完全透明
-    cmap_obj.set_bad(color=(0, 0, 0, 0))  # RGBA: 完全透明
-
-    # --- ✅ 关键修改5：强制设置透明并使用alpha通道 ---
-    # 创建一个RGBA数组，直接控制透明度
-    from matplotlib.colors import Normalize
-
-    # 先将数据标准化
-    if normalization == 'log':
-        norm_for_rgba = LogNorm(vmin=vmin, vmax=vmax)
-    elif normalization == 'linear':
-        norm_for_rgba = Normalize(vmin=vmin, vmax=vmax)
-    elif normalization == 'stretch':
-        norm_for_rgba = norm
-    else:  # hist_eq
-        norm_for_rgba = norm
-
-    # 将数据转换为0-1范围
-    normalized_data = norm_for_rgba(data_to_plot.filled(np.nan))
-
-    # 获取colormap
-    if isinstance(cmap, str):
-        cmap_func = mpl.colormaps.get_cmap(cmap)
-    else:
-        cmap_func = cmap
-
-    # 转换为RGBA
-    rgba_data = cmap_func(normalized_data)
-
-    # 设置掩膜区域为完全透明
-    mask_2d = np.ma.getmaskarray(data_to_plot)
-    rgba_data[mask_2d] = [0, 0, 0, 0]  # 完全透明
-
-    # 绘制RGBA数组
-    im = ax.imshow(
-        rgba_data,
-        origin='upper',
-        extent=extent,
-        transform=data_crs,
-        interpolation=interpolation
-    )
-
-    # --- 色条：沿用"均匀色带"的线性 mappable ---
-    linear_sm = mpl.cm.ScalarMappable(norm=mcolors.Normalize(0, 1), cmap=cmap_obj)
+    # —— 色条：线性 mappable（0..1） + 线性映射刻度 ——
+    linear_sm = mpl.cm.ScalarMappable(norm=mcolors.Normalize(0, 1), cmap=cmap_obj)  # ← 用 cmap_obj
     cax = inset_axes(
         ax, width=legend_width, height=legend_height, loc=legend_loc,
         borderpad=legend_borderpad, bbox_to_anchor=legend_bbox_to_anchor,
         bbox_transform=ax.transAxes,
     )
-    cbar = mpl.pyplot.colorbar(
-        linear_sm, cax=cax, orientation='horizontal', extend='both',
-        extendfrac=0.1, extendrect=False
+    cbar = plt.colorbar(
+        linear_sm, cax=cax, orientation='horizontal',
+        extend='both', extendfrac=0.1, extendrect=False
     )
 
-    # 刻度
-    if custom_tick_values is not False:
-        tick_vals_nice = custom_tick_values
-        ticks_01_nice = _forward_map_values(tick_vals_nice, norm, normalization)
-    else:
-        ticks_01 = np.linspace(0, 1, legend_nbins if legend_nbins >= 2 else 2)
-        tick_vals = _inverse_map_values(ticks_01, norm, normalization)
-        tick_vals_nice = nice_round(tick_vals)
-        ticks_01_nice = _forward_map_values(tick_vals_nice, norm, normalization)
+    # span = max(norm.vmax - norm.vmin, 1e-12)
+    #
+    # if custom_tick_values is not False:
+    #     # 用户指定数值 -> 按真实值映射位置
+    #     vals_for_pos = np.asarray(list(custom_tick_values), dtype=float)
+    #     ticks_01 = np.clip((vals_for_pos - norm.vmin) / span, 0, 1)
+    #     labels_vals = vals_for_pos
+    # else:
+    #     # 自动：位置等距，确保中间=0.5
+    #     N = max(int(legend_nbins), 2)
+    #     ticks_01 = np.linspace(0, 1, N)  # ★ 等距位置
+    #     labels_vals = norm.vmin + ticks_01 * span  # 对应的原值
+    #
+    # # 标签做“好看”四舍五入，但不改变位置
+    # labels_vals_rounded = nice_round(labels_vals)
+    # tick_labels = _format_tick_labels(labels_vals_rounded, decimal_places)
+    #
+    # cbar.set_ticks(ticks_01)
+    # cbar.set_ticklabels(tick_labels)
 
-    tick_labels = _format_tick_labels(tick_vals_nice, decimal_places)
-    cbar.set_ticks(ticks_01_nice)
-    cbar.set_ticklabels(tick_labels)
+    if custom_tick_values is not False:
+        tick_vals = np.asarray(list(custom_tick_values), dtype=float)
+    else:
+        nb = max(int(legend_nbins), 2)  # 至少 2 个刻度
+        v_minv, v_maxv, ticks_list = get_y_axis_ticks(vmin_plot, vmax_plot, desired_ticks=nb)
+        tick_vals = np.asarray(ticks_list, dtype=float)
+
+    # 仅保留落在 [vmin, vmax] 范围内的刻度，避免超界标签
+    eps = 1e-12
+    in_range = (tick_vals >= v_minv - eps) & (tick_vals <= v_maxv + eps)
+    tick_vals = tick_vals[in_range]
+
+    # 映射到 0..1（线性 mappable 的坐标）
+    span = max(v_maxv - v_minv, 1e-12)
+    ticks_01 = np.clip((tick_vals - norm.vmin) / span, 0.0, 1.0)
+
+    # 应用到 colorbar
+    cbar.set_ticks(ticks_01)
+    cbar.set_ticklabels(_format_tick_labels(tick_vals, decimal_places))
+
+
+
     cbar.outline.set_visible(False)
     cbar.ax.xaxis.set_label_position('top')
     cbar.ax.tick_params(length=char_ticks_length, pad=char_ticks_pad)
     if unit_name:
         cbar.set_label(unit_name, labelpad=unit_labelpad, family='Arial')
 
-    ax.set_title(title_name, y=title_y, fontfamily='Arial') # , weight='bold'
-    return im, cbar
+    return coll, cbar
+
+
+def get_y_axis_ticks(min_value, max_value, desired_ticks=5, min_upper=None):
+    """
+    生成Y轴刻度，根据数据范围智能调整刻度间隔和范围。
+    新增参数：
+      - min_upper: 若提供，则保证返回的 max_v 和最上端刻度 >= min_upper（确保最大值只增不减）
+    """
+    # 0) 如需保持上界不回退，先将 max_value 至少抬到 min_upper
+    if min_upper is not None:
+        max_value = max(max_value, float(min_upper))
+
+    # 1. 快速处理特殊情况
+    if min_value > 0 and max_value > 0:
+        min_value = 0
+    elif min_value < 0 and max_value < 0:
+        max_value = 0
+
+    range_value = max_value - min_value
+    if range_value <= 0:
+        return (0, 1, [0, 0.5, 1])
+
+    # 2. 计算“nice”间隔
+    ideal_interval = range_value / (desired_ticks - 1)
+    e = math.floor(math.log10(ideal_interval))
+    base = 10 ** e
+    normalized_interval = ideal_interval / base
+    nice_intervals = [1, 2, 5, 10]
+    interval = min(nice_intervals, key=lambda x: abs(x - normalized_interval)) * base
+
+    # 3. 对齐边界
+    min_tick = math.floor(min_value / interval) * interval
+    max_tick = math.ceil(max_value / interval) * interval
+
+    # 4. 生成刻度
+    tick_count = int((max_tick - min_tick) / interval) + 1
+    ticks = np.linspace(min_tick, max_tick, tick_count)
+
+    # 压缩刻度数量（尽量接近 desired_ticks）
+    if len(ticks) > desired_ticks + 1:
+        scale = math.ceil((len(ticks) - 1) / (desired_ticks - 1))
+        interval *= scale
+        min_tick = math.floor(min_value / interval) * interval
+        max_tick = math.ceil(max_value / interval) * interval
+        tick_count = int((max_tick - min_tick) / interval) + 1
+        ticks = np.linspace(min_tick, max_tick, tick_count)
+
+    # 5. 插入 0
+    if min_value < 0 < max_value and 0 not in ticks:
+        zero_idx = np.searchsorted(ticks, 0)
+        ticks = np.insert(ticks, zero_idx, 0)
+
+    close_threshold = 0.3 * interval
+    max_v = max_tick
+    min_v = min_tick
+
+    # 6. 末端微调
+    if len(ticks) >= 2:
+        # 顶端
+        if (ticks[-1] != 0 and
+            (max_value - ticks[-2]) < close_threshold and
+            (ticks[-1] - max_value) > close_threshold):
+            ticks = ticks[:-1]
+            max_v = max_value + 0.1 * interval
+
+        # 底端
+        if (ticks[0] != 0 and
+            (ticks[1] - min_value) < close_threshold and
+            (min_value - ticks[0]) > close_threshold):
+            ticks = ticks[1:]
+            min_v = min_value - 0.1 * interval
+        elif abs(min_value) < interval:
+            min_v = math.floor(min_value)
+
+    # 7. 0-100 特例
+    if ((abs(ticks[0]) < 1e-10 and abs(ticks[-1] - 100) < 1e-10)
+        or (min_tick == 0 and max_tick == 100)):
+        ticks = np.array([0, 25, 50, 75, 100])
+
+    # 8) 强制不回退：若提供了 min_upper，确保上界与最上刻度不低于它
+    if min_upper is not None:
+        target = float(min_upper)
+        if max_v < target:
+            max_v = target
+        # 若最上刻度低于 target，把上端刻度抬到不低于 target 的下一“格”
+        top_tick_needed = math.ceil(target / interval) * interval
+        if ticks[-1] < top_tick_needed:
+            tick_count = int((top_tick_needed - ticks[0]) / interval) + 1
+            ticks = np.linspace(ticks[0], top_tick_needed, tick_count)
+
+    return (min_v, max_v, ticks.tolist())
+
+# def nice_round(values):
+#     """对数组 values 里的数进行数量级四舍五入，
+#     - 1 位数：个位
+#     - 2/3 位数：十位
+#     - 4 位数：百位
+#     - 5 位数：千位
+#     - 6 位及以上：只保留前两位
+#     """
+#     rounded = []
+#     for v in values:
+#         if v <= 1 or np.isnan(v):
+#             rounded.append(v)
+#             continue
+#
+#         magnitude = int(np.floor(np.log10(abs(v))))  # 数量级
+#         if magnitude == 0:
+#             # 个位数
+#             r = round(v)
+#         elif magnitude in (1, 2):
+#             # 两位数或三位数 -> 十位
+#             r = round(v, -1)
+#         elif magnitude == 3:
+#             # 四位数 -> 百位
+#             r = round(v, -2)
+#         elif magnitude == 4:
+#             # 五位数 -> 千位
+#             r = round(v, -3)
+#         else:
+#             # 六位及以上 -> 保留前两位
+#             digits_to_keep = magnitude - 1  # 保留前两位
+#             r = round(v, -digits_to_keep)
+#         rounded.append(r)
+#     return np.array(rounded)
+
+
 
 def nice_round(values):
-    """对数组 values 里的数进行数量级四舍五入，
-    - 1 位数：个位
-    - 2/3 位数：十位
-    - 4 位数：百位
-    - 5 位数：千位
-    - 6 位及以上：只保留前两位
     """
-    rounded = []
-    for v in values:
-        if v <= 1 or np.isnan(v):
-            rounded.append(v)
-            continue
+    按整组数据范围选取 1–2–5×10^e 的“nice”间隔，
+    再把各值四舍五入到该间隔的整数倍。
+    - NaN 保留
+    - |v| <= 1 保留原值（与旧实现一致）
+    """
+    arr = np.asarray(values, dtype=float)
+    out = arr.copy()
 
-        magnitude = int(np.floor(np.log10(abs(v))))  # 数量级
-        if magnitude == 0:
-            # 个位数
-            r = round(v)
-        elif magnitude in (1, 2):
-            # 两位数或三位数 -> 十位
-            r = round(v, -1)
-        elif magnitude == 3:
-            # 四位数 -> 百位
-            r = round(v, -2)
-        elif magnitude == 4:
-            # 五位数 -> 千位
-            r = round(v, -3)
-        else:
-            # 六位及以上 -> 保留前两位
-            digits_to_keep = magnitude - 1  # 保留前两位
-            r = round(v, -digits_to_keep)
-        rounded.append(r)
-    return np.array(rounded)
+    # 有效值（排除 NaN/Inf）
+    finite_mask = np.isfinite(arr)
+    if not np.any(finite_mask):
+        return out  # 全是 NaN/Inf，原样返回
+
+    vmin = np.nanmin(arr[finite_mask])
+    vmax = np.nanmax(arr[finite_mask])
+    rng  = vmax - vmin
+    if not np.isfinite(rng) or rng <= 0:
+        return out  # 无范围或范围为0，不做处理
+
+    desired_ticks = 5  # 与刻度函数保持一致的默认“目标刻度数”
+    ideal_interval = rng / (desired_ticks - 1)
+
+    # 选取最接近理想间隔的“nice”间隔（1/2/5/10 × 10^e）
+    e = math.floor(math.log10(ideal_interval))
+    base = 10 ** e
+    normalized = ideal_interval / base
+    nice_choices = [1, 2, 5, 10]
+    interval = min(nice_choices, key=lambda x: abs(x - normalized)) * base
+
+    if not np.isfinite(interval) or interval == 0:
+        return out
+
+    # 对 |v|>1 的有效值进行就近取整到 interval 的整数倍；其余保持原值
+    mask_to_round = finite_mask & (np.abs(arr) > 1)
+    out[mask_to_round] = np.round(arr[mask_to_round] / interval) * interval
+    return out
+
 
 def _forward_map_values(values, norm, normalization):
     """将数据值映射到0-1区间"""
@@ -525,6 +401,22 @@ def _inverse_map_values(u_values, norm, normalization):
             return norm.vmin + u_values * (norm.vmax - norm.vmin)
 
 
+# def _format_tick_labels(values, decimal_places=None):
+#     labels = []
+#     for i, v in enumerate(values):
+#         if v < 1:
+#             if decimal_places is not None:
+#                 # 自动判断格式
+#                 if i == 0:
+#                     # 首尾用整数格式
+#                     labels.append(f"{v:,.0f}")
+#                 else:
+#                     # 其他用整数格式
+#                     labels.append(f"{v:,.{decimal_places}f}")
+#         else:
+#             labels.append(f"{v:,.0f}")
+#
+#     return labels
 
 def _format_tick_labels(values, decimal_places=None):
     labels = []
@@ -820,57 +712,59 @@ def add_north_arrow(fig, x, y, size=0.1, img_path='../Map/north_arrow.png', tran
 
 
 def plot_tif_layer(
-        tif_file: str,
+        shp_file: str,
         title: str,
         unit: str,
         cmap,
         outfile: str = None,
         ax=None,
-        normalization=None,
         decimal_places=2,
         custom_tick_values=False,
-        line_width=0.3,
+        line_width=1,
         title_y=0.95,
+        which="sum",
+        vmax_percentile=None,
+        **kwargs
 ):
     """通用绘制函数：既可以保存单图，也可以在指定ax上绘制"""
 
     if ax is None:
-        # 原来的单图模式
         fig = plt.figure(figsize=(6, 6), dpi=300, constrained_layout=False)
         ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
         should_save = True
     else:
-        # 子图模式，ax已经提供
         should_save = False
 
-    # 绘制逻辑（不变）
-    efficient_tif_plot(
-        ax,
-        os.path.join(arr_path, tif_file),
+    # 把所有参数集中到一个字典
+    args_dict = dict(
+        ax=ax,
+        shp_path=os.path.join(arr_path, shp_file),
+        which=which,
         cmap=cmap,
-        shp="../Map/AUS_line1.shp",
+        admin_shp="../Map/AUS_line1.shp",
         line_width=line_width,
         title_name=title,
         unit_name=unit,
-        legend_bbox_to_anchor=legend_bbox,
-        legend_nbins=legend_nbins,
+        legend_bbox_to_anchor=(0.1, 0.02, 0.8, 0.9),
         title_y=title_y,
         char_ticks_length=1,
-        unit_labelpad=1,
-        normalization=normalization,
+        unit_labelpad=5,
         decimal_places=decimal_places,
         custom_tick_values=custom_tick_values,
+        vmax_percentile=vmax_percentile
     )
-    add_binary_gray_layer(ax, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
+    args_dict.update(kwargs)  # 合并其它额外参数
 
-    # 只有单图模式才保存和显示
+    # 一次性传递所有参数
+    draw_hex_map_agg_linear(**args_dict)
+
     if should_save and outfile:
         plt.savefig(outfile, dpi=300, pad_inches=0.1, transparent=True)
         plt.show()
         plt.close(fig)
 
 
-def safe_plot(*, tif_file, title, unit, cmap, outfile=None, ax=None, **kwargs):
+def safe_plot(*, tif_file, title, unit, cmap, outfile=None, ax=None, which='sum',vmax_percentile=None,**kwargs):
     """既支持单图保存，也支持子图绘制"""
     if ax is None:
         print(f"[INFO] Plotting {tif_file} -> {outfile}")
@@ -890,17 +784,19 @@ def safe_plot(*, tif_file, title, unit, cmap, outfile=None, ax=None, **kwargs):
         return
 
     plot_tif_layer(
-        tif_file=tif_file,
+        shp_file=tif_file,
         title=title,
         unit=unit,
         cmap=cmap,
         outfile=outfile,
         ax=ax,
+        which=which,
+        vmax_percentile=vmax_percentile,
         **kwargs
     )
 
 
-def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=False,
+def plot_all_for_scenario(env: str,shp_name: str, cfg: dict, year: int = 2050, combined_mode=False,
                           combined_fig=None, plot_idx_ref=None):
     """
     既支持原来的单个保存模式，也支持合并到一张大图模式
@@ -920,8 +816,10 @@ def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=F
         nrows, ncols = 6, 4
 
     # 1) Total cost
-    tif = f"{env}/xr_total_cost_{env}_{year}.tif"
-    gs = gridspec.GridSpec(6, 4, figure=combined_fig, hspace=-0.45, wspace=0.03,
+    tif = f"{env}/{shp_name}/{shp_name}_total_cost_{env}_{year}.shp"
+    kwargs = layer_overrides.get('total_cost', {})
+
+    gs = gridspec.GridSpec(6, 4, figure=combined_fig, hspace=0, wspace=0.03,
                            left=0.03, right=0.99, top=0.99, bottom=0.03)
     if combined_mode:
         if plot_idx_ref[0] < nrows * ncols:
@@ -936,9 +834,8 @@ def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=F
                 title="Total cost",
                 unit=r"MAU\$ yr$^{-1}$",
                 cmap=cost_cmap,
-                normalization="log",
-                decimal_places=2,
-                ax=ax
+                ax=ax,
+                ** kwargs
             )
             plot_idx_ref[0] += 1
     else:
@@ -948,15 +845,14 @@ def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=F
             title="Total cost",
             unit=r"MAU\$ yr$^{-1}$",
             cmap=cost_cmap,
-            normalization="log",
-            decimal_places=2,
-            outfile=out
+            outfile=out,
+            ** kwargs
         )
 
     # 2) Cost components
     for key, title in zip(env_keys, title_keys):
-        tif = f"{env}/xr_{key}_{env}_{year}.tif"
-        kwargs = dict(normalization="log") | layer_overrides.get(key, {})
+        kwargs = layer_overrides.get(key, {})
+        tif = f"{env}/{shp_name}/{shp_name}_{key}_{env}_{year}.shp"
 
         if combined_mode:
             if plot_idx_ref[0] < nrows * ncols:
@@ -978,23 +874,23 @@ def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=F
                 unit=r"MAU\$ yr$^{-1}$",
                 cmap=cost_cmap,
                 outfile=out,
-                **kwargs
+                ** kwargs
             )
 
     # 3) Benefits
     if "ghg" in cfg.get("benefits", []):
-        tif = f"{env}/xr_total_carbon_{env}_{year}.tif"
+        kwargs = layer_overrides.get('total_carbon', {})
+        tif = f"{env}/{shp_name}/{shp_name}_total_carbon_{env}_{year}.shp"
         if combined_mode:
             if plot_idx_ref[0] < nrows * ncols:
                 ax = combined_fig.add_subplot(6, 4, plot_idx_ref[0] + 1, projection=ccrs.PlateCarree())
                 safe_plot(
                     tif_file=tif,
                     title=f"Change in GHG benefit",
-                    unit=r"tCO$_2$e yr$^{-1}$",
+                    unit=r"MtCO$_2$e yr$^{-1}$",
                     cmap=benefit_cmap,
-                    normalization='percent_clip',
-                    decimal_places=2,
-                    ax=ax
+                    ax=ax,
+                    ** kwargs
                 )
                 plot_idx_ref[0] += 1
         else:
@@ -1002,25 +898,25 @@ def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=F
             safe_plot(
                 tif_file=tif,
                 title="Change in GHG benefit",
-                unit=r"tCO$_2$e yr$^{-1}$",
+                unit=r"MtCO$_2$e yr$^{-1}$",
                 cmap=benefit_cmap,
-                normalization='percent_clip',
-                decimal_places=2,
-                outfile=out
+                outfile=out,
+                ** kwargs
             )
 
     if "bio" in cfg.get("benefits", []):
-        tif = f"{env}/xr_total_bio_{env}_{year}.tif"
+        kwargs = layer_overrides.get('total_bio', {})
+        tif = f"{env}/{shp_name}/{shp_name}_total_bio_{env}_{year}.shp"
         if combined_mode:
             if plot_idx_ref[0] < nrows * ncols:
                 ax = combined_fig.add_subplot(6, 4, plot_idx_ref[0] + 1, projection=ccrs.PlateCarree())
                 safe_plot(
                     tif_file=tif,
                     title=f"Change in biodiversity benefit",
-                    unit=r"ha yr$^{-1}$",
+                    unit="Contribution-weighted\narea, ha yr$^{-1}$",
                     cmap=benefit_cmap,
-                    decimal_places=2,
-                    ax=ax
+                    ax=ax,
+                    ** kwargs
                 )
                 plot_idx_ref[0] += 1
         else:
@@ -1028,21 +924,18 @@ def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=F
             safe_plot(
                 tif_file=tif,
                 title="Change in biodiversity benefit",
-                unit=r"ha yr$^{-1}$",
+                unit="Contribution-weighted\narea, ha yr$^{-1}$",
                 cmap=benefit_cmap,
-                decimal_places=2,
-                outfile=out
+                outfile=out,
+                ** kwargs
             )
 
     # 4) Prices
     if "carbon" in cfg.get("prices", []):
-        if 'Counterfactual_carbon_high_bio_50' in env:
-            title_name = f"Carbon price for GHG and biodiversity"
-        elif 'carbon_high_bio_50' in env:
-            title_name = f"Carbon price for biodiversity"
-        else:
-            title_name = f"Carbon price"
-        tif = f"{env}/xr_carbon_price_{env}_{year}.tif"
+        kwargs = layer_overrides.get('carbon_price', {})
+        title_name = layer_overrides.get(env, {}).get("title_name", "Carbon price")
+
+        tif = f"{env}/{shp_name}/{shp_name}_carbon_price_{env}_{year}.shp"
         if combined_mode:
             if plot_idx_ref[0] < nrows * ncols:
                 ax = combined_fig.add_subplot(6, 4, plot_idx_ref[0] + 1, projection=ccrs.PlateCarree())
@@ -1051,8 +944,11 @@ def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=F
                     title=title_name,
                     unit=r"AU\$ CO$_2$e$^{-1}$ yr$^{-1}$",
                     cmap=price_cmap,
-                    decimal_places=2,
-                    ax=ax
+                    ax=ax,
+                    which="mean",
+                    vmax_percentile=90,
+                    **kwargs
+
                 )
                 plot_idx_ref[0] += 1
         else:
@@ -1062,12 +958,15 @@ def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=F
                 title=title_name,
                 unit=r"AU\$ CO$_2$e$^{-1}$ yr$^{-1}$",
                 cmap=price_cmap,
-                decimal_places=2,
-                outfile=out
+                outfile=out,
+                which="mean",
+                vmax_percentile=90,
+                ** kwargs
             )
 
     if "bio" in cfg.get("prices", []):
-        tif = f"{env}/xr_bio_price_{env}_{year}.tif"
+        kwargs = layer_overrides.get('bio_price', {})
+        tif = f"{env}/{shp_name}/{shp_name}_bio_price_{env}_{year}.shp"
         if combined_mode:
             if plot_idx_ref[0] < nrows * ncols:
                 ax = combined_fig.add_subplot(6, 4, plot_idx_ref[0] + 1, projection=ccrs.PlateCarree())
@@ -1076,8 +975,9 @@ def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=F
                     title=f"Biodiversity cost",
                     unit=r"AU\$ ha$^{-1}$ yr$^{-1}$",
                     cmap=price_cmap,
-                    decimal_places=2,
-                    ax=ax
+                    ax=ax,
+                    vmax_percentile=90,
+                    ** kwargs
                 )
                 plot_idx_ref[0] += 1
         else:
@@ -1087,14 +987,15 @@ def plot_all_for_scenario(env: str, cfg: dict, year: int = 2050, combined_mode=F
                 title="Biodiversity price",
                 unit=r"AU\$ ha$^{-1}$ yr$^{-1}$",
                 cmap=price_cmap,
-                decimal_places=2,
-                outfile=out
+                outfile=out,
+                vmax_percentile=90,
+                ** kwargs
             )
     if combined_mode:
         return combined_fig,ax
 
 
-def plot_all_scenarios_combined(scenarios: dict, year: int = 2050, figsize=(20, 30), combined_mode=True):
+def plot_all_scenarios_combined(scenarios: dict,shp_name:str, year: int = 2050, figsize=(20, 30), combined_mode=True):
     """创建合并的所有情景图表"""
     print(f"\n===== CREATING COMBINED PLOT FOR ALL SCENARIOS (year={year}) =====")
 
@@ -1102,7 +1003,7 @@ def plot_all_scenarios_combined(scenarios: dict, year: int = 2050, figsize=(20, 
     plot_idx_ref = [0]  # 用列表包装以便在函数间修改
 
     for env, cfg in scenarios.items():
-        fig,ax = plot_all_for_scenario(env, cfg, year=year, combined_mode=combined_mode,
+        fig,ax = plot_all_for_scenario(env,shp_name, cfg, year=year, combined_mode=combined_mode,
                               combined_fig=fig, plot_idx_ref=plot_idx_ref)
     return fig,ax
 
@@ -1114,8 +1015,7 @@ arr_path = f"{base_dir}/4_tif"
 out_dir  = f"{base_dir}/5_map"
 os.makedirs(out_dir, exist_ok=True)
 
-legend_nbins = 3
-legend_bbox = (0.1, 0.10, 0.8, 0.9)
+
 
 # 统一样式
 set_plot_style(font_size=15, font_family='Arial')
@@ -1127,12 +1027,12 @@ aligned_tif = f"{arr_path}/public_area_aligned.tif"
 align_raster_to_reference(src_tif, ref_tif, aligned_tif, resampling="nearest")
 
 # 统一色带
-# cost_cmap  = LinearSegmentedColormap.from_list("cost",  ["#FFFEC2", "#FA4F00", "#A80000","#5c2324"])
-cost_cmap  = cmocean.cm.matter
-# benefit_cmap = LinearSegmentedColormap.from_list("benefit", ["#ffff80", "#38e009","#1a93ab","#0c1078"])
-benefit_cmap = cmocean.cm.haline_r
-# price_cmap = LinearSegmentedColormap.from_list("price", ["#00ffff", "#ff00ff"])
-price_cmap = cm.buda_r
+cost_cmap  = LinearSegmentedColormap.from_list("cost",  ["#FFFEC2", "#FA4F00", "#A80000","#5c2324"])
+# cost_cmap  = cmocean.cm.matter
+benefit_cmap = LinearSegmentedColormap.from_list("benefit", ["#ffff80", "#38e009","#1a93ab","#0c1078"])
+# benefit_cmap = cmocean.cm.haline_r
+price_cmap = LinearSegmentedColormap.from_list("price", ["#00ffff", "#ff00ff"])
+# price_cmap = cm.buda_r
 
 # ==== 你的既有配置（保持不变）====
 scenarios = {
@@ -1167,54 +1067,56 @@ title_keys = [
 
 # 可选覆盖：别忘了它（生效于成本组件）
 layer_overrides = {
-    # "cost_ag": dict(decimal_places=3),
-    # "cost_agricultural_management": dict(custom_tick_values=[0, 0.01, 50], decimal_places=2),
-    # ...
+    'Counterfactual_carbon_high_bio_50': dict(title_name = f"Carbon price for GHG and biodiversity"),
+    'carbon_high_bio_50': dict(title_name = f"Carbon price for biodiversity"),
+    'total_bio':dict(legend_nbins=3,unit_labelpad=5),
+    'carbon_price':dict(legend_nbins=3),
 }
 
 
 # ==== 逐个情景执行：一个情景所有图画完，再画下一个 ====
-for env, cfg in scenarios.items():
-    plot_all_for_scenario(env, cfg, year=2050)
+shp_name = 'H_5kkm2'
+# for env, cfg in scenarios.items():
+#     plot_all_for_scenario(env,shp_name, cfg, year=2050)
 # 合并模式
-# fig,ax = plot_all_scenarios_combined(scenarios, year=2050, figsize=(20, 30))
-#
-# font_size = ax.xaxis.get_label().get_size()
-# font_family = ax.xaxis.get_label().get_family()[0]
-#
-# plt.rcParams['font.family'] = font_family
-# plt.rcParams['mathtext.fontset'] = 'custom'
-# plt.rcParams['mathtext.rm'] = font_family   # 直立
-# plt.rcParams['mathtext.it'] = font_family   # 斜体
-# plt.rcParams['mathtext.bf'] = font_family   # 粗体
-# plt.rcParams['mathtext.sf'] = font_family   # 无衬线
-#
-# add_north_arrow(fig, 0.20, 0.063,size=0.012)
-# add_scalebar(fig,ax, 0.23, 0.069, length_km=500, fontsize=font_size,fontfamily=font_family,linewidth=1)
-# add_annotation(fig, 0.285, 0.073, width=0.015, text="Australian state boundary",linewidth=1,
-#                style="line", linecolor="black",fontsize=font_size, fontfamily=font_family)
-# add_annotation(fig, 0.435, 0.07, width=0.0122, height=0.0072,linewidth=1, text="No data",
-#                style="box", facecolor="white", edgecolor="black",fontsize=font_size, fontfamily=font_family)
-# add_annotation(fig, 0.52, 0.07, width=0.0122, height=0.0072,linewidth=1, text="Public, indigenous, urban, and other intensive land uses",
-#                style="box", facecolor="#808080",edgecolor="#808080",fontsize=font_size, fontfamily=font_family)
-# fig.text(
-#     0.015, 0.76, r'Reference→$\mathrm{GHG}_{\mathrm{high}}$',
-#     rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
-#     rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
-# )
-# fig.text(
-#     0.015, 0.47, r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
-#     rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
-#     rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
-# )
-# fig.text(
-#     0.015, 0.2, r'Reference→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
-#     rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
-#     rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
-# )
-#
-# # plt.subplots_adjust(bottom=0.05)
-# output_path = os.path.join(out_dir, f"06_all_maps")
-# # save_figure_properly(fig, output_path, facecolor='white')
-# fig.savefig(f"{output_path}.png", dpi=300)
-# plt.show()
+fig,ax = plot_all_scenarios_combined(scenarios,shp_name, year=2050, figsize=(20, 30))
+
+font_size = ax.xaxis.get_label().get_size()
+font_family = ax.xaxis.get_label().get_family()[0]
+
+plt.rcParams['font.family'] = font_family
+plt.rcParams['mathtext.fontset'] = 'custom'
+plt.rcParams['mathtext.rm'] = font_family   # 直立
+plt.rcParams['mathtext.it'] = font_family   # 斜体
+plt.rcParams['mathtext.bf'] = font_family   # 粗体
+plt.rcParams['mathtext.sf'] = font_family   # 无衬线
+
+add_north_arrow(fig, 0.20, 0.013,size=0.012)
+add_scalebar(fig,ax, 0.24, 0.019, length_km=500, fontsize=font_size,fontfamily=font_family,linewidth=1)
+add_annotation(fig, 0.3, 0.023, width=0.015, text="Australian state boundary",linewidth=1,
+               style="line", linecolor="black",fontsize=font_size, fontfamily=font_family)
+add_annotation(fig, 0.46, 0.02, width=0.0122, height=0.0072,linewidth=1, text="No data",
+               style="box", facecolor="white", edgecolor="black",fontsize=font_size, fontfamily=font_family)
+add_annotation(fig, 0.54, 0.02, width=0.0122, height=0.0072,linewidth=1, text="Public, indigenous, urban, and other intensive land uses",
+               style="box", facecolor="#808080",edgecolor="#808080",fontsize=font_size, fontfamily=font_family)
+fig.text(
+    0.015, 0.80, r'Reference→$\mathrm{GHG}_{\mathrm{high}}$',
+    rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
+    rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
+)
+fig.text(
+    0.015, 0.47, r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
+    rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
+    rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
+)
+fig.text(
+    0.015, 0.16, r'Reference→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
+    rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
+    rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
+)
+
+# plt.subplots_adjust(bottom=0.05)
+output_path = os.path.join(out_dir, f"06_all_maps")
+# save_figure_properly(fig, output_path, facecolor='white')
+fig.savefig(f"{output_path}.png", dpi=300)
+plt.show()

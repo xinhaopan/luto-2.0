@@ -104,11 +104,8 @@ def stacked_area_pos_neg(
     if add_line:
         ax.plot(
             df.index, total_col_data,
-            linestyle='-', marker='o',
-            color='black', linewidth=2,
-            markersize=5, markeredgewidth=1,
-            markerfacecolor='black', markeredgecolor='black',
-            label=total_col_name,zorder=20
+            linestyle='-', color='#404040', linewidth=3,  # thick dark grey
+            label=total_col_name, zorder=20
         )
 
     # 轴和外观
@@ -382,7 +379,7 @@ def plot_13_layout(
     ncol=2,
     column_spacing=1,
     ghost_legend_num=3,
-    figsize=(22, 12),
+    figsize=(22, 14),
     post_process=None,
 ):
     """
@@ -398,7 +395,8 @@ def plot_13_layout(
     ylabel: Y轴标签
     """
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.3, wspace=0.5)
+    gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.15, wspace=0.15)
+    fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
     axes = []
     axes.append(fig.add_subplot(gs[0, 0]))
     axes.append(fig.add_subplot(gs[0, 1], sharey=axes[0]))
@@ -435,17 +433,30 @@ def plot_13_layout(
         tick_positions = [start_tick, middle_tick, end_tick]
 
         ax.set_xticks(tick_positions)
+        # 底行显示 x 轴标签，其余行隐藏
         if i in [8, 9, 10, 11, 12]:
             ax.tick_params(axis='x')
-            # x_labels = ax.get_xticklabels()
-            # if len(x_labels) >= 3:
-            #     x_labels[0].set_horizontalalignment('left')
-            #     x_labels[-1].set_horizontalalignment('right')
         else:
             ax.tick_params(axis='x', labelbottom=False)
 
+        # 左列保留 y 轴标签，其余列隐藏
         if i not in [0, 3, 8]:
             ax.tick_params(axis='y', labelleft=False)
+
+        ax.figure.canvas.draw()
+
+        # 仅对 9,10,11,12：隐藏 x 轴“最左边”的刻度标签（保留刻度线）
+        if i in [9, 10, 11, 12]:
+            xtlabs = ax.get_xticklabels()
+            if xtlabs:
+                xtlabs[0].set_visible(False)  # 隐藏第一个（最左）
+
+        # 仅对 8：隐藏 y 轴“最下面”的刻度标签（保留刻度线）
+        if i == 8:
+            ytlabs = ax.get_yticklabels()
+            if ytlabs:
+                ytlabs[0].set_visible(False)  # 隐藏第一个（最下）
+
 
         if i == 0:
             legend_handles, legend_labels = ax.get_legend_handles_labels()
@@ -689,14 +700,14 @@ def plot_22_layout(
     summary_ylim: tuple,
     desired_ticks: int = 5,
     add_line=True,
-    bbox_to_anchor=(0.42, 0.95),
+    bbox_to_anchor=(0.44, 0.95),
     stacked_area_pos_neg=stacked_area_pos_neg,
     draw_legend=draw_legend,
     ylabel: str = 'Cost (Billion AU$)',
     dividing_line=0.5,
     ncol=1,
     column_spacing=1,
-    figsize=(22, 20)
+    figsize=(22, 24)
 ):
     """
     绘制5x5布局的22张图。all_dfs为dict，key为图类型+序号（如'carbon_0'），value为df；
@@ -704,71 +715,88 @@ def plot_22_layout(
     第一行前两列画图，第3-5列合并为图例。其余行每行5张。
     """
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.3, wspace=0.4)
+    gs = gridspec.GridSpec(5, 5, figure=fig,
+                           left=0.06, right=0.98, top=0.95, bottom=0.05,
+                           wspace=0.15, hspace=0.14)
 
-    # 画图例（第一行第3~5列合并）
-    legend_ax = fig.add_subplot(gs[0, 2:])
+    axes = np.empty((5, 5), dtype=object)
+    share_col = [None] * 5  # 每列共享 y 轴
+
+    y_ticks_all = get_y_axis_ticks(summary_ylim[0], summary_ylim[1],desired_ticks)
+    items = list(all_dfs.items())
+    data_idx = 0
+    for r in range(5):
+        for c in range(5):
+            # 跳过第一行后三个，用来放图例
+            if r == 0 and c >= 2:
+                continue
+
+            # 防止越界（也方便你调试数量是否匹配 22）
+            if data_idx >= len(items):
+                break  # 或者 raise / continue，看你的需求
+
+            title_key, df = items[data_idx]
+            data_idx += 1
+
+            title = title_map.get(title_key, title_key)
+
+            # 建轴（同列 sharey）
+            ax = fig.add_subplot(gs[r, c], sharey=share_col[c])
+            axes[r, c] = ax
+            if share_col[c] is None:
+                share_col[c] = ax
+
+            # ===== 绘图逻辑 =====
+            stacked_area_pos_neg(
+                ax, df, colors=colors,
+                title_name=title,
+                y_ticks_all=y_ticks_all,
+                add_line=add_line,
+                ylabel=(ylabel if (c == 0 and r == 2) else ''),
+                show_legend=False,
+                dividing_line=dividing_line
+            )
+
+            # 设置 x 轴刻度
+            if r == 4:
+                ax.tick_params(axis='x', labelbottom=True)
+            else:
+                ax.tick_params(axis='x', labelbottom=False)
+
+            # 左列保留 y 轴标签，其余列隐藏
+            if c == 0:
+                ax.tick_params(axis='y', labelleft=True)
+            else:
+                ax.tick_params(axis='y', labelleft=False)
+            ax.figure.canvas.draw()
+
+            #
+            if r==4 and  c > 0:
+                xtlabs = ax.get_xticklabels()
+                if xtlabs:
+                    xtlabs[0].set_visible(False)  # 隐藏第一个（最左）
+
+            # 仅对 8：隐藏 y 轴“最下面”的刻度标签（保留刻度线）
+            if r == 4 and c == 0:
+                ytlabs = ax.get_yticklabels()
+                if ytlabs:
+                    ytlabs[0].set_visible(False)  # 隐藏第一个（最下）
+
+    # 在第一行右侧三格创建一个“空轴”做图例面板（跨 3 列）
+    legend_ax = fig.add_subplot(gs[0, 2:5])
     legend_ax.axis('off')
 
-    y_ticks_all = get_y_axis_ticks(summary_ylim[0], summary_ylim[1],
-                                   desired_ticks=desired_ticks)
 
-
-    keys_ordered = list(all_dfs.keys())
-    axes_list = []
-    shared_ax = None
-
-    for plot_idx, key in enumerate(keys_ordered):
-        # 行列计算
-        if plot_idx < 2:
-            row, col = 0, plot_idx
-        else:
-            # plot_idx从2开始，对应row=1+(plot_idx-2)//5，col=(plot_idx-2)%5
-            row = 1 + (plot_idx - 2) // 5
-            col = (plot_idx - 2) % 5
-
-        df = all_dfs.get(key)
-        title = title_map.get(key, key)
-
-        if shared_ax is None:
-            ax = fig.add_subplot(gs[row, col])
-            shared_ax = ax
-        else:
-            ax = fig.add_subplot(gs[row, col], sharey=shared_ax)
-        stacked_area_pos_neg(
-            ax, df, colors=colors,
-            title_name=title,
-            y_ticks_all=y_ticks_all,
-            add_line=add_line,
-            ylabel='', show_legend=False,
-            dividing_line=dividing_line
-        )
-        if col != 0:
-            ax.tick_params(axis='y', labelleft=False)
-        x_data = df.index
-        start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
-        tick_positions = [start_tick, middle_tick, end_tick]
-        ax.set_xticks(tick_positions)
-        if row == 4:
-            ax.tick_params(axis='x')
-            # x_labels = ax.get_xticklabels()
-            # if len(x_labels) >= 3:
-            #     x_labels[0].set_horizontalalignment('left')
-            #     x_labels[-1].set_horizontalalignment('right')
-        else:
-            ax.tick_params(axis='x', labelbottom=False)
-        axes_list.append(ax)
-
-    # --- 全局Y轴标题 ---
-    first_ax = axes_list[0]  # 第一个 subplot
-    pos = first_ax.get_position(fig)  # Bbox, figure坐标
-    x = pos.x0 - 0.12  # 比左侧再左一点，0.02可以自己试
-    x = max(x, 0)  # 防止越界到负数
-
-    fig.text(x, 0.5, ylabel, va='center', rotation='vertical')
+    # # --- 全局Y轴标题 ---
+    # first_ax = axes[0,0]  # 第一个 subplot
+    # pos = first_ax.get_position(fig)  # Bbox, figure坐标
+    # x = pos.x0 - 0.12  # 比左侧再左一点，0.02可以自己试
+    # x = max(x, 0)  # 防止越界到负数
+    #
+    # fig.text(x, 0.5, ylabel, va='center', rotation='vertical')
 
     # --- 图例 ---
-    draw_legend(axes_list[0], bbox_to_anchor=bbox_to_anchor, ncol=ncol, column_spacing=column_spacing)
+    draw_legend(axes[0,0], bbox_to_anchor=bbox_to_anchor, ncol=ncol, column_spacing=column_spacing)
     fig.subplots_adjust(left=0.05, right=0.98, top=0.97, bottom=0.03)
     # --- 保存 ---
     if not os.path.exists(os.path.dirname(output_path)):

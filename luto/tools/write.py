@@ -184,8 +184,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_biodiversity_GBF4_SNES_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF4_ECNES_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF8_scores_groups)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_GBF8_scores_species)(data, yr_cal, path_yr),
-        # delayed(write_GHG_BIO_xr)(data, yr_cal, path_yr)
+        delayed(write_biodiversity_GBF8_scores_species)(data, yr_cal, path_yr)
     ]
 
     return tasks

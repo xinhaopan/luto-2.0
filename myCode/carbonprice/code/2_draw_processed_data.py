@@ -3,7 +3,7 @@ from collections import namedtuple
 import tools.config as config
 from tools.helper_plot import set_plot_style,xarray_to_dict, get_global_ylim, plot_22_layout, get_colors
 
-set_plot_style(font_size=18, font_family='Arial')
+set_plot_style(font_size=20, font_family='Arial')
 
 task_name = config.TASK_NAME
 # task_name = '20250922_Paper2_Results_HPC_test'

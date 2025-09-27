@@ -31,21 +31,23 @@ def add_targets_line(axes):
     new_df.columns = ['high', 'low']
     new_df = new_df[(new_df.index >= config.START_YEAR) & (new_df.index <= 2050)]
     # 需要画 high 的子图 index
-    high_axes = [2, 8, 9, 11, 12]
+    high_axes = [2, 8, 9,10, 11, 12]
     # 需要画 low 的子图 index
     low_axes = [1, 3, 4, 5, 6, 7]
 
+    # 统一样式：藏青色、实线、无点
+    line_kw = dict(color='navy', linestyle='-', linewidth=3, zorder=60)
+
+    # high 子图
     for idx in high_axes:
-        axes[idx].plot(new_df.index, new_df['high'], color='red', linestyle='-',linewidth = 2,
-                        markersize = 5, marker='o', markeredgewidth = 1, label='_nolegend_',zorder=60)
+        axes[idx].plot(new_df.index, new_df['high'], **line_kw, label='_nolegend_')
 
-    # 在 low 子图上画红色虚点线
+    # low 子图
     for idx in low_axes:
-        axes[idx].plot(new_df.index, new_df['low'], color='red', linestyle='-',linewidth = 2,
-                        markersize = 5, marker='o', markeredgewidth = 1,  label='_nolegend_',zorder=60)
+        axes[idx].plot(new_df.index, new_df['low'], **line_kw, label='_nolegend_')
 
-    axes[-1].plot(new_df.index, new_df['high'], color='red', linestyle='-',linewidth = 2,
-                        markersize = 5, marker='o', markeredgewidth = 1, label='GHG emissions targets')
+    # 图例只在最后一个轴上保留
+    axes[-1].plot(new_df.index, new_df['high'], **line_kw, label='GHG emissions targets')
 
     return axes
 
@@ -53,7 +55,7 @@ def add_targets_line(axes):
 
 
 # Main script
-set_plot_style(font_size=18, font_family='Arial')
+set_plot_style(font_size=20, font_family='Arial')
 
 task_name = config.TASK_NAME
 input_dir = f'../../../output/{task_name }/carbon_price/1_draw_data'
@@ -66,20 +68,20 @@ data_dict, colors = get_colors(data_dict,'tools/land use colors.xlsx',sheet_name
 summary_ylim = get_global_ylim(data_dict)
 
 output_path = os.path.join(output_dir, '03_Profit.png')
-plot_13_layout(data_dict,config.ORIGINAL_TITLE_MAP,colors,output_path,summary_ylim,bbox_to_anchor=[0.60, 0.75, 0.4, 0.1],dividing_line=1,column_spacing=-7)
+plot_13_layout(data_dict,config.ORIGINAL_TITLE_MAP,colors,output_path,summary_ylim,bbox_to_anchor=[0.63, 0.80, 0.4, 0.1],dividing_line=1,column_spacing=-7)
 
 PlotSpec = namedtuple("PlotSpec", ["file", "sheet", "ylabel","add_line","bbox_to_anchor","post_process"])
 
 # 把三元组写在一起，避免对不上的问题
 plot_specs = [
-    PlotSpec("xr_total_carbon", "carbon_total", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", True,[0.60, 0.76, 0.4, 0.1],None),
-    PlotSpec("xr_total_bio", "biodiversity_total", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", True,[0.60, 0.76, 0.4, 0.1],None),
-    PlotSpec("xr_area_agricultural_management", "am", r"Area (Mha yr$^{-1}$)", False,[0.60, 0.78, 0.4, 0.1],None),
-    PlotSpec("xr_area_non_agricultural_landuse", "non_ag", r"Area (Mha yr$^{-1}$)", False,[0.58, 0.79, 0.4, 0.1],None),
-    PlotSpec("xr_biodiversity_GBF2_priority_ag_management", "am", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", False,[0.60, 0.78, 0.4, 0.1],None),
-    PlotSpec("xr_biodiversity_GBF2_priority_non_ag", "non_ag", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", False,[0.58, 0.79, 0.4, 0.1],None),
-    PlotSpec("xr_GHG_ag_management", "am", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", False,[0.60, 0.78, 0.4, 0.1],None),
-    PlotSpec("xr_GHG_non_ag", "non_ag", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", False,[0.58, 0.79, 0.4, 0.1],add_targets_line)
+    PlotSpec("xr_total_carbon", "carbon_total", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", True,[0.63, 0.80, 0.4, 0.1],None),
+    PlotSpec("xr_total_bio", "biodiversity_total", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", True,[0.63, 0.80, 0.4, 0.1],None),
+    PlotSpec("xr_area_agricultural_management", "am", r"Area (Mha yr$^{-1}$)", False,[0.63, 0.80, 0.4, 0.1],None),
+    PlotSpec("xr_area_non_agricultural_landuse", "non_ag", r"Area (Mha yr$^{-1}$)", False,[0.63, 0.82, 0.4, 0.1],None),
+    PlotSpec("xr_biodiversity_GBF2_priority_ag_management", "am", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", False,[0.63, 0.80, 0.4, 0.1],None),
+    PlotSpec("xr_biodiversity_GBF2_priority_non_ag", "non_ag", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", False,[0.63, 0.82, 0.4, 0.1],None),
+    PlotSpec("xr_GHG_ag_management", "am", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", False,[0.63, 0.80, 0.4, 0.1],None),
+    PlotSpec("xr_GHG_non_ag", "non_ag", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", False,[0.63, 0.84, 0.4, 0.1],add_targets_line)
 ]
 
 for spec in plot_specs:

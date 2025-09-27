@@ -746,11 +746,13 @@ def subtract_tifs(a_path, b_path, out_path):
         out = arr_a - arr_b
 
         # 4) 将 <0 的结果置为 NaN（其他位置原本的 NaN 将自动保留）
-        out[out < 0] = np.nan
+        out[out <= 0] = np.nan
 
         # 5) 写出（Float32 + LZW 压缩；nodata 设为 NaN）
+        nodata_value = -9999
         profile = A.profile.copy()
-        profile.update(dtype="float32", compress="lzw", nodata=np.nan)
+        profile.update(dtype="float32", compress="lzw", nodata=nodata_value)
+        out = np.where(np.isnan(out), nodata_value, out)
 
         with rasterio.open(out_path, "w", **profile) as dst:
             dst.write(out, 1)
