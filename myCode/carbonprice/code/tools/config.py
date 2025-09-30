@@ -1,9 +1,7 @@
 import math
 
 N_JOBS = math.ceil(41 / 1)
-TASK_NAME = "20250922_Paper2_Results_NCI"
-
-
+TASK_NAME = "20250926_Paper2_Results_HPC" # "20250922_Paper2_Results_NCI"  #
 
 COST_DICT = {
     'cost_am': [
@@ -69,7 +67,7 @@ NAME_DICT = {
     "cost": {"title": "Cost", "unit": "(MAU$)"},
 }
 
-START_YEAR = 2020
+START_YEAR = 2025
 COLUMN_NAME = ["Ag", "AM",  "Non-ag", "Transition(ag2ag)","Transition(ag2non-ag)"]
 
 
@@ -77,7 +75,7 @@ economic_files = ['xr_cost_ag', 'xr_cost_agricultural_management', 'xr_cost_non_
 carbon_files = ['xr_GHG_ag', 'xr_GHG_ag_management', 'xr_GHG_non_ag', 'xr_transition_GHG']
 bio_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_biodiversity_GBF2_priority_ag_management','xr_biodiversity_GBF2_priority_non_ag']
 
-input_files_0 = ['Run_13_GHG_off_BIO_off_CUT_50']
+input_files_0 = ['Run_18_GHG_off_BIO_off_CUT_50']
 input_files_1 = ['Run_12_GHG_low_BIO_off_CUT_50', 'Run_06_GHG_high_BIO_off_CUT_50']
 input_files_2 = [
     'Run_11_GHG_low_BIO_high_CUT_10',  'Run_10_GHG_low_BIO_high_CUT_20',  'Run_09_GHG_low_BIO_high_CUT_30',  'Run_08_GHG_low_BIO_high_CUT_40',  'Run_07_GHG_low_BIO_high_CUT_50',
@@ -120,7 +118,7 @@ PRICE_TITLE_MAP = {'carbon_low': r'Reference→$\mathrm{GHG}_{\mathrm{low}}$',
                 'Counterfactual_carbon_high_bio_50': r'Reference→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
                 }
 
-ORIGINAL_TITLE_MAP = {'Run_13_GHG_off_BIO_off_CUT_50': 'Reference',
+ORIGINAL_TITLE_MAP = {'Run_18_GHG_off_BIO_off_CUT_50': 'Reference',
                 'Run_12_GHG_low_BIO_off_CUT_50': r'$\mathrm{GHG}_{\mathrm{low}}$',
                 'Run_06_GHG_high_BIO_off_CUT_50': r'$\mathrm{GHG}_{\mathrm{high}}$',
 

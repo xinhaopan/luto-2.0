@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250926_Paper2_Results_HPC_1'],
+    'TASK_NAME': ['20250926_Paper2_Results_HPC'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],

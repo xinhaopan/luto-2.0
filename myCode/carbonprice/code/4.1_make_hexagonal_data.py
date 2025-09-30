@@ -1,20 +1,13 @@
 import tools.config as config
-from tools.tools import get_path
 
-import os
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from joblib import Parallel, delayed
-from rasterio.features import geometry_mask
+import os
 import numpy as np
 import geopandas as gpd
-import pandas as pd
 import rasterio
 from rasterio.features import rasterize
 
-def process_env_cat(env_cat, shp_name, file_parts, tif_dir):
+def create_shp(env_cat, shp_name, file_parts, tif_dir):
     for file_part in file_parts:
         tif_env_dir = os.path.join(tif_dir, env_cat)
         input_tif_name = f'xr_{file_part}_{env_cat}_2050.tif'
@@ -22,11 +15,7 @@ def process_env_cat(env_cat, shp_name, file_parts, tif_dir):
         os.makedirs(os.path.dirname(out_shp), exist_ok=True)
         zonal_stats_rasterized(tif_env_dir, input_tif_name, shp_path, out_shp)
 
-import os
-import numpy as np
-import geopandas as gpd
-import rasterio
-from rasterio.features import rasterize
+
 
 def zonal_stats_rasterized(input_tif_dir, input_tif_name, shp_path, out_shp,
                            extra_nodata_vals=(-9999.0,), drop_allnan=True):
@@ -114,21 +103,16 @@ output_all_names = carbon_names + carbon_bio_names + counter_carbon_bio_names
 file_parts = ['total_cost', 'cost_ag', 'cost_agricultural_management', 'cost_non_ag', 'cost_transition_ag2ag_diff',
                   'transition_cost_ag2non_ag_amortised_diff', 'total_carbon', 'total_bio', 'bio_price', 'carbon_price']
 
-# shp_names = ['H_1kkm2','H_2kkm2','H_5kkm2','H_100km2']
-shp_names = ['H_5kkm2']
+njobs = 41
+shp_names = ['H_1kkm2','H_2kkm2','H_5kkm2','H_100km2']
 
 for shp_name in shp_names:
     shp_path = f"../Map/{shp_name}.shp"
-    Parallel(n_jobs=len(output_all_names))(
-        delayed(process_env_cat)(env_cat, shp_name, file_parts, tif_dir)
-        for env_cat in output_all_names
-    )
-# for shp_name in shp_names:
-#     shp_path = f"../Map/{shp_name}.shp"
-#     for env_cat in output_all_names:
-#         for file_part in file_parts:
-#             tif_env_dir = os.path.join(tif_dir, env_cat)
-#             input_tif_name = f'xr_{file_part}_{env_cat}_2050.tif'
-#             out_shp = os.path.join(tif_env_dir, f'{shp_name}',f'{shp_name}_{file_part}_{env_cat}_2050.shp')
-#             os.makedirs(os.path.dirname(out_shp), exist_ok=True)
-#             zonal_stats_rasterized(tif_env_dir, input_tif_name, shp_path, out_shp)
+    if njobs == 0:
+        for env_cat in output_all_names:
+            create_shp(env_cat, shp_name, file_parts, tif_dir)
+    else:
+        Parallel(n_jobs=len(output_all_names))(
+            delayed(create_shp)(env_cat, shp_name, file_parts, tif_dir)
+            for env_cat in output_all_names
+        )

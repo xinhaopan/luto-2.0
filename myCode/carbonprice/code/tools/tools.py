@@ -9,6 +9,7 @@ import tempfile
 import shutil
 from filelock import FileLock, Timeout
 from typing import Union
+import glob
 
 import tools.config as config
 
@@ -443,3 +444,24 @@ def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0):
         dst.write_mask((valid_mask.astype(np.uint8) * 255))
 
     print(f"✅ 已保存: {tif_path}")
+
+def get_data_RES_path(output_path="output"):
+    """
+    获取 output 文件夹下第一个子文件夹的路径，并拼接文件名 'data_with_solution.pkl'。
+
+    参数:
+        output_path (str): output 文件夹路径，默认为 "output"。
+
+    返回:
+        str: 拼接后的 pkl 文件路径。如果没有子文件夹，返回 None。
+    """
+    # 获取所有子文件夹
+    # subfolders = [f for f in os.listdir(output_path) if os.path.isdir(os.path.join(output_path, f))]
+    subfolders = [f for f in os.listdir(output_path) if
+                  os.path.isdir(os.path.join(output_path, f)) and '2010-2050' in f]
+
+    pattern = os.path.join(os.path.join(output_path, subfolders[0]), "Data_RES*.gz")
+    found_file = glob.glob(pattern)[0]
+
+    # return os.path.join(output_path, subfolders[0], 'data_with_solution.pkl')
+    return found_file

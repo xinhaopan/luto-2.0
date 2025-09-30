@@ -18,6 +18,8 @@ from pygam import LinearGAM, s
 import re
 from typing import List, Optional, Dict
 
+import tools.config as config
+
 def xarray_to_dict(file_path: str, scale: float = None, add_total: bool = False,negative=False, year_threshold: int = 2020) -> dict:
     """
     将 (scenario, Year, type) 的 xarray.DataArray 转换为 dict。
@@ -50,6 +52,7 @@ def xarray_to_dict(file_path: str, scale: float = None, add_total: bool = False,
             index=da_s.coords['Year'].values,
             columns=da_s.coords['type'].values
         )
+
         if add_total:
             df['Total'] = df.sum(axis=1)
         result[scenario] = df
@@ -416,6 +419,7 @@ def plot_13_layout(
                                                                desired_ticks=desired_ticks)
     for i, (ax, title_key) in enumerate(zip(axes, title_names)):
         df = all_dfs[title_key]
+        df = df[df.index >= config.START_YEAR]
         title = title_map.get(title_key, title_key)
 
         stacked_area_pos_neg(
@@ -429,10 +433,13 @@ def plot_13_layout(
         )
 
         x_data = df.index
-        start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
-        tick_positions = [start_tick, middle_tick, end_tick]
-
+        x_min, x_max = x_data.min(), x_data.max()
+        tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+        tick_positions = [year for year in tick_positions if year in x_data]
+        # start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
+        # tick_positions = [start_tick, middle_tick, end_tick]
         ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x', labelrotation=45)
         # 底行显示 x 轴标签，其余行隐藏
         if i in [8, 9, 10, 11, 12]:
             ax.tick_params(axis='x')
@@ -452,10 +459,10 @@ def plot_13_layout(
                 xtlabs[0].set_visible(False)  # 隐藏第一个（最左）
 
         # 仅对 8：隐藏 y 轴“最下面”的刻度标签（保留刻度线）
-        if i == 8:
-            ytlabs = ax.get_yticklabels()
-            if ytlabs:
-                ytlabs[0].set_visible(False)  # 隐藏第一个（最下）
+        # if i == 8:
+        #     ytlabs = ax.get_yticklabels()
+        #     if ytlabs:
+        #         ytlabs[0].set_visible(False)  # 隐藏第一个（最下）
 
 
         if i == 0:
@@ -736,6 +743,7 @@ def plot_22_layout(
                 break  # 或者 raise / continue，看你的需求
 
             title_key, df = items[data_idx]
+            df = df[df.index >= config.START_YEAR]
             data_idx += 1
 
             title = title_map.get(title_key, title_key)
@@ -757,6 +765,15 @@ def plot_22_layout(
                 dividing_line=dividing_line
             )
 
+            x_data = df.index
+            x_min, x_max = x_data.min(), x_data.max()
+            tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+            tick_positions = [year for year in tick_positions if year in x_data]
+            ax.set_xticks(tick_positions)
+            # start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
+            # tick_positions = [start_tick, middle_tick, end_tick]
+            # ax.set_xticks(tick_positions)
+            ax.tick_params(axis='x', labelrotation=45)
             # 设置 x 轴刻度
             if r == 4:
                 ax.tick_params(axis='x', labelbottom=True)
@@ -776,11 +793,11 @@ def plot_22_layout(
                 if xtlabs:
                     xtlabs[0].set_visible(False)  # 隐藏第一个（最左）
 
-            # 仅对 8：隐藏 y 轴“最下面”的刻度标签（保留刻度线）
-            if r == 4 and c == 0:
-                ytlabs = ax.get_yticklabels()
-                if ytlabs:
-                    ytlabs[0].set_visible(False)  # 隐藏第一个（最下）
+            # # 仅对 8：隐藏 y 轴“最下面”的刻度标签（保留刻度线）
+            # if r == 4 and c == 0:
+            #     ytlabs = ax.get_yticklabels()
+            #     if ytlabs:
+            #         ytlabs[0].set_visible(False)  # 隐藏第一个（最下）
 
     # 在第一行右侧三格创建一个“空轴”做图例面板（跨 3 列）
     legend_ax = fig.add_subplot(gs[0, 2:5])
@@ -892,19 +909,24 @@ def draw_12_price(
     color,
     output_path,
     desired_ticks=5,
-    ylabel_carbon=r"Carbon price (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
-    ylabel_bio=r"Biodiversity cost (AU\$ contribution-weighted area ha$^{-1}$ yr$^{-1}$)",
+    ylabel_carbon="Shadow carbon price under net-zero targets\n(AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
+    ylabel_bio="Biodiversity cost\n(AU\$ contribution-weighted area ha$^{-1}$ yr$^{-1}$)",
     figsize=(24, 16),
     ci=95,
 ):
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.5, wspace=0.2)
+    gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.15, wspace=0.15)
+    fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
 
     # ------ x轴刻度（所有数据统一） ------
     x_data = df.index
     x_min, x_max = x_data.min(), x_data.max()
-    x_middle = x_data[int(len(x_data) // 2)]
-    tick_positions = [x_min, x_middle, x_max]
+    # x_middle = x_data[int(len(x_data) // 2)]
+    # tick_positions = [x_min, x_middle, x_max]
+
+
+    tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+    tick_positions = [year for year in tick_positions if year in x_data]
 
     # ------ Carbon图（第一行前两个） ------
     carbon_y = np.concatenate([df.iloc[:, i].values for i in range(2)])
@@ -920,7 +942,7 @@ def draw_12_price(
         ax.set_ylim(y_carbon_all[0],y_carbon_all[1])
         ax.set_yticks(y_carbon_all[2])
         ax.set_xticks(tick_positions)
-        ax.tick_params(axis='x')
+        ax.tick_params(axis='x', labelbottom=False)
         if i != 0:
             ax.tick_params(axis='y', labelleft=False)
         ax_carbon_list.append(ax)
@@ -931,8 +953,8 @@ def draw_12_price(
 
     # ------ Bio图（后两行） ------
     bio_y = np.concatenate([df.iloc[:, i + 2].values for i in range(10)])
-    y_bio_all = get_y_axis_ticks(0,np.nanmax(bio_y),desired_ticks=desired_ticks)
-    bio_ylim = (y_bio_all[0], y_bio_all[1])
+    y_bio_all = get_y_axis_ticks(0,np.nanmax(bio_y),desired_ticks=desired_ticks-2)
+    # bio_ylim = (y_bio_all[0], y_bio_all[1])
     ax_bio_list = []
     for i in range(10):
         row, col = i // 5 + 1, i % 5
@@ -940,20 +962,36 @@ def draw_12_price(
         df_input = df.iloc[:, i + 2].to_frame()
         draw_fit_line_ax(
             ax, df_input, color=color, title_name=title_map.get(df.columns[i + 2]),ci=ci)
-        ax.set_ylim(*bio_ylim)
-
+        ax.set_ylim(y_bio_all[0], y_bio_all[1])
+        ax.set_yticks(y_bio_all[2])
         ax.set_xticks(tick_positions)
         ax.tick_params(axis='x')
 
         if col != 0:
             ax.tick_params(axis='y', labelleft=False)
+        if row != 2:
+            ax.tick_params(axis='x', labelbottom=False)
+
+
+        # if row == 2 and col == 0:
+        #     ytlabs = ax.get_yticklabels()
+        #     if ytlabs:
+        #         ytlabs[0].set_visible(False)
+        # if row == 2 and col > 0:
+        #     xtlabs = ax.get_xticklabels()
+        #     if xtlabs:
+        #         xtlabs[0].set_visible(False)
+
+
         ax_bio_list.append(ax)
 
     # ------ Y轴标签 ------
     ax_carbon_list[0].set_ylabel(ylabel_carbon)
+    x0, y0 = ax_carbon_list[0].yaxis.get_label().get_position()
+    ax_carbon_list[0].yaxis.set_label_coords(-0.19, y0)
+
     ax_bio_list[0].set_ylabel(ylabel_bio)
-    ax_carbon_list[0].yaxis.set_label_coords(-0.3, 0.3)
-    ax_bio_list[0].yaxis.set_label_coords(-0.3, -0.4)
+    ax_bio_list[0].yaxis.set_label_coords(-0.19, -0.02)
 
     # ------ 图例 ------
     if draw_legend:
@@ -1164,13 +1202,17 @@ def draw_10_price(
     依赖外部函数：draw_fit_line_ax(ax, df_input, color, title_name)
     """
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(2, 5, figure=fig, hspace=0.5, wspace=0.2)
+    gs = gridspec.GridSpec(2, 5, figure=fig, hspace=0.15, wspace=0.15)
+    fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
 
     # ---- 统一 x 轴刻度 ----
     x_data = df2.index
     x_min, x_max = x_data.min(), x_data.max()
-    x_middle = x_data[int(len(x_data) // 2)]
-    tick_positions = [x_min, x_middle, x_max]
+    # x_middle = x_data[int(len(x_data) // 2)]
+    # tick_positions = [x_min, x_middle, x_max]
+
+    tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+    tick_positions = [year for year in tick_positions if year in x_data]
 
     # ---- 统一 y 轴范围（根据全部10列）----
     bio_y = np.concatenate([df2.iloc[:, i].values for i in range(10)])
@@ -1208,21 +1250,26 @@ def draw_10_price(
         ax.set_xticks(tick_positions)
         ax.tick_params(axis='x')
 
-        # 左右对齐首尾 label（可选）
-        x_labels = ax.get_xticklabels()
-        if len(x_labels) >= 3:
-            x_labels[0].set_horizontalalignment('left')
-            x_labels[-1].set_horizontalalignment('right')
-
         # 非首列不显示 y 轴刻度文本
         if col != 0:
             ax.tick_params(axis='y', labelleft=False)
+        if row != 1:
+            ax.tick_params(axis='x', labelbottom=False)
+
+        # if row == 1 and col == 0:
+        #     ytlabs = ax.get_yticklabels()
+        #     if ytlabs:
+        #         ytlabs[0].set_visible(False)
+        # if row == 1 and col > 0:
+        #     xtlabs = ax.get_xticklabels()
+        #     if xtlabs:
+        #         xtlabs[0].set_visible(False)
 
         axes.append(ax)
 
     # y 轴标签放在第一个子图上，并上移
     axes[0].set_ylabel(ylabel)
-    axes[0].yaxis.set_label_coords(*ylabel_pos)
+    axes[0].yaxis.set_label_coords(-0.19, -0.03)
 
     # legend：默认只在第一个子图里放，避免重复
     if legend_on_first_ax:

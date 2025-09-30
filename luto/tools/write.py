@@ -1737,19 +1737,14 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
     if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
-        priority_degraded_area_score_r = xr.DataArray(
-            np.zeros(data.NCELLS),
-            dims=['cell'],
-            coords={'cell': range(data.NCELLS)}
-        )
+        data.BIO_PRIORITY_DEGRADED_AREAS_R = np.zeros(data.NCELLS, dtype=np.float32)
 
-    else:
-        # Get the priority degraded areas score
-        priority_degraded_area_score_r = xr.DataArray(
-            data.BIO_PRIORITY_DEGRADED_AREAS_R,
-            dims=['cell'],
-            coords={'cell':range(data.NCELLS)}
-        )
+    # Get the priority degraded areas score
+    priority_degraded_area_score_r = xr.DataArray(
+        data.BIO_PRIORITY_DEGRADED_AREAS_R,
+        dims=['cell'],
+        coords={'cell':range(data.NCELLS)}
+    )
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(

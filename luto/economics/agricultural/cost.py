@@ -530,7 +530,8 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
     base_yr_idx = all_yrs.index(yr_cal) - 1
     base_yr = all_yrs[base_yr_idx]
     if base_yr_idx < 0:
-        raise ValueError("The base year index for HIR - Sheep is out of range. Are you calculating HIR cost for the BASE year?")
+        # raise ValueError("The base year index for HIR - Sheep is out of range. Are you calculating HIR cost for the BASE year?")
+        return np.zeros_like(c_mrj_effects)
 
     # Cost reduction due to reduced livestock density; assume all costs (Area, Fixed, Quantity ...) are reduced proportionally
     for m, lm in enumerate(data.LANDMANS):

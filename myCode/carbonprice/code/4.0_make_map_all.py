@@ -356,7 +356,7 @@ def efficient_tif_plot(
         data_to_plot = data
 
     elif normalization == 'percent_clip':
-        norm = make_percent_clip_norm(data, clip_percent=(5, 95))
+        norm = make_percent_clip_norm(data, clip_percent=(0, 95))
         data_to_plot = data
 
     elif normalization == 'sigmoid':
@@ -857,7 +857,7 @@ def plot_tif_layer(
         title_y=title_y,
         char_ticks_length=1,
         unit_labelpad=1,
-        normalization=normalization,
+        normalization='linear', # normalization,
         decimal_places=decimal_places,
         custom_tick_values=custom_tick_values,
     )
@@ -1127,13 +1127,12 @@ aligned_tif = f"{arr_path}/public_area_aligned.tif"
 align_raster_to_reference(src_tif, ref_tif, aligned_tif, resampling="nearest")
 
 # 统一色带
-# cost_cmap  = LinearSegmentedColormap.from_list("cost",  ["#FFFEC2", "#FA4F00", "#A80000","#5c2324"])
-cost_cmap  = cmocean.cm.matter
-# benefit_cmap = LinearSegmentedColormap.from_list("benefit", ["#ffff80", "#38e009","#1a93ab","#0c1078"])
-benefit_cmap = cmocean.cm.haline_r
-# price_cmap = LinearSegmentedColormap.from_list("price", ["#00ffff", "#ff00ff"])
-price_cmap = cm.buda_r
-
+cost_cmap  = LinearSegmentedColormap.from_list("cost",  ["#FFFEC2", "#FA4F00", "#A80000","#5c2324"])
+# cost_cmap  = cmocean.cm.matter
+benefit_cmap = LinearSegmentedColormap.from_list("benefit", ["#ffff80", "#38e009","#1a93ab","#0c1078"])
+# benefit_cmap = cmocean.cm.haline_r
+price_cmap = LinearSegmentedColormap.from_list("price", ["#00ffff", "#ff00ff"])
+# price_cmap = cm.buda_r
 # ==== 你的既有配置（保持不变）====
 scenarios = {
     "carbon_high": {
@@ -1173,48 +1172,48 @@ layer_overrides = {
 }
 
 
-# ==== 逐个情景执行：一个情景所有图画完，再画下一个 ====
-for env, cfg in scenarios.items():
-    plot_all_for_scenario(env, cfg, year=2050)
+# # ==== 逐个情景执行：一个情景所有图画完，再画下一个 ====
+# for env, cfg in scenarios.items():
+#     plot_all_for_scenario(env, cfg, year=2050)
 # 合并模式
-# fig,ax = plot_all_scenarios_combined(scenarios, year=2050, figsize=(20, 30))
-#
-# font_size = ax.xaxis.get_label().get_size()
-# font_family = ax.xaxis.get_label().get_family()[0]
-#
-# plt.rcParams['font.family'] = font_family
-# plt.rcParams['mathtext.fontset'] = 'custom'
-# plt.rcParams['mathtext.rm'] = font_family   # 直立
-# plt.rcParams['mathtext.it'] = font_family   # 斜体
-# plt.rcParams['mathtext.bf'] = font_family   # 粗体
-# plt.rcParams['mathtext.sf'] = font_family   # 无衬线
-#
-# add_north_arrow(fig, 0.20, 0.063,size=0.012)
-# add_scalebar(fig,ax, 0.23, 0.069, length_km=500, fontsize=font_size,fontfamily=font_family,linewidth=1)
-# add_annotation(fig, 0.285, 0.073, width=0.015, text="Australian state boundary",linewidth=1,
-#                style="line", linecolor="black",fontsize=font_size, fontfamily=font_family)
-# add_annotation(fig, 0.435, 0.07, width=0.0122, height=0.0072,linewidth=1, text="No data",
-#                style="box", facecolor="white", edgecolor="black",fontsize=font_size, fontfamily=font_family)
-# add_annotation(fig, 0.52, 0.07, width=0.0122, height=0.0072,linewidth=1, text="Public, indigenous, urban, and other intensive land uses",
-#                style="box", facecolor="#808080",edgecolor="#808080",fontsize=font_size, fontfamily=font_family)
-# fig.text(
-#     0.015, 0.76, r'Reference→$\mathrm{GHG}_{\mathrm{high}}$',
-#     rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
-#     rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
-# )
-# fig.text(
-#     0.015, 0.47, r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
-#     rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
-#     rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
-# )
-# fig.text(
-#     0.015, 0.2, r'Reference→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
-#     rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
-#     rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
-# )
-#
-# # plt.subplots_adjust(bottom=0.05)
-# output_path = os.path.join(out_dir, f"06_all_maps")
-# # save_figure_properly(fig, output_path, facecolor='white')
-# fig.savefig(f"{output_path}.png", dpi=300)
-# plt.show()
+fig,ax = plot_all_scenarios_combined(scenarios, year=2050, figsize=(20, 30))
+
+font_size = ax.xaxis.get_label().get_size()
+font_family = ax.xaxis.get_label().get_family()[0]
+
+plt.rcParams['font.family'] = font_family
+plt.rcParams['mathtext.fontset'] = 'custom'
+plt.rcParams['mathtext.rm'] = font_family   # 直立
+plt.rcParams['mathtext.it'] = font_family   # 斜体
+plt.rcParams['mathtext.bf'] = font_family   # 粗体
+plt.rcParams['mathtext.sf'] = font_family   # 无衬线
+
+add_north_arrow(fig, 0.20, 0.063,size=0.012)
+add_scalebar(fig,ax, 0.23, 0.069, length_km=500, fontsize=font_size,fontfamily=font_family,linewidth=1)
+add_annotation(fig, 0.285, 0.073, width=0.015, text="Australian state boundary",linewidth=1,
+               style="line", linecolor="black",fontsize=font_size, fontfamily=font_family)
+add_annotation(fig, 0.435, 0.07, width=0.0122, height=0.0072,linewidth=1, text="No data",
+               style="box", facecolor="white", edgecolor="black",fontsize=font_size, fontfamily=font_family)
+add_annotation(fig, 0.52, 0.07, width=0.0122, height=0.0072,linewidth=1, text="Public, indigenous, urban, and other intensive land uses",
+               style="box", facecolor="#808080",edgecolor="#808080",fontsize=font_size, fontfamily=font_family)
+fig.text(
+    0.015, 0.76, r'Reference→$\mathrm{GHG}_{\mathrm{high}}$',
+    rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
+    rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
+)
+fig.text(
+    0.015, 0.47, r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
+    rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
+    rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
+)
+fig.text(
+    0.015, 0.2, r'Reference→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
+    rotation=90, va="center", ha="left", fontsize=font_size,fontfamily=font_family,
+    rotation_mode="anchor"  # 以锚点为中心旋转，贴边更稳
+)
+
+# plt.subplots_adjust(bottom=0.05)
+output_path = os.path.join(out_dir, f"06_all_maps_line")
+# save_figure_properly(fig, output_path, facecolor='white')
+fig.savefig(f"{output_path}.png", dpi=300)
+plt.show()

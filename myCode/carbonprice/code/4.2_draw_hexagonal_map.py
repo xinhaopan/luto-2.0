@@ -1067,8 +1067,9 @@ title_keys = [
 
 # 可选覆盖：别忘了它（生效于成本组件）
 layer_overrides = {
-    'Counterfactual_carbon_high_bio_50': dict(title_name = f"Carbon price for GHG and biodiversity"),
-    'carbon_high_bio_50': dict(title_name = f"Carbon price for biodiversity"),
+    'Counterfactual_carbon_high_bio_50': dict(title_name = "Shadow carbon price under\nnet-zero targets and nature-positive targets"),
+    'carbon_high_bio_50': dict(title_name = "Shadow carbon price\nunder nature-positive targets"),
+    'carbon_high': dict(title_name = "Shadow carbon price\nunder net-zero targets"),
     'total_bio':dict(legend_nbins=3,unit_labelpad=5),
     'carbon_price':dict(legend_nbins=3),
 }

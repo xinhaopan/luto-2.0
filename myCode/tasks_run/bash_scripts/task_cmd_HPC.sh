@@ -10,6 +10,7 @@ echo "[$(date '+%F %T')] Script started"
 script_name="$1"
 echo "script_name: $script_name"
 
+
 WORKDIR=$(pwd)
 echo "[$(date '+%F %T')] Current working directory: $WORKDIR"
 
@@ -153,6 +154,24 @@ for RETRY_COUNT in $(seq 1 $MAX_RETRIES); do
 #SBATCH --error=%x_%j.err
 
 cd "$WORKDIR"
+
+
+# Create temporary directory (add job ID to avoid conflicts)
+export CUSTOM_TMPDIR="/home/remote/s222552331/LUTO2_XH/TMPDIR/job_\${SLURM_JOB_ID}"
+mkdir -p "\$CUSTOM_TMPDIR"
+# Set all temporary directory environment variables
+export TMPDIR="\$CUSTOM_TMPDIR"
+export TMP="\$CUSTOM_TMPDIR"
+export TEMP="\$CUSTOM_TMPDIR"
+# Cleanup function (prevent accumulation of temporary files)
+cleanup() {
+    echo "Cleaning up temporary files: \$CUSTOM_TMPDIR"
+    rm -rf "\$CUSTOM_TMPDIR"
+}
+trap cleanup EXIT
+echo "Using temporary directory: \$TMPDIR"
+
+
 echo "SLURM job started at \$(date '+%F %T')"
 ${PYTHON} ${script_name}
 EOF

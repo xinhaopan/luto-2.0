@@ -6,10 +6,10 @@ import shutil
 #  配置区域
 # ==============================================================================
 CPU_CORES = 90
-MEMORY_GB = "1500G"
+MEMORY_GB = "900G"
 TIME_LIMIT = "0-720:00:00"
 
-PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"
+PYTHON_SCRIPT_TO_RUN = "3.9_create_tif.py"
 CONDA_ENV_NAME = "xpluto-fixed"
 
 SUBMISSION_SCRIPT_NAME = "submit_preprocess.sh"
@@ -25,8 +25,8 @@ def create_and_submit_hpc_job():
 
     slurm_script_content = f"""#!/bin/bash
 #SBATCH --job-name=carbon_preprocess
-#SBATCH --partition=mem
-#SBATCH --nodelist=hpc-fc-b-1
+#SBATCH --partition=dgx
+#SBATCH --nodelist=hpc-dgx-b-2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task={CPU_CORES}
 #SBATCH --mem={MEMORY_GB}

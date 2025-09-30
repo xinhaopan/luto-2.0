@@ -36,7 +36,7 @@ def add_targets_line(axes):
     low_axes = [1, 3, 4, 5, 6, 7]
 
     # 统一样式：藏青色、实线、无点
-    line_kw = dict(color='navy', linestyle='-', linewidth=3, zorder=60)
+    line_kw = dict(color='#0078d4', linestyle='-', linewidth=3, zorder=60)
 
     # high 子图
     for idx in high_axes:
@@ -74,14 +74,14 @@ PlotSpec = namedtuple("PlotSpec", ["file", "sheet", "ylabel","add_line","bbox_to
 
 # 把三元组写在一起，避免对不上的问题
 plot_specs = [
-    PlotSpec("xr_total_carbon", "carbon_total", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", True,[0.63, 0.80, 0.4, 0.1],None),
+    PlotSpec("xr_total_carbon", "carbon_total", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", True,[0.63, 0.80, 0.4, 0.1],add_targets_line),
     PlotSpec("xr_total_bio", "biodiversity_total", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", True,[0.63, 0.80, 0.4, 0.1],None),
     PlotSpec("xr_area_agricultural_management", "am", r"Area (Mha yr$^{-1}$)", False,[0.63, 0.80, 0.4, 0.1],None),
     PlotSpec("xr_area_non_agricultural_landuse", "non_ag", r"Area (Mha yr$^{-1}$)", False,[0.63, 0.82, 0.4, 0.1],None),
     PlotSpec("xr_biodiversity_GBF2_priority_ag_management", "am", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", False,[0.63, 0.80, 0.4, 0.1],None),
     PlotSpec("xr_biodiversity_GBF2_priority_non_ag", "non_ag", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", False,[0.63, 0.82, 0.4, 0.1],None),
     PlotSpec("xr_GHG_ag_management", "am", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", False,[0.63, 0.80, 0.4, 0.1],None),
-    PlotSpec("xr_GHG_non_ag", "non_ag", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", False,[0.63, 0.84, 0.4, 0.1],add_targets_line)
+    PlotSpec("xr_GHG_non_ag", "non_ag", r"GHG emissions (MtCO$_2$e yr$^{-1}$)", False,[0.63, 0.84, 0.4, 0.1],None)
 ]
 
 for spec in plot_specs:

@@ -192,6 +192,15 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
             print(f"Warning: Gurobi solver did not find an optimal/suboptimal solution for year {target_year}. Status: {luto_solver.gurobi_model.Status}")
             print(f'Warning: The results are still written to disk, but will not be optimal.')
             print('!' * 100)
+
+            # 🎯 Step 1: Compute the IIS
+            luto_solver.gurobi_model.computeIIS()
+
+            # 📄 Step 2: Write the IIS to a file for easy analysis
+            # This is the most useful step. The .ilp file will contain ONLY the conflicting constraints.
+            iis_filename = f"model_iis_{target_year}.ilp"
+            luto_solver.gurobi_model.write(iis_filename)
+
             print('\n')
             
             break
