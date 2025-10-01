@@ -88,7 +88,7 @@ def parse_running_year(runing_file):
 
 
 if __name__ == "__main__":
-    base_dir = '../../output/20250926_Paper2_Results_HPC'
+    base_dir = '../../output/20250930_Nick_task'
     # base_dir = '../../output/20250921_Paper2_Results'
     target_year = 2050
 
@@ -120,11 +120,11 @@ if __name__ == "__main__":
     print(results_df)
     print(f"✅ Run 状态表已保存: {out_excel}")
 
-    # 筛选 EndYear != target_year
-    not_target = results_df[results_df["EndYear"] != target_year]["Name"]
-    if not not_target.empty:
-        print(f"\n以下运行的 EndYear 不是 {target_year}:")
-        for name in not_target:
-            print(" -", name)
-    else:
-        print(f"\n所有运行的 EndYear 均为 {target_year} ✅")
+    # # 筛选 EndYear != target_year
+    # not_target = results_df[results_df["EndYear"] != target_year]["Name"]
+    # if not not_target.empty:
+    #     print(f"\n以下运行的 EndYear 不是 {target_year}:")
+    #     for name in not_target:
+    #         print(" -", name)
+    # else:
+    #     print(f"\n所有运行的 EndYear 均为 {target_year} ✅")

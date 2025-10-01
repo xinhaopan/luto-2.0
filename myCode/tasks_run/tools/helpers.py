@@ -37,6 +37,7 @@ def get_settings_df(task_root_dir:str) -> pd.DataFrame:
         for k, v in settings_dict.items():
             if not isinstance(v, str):
                 non_str_val_file.write(f'{k}\n')
+        non_str_val_file.write(f'KEEP_OUTPUTS\n')
 
     # Create a template for custom settings
     settings_df = pd.DataFrame({k: [v] for k, v in settings_dict.items()}).T.reset_index()

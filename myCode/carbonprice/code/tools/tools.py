@@ -1,15 +1,11 @@
-import numpy as np
-import pandas as pd
-import os
-import re
-import rasterio
-import xarray as xr
-import os
-import tempfile
-import shutil
-from filelock import FileLock, Timeout
 from typing import Union
 import glob
+import shutil, tempfile, time, random
+import xarray as xr
+from filelock import FileLock, Timeout
+import numpy as np
+import rasterio
+import os
 
 import tools.config as config
 
@@ -78,62 +74,6 @@ def get_path(task_name, path_name):
             f"Current directory content for {output_path}: {os.listdir(output_path) if os.path.exists(output_path) else 'Directory not found'}")
 
 
-# def npy_to_map(input_arr, output_tif, proj_file,
-#                fill_value=np.nan, shift=0,
-#                dtype=rasterio.float32):
-#     """
-#     将一维 .npy 数组铺回到栅格地图中。
-#     - input_arr: path to .npy (1D array of length = number of valid pixels in proj_file)
-#     - output_tif: 输出 GeoTIFF 路径
-#     - proj_file: 用于投影和形状参照的已有 GeoTIFF
-#     - fill_value: 初始填充值（默认 np.nan）
-#     - shift: 在写入前对数据统一加的偏移量
-#     - dtype: 输出栅格的数据类型
-#     """
-#     if not input_arr.lower().endswith(".npy"):
-#         return
-#
-#     # 1) 读取参考栅格
-#     with rasterio.open(proj_file) as src:
-#         mask2D = src.read(1) >= 0
-#         transform = src.transform
-#         crs = src.crs
-#         profile = src.profile.copy()
-#         shape = src.shape
-#
-#     # 2) 加载一维数组
-#     nonzeroes = np.where(mask2D)
-#     lumap = np.load(input_arr)
-#
-#     if lumap.ndim != 1:
-#         raise ValueError(f"{input_arr} 中的数组不是一维的")
-#     if len(lumap) != len(nonzeroes[0]):
-#         print(f"Warning: {input_arr} 的长度为 {len(lumap)}, proj_file 中有效像元数量为 {len(nonzeroes[0])}.")
-#         raise ValueError("lumap 的长度与 proj_file 中的有效像元数量不一致")
-#
-#     # 3) 构建全图，并赋值
-#     themap = np.full(shape, fill_value=fill_value, dtype=float)
-#     themap[nonzeroes] = lumap + shift
-#
-#     # 4) 把 +/- inf 都变成 np.nan
-#     themap[~np.isfinite(themap)] = np.nan
-#
-#     # 5) 更新 profile 并写出
-#     profile.update({
-#         'dtype': dtype,
-#         'count': 1,
-#         'compress': 'lzw',
-#         'nodata': fill_value
-#     })
-#     with rasterio.open(output_tif, 'w', **profile) as dst:
-#         dst.write(themap.astype(dtype), 1)
-#
-#     return output_tif
-
-import os, shutil, tempfile, time, random
-import numpy as np
-import xarray as xr
-from filelock import FileLock, Timeout
 
 
 def save2nc(
@@ -243,94 +183,6 @@ def save2nc(
             print(f"警告：清理锁文件失败 {lockfile}: {e}")
 
 
-# def save2nc(
-#     in_xr,
-#     save_path: str,
-#     *,
-#     engine: str = "h5netcdf",
-#     allow_overwrite: bool = True,
-#     compress: bool = True,
-#     lock_timeout: int = 600,
-#     lock_path: str | None = None,
-#     compute_before_write: bool = True,
-#     max_retries: int = 5,
-#     retry_delay: float = 1.0
-# ):
-#     # 目录
-#     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
-
-#     # 统一为 DataArray
-#     if isinstance(in_xr, xr.Dataset):
-#         if len(in_xr.data_vars) != 1:
-#             raise ValueError(f"输入 Dataset 含 {len(in_xr.data_vars)} 个变量，需单变量。")
-#         var_name = next(iter(in_xr.data_vars))
-#         da = in_xr[var_name]
-#     elif isinstance(in_xr, xr.DataArray):
-#         da = in_xr
-#         var_name = da.name or "data"
-#     else:
-#         raise TypeError("in_xr 必须是 xarray.DataArray 或 单变量 xarray.Dataset")
-
-#     if da.name != var_name:
-#         da = da.rename(var_name)
-
-#     # 仅保留维度坐标，剔除非维度坐标（避免写出失败）
-#     coords_to_drop = set(da.coords) - set(da.dims)
-#     if coords_to_drop:
-#         da = da.drop_vars(coords_to_drop, errors="ignore")
-
-#     # 预先计算，避免写出时仍有 dask 依赖
-#     if compute_before_write:
-#         da = da.load()
-
-#     # 编码
-#     enc = {var_name: {"dtype": "float32"}}
-#     if compress:
-#         enc[var_name].update({"zlib": True, "complevel": 4})
-#     if hasattr(da.data, "chunks") and da.data.chunks is not None:
-#         enc[var_name]["chunksizes"] = da.chunks
-
-#     # 锁
-#     lockfile = lock_path or (save_path + ".lock")
-#     save_dir = os.path.dirname(save_path) or "."
-
-#     try:
-#         # ✅ 正确的上下文写法：FileLock(...) 作为 with
-#         with FileLock(lockfile, timeout=lock_timeout):
-#             # 二次检查
-#             if os.path.exists(save_path) and not allow_overwrite:
-#                 raise FileExistsError(f"目标已存在且不允许覆盖：{save_path}")
-
-#             # 独立临时文件路径（先关闭句柄，避免 Windows 上无法 move）
-#             with tempfile.NamedTemporaryFile(dir=save_dir, suffix=".nc", delete=False) as tmp_file:
-#                 temp_path = tmp_file.name
-
-#             try:
-#                 # 写入临时文件（xarray 会在函数返回时关闭句柄）
-#                 da.astype("float32").to_netcdf(path=temp_path, engine=engine, encoding=enc)
-
-#                 # 原子移动（带重试，处理偶发 PermissionError/杀毒软件扫描占用等）
-#                 for attempt in range(max_retries):
-#                     try:
-#                         shutil.move(temp_path, save_path)
-#                         break
-#                     except PermissionError:
-#                         if attempt < max_retries - 1:
-#                             sleep_time = retry_delay * (1.5 ** attempt) + random.uniform(0, 0.5)
-#                             print(f"⚠️ 移动时权限被拒绝，{sleep_time:.2f}s 后重试...")
-#                             time.sleep(sleep_time)
-#                         else:
-#                             raise
-#             except Exception:
-#                 if os.path.exists(temp_path):
-#                     try:
-#                         os.remove(temp_path)
-#                     except Exception:
-#                         pass
-#                 raise
-#     except Timeout:
-#         raise TimeoutError(f"获取写锁超时（{lock_timeout}s）：{lockfile}")
-
 
 def filter_all_from_dims(ds: Union[xr.Dataset, xr.DataArray]) -> Union[xr.Dataset, xr.DataArray]:
     """
@@ -393,55 +245,70 @@ def create_xarray(years, base_path, env_category, env_name, mask=None,
     return ds
 
 
-import numpy as np
-import rasterio
-import os
-
-
 def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0):
+    """
+    将 xarray DataArray 转换为 GeoTIFF，正确处理 nodata 和掩膜
+    """
     # 仅支持 1D 'cell'
     if "cell" not in da.dims or len(da.dims) != 1:
         raise ValueError(f"维度是 {da.dims}，只支持一维 'cell'。")
 
     arr1d = da.values.astype(np.float32)
-    arr1d = np.where(np.isfinite(arr1d), arr1d, nodata_value)
 
-    # 铺回 2D（保持你的逻辑）
+    # 创建有效性掩膜（在转换前）
+    valid_mask_1d = np.isfinite(arr1d)
+
+    # 将无效值替换为 nodata
+    arr1d = np.where(valid_mask_1d, arr1d, nodata_value)
+
+    # 铺回 2D
     full_res_raw = (arr1d.size == data.LUMAP_NO_RESFACTOR.size)
     if full_res_raw:
         geo_meta = data.GEO_META_FULLRES.copy()
         arr_2d = np.full(data.NLUM_MASK.shape, nodata_value, dtype=np.float32)
-        np.place(arr_2d, data.NLUM_MASK, arr1d)
+        valid_mask_2d = np.zeros(data.NLUM_MASK.shape, dtype=bool)
+        # 只在有效位置填充数据和掩膜
+        mask_indices = np.where(data.NLUM_MASK)
+        arr_2d[mask_indices] = arr1d
+        valid_mask_2d[mask_indices] = valid_mask_1d
     else:
         geo_meta = data.GEO_META.copy()
         arr_2d = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
-        np.place(arr_2d,
-                 (arr_2d != data.MASK_LU_CODE) & (arr_2d != data.NODATA),
-                 arr1d)
+        valid_mask_2d = np.ones_like(arr_2d, dtype=bool)
 
-    # 生成有效性掩膜：True=有效，False=无效
-    valid_mask = np.isfinite(arr_2d)  # 先按是否为有限数
-    # 把 NaN/inf 替换为 nodata 值
-    arr_2d = np.where(valid_mask, arr_2d, nodata_value).astype(np.float32)
-    arr_2d[arr_2d == data.MASK_LU_CODE] = nodata_value
+        # 标记掩膜区域为无效
+        mask_condition = (arr_2d == data.MASK_LU_CODE) | (arr_2d == data.NODATA)
+        valid_mask_2d[mask_condition] = False
+        arr_2d[mask_condition] = nodata_value
 
+        # 填充有效数据
+        data_condition = ~mask_condition
+        data_indices = np.where(data_condition)
+        arr_2d[data_indices] = arr1d
+        valid_mask_2d[data_indices] = valid_mask_1d
+
+    # 确保所有无效位置都设为 nodata
+    arr_2d = np.where(valid_mask_2d, arr_2d, nodata_value).astype(np.float32)
+
+    # 配置元数据
     meta = geo_meta.copy()
     meta.update(
         count=1,
         dtype="float32",
-        nodata=nodata_value,
-        compress="deflate",  # 可选：压缩
-        predictor=3,  # 浮点预测器
-        tiled=True,  # 平铺
-        blockxsize=256,  # 块大小（可按需）
+        nodata=nodata_value,  # 关键：设置 nodata 值
+        compress="deflate",
+        predictor=3,
+        tiled=True,
+        blockxsize=256,
         blockysize=256,
     )
 
     os.makedirs(os.path.dirname(tif_path), exist_ok=True)
+
     with rasterio.open(tif_path, "w", **meta) as dst:
         dst.write(arr_2d, 1)
-        # 写 GDAL 内部掩膜（0=无效, 255=有效）
-        dst.write_mask((valid_mask.astype(np.uint8) * 255))
+        # 写入内部掩膜：255=有效，0=无效
+        dst.write_mask((valid_mask_2d.astype(np.uint8) * 255))
 
     print(f"✅ 已保存: {tif_path}")
 

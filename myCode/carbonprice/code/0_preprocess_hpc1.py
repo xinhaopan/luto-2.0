@@ -9,7 +9,7 @@ CPU_CORES = 90
 MEMORY_GB = "900G"
 TIME_LIMIT = "0-720:00:00"
 
-PYTHON_SCRIPT_TO_RUN = "3.9_create_tif.py"
+PYTHON_SCRIPT_TO_RUN = "4_create_tif.py"
 CONDA_ENV_NAME = "xpluto-fixed"
 
 SUBMISSION_SCRIPT_NAME = "submit_preprocess.sh"
