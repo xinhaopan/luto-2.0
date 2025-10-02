@@ -5,6 +5,9 @@ import time
 from datetime import datetime
 import glob
 from luto.tools.write import write_outputs
+import luto.settings as settings
+import traceback
+import shutil, zipfile
 
 def print_with_time(message):
     """打印带有时间戳的信息"""
@@ -71,3 +74,48 @@ else:
     print_with_time("Writing outputs...")
     write_outputs(data)
     print_with_time("Data processed successfully.")
+
+if settings.KEEP_OUTPUTS:
+
+    # Save the data object to disk
+    pass
+
+else:
+    report_dir = f"{data.path}/DATA_REPORT"
+    archive_path = './DATA_REPORT.zip'
+
+    # Zip the output directory, and remove the original directory
+    with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(report_dir):
+            for file in files:
+                abs_path = os.path.join(root, file)
+                rel_path = os.path.relpath(abs_path, start=report_dir)
+                zipf.write(abs_path, arcname=rel_path)
+
+    # —— 只保留 ZIP 和指定的 RES gz 文件 ——
+    keep = {
+        os.path.basename(archive_path),  # 'DATA_REPORT.zip'
+        f"Data_RES{settings.RESFACTOR}.gz",
+    }
+
+    for k in keep:
+        if k == os.path.basename(archive_path):
+            continue  # DATA_REPORT.zip 已经在当前目录，无需复制
+        src = os.path.join(data.path, k)
+        dst = os.path.join('.', k)
+        if os.path.exists(src):
+            if not os.path.exists(dst):
+                shutil.copy2(src, dst)
+        else:
+            print(f"[WARN] 源文件不存在: {src}")
+
+    for item in os.listdir('.'):
+        if item in keep:
+            continue
+        try:
+            if os.path.isfile(item) or os.path.islink(item):
+                os.unlink(item)
+            elif os.path.isdir(item):
+                shutil.rmtree(item)
+        except Exception as e:
+            print(f"Failed to delete {item}. Reason: {e}")
