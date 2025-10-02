@@ -2,7 +2,7 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 import tools.config as config
-from tools.helper_plot import set_plot_style, draw_12_price, draw_10_price
+from tools.helper_plot import set_plot_style, draw_12_price, draw_10_price, draw_22_price
 
 
 
@@ -34,8 +34,15 @@ df3 = pd.DataFrame(res, index=df1.index, columns=df1.columns[-10:]).fillna(0)
 df3[df3 < 0] = 0
 color = 'green'
 
-set_plot_style(20)
+set_plot_style(30)
 
-draw_12_price(df1,config.PRICE_TITLE_MAP,color,f"{output_dir}/05_Carbon_Bio_price.png",desired_ticks=5,ci=None)
-draw_10_price(df2,config.PRICE_TITLE_MAP,color,f"{output_dir}/05_Carbon_price_for_bio&carbon.png",desired_ticks=5,ylabel="Shadow carbon price under net-zero targets and nature-positive targets\n(AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",ci=None)
-draw_10_price(df3,config.PRICE_TITLE_MAP,color,f"{output_dir}/05_Carbon_price_for_bio.png",desired_ticks=5,ylabel="Shadow carbon price under nature-positive targets\n(AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",ci=None)
+# draw_12_price(df1,config.PRICE_TITLE_MAP,color,f"{output_dir}/05_Carbon_Bio_price.png",desired_ticks=5,ci=None)
+# draw_10_price(df2,config.PRICE_TITLE_MAP,color,f"{output_dir}/05_Carbon_price_for_bio&carbon.png",desired_ticks=5,ylabel="Shadow carbon price under net-zero targets and nature-positive targets\n(AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",ci=None)
+# draw_10_price(df3,config.PRICE_TITLE_MAP,color,f"{output_dir}/05_Carbon_price_for_bio.png",desired_ticks=5,ylabel="Shadow carbon price under nature-positive targets\n(AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",ci=None)
+
+df4 = pd.concat([df1.iloc[:, :2], df2, df3], axis=1)
+draw_22_price(df4, config.PRICE_TITLE_MAP,output_path=f"{output_dir}/05_Carbon_price_all.png", desired_ticks=5,  y_label=r"Shadow carbon price (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",ci=95)
+
+set_plot_style(20)
+df5 = df1.iloc[:, 2:]
+draw_10_price(df5,config.PRICE_TITLE_MAP,color,f"{output_dir}/05_biodiversity_price.png",desired_ticks=5,ylabel="Biodiversity price (AU\$ contribution-weighted area ha$^{-1}$ yr$^{-1}$)",ci=95)

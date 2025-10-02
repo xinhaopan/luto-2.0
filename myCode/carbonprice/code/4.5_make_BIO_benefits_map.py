@@ -61,8 +61,7 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
             safe_plot(
                 tif_path=tif,
                 title='',  # 标题统一在外部添加
-                unit=r"%",
-
+                unit="Contribution-weighted\narea, ha yr$^{-1}$",
 
                 cmap=benefit_cmap,
                 ax=ax,
@@ -81,7 +80,7 @@ out_dir = f"{base_dir}/5_map"
 os.makedirs(out_dir, exist_ok=True)
 
 legend_nbins = 3
-legend_bbox = (0.1, 0.10, 0.8, 0.9)
+
 
 # 统一样式
 set_plot_style(font_size=15, font_family='Arial')
@@ -93,8 +92,8 @@ aligned_tif = f"../Map/public_area_aligned.tif"
 align_raster_to_reference(src_tif, ref_tif, aligned_tif, resampling="nearest")
 
 # 统一色带
-benefit_cmap = LinearSegmentedColormap.from_list("benefit", ["#ffff80", "#38e009","#1a93ab","#0c1078"])
-
+# benefit_cmap = LinearSegmentedColormap.from_list("benefit", ["#ffff80", "#38e009","#1a93ab","#0c1078"])
+benefit_cmap = "BrBG"
 # ==== 场景配置 ====
 scenarios = {
     # "carbon_high": {},
@@ -104,14 +103,14 @@ scenarios = {
 
 # 成本组件的键（按行顺序）
 env_keys = [
-    "total_bio",
+    "total_sol_bio_benefit",
     "biodiversity_GBF2_priority_ag_management",
     "biodiversity_GBF2_priority_non_ag",
 ]
 
 # 行标签（左侧）
 row_labels = [
-    'Total',
+    'Total solution',
     'Agricultural management',
     'Non-agriculture',
 ]
@@ -125,9 +124,9 @@ column_titles = [
 
 # 可选覆盖
 layer_overrides = {
-    # 'total_carbon': {"clip_percent": [0, 99]},
-    # 'GHG_ag_management': {"clip_percent": [0, 99]},
-    # 'GHG_non_ag': {"clip_percent": [0, 99]},
+    "total_sol_bio_benefit": {"clip_percent": [1,99],"force_zero_center": True,'legend_bbox':(0.1, 0.02, 0.8, 0.9)},
+    "biodiversity_GBF2_priority_ag_management": {"clip_percent": [1,99],"force_zero_center": True,'legend_bbox':(0.1, 0.02, 0.8, 0.9)},
+    "biodiversity_GBF2_priority_non_ag": {"clip_percent": [1,99],"force_zero_center": True,'legend_bbox':(0.1, 0.02, 0.8, 0.9)},
     # 'transition_cost_ag2non_ag_amortised_diff': {"clip_percent": [0, 95]},
 }
 
@@ -167,16 +166,16 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 # 添加图例元素
-add_north_arrow(fig, 0.03, 0.08, size=0.02)
-add_scalebar(fig, axes[0], 0.08, 0.089, length_km=500, fontsize=font_size,
+add_north_arrow(fig, 0.21, 0.098, size=0.018)
+add_scalebar(fig, axes[0], 0.26, 0.106, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
-add_annotation(fig, 0.15, 0.093, width=0.015, text="Australian state boundary",
+add_annotation(fig, 0.34, 0.110, width=0.015, text="Australian state boundary",
                linewidth=2, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.35, 0.090, width=0.008, height=0.0072, linewidth=2,
+add_annotation(fig, 0.62, 0.107, width=0.011, height=0.0072, linewidth=2,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.44, 0.090, width=0.008, height=0.0072, linewidth=2,
+add_annotation(fig, 0.20, 0.085, width=0.012, height=0.0072, linewidth=2,
                text="Public, indigenous, urban, and other intensive land uses",
                style="box", facecolor="#808080", edgecolor="#808080",
                fontsize=font_size, fontfamily=font_family)

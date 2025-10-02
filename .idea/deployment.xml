@@ -1,65 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="HPC" deleteMissingItems="true" createEmptyFolders="true" exclude=".svn;.cvs;.idea;.DS_Store;.git;.hg;*.hprof;*.pyc;~$*;*.sync.*;" confirmBeforeUploading="false" confirmBeforeDeletion="false" autoUploadExternalChanges="true">
-    <option name="confirmBeforeDeletion" value="false" />
-    <option name="confirmBeforeUploading" value="false" />
+  <component name="PublishConfigData">
     <serverData>
       <paths name="HPC">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/remote/s222552331/LUTO2_XH/LUTO2" local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$/output" web="/" />
           </mappings>
-          <excludedPaths>
-            <excludedPath local="true" path="$PROJECT_DIR$/output" />
-            <excludedPath path="/home/remote/s222552331/LUTO2_XH/LUTO2/output" />
-          </excludedPaths>
         </serverdata>
       </paths>
       <paths name="NCI">
         <serverdata>
           <mappings>
-            <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$/output" web="/" />
           </mappings>
-          <excludedPaths>
-            <excludedPath path="/g/data/jk53/LUTO_XH/LUTO2/output" />
-            <excludedPath local="true" path="$PROJECT_DIR$/output" />
-          </excludedPaths>
         </serverdata>
       </paths>
       <paths name="s222552331@hpclogin.deakingpuhpc.deakin.edu.au:22 password">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/remote/s222552331/LUTO2_XH/LUTO2" local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$/output" web="/" />
           </mappings>
-          <excludedPaths>
-            <excludedPath local="true" path="$PROJECT_DIR$/output" />
-            <excludedPath path="/home/remote/s222552331/LUTO2_XH/LUTO2/output" />
-          </excludedPaths>
         </serverdata>
       </paths>
       <paths name="xp7241@gadi.nci.org.au:22 password">
         <serverdata>
           <mappings>
-            <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$/output" web="/" />
           </mappings>
-          <excludedPaths>
-            <excludedPath local="true" path="$PROJECT_DIR$/output" />
-            <excludedPath path="/g/data/jk53/LUTO_XH/LUTO2/output" />
-          </excludedPaths>
         </serverdata>
       </paths>
       <paths name="xp7241@gadi.nci.org.au:22 password (2)">
         <serverdata>
           <mappings>
-            <mapping deploy="/g/data/jk53/LUTO_XH/LUTO2" local="$PROJECT_DIR$" />
+            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$/output" web="/" />
           </mappings>
-          <excludedPaths>
-            <excludedPath path="/g/data/jk53/LUTO_XH/LUTO2/output" />
-            <excludedPath local="true" path="$PROJECT_DIR$/output" />
-          </excludedPaths>
         </serverdata>
       </paths>
     </serverData>
-    <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>

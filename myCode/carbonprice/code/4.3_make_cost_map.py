@@ -52,7 +52,7 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
             ax = fig.add_subplot(gs[row, col], projection=ccrs.PlateCarree())
 
             # 构建tif文件路径
-            if cost_key == "total_cost":
+            if cost_key == "total_sol_cost":
                 tif = f"{arr_path}/{env}/xr_total_cost_{env}_{year}.tif"
             else:
                 tif = f"{arr_path}/{env}/xr_{cost_key}_{env}_{year}.tif"
@@ -113,7 +113,7 @@ env_keys = [
 
 # 行标签（左侧）
 row_labels = [
-    'Total cost',
+    'Total solution cost',
     'Agricultural management cost',
     'Non-agriculture cost',
     'Transition(ag→non-ag) cost',
@@ -128,10 +128,10 @@ column_titles = [
 
 # 可选覆盖
 layer_overrides = {
-    'total_cost': {"clip_percent": [0, 95]},
-    'cost_agricultural_management': {"clip_percent": [0, 95]},
-    'cost_non_ag': {"clip_percent": [0, 95]},
-    'transition_cost_ag2non_ag_amortised_diff': {"clip_percent": [0, 95]},
+    'total_cost': {"clip_percent": [1, 99]},
+    'cost_agricultural_management': {"clip_percent": [1, 99]},
+    'cost_non_ag': {"clip_percent": [1, 99]},
+    'transition_cost_ag2non_ag_amortised_diff': {"clip_percent": [1, 99]},
 }
 
 # ==== 创建网格图 ====

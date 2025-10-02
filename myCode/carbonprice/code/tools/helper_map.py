@@ -28,6 +28,7 @@ import cartopy.crs as ccrs
 import os
 import math
 from matplotlib.colors import Normalize, LogNorm
+
 import json
 import pylustrator
 from cmcrameri import cm
@@ -43,132 +44,132 @@ from tools.helper_plot import set_plot_style
 
 
 
-def efficient_tif_plot(
-        ax,
-        tif_file,
-        cmap='terrain',
-        interpolation='nearest',
-        title_name='',
-        unit_name='',
-        shp=None, line_color='black', line_width=2,
-        legend_width="55%", legend_height="6%",
-        legend_loc='lower left', legend_bbox_to_anchor=(0, 0, 1, 1),
-        legend_borderpad=1, legend_nbins=5,
-        char_ticks_length=3, char_ticks_pad=1,
-        title_y=1, unit_labelpad=5,
-        decimal_places=None, clip_percent=None,
-        custom_tick_values=False,
-):
-
-    # 读取栅格数据
-    with rasterio.open(tif_file) as src:
-        bounds = src.bounds
-        data = src.read(1)
-        nodata = src.nodata
-        raster_crs = src.crs
-        extent = (bounds.left, bounds.right, bounds.bottom, bounds.top)
-
-    # 处理无效值
-    if nodata is not None:
-        data = np.where(data == nodata, np.nan, data)
-
-    # 移除非正值（如果需要）
-    # data = np.where(data <= 0, np.nan, data)
-
-    # 检查数据有效性
-    valid_mask = ~np.isnan(data)
-    if not np.any(valid_mask):
-        print("Warning: No valid data found!")
-        return None, None
-
-    # CRS
-    data_crs = _cartopy_crs_from_raster_crs(raster_crs)
-
-    # 矢量边界
-    if shp is not None:
-        gdf = gpd.read_file(shp) if isinstance(shp, str) else shp
-        gdf = gdf.to_crs(raster_crs)
-        gdf.plot(ax=ax, edgecolor=line_color, linewidth=line_width, facecolor='none')
-        minx, miny, maxx, maxy = gdf.total_bounds
-        pad_x = (maxx - minx) * 0.02 or 1e-4
-        pad_y = (maxy - miny) * 0.02 or 1e-4
-        ax.set_extent((minx - pad_x, maxx + pad_x, miny - pad_y, maxy + pad_y), crs=data_crs)
-
-    ax.set_title(title_name, y=title_y, fontfamily='Arial')
-    ax.set_axis_off()
-
-    # 计算数据范围
-    valid_data = data[valid_mask]
-    vmin_real = float(np.nanmin(valid_data))
-    vmax_real = float(np.nanmax(valid_data))
-
-    # 非负数据从 0 起；否则用真实最小值
-    vmin_data = 0.0 if vmin_real >= 0 else vmin_real
-
-    if clip_percent is not None:
-        # 合法性保护：限制在 0~100 范围
-        percentiles = [min(max(float(p), 0.0), 100.0) for p in clip_percent]
-        vmin_data, vmax_data = np.nanpercentile(valid_data, percentiles)
-    else:
-        vmin_data = vmin_real
-        vmax_data = vmax_real
-
-    # 使用 get_y_axis_ticks 获取优化的范围和刻度
-    if custom_tick_values is not False:
-        tick_vals = np.asarray(list(custom_tick_values), dtype=float)
-        # 对于自定义刻度，使用数据范围
-        vmin_plot = vmin_data
-        vmax_plot = vmax_data
-    else:
-        nb = max(int(legend_nbins), 2)  # 至少 2 个刻度
-        vmin_plot, vmax_plot, ticks_list = get_y_axis_ticks(vmin_data, vmax_data, desired_ticks=nb,strict_count=True)
-        tick_vals = np.asarray(ticks_list, dtype=float)
-
-    # 创建归一化对象 - 使用实际的绘图范围
-    norm = Normalize(vmin=vmin_plot, vmax=vmax_plot, clip=True)
-    cmap_obj = mpl.colormaps.get_cmap(cmap).copy()
-
-    # 绘制栅格 - 使用实际的绘图范围
-    im = ax.imshow(
-        data,
-        origin='upper',
-        extent=extent,
-        transform=data_crs,
-        interpolation=interpolation,
-        cmap=cmap_obj,
-        vmin=vmin_plot,
-        vmax=vmax_plot,
-    )
-
-    # 创建colorbar - 直接使用 im 而不是创建新的 ScalarMappable
-    cax = inset_axes(
-        ax, width=legend_width, height=legend_height, loc=legend_loc,
-        borderpad=legend_borderpad, bbox_to_anchor=legend_bbox_to_anchor,
-        bbox_transform=ax.transAxes,
-    )
-
-    cbar = plt.colorbar(
-        im, cax=cax, orientation='horizontal',
-        extend='both',
-        extendfrac=0.1, extendrect=False
-    )
-
-    # 仅保留落在绘图范围内的刻度
-    eps = 1e-12
-    in_range = (tick_vals >= vmin_plot - eps) & (tick_vals <= vmax_plot + eps)
-    tick_vals_filtered = tick_vals[in_range]
-
-    # 直接设置刻度值 - 不需要映射到0-1
-    cbar.set_ticks(tick_vals_filtered)
-    cbar.set_ticklabels(_format_tick_labels(tick_vals_filtered, decimal_places))
-
-    cbar.outline.set_visible(False)
-    cbar.ax.xaxis.set_label_position('top')
-    cbar.ax.tick_params(length=char_ticks_length, pad=char_ticks_pad)
-    if unit_name:
-        cbar.set_label(unit_name, labelpad=unit_labelpad, family='Arial')
-
-    return im, cbar
+# def efficient_tif_plot(
+#         ax,
+#         tif_file,
+#         cmap='terrain',
+#         interpolation='nearest',
+#         title_name='',
+#         unit_name='',
+#         shp=None, line_color='black', line_width=2,
+#         legend_width="55%", legend_height="6%",
+#         legend_loc='lower left', legend_bbox_to_anchor=(0, 0, 1, 1),
+#         legend_borderpad=1, legend_nbins=5,
+#         char_ticks_length=3, char_ticks_pad=1,
+#         title_y=1, unit_labelpad=5,
+#         decimal_places=None, clip_percent=None,
+#         custom_tick_values=False,
+# ):
+#
+#     # 读取栅格数据
+#     with rasterio.open(tif_file) as src:
+#         bounds = src.bounds
+#         data = src.read(1)
+#         nodata = src.nodata
+#         raster_crs = src.crs
+#         extent = (bounds.left, bounds.right, bounds.bottom, bounds.top)
+#
+#     # 处理无效值
+#     if nodata is not None:
+#         data = np.where(data == nodata, np.nan, data)
+#
+#     # 移除非正值（如果需要）
+#     # data = np.where(data <= 0, np.nan, data)
+#
+#     # 检查数据有效性
+#     valid_mask = ~np.isnan(data)
+#     if not np.any(valid_mask):
+#         print("Warning: No valid data found!")
+#         return None, None
+#
+#     # CRS
+#     data_crs = _cartopy_crs_from_raster_crs(raster_crs)
+#
+#     # 矢量边界
+#     if shp is not None:
+#         gdf = gpd.read_file(shp) if isinstance(shp, str) else shp
+#         gdf = gdf.to_crs(raster_crs)
+#         gdf.plot(ax=ax, edgecolor=line_color, linewidth=line_width, facecolor='none')
+#         minx, miny, maxx, maxy = gdf.total_bounds
+#         pad_x = (maxx - minx) * 0.02 or 1e-4
+#         pad_y = (maxy - miny) * 0.02 or 1e-4
+#         ax.set_extent((minx - pad_x, maxx + pad_x, miny - pad_y, maxy + pad_y), crs=data_crs)
+#
+#     ax.set_title(title_name, y=title_y, fontfamily='Arial')
+#     ax.set_axis_off()
+#
+#     # 计算数据范围
+#     valid_data = data[valid_mask]
+#     vmin_real = float(np.nanmin(valid_data))
+#     vmax_real = float(np.nanmax(valid_data))
+#
+#     # 非负数据从 0 起；否则用真实最小值
+#     vmin_data = 0.0 if vmin_real >= 0 else vmin_real
+#
+#     if clip_percent is not None:
+#         # 合法性保护：限制在 0~100 范围
+#         percentiles = [min(max(float(p), 0.0), 100.0) for p in clip_percent]
+#         vmin_data, vmax_data = np.nanpercentile(valid_data, percentiles)
+#     else:
+#         vmin_data = vmin_real
+#         vmax_data = vmax_real
+#
+#     # 使用 get_y_axis_ticks 获取优化的范围和刻度
+#     if custom_tick_values is not False:
+#         tick_vals = np.asarray(list(custom_tick_values), dtype=float)
+#         # 对于自定义刻度，使用数据范围
+#         vmin_plot = vmin_data
+#         vmax_plot = vmax_data
+#     else:
+#         nb = max(int(legend_nbins), 2)  # 至少 2 个刻度
+#         vmin_plot, vmax_plot, ticks_list = get_y_axis_ticks(vmin_data, vmax_data, desired_ticks=nb,strict_count=True)
+#         tick_vals = np.asarray(ticks_list, dtype=float)
+#
+#     # 创建归一化对象 - 使用实际的绘图范围
+#     norm = Normalize(vmin=vmin_plot, vmax=vmax_plot, clip=True)
+#     cmap_obj = mpl.colormaps.get_cmap(cmap).copy()
+#
+#     # 绘制栅格 - 使用实际的绘图范围
+#     im = ax.imshow(
+#         data,
+#         origin='upper',
+#         extent=extent,
+#         transform=data_crs,
+#         interpolation=interpolation,
+#         cmap=cmap_obj,
+#         vmin=vmin_plot,
+#         vmax=vmax_plot,
+#     )
+#
+#     # 创建colorbar - 直接使用 im 而不是创建新的 ScalarMappable
+#     cax = inset_axes(
+#         ax, width=legend_width, height=legend_height, loc=legend_loc,
+#         borderpad=legend_borderpad, bbox_to_anchor=legend_bbox_to_anchor,
+#         bbox_transform=ax.transAxes,
+#     )
+#
+#     cbar = plt.colorbar(
+#         im, cax=cax, orientation='horizontal',
+#         extend='both',
+#         extendfrac=0.1, extendrect=False
+#     )
+#
+#     # 仅保留落在绘图范围内的刻度
+#     eps = 1e-12
+#     in_range = (tick_vals >= vmin_plot - eps) & (tick_vals <= vmax_plot + eps)
+#     tick_vals_filtered = tick_vals[in_range]
+#
+#     # 直接设置刻度值 - 不需要映射到0-1
+#     cbar.set_ticks(tick_vals_filtered)
+#     cbar.set_ticklabels(_format_tick_labels(tick_vals_filtered, decimal_places))
+#
+#     cbar.outline.set_visible(False)
+#     cbar.ax.xaxis.set_label_position('top')
+#     cbar.ax.tick_params(length=char_ticks_length, pad=char_ticks_pad)
+#     if unit_name:
+#         cbar.set_label(unit_name, labelpad=unit_labelpad, family='Arial')
+#
+#     return im, cbar
 
 
 def get_y_axis_ticks(min_value, max_value, desired_ticks=5, min_upper=None, strict_count=False):
@@ -270,6 +271,179 @@ def get_y_axis_ticks(min_value, max_value, desired_ticks=5, min_upper=None, stri
 
     return (min_v, max_v, ticks.tolist())
 
+def efficient_tif_plot(
+        ax,
+        tif_file,
+        cmap='terrain',
+        interpolation='nearest',
+        title_name='',
+        unit_name='',
+        shp=None, line_color='black', line_width=2,
+        legend_width="55%", legend_height="6%",
+        legend_loc='lower left', legend_bbox_to_anchor=(0, 0, 1, 1),
+        legend_borderpad=1, legend_nbins=5,
+        char_ticks_length=3, char_ticks_pad=1,
+        title_y=1, unit_labelpad=5, strict_count=True,
+        decimal_places=None, clip_percent=None,
+        custom_tick_values=False,
+        force_zero_center=False,  # 新增：强制以0为中心（用于偏差、异常等）
+        force_one_start=False,  # 新增：强制从0开始（用于成本、距离等非负概念）
+):
+    """
+    改进的栅格绘图函数，支持多种数据类型的归一化策略
+
+    参数说明：
+    - force_zero_center: True 时强制色标以0为中心，适合偏差、变化率等数据
+    - force_zero_start: True 时强制从0开始（即使数据最小值>0），适合成本、距离等
+    """
+
+    # 读取栅格数据
+    with rasterio.open(tif_file) as src:
+        bounds = src.bounds
+        data = src.read(1)
+        nodata = src.nodata
+        raster_crs = src.crs
+        extent = (bounds.left, bounds.right, bounds.bottom, bounds.top)
+
+    # 处理无效值
+    if nodata is not None:
+        data = np.where(data == nodata, np.nan, data)
+
+    # 检查数据有效性
+    valid_mask = ~np.isnan(data)
+    if not np.any(valid_mask):
+        print("Warning: No valid data found!")
+        return None, None
+
+    # CRS
+    data_crs = _cartopy_crs_from_raster_crs(raster_crs)
+
+    # 矢量边界
+    if shp is not None:
+        gdf = gpd.read_file(shp) if isinstance(shp, str) else shp
+        gdf = gdf.to_crs(raster_crs)
+        gdf.plot(ax=ax, edgecolor=line_color, linewidth=line_width, facecolor='none')
+        minx, miny, maxx, maxy = gdf.total_bounds
+        pad_x = (maxx - minx) * 0.02 or 1e-4
+        pad_y = (maxy - miny) * 0.02 or 1e-4
+        ax.set_extent((minx - pad_x, maxx + pad_x, miny - pad_y, maxy + pad_y), crs=data_crs)
+
+    ax.set_title(title_name, y=title_y, fontfamily='Arial')
+    ax.set_axis_off()
+
+    # 计算数据范围
+    valid_data = data[valid_mask]
+    vmin_real = float(np.nanmin(valid_data))
+    vmax_real = float(np.nanmax(valid_data))
+
+    # 应用分位数裁剪（如果指定）
+    if clip_percent is not None:
+        percentiles = [min(max(float(p), 0.0), 100.0) for p in clip_percent]
+        vmin_clipped, vmax_clipped = np.nanpercentile(valid_data, percentiles)
+    else:
+        vmin_clipped = vmin_real
+        vmax_clipped = vmax_real
+
+    # ===== 改进的归一化策略 =====
+    if force_zero_center:
+        # 策略1：以0为中心（适合偏差、变化、异常等）
+        # 例如：数据范围 [-30, 100] -> 色标范围 [-100, 100]
+        max_abs = max(abs(vmin_clipped), abs(vmax_clipped))
+        vmin_data = -max_abs
+        vmax_data = max_abs
+
+        nice_rounds = nice_round([vmin_data,vmax_data])
+        vmin_plot, vmax_plot = nice_rounds[0], nice_rounds[1]
+        ticks_list = [vmin_plot, 0, vmax_plot]
+        tick_vals = np.asarray(ticks_list, dtype=float)
+
+    elif force_one_start:
+        # 策略2：强制从0开始（适合成本、距离、数量等非负概念）
+        # 例如：数据范围 [50, 200] -> 色标范围 [0, 200]
+        vmin_data = 1
+        vmax_data = vmax_clipped
+        if vmax_data < 1:
+            vmin_data = 0
+            vmax_data = 1
+        data = np.where(data < 1, np.nan, data)  # 强制小于1的值为NaN
+        if custom_tick_values is not False:
+            tick_vals = np.asarray(list(custom_tick_values), dtype=float)
+            vmin_plot = vmin_data
+            vmax_plot = vmax_data
+        else:
+            nb = max(int(legend_nbins), 2)
+            vmin_plot, vmax_plot, ticks_list = get_y_axis_ticks(
+                vmin_data, vmax_data,
+                desired_ticks=nb,
+                strict_count=strict_count
+            )
+            tick_vals = np.asarray(ticks_list, dtype=float)
+
+    else:
+        # 默认策略：使用裁剪后的实际范围
+        vmin_data = vmin_clipped
+        vmax_data = vmax_clipped
+
+        # 使用 get_y_axis_ticks 获取优化的刻度
+        if custom_tick_values is not False:
+            tick_vals = np.asarray(list(custom_tick_values), dtype=float)
+            vmin_plot = vmin_data
+            vmax_plot = vmax_data
+        else:
+            nb = max(int(legend_nbins), 2)
+            vmin_plot, vmax_plot, ticks_list = get_y_axis_ticks(
+                vmin_data, vmax_data,
+                desired_ticks=nb,
+                strict_count=strict_count
+            )
+            tick_vals = np.asarray(ticks_list, dtype=float)
+
+    # 创建归一化对象
+    norm = Normalize(vmin=vmin_plot, vmax=vmax_plot, clip=True)
+    cmap_obj = mpl.colormaps.get_cmap(cmap).copy()
+
+    # 绘制栅格
+    im = ax.imshow(
+        data,
+        origin='upper',
+        extent=extent,
+        transform=data_crs,
+        interpolation=interpolation,
+        cmap=cmap_obj,
+        vmin=vmin_plot,
+        vmax=vmax_plot,
+    )
+
+    # 创建colorbar
+    cax = inset_axes(
+        ax, width=legend_width, height=legend_height, loc=legend_loc,
+        borderpad=legend_borderpad, bbox_to_anchor=legend_bbox_to_anchor,
+        bbox_transform=ax.transAxes,
+    )
+
+    cbar = plt.colorbar(
+        im, cax=cax, orientation='horizontal',
+        extend='both',
+        extendfrac=0.1, extendrect=False
+    )
+
+    # 过滤刻度
+    eps = 1e-12
+    in_range = (tick_vals >= vmin_plot - eps) & (tick_vals <= vmax_plot + eps)
+    tick_vals_filtered = tick_vals[in_range]
+
+    cbar.set_ticks(tick_vals_filtered)
+    cbar.set_ticklabels(_format_tick_labels(tick_vals_filtered, decimal_places))
+
+    cbar.outline.set_visible(False)
+    cbar.ax.xaxis.set_label_position('top')
+    cbar.ax.tick_params(length=char_ticks_length, pad=char_ticks_pad)
+    if unit_name:
+        cbar.set_label(unit_name, labelpad=unit_labelpad, family='Arial')
+
+    return im, cbar
+
+
 def nice_round(values):
     """对数组 values 里的数进行数量级四舍五入，
     - 1 位数：个位
@@ -277,10 +451,11 @@ def nice_round(values):
     - 4 位数：百位
     - 5 位数：千位
     - 6 位及以上：只保留前两位
+    负数也适用
     """
     rounded = []
     for v in values:
-        if v <= 1 or np.isnan(v):
+        if abs(v) <= 1 or np.isnan(v):
             rounded.append(v)
             continue
 
@@ -307,20 +482,23 @@ def nice_round(values):
 def _format_tick_labels(values, decimal_places=None):
     labels = []
     for i, v in enumerate(values):
-        if v < 1:
+        if abs(v) < 1e-12:  # 0 就是0
+            labels.append("0")
+        elif abs(v) < 1:
             if decimal_places is not None:
-                if i == 0:
-                    # 首尾用整数格式
+                # 首尾tick用整数格式
+                if i == 0 or i == len(values) - 1:
                     labels.append(f"{v:,.0f}")
                 else:
-                    # 常规先格式化
                     label = f"{v:,.{decimal_places}f}"
-                    # 如果结果是 0，就继续增加小数位，直到显示出非零或达到限制
                     extra = decimal_places
-                    while float(label.replace(",", "")) == 0 and extra < 10:  # 给个上限避免无限循环
+                    # 只要显示为0就增加小数位，最多10位
+                    while float(label.replace(",", "")) == 0 and extra < 10:
                         extra += 1
                         label = f"{v:,.{extra}f}"
                     labels.append(label)
+            else:
+                labels.append(str(v))
         else:
             labels.append(f"{v:,.0f}")
     return labels
@@ -622,7 +800,10 @@ def plot_tif_layer(
         char_ticks_length=1,
         legend_nbins=3,
         legend_bbox=(0.1, 0.10, 0.8, 0.9),
-        clip_percent=None
+        clip_percent=None,
+        force_zero_center=False,
+        force_one_start=False,
+        strict_count=True
 ):
     """通用绘制函数：既可以保存单图，也可以在指定ax上绘制"""
 
@@ -651,7 +832,10 @@ def plot_tif_layer(
         unit_labelpad=unit_labelpad,
         decimal_places=decimal_places,
         custom_tick_values=custom_tick_values,
-        clip_percent=clip_percent
+        clip_percent=clip_percent,
+        force_zero_center=force_zero_center,
+        force_one_start=force_one_start,
+        strict_count=strict_count
     )
     aligned_tif = f"../Map/public_area_aligned.tif"
     add_binary_gray_layer(ax, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
@@ -690,3 +874,179 @@ def safe_plot(*, tif_path, title, unit, cmap, outfile=None, ax=None,**kwargs):
         ax=ax,
         **kwargs
     )
+
+
+
+def draw_combined_plot(
+        df_carbon,  # 2列：Carbon价格数据
+        df_bio_12,  # 10列：12图中的Bio数据
+        df_bio_10,  # 10列：10图的数据
+        title_map,  # 所有列名到标题的映射字典
+        colors=None,  # 三组颜色：[carbon_color, bio12_color, bio10_color]
+        output_path='combined_plot.png',
+        desired_ticks_carbon=5,
+        desired_ticks_bio12=3,
+        desired_ticks_bio10=4,
+        ylabel_carbon="Shadow carbon price under net-zero targets\n(AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
+        ylabel_bio12="Biodiversity cost\n(AU\$ contribution-weighted area ha$^{-1}$ yr$^{-1}$)",
+        ylabel_bio10=r"Carbon price for GHG and biodiversity (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
+        figsize=(24, 32),
+        ci=95,
+        draw_legend=True,
+):
+    """
+    合并绘制三组数据：
+    - 第1行前2列：Carbon价格（2个子图）
+    - 第2-3行：12图的Bio数据（10个子图）
+    - 第4-5行：10图的Bio数据（10个子图）
+    每组使用不同颜色
+    """
+
+    # 默认颜色
+    if colors is None:
+        colors = ['#2E86AB', '#A23B72', '#F18F01']  # 蓝色、紫色、橙色
+
+    color_carbon, color_bio12, color_bio10 = colors
+
+    # 创建图形：5行5列
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.15, wspace=0.15)
+    fig.subplots_adjust(left=0.06, right=0.97, top=0.97, bottom=0.03)
+
+    # ------ 统一 x 轴刻度 ------
+    x_data = df_carbon.index  # 假设三个df的index相同
+    x_min, x_max = x_data.min(), x_data.max()
+    tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+    tick_positions = [year for year in tick_positions if year in x_data]
+
+    # ================== 第1组：Carbon价格（第1行前2列）==================
+    carbon_y = np.concatenate([df_carbon.iloc[:, i].values for i in range(2)])
+    y_carbon_min, y_carbon_max, y_carbon_ticks = get_y_axis_ticks(
+        0, np.nanmax(carbon_y), desired_ticks=desired_ticks_carbon
+    )
+
+    ax_carbon_list = []
+    for i in range(2):
+        ax = fig.add_subplot(gs[0, i])
+        df_input = df_carbon.iloc[:, i].to_frame()
+        draw_fit_line_ax(
+            ax, df_input,
+            color=color_carbon,  # 使用carbon专属颜色
+            title_name=title_map.get(df_carbon.columns[i]),
+            ci=ci
+        )
+        ax.set_ylim(y_carbon_min, y_carbon_max)
+        ax.set_yticks(y_carbon_ticks)
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x', labelbottom=False)
+        if i != 0:
+            ax.tick_params(axis='y', labelleft=False)
+        ax_carbon_list.append(ax)
+
+    # Carbon的Y轴标签
+    ax_carbon_list[0].set_ylabel(ylabel_carbon)
+    ax_carbon_list[0].yaxis.set_label_coords(-0.19, 0.5)
+
+    # ------ 图例区（第1行后3列）------
+    legend_ax = fig.add_subplot(gs[0, 2:])
+    legend_ax.axis('off')
+
+    # ================== 第2组：12图的Bio数据（第2-3行）==================
+    bio12_y = np.concatenate([df_bio_12.iloc[:, i].values for i in range(10)])
+    y_bio12_min, y_bio12_max, y_bio12_ticks = get_y_axis_ticks(
+        0, np.nanmax(bio12_y), desired_ticks=desired_ticks_bio12
+    )
+
+    ax_bio12_list = []
+    for i in range(10):
+        row, col = i // 5 + 1, i % 5  # 第1-2行（row=1,2）
+        ax = fig.add_subplot(gs[row, col])
+        df_input = df_bio_12.iloc[:, i].to_frame()
+        draw_fit_line_ax(
+            ax, df_input,
+            color=color_bio12,  # 使用bio12专属颜色
+            title_name=title_map.get(df_bio_12.columns[i]),
+            ci=ci
+        )
+        ax.set_ylim(y_bio12_min, y_bio12_max)
+        ax.set_yticks(y_bio12_ticks)
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x', labelbottom=False)  # 这组不显示x轴标签
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+        ax_bio12_list.append(ax)
+
+    # Bio12的Y轴标签
+    ax_bio12_list[0].set_ylabel(ylabel_bio12)
+    ax_bio12_list[0].yaxis.set_label_coords(-0.19, -0.02)
+
+    # ================== 第3组：10图的Bio数据（第4-5行）==================
+    bio10_y = np.concatenate([df_bio_10.iloc[:, i].values for i in range(10)])
+    bio10_ymax = np.nanmax(bio10_y)
+    y_bio10_min = 0.0
+    y_bio10_max = float(bio10_ymax) * 1.20  # 顶部留20%空间
+
+    def _int_fmt(x, pos):
+        return f"{int(x)}"
+
+    int_formatter = FuncFormatter(_int_fmt)
+
+    ax_bio10_list = []
+    for i in range(10):
+        row, col = i // 5 + 3, i % 5  # 第3-4行（row=3,4）
+        ax = fig.add_subplot(gs[row, col])
+        df_input = df_bio_10.iloc[:, i].to_frame()
+        draw_fit_line_ax(
+            ax, df_input,
+            color=color_bio10,  # 使用bio10专属颜色
+            title_name=title_map.get(df_bio_10.columns[i]),
+            ci=ci
+        )
+        ax.set_ylim(y_bio10_min, y_bio10_max)
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=desired_ticks_bio10, integer=True))
+        ax.yaxis.set_major_formatter(int_formatter)
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x')
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+        if row != 4:  # 只有最后一行显示x轴标签
+            ax.tick_params(axis='x', labelbottom=False)
+        ax_bio10_list.append(ax)
+
+    # Bio10的Y轴标签
+    ax_bio10_list[0].set_ylabel(ylabel_bio10)
+    ax_bio10_list[0].yaxis.set_label_coords(-0.19, -0.03)
+
+    # ================== 图例（在第1行的图例区）==================
+    if draw_legend:
+        # 创建三组图例
+        line_carbon = mlines.Line2D([], [], color=color_carbon, linewidth=2,
+                                    label="Carbon price fit")
+        line_bio12 = mlines.Line2D([], [], color=color_bio12, linewidth=2,
+                                   label="Biodiversity cost fit")
+        line_bio10 = mlines.Line2D([], [], color=color_bio10, linewidth=2,
+                                   label="Combined price fit")
+
+        handles = [line_carbon, line_bio12, line_bio10]
+
+        if ci is not None and ci > 0:
+            shade_carbon = Patch(color=color_carbon, alpha=0.25, label="Carbon 95% CI")
+            shade_bio12 = Patch(color=color_bio12, alpha=0.25, label="Bio cost 95% CI")
+            shade_bio10 = Patch(color=color_bio10, alpha=0.25, label="Combined 95% CI")
+            handles.extend([shade_carbon, shade_bio12, shade_bio10])
+
+        leg = fig.legend(
+            handles=handles,
+            loc='upper center',
+            bbox_to_anchor=(0.65, 0.96),
+            ncol=2,
+            frameon=False
+        )
+        leg.get_frame().set_facecolor('none')
+        leg.get_frame().set_edgecolor('none')
+
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close(fig)
+
+    return fig

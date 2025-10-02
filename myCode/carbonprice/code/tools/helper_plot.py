@@ -1170,7 +1170,7 @@ def draw_fit_line_ax(ax, df, color='black', title_name='', order=2, ci=95):
         scatter_kws=scatter_kws,
         line_kws=line_kws,
         ci= ci,  # 与 seaborn 一致；None 表示不画 CI
-        n_splines=25,
+        n_splines=8,
         spline_order=3,
         lam='auto'
     )
@@ -1189,7 +1189,7 @@ def draw_10_price(
     desired_ticks=4,
     ylabel=r"Carbon price for GHG and biodiversity (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
     figsize=(24, 10),
-    legend_label_line="Quadratic fit",
+    legend_label_line="Nature-positive targets",
     legend_label_shade="95% CI",
     legend_loc="best",
     legend_on_first_ax=True,
@@ -1283,3 +1283,122 @@ def draw_10_price(
     plt.savefig(output_path, dpi=300)
     plt.show()
     return fig, axes
+
+def draw_22_price(
+    df,
+    title_map,
+    output_path,
+    desired_ticks=5,
+    y_label="Shadow carbon price",
+    figsize=(36, 40),
+    ci=95,
+):
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.15, wspace=0.15)
+    fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
+
+    # ------ x轴刻度（所有数据统一） ------
+    x_data = df.index
+    x_min, x_max = x_data.min(), x_data.max()
+    # x_middle = x_data[int(len(x_data) // 2)]
+    # tick_positions = [x_min, x_middle, x_max]
+
+
+    tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+    tick_positions = [year for year in tick_positions if year in x_data]
+
+    # ------ Carbon图（第一行前两个） ------
+    carbon_y = np.concatenate([df.iloc[:, i].values for i in range(2)])
+    y_carbon_all = get_y_axis_ticks(0, np.nanmax(carbon_y), desired_ticks=desired_ticks)
+    ax_list = []
+    for i in range(2):
+        ax = fig.add_subplot(gs[0, i])
+        df_input = df.iloc[:, i].to_frame()
+        draw_fit_line_ax(
+            ax, df_input, color='black', title_name=title_map.get(df.columns[i]),ci=ci
+        )
+
+        ax.set_ylim(y_carbon_all[0],y_carbon_all[1])
+        ax.set_yticks(y_carbon_all[2])
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x', labelbottom=False)
+        # if i != 0:
+        #     ax.tick_params(axis='y', labelleft=False)
+        ax_list.append(ax)
+
+
+    # ------ carbon price图（第2,3行） ------
+    bio_y = np.concatenate([df.iloc[:, i + 2].values for i in range(10)])
+    y_bio_all = get_y_axis_ticks(0,np.nanmax(bio_y),desired_ticks=desired_ticks-2)
+    # bio_ylim = (y_bio_all[0], y_bio_all[1])
+    for i in range(2,12):
+        row, col = (i-2) // 5 + 1, (i-2) % 5
+        ax = fig.add_subplot(gs[row, col])
+        df_input = df.iloc[:, i].to_frame()
+        draw_fit_line_ax(
+            ax, df_input, color='orange', title_name=title_map.get(df.columns[i]),ci=ci)
+        ax.set_ylim(y_bio_all[0], y_bio_all[1])
+        ax.set_yticks(y_bio_all[2])
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x', labelbottom=False)
+
+        # if col != 0:
+        #     ax.tick_params(axis='y', labelleft=False)
+        # if row != 2:
+        #     ax.tick_params(axis='x', labelbottom=False)
+        ax_list.append(ax)
+
+    # ------ carbon price图（第3,4行） ------
+    bio_y = np.concatenate([df.iloc[:, i + 7].values for i in range(10)])
+    y_bio_all = get_y_axis_ticks(0, np.nanmax(bio_y), desired_ticks=desired_ticks - 2)
+    # bio_ylim = (y_bio_all[0], y_bio_all[1])
+    for i in range(12,22):
+        row, col = (i-2) // 5 + 1, (i-2) % 5
+        ax = fig.add_subplot(gs[row, col])
+        df_input = df.iloc[:, i].to_frame()
+        draw_fit_line_ax(
+            ax, df_input, color='purple', title_name=title_map.get(df.columns[i]), ci=ci)
+        ax.set_ylim(y_bio_all[0], y_bio_all[1])
+        ax.set_yticks(y_bio_all[2])
+        ax.set_xticks(tick_positions)
+
+        if row == 4:
+            ax.tick_params(axis='x', labelbottom=True)
+        else:
+            ax.tick_params(axis='x', labelbottom=False)
+
+        # if col != 0:
+        #     ax.tick_params(axis='y', labelleft=False)
+        # if row != 2:
+        #     ax.tick_params(axis='x', labelbottom=False)
+        ax_list.append(ax)
+
+
+    ax_list[0].set_ylabel(y_label)
+    ax_list[0].yaxis.set_label_coords(-0.19, -1.8)
+
+
+    # ------ 图例 ------
+    if draw_legend:
+        # 定义legend句柄
+        handle_carbon = mlines.Line2D([], [], color='black', linewidth=2, label="Net-zero targets")
+        handle_bio12 = mlines.Line2D([], [], color='orange', linewidth=2, label="Net-zero targets and nature-positive targets")
+        handle_bio10 = mlines.Line2D([], [], color='purple', linewidth=2, label="Nature-positive targets")
+
+        shade_carbon = Patch(color='black', alpha=0.25, label="95% CI")
+        shade_bio12 = Patch(color='orange', alpha=0.25, label="95% CI")
+        shade_bio10 = Patch(color='purple', alpha=0.25, label="95% CI")
+
+        handles = [handle_carbon, shade_carbon, handle_bio12, shade_bio12, handle_bio10, shade_bio10]
+
+        fig.legend(
+            handles=handles,
+            loc='upper center',  # 可选: 'lower center', 'upper left', etc.
+            bbox_to_anchor=(0.6, 0.95),  # (x, y)，1.04可以让图例在图像上方
+            ncol=1,  # 每行3个图例（你有3组）
+            frameon=False
+        )
+
+    plt.savefig(output_path, dpi=300)
+    plt.show()
+    plt.close(fig)

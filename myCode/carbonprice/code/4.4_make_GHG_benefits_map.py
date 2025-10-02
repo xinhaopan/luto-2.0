@@ -66,6 +66,7 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
 
                 cmap=benefit_cmap,
                 ax=ax,
+
                 **kwargs
             )
 
@@ -93,7 +94,8 @@ aligned_tif = f"../Map/public_area_aligned.tif"
 align_raster_to_reference(src_tif, ref_tif, aligned_tif, resampling="nearest")
 
 # 统一色带
-benefit_cmap = LinearSegmentedColormap.from_list("benefit", ["#ffff80", "#38e009","#1a93ab","#0c1078"])
+# benefit_cmap = LinearSegmentedColormap.from_list("benefit", ["#ffff80", "#38e009","#1a93ab","#0c1078"])
+benefit_cmap = "BrBG"  # 预设色带
 
 # ==== 场景配置 ====
 scenarios = {
@@ -104,14 +106,14 @@ scenarios = {
 
 # 成本组件的键（按行顺序）
 env_keys = [
-    "total_carbon",
+    "total_sol_ghg_benefit",
     "GHG_ag_management",
     "GHG_non_ag",
 ]
 
 # 行标签（左侧）
 row_labels = [
-    'Total',
+    'Total solution',
     'Agricultural management',
     'Non-agriculture',
 ]
@@ -125,9 +127,9 @@ column_titles = [
 
 # 可选覆盖
 layer_overrides = {
-    'total_carbon': {"clip_percent": [0, 99]},
-    'GHG_ag_management': {"clip_percent": [0, 99]},
-    'GHG_non_ag': {"clip_percent": [0, 99]},
+    'total_carbon': {"clip_percent": [1,99],"force_zero_center": True,},
+    'GHG_ag_management': {"clip_percent": [1,99],"force_zero_center": True,},
+    'GHG_non_ag': {"clip_percent": [1,99],"force_zero_center": True,},
     # 'transition_cost_ag2non_ag_amortised_diff': {"clip_percent": [0, 95]},
 }
 
@@ -167,16 +169,16 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 # 添加图例元素
-add_north_arrow(fig, 0.19, 0.083, size=0.012)
-add_scalebar(fig, axes[0], 0.22, 0.089, length_km=500, fontsize=font_size,
+add_north_arrow(fig, 0.19, 0.088, size=0.012)
+add_scalebar(fig, axes[0], 0.22, 0.094, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
-add_annotation(fig, 0.28, 0.093, width=0.015, text="Australian state boundary",
+add_annotation(fig, 0.28, 0.098, width=0.015, text="Australian state boundary",
                linewidth=2, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.470, 0.090, width=0.008, height=0.0072, linewidth=2,
+add_annotation(fig, 0.470, 0.095, width=0.008, height=0.0072, linewidth=2,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.54, 0.090, width=0.008, height=0.0072, linewidth=2,
+add_annotation(fig, 0.54, 0.095, width=0.008, height=0.0072, linewidth=2,
                text="Public, indigenous, urban, and other intensive land uses",
                style="box", facecolor="#808080", edgecolor="#808080",
                fontsize=font_size, fontfamily=font_family)
