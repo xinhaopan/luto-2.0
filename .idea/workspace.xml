@@ -5,50 +5,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="Revert: some document">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/0_runs_test.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/0_runs_test1.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/0_runs_test2.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/1_write.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/1_write1.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/1_write_repeat.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/1_write_report.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/1_write_test.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/2_writes.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/2_writes_linux.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/3_tansfer_html.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/CITATION.cff" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/COPYING" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/DataFlow.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/input/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/.idea/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/.idea/deployment.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/.idea/myCode.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/temp_zip.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/tools/report/data_tools/template_html/index.css" beforeDir="false" afterPath="$PROJECT_DIR$/luto/tools/report/data_tools/template_html/index.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/tools/report/data_tools/template_html/pages/GHG_emissions.css" beforeDir="false" afterPath="$PROJECT_DIR$/luto/tools/report/data_tools/template_html/pages/GHG_emissions.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/tools/report/data_tools/template_html/pages/land-use_area.css" beforeDir="false" afterPath="$PROJECT_DIR$/luto/tools/report/data_tools/template_html/pages/land-use_area.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/tools/report/data_tools/template_html/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/luto/tools/report/data_tools/template_html/style.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.cpg" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.cpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.dbf" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.dbf" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.prj" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.prj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.sbn" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.sbn" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.sbx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.sbx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.shp" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.shp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/deployment.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deployment.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.shp.DESKTOP-JRK700U.22384.32056.sr.lock" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/AUS_line1.shp.ed.lock" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/AU_boundary_line_main.shp.DESKTOP-JRK700U.623124.621464.sr.lock" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/H_1wkm2.shp.DESKTOP-JRK700U.374120.361316.sr.lock" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/myCode/carbonprice/Map/H_1wkm2.shp.DESKTOP-JRK700U.375292.361316.sr.lock" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/bash_scripts/python_write_script.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/bash_scripts/python_write_script.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/temp_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/temp_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/4.4_make_GHG_benefits_map.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/4.4_make_GHG_benefits_map.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/4.5_make_BIO_benefits_map.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/4.5_make_BIO_benefits_map.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/4.6_make_price_map.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/4.6_make_price_map.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/4.7_make_agmgt_map.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/4.7_make_agmgt_map.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/4.8_make_non_ag_map.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/4.8_make_non_ag_map.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/tools/land use colors.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/tools/land use colors.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Nick_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Nick_tasks.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -109,7 +79,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "configurable.group.editor",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -125,30 +95,7 @@
       <recent name="N:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\carbonprice\code" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.0_preprocess_hpc1">
-    <configuration name="0_preprocess_hpc1" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="LUTO2" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="SDK_NAME" value="Remote Python 3.12.8 (sftp://s222552331@hpclogin.deakingpuhpc.deakin.edu.au:22/home/remote/s222552331/apps/miniforge3/envs/luto/bin/python3)" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/carbonprice/code" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/carbonprice/code/0_preprocess_hpc1.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
+  <component name="RunManager" selected="Python.1_draw_original_data">
     <configuration name="0_write_tasks" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="LUTO2" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -164,6 +111,29 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/tasks_run/0_write_tasks.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="1_draw_original_data" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="LUTO2" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="SDK_NAME" value="Python 3.12" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/carbonprice/code" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/carbonprice/code/1_draw_original_data.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -216,18 +186,43 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="Nick_tasks" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="LUTO2" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="SDK_NAME" value="Remote Python 3.12.11 (sftp://xp7241@gadi.nci.org.au:22/home/582/xp7241/apps/miniforge3/envs/xpluto/bin/python)" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/tasks_run" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/tasks_run/Nick_tasks.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <list>
-      <item itemvalue="Python.0_preprocess_hpc1" />
+      <item itemvalue="Python.1_draw_original_data" />
+      <item itemvalue="Python.Nick_tasks" />
       <item itemvalue="Python.0_write_tasks" />
       <item itemvalue="Python.2_draw_processed_data" />
       <item itemvalue="Python.4.0_create_tif" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.0_preprocess_hpc1" />
-        <item itemvalue="Python.0_write_tasks" />
+        <item itemvalue="Python.1_draw_original_data" />
+        <item itemvalue="Python.Nick_tasks" />
         <item itemvalue="Python.4.0_create_tif" />
         <item itemvalue="Python.2_draw_processed_data" />
+        <item itemvalue="Python.0_write_tasks" />
       </list>
     </recent_temporary>
   </component>
@@ -250,7 +245,10 @@
       <workItem from="1758699268152" duration="162848000" />
       <workItem from="1759131087634" duration="920000" />
       <workItem from="1759132026201" duration="71943000" />
-      <workItem from="1759390747225" duration="1567000" />
+      <workItem from="1759390747225" duration="2856000" />
+      <workItem from="1759394551910" duration="1247000" />
+      <workItem from="1759395820463" duration="170000" />
+      <workItem from="1759396058899" duration="3074000" />
     </task>
     <task id="LOCAL-00001" summary="update: run test">
       <option name="closed" value="true" />
@@ -588,7 +586,15 @@
       <option name="project" value="LOCAL" />
       <updated>1759391210224</updated>
     </task>
-    <option name="localTasksCounter" value="43" />
+    <task id="LOCAL-00043" summary="Revert: some document">
+      <option name="closed" value="true" />
+      <created>1759393254129</created>
+      <option name="number" value="00043" />
+      <option name="presentableId" value="LOCAL-00043" />
+      <option name="project" value="LOCAL" />
+      <updated>1759393254129</updated>
+    </task>
+    <option name="localTasksCounter" value="44" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -761,7 +767,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$3_draw_average_price.coverage" NAME="3_draw_average_price Coverage Results" MODIFIED="1759334760896" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$4_0_create_tif.coverage" NAME="4.0_create_tif Coverage Results" MODIFIED="1759377085398" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$0_preprocess_nci.coverage" NAME="0_preprocess_nci Coverage Results" MODIFIED="1758606093451" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
-    <SUITE FILE_PATH="coverage/LUTO2$1_draw_original_data.coverage" NAME="1_draw_original_data Coverage Results" MODIFIED="1759334852950" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/LUTO2$1_draw_original_data.coverage" NAME="1_draw_original_data Coverage Results" MODIFIED="1759400337477" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$write_helper.coverage" NAME="write_helper Coverage Results" MODIFIED="1757334501514" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run/tools" />
     <SUITE FILE_PATH="coverage/LUTO2$01_caculate_price_with_mask.coverage" NAME="01_caculate_price_with_mask Coverage Results" MODIFIED="1758202106738" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$write_tasks.coverage" NAME="write_tasks Coverage Results" MODIFIED="1758684757360" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
@@ -784,7 +790,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$03_draw_carbon_bio.coverage" NAME="03_draw_carbon&amp;bio Coverage Results" MODIFIED="1758105949163" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$mem_moniter.coverage" NAME="mem_moniter Coverage Results" MODIFIED="1758027834102" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/LUTO2$02_Draw_cost_sector.coverage" NAME="02_Draw_cost_sector Coverage Results" MODIFIED="1758077465556" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
-    <SUITE FILE_PATH="coverage/LUTO2$Nick_tasks.coverage" NAME="Nick_tasks Coverage Results" MODIFIED="1759239628683" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
+    <SUITE FILE_PATH="coverage/LUTO2$Nick_tasks.coverage" NAME="Nick_tasks Coverage Results" MODIFIED="1759396679435" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$0_preprocess_hpc.coverage" NAME="0_preprocess_hpc Coverage Results" MODIFIED="1759218669117" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$4_7_make_agmgt_map.coverage" NAME="4.7_make_agmgt_map Coverage Results" MODIFIED="1759329593260" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$Check_status.coverage" NAME="Check_status Coverage Results" MODIFIED="1758543326638" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />

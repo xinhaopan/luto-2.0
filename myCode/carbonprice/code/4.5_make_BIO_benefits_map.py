@@ -169,14 +169,14 @@ plt.rcParams['mathtext.sf'] = font_family
 add_north_arrow(fig, 0.21, 0.098, size=0.018)
 add_scalebar(fig, axes[0], 0.26, 0.106, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
-add_annotation(fig, 0.34, 0.110, width=0.015, text="Australian state boundary",
+add_annotation(fig, 0.34, 0.110, width=0.015, text="State/Territory boundaries",
                linewidth=2, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
 add_annotation(fig, 0.62, 0.107, width=0.011, height=0.0072, linewidth=2,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
 add_annotation(fig, 0.20, 0.085, width=0.012, height=0.0072, linewidth=2,
-               text="Public, indigenous, urban, and other intensive land uses",
+               text="Public, indigenous, urban, water bodies, and other land",
                style="box", facecolor="#808080", edgecolor="#808080",
                fontsize=font_size, fontfamily=font_family)
 

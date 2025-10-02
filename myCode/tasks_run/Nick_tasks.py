@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20251001_Nick_task'],
+    'TASK_NAME': ['20251002_Cost_curve_task'],
     'KEEP_OUTPUTS': [False],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -12,7 +12,7 @@ grid_search = {
     'MEM': ['28GB'],
     'NCPUS': ['4'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['5:00:00'],
+    'TIME': ['6:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
     'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],
@@ -55,6 +55,17 @@ grid_search = {
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
     #----------------------------------- other settings --------------------------------
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],
+
+    "AG_MANAGEMENTS": [{
+        'Asparagopsis taxiformis': False,
+        'Precision Agriculture': False,
+        'Ecological Grazing': False,
+        'Savanna Burning': True,
+        'AgTech EI': False,
+        'Biochar': False,
+        'HIR - Beef': True,
+        'HIR - Sheep': True,
+    }],
 }
 
 conditional_rules = [
