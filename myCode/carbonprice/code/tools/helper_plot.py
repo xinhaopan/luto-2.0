@@ -1326,39 +1326,38 @@ def draw_22_price(
         #     ax.tick_params(axis='y', labelleft=False)
         ax_list.append(ax)
 
+    # ------ carbon price图（第2,3,4行） ------
+    # 拼接两段需要画的所有数据
+    bio_y = np.concatenate([
+        # 第2、3行
+        np.concatenate([df.iloc[:, i + 2].values for i in range(10)]),
+        # 第3、4行
+        np.concatenate([df.iloc[:, i + 7].values for i in range(10)])
+    ])
+    # 使用全量数据获取 y 轴范围和刻度
+    y_bio_all = get_y_axis_ticks(0, np.nanmax(bio_y), desired_ticks=desired_ticks - 2)
 
-    # ------ carbon price图（第2,3行） ------
-    bio_y = np.concatenate([df.iloc[:, i + 2].values for i in range(10)])
-    y_bio_all = get_y_axis_ticks(0,np.nanmax(bio_y),desired_ticks=desired_ticks-2)
-    # bio_ylim = (y_bio_all[0], y_bio_all[1])
-    for i in range(2,12):
-        row, col = (i-2) // 5 + 1, (i-2) % 5
+    # ----- 画第2、3行 -----
+    for i in range(2, 12):
+        row, col = (i - 2) // 5 + 1, (i - 2) % 5
         ax = fig.add_subplot(gs[row, col])
         df_input = df.iloc[:, i].to_frame()
         draw_fit_line_ax(
-            ax, df_input, color='orange', title_name=title_map.get(df.columns[i]),ci=ci)
+            ax, df_input, color='orange', title_name=title_map.get(df.columns[i]), ci=ci)
         ax.set_ylim(y_bio_all[0], y_bio_all[1])
         ax.set_yticks(y_bio_all[2])
         ax.set_xticks(tick_positions)
         ax.tick_params(axis='x', labelbottom=False)
-
-        # if col != 0:
-        #     ax.tick_params(axis='y', labelleft=False)
-        # if row != 2:
-        #     ax.tick_params(axis='x', labelbottom=False)
         ax_list.append(ax)
 
-    # ------ carbon price图（第3,4行） ------
-    bio_y = np.concatenate([df.iloc[:, i + 7].values for i in range(10)])
-    y_bio_all = get_y_axis_ticks(0, np.nanmax(bio_y), desired_ticks=desired_ticks - 2)
-    # bio_ylim = (y_bio_all[0], y_bio_all[1])
-    for i in range(12,22):
-        row, col = (i-2) // 5 + 1, (i-2) % 5
+    # ----- 画第3、4行 -----
+    for i in range(12, 22):
+        row, col = (i - 2) // 5 + 1, (i - 2) % 5
         ax = fig.add_subplot(gs[row, col])
         df_input = df.iloc[:, i].to_frame()
         draw_fit_line_ax(
             ax, df_input, color='purple', title_name=title_map.get(df.columns[i]), ci=ci)
-        ax.set_ylim(y_bio_all[0], y_bio_all[1])
+        ax.set_ylim(y_bio_all[0], y_bio_all[1])  # 用统一的 y_bio_all
         ax.set_yticks(y_bio_all[2])
         ax.set_xticks(tick_positions)
 
@@ -1367,12 +1366,7 @@ def draw_22_price(
         else:
             ax.tick_params(axis='x', labelbottom=False)
 
-        # if col != 0:
-        #     ax.tick_params(axis='y', labelleft=False)
-        # if row != 2:
-        #     ax.tick_params(axis='x', labelbottom=False)
         ax_list.append(ax)
-
 
     ax_list[0].set_ylabel(y_label)
     ax_list[0].yaxis.set_label_coords(-0.19, -1.8)

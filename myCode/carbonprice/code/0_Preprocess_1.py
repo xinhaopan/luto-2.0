@@ -23,8 +23,8 @@ from tools.tools import (
     get_path, get_year, save2nc, filter_all_from_dims, nc_to_tif, get_data_RES_path
 )
 from tools.helper_data import (
-    summarize_to_type, summarize_to_category, build_profit_and_cost_nc,
-    make_prices_nc, summarize_netcdf_to_excel, create_profit_for_cost, create_summary
+    summarize_to_type, summarize_to_category, build_profit_and_cost_nc,create_processed_xarray,build_sol_profit_and_cost_nc,
+    make_prices_nc, summarize_netcdf_to_excel, create_profit_for_cost, create_summary, make_sol_prices_nc
 )
 from tools import LogToFile, log_memory_usage
 import tools.config as config
@@ -667,7 +667,7 @@ def aggregate_and_save_cost(year, output_path, cost_names):
             tprint(f"Saved aggregated total cost to {final_path}")
     return
 
-def aggregate_and_save_cost_non_ag(year, output_path, cost_names):
+def aggregate_and_save_cost_sol(year, output_path, cost_names):
     """
     【最终版】聚合单个年份的成本文件，使用一个精确的文件列表。
     """
@@ -675,51 +675,45 @@ def aggregate_and_save_cost_non_ag(year, output_path, cost_names):
     base_names = [
         'xr_cost_agricultural_management',
         'xr_cost_non_ag',
+        'xr_transition_cost_ag2non_ag_amortised_diff',
     ]
     # 注意：你的输入名带有 _diff，这里兼容并据此判断 am_type
-    add_variants = [
-        'xr_transition_cost_ag2non_ag_amortised_diff',
-        'xr_transition_cost_ag2non_ag_diff',
-    ]
+
     for i in range(len(cost_names)):
         file_dir = os.path.join(output_path, f'{cost_names[i]}', str(year))
 
-        for add_name in add_variants:
-            data_type_names_all = base_names + [add_name]
+        # 1) 先生成全路径并逐一校验存在性；缺哪个立即报错
+        full_paths = [
+            os.path.join(file_dir, f'{basename}_{cost_names[i]}_{year}.nc')
+            for basename in base_names
+        ]
 
-            # 1) 先生成全路径并逐一校验存在性；缺哪个立即报错
-            full_paths = [
-                os.path.join(file_dir, f'{basename}_{cost_names[i]}_{year}.nc')
-                for basename in data_type_names_all
-            ]
+        # 2) 初始化累加器
+        total_sum_ds = None
 
-            # 2) 初始化累加器
-            total_sum_ds = None
+        # 3) 逐个文件读取 -> 预检查 -> 求和 -> 累加
 
-            # 3) 逐个文件读取 -> 预检查 -> 求和 -> 累加
+        # 5) 保存：根据是否包含 'amortised' 判定 am_type
+        final_path = os.path.join(file_dir, f'xr_total_sol_cost_{cost_names[i]}_{year}.nc')
 
-            # 5) 保存：根据是否包含 'amortised' 判定 am_type
-            am_type = 'amortised' if 'amortised' in add_name else 'original'
-            final_path = os.path.join(file_dir, f'xr_total_non_ag_cost_{cost_names[i]}_{am_type}_{year}.nc')
+        for file_path in full_paths:
+            tprint(f"Aggregated total cost file: {file_path}")
+            with xr.open_dataset(file_path,chunks='auto') as ds:
+                ds = filter_all_from_dims(ds)
+                # 将除 'cell' 外的维度全部求和
+                sum_dims = [d for d in ds.dims if d != 'cell']
+                summed_single_ds = ds.sum(dim=sum_dims) if sum_dims else ds
 
-            for file_path in full_paths:
-                tprint(f"Aggregated total cost file: {file_path}")
-                with xr.open_dataset(file_path,chunks='auto') as ds:
-                    ds = filter_all_from_dims(ds)
-                    # 将除 'cell' 外的维度全部求和
-                    sum_dims = [d for d in ds.dims if d != 'cell']
-                    summed_single_ds = ds.sum(dim=sum_dims) if sum_dims else ds
+                if total_sum_ds is None:
+                    total_sum_ds = summed_single_ds
+                else:
+                    total_sum_ds = total_sum_ds + summed_single_ds
+        save2nc(total_sum_ds, final_path)
 
-                    if total_sum_ds is None:
-                        total_sum_ds = summed_single_ds
-                    else:
-                        total_sum_ds = total_sum_ds + summed_single_ds
-                    save2nc(total_sum_ds, final_path)
-
-            tprint(f"Saved aggregated total cost to {final_path}")
+        tprint(f"Saved aggregated total cost to {final_path}")
     return
 
-def aggregate_and_save_summary(year, output_path, data_type_names, input_files_names, type,non_ag=False):
+def aggregate_and_save_summary(year, output_path, data_type_names, input_files_names, type):
     # 1. 【关键修改】根据传入的列表构建完整的文件路径
     for i in range(len(input_files_names)):
         tprint(f"Aggregating summary for {input_files_names[i]} in year {year}...")
@@ -744,14 +738,12 @@ def aggregate_and_save_summary(year, output_path, data_type_names, input_files_n
                     total_sum_ds += summed_single_ds
 
         # 5. 保存
-        if non_ag:
-            final_path = os.path.join(final_dir, f'xr_total_non_ag_{type}_{input_files_name}_{year}.nc')
-        else:
-            final_path = os.path.join(final_dir, f'xr_total_{type}_{input_files_name}_{year}.nc')
+        final_path = os.path.join(final_dir, f'xr_total_{type}_{input_files_name}_{year}.nc')
         save2nc(total_sum_ds, final_path)
     return
 
-def calculate_price(input_file, year, base_dir,type,chunks='auto'):
+
+def calculate_cell_price(input_file, year, base_dir,type,chunks='auto'):
     tprint(f"Processing price {input_file} for year {year}...")
 
     output_path = os.path.join(base_dir, input_file, str(year), f"xr_{type}_price_{input_file}_{year}.nc")
@@ -764,12 +756,12 @@ def calculate_price(input_file, year, base_dir,type,chunks='auto'):
         price_da = price_da.where(mask_da, np.nan)
         save2nc(price_da, output_path)
 
-def calculate_price_non_ag(input_file, year, base_dir,type,chunks='auto'):
+def calculate_price_sol(input_file, year, base_dir,type,chunks='auto'):
     tprint(f"Processing price {input_file} for year {year}...")
 
-    output_path = os.path.join(base_dir, input_file, str(year), f"xr_{type}_non_ag_price_{input_file}_{year}.nc")
-    cost_path = os.path.join(base_dir, input_file, str(year), f"xr_total_non_ag_cost_{input_file}_amortised_{year}.nc")
-    env_path = os.path.join(base_dir, input_file, str(year), f"xr_total_non_ag_{type}_{input_file}_{year}.nc")
+    output_path = os.path.join(base_dir, input_file, str(year), f"xr_{type}_price_{input_file}_{year}.nc")
+    cost_path = os.path.join(base_dir, input_file, str(year), f"xr_total_sol_cost_{input_file}_{year}.nc")
+    env_path = os.path.join(base_dir, input_file, str(year), f"xr_total_{type}_{input_file}_{year}.nc")
 
     with xr.open_dataarray(cost_path, chunks=chunks) as cost_da, xr.open_dataarray(env_path, chunks=chunks) as env_da:
         mask_da = (cost_da >= 1) & (env_da >= 1)
@@ -777,7 +769,8 @@ def calculate_price_non_ag(input_file, year, base_dir,type,chunks='auto'):
         price_da = price_da.where(mask_da, np.nan)
         save2nc(price_da, output_path)
 
-def xarrays_to_tifs(env_cat, file_part, base_dir, tif_dir, data):
+
+def xarrays_to_tifs(env_cat, file_part, base_dir, tif_dir, data, remove_negative=True, per_ha=True):
     """处理一个类别+文件部分，并输出tif"""
     print(f"Processing {env_cat} - {file_part}")
 
@@ -790,17 +783,15 @@ def xarrays_to_tifs(env_cat, file_part, base_dir, tif_dir, data):
     # 读取和处理
     da = xr.open_dataarray(input_path)
     da = da.sum(dim=[d for d in da.dims if d != 'cell'])
-    if ('total_bio' not in file_part) and ('total_carbon' not in file_part):
-        da = da.where(da >= 1)
 
-    # 输出路径
-    out_tif = f"{tif_dir}/{env_cat}/xr_{file_part}_{env_cat}_cell_2050.tif"
-    os.makedirs(os.path.dirname(out_tif), exist_ok=True)
-    nc_to_tif(data, da, out_tif)
-
-    out_tif = f"{tif_dir}/{env_cat}/xr_{file_part}_{env_cat}_area_2050.tif"
-    if 'price' not in file_part:
+    if per_ha:
         da = da / data.REAL_AREA
+    if remove_negative:
+        da = da.where(da >= 0, np.nan)
+
+    # 输出 cell 版本
+    out_tif = f"{tif_dir}/{env_cat}/xr_{file_part}_{env_cat}_2050.tif"
+    os.makedirs(os.path.dirname(out_tif), exist_ok=True)
     nc_to_tif(data, da, out_tif)
 
     return out_tif
@@ -832,6 +823,168 @@ def subtract_tifs(a_path, b_path, out_path):
 
         with rasterio.open(out_path, "w", **profile) as dst:
             dst.write(out, 1)
+
+def plus_tifs(base_dir, env_cat, cost_names, outpath_part, remove_negative=True):
+    cost_arrs = []
+    for fname_part in cost_names:
+        fname = f"{base_dir}/{env_cat}/xr_{fname_part}_{env_cat}_2050.tif"
+        with rasterio.open(fname) as src:
+            arr = src.read(1, masked=True).filled(np.nan).astype(np.float32)
+            cost_arrs.append(arr)
+            if len(cost_arrs) == 1:
+                cost_profile = src.profile.copy()
+
+    # 堆叠到三维
+    cost_stack = np.stack(cost_arrs, axis=0)  # shape: (n_files, height, width)
+    # 计算每个像元是否全为有效值
+    all_valid = ~np.any(np.isnan(cost_stack), axis=0)  # True表示所有层都非nan
+    # 求和
+    cost_sum = np.nansum(cost_stack, axis=0)
+    # 把非全有效的地方设为 np.nan
+    cost_sum[~all_valid] = np.nan
+
+    # nodata处理
+    nodata_value = -9999
+    cost_sum[np.isnan(cost_sum)] = nodata_value
+    if remove_negative:
+        cost_sum[cost_sum < 1] = nodata_value
+
+    # 更新 profile
+    profile = cost_profile.copy()
+    profile.update(dtype="float32", compress="lzw", nodata=nodata_value)
+
+    # 写出
+    out_path = f"{base_dir}/{env_cat}/xr_{outpath_part}_{env_cat}_2050.tif"
+    with rasterio.open(out_path, "w", **profile) as dst:
+        dst.write(cost_sum, 1)
+
+def divide_tifs(base_dir,env_cat, cost_names, benefit_names, outpath_part):
+    """
+    用 cost_names 的所有 tif 求和（去掉小于1的），
+    用 benefit_names 的所有 tif 求和（去掉小于1的），
+    然后相除，输出结果为 tif。
+    """
+    # 读取并累加成本影像
+    cost_sum = None
+    for fname_part in cost_names:
+        fname = f"{base_dir}/{env_cat}/xr_{fname_part}_{env_cat}_2050.tif"
+        with rasterio.open(fname) as src:
+            arr = src.read(1, masked=True).filled(np.nan).astype(np.float32)
+            arr[arr < 1] = np.nan
+            if cost_sum is None:
+                cost_sum = arr
+                cost_profile = src.profile.copy()
+            else:
+                cost_sum = np.nansum(np.stack([cost_sum, arr]), axis=0)
+
+    # 读取并累加效益影像
+    benefit_sum = None
+    for fname_part in benefit_names:
+        fname = f"{base_dir}/{env_cat}/xr_{fname_part}_{env_cat}_2050.tif"
+        with rasterio.open(fname) as src:
+            arr = src.read(1, masked=True).filled(np.nan).astype(np.float32)
+            arr[arr < 1] = np.nan
+            if benefit_sum is None:
+                benefit_sum = arr
+                benefit_profile = src.profile.copy()
+            else:
+                benefit_sum = np.nansum(np.stack([benefit_sum, arr]), axis=0)
+
+    # 输入一致性检查
+    if cost_sum.shape != benefit_sum.shape:
+        raise ValueError("成本和效益影像的大小不一致！")
+    if cost_profile['transform'] != benefit_profile['transform'] or cost_profile['crs'] != benefit_profile['crs']:
+        raise ValueError("成本和效益影像的 transform 或 CRS 不一致！")
+
+    # 相除
+    out = cost_sum / benefit_sum
+
+    # 只保留有效值，其他位置设为 nodata
+    nodata_value = -9999
+    out[np.isnan(out)] = nodata_value
+    out[benefit_sum < 1] = nodata_value  # 避免除以小于1的效益
+    out[cost_sum < 1] = nodata_value     # 避免成本小于1
+
+    # 更新 profile
+    profile = cost_profile.copy()
+    profile.update(dtype="float32", compress="lzw", nodata=nodata_value)
+
+    # 写出
+    out_path = f"{base_dir}/{env_cat}/xr_{outpath_part}_{env_cat}_2050.tif"
+    with rasterio.open(out_path, "w", **profile) as dst:
+        dst.write(out, 1)
+
+def xarrays_to_tifs_by_type(
+    env_cat,
+    file_part,
+    base_dir,
+    tif_dir,
+    data,
+    sum_dim,                # 你要合并的第二个维度（比如 "year"）
+    remove_negative=False,
+    per_ha=True
+):
+    """
+    按照 'cell' 和 sum_dim 对数据求和，分别输出每个 sum_dim 坐标的 tif 文件，
+    并先输出总和版本（对除了cell的所有维度求和）
+
+    Parameters
+    ----------
+    env_cat: str
+    file_part: str
+    base_dir: str
+    tif_dir: str
+    data: object
+    sum_dim: str   # 你要分组的维度，比如 'year'
+    remove_negative: bool
+    per_ha: bool
+    """
+    print(f"Processing {env_cat} - {file_part} by {sum_dim}")
+
+    # 构造输入路径
+    input_path = f"{base_dir}/{env_cat}/2050/xr_{file_part}_2050.nc"
+
+    # 读取和处理
+    da = xr.open_dataarray(input_path)
+
+    # ----------- 1. 求总和版本（除了cell的所有维度都求和） -----------
+    sum_dims_total = [d for d in da.dims if d != 'cell']
+    da_total = da.sum(dim=sum_dims_total)
+
+    if per_ha:
+        da_total = da_total / data.REAL_AREA
+    if remove_negative:
+        da_total = da_total.where(da_total >= 0, np.nan)
+
+    out_total_tif = f"{tif_dir}/{env_cat}/xr_total_{file_part}_{env_cat}_2050.tif"
+    os.makedirs(os.path.dirname(out_total_tif), exist_ok=True)
+    nc_to_tif(data, da_total, out_total_tif)
+    print(f"Saved {out_total_tif}")
+
+    # ----------- 2. 按 sum_dim 输出分组 tif -----------
+    if sum_dim not in da.dims:
+        raise ValueError(f"{sum_dim} 不在数据的维度 {da.dims} 中！")
+
+    results = [out_total_tif]
+    # 遍历新维度的所有坐标
+    for coord_val in da[sum_dim].values:
+        da_slice = da.sel({sum_dim: coord_val})
+        sum_dims = [d for d in da_slice.dims if d != 'cell']
+        da_out = da_slice.sum(dim=sum_dims)
+
+        if per_ha:
+            da_out = da_out / data.REAL_AREA
+        if remove_negative:
+            da_out = da_out.where(da_out >= 0, np.nan)
+
+        out_tif = f"{tif_dir}/{env_cat}/xr_{file_part}_{env_cat}_{coord_val}_2050.tif"
+        os.makedirs(os.path.dirname(out_tif), exist_ok=True)
+        nc_to_tif(data, da_out, out_tif)
+        results.append(out_tif)
+        print(f"Saved {out_tif}")
+
+    return results
+
 
 def create_shp(env_cat, shp_name, file_parts, tif_dir):
     for file_part in file_parts:
@@ -932,18 +1085,14 @@ def main(task_dir, njobs):
     carbon_files = ['xr_GHG_ag', 'xr_GHG_ag_management', 'xr_GHG_non_ag', 'xr_transition_GHG']
     bio_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_biodiversity_GBF2_priority_ag_management',
                  'xr_biodiversity_GBF2_priority_non_ag']
+    carbon_sol_files = ['xr_GHG_ag_management', 'xr_GHG_non_ag']
+    bio_sol_files = ['xr_biodiversity_GBF2_priority_ag_management', 'xr_biodiversity_GBF2_priority_non_ag']
+
     amortize_files = ['xr_transition_cost_ag2non_ag']
     economic_files = config.economic_files
     env_files = carbon_files + bio_files
 
-    # carbon_files_diff = ['xr_GHG_ag_diff', 'xr_GHG_ag_management', 'xr_GHG_non_ag', 'xr_transition_GHG']
-    # bio_files_diff = ['xr_biodiversity_GBF2_priority_ag_diff', 'xr_biodiversity_GBF2_priority_ag_management',
-    #                   'xr_biodiversity_GBF2_priority_non_ag']
-    # env_files_diff = carbon_files_diff + bio_files_diff
-
-    carbon_non_ag_files = [ 'xr_GHG_ag_management', 'xr_GHG_non_ag']
-    bio_non_ag_files = ['xr_biodiversity_GBF2_priority_ag_management','xr_biodiversity_GBF2_priority_non_ag']
-    cost_no_ag_files = ['xr_cost_agricultural_management', 'xr_cost_non_ag', 'xr_transition_cost_ag2non_ag']
+    economic_sol_files = ['xr_cost_agricultural_management', 'xr_cost_non_ag', 'xr_transition_cost_ag2non_ag_amortised', 'xr_revenue_ag','xr_revenue_agricultural_management', 'xr_revenue_non_ag']
 
     input_files_0 = config.input_files_0
     input_files_1 = config.input_files_1
@@ -970,8 +1119,8 @@ def main(task_dir, njobs):
     # ----------------------------------------------------------------------------
     # ===========================================================================
     # --- 阶段 1: 文件处理 ---
-    # tprint("\n--- 文件copy ---")
-    #
+    tprint("\n--- 文件copy ---")
+
     # for i in range(len(run_all_names)):
     #     run_names = run_all_names[i]
     #     for j in range(len(run_names)):
@@ -995,24 +1144,6 @@ def main(task_dir, njobs):
     #
     # tprint(f"✅ 文件copy任务完成!")
     #
-    # ## --- 1. 并行化文件diff in two years for GHG/BIO ag benefit ---
-    # for i in range(len(run_all_names)):
-    #     run_names = run_all_names[i]
-    #     for j in range(len(run_names)):
-    #         data_path_name = os.path.join(output_path, run_names[j])
-    #         diff_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_GHG_ag']
-    #
-    #         if diff_files:
-    #             for diff_file in diff_files:
-    #                 if njobs == 0:
-    #                     for year in years[1:]:
-    #                         calculate_and_save_single_diff(diff_file, year, data_path_name)
-    #                 else:
-    #                     Parallel(n_jobs=njobs)(
-    #                         delayed(calculate_and_save_single_diff)(diff_file, year, data_path_name)
-    #                         for year in years[1:]
-    #                     )
-
     # if njobs == 0:
     #     for i in range(len(input_files)):
     #         data_path_name = os.path.join(output_path, input_files[i])
@@ -1028,7 +1159,7 @@ def main(task_dir, njobs):
     #         for run_name in input_files
     #     )
     # tprint("摊销成本计算 完成!")
-    #
+    # #
     # ##--- 阶段 2: carbon & bio计算 ---
     # if njobs == 0:
     #     for env_file in env_files:
@@ -1066,25 +1197,25 @@ def main(task_dir, njobs):
     #         delayed(aggregate_and_save_summary)(year, output_path, bio_files, output_all_names,'bio')
     #         for year in years[1:]
     #     )
+    #
+    # if njobs == 0:
+    #     for year in years[1:]:
+    #         # 直接调用
+    #         aggregate_and_save_summary(year, output_path, carbon_sol_files, output_all_names,'sol_carbon')
+    #         aggregate_and_save_summary(year, output_path, bio_sol_files, output_all_names,'sol_bio')
+    # else:
+    #     Parallel(n_jobs=njobs)(
+    #         delayed(aggregate_and_save_summary)(year, output_path, carbon_sol_files, output_all_names,'sol_carbon')
+    #         for year in years[1:]
+    #     )
+    #     Parallel(n_jobs=njobs)(
+    #         delayed(aggregate_and_save_summary)(year, output_path, bio_sol_files, output_all_names,'sol_bio')
+    #         for year in years[1:]
+    #     )
+    #
+    # tprint(f"✅ 第2批任务汇总carbon & bio完成! ")
 
-    if njobs == 0:
-        for year in years[1:]:
-            # 直接调用
-            aggregate_and_save_summary(year, output_path, carbon_non_ag_files, output_all_names,'carbon', non_ag=True)
-            aggregate_and_save_summary(year, output_path, bio_non_ag_files, output_all_names,'bio', non_ag=True)
-    else:
-        Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_summary)(year, output_path, carbon_non_ag_files, output_all_names,'carbon', non_ag=True)
-            for year in years[1:]
-        )
-        Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_summary)(year, output_path, bio_non_ag_files, output_all_names,'bio', non_ag=True)
-            for year in years[1:]
-        )
-
-    tprint(f"✅ 第2批任务汇总carbon & bio完成! ")
-
-    # --- 阶段 3: 利润计算 ---
+    # # --- 阶段 3: 利润计算 ---
     # tprint("\n--- 阶段 3: 利润计算 ---")
     # profit_categories = zip(cost_files, revenue_files)
     # for cost_base, rev_base in profit_categories:
@@ -1128,7 +1259,7 @@ def main(task_dir, njobs):
     #         )
     # tprint(f"✅ 第4批任务完成! ")
     #
-    # --- 阶段 5: 转型成本差值计算 (仅独立部分) ---
+    # ##--- 阶段 5: 转型成本差值计算 (仅独立部分) ---
     # tprint("\n--- 阶段 5: 转型成本差值计算 ---")
     # independent_tran_files = ['xr_cost_transition_ag2ag', 'xr_transition_cost_ag2non_ag',
     #                           'xr_transition_cost_ag2non_ag_amortised']
@@ -1154,71 +1285,92 @@ def main(task_dir, njobs):
     #             for year in years[1:]
     #         )
     # tprint(f"✅ 第5批 转型成本差值计算 任务完成! ")
-
+    #
     # # --- 阶段 6: 成本聚合 ---
-    tprint("\n--- 阶段 6: 成本聚合 ---")
+    # tprint("\n--- 阶段 6: 成本聚合 ---")
+    #
+    # if njobs == 0:
+    #     for year in years[1:]:
+    #         # 直接调用
+    #         aggregate_and_save_cost(year, output_path,carbon_names)
+    #         aggregate_and_save_cost(year, output_path,carbon_bio_names)
+    #         aggregate_and_save_cost(year, output_path,counter_carbon_bio_names)
+    # else:
+    #     Parallel(n_jobs=njobs)(
+    #         delayed(aggregate_and_save_cost)(year, output_path, carbon_names)
+    #         for year in years[1:]
+    #     )
+    #     Parallel(n_jobs=njobs)(
+    #         delayed(aggregate_and_save_cost)(year, output_path, carbon_bio_names)
+    #         for year in years[1:]
+    #     )
+    #     Parallel(n_jobs=njobs)(
+    #         delayed(aggregate_and_save_cost)(year, output_path, counter_carbon_bio_names)
+    #         for year in years[1:]
+    #     )
+    #
+    # if njobs == 0:
+    #     for year in years[1:]:
+    #         # 直接调用
+    #         aggregate_and_save_cost_sol(year, output_path,carbon_names)
+    #         aggregate_and_save_cost_sol(year, output_path,carbon_bio_names)
+    #         aggregate_and_save_cost_sol(year, output_path,counter_carbon_bio_names)
+    # else:
+    #     Parallel(n_jobs=njobs)(
+    #         delayed(aggregate_and_save_cost_sol)(year, output_path, carbon_names)
+    #         for year in years[1:]
+    #     )
+    #     Parallel(n_jobs=njobs)(
+    #         delayed(aggregate_and_save_cost_sol)(year, output_path, carbon_bio_names)
+    #         for year in years[1:]
+    #     )
+    #     Parallel(n_jobs=njobs)(
+    #         delayed(aggregate_and_save_cost_sol)(year, output_path, counter_carbon_bio_names)
+    #         for year in years[1:]
+    #     )
+    #
+    # tprint(f"✅ 第6批 (最终聚合) 任务完成! ")
 
-    if njobs == 0:
-        for year in years[1:]:
-            # 直接调用
-            aggregate_and_save_cost(year, output_path,output_all_names)
-    else:
-        Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_cost)(year, output_path, output_all_names)
-            for year in years[1:]
-        )
-
-    if njobs == 0:
-        for year in years[1:]:
-            # 直接调用
-            aggregate_and_save_cost_non_ag(year, output_path,output_all_names)
-    else:
-        Parallel(n_jobs=njobs)(
-            delayed(aggregate_and_save_cost_non_ag)(year, output_path, output_all_names)
-            for year in years[1:]
-        )
-
-
-    tprint(f"✅ 第6批 (最终聚合) 任务完成! ")
-
-    # --- 阶段 7: 价格计算 ---
-    tprint("\n--- 阶段 7: 价格计算 ---")
+    # # --- 阶段 7: 价格计算 ---
+    # tprint("\n--- 阶段 7: 价格计算 ---")
+    #
+    # if njobs == 0:
+    #     for input_file in output_all_names:
+    #         for year in years[1:]:
+    #             calculate_cell_price(input_file, year, output_path,'carbon')
+    #             calculate_cell_price(input_file, year, output_path,'bio')
+    # else:
+    #     for input_file in output_all_names:
+    #         Parallel(n_jobs=njobs)(
+    #             delayed(calculate_cell_price)(input_file, year, output_path,'carbon')
+    #             for year in years[1:]
+    #         )
+    #         Parallel(n_jobs=njobs)(
+    #             delayed(calculate_cell_price)(input_file, year, output_path,'bio')
+    #             for year in years[1:]
+    #         )
 
     # if njobs == 0:
     #     for input_file in output_all_names:
     #         for year in years[1:]:
-    #             calculate_price(input_file, year, output_path,'carbon')
-    #             calculate_price(input_file, year, output_path,'bio')
+    #             calculate_cell_price_sol(input_file, year, output_path,'sol_carbon')
+    #             calculate_cell_price_sol(input_file, year, output_path,'sol_bio')
     # else:
     #     for input_file in output_all_names:
     #         Parallel(n_jobs=njobs)(
-    #             delayed(calculate_price)(input_file, year, output_path,'carbon')
+    #             delayed(calculate_cell_price_sol)(input_file, year, output_path,'sol_carbon')
     #             for year in years[1:]
     #         )
     #         Parallel(n_jobs=njobs)(
-    #             delayed(calculate_price)(input_file, year, output_path,'bio')
+    #             delayed(calculate_cell_price_sol)(input_file, year, output_path,'sol_bio')
     #             for year in years[1:]
     #         )
-
-    if njobs == 0:
-        for input_file in output_all_names:
-            for year in years[1:]:
-                calculate_price_non_ag(input_file, year, output_path,'carbon')
-                calculate_price_non_ag(input_file, year, output_path,'bio')
-    else:
-        for input_file in output_all_names:
-            Parallel(n_jobs=njobs)(
-                delayed(calculate_price_non_ag)(input_file, year, output_path,'carbon')
-                for year in years[1:]
-            )
-            Parallel(n_jobs=njobs)(
-                delayed(calculate_price_non_ag)(input_file, year, output_path,'bio')
-                for year in years[1:]
-            )
-
-    tprint(f"✅ 第7批 价格计算 任务完成! ")
+    #
+    #
+    #
+    #
+    # tprint(f"✅ 第7批 价格计算 任务完成! ")
    ## ==========================================================================
-
 
 # # ============================================================================
 #     excel_path = f"../../../output/{config.TASK_NAME}/carbon_price/1_excel"
@@ -1365,7 +1517,18 @@ def main(task_dir, njobs):
 #     profit_da = summarize_to_category(input_files, years[1:], economic_files, 'xr_cost_for_profit', n_jobs=41,scenario_name=False)
 #     build_profit_and_cost_nc(profit_da, input_files_0, input_files_1, input_files_2, carbon_names, carbon_bio_names,
 #                              counter_carbon_bio_names)
-#     make_prices_nc(output_all_names)
+
+    # make_prices_nc(output_all_names)
+
+    # summarize_to_category(output_all_names, years[1:], carbon_sol_files, 'xr_total_sol_carbon', n_jobs=41)
+    # summarize_to_category(output_all_names, years[1:], bio_sol_files, 'xr_total_sol_bio', n_jobs=41)
+    #
+    profit_sol_da = summarize_to_category(input_files, years[1:], economic_sol_files, 'xr_sol_cost_for_profit', n_jobs=41,scenario_name=False)
+    build_sol_profit_and_cost_nc(profit_sol_da, input_files_0, input_files_1, input_files_2, carbon_names, carbon_bio_names,
+                                 counter_carbon_bio_names)
+
+    make_sol_prices_nc(output_all_names)
+
 #     files = ['xr_cost_agricultural_management', 'xr_cost_non_ag', 'xr_transition_cost_ag2non_ag_amortised_diff',
 #              'xr_GHG_ag_management', 'xr_GHG_non_ag', 'xr_biodiversity_GBF2_priority_ag_management',
 #              'xr_biodiversity_GBF2_priority_non_ag']
@@ -1404,52 +1567,104 @@ def main(task_dir, njobs):
 #             scenario_name=False
 #         )
 #
-    tif_dir = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif"
-    data_path = get_data_RES_path(f"../../../output/{config.TASK_NAME}/{input_files_0[0]}/output")
-
-    with gzip.open(data_path, 'rb') as f:
-        data = dill.load(f)
-
-    file_parts = ['total_cost', 'cost_ag', 'cost_agricultural_management', 'cost_non_ag', 'cost_transition_ag2ag_diff',
-                  'transition_cost_ag2non_ag_amortised_diff', 'total_carbon', 'total_bio', 'bio_price', 'carbon_price']
-
-    tasks = [(env_cat, file_part) for env_cat in output_all_names for file_part in file_parts]
-
-    results = Parallel(n_jobs=njobs)(  # 这里你可以改 n_jobs，比如 8 或 -1 用所有CPU
-        delayed(xarrays_to_tifs)(env_cat, file_part, output_path, tif_dir, data)
-        for env_cat, file_part in tasks
-    )
-
-    file_parts = ['total_non_ag_cost', 'total_non_ag_carbon', 'total_non_ag_bio', 'bio_non_ag_price', 'carbon_non_ag_price']
-
-    tasks = [(env_cat, file_part) for env_cat in output_all_names for file_part in file_parts]
-
-    results = Parallel(n_jobs=njobs)(  # 这里你可以改 n_jobs，比如 8 或 -1 用所有CPU
-        delayed(xarrays_to_tifs)(env_cat, file_part, output_path, tif_dir, data)
-        for env_cat, file_part in tasks
-    )
-
-    tif_path_1 = os.path.join(tif_dir, 'carbon_high', "xr_carbon_price_carbon_high_2050.tif")
-    tif_path_2 = os.path.join(tif_dir, 'Counterfactual_carbon_high_bio_50',
-                              f"xr_carbon_price_Counterfactual_carbon_high_bio_50_2050.tif")
-    tif_output = os.path.join(tif_dir, 'carbon_high_bio_50', f"xr_carbon_price_carbon_high_bio_50_2050.tif")
-    subtract_tifs(tif_path_2, tif_path_1, tif_output)
-
-    # # --- 阶段 8: shp计算 ---
-    # tprint("\n--- 阶段 8: shp计算 ---")
-    # shp_names = ['H_1kkm2', 'H_2kkm2', 'H_5kkm2', 'H_100km2']
-    #
-    # for shp_name in shp_names:
-    #     if njobs == 0:
-    #         for env_cat in output_all_names:
-    #             create_shp(env_cat, shp_name, file_parts, tif_dir)
-    #     else:
-    #         Parallel(n_jobs=njobs)(
-    #             delayed(create_shp)(env_cat, shp_name, file_parts, tif_dir)
-    #             for env_cat in output_all_names
-    #         )
-
-    # --- 总结 ---
+#     tif_dir = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif"
+#     output_path = f"../../../output/{config.TASK_NAME}/carbon_price/0_base_data"
+#     data_path = get_data_RES_path(f"../../../output/{config.TASK_NAME}/{input_files_0[0]}/output")
+#
+#     with gzip.open(data_path, 'rb') as f:
+#         data = dill.load(f)
+#
+#     cost_file_parts = ['total_cost', 'cost_agricultural_management', 'cost_non_ag',
+#                        'transition_cost_ag2non_ag_amortised_diff']
+#     tasks = [(env_cat, file_part) for env_cat in output_all_names for file_part in cost_file_parts]
+#     results = Parallel(n_jobs=njobs)(  # 这里你可以改 n_jobs，比如 8 或 -1 用所有CPU
+#         delayed(xarrays_to_tifs)(env_cat, file_part, output_path, tif_dir, data)
+#         for env_cat, file_part in tasks
+#     )
+#
+#     GHG_file_parts = ['total_carbon', 'GHG_ag_management', 'GHG_non_ag']
+#     tasks = [(env_cat, file_part) for env_cat in output_all_names for file_part in GHG_file_parts]
+#     results = Parallel(n_jobs=njobs)(  # 这里你可以改 n_jobs，比如 8 或 -1 用所有CPU
+#         delayed(xarrays_to_tifs)(env_cat, file_part, output_path, tif_dir, data, remove_negative=False)
+#         for env_cat, file_part in tasks
+#     )
+#
+#     bio_file_parts = ['total_bio', 'biodiversity_GBF2_priority_ag_management', 'biodiversity_GBF2_priority_non_ag']
+#     tasks = [(env_cat, file_part) for env_cat in output_all_names for file_part in bio_file_parts]
+#     results = Parallel(n_jobs=njobs)(  # 这里你可以改 n_jobs，比如 8 或 -1 用所有CPU
+#         delayed(xarrays_to_tifs)(env_cat, file_part, output_path, tif_dir, data, remove_negative=False, per_ha=False)
+#         for env_cat, file_part in tasks
+#     )
+#
+#     input_files = ['Run_01_GHG_high_BIO_high_CUT_50', 'Run_06_GHG_high_BIO_off_CUT_50', 'Run_18_GHG_off_BIO_off_CUT_50']
+#     agmgt_file_parts = ['area_agricultural_management']
+#
+#     tasks = [(env_cat, file_part) for env_cat in input_files for file_part in agmgt_file_parts]
+#     results = Parallel(n_jobs=njobs)(  # 这里你可以改 n_jobs，比如 8 或 -1 用所有CPU
+#         delayed(xarrays_to_tifs_by_type)(
+#             env_cat, file_part, output_path, tif_dir, data,
+#             sum_dim='am'
+#         )
+#         for env_cat, file_part in tasks
+#     )
+#
+#     nonag = ['area_non_agricultural_landuse']
+#     tasks = [(env_cat, file_part) for env_cat in input_files for file_part in nonag]
+#     results = Parallel(n_jobs=njobs)(  # 这里你可以改 n_jobs，比如 8 或 -1 用所有CPU
+#         delayed(xarrays_to_tifs_by_type)(
+#             env_cat, file_part, output_path, tif_dir, data,
+#             sum_dim='lu'
+#         )
+#         for env_cat, file_part in tasks
+#     )
+#
+#     solution_cost_parts = ['cost_agricultural_management', 'cost_non_ag', 'transition_cost_ag2non_ag_amortised_diff']
+#     results = Parallel(n_jobs=njobs)(
+#         delayed(plus_tifs)(tif_dir, env_cat, solution_cost_parts, "total_sol_cost")
+#         for env_cat in output_all_names
+#     )
+#
+#     solution_ghg_benefit_parts = ['GHG_ag_management', 'GHG_non_ag']
+#     results = Parallel(n_jobs=njobs)(
+#         delayed(plus_tifs)(tif_dir, env_cat, solution_ghg_benefit_parts, "total_sol_ghg_benefit", remove_negative=False)
+#         for env_cat in output_all_names
+#     )
+#     results = Parallel(n_jobs=njobs)(
+#         delayed(divide_tifs)(tif_dir, env_cat, solution_cost_parts, solution_ghg_benefit_parts, "carbon_sol_price")
+#         for env_cat in output_all_names
+#     )
+#
+#     solution_bio_benefit_parts = ['biodiversity_GBF2_priority_ag_management', 'biodiversity_GBF2_priority_non_ag']
+#     results = Parallel(n_jobs=njobs)(
+#         delayed(plus_tifs)(tif_dir, env_cat, solution_bio_benefit_parts, "total_sol_bio_benefit", remove_negative=False)
+#         for env_cat in output_all_names
+#     )
+#     results = Parallel(n_jobs=njobs)(
+#         delayed(divide_tifs)(tif_dir, env_cat, solution_cost_parts, solution_bio_benefit_parts, "bio_sol_price")
+#         for env_cat in output_all_names
+#     )
+#
+#     tif_path_1 = os.path.join(tif_dir, 'carbon_high', "xr_carbon_price_carbon_high_2050.tif")
+#     tif_path_2 = os.path.join(tif_dir, 'Counterfactual_carbon_high_bio_50',
+#                               f"xr_ghg_sol_price_Counterfactual_carbon_high_bio_50_2050.tif")
+#     tif_output = os.path.join(tif_dir, 'carbon_high_bio_50', f"xr_ghg_sol_price_carbon_high_bio_50_2050.tif")
+#     subtract_tifs(tif_path_2, tif_path_1, tif_output)
+#     #
+#     # # --- 阶段 8: shp计算 ---
+#     # tprint("\n--- 阶段 8: shp计算 ---")
+#     # shp_names = ['H_1kkm2', 'H_2kkm2', 'H_5kkm2', 'H_100km2']
+#     #
+#     # for shp_name in shp_names:
+#     #     if njobs == 0:
+#     #         for env_cat in output_all_names:
+#     #             create_shp(env_cat, shp_name, file_parts, tif_dir)
+#     #     else:
+#     #         Parallel(n_jobs=njobs)(
+#     #             delayed(create_shp)(env_cat, shp_name, file_parts, tif_dir)
+#     #             for env_cat in output_all_names
+#     #         )
+#
+#     # --- 总结 ---
     end_time = time.time()
     total_time = end_time - start_time
     tprint("\n" + "=" * 80)

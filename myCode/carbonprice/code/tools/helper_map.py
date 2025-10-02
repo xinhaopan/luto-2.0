@@ -366,18 +366,13 @@ def efficient_tif_plot(
             vmin_data = 0
             vmax_data = 1
         data = np.where(data < 1, np.nan, data)  # 强制小于1的值为NaN
-        if custom_tick_values is not False:
-            tick_vals = np.asarray(list(custom_tick_values), dtype=float)
-            vmin_plot = vmin_data
-            vmax_plot = vmax_data
-        else:
-            nb = max(int(legend_nbins), 2)
-            vmin_plot, vmax_plot, ticks_list = get_y_axis_ticks(
-                vmin_data, vmax_data,
-                desired_ticks=nb,
-                strict_count=strict_count
-            )
-            tick_vals = np.asarray(ticks_list, dtype=float)
+        nb = max(int(legend_nbins), 2)
+        vmin_plot, vmax_plot, ticks_list = get_y_axis_ticks(
+            vmin_data, vmax_data,
+            desired_ticks=nb,
+            strict_count=strict_count
+        )
+        tick_vals = np.asarray(ticks_list, dtype=float)
 
     else:
         # 默认策略：使用裁剪后的实际范围
@@ -385,22 +380,22 @@ def efficient_tif_plot(
         vmax_data = vmax_clipped
 
         # 使用 get_y_axis_ticks 获取优化的刻度
-        if custom_tick_values is not False:
-            tick_vals = np.asarray(list(custom_tick_values), dtype=float)
-            vmin_plot = vmin_data
-            vmax_plot = vmax_data
-        else:
-            nb = max(int(legend_nbins), 2)
-            vmin_plot, vmax_plot, ticks_list = get_y_axis_ticks(
-                vmin_data, vmax_data,
-                desired_ticks=nb,
-                strict_count=strict_count
-            )
-            tick_vals = np.asarray(ticks_list, dtype=float)
+        nb = max(int(legend_nbins), 2)
+        vmin_plot, vmax_plot, ticks_list = get_y_axis_ticks(
+            vmin_data, vmax_data,
+            desired_ticks=nb,
+            strict_count=strict_count
+        )
+        tick_vals = np.asarray(ticks_list, dtype=float)
 
     # 创建归一化对象
     norm = Normalize(vmin=vmin_plot, vmax=vmax_plot, clip=True)
     cmap_obj = mpl.colormaps.get_cmap(cmap).copy()
+
+    if custom_tick_values is not False:
+        tick_vals = np.asarray(list(custom_tick_values), dtype=float)
+        vmin_plot = custom_tick_values[0]
+        vmax_plot = custom_tick_values[-1]
 
     # 绘制栅格
     im = ax.imshow(
@@ -792,9 +787,9 @@ def plot_tif_layer(
         cmap,
         outfile: str = None,
         ax=None,
-        decimal_places=2,
+        decimal_places=1,
         custom_tick_values=False,
-        line_width=1,
+        line_width=0.1,
         title_y=0.9,
         unit_labelpad=5,
         char_ticks_length=1,

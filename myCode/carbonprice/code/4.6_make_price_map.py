@@ -14,14 +14,18 @@ def plot_tif_grid(tif_title_list, figsize=(10, 10)):
     """
     fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(2, 2, figure=fig, hspace=-0.2, wspace=0.02,
-                           left=0.03, right=0.99, top=0.99, bottom=0.03)
+                           left=0.01, right=0.99, top=0.99, bottom=0.01)
     axes = []
 
     for idx, (tif, title, unit_name, clip_percent) in enumerate(tif_title_list):
         row = idx // 2
         col = idx % 2
         ax = fig.add_subplot(gs[row, col], projection=ccrs.PlateCarree())
-        # 你自己的safe_plot函数
+        # 获取覆盖参数
+        key = os.path.splitext(os.path.basename(tif))[0]  # 得到 'xr_ghg_sol_price_carbon_high_2050'
+        main_key = key.replace('xr_', '').replace('_2050', '')  # 得到 'ghg_sol_price_carbon_high'
+        kwargs = layer_overrides.get(main_key, {})
+
         safe_plot(
             tif_path=tif,
             title=title,
@@ -30,6 +34,7 @@ def plot_tif_grid(tif_title_list, figsize=(10, 10)):
             cmap=price_cmap,
             clip_percent=clip_percent,
             title_y=0.95,
+            **kwargs
             # 其它参数按需传
         )
         axes.append(ax)
@@ -42,13 +47,20 @@ os.makedirs(out_dir, exist_ok=True)
 # price_cmap = LinearSegmentedColormap.from_list("price", ["#00ffff", "#ff00ff"])
 price_cmap = LinearSegmentedColormap.from_list("price", ["#ffff80", "#38e009","#1a93ab","#0c1078"])
 
+
+layer_overrides = {
+    'ghg_sol_price_carbon_high': {"custom_tick_values": [0,50,100]},
+    'ghg_sol_price_carbon_high_bio_50': {"custom_tick_values": [0,500,1000]},
+    'ghg_sol_price_Counterfactual_carbon_high_bio_50': {"custom_tick_values": [0,500,1000]},
+}
+
 legend_nbins = 3
 # 统一样式
 set_plot_style(font_size=15, font_family='Arial')
 
 tif_title_list = [
-    (f"{arr_path}/carbon_high/xr_ghg_sol_price_carbon_high_2050.tif", "Shadow carbon price\nunder net-zero targets",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
-    (f"{arr_path}/carbon_high_bio_50/xr_ghg_sol_price_carbon_high_bio_50_2050.tif", "Shadow carbon price\nunder nature positive",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
+    (f"{arr_path}/carbon_high/xr_ghg_sol_price_carbon_high_2050.tif", "Shadow carbon price\nunder Net Zero targets",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
+    (f"{arr_path}/carbon_high_bio_50/xr_ghg_sol_price_carbon_high_bio_50_2050.tif", "Shadow carbon price\nunder Nature Positive",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
     (f"{arr_path}/Counterfactual_carbon_high_bio_50/xr_ghg_sol_price_Counterfactual_carbon_high_bio_50_2050.tif", "Shadow carbon price\nunder both targets",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
     (f"{arr_path}/carbon_high_bio_50/xr_bio_sol_price_carbon_high_bio_50_2050.tif", "Shadow biodiversity price",'AU\$ ha$^{-1}$ yr$^{-1}$',[1,99]),
 ]
@@ -67,16 +79,16 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 # 添加图例元素
-add_north_arrow(fig, 0.21, 0.068, size=0.018)
-add_scalebar(fig, axes[0], 0.26, 0.076, length_km=500, fontsize=font_size,
+add_north_arrow(fig, 0.21, 0.038, size=0.018)
+add_scalebar(fig, axes[0], 0.26, 0.046, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
-add_annotation(fig, 0.34, 0.080, width=0.015, text="State/Territory boundaries",
+add_annotation(fig, 0.34, 0.050, width=0.015, text="State/Territory boundaries",
                linewidth=2, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.61, 0.074, width=0.011, height=0.011, linewidth=2,
+add_annotation(fig, 0.61, 0.044, width=0.011, height=0.011, linewidth=2,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.20, 0.045, width=0.012, height=0.011, linewidth=2,
+add_annotation(fig, 0.20, 0.015, width=0.012, height=0.011, linewidth=2,
                text="Public, indigenous, urban, water bodies, and other land",
                style="box", facecolor="#808080", edgecolor="#808080",
                fontsize=font_size, fontfamily=font_family)

@@ -54,6 +54,7 @@ KEY_TO_COLUMN_MAP = {
     "xr_biodiversity_GBF2_priority_non_ag": "Non-ag biodiversity",
     "xr_biodiversity_GBF2_priority_ag_diff": "Ag biodiversity",
 
+
 }
 
 # 创建 revenue_dict，主键从 cost 换成 revenue

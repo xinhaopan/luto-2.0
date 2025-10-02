@@ -29,13 +29,13 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
 
     # 自动计算图像尺寸
     if figsize is None:
-        figsize = (ncols * 5, nrows * 5)
+        figsize = (ncols * 5, nrows * 4.5)
 
     fig = plt.figure(figsize=figsize)
 
     # 创建网格规范
-    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.45, wspace=0.03,
-                           left=0.03, right=0.99, top=0.99, bottom=0.03)
+    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.2, wspace=0.03,
+                           left=0.03, right=0.99, top=0.99, bottom=0.01)
 
     axes_list = []
     scenario_names = list(scenarios.keys())
@@ -120,14 +120,14 @@ row_labels = [
 
 # 列标题（顶部）
 column_titles = [
-    r'Reference→$\mathrm{GHG}_{\mathrm{high}}$',
-    r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
-    r'Reference→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$'
+    r'Reference→$\mathrm{NZ}_{\mathrm{high}}$',
+    r'$\mathrm{NZ}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$',
+    r'Reference→$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$'
 ]
 
 # 可选覆盖
 layer_overrides = {
-    'total_carbon': {"clip_percent": [1,99],"force_zero_center": True,},
+    'total_sol_ghg_benefit': {"clip_percent": [1,99],"force_zero_center": True,},
     'GHG_ag_management': {"clip_percent": [1,99],"force_zero_center": True,},
     'GHG_non_ag': {"clip_percent": [1,99],"force_zero_center": True,},
     # 'transition_cost_ag2non_ag_amortised_diff': {"clip_percent": [0, 95]},
@@ -169,16 +169,16 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 # 添加图例元素
-add_north_arrow(fig, 0.19, 0.088, size=0.012)
-add_scalebar(fig, axes[0], 0.22, 0.094, length_km=500, fontsize=font_size,
+add_north_arrow(fig, 0.19, 0.008, size=0.012)
+add_scalebar(fig, axes[0], 0.22, 0.014, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
-add_annotation(fig, 0.28, 0.098, width=0.015, text="State/Territory boundaries",
+add_annotation(fig, 0.28, 0.018, width=0.015, text="State/Territory boundaries",
                linewidth=2, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.470, 0.095, width=0.008, height=0.0072, linewidth=2,
+add_annotation(fig, 0.470, 0.014, width=0.008, height=0.008, linewidth=2,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.54, 0.095, width=0.008, height=0.0072, linewidth=2,
+add_annotation(fig, 0.54, 0.0145, width=0.008, height=0.008, linewidth=2,
                text="Public, indigenous, urban, water bodies, and other land",
                style="box", facecolor="#808080", edgecolor="#808080",
                fontsize=font_size, fontfamily=font_family)

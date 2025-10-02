@@ -67,30 +67,30 @@ def subtract_tifs(a_path, b_path, out_path):
         with rasterio.open(out_path, "w", **profile) as dst:
             dst.write(out, 1)
 
-def plus_tifs(base_dir,env_cat, cost_names, outpath_part, remove_negative=True):
-    """
-    用 cost_names 的所有 tif 求和（去掉小于1的），
-    用 benefit_names 的所有 tif 求和（去掉小于1的），
-    然后相除，输出结果为 tif。
-    """
-    # 读取并累加成本影像
-    cost_sum = None
+def plus_tifs(base_dir, env_cat, cost_names, outpath_part, remove_negative=True):
+    cost_arrs = []
     for fname_part in cost_names:
         fname = f"{base_dir}/{env_cat}/xr_{fname_part}_{env_cat}_2050.tif"
         with rasterio.open(fname) as src:
             arr = src.read(1, masked=True).filled(np.nan).astype(np.float32)
-            # arr[arr < 1] = np.nan
-            if cost_sum is None:
-                cost_sum = arr
+            cost_arrs.append(arr)
+            if len(cost_arrs) == 1:
                 cost_profile = src.profile.copy()
-            else:
-                cost_sum = np.nansum(np.stack([cost_sum, arr]), axis=0)
 
-    # 只保留有效值，其他位置设为 nodata
+    # 堆叠到三维
+    cost_stack = np.stack(cost_arrs, axis=0)  # shape: (n_files, height, width)
+    # 计算每个像元是否全为有效值
+    all_valid = ~np.any(np.isnan(cost_stack), axis=0)  # True表示所有层都非nan
+    # 求和
+    cost_sum = np.nansum(cost_stack, axis=0)
+    # 把非全有效的地方设为 np.nan
+    cost_sum[~all_valid] = np.nan
+
+    # nodata处理
     nodata_value = -9999
     cost_sum[np.isnan(cost_sum)] = nodata_value
     if remove_negative:
-        cost_sum[cost_sum < 1] = nodata_value     # 避免成本小于1
+        cost_sum[cost_sum < 1] = nodata_value
 
     # 更新 profile
     profile = cost_profile.copy()
@@ -228,16 +228,16 @@ def xarrays_to_tifs_by_type(
 
     return results
 
-
+njobs = 41
 task_name = config.TASK_NAME
 input_files_0 = config.input_files_0
 # output_all_names = config.carbon_names + config.carbon_bio_names + config.counter_carbon_bio_names
 output_all_names = ['carbon_high', 'carbon_high_bio_50', 'Counterfactual_carbon_high_bio_50']
+
+
 tif_dir = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif"
 output_path = f"../../../output/{config.TASK_NAME}/carbon_price/0_base_data"
 data_path = get_data_RES_path(f"../../../output/{config.TASK_NAME}/{input_files_0[0]}/output")
-
-njobs = 41
 
 with gzip.open(data_path, 'rb') as f:
     data = dill.load(f)
@@ -284,8 +284,6 @@ results = Parallel(n_jobs=njobs)(  # 这里你可以改 n_jobs，比如 8 或 -1
     )
     for env_cat, file_part in tasks
 )
-
-
 
 solution_cost_parts = ['cost_agricultural_management','cost_non_ag','transition_cost_ag2non_ag_amortised_diff']
 results = Parallel(n_jobs=njobs)(

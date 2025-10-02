@@ -29,13 +29,13 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
 
     # 自动计算图像尺寸
     if figsize is None:
-        figsize = (ncols * 5, nrows * 5)
+        figsize = (ncols * 5, nrows * 4.5)
 
     fig = plt.figure(figsize=figsize)
 
     # 创建网格规范
-    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.45, wspace=0.03,
-                           left=0.03, right=0.99, top=0.99, bottom=0.03)
+    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.2, wspace=0.03,
+                           left=0.03, right=0.99, top=0.995, bottom=0.015)
 
     axes_list = []
     scenario_names = list(scenarios.keys())
@@ -118,8 +118,8 @@ row_labels = [
 # 列标题（顶部）
 column_titles = [
     # r'Reference→$\mathrm{GHG}_{\mathrm{high}}$',
-    r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
-    r'Reference→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$'
+    r'$\mathrm{NZ}_{\mathrm{high}}$→$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$',
+    r'Reference→$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$'
 ]
 
 # 可选覆盖
@@ -166,16 +166,16 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 # 添加图例元素
-add_north_arrow(fig, 0.21, 0.098, size=0.018)
-add_scalebar(fig, axes[0], 0.26, 0.106, length_km=500, fontsize=font_size,
+add_north_arrow(fig, 0.21, 0.018, size=0.018)
+add_scalebar(fig, axes[0], 0.26, 0.029, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
-add_annotation(fig, 0.34, 0.110, width=0.015, text="State/Territory boundaries",
+add_annotation(fig, 0.33, 0.034, width=0.025, text="State/Territory boundaries",
                linewidth=2, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.62, 0.107, width=0.011, height=0.0072, linewidth=2,
+add_annotation(fig, 0.62, 0.030, width=0.014, height=0.0095, linewidth=2,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.20, 0.085, width=0.012, height=0.0072, linewidth=2,
+add_annotation(fig, 0.20, 0.005, width=0.012, height=0.0095, linewidth=2,
                text="Public, indigenous, urban, water bodies, and other land",
                style="box", facecolor="#808080", edgecolor="#808080",
                fontsize=font_size, fontfamily=font_family)

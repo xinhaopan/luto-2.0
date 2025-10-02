@@ -460,7 +460,135 @@ def build_profit_and_cost_nc(
         "cost_all": all_cost,  # 合并后的总结果 (scenario, Year, type) + 辅助坐标 category
     }
 
+def build_sol_profit_and_cost_nc(
+    economic_da: xr.DataArray,
+    input_files_0,              # baseline 列表（用第 0 个）
+    input_files_1,              # 碳情景列表
+    input_files_2,              # 碳+生物多样性 列表
+    carbon_names,               # 与 input_files_1 对齐的输出名
+    carbon_bio_names,           # 与 input_files_2 对齐的输出名
+    counter_carbon_bio_names,   # 与 input_files_2 对齐的输出名
+    add_total=False,            # 是否把 Total 作为额外的 type 写入
+):
+    """
+    economic_da 维度必须是 (scenario, Year, type) 且 type 名包含：
+      'Ag revenue','Ag cost','AgMgt revenue','AgMgt cost',
+      'Non-ag revenue','Non-ag cost','Transition(ag→ag) cost',
+      'Transition(ag→non-ag) amortised cost'
+    """
+    out_dir = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
+    os.makedirs(out_dir, exist_ok=True)
 
+    # ---------- 1) 计算 profit(scenario, Year, type) ----------
+    required_types = [
+        "AgMgt revenue", "AgMgt cost",
+        "Non-ag revenue", "Non-ag cost",
+        "Transition(ag→non-ag) amortised cost",
+    ]
+    type_names = set(economic_da.coords["type"].astype(str).values)
+    missing = [t for t in required_types if t not in type_names]
+    if missing:
+        raise ValueError(f"economic_da 缺少必要 type: {missing}")
+
+    def pick(name: str) -> xr.DataArray:
+        # 选中一个类型 -> 去掉原来的 type 维度，避免后续按坐标对齐
+        da = economic_da.sel(type=name).squeeze(drop=True)
+        # 现在 da 的维度里已经没有 type 了（只剩 scenario/year 等）
+        return da
+
+    profit_list = [
+        (pick("AgMgt revenue") - pick("AgMgt cost")).expand_dims(type=["AgMgt profit"]),
+        (pick("Non-ag revenue") - pick("Non-ag cost")).expand_dims(type=["Non-ag profit"]),
+        (-pick("Transition(ag→non-ag) amortised cost")).expand_dims(type=["Transition(ag→non-ag) amortised profit"]),
+    ]
+
+    profit_da = xr.concat(profit_list, dim="type")
+    profit_da.name = "data"
+
+    # 如果需要固定维度顺序（比如 scenario, year, type）：
+    want = [d for d in ["scenario", "Year", "type"] if d in profit_da.dims]
+    profit_da = profit_da.transpose(*want)
+    profit_da.name = "data"
+
+    # 存 profit（修正：encoding 的 key 要用当前 name）
+    profit_nc = os.path.join(out_dir, "xr_sol_profit.nc")
+    save2nc(profit_da, profit_nc)
+
+    # ---------- 2) 构造三个差值 DataArray ----------
+    baseline = input_files_0[0]
+
+    # A) carbon：baseline - input_files_1[i]  ->  (policy, Year, type)
+    diffs = []
+    for scen in input_files_1:
+        diffs.append(profit_da.sel(scenario=baseline) - profit_da.sel(scenario=scen))
+    carbon_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(carbon_names))
+
+    # B) carbon_bio：input_files_1[i] - input_files_2[idx]
+    if len(input_files_2) % len(input_files_1) != 0:
+        raise ValueError("len(input_files_2) 必须是 len(input_files_1) 的整数倍，用于分组匹配。")
+    bio_nums = len(input_files_2) // len(input_files_1)
+
+    diffs = []
+    for k, scen2 in enumerate(input_files_2):
+        i = k // bio_nums
+        scen1 = input_files_1[i]
+        diffs.append(profit_da.sel(scenario=scen1) - profit_da.sel(scenario=scen2))
+    carbon_bio_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(carbon_bio_names))
+
+    # C) counter：input_files_2 的前 bio_nums 个与 baseline
+    diffs = []
+    for i in range(len(counter_carbon_bio_names)):
+        scen2 = input_files_2[i]
+        diffs.append(profit_da.sel(scenario=baseline) - profit_da.sel(scenario=scen2))
+    counter_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(counter_carbon_bio_names))
+
+    # 可选把 Total 作为额外的 type 追加
+    def append_total(da, add_total=add_total):
+        if not add_total:
+            return da
+        total = da.sum(dim="type")
+        total = total.expand_dims({"type": ["Total"]})
+        da2 = xr.concat([da, total], dim="type")
+        return da2
+
+    carbon_cost = append_total(carbon_cost)
+    carbon_bio_cost = append_total(carbon_bio_cost)
+    counter_cost = append_total(counter_cost)
+
+    # ---------- 3) 在“情景维度”上合并三个输出 ----------
+    # 关键点：
+    # - 先把三个 DataArray 的 'policy' 维重命名为 'scenario'
+    # - 再各自添加一个辅助坐标 'category'，用于区分来源
+    # - 最后在 'scenario' 维上 concat 成一个总的 DataArray
+    def tag_and_rename(da, category_name: str) -> xr.DataArray:
+        da2 = da.rename(policy="scenario")
+        da2 = da2.assign_coords(
+            category=("scenario", [category_name] * da2.sizes["scenario"])
+        )
+        return da2
+
+    carbon_cost_sc   = tag_and_rename(carbon_cost,   "carbon")
+    carbon_bio_sc    = tag_and_rename(carbon_bio_cost, "carbon_bio")
+    counter_cost_sc  = tag_and_rename(counter_cost,  "counter_carbon_bio")
+
+    # 合并：(scenario, Year, type)
+    all_cost = xr.concat([carbon_cost_sc, carbon_bio_sc, counter_cost_sc], dim="scenario")
+    type_vals = all_cost.coords["type"].values
+    new_type_vals = [v.replace(" profit", "") for v in type_vals]
+    all_cost = all_cost.assign_coords(type=("type", new_type_vals))
+    all_cost.name = "data"
+
+    # 存一个总的 nc
+    all_nc = os.path.join(out_dir, "xr_total_sol_cost.nc")
+    save2nc(all_cost, all_nc)
+
+    return {
+        "profit": profit_da,
+        "cost_carbon": carbon_cost,
+        "cost_carbon_bio": carbon_bio_cost,
+        "cost_counter_carbon_bio": counter_cost,
+        "cost_all": all_cost,  # 合并后的总结果 (scenario, Year, type) + 辅助坐标 category
+    }
 
 def make_prices_nc(output_names):
     """
@@ -526,6 +654,73 @@ def make_prices_nc(output_names):
     os.makedirs(out_dir, exist_ok=True)
     save2nc(carbon_price, os.path.join(out_dir, 'xr_carbon_price.nc'))
     save2nc(bio_price, os.path.join(out_dir, 'xr_bio_price.nc'))
+
+    return carbon_price, bio_price
+
+def make_sol_prices_nc(output_names):
+    """
+    从 xr_total_cost.nc / xr_total_carbon.nc / xr_total_bio.nc 读取数据，
+    对每个情景只保留 (scenario, Year)，其余维度（若存在）全部按和聚合；
+    然后计算：
+        carbon_price = total_cost / total_carbon
+        bio_price    = total_cost / total_bio
+    合并所有情景 -> 两个 DataArray：(scenario, Year)，并保存到 out_dir。
+    """
+    out_dir = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
+    base = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
+    cost_da = xr.open_dataarray(os.path.join(base, 'xr_total_sol_cost.nc'))
+    carbon_da = xr.open_dataarray(os.path.join(base, 'xr_total_sol_carbon.nc'))
+    bio_da = xr.open_dataarray(os.path.join(base, 'xr_total_sol_bio.nc'))
+
+    def _collapse_to_year(da_all: xr.DataArray, scen_name: str) -> xr.DataArray:
+        """
+        选中单个情景，除 Year 外的所有维度求和，返回维度仅 (scenario, Year) 的 DataArray。
+        """
+        da = da_all.sel(scenario=scen_name)
+
+        # 需要保留的维度：Year（和 scenario 这个坐标）
+        keep = {'Year'}
+        # 允许有/无 Year 这一坐标（某些数据可能命名不同，必要时在外面改名）
+        sum_dims = [d for d in da.dims if d not in keep]
+
+        if sum_dims:
+            da = da.sum(dim=sum_dims, skipna=True)
+
+        # 确保有 scenario 维度（如果被掉了就补回来）
+        if 'scenario' not in da.dims:
+            da = da.expand_dims({'scenario': [scen_name]})
+        else:
+            # 把单场景的坐标设置为该 scen_name（防止保留了原坐标数组）
+            da = da.assign_coords(scenario=[scen_name])
+
+        # 维度顺序统一成 (scenario, Year)（若 Year 不存在，这里会报错，需保证 Year 维存在）
+        if 'Year' in da.dims:
+            da = da.transpose('scenario', 'Year')
+        return da
+
+    # 聚合每个情景
+    cost_list, car_list, bio_list = [], [], []
+    for scen in output_names:
+        cost_list.append(_collapse_to_year(cost_da, scen))
+        car_list.append(_collapse_to_year(carbon_da, scen))
+        bio_list.append(_collapse_to_year(bio_da, scen))
+
+    # 合并所有情景
+    cost_all = xr.concat(cost_list, dim='scenario')
+    carbon_all = xr.concat(car_list, dim='scenario')
+    bio_all = xr.concat(bio_list, dim='scenario')
+
+
+    carbon_price = cost_all / carbon_all
+    bio_price = cost_all / bio_all
+
+    carbon_price.name = 'data'
+    bio_price.name = 'data'
+
+    # 保存
+    os.makedirs(out_dir, exist_ok=True)
+    save2nc(carbon_price, os.path.join(out_dir, 'xr_carbon_sol_price.nc'))
+    save2nc(bio_price, os.path.join(out_dir, 'xr_bio_sol_price.nc'))
 
     return carbon_price, bio_price
 
@@ -639,7 +834,37 @@ def create_xarray(years, base_path, env_category, env_name, mask=None,
 
     return ds
 
+def create_processed_xarray(years, base_path, env_category, env_name, mask=None,
+                  engine="h5netcdf",
+                  cell_dim="cell", cell_chunk="auto",
+                  year_chunk=1, parallel=False):
+    """
+    以 year 维度拼接多个年度 NetCDF，懒加载+分块，避免过多文件句柄。
+    """
+    file_paths = [
+        os.path.join(base_path, str(env_category), str(y), f"xr_{env_name}_{env_category}_{y}.nc")
+        for y in years
+    ]
+    missing = [p for p in file_paths if not os.path.exists(p)]
+    if missing:
+        raise FileNotFoundError(f"以下文件未找到:\n" + "\n".join(missing))
 
+    # 从文件名提取实际年份，确保坐标与文件顺序一致
+    valid_years = [int(os.path.basename(p).split("_")[-1].split(".")[0]) for p in file_paths]
+
+    ds = xr.open_mfdataset(
+        file_paths,
+        engine=engine,
+        combine="nested",  # 明确“按给定顺序拼接”
+        concat_dim="Year",  # 新增 year 维度
+        parallel=parallel,  # 一般 False 更稳，避免句柄并发
+        chunks={cell_dim: cell_chunk, "Year": year_chunk}  # year=1，cell 分块
+    ).assign_coords(year=valid_years)
+
+    if mask is not None:
+        ds = ds.where(mask, other=0)  # 使用掩码，非掩码区域设为 0
+
+    return ds
 
 def create_summary(env_category, years, base_path,env_type, colnames):
     """

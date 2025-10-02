@@ -29,13 +29,13 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
 
     # 自动计算图像尺寸
     if figsize is None:
-        figsize = (ncols * 5, nrows * 5)
+        figsize = (ncols * 5, nrows * 4.2)
 
     fig = plt.figure(figsize=figsize)
 
     # 创建网格规范
-    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.45, wspace=0.03,
-                           left=0.03, right=0.99, top=0.99, bottom=0.03)
+    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.3, wspace=0.015,
+                           left=0.03, right=0.99, top=0.99, bottom=0.01)
 
     axes_list = []
     scenario_names = list(scenarios.keys())
@@ -67,6 +67,7 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
                 unit=r"AU\$ ha$^{-1}$ yr$^{-1}$",
                 cmap=cost_cmap,
                 ax=ax,
+                force_one_start=True,
                 **kwargs
             )
 
@@ -95,7 +96,10 @@ align_raster_to_reference(src_tif, ref_tif, aligned_tif, resampling="nearest")
 
 # 统一色带
 cost_cmap = LinearSegmentedColormap.from_list("cost", ["#FFFEC2", "#FA4F00", "#A80000", "#5c2324"])
-
+# cost_cmap = LinearSegmentedColormap.from_list(
+#     "cost",
+#     ["#FFFFFF", "#FFFEC2", "#FA4F00", "#A80000", "#5c2324"]
+# )
 # ==== 场景配置 ====
 scenarios = {
     "carbon_high": {},
@@ -121,9 +125,9 @@ row_labels = [
 
 # 列标题（顶部）
 column_titles = [
-    r'Reference→$\mathrm{GHG}_{\mathrm{high}}$',
-    r'$\mathrm{GHG}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$',
-    r'Reference→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{Bio}_{\mathrm{50}}$'
+    r'Reference→$\mathrm{NZ}_{\mathrm{high}}$',
+    r'$\mathrm{NZ}_{\mathrm{high}}$→$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$',
+    r'Reference→$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$'
 ]
 
 # 可选覆盖
@@ -137,7 +141,7 @@ layer_overrides = {
 # ==== 创建网格图 ====
 nrows = len(env_keys)  # 4种成本类型
 ncols = len(scenarios)  # 3个场景
-fig, axes = plot_cost_grid(scenarios, year=2050, nrows=nrows, ncols=ncols, figsize=(20, 25))
+fig, axes = plot_cost_grid(scenarios, year=2050, nrows=nrows, ncols=ncols)
 
 # 获取字体设置
 font_size = axes[0].xaxis.get_label().get_size()
@@ -170,17 +174,17 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 # 添加图例元素
-add_north_arrow(fig, 0.20, 0.083, size=0.012)
-add_scalebar(fig, axes[0], 0.245, 0.089, length_km=500, fontsize=font_size,
+add_north_arrow(fig, 0.18, 0.005, size=0.012)
+add_scalebar(fig, axes[0], 0.22, 0.009, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=1.5)
-add_annotation(fig, 0.31, 0.093, width=0.015, text="Australian state boundary",
+add_annotation(fig, 0.28, 0.013, width=0.015, text="State/Territory boundaries",
                linewidth=1.5, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.472, 0.090, width=0.01, height=0.0072, linewidth=1.5,
+add_annotation(fig, 0.472, 0.010, width=0.01, height=0.0075, linewidth=1.5,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.54, 0.090, width=0.01, height=0.0072, linewidth=1.5,
-               text="Public, indigenous, urban, and other intensive land uses",
+add_annotation(fig, 0.54, 0.010, width=0.01, height=0.0075, linewidth=1.5,
+               text="Public, indigenous, urban, water bodies, and other land",
                style="box", facecolor="#808080", edgecolor="#808080",
                fontsize=font_size, fontfamily=font_family)
 

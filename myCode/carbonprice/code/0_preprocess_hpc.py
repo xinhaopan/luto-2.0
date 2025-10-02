@@ -9,7 +9,7 @@ CPU_CORES = 90
 MEMORY_GB = "1500G"
 TIME_LIMIT = "0-720:00:00"
 
-PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"
+PYTHON_SCRIPT_TO_RUN = "0_Preprocess_1.py"
 CONDA_ENV_NAME = "xpluto-fixed"
 
 SUBMISSION_SCRIPT_NAME = "submit_preprocess.sh"

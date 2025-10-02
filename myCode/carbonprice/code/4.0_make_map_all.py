@@ -1122,8 +1122,8 @@ set_plot_style(font_size=15, font_family='Arial')
 
 # 参照/掩膜对齐（仅一次）
 ref_tif   = f"{arr_path}/carbon_high/xr_total_cost_carbon_high_2050.tif"   # 用 carbon_high 的 total_cost 作为参考
-src_tif   = f"{arr_path}/public_area.tif"
-aligned_tif = f"{arr_path}/public_area_aligned.tif"
+src_tif   = f"../Map/public_area.tif"
+aligned_tif = f"../Map/public_area_aligned.tif"
 align_raster_to_reference(src_tif, ref_tif, aligned_tif, resampling="nearest")
 
 # 统一色带
