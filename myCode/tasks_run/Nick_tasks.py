@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20251002_Cost_curve_task'],
+    'TASK_NAME': ['20251004_Cost_curve_task'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -12,7 +12,7 @@ grid_search = {
     'MEM': ['28GB'],
     'NCPUS': ['4'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['6:00:00'],
+    'TIME': ['12:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
     'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],
@@ -29,7 +29,7 @@ grid_search = {
     # ----------------------------------- GHG settings --------------------------------
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
-    'CARBON_EFFECTS_WINDOW': [91],
+    'CARBON_EFFECTS_WINDOW': [60],
 
     # ----------------------------- Biodiversity settings -------------------------------
     'GBF2_CONSTRAINT_TYPE': ['hard'],

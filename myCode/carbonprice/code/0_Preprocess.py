@@ -17,6 +17,10 @@ from joblib import Parallel, delayed
 import geopandas as gpd
 import rasterio
 from rasterio.features import rasterize
+import io
+import zipfile
+from threading import Lock
+
 
 # --- Local packages ---
 from tools.tools import (
@@ -114,7 +118,7 @@ def sum_dims_if_exist(
         return res
     return out
 
-def amortize_costs(data_path_name, amortize_file, years, njobs=0, rate=0.07, horizon=91):
+def amortize_costs(data_path_name, amortize_file, years, njobs=0, rate=0.07, horizon=60):
     """
     【最终修复版 - 逐年输出】计算成本均摊，并为每一年生成一个累计成本文件。
     1. 使用 Dask 构建完整的计算图，计算出所有年份的累计摊销成本。
@@ -287,6 +291,78 @@ def copy_single_file(
     return f"✅ Copied: {os.path.basename(src_file)} to {dst_file}"
 
 
+def extract_files_from_zip(
+        zip_path: str,
+        copy_files: list,
+        years: list,
+        allow_missing_2010: bool = True
+) -> Dict[Tuple[str, int], bytes]:
+    """
+    一次性从 zip 提取所有需要的文件到内存
+
+    返回: {(var_prefix, year): file_bytes} 字典
+    """
+    files_dict = {}
+
+    tprint(f"Extracting all files from {os.path.basename(zip_path)}...")
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        all_names = set(zf.namelist())
+
+        for var_prefix in copy_files:
+            for year in years:
+                src_file_in_zip = f"out_{year}/{var_prefix}_{year}.nc"
+
+                if src_file_in_zip in all_names:
+                    files_dict[(var_prefix, year)] = zf.read(src_file_in_zip)
+                    tprint(f"  Extracted: {src_file_in_zip}")
+                elif allow_missing_2010 and year == 2010:
+                    tprint(f"  Skipped: {src_file_in_zip} (missing but allowed)")
+                    files_dict[(var_prefix, year)] = None  # 标记为跳过
+                else:
+                    tprint(f"  Warning: {src_file_in_zip} not found")
+                    files_dict[(var_prefix, year)] = None
+
+    tprint(f"Extraction complete: {sum(1 for v in files_dict.values() if v is not None)} files loaded")
+    return files_dict
+
+
+def process_single_file_from_memory(
+        file_bytes: bytes,
+        var_prefix: str,
+        year: int,
+        target_path_name: str,
+        dims_to_sum=('source',),
+        engine: str = "h5netcdf",
+        chunks="auto",
+) -> str:
+    """
+    处理已经在内存中的文件（无需锁，可并行）
+    """
+    if file_bytes is None:
+        return f"⏭️ Skipped: {var_prefix}_{year}.nc"
+
+    target_year_path = os.path.join(target_path_name, str(year))
+    os.makedirs(target_year_path, exist_ok=True)
+    dst_file = os.path.join(target_year_path, f"{var_prefix}_{year}.nc")
+
+    tprint(f"Processing: {var_prefix}_{year}.nc")
+
+    def _reduce_one(da: xr.DataArray) -> xr.DataArray:
+        if not np.issubdtype(da.dtype, np.number):
+            return da
+        present_dims = [d for d in dims_to_sum if d in da.dims]
+        if present_dims:
+            return da.sum(dim=present_dims, keep_attrs=True, skipna=True)
+        return da
+
+    with io.BytesIO(file_bytes) as bio:
+        with xr.open_dataset(bio, engine=engine, chunks=chunks) as ds:
+            ds = filter_all_from_dims(ds)
+            ds_filled = ds.fillna(0)
+            out = ds_filled.map(_reduce_one).load()
+
+    save2nc(out, dst_file)
+    return f"✅ Processed: {var_prefix}_{year}.nc"
 
 # ==============================================================================
 # STAGE 1: 计算利润 (Profit = Revenue - Cost)
@@ -351,15 +427,15 @@ def calculate_policy_cost(year, output_path, run_all_names, cost_category, polic
 
     if policy_type == 'carbon':
         input_all_names_dif = [run_all_names[1], run_all_names[0]]
-        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, profit_file_basename)
+        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, profit_file_basename, f"xr_cost_{cost_category}")
 
     elif policy_type == 'bio':
         input_all_names_dif = [run_all_names[2], run_all_names[1]]
-        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, profit_file_basename)
+        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, profit_file_basename, f"xr_cost_{cost_category}")
 
     elif policy_type == 'counter':
         input_all_names_dif = [run_all_names[2], run_all_names[0]]
-        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, profit_file_basename)
+        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, profit_file_basename, f"xr_cost_{cost_category}")
 
     tprint(f"✅ All {policy_type} policy cost calculations complete for year {year}.")
     return
@@ -376,15 +452,15 @@ def calculate_transition_cost_diff(year, output_path, run_all_names, tran_cost_f
 
     if policy_type == 'carbon':
         input_all_names_dif = [run_all_names[0], run_all_names[1]]
-        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, tran_file_basename)
+        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, tran_file_basename,f"{tran_cost_file}_diff")
 
     elif policy_type == "bio":
         input_all_names_dif = [run_all_names[1], run_all_names[2]]
-        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, tran_file_basename)
+        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, tran_file_basename,f"{tran_cost_file}_diff")
 
     elif policy_type == "counter":
         input_all_names_dif = [run_all_names[0], run_all_names[2]]
-        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, tran_file_basename)
+        caculate_diff_two_scenarios(input_all_names_dif, cost_names, output_path, year, tran_file_basename,f"{tran_cost_file}_diff")
     else:
         raise ValueError(f"Invalid policy_type '{policy_type}'. Use 'carbon' or 'bio'.")
 
@@ -392,7 +468,7 @@ def calculate_transition_cost_diff(year, output_path, run_all_names, tran_cost_f
     return
 
 
-def caculate_diff_two_scenarios(input_all_names, output_names, output_path, year, env_file_basename):
+def caculate_diff_two_scenarios(input_all_names, output_names, output_path, year, env_file_basename,output_part_name):
 
     for i, (run_name_0, run_name_1) in enumerate(zip(input_all_names[0], input_all_names[1])):
         output_subdir = output_names[i]
@@ -408,7 +484,7 @@ def caculate_diff_two_scenarios(input_all_names, output_names, output_path, year
         # 保存结果
         output_dir = os.path.join(output_path, output_subdir, str(year))
         os.makedirs(output_dir, exist_ok=True)
-        output_filename = f"{env_file}_{output_subdir}_{year}.nc"
+        output_filename = f"{output_part_name}_{output_subdir}_{year}.nc"
         save2nc(env_diff, os.path.join(output_dir, output_filename))
         tprint(f"  - Saved: {output_filename}")
 
@@ -416,15 +492,15 @@ def calculate_env_diff(year, output_path, input_all_names, env_file, policy_type
     env_file_basename = f"{env_file}_{year}.nc"
     if policy_type == "carbon":
         input_all_names_dif = [input_all_names[1], input_all_names[0]]
-        caculate_diff_two_scenarios(input_all_names_dif, output_names, output_path, year, env_file_basename)
+        caculate_diff_two_scenarios(input_all_names_dif, output_names, output_path, year, env_file_basename, env_file)
 
     elif policy_type == "bio":
         input_all_names_dif = [input_all_names[1], input_all_names[2]]
-        caculate_diff_two_scenarios(input_all_names_dif, output_names, output_path, year, env_file_basename)
+        caculate_diff_two_scenarios(input_all_names_dif, output_names, output_path, year, env_file_basename, env_file)
 
     elif policy_type == "counter":
         input_all_names_dif = [input_all_names[0], input_all_names[2]]
-        caculate_diff_two_scenarios(input_all_names_dif, output_names, output_path, year, env_file_basename)
+        caculate_diff_two_scenarios(input_all_names_dif, output_names, output_path, year, env_file_basename, env_file)
 
     else:
         raise ValueError(f"Invalid policy_type '{policy_type}'. Use 'carbon' or 'bio'.")
@@ -938,26 +1014,38 @@ def main(task_dir, njobs):
     # --- 阶段 1: 文件处理 ---
     tprint("\n--- 文件copy ---")
 
-    for i in range(len(input_all_names)):
-        run_names = input_all_names[i]
-        for j in range(len(run_names)):
-            origin_path_name = get_path(task_name, run_names[j])
-            target_path_name = os.path.join(output_path, run_names[j])
-            tprint(f"  -> 正在copy: {origin_path_name}")
-            copy_files = cost_files + revenue_files + carbon_files + bio_files + area_files
-            # 直接调用函数，而不是用 delayed 包装
+    for input_file in input_files:
+        origin_path_name = os.path.join(task_name, input_file,'Run_Archive.zip')
+        target_path_name = os.path.join(output_path, input_file)
+        tprint(f"  -> 正在copy: {origin_path_name}")
+        copy_files = cost_files + revenue_files + carbon_files + bio_files + area_files
+        # 直接调用函数，而不是用 delayed 包装
 
-            # --- 1. 并行化文件复制 (逻辑不变) ---
-            if copy_files:
-                for f in copy_files:
-                    if njobs == 0:
-                        for year in years:
-                            copy_single_file(origin_path_name, target_path_name, f, year,dims_to_sum=('source'))
-                    else:
-                        Parallel(n_jobs=njobs)(
-                            delayed(copy_single_file)(origin_path_name, target_path_name, f, year,dims_to_sum=('source'))
-                            for year in years
-                        )
+        # --- 1. 并行化文件复制 (逻辑不变) ---
+        if copy_files:
+            # 步骤1: 一次性提取所有文件到内存（串行，但只执行一次）
+            files_in_memory = extract_files_from_zip(
+                origin_path_name,
+                copy_files,
+                years,
+                allow_missing_2010=True
+            )
+
+            # 步骤2: 并行处理所有文件（无锁，充分并行）
+            if njobs == 0:
+                # 串行处理
+                for (var_prefix, year), file_bytes in files_in_memory.items():
+                    process_single_file_from_memory(
+                        file_bytes, var_prefix, year, target_path_name, dims_to_sum=('source',)
+                    )
+            else:
+                # 并行处理
+                Parallel(n_jobs=njobs)(
+                    delayed(process_single_file_from_memory)(
+                        file_bytes, var_prefix, year, target_path_name, dims_to_sum=('source',)
+                    )
+                    for (var_prefix, year), file_bytes in files_in_memory.items()
+                )
 
     tprint(f"✅ 文件copy任务完成!")
 
