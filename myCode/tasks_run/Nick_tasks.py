@@ -5,7 +5,7 @@ from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
     'TASK_NAME': ['20251002_Cost_curve_task'],
-    'KEEP_OUTPUTS': [False],  # If False, only keep report HTML
+    'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
@@ -84,7 +84,7 @@ settings_name_dict = {
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
-# grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
-# print(grid_search_settings_df.columns)
-grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
+grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
+print(grid_search_settings_df.columns)
+# grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
 create_task_runs(task_root_dir, grid_search_settings_df, platform="NCI", n_workers=min(len(grid_search_settings_df.columns), 100),use_parallel=True)

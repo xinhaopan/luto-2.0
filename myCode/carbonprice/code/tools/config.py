@@ -77,7 +77,8 @@ carbon_files = ['xr_GHG_ag', 'xr_GHG_ag_management', 'xr_GHG_non_ag', 'xr_transi
 bio_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_biodiversity_GBF2_priority_ag_management','xr_biodiversity_GBF2_priority_non_ag']
 
 input_files_0 = \
-    ['Run_25_GHG_off_BIO_off_CUT_50', 'Run_24_GHG_off_BIO_off_CUT_40', 'Run_23_GHG_off_BIO_off_CUT_30', 'Run_22_GHG_off_BIO_off_CUT_20', 'Run_21_GHG_off_BIO_off_CUT_10']
+    ['Run_21_GHG_off_BIO_off_CUT_10', 'Run_22_GHG_off_BIO_off_CUT_20',  'Run_23_GHG_off_BIO_off_CUT_30',  'Run_24_GHG_off_BIO_off_CUT_40',  'Run_25_GHG_off_BIO_off_CUT_50',
+     'Run_21_GHG_off_BIO_off_CUT_10', 'Run_22_GHG_off_BIO_off_CUT_20',  'Run_23_GHG_off_BIO_off_CUT_30',  'Run_24_GHG_off_BIO_off_CUT_40',  'Run_25_GHG_off_BIO_off_CUT_50']
 input_files_1 = \
     ['Run_20_GHG_low_BIO_off_CUT_10', 'Run_19_GHG_low_BIO_off_CUT_20',  'Run_17_GHG_low_BIO_off_CUT_30',  'Run_16_GHG_low_BIO_off_CUT_40',  'Run_12_GHG_low_BIO_off_CUT_50',
      'Run_10_GHG_high_BIO_off_CUT_10', 'Run_09_GHG_high_BIO_off_CUT_20', 'Run_08_GHG_high_BIO_off_CUT_30', 'Run_07_GHG_high_BIO_off_CUT_40', 'Run_06_GHG_high_BIO_off_CUT_50']
@@ -88,7 +89,7 @@ input_files_2 = [
 input_files = input_files_0 + input_files_1 + input_files_2
 
 carbon_names = ['carbon_low_10', 'carbon_low_20', 'carbon_low_30', 'carbon_low_40', 'carbon_low_50',
-                'carbon_high', 'carbon_high_20', 'carbon_high_30', 'carbon_high_40', 'carbon_high_50']
+                'carbon_high_10', 'carbon_high_20', 'carbon_high_30', 'carbon_high_40', 'carbon_high_50']
 carbon_bio_names = [
         'carbon_low_bio_10', 'carbon_low_bio_20', 'carbon_low_bio_30', 'carbon_low_bio_40', 'carbon_low_bio_50',
         'carbon_high_bio_10', 'carbon_high_bio_20', 'carbon_high_bio_30', 'carbon_high_bio_40', 'carbon_high_bio_50'

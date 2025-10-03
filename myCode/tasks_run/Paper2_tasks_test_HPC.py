@@ -4,13 +4,13 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20250926_Paper2_Results_HPC_test'],
-    'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
+    'TASK_NAME': ['20251003_Paper2_Results_test'],
+    'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['32GB'],
-    'NCPUS': ['8'],
+    'NCPUS': ['2'],
     'WRITE_THREADS': ['2'],
     'TIME': ['24:00:00'],
 
@@ -22,7 +22,7 @@ grid_search = {
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [13],
+    'RESFACTOR': [5],
     'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
@@ -58,22 +58,22 @@ grid_search = {
 
 conditional_rules = [
     # 最具体的规则优先
-    {
-        'conditions': {'GHG_EMISSIONS_LIMITS': ['off'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
-        'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
-    },
-    {
-        'conditions': {'GHG_EMISSIONS_LIMITS': ['high'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
-        'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
-    },
-    {
-        'conditions': {'GHG_EMISSIONS_LIMITS': ['low'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
-        'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
-    },
     # {
-    #     'conditions': {'GHG_EMISSIONS_LIMITS': ['off'], 'BIODIVERSITY_TARGET_GBF_2': ['high']},
-    #     'restrictions': {}
-    # }
+    #     'conditions': {'GHG_EMISSIONS_LIMITS': ['off'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
+    #     'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
+    # },
+    # {
+    #     'conditions': {'GHG_EMISSIONS_LIMITS': ['high'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
+    #     'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
+    # },
+    # {
+    #     'conditions': {'GHG_EMISSIONS_LIMITS': ['low'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
+    #     'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
+    # },
+    {
+        'conditions': {'GHG_EMISSIONS_LIMITS': ['off'], 'BIODIVERSITY_TARGET_GBF_2': ['high']},
+        'restrictions': {}
+    }
 ]
 
 
