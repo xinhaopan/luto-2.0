@@ -387,7 +387,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     ag_X_mrj_xr = xr.concat([ag_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_X_mrj_xr], dim='lm')
     ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_X_mrj_xr], dim='lm')
     ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_man_X_mrj_xr], dim='am')
-
+    
     ag_q_mrp_xr = xr.concat([ag_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_q_mrp_xr], dim='lm')
     ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_q_mrp_xr], dim='lm')
     ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_man_q_mrp_xr], dim='am')
@@ -1736,9 +1736,12 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
+    # Get the priority degraded areas
+    GBF2_MASK_area_ha = ag_biodiversity.get_GBF2_MASK_area(data)
+
     # Get the priority degraded areas score
     priority_degraded_area_score_r = xr.DataArray(
-        data.BIO_GBF2_MASK_LDS,
+        GBF2_MASK_area_ha,
         dims=['cell'],
         coords={'cell':range(data.NCELLS)}
     )
@@ -1770,21 +1773,12 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
 
     # Get the total area of the priority degraded areas
-    total_priority_degraded_area = data.BIO_GBF2_MASK_LDS.sum()
+    total_priority_degraded_area = GBF2_MASK_area_ha.sum()
 
     # Calculate xarray biodiversity GBF2 scores
     xr_gbf2_ag = priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
     xr_gbf2_non_ag = priority_degraded_area_score_r * non_ag_impact_k * non_ag_dvar_rk
     xr_gbf2_am = priority_degraded_area_score_r * am_impact_raj * am_dvar_amrj
-
-    # Save xarray data to netCDF
-    save2nc(xr_gbf2_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf2_non_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_non_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf2_am, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_management_{yr_cal}.nc'))
-
-    # Do nothing if biodiversity limits are off and no need to report
-    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
-        return 'Skipped: Biodiversity GBF2 scores not written as `BIODIVERSITY_TARGET_GBF_2` is set to "off"'
 
     # Regional level aggregation
     GBF2_score_ag_region = xr_gbf2_ag.groupby('region'
@@ -1860,8 +1854,11 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).to_csv(os.path.join(path, f'biodiversity_GBF2_priority_scores_{yr_cal}.csv'), index=False)
 
+    # Save xarray data to netCDF
+    save2nc(xr_gbf2_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_{yr_cal}.nc'))
+    save2nc(xr_gbf2_non_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_non_ag_{yr_cal}.nc'))
+    save2nc(xr_gbf2_am, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_management_{yr_cal}.nc'))
 
-    
     return f"Biodiversity GBF2 priority scores written for year {yr_cal}"
 
 
@@ -1896,7 +1893,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
 
     # Get vegetation matrices for the year
     vegetation_score_vr = xr.DataArray(
-        ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data), 
+        ag_biodiversity.get_GBF3_NVIS_matrices_vr(data),
         dims=['group','cell'], 
         coords={'group':list(data.BIO_GBF3_NVIS_ID2DESC.values()),  'cell':range(data.NCELLS)}
     ).chunk({'cell': min(1024, data.NCELLS), 'group': 1})
@@ -2639,147 +2636,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     return f"Biodiversity GBF8 species scores written for year {yr_cal}"
 
 
-# def write_GHG_BIO_xr(data: Data, yr_cal, path):
-#     # Convert calendar year to year index.
-#     yr_idx = yr_cal - data.YR_CAL_BASE
-#
-#     # Get the ghg_df
-#     ag_g_xr = xr.Dataset(ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=False)
-#                          ).rename({'dim_0': 'cell'})
-#     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-#                                      ).assign_coords(region=('cell', data.REGION_NRM_NAME)
-#                                                      ).chunk({'cell': min(1024, data.NCELLS)})
-#
-#     mindex = pd.MultiIndex.from_tuples(ag_g_xr.data_vars.keys(), names=['GHG_source', 'lm', 'lu'])
-#     mindex_coords = xr.Coordinates.from_pandas_multiindex(mindex, 'variable')
-#     ag_g_rsmj = ag_g_xr.to_dataarray().assign_coords(mindex_coords).chunk({'cell': min(1024, data.NCELLS)}).unstack()
-#     ag_g_rsmj['GHG_source'] = ag_g_rsmj['GHG_source'].to_series().replace(GHG_NAMES)
-#
-#     # Expand dimension
-#     ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
-#     ag_g_rsmj = xr.concat([ag_g_rsmj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_g_rsmj], dim='lm')
-#     ag_g_rsmj = xr.concat([ag_g_rsmj.sum(dim='GHG_source', keepdims=True).assign_coords(GHG_source=['ALL']), ag_g_rsmj],
-#                           dim='GHG_source')
-#
-#     ghg_e = ag_g_rsmj * ag_dvar_mrj
-#
-#     save2nc(ghg_e, os.path.join(path, f'xr_GHG_ag_{yr_cal}.nc'))
-#
-#     # -----------------------------------------------------------#
-#     # Get greenhouse gas emissions from non-agricultural landuse #
-#     # -----------------------------------------------------------#
-#
-#     # Get the non_ag GHG reduction
-#     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-#                                            ).assign_coords(region=('cell', data.REGION_NRM_NAME)
-#                                                            ).chunk({'cell': min(1024, data.NCELLS)})
-#
-#     non_ag_g_rk = tools.non_ag_rk_to_xr(
-#         data,
-#         non_ag_ghg.get_ghg_matrix(
-#             data,
-#             ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True),
-#             data.lumaps[yr_cal]
-#         )
-#     )
-#
-#     # Calculate GHG emissions for non-agricultural land use
-#     xr_ghg_non_ag = non_ag_dvar_rk * non_ag_g_rk
-#
-#     # Save xarray data to netCDF
-#     save2nc(xr_ghg_non_ag, os.path.join(path, f'xr_GHG_non_ag_{yr_cal}.nc'))
-#
-#     # -------------------------------------------------------------------#
-#     # Get greenhouse gas emissions from agricultural management          #
-#     # -------------------------------------------------------------------#
-#
-#     # Get the ag_man_g_mrj
-#     ag_man_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-#                                          ).assign_coords(region=('cell', data.REGION_NRM_NAME)
-#                                                          ).chunk({'cell': min(1024, data.NCELLS)})
-#
-#     ag_man_g_mrj = tools.am_mrj_to_xr(
-#         data,
-#         ag_ghg.get_agricultural_management_ghg_matrices(data, yr_idx)
-#     )
-#
-#     # Expand dimension
-#     ag_man_dvar_mrj = xr.concat(
-#         [ag_man_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_dvar_mrj], dim='lm')
-#     ag_man_dvar_mrj = xr.concat(
-#         [ag_man_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_man_dvar_mrj], dim='am')
-#     ag_man_g_mrj = xr.concat([ag_man_g_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_g_mrj],
-#                              dim='lm')
-#     ag_man_g_mrj = xr.concat([ag_man_g_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_man_g_mrj],
-#                              dim='am')
-#
-#     # Calculate GHG emissions for agricultural management
-#     xr_ghg_ag_man = ag_man_dvar_mrj * ag_man_g_mrj
-#
-#     # Save xarray data to netCDF
-#     save2nc(xr_ghg_ag_man, os.path.join(path, f'xr_GHG_ag_management_{yr_cal}.nc'))
-#
-#     # -----------------------------------------------------------#
-#
-#     # Unpack the ag managements and land uses
-#     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
-#
-#     # Get decision variables for the year
-#     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-#                                      ).chunk({'cell': min(1024, data.NCELLS)}
-#                                              ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-#     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-#                                            ).chunk({'cell': min(1024, data.NCELLS)}
-#                                                    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-#     am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-#                                       ).chunk({'cell': min(1024, data.NCELLS)}
-#                                               ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-#
-#     # Get the priority degraded areas score
-#     priority_degraded_area_score_r = xr.DataArray(
-#         data.BIO_PRIORITY_DEGRADED_AREAS_R,
-#         dims=['cell'],
-#         coords={'cell': range(data.NCELLS)}
-#     )
-#
-#     # Get the impacts of each ag/non-ag/am to vegetation matrices
-#     ag_impact_j = xr.DataArray(
-#         ag_biodiversity.get_ag_biodiversity_contribution(data),
-#         dims=['lu'],
-#         coords={'lu': data.AGRICULTURAL_LANDUSES}
-#     )
-#     non_ag_impact_k = xr.DataArray(
-#         list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
-#         dims=['lu'],
-#         coords={'lu': data.NON_AGRICULTURAL_LANDUSES}
-#     )
-#     am_impact_raj = xr.DataArray(
-#         np.stack(
-#             [arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr
-#              in v.values()]),
-#         dims=['idx', 'cell'],
-#         coords={
-#             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
-#             'cell': range(data.NCELLS)}
-#     ).unstack()
-#
-#     # Expand dimension
-#     ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
-#     am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_amrj],
-#                              dim='am')
-#     am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_amrj],
-#                              dim='lm')
-#     am_impact_raj = xr.concat([am_impact_raj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_impact_raj],
-#                               dim='am')
-#
-#     # Calculate xarray biodiversity GBF2 scores
-#     xr_gbf2_ag = priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
-#     xr_gbf2_non_ag = priority_degraded_area_score_r * non_ag_impact_k * non_ag_dvar_rk
-#     xr_gbf2_am = priority_degraded_area_score_r * am_impact_raj * am_dvar_amrj
-#
-#     # Save xarray data to netCDF
-#     save2nc(xr_gbf2_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_{yr_cal}.nc'))
-#     save2nc(xr_gbf2_non_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_non_ag_{yr_cal}.nc'))
-#     save2nc(xr_gbf2_am, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_management_{yr_cal}.nc'))
-#
+
+
+
 
