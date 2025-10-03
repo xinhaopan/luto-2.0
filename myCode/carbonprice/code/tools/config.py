@@ -76,15 +76,19 @@ economic_files = ['xr_cost_ag', 'xr_cost_agricultural_management', 'xr_cost_non_
 carbon_files = ['xr_GHG_ag', 'xr_GHG_ag_management', 'xr_GHG_non_ag', 'xr_transition_GHG']
 bio_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_biodiversity_GBF2_priority_ag_management','xr_biodiversity_GBF2_priority_non_ag']
 
-input_files_0 = ['Run_18_GHG_off_BIO_off_CUT_50']
-input_files_1 = ['Run_12_GHG_low_BIO_off_CUT_50', 'Run_06_GHG_high_BIO_off_CUT_50']
+input_files_0 = \
+    ['Run_25_GHG_off_BIO_off_CUT_50', 'Run_24_GHG_off_BIO_off_CUT_40', 'Run_23_GHG_off_BIO_off_CUT_30', 'Run_22_GHG_off_BIO_off_CUT_20', 'Run_21_GHG_off_BIO_off_CUT_10']
+input_files_1 = \
+    ['Run_20_GHG_low_BIO_off_CUT_10', 'Run_19_GHG_low_BIO_off_CUT_20',  'Run_17_GHG_low_BIO_off_CUT_30',  'Run_16_GHG_low_BIO_off_CUT_40',  'Run_12_GHG_low_BIO_off_CUT_50',
+     'Run_10_GHG_high_BIO_off_CUT_10', 'Run_09_GHG_high_BIO_off_CUT_20', 'Run_08_GHG_high_BIO_off_CUT_30', 'Run_07_GHG_high_BIO_off_CUT_40', 'Run_06_GHG_high_BIO_off_CUT_50']
 input_files_2 = [
-    'Run_11_GHG_low_BIO_high_CUT_10',  'Run_10_GHG_low_BIO_high_CUT_20',  'Run_09_GHG_low_BIO_high_CUT_30',  'Run_08_GHG_low_BIO_high_CUT_40',  'Run_07_GHG_low_BIO_high_CUT_50',
+    'Run_15_GHG_low_BIO_high_CUT_10',  'Run_14_GHG_low_BIO_high_CUT_20',  'Run_13_GHG_low_BIO_high_CUT_30',  'Run_12_GHG_low_BIO_high_CUT_40',  'Run_11_GHG_low_BIO_high_CUT_50',
     'Run_05_GHG_high_BIO_high_CUT_10', 'Run_04_GHG_high_BIO_high_CUT_20', 'Run_03_GHG_high_BIO_high_CUT_30', 'Run_02_GHG_high_BIO_high_CUT_40', 'Run_01_GHG_high_BIO_high_CUT_50'
 ]
 input_files = input_files_0 + input_files_1 + input_files_2
 
-carbon_names = ['carbon_low', 'carbon_high']
+carbon_names = ['carbon_low_10', 'carbon_low_20', 'carbon_low_30', 'carbon_low_40', 'carbon_low_50',
+                'carbon_high', 'carbon_high_20', 'carbon_high_30', 'carbon_high_40', 'carbon_high_50']
 carbon_bio_names = [
         'carbon_low_bio_10', 'carbon_low_bio_20', 'carbon_low_bio_30', 'carbon_low_bio_40', 'carbon_low_bio_50',
         'carbon_high_bio_10', 'carbon_high_bio_20', 'carbon_high_bio_30', 'carbon_high_bio_40', 'carbon_high_bio_50'

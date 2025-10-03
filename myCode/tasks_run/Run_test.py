@@ -5,7 +5,7 @@ from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
     'TASK_NAME': ['Run_task_test'],
-    'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
+    'KEEP_OUTPUTS': [False],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
     # ---------Computational settings, which are not relevant to LUTO itself---------

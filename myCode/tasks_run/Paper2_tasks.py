@@ -58,18 +58,18 @@ grid_search = {
 
 conditional_rules = [
     # 最具体的规则优先
-    {
-        'conditions': {'GHG_EMISSIONS_LIMITS': ['off'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
-        'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
-    },
-    {
-        'conditions': {'GHG_EMISSIONS_LIMITS': ['high'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
-        'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
-    },
-    {
-        'conditions': {'GHG_EMISSIONS_LIMITS': ['low'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
-        'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
-    },
+    # {
+    #     'conditions': {'GHG_EMISSIONS_LIMITS': ['off'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
+    #     'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
+    # },
+    # {
+    #     'conditions': {'GHG_EMISSIONS_LIMITS': ['high'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
+    #     'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
+    # },
+    # {
+    #     'conditions': {'GHG_EMISSIONS_LIMITS': ['low'], 'BIODIVERSITY_TARGET_GBF_2': ['off']},
+    #     'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
+    # },
     {
         'conditions': {'GHG_EMISSIONS_LIMITS': ['off'], 'BIODIVERSITY_TARGET_GBF_2': ['high']},
         'restrictions': {}

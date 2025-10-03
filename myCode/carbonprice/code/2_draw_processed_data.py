@@ -19,14 +19,14 @@ plot_specs = [
     PlotSpec("xr_cost_non_ag",                         "non_ag", 1e3, r"Cost (Billion AU\$ yr$^{-1}$)",               1, False),
     PlotSpec("xr_transition_cost_ag2non_ag_amortised_diff","non_ag",1e3, r"Cost (Billion AU\$ yr$^{-1}$)",           1, False),
 
-    PlotSpec("xr_total_carbon",                        "cost",     1,  r"Change in GHG emission benefit (MtCO$_2$e yr$^{-1}$)",        1, True),
-    PlotSpec("xr_total_bio",                           "cost",     1,  r"Change in biodiversity benefit (contribution-weighted area, Mha yr$^{-1}$)",        1, True),
+    PlotSpec("xr_total_carbon",                        "cost",     1,  r"GHG emission benefit (MtCO$_2$e yr$^{-1}$)",        1, True),
+    PlotSpec("xr_total_bio",                           "cost",     1,  r"Biodiversity benefit (contribution-weighted area, Mha yr$^{-1}$)",        1, True),
 
-    PlotSpec("xr_GHG_ag_management",                   "am",       1,  r"Change in GHG emission benefit (MtCO$_2$e yr$^{-1}$)",        1, False),
-    PlotSpec("xr_GHG_non_ag",                          "non_ag",   1,  r"Change in GHG emission benefit (MtCO$_2$e yr$^{-1}$)",      1, False),
+    PlotSpec("xr_GHG_ag_management",                   "am",       1,  r"GHG emission benefit (MtCO$_2$e yr$^{-1}$)",        1, False),
+    PlotSpec("xr_GHG_non_ag",                          "non_ag",   1,  r"GHG emission benefit (MtCO$_2$e yr$^{-1}$)",      1, False),
 
-    PlotSpec("xr_biodiversity_GBF2_priority_ag_management", "am",     1,  r"Change in biodiversity benefit (contribution-weighted area, Mha yr$^{-1}$)",    1, False),
-    PlotSpec("xr_biodiversity_GBF2_priority_non_ag",        "non_ag", 1,  r"Change in biodiversity benefit (contribution-weighted area, Mha yr$^{-1}$)",  1, False),
+    PlotSpec("xr_biodiversity_GBF2_priority_ag_management", "am",     1,  r"Biodiversity benefit (contribution-weighted area, Mha yr$^{-1}$)",    1, False),
+    PlotSpec("xr_biodiversity_GBF2_priority_non_ag",        "non_ag", 1,  r"Biodiversity benefit (contribution-weighted area, Mha yr$^{-1}$)",  1, False),
 ]
 
 for spec in plot_specs:

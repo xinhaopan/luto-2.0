@@ -1736,9 +1736,6 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
-    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
-        data.BIO_PRIORITY_DEGRADED_AREAS_R = np.zeros(data.NCELLS, dtype=np.float32)
-
     # Get the priority degraded areas score
     priority_degraded_area_score_r = xr.DataArray(
         data.BIO_GBF2_MASK_LDS,
