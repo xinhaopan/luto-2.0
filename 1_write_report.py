@@ -77,7 +77,7 @@ def create_report(data: Data):
 
 # 调用函数并加载数据
 # pkl_path = get_first_subfolder_name("output")
-pkl_path = 'output/2025_09_06__01_41_06_RF13_2020-2050/Data_RES13.gz'
+pkl_path = 'output/2025_10_03__15_55_58_RF13_2020-2050/Data_RES13.gz'
 print_with_time(f"PKL file path: {pkl_path}")
 # 如果文件存在，则加载并处理数据
 print_with_time(f"{pkl_path} Loading...")

@@ -973,7 +973,7 @@ def main(task_dir, njobs):
                 years,
                 njobs=math.ceil(njobs/7)  # 传给内部的并行参数（若有）
             )
-            for run_name in input_files
+            for run_name in list(set(input_files))
         )
     tprint("摊销成本计算 完成!")
     #
