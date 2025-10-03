@@ -722,7 +722,8 @@ class Data:
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(settings.INPUT_DIR, "ag_tmatrix.npy"))
         self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = np.load(os.path.join(settings.INPUT_DIR, "ag_to_destock_tmatrix.npy"))
-        
+
+
   
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(settings.INPUT_DIR, "x_mrj.npy"))
@@ -970,7 +971,7 @@ class Data:
         nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
         
         # Get the carbon stock of unallowcated natural land
-        self.CO2E_STOCK_UNALL_NATURAL = np.array(
+        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = np.array(
             nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk).to_numpy() / 100),  # everyting minus the fire DAMAGE
         )
         
@@ -1125,12 +1126,25 @@ class Data:
         in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
         """
 
-        biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'), where=self.MASK)
+
         biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))                              
         
 
         # ------------- Biodiversity priority scores for maximising overall biodiversity conservation in Australia ----------------------------
         
+        biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'), where=self.MASK)
+
+        # Get the biodiversity quality score
+        if settings.BIO_QUALITY_LAYER == 'Suitability':
+            bio_quality_raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values
+            performance_sheet = f'ssp{settings.SSP}'
+        elif 'NES' in settings.BIO_QUALITY_LAYER:
+            bio_quality_raw = xr.open_dataarray(f"{settings.INPUT_DIR}/bio_NES_Zonation.nc").sel(layer=settings.BIO_QUALITY_LAYER).compute().values[self.MASK]
+            performance_sheet = settings.BIO_QUALITY_LAYER
+        else:
+            raise ValueError(f"Invalid biodiversity quality layer: {settings.BIO_QUALITY_LAYER}, must be 'Suitability' or contain '*NES_likely|may' layers")
+
+
         # Get connectivity score
         match settings.CONNECTIVITY_SOURCE:
             case 'NCI':
@@ -1143,128 +1157,166 @@ class Data:
                 connectivity_score = np.ones(self.NCELLS, dtype=np.float32)
             case _:
                 raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
-            
-        self.CONNECTIVITY_SCORE = connectivity_score
+
 
         # Get the HCAS contribution scale (0-1)
-        match settings.HABITAT_CONDITION:
+        match settings.CONTRIBUTION_PERCENTILE:
             case 10 | 25 | 50 | 75 | 90:
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HABITAT_CONDITION}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.CONTRIBUTION_PERCENTILE}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
                 unallow_nat_scale = bio_HCAS_contribution_lookup[self.DESC2AGLU['Unallocated - natural land']]                                          # Get the biodiversity degradation score for unallocated natural land (float)
                 bio_HCAS_contribution_lookup = {int(k): v * (1 / unallow_nat_scale) for k, v in bio_HCAS_contribution_lookup.items()}                   # Normalise the biodiversity degradation score to the unallocated natural land score
             case 'USER_DEFINED':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['USER_DEFINED'].to_dict()
             case _:
-                print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'")
+                print(f"WARNING!! Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'")
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}                 # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
         
-        # Get the biodiversity contribution score 
-        if settings.BIO_QUALITY_LAYER == 'Suitability':
-            bio_contribution_raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values
-        elif 'NES' in settings.BIO_QUALITY_LAYER:
-            bio_contribution_raw = xr.open_dataarray(f"{settings.INPUT_DIR}/bio_NES_Zonation.nc").sel(layer=settings.BIO_QUALITY_LAYER).compute().values
-            bio_contribution_raw = bio_contribution_raw[self.MASK]
-        else:
-            raise ValueError(f"Invalid biodiversity quality layer: {settings.BIO_QUALITY_LAYER}, must be 'Suitability' or contain '*NES_likely|may' layers")
-
-        self.BIO_CONNECTIVITY_RAW = bio_contribution_raw * connectivity_score                                          
-        self.BIO_CONNECTIVITY_LDS = np.where(                                                                     
+        # Get the biodiversity quantity score for each land use in each cell
+        self.BIO_QUALITY_RAW = bio_quality_raw * connectivity_score
+        self.BIO_QUALITY_LDS = np.where(
             self.SAVBURN_ELIGIBLE, 
-            self.BIO_CONNECTIVITY_RAW * settings.BIO_CONTRIBUTION_LDS, 
-            self.BIO_CONNECTIVITY_RAW
+            self.BIO_QUALITY_RAW  - (self.BIO_QUALITY_RAW * (1 - settings.BIO_CONTRIBUTION_LDS)),
+            self.BIO_QUALITY_RAW
         )
         
   
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
         if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
 
-            if settings.BIO_QUALITY_LAYER == 'Suitability':
-                performance_sheet = f'ssp{settings.SSP}'
-            elif 'NES' in settings.BIO_QUALITY_LAYER:
-                performance_sheet = settings.BIO_QUALITY_LAYER
-            else:
-                raise ValueError(f"Invalid biodiversity quality layer: {settings.BIO_QUALITY_LAYER}, must be 'Suitability' or contain '*NES_likely|may' layers")
-
             # Get the mask of 'priority degraded areas' for habitat conservation
-            conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), sheet_name=performance_sheet
-                ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+            conservation_performance_curve = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'),
+                sheet_name=performance_sheet
+            ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
             
-            priority_degraded_areas_mask = bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
-            
-            self.BIO_PRIORITY_DEGRADED_AREAS_R = np.where(
+            self.BIO_GBF2_MASK = bio_quality_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
+            self.BIO_GBF2_MASK_LDS = np.where(
                 self.SAVBURN_ELIGIBLE,
-                priority_degraded_areas_mask * self.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-                priority_degraded_areas_mask * self.REAL_AREA
+                self.BIO_GBF2_MASK  - (self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS)),
+                self.BIO_GBF2_MASK
             )
             
-            self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R = np.einsum(
-                'j,mrj,r->r',
+            self.BIO_GBF2_BASE_YR = np.einsum(
+                'j,mrj,r,r->r',
                 np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
-                self.AG_L_MRJ,
-                self.BIO_PRIORITY_DEGRADED_AREAS_R
-            )
+                self.AG_L_MRJ,      # lumap in proportion representation if resfactored
+                self.BIO_GBF2_MASK,
+                self.REAL_AREA
+            ) - (self.SAVBURN_ELIGIBLE * self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS) * self.REAL_AREA)
 
         
         ###############################################################
-        # Vegetation data (GBF3).
+        # Biogeographic Regionalisation (GBF3).
         ###############################################################
-        if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
+        if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         
             print("\tLoading vegetation data...", flush=True)
             
             # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
-            GBF3_targets_df = pd.read_excel(
-                settings.INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
-                sheet_name = f'NVIS_{settings.GBF3_TARGET_CLASS}'
+            GBF3_NVIS_targets_df = pd.read_excel(
+                settings.INPUT_DIR + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx',
+                sheet_name = f'NVIS_{settings.GBF3_NVIS_TARGET_CLASS}'
             ).sort_values(by='group', ascending=True)
             
             
-            if settings.BIODIVERSITY_TARGET_GBF_3 == 'USER_DEFINED':
-                self.GBF3_GROUPS_SEL = [row['group'] for _,row in GBF3_targets_df.iterrows()
+            if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == 'USER_DEFINED':
+                self.GBF3_NVIS_SEL = [row['group'] for _,row in GBF3_NVIS_targets_df.iterrows()
                     if all([
                         row['USER_DEFINED_TARGET_PERCENT_2030']>0,
                         row['USER_DEFINED_TARGET_PERCENT_2050']>0,
                         row['USER_DEFINED_TARGET_PERCENT_2100']>0]
                     )]
-                self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = GBF3_targets_df.query('group.isin(@self.GBF3_GROUPS_SEL)')
+                self.GBF3_NVIS_BASELINE_AND_TARGETS = GBF3_NVIS_targets_df.query('group.isin(@self.GBF3_NVIS_SEL)')
             else:
-                self.GBF3_GROUPS_SEL = GBF3_targets_df['group'].tolist()
-                self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = GBF3_targets_df.query('group.isin(@self.GBF3_GROUPS_SEL)')
-                self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS[[
+                self.GBF3_NVIS_SEL = GBF3_NVIS_targets_df['group'].tolist()
+                self.GBF3_NVIS_BASELINE_AND_TARGETS = GBF3_NVIS_targets_df.query('group.isin(@self.GBF3_NVIS_SEL)')
+                self.GBF3_NVIS_BASELINE_AND_TARGETS[[
                     'USER_DEFINED_TARGET_PERCENT_2030',
                     'USER_DEFINED_TARGET_PERCENT_2050', 
-                    'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3]
+                    'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3_NVIS]
                 
 
-            self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
-            self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
-            self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_GROUPS_SEL))
-            self.BIO_GBF3_N_CLASSES = len(self.GBF3_GROUPS_SEL) 
-            
-            
-            
+            self.BIO_GBF3_NVIS_BASELINE_AUSTRALIA = self.GBF3_NVIS_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
+            self.BIO_GBF3_NVIS_BASELINE_OUTSIDE_LUTO = self.GBF3_NVIS_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
+
+
             # Read in vegetation layer data
-            NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_NVIS_{settings.GBF3_TARGET_CLASS}.nc").sel(group=self.GBF3_GROUPS_SEL)
+            NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_NVIS_{settings.GBF3_NVIS_TARGET_CLASS}.nc").sel(group=self.GBF3_NVIS_SEL)
+            self.BIO_GBF3_NVIS_ID2DESC = dict(enumerate(NVIS_layers.group.values))
             NVIS_layers = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
+
+            # Make sure the target has the same order as the layers
+            self.GBF3_NVIS_BASELINE_AND_TARGETS['order'] = self.GBF3_NVIS_BASELINE_AND_TARGETS['group'].apply(lambda x: list(NVIS_layers.group.values).index(x))
+            self.GBF3_NVIS_BASELINE_AND_TARGETS = self.GBF3_NVIS_BASELINE_AND_TARGETS.sort_values(by='order').drop(columns='order')
 
             # Apply Savanna Burning penalties
             self.NVIS_LAYERS_LDS = np.where(
                 self.SAVBURN_ELIGIBLE,
-                NVIS_layers * settings.BIO_CONTRIBUTION_LDS,
+                NVIS_layers  - (NVIS_layers * (1 - settings.BIO_CONTRIBUTION_LDS)),
                 NVIS_layers
             )
             
             # Container storing which cells apply to each major vegetation group
             epsilon = 1e-5
-            self.MAJOR_VEG_INDECES = {
+            self.GBF3_NVIS_IDX = {
                 v: np.where(NVIS_layers[v] > epsilon)[0]
                 for v in range(NVIS_layers.shape[0])
             }
             
             
- 
+        if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
+            print("\tLoading bioregional data...", flush=True)
+
+            # Read in the pre-1750 vegetation statistics, and get IBRA class names and areas
+            GBF3_IBRA_targets_df = pd.read_excel(
+                settings.INPUT_DIR + '/BIODIVERSITY_GBF3_IBRA_SCORES_AND_TARGETS.xlsx',
+                sheet_name = f'{settings.GBF3_IBRA_TARGET_CLASS}'
+            ).sort_values(by='Region', ascending=True)
+
+
+            if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == 'USER_DEFINED':
+                self.GBF3_IBRA_SEL = [row['Region'] for _,row in GBF3_IBRA_targets_df.iterrows()
+                    if all([
+                        row['USER_DEFINED_TARGET_PERCENT_2030']>0,
+                        row['USER_DEFINED_TARGET_PERCENT_2050']>0,
+                        row['USER_DEFINED_TARGET_PERCENT_2100']>0]
+                    )]
+                self.GBF3_IBRA_BASELINE_AND_TARGETS = GBF3_IBRA_targets_df.query('Region.isin(@self.GBF3_IBRA_SEL)')
+            else:
+                self.GBF3_IBRA_SEL = GBF3_IBRA_targets_df['Region'].tolist()
+                self.GBF3_IBRA_BASELINE_AND_TARGETS = GBF3_IBRA_targets_df.query('Region.isin(@self.GBF3_IBRA_SEL)')
+                self.GBF3_IBRA_BASELINE_AND_TARGETS[[
+                    'USER_DEFINED_TARGET_PERCENT_2030',
+                    'USER_DEFINED_TARGET_PERCENT_2050',
+                    'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3_IBRA]
+
+            self.BIO_GBF3_IBRA_BASELINE_AUSTRALIA = self.GBF3_IBRA_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
+            self.BIO_GBF3_IBRA_BASELINE_OUTSIDE_LUTO = self.GBF3_IBRA_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
+
+            # Read in IBRA layer data
+            IBRA_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_{settings.GBF3_IBRA_TARGET_CLASS}.nc")
+            self.BIO_GBF3_IBRA_ID2DESC = dict(enumerate(self.GBF3_IBRA_SEL))
+            IBRA_layers = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in IBRA_layers.sel(region=self.GBF3_IBRA_SEL)], dtype=np.float32)
+
+            # Make sure the target has the same order as the layers
+            self.GBF3_IBRA_BASELINE_AND_TARGETS['order'] = self.GBF3_IBRA_BASELINE_AND_TARGETS['Region'].apply(lambda x: list(IBRA_layers.region.values).index(x))
+            self.GBF3_IBRA_BASELINE_AND_TARGETS = self.GBF3_IBRA_BASELINE_AND_TARGETS.sort_values(by='order').drop(columns='order')
+
+            # Apply Savanna Burning penalties
+            self.IBRA_LAYERS_LDS = np.where(
+                self.SAVBURN_ELIGIBLE,
+                IBRA_layers  - (IBRA_layers * (1 - settings.BIO_CONTRIBUTION_LDS)),
+                IBRA_layers
+            )
+
+            self.GBF3_IBRA_IDX = {
+                v: np.where(IBRA_layers[v] > 0)[0]
+                for v in range(IBRA_layers.shape[0])
+            }
+
+
         
         ##########################################################################
         #  Biodiersity environmental significance (GBF4)                         #
@@ -1637,9 +1689,9 @@ class Data:
         float
             The priority degrade areas conservation target for the given year.
         """
- 
-        bio_habitat_score_baseline_sum = self.BIO_PRIORITY_DEGRADED_AREAS_R.sum()
-        bio_habitat_score_base_yr_sum = self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R.sum()
+
+        bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA).sum()
+        bio_habitat_score_base_yr_sum = self.BIO_GBF2_BASE_YR.sum()
         bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
 
         bio_habitat_target_proportion = [
@@ -1649,7 +1701,10 @@ class Data:
 
         targets_key_years = {
             self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
-            **dict(zip(settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
+            **dict(zip(
+                settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].keys(),
+                bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)
+            ))
         }
 
         f = interp1d(
@@ -1668,7 +1723,7 @@ class Data:
         '''
         
         GBF3_target_percents = []
-        for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
+        for _,row in self.GBF3_NVIS_BASELINE_AND_TARGETS.iterrows():
             f = interp1d(
                 [2010, 2030, 2050, 2100],
                 [min(row['BASE_YR_PERCENT'],row['USER_DEFINED_TARGET_PERCENT_2030']), 
@@ -1681,8 +1736,8 @@ class Data:
             )
             GBF3_target_percents.append(f(yr).item())
         
-        limit_score_all_AUS = self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA * (np.array(GBF3_target_percents) / 100)  # Convert the percentage to proportion
-        limit_score_inside_LUTO = limit_score_all_AUS - self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO
+        limit_score_all_AUS = self.BIO_GBF3_NVIS_BASELINE_AUSTRALIA * (np.array(GBF3_target_percents) / 100)  # Convert the percentage to proportion
+        limit_score_inside_LUTO = limit_score_all_AUS - self.BIO_GBF3_NVIS_BASELINE_OUTSIDE_LUTO
             
         return np.where(limit_score_inside_LUTO < 0, 0, limit_score_inside_LUTO)
 

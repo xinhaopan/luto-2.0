@@ -1358,16 +1358,16 @@ def save_report_data(raw_data_dir:str):
     GHG_ag = pd.concat([pd.read_csv(path) for path in GHG_ag['path']], ignore_index=True)
     GHG_ag = GHG_ag.replace(GHG_NAMES).round({'Value (t CO2e)': 2})
     GHG_ag_non_all = GHG_ag.query('Water_supply != "ALL" and Source != "ALL"').reset_index(drop=True)
-
+    
     GHG_non_ag = GHG_files.query('base_name.str.contains("no_ag_reduction")').reset_index(drop=True)
     GHG_non_ag = pd.concat([pd.read_csv(path) for path in GHG_non_ag['path'] if not pd.read_csv(path).empty], ignore_index=True)
     GHG_non_ag = GHG_non_ag.replace(RENAME_AM_NON_AG).round({'Value (t CO2e)': 2})
-
+    
     GHG_ag_man = GHG_files.query('base_name.str.contains("agricultural_management")').reset_index(drop=True)
     GHG_ag_man = pd.concat([pd.read_csv(path) for path in GHG_ag_man['path'] if not pd.read_csv(path).empty], ignore_index=True)
     GHG_ag_man = GHG_ag_man.replace(RENAME_AM_NON_AG).round({'Value (t CO2e)': 2})
     GHG_ag_man_non_all = GHG_ag_man.query('Water_supply != "ALL" and `Agricultural Management Type` != "ALL"').reset_index(drop=True)
-
+    
     GHG_transition = GHG_files.query('base_name.str.contains("transition_penalty")').reset_index(drop=True)
     GHG_transition = pd.concat([pd.read_csv(path) for path in GHG_transition['path'] if not pd.read_csv(path).empty], ignore_index=True)
     GHG_transition = GHG_transition.replace(RENAME_AM_NON_AG).round({'Value (t CO2e)': 2})
@@ -1389,8 +1389,8 @@ def save_report_data(raw_data_dir:str):
         .reset_index(drop=True)
     GHG_land_non_all = pd.concat([GHG_ag_non_all, GHG_non_ag, GHG_ag_man_non_all, GHG_transition], axis=0)\
         .query('abs(`Value (t CO2e)`) > 1')\
-        .reset_index(drop=True)
-
+        .reset_index(drop=True)   
+        
     GHG_land['Land-use type'] = GHG_land['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
     GHG_land_non_all['Land-use type'] = GHG_land_non_all['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
 
@@ -1403,7 +1403,7 @@ def save_report_data(raw_data_dir:str):
     GHG_limit = GHG_limit.query('Variable == "GHG_EMISSIONS_LIMIT_TCO2e"').copy()
     GHG_limit['Value (t CO2e)'] = GHG_limit['Emissions (t CO2e)']
     GHG_limit_wide = list(map(list,zip(GHG_limit['Year'],GHG_limit['Value (t CO2e)'])))
-
+    
     order_GHG = [
         'Agricultural land-use',
         'Agricultural Management',
@@ -1435,17 +1435,17 @@ def save_report_data(raw_data_dir:str):
         if region == "AUSTRALIA":
             df_reg.loc[len(df_reg)] = ['Off-land emissions', net_offland_AUS_wide,  'column']
             df_reg.loc[len(df_reg)] = ['GHG emission limit', GHG_limit_wide, 'line']
-            df_reg.loc[len(df_reg)] = ['Net emissions',
+            df_reg.loc[len(df_reg)] = ['Net emissions', 
                 list(zip(years, (df.groupby('Year')['Value (t CO2e)'].sum().values + GHG_off_land.groupby('Year')['Value (t CO2e)'].sum()))),
                 'line'
             ]
         else:
             df_reg.loc[len(df_reg)] = [
-                'Net emissions',
+                'Net emissions', 
                 list(zip(years, (df.groupby('Year')['Value (t CO2e)'].sum().values))),
                 'line'
             ]
-
+                
 
         df_reg['name_order'] = df_reg['name'].apply(lambda x: order_GHG.index(x))
         df_reg = df_reg.sort_values('name_order').drop(columns=['name_order'])
@@ -1457,9 +1457,9 @@ def save_report_data(raw_data_dir:str):
         f.write(f'window["{filename}"] = ')
         json.dump(GHG_region, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
-
-
+        
+        
+        
     # Ag
     GHG_ag_non_all_wide = GHG_ag_non_all\
         .groupby(['region','Land-use','Year'])[['Value (t CO2e)']]\
@@ -1468,23 +1468,23 @@ def save_report_data(raw_data_dir:str):
         .groupby(['region','Land-use'])[['Year','Value (t CO2e)']]\
         .apply(lambda x:x[['Year', 'Value (t CO2e)']].values.tolist())\
         .reset_index()
-
+        
     GHG_ag_non_all_wide.columns = ['region', 'name','data']
     GHG_ag_non_all_wide['type'] = 'column'
-
+    
     out_dict = {}
     for region,df in GHG_ag_non_all_wide.groupby('region'):
         df = df.drop(columns='region')
         out_dict[region] = df.to_dict(orient='records')
-
+    
 
     filename = 'GHG_overview_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
-
+        
+        
     # Am
     GHG_ag_man_non_all_wide = GHG_ag_man_non_all\
         .groupby(['region', 'Agricultural Management Type', 'Year'])[['Value (t CO2e)']]\
@@ -1493,23 +1493,23 @@ def save_report_data(raw_data_dir:str):
         .groupby(['region', 'Agricultural Management Type'])[['Year','Value (t CO2e)']]\
         .apply(lambda x:x[['Year', 'Value (t CO2e)']].values.tolist())\
         .reset_index()
-
+        
     GHG_ag_man_non_all_wide.columns = ['region', 'name','data']
     GHG_ag_man_non_all_wide['type'] = 'column'
-
+    
     out_dict = {}
     for region, df in GHG_ag_man_non_all_wide.groupby('region'):
         df = df.drop(columns='region')
         out_dict[region] = df.to_dict(orient='records')
-
+    
 
     filename = 'GHG_overview_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
-
+        
+        
     # Non-Ag
     GHG_non_ag_wide = GHG_non_ag\
         .groupby(['region','Land-use','Year'])[['Value (t CO2e)']]\
@@ -1518,22 +1518,22 @@ def save_report_data(raw_data_dir:str):
         .groupby(['region','Land-use'])[['Year','Value (t CO2e)']]\
         .apply(lambda x:x[['Year', 'Value (t CO2e)']].values.tolist())\
         .reset_index()
-
+        
     GHG_non_ag_wide.columns = ['region','name','data']
     GHG_non_ag_wide['type'] = 'column'
-
+    
     out_dict = {}
     for region,df in GHG_non_ag_wide.groupby('region'):
         df = df.drop(columns='region')
         out_dict[region] = df.to_dict(orient='records')
-
+    
 
     filename = 'GHG_overview_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
+    
 
 
     # -------------------- GHG ranking --------------------
@@ -1545,11 +1545,11 @@ def save_report_data(raw_data_dir:str):
         .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
         .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
         .assign(Type='GHG emissions')
-
+        
     GHG_rank_emission_region.loc[
-        GHG_rank_emission_region['region'] == 'AUSTRALIA',
+        GHG_rank_emission_region['region'] == 'AUSTRALIA', 
         'Value (t CO2e)'] += GHG_off_land.groupby('Year')['Value (t CO2e)'].sum().values
-
+    
     GHG_rank_sequestration_region = GHG_land_non_all\
         .query('`Value (t CO2e)` < 0')\
         .assign(**{'Value (t CO2e)': lambda x: abs(x['Value (t CO2e)'])})\
@@ -1566,13 +1566,13 @@ def save_report_data(raw_data_dir:str):
 
 
     GHG_rank = pd.concat([
-        GHG_rank_emission_region,
-        GHG_rank_sequestration_region,
+        GHG_rank_emission_region, 
+        GHG_rank_sequestration_region, 
         GHG_rank_region_net,
         ], axis=0, ignore_index=True).reset_index(drop=True)\
         .round({'Value (t CO2e)':2})\
         .assign(color=lambda x: x['Rank'].map(get_rank_color))
-
+    
 
     out_dict = {}
     for (region, e_type), df in GHG_rank.groupby(['region', 'Type']):
@@ -1591,13 +1591,13 @@ def save_report_data(raw_data_dir:str):
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
-
+        
+        
 
 
 
     # -------------------- GHG by agricultural land-use --------------------
-    GHG_ag = GHG_land.query('Type == "Agricultural land-use"')
+    GHG_ag = GHG_land.query('Type == "Agricultural land-use"') 
     GHG_CO2 = GHG_ag.query('~Source.isin(@GHG_CATEGORY.keys())').copy()
     GHG_CO2['GHG Category'] = 'CO2'
 
@@ -1611,8 +1611,8 @@ def save_report_data(raw_data_dir:str):
     GHG_ag_emissions_long = pd.concat([GHG_CO2, GHG_nonCO2], axis=0).reset_index(drop=True)
     GHG_ag_emissions_long['GHG Category'] = GHG_ag_emissions_long['GHG Category']\
         .replace({
-            'CH4': 'Methane (CH4)',
-            'N2O': 'Nitrous Oxide (N2O)',
+            'CH4': 'Methane (CH4)', 
+            'N2O': 'Nitrous Oxide (N2O)', 
             'CO2': 'Carbon Dioxide (CO2)'
         })
 
@@ -1640,7 +1640,7 @@ def save_report_data(raw_data_dir:str):
         if water not in out_dict[region][source]:
             out_dict[region][source][water] = {}
         out_dict[region][source][water] = df.to_dict(orient='records')
-
+        
     filename = 'GHG_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
@@ -1652,7 +1652,7 @@ def save_report_data(raw_data_dir:str):
     # -------------------- GHG by Non-Agricultural --------------------
     Non_ag_reduction_long = GHG_land.query('Type == "Non-Agricultural Land-use"').reset_index(drop=True)
     Non_ag_reduction_long['Value (t CO2e)'] *= -1  # Convert from negative to positive
-
+    
     df_region = Non_ag_reduction_long\
         .groupby(['Year', 'region', 'Land-use'])[['Value (t CO2e)']]\
         .sum(numeric_only=True)\
@@ -1663,11 +1663,11 @@ def save_report_data(raw_data_dir:str):
         .reset_index()
     df_wide.columns = ['name', 'region', 'data']
     df_wide['type'] = 'column'
-
+    
     df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
     df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
     df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-
+    
     out_dict = {}
     for region, df in df_wide.groupby('region'):
         df = df.drop(['region'], axis=1)
@@ -1710,7 +1710,7 @@ def save_report_data(raw_data_dir:str):
         if water not in out_dict[region][_type]:
             out_dict[region][_type][water] = {}
         out_dict[region][_type][water] = df.to_dict(orient='records')
-
+        
     filename = 'GHG_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
@@ -2155,7 +2155,7 @@ def save_report_data(raw_data_dir:str):
     #########################################################
 
     bio_rank_dict = {}
-
+    
     # ---------------- Overall quality ----------------
     filter_str = '''
         category == "biodiversity"
@@ -2172,7 +2172,7 @@ def save_report_data(raw_data_dir:str):
     bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Landuse"').copy()
     bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"').copy()
     bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-
+    
     # ---------------- Overall quality - Ranking -----------------
     bio_rank_type = bio_df_non_all\
         .groupby(['Year', 'region', 'Type'])\
@@ -2190,8 +2190,8 @@ def save_report_data(raw_data_dir:str):
         .assign(color=lambda x: x['Rank'].map(get_rank_color))\
         .assign(Type='Total')
     bio_rank = pd.concat([bio_rank_type, bio_rank_total], axis=0, ignore_index=True)
-
-
+    
+    
     for region, df in bio_rank_total.groupby('region'):
         if region not in bio_rank_dict:
             bio_rank_dict[region] = {}
@@ -2244,9 +2244,9 @@ def save_report_data(raw_data_dir:str):
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
-
-
+    
+    
+    
     # ag
     df_region = bio_df_ag_non_all\
         .groupby(['Year', 'region', 'Landuse'])\
@@ -2267,13 +2267,13 @@ def save_report_data(raw_data_dir:str):
     for region, df in df_wide.groupby('region'):
         df = df.drop(['region'], axis=1)
         out_dict[region] = df.to_dict(orient='records')
-
+        
     filename = f'BIO_quality_overview_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
+            
     # am
     df_region = bio_df_am_non_all\
         .groupby(['Year', 'region', "Agri-Management"])\
@@ -2286,13 +2286,13 @@ def save_report_data(raw_data_dir:str):
     df_wide.columns = ['name', 'region', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
-
-
+    
+    
     out_dict = {}
     for region, df in df_wide.groupby('region'):
         df = df.drop(['region'], axis=1)
         out_dict[region] = df.to_dict(orient='records')
-
+        
     filename = f'BIO_quality_overview_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
@@ -2319,14 +2319,14 @@ def save_report_data(raw_data_dir:str):
     for region, df in df_wide.groupby('region'):
         df = df.drop(['region'], axis=1)
         out_dict[region] = df.to_dict(orient='records')
-
+        
     filename = f'BIO_quality_overview_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
-
+        
+        
     # ---------------- Overall quality - Ag ----------------
     bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
     bio_df_wide = bio_df_ag.groupby(['region', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
@@ -2335,9 +2335,9 @@ def save_report_data(raw_data_dir:str):
     bio_df_wide.columns = ['region', 'water', 'name', 'data']
     bio_df_wide['type'] = 'column'
     bio_df_wide['color'] = bio_df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-    bio_df_wide['name_order'] = bio_df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    bio_df_wide['name_order'] = bio_df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))   
     bio_df_wide = bio_df_wide.sort_values('name_order').drop(columns=['name_order'])
-
+    
     out_dict = {}
     for (region,water), df in bio_df_wide.groupby(['region', 'water']):
         df = df.drop(['region', 'water'], axis=1)
@@ -2352,7 +2352,7 @@ def save_report_data(raw_data_dir:str):
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
+        
     # ---------------- Overall quality - Am ----------------
     bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
@@ -2377,8 +2377,8 @@ def save_report_data(raw_data_dir:str):
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
-
+        
+        
     # ---------------- Overall quality - Non-Ag ----------------
     bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
     df_wide = bio_df_nonag.groupby(['region', 'Landuse'])[['Year','Value (%)']]\
@@ -2402,7 +2402,7 @@ def save_report_data(raw_data_dir:str):
         f.write(';\n')
     
     
-
+        
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
 
         filter_str = '''
@@ -2416,7 +2416,7 @@ def save_report_data(raw_data_dir:str):
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round({'Value (%)': 2})
-
+            
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Landuse"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
@@ -2439,10 +2439,10 @@ def save_report_data(raw_data_dir:str):
             bio_rank_dict[region]['GBF2']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
             bio_rank_dict[region]['GBF2']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
             bio_rank_dict[region]['GBF2']['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
-
+            
 
         # ---------------- (GBF2) overview  ----------------
-
+        
         # sum
         bio_df_target = bio_df.groupby(['Year'])[['Priority Target (%)']].agg('first').reset_index()
         bio_df_target = bio_df_target[['Year','Priority Target (%)']].values.tolist()
@@ -2457,7 +2457,7 @@ def save_report_data(raw_data_dir:str):
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
-
+        
         df_wide.loc[len(df_wide)] = ['Target (%)', 'AUSTRALIA', bio_df_target, 'line']
 
         out_dict = {}
@@ -2489,7 +2489,7 @@ def save_report_data(raw_data_dir:str):
         df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
         df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
-
+        
         out_dict = {}
         for region, df in df_wide.groupby('region'):
             df = df.drop(['region'], axis=1)
@@ -2512,7 +2512,7 @@ def save_report_data(raw_data_dir:str):
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
-
+        
         out_dict = {}
         for region, df in df_wide.groupby('region'):
             df = df.drop(['region'], axis=1)
@@ -2523,8 +2523,8 @@ def save_report_data(raw_data_dir:str):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-
-
+            
+                
         # non-ag
         df_region = bio_df_nonag\
             .groupby(['Year', 'region', 'Landuse'])\
@@ -2551,8 +2551,8 @@ def save_report_data(raw_data_dir:str):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-
-
+            
+            
         # ---------------- (GBF2) Ag  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         df_region = bio_df_ag\
@@ -2564,7 +2564,7 @@ def save_report_data(raw_data_dir:str):
         df_region['color'] = df_region.apply(lambda x: COLORS_LU[x['name']], axis=1)
         df_region['name_order'] = df_region['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
         df_region = df_region.sort_values('name_order').drop(columns=['name_order'])
-
+        
         out_dict = {}
         for (region, water), df in df_region.groupby(['region', 'water']):
             df = df.drop(['region', 'water'], axis=1)
@@ -2573,14 +2573,14 @@ def save_report_data(raw_data_dir:str):
             if water not in out_dict[region]:
                 out_dict[region][water] = {}
             out_dict[region][water] = df.to_dict(orient='records')
-
+            
         filename = f'BIO_GBF2_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-
-
+            
+        
         # ---------------- (GBF2) Ag-Mgt  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
         df_region = bio_df_am\
@@ -2605,8 +2605,8 @@ def save_report_data(raw_data_dir:str):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-
-
+            
+            
         # ---------------- (GBF2) Non-Ag  ----------------
         bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
         df_region = bio_df_nonag\
@@ -2633,12 +2633,12 @@ def save_report_data(raw_data_dir:str):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-
-
             
-
-
-    if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
+            
+            
+            
+            
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         filter_str = '''
             category == "biodiversity" 
             and base_name.str.contains("biodiversity_GBF3")
@@ -2654,7 +2654,7 @@ def save_report_data(raw_data_dir:str):
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Landuse"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
-
+        
         
         # ---------------- (GBF3) Ranking  ----------------
         bio_rank_total = bio_df_non_all\
@@ -2665,19 +2665,19 @@ def save_report_data(raw_data_dir:str):
             .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
             .assign(Type='Total')\
             .assign(color=lambda x: x['Rank'].map(get_rank_color))
-
+            
         for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
             if 'GBF3' not in bio_rank_dict[region]:
                 bio_rank_dict[region]['GBF3'] = {}
-
+                
             bio_rank_dict[region]['GBF3']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
             bio_rank_dict[region]['GBF3']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
             bio_rank_dict[region]['GBF3']['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
 
         # ---------------- (GBF3) Overview  ----------------
-
+        
         # sum
         bio_df_target = bio_df_non_all.groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
 
@@ -2702,9 +2702,9 @@ def save_report_data(raw_data_dir:str):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-
-
-
+                
+                
+                
         # ag
         df_region = bio_df_ag_non_all\
             .groupby(['Year', 'region', 'Landuse'])\
@@ -2785,8 +2785,8 @@ def save_report_data(raw_data_dir:str):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-
-
+            
+            
         # ---------------- (GBF3) - Ag  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
 
@@ -2799,7 +2799,7 @@ def save_report_data(raw_data_dir:str):
         df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
         df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
         df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-
+        
         out_dict = {}
         for (region, species, water), df in df_wide.groupby(['region', 'species', 'water']):
             df = df.drop(['region', 'species', 'water'], axis=1)
@@ -2810,17 +2810,17 @@ def save_report_data(raw_data_dir:str):
             if water not in out_dict[region][species]:
                 out_dict[region][species][water] = {}
             out_dict[region][species][water] = df.to_dict(orient='records')
-
+            
         filename = f'BIO_GBF3_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-
-
+            
+            
         # ---------------- (GBF3) - Am  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
-
+        
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agri-Management', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
@@ -2845,10 +2845,10 @@ def save_report_data(raw_data_dir:str):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-
+            
         # ---------------- (GBF3) - Non-Ag  ----------------
         bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
-
+        
         df_wide = bio_df_nonag\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
@@ -2875,7 +2875,7 @@ def save_report_data(raw_data_dir:str):
             
 
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'on':
-
+        
         filter_str = '''
             category == "biodiversity" 
             and base_name.str.contains("biodiversity_GBF4_SNES_scores")
@@ -2901,7 +2901,7 @@ def save_report_data(raw_data_dir:str):
             .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
             .assign(Type='Total')\
             .assign(color=lambda x: x['Rank'].map(get_rank_color))
-
+            
         for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
             if 'GBF4 (SNES)' not in bio_rank_dict[region]:
@@ -3559,7 +3559,7 @@ def save_report_data(raw_data_dir:str):
             f.write(';\n')
         
         
-
+    
         # ---------------- (GBF8 GROUP)  ----------------
         bio_paths = files.query('base_name.str.contains("biodiversity_GBF8_groups_scores")')
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])

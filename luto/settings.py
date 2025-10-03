@@ -26,14 +26,14 @@ import pandas as pd
 
 
 # ---------------------------------------------------------------------------- #
-# LUTO model version.                                                                 #
+# LUTO model version.                                                          #
 # ---------------------------------------------------------------------------- #
 
 VERSION = '2.3'
 
 
 # ---------------------------------------------------------------------------- #
-# Spyder options                                                            #
+# Spyder options                                                               #
 # ---------------------------------------------------------------------------- #
 
 pd.set_option('display.width', 470)
@@ -52,7 +52,7 @@ RAW_DATA = '../raw_data'
 
 
 # ---------------------------------------------------------------------------- #
-# Scenario parameters.                                                                  #
+# Scenario parameters.                                                         #
 # ---------------------------------------------------------------------------- #
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
@@ -78,10 +78,12 @@ CARBON_EFFECTS_WINDOW = 91
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
-""" Mean FIRE_RISK cell values (%)
-    FD_RISK_PERC_5TH    80.3967
-    FD_RISK_MEDIAN      89.2485
-    FD_RISK_PERC_95TH   93.2735 """
+""" 
+Mean FIRE_RISK cell values (%)
+- FD_RISK_PERC_5TH    80.3967
+- FD_RISK_MEDIAN      89.2485
+- FD_RISK_PERC_95TH   93.2735 
+"""
 
 
 # ---------------------------------------------------------------------------- #
@@ -104,10 +106,10 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 5      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2010,2051,1)) # range(2020,2050)
+SIM_YEARS = list(range(2020,2051,5)) # range(2020,2050)
 
 
 # Define the objective function
@@ -185,24 +187,36 @@ THREADS = min(32, os.cpu_count())
 # No-Go areas; Regional adoption constraints
 # ---------------------------------------------------------------------------- #
 
-EXCLUDE_NO_GO_LU = False
+EXCLUDE_NO_GO_LU = False        # True or False
+'''
+The exclude no-go land-uses option.
+- True: exclude land-uses from no-go areas. User must provide the `NO_GO_VECTORS` dictionary, with land-use names as keys and shapefile paths as values.
+- False: do not exclude land-uses from no-go areas.
+'''
 NO_GO_VECTORS = {
     'Winter cereals':           os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Winter_cereals.shp'),
     'Environmental Plantings':  os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 
- - The key is the land-use name. 
- - The value is the path to the ESRI shapefile.
+- The key is the land-use name. 
+- The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'off'            # 'off',
-                                                 # 'on', user needs to set the percentage targets in 'input/regional_adoption_zones.xlsx'
-                                                 # 'NON_AG_UNIFORM', each of the non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_UNIFORM) in every region
+REGIONAL_ADOPTION_CONSTRAINTS = 'off'
+'''
+Adoption mode for non-ag land uses.
+- 'off': no regional adoption constraints
+- 'on', user needs to set the percentage targets in 'input/regional_adoption_zones.xlsx'
+- 'NON_AG_UNIFORM', each of the non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_UNIFORM) in every region
+'''
 
-REGIONAL_ADOPTION_NON_AG_UNIFORM = 15            # None or numbers between 0-100 (both inclusive); Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_UNIFORM'
-                                                 #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
-
+REGIONAL_ADOPTION_NON_AG_UNIFORM = 15
+'''
+None or numbers between 0-100 (both inclusive); 
+ Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_UNIFORM'. E.g., 5 means each non-ag land can not exceed 5% adoption in every region.
+'''
+                                        
 REGIONAL_ADOPTION_ZONE = 'NRM_CODE'              # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
@@ -320,9 +334,9 @@ AG_MANAGEMENTS_TO_LAND_USES = {
     
     'Ecological Grazing':       ['Beef - modified land', 'Sheep - modified land', 'Dairy - modified land'],
     
-    'Savanna Burning': [        'Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land'],
+    'Savanna Burning':          ['Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land'],
     
-    'AgTech EI': [              # Cropping:
+    'AgTech EI':                [# Cropping:
                                 'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
                                 # Intensive Cropping:
                                 'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
@@ -390,6 +404,9 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 # Productivity contribution of HIR compared to not implementing HIR
 HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 
+# HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
+HIR_CEILING_PERCENTAGE = 0.9
+
 # Maintainace cost for HIR
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
@@ -419,7 +436,7 @@ GHG_TARGETS_DICT = {
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'off'        # 'off', 'low', 'medium', or 'high'
+GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
 '''
 `GHG_EMISSIONS_LIMITS` options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
@@ -552,7 +569,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 10
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -569,7 +586,7 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 
 
 # Biodiversity quality options
-BIO_QUALITY_LAYER = 'MNES_likely_may' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'
+BIO_QUALITY_LAYER = 'Suitability' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'
 '''
 One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'.
     - 'Suitability': use the Zonation algorith to compute quanlity score over 10k species.
@@ -578,7 +595,7 @@ One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SN
 Essentially, the biodiversity quality layer determines how important (0-100) a cell is to the overall biodiversity value. 
     - By choosing 'Suitability' layer, you assume that the overal biodiversity is determined by considering all species (plants, 
       mamals, amphibians, birds, reptiles, etc). 
-    - If choosing one of the 'SNES_likely|may' layers, you assume that the overal biodiversity is determined by species species 
+    - If choosing one of the 'SNES_likely|may' layers, you assume that the overal biodiversity is determined by species 
       related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act). 
     - If choosing one of the 'ECNES_likely|may' layers, you assume that the overal biodiversity is determined by ecological
       communities related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act).
@@ -615,7 +632,7 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HABITAT_CONDITION = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'
+CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'
 '''
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
 suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of [10, 25, 50, 75, 90].
@@ -647,9 +664,23 @@ will be 0.6 * 0.8 = 0.48.
 
 
 
-# ---------------------- Vegetation parameters ----------------------
+# ---------------------- GBF3 parameters ----------------------
 
-GBF3_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBRA'
+BIODIVERSITY_TARGET_GBF_3_NVIS  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3_IBRA = 'off'            # 'off', 'medium', 'high', or 'USER_DEFINED'
+'''
+Target 3 of the Kunming-Montreal Global Biodiversity Framework:
+protect and manage 30% of the world's land, water, and coastal areas by 2030.
+
+- if 'off' is selected, turn off the GBF-3 target for biodiversity.
+- if 'medium' is selected, the conservation target is set to 30% for each NVIS group at 2050.
+- if 'high' is selected, the conservation target is set to 50% for each NVIS group at 2050.
+- if 'USER_DEFINED' is selected, the conservation target is reading from `input.BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx`.
+'''
+
+
+GBF3_NVIS_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBRA'
+GBF3_IBRA_TARGET_CLASS  = 'IBRA_Regions'         # 'IBRA_Regions', 'IBRA_SubRegions'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
@@ -657,9 +688,6 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 We resampled the 100m NVIS layers to 1km resolution by calculating the percentage of each vegetation type in 
 each 1km cell. Therefore, the original 100m sigle layer is converted to a n-bands (n=number of vegetation types)
 raster layer, with each band representing the percentage of that vegetation type in each 1km cell.
-
-- If 'MVG/MVS' is selected, use need to define conservation target for each NVIS group across the whole study area.
-- If 'MVS_IBRA/MVG_IBRA' is selected, use need to define conservation target for each NVIS group for selected the IBRA region.
 '''
 
 GBF3_TARGETS_DICT = {
@@ -669,16 +697,6 @@ GBF3_TARGETS_DICT = {
     'USER_DEFINED': None
 }
 
-BIODIVERSITY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
-'''
-Target 3 of the Kunming-Montreal Global Biodiversity Framework:
-protect and manage 30% of the world's land, water, and coastal areas by 2030.
-
-- if 'off' is selected, turn off the GBF-3 target for biodiversity.
-- if 'medium' is selected, the conservation target is set to 30% for each NVIS group at 2050.
-- if 'high' is selected, the conservation target is set to 50% for each NVIS group at 2050.
-- if 'USER_DEFINED' is selected, the conservation target is reading from `input.BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx`.
-'''
 
 
 
