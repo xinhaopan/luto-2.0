@@ -62,7 +62,7 @@ area_cmap = mcolors.LinearSegmentedColormap.from_list("white_YlGn", new_colors)
 set_plot_style(font_size=15, font_family='Arial')
 
 # --- Data and Labels ---
-scenarios = ["Run_25_GHG_off_BIO_off_CUT_50", "Run_06_GHG_high_BIO_off_CUT_50", "Run_01_GHG_high_BIO_high_CUT_50"]
+scenarios = ["Run_21_GHG_off_BIO_off_CUT_50", "Run_06_GHG_high_BIO_off_CUT_50", "Run_01_GHG_high_BIO_high_CUT_50"]
 
 # Column headers for the plot grid
 title_names = ['Reference', r'$\mathrm{NZ}_{\mathrm{high}}$',

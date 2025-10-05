@@ -52,7 +52,7 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
             ax = fig.add_subplot(gs[row, col], projection=ccrs.PlateCarree())
 
             # 构建tif文件路径
-            tif = f"{arr_path}/{env}/xr_{cost_key}_{env}_{year}.tif"
+            tif = f"{arr_path}/{env}/xr_{cost_key}_ha_{env}_{year}.tif"
 
             # 获取覆盖参数
             kwargs = layer_overrides.get(cost_key, {})
@@ -88,7 +88,7 @@ legend_bbox = (0.1, 0.10, 0.8, 0.9)
 set_plot_style(font_size=15, font_family='Arial')
 
 # 参照/掩膜对齐（仅一次）
-ref_tif = f"{arr_path}/carbon_high_50/xr_total_cost_carbon_high_50_2050.tif"
+ref_tif = f"{arr_path}/carbon_high_50/xr_total_cost_ha_carbon_high_50_2050.tif"
 src_tif = f"../Map/public_area.tif"
 aligned_tif = f"../Map/public_area_aligned.tif"
 align_raster_to_reference(src_tif, ref_tif, aligned_tif, resampling="nearest")

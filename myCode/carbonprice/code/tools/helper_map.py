@@ -671,8 +671,14 @@ def add_annotation(fig, x, y, width=None, height=None, text="",
     if anchor == "center":
         if style == "box":
             fig_width_inch, fig_height_inch = fig.get_size_inches()
-            aspect_ratio = fig_height_inch / fig_width_inch
-            height = width * aspect_ratio
+            fig_dpi = fig.dpi
+
+            # 计算width在显示器上对应的像素/英寸尺寸
+            width_inch = width * fig_width_inch
+            # height使用相同的英寸尺寸，确保是正方形
+            height_inch = width_inch
+            # 转换回axes坐标系
+            height = height_inch / fig_height_inch
 
             x0, y0 = x - width / 2, y - height / 2
             overlay.add_patch(patches.Rectangle(
@@ -696,8 +702,14 @@ def add_annotation(fig, x, y, width=None, height=None, text="",
     else:  # 左下角锚点
         if style == "box":
             fig_width_inch, fig_height_inch = fig.get_size_inches()
-            aspect_ratio = fig_height_inch / fig_width_inch
-            height = width * aspect_ratio
+            fig_dpi = fig.dpi
+
+            # 计算width在显示器上对应的像素/英寸尺寸
+            width_inch = width * fig_width_inch
+            # height使用相同的英寸尺寸，确保是正方形
+            height_inch = width_inch
+            # 转换回axes坐标系
+            height = height_inch / fig_height_inch
 
             overlay.add_patch(patches.Rectangle(
                 (x, y), width, height,
