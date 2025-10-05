@@ -59,9 +59,9 @@ legend_nbins = 3
 set_plot_style(font_size=15, font_family='Arial')
 
 tif_title_list = [
-    (f"{arr_path}/carbon_high/xr_ghg_sol_price_carbon_high_2050.tif", "Shadow carbon price\nunder Net Zero targets",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
-    (f"{arr_path}/carbon_high_bio_50/xr_ghg_sol_price_carbon_high_bio_50_2050.tif", "Shadow carbon price\nunder Nature Positive",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
-    (f"{arr_path}/Counterfactual_carbon_high_bio_50/xr_ghg_sol_price_Counterfactual_carbon_high_bio_50_2050.tif", "Shadow carbon price\nunder both targets",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
+    (f"{arr_path}/carbon_high_50/xr_carbon_sol_price_carbon_high_50_2050.tif", "Shadow carbon price\nunder Net Zero targets",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
+    (f"{arr_path}/carbon_high_bio_50/xr_carbon_sol_price_carbon_high_bio_50_2050.tif", "Shadow carbon price\nunder Nature Positive",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
+    (f"{arr_path}/Counterfactual_carbon_high_bio_50/xr_carbon_sol_price_Counterfactual_carbon_high_bio_50_2050.tif", "Shadow carbon price\nunder both targets",'AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$',[1,99]),
     (f"{arr_path}/carbon_high_bio_50/xr_bio_sol_price_carbon_high_bio_50_2050.tif", "Shadow biodiversity price",'AU\$ ha$^{-1}$ yr$^{-1}$',[1,99]),
 ]
 

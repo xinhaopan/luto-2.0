@@ -88,7 +88,7 @@ legend_bbox = (0.1, 0.10, 0.8, 0.9)
 set_plot_style(font_size=15, font_family='Arial')
 
 # 参照/掩膜对齐（仅一次）
-ref_tif = f"{arr_path}/carbon_high/xr_total_cost_carbon_high_2050.tif"
+ref_tif = f"{arr_path}/carbon_high_50/xr_total_cost_carbon_high_50_2050.tif"
 src_tif = f"../Map/public_area.tif"
 aligned_tif = f"../Map/public_area_aligned.tif"
 align_raster_to_reference(src_tif, ref_tif, aligned_tif, resampling="nearest")
@@ -99,7 +99,7 @@ benefit_cmap = "BrBG"  # 预设色带
 
 # ==== 场景配置 ====
 scenarios = {
-    "carbon_high": {},
+    "carbon_high_50": {},
     "carbon_high_bio_50": {},
     "Counterfactual_carbon_high_bio_50": {}
 }

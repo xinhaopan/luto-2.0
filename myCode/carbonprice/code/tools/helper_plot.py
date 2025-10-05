@@ -20,7 +20,7 @@ from typing import List, Optional, Dict
 
 import tools.config as config
 
-def xarray_to_dict(file_path: str, scale: float = None, add_total: bool = False,negative=False, year_threshold: int = 2020) -> dict:
+def xarray_to_dict(file_path: str, scale: float = None, total_name: str =None,negative=False, year_threshold: int = 2020) -> dict:
     """
     将 (scenario, Year, type) 的 xarray.DataArray 转换为 dict。
     key: scenario坐标
@@ -53,23 +53,59 @@ def xarray_to_dict(file_path: str, scale: float = None, add_total: bool = False,
             columns=da_s.coords['type'].values
         )
 
-        if add_total:
-            df['Total'] = df.sum(axis=1)
+        if total_name:
+            df[total_name] = df.sum(axis=1)
         result[scenario] = df
     return result
+
+def xarray_to_long_df(file_path: str, scale: float = None, negative=False, year_threshold: int = 2020) -> pd.DataFrame:
+    """
+    将 (scenario, Year, type) 的 xarray.DataArray 转换为长格式 DataFrame。
+    每行包含: scenario, Year, type, value
+    scale: 所有值除以 scale
+    negative: 是否取负值
+    year_threshold: 只保留 Year >= year_threshold 的数据
+    """
+    data_array = xr.open_dataarray(file_path)
+    arr = data_array
+    if scale is not None:
+        arr = arr / scale
+    if negative:
+        arr = -arr
+
+    # 筛选年份
+    if year_threshold is not None:
+        years = arr.coords['Year'].values
+        mask = years >= year_threshold
+        years = years[mask]
+        arr = arr.sel(Year=years)
+
+    # 转为 DataFrame（长格式）
+    df_long = arr.to_dataframe().reset_index()
+    # 如果 value 列不是叫 'value'，统一改名
+    if arr.name and arr.name in df_long.columns:
+        df_long = df_long.rename(columns={arr.name: "value"})
+    return df_long[['scenario', 'Year', 'type', 'value']]
 
 def stacked_area_pos_neg(
         ax, df, colors=None, alpha=0.60,
         title_name='', ylabel='',y_ticks_all=None,
-        add_line=True, n_col=1,dividing_line=0.5, show_legend=False, bbox_to_anchor=(0.5, -0.25)
+        total_name=None, n_col=1,dividing_line=0.5, show_legend=False, bbox_to_anchor=(0.5, -0.25), y_labelpad=6
 ):
     """
     绘制可分正负值的堆叠面积图，并在区域间加白色细线。
     """
     # 数据分离
-    df_stack = df.iloc[:, :-1]
-    total_col_name = df.columns[-1]
-    total_col_data = df.iloc[:, -1]
+    if total_name:
+        df_stack = df.drop(columns=[total_name])
+        total_col_data = df[total_name]
+        ax.plot(
+            df.index, total_col_data,
+            linestyle='-', color='#404040', linewidth=3,  # thick dark grey
+            label=total_name, zorder=20
+        )
+    else:
+        df_stack = df
 
     # 颜色管理
     default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
@@ -103,13 +139,6 @@ def stacked_area_pos_neg(
             cum_pos += pos
             cum_neg += neg
 
-    # 可选总和线
-    if add_line:
-        ax.plot(
-            df.index, total_col_data,
-            linestyle='-', color='#404040', linewidth=3,  # thick dark grey
-            label=total_col_name, zorder=20
-        )
 
     # 轴和外观
     if y_ticks_all is not None:
@@ -125,7 +154,7 @@ def stacked_area_pos_neg(
         )
     ax.set_xlim(df.index.min(), df.index.max())
     ax.set_title(title_name, pad=6)
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(ylabel,labelpad=y_labelpad)
     ax.set_xlabel('')
     ax.tick_params(direction='out')
     for spine in ax.spines.values():
@@ -138,9 +167,9 @@ def stacked_area_pos_neg(
     for h, l in zip(handles, labels):
         if l not in unique:
             unique[l] = h
-    if add_line and total_col_name in unique:
-        total_handle = unique.pop(total_col_name)
-        final_labels = list(unique.keys()) + [total_col_name]
+    if total_name:
+        total_handle = unique.pop(total_name)
+        final_labels = list(unique.keys()) + [total_name]
         final_handles = list(unique.values()) + [total_handle]
     else:
         final_labels = list(unique.keys())
@@ -201,58 +230,58 @@ def set_plot_style(font_size=12, font_family='Arial'):
     })
 
 
-def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0):
-    """
-    绘制调整过布局的图例。
-    - bbox_to_anchor 控制整体位置 (x=0.85 使其左移)。
-    - ncol=2 设置为两列。
-    - column_spacing=1.0 减小列间距。
-    """
-    fig = ax.get_figure()
-    handles, labels = ax.get_legend_handles_labels()
-
-    # # --- 新增：交换第5项和第6项 ---
-    # handles[4], handles[5] = handles[5], handles[4]
-    # # 交换 labels 列表中的第5个和第6个元素
-    # labels[4], labels[5] = labels[5], labels[4]
-    # # --- 交换结束 ---
-
-    ghost_handle = Patch(alpha=0)
-    ghost_label = ""
-
-    # 3. 将占位项添加到列表末尾
-    for _ in range(3):
-        handles.append(ghost_handle)
-        labels.append(ghost_label)
-
-    if ax.get_legend() is not None:
-        ax.get_legend().remove()
-
-    # ... (创建 new_handles 的代码保持不变) ...
-    new_handles = []
-    for h in handles:
-        if isinstance(h, Patch):
-            new_handles.append(
-                Patch(facecolor=h.get_facecolor(), edgecolor=h.get_edgecolor(), linewidth=h.get_linewidth()))
-        elif isinstance(h, Line2D):
-            new_handles.append(Line2D([0], [0], color=h.get_color(), linestyle=h.get_linestyle(),
-                                      linewidth=h.get_linewidth(), marker=h.get_marker(),
-                                      markersize=h.get_markersize(), markerfacecolor=h.get_markerfacecolor(),
-                                      markeredgecolor=h.get_markeredgecolor()))
-        else:
-            new_handles.append(h)
-
-    # 关键修改：应用新的布局参数
-    fig.legend(handles=new_handles, labels=labels, loc='upper left',
-               bbox_to_anchor=bbox_to_anchor,
-               ncol=ncol,
-               frameon=False,
-               handlelength=1.0,
-               handleheight=1.0,
-               handletextpad=0.4,
-               labelspacing=0.3,
-               columnspacing=column_spacing  # <--- 控制列间距
-               )
+# def draw_legend(ax, bbox_to_anchor=(0.85, 0.69), ncol=2, column_spacing=1.0):
+#     """
+#     绘制调整过布局的图例。
+#     - bbox_to_anchor 控制整体位置 (x=0.85 使其左移)。
+#     - ncol=2 设置为两列。
+#     - column_spacing=1.0 减小列间距。
+#     """
+#     fig = ax.get_figure()
+#     handles, labels = ax.get_legend_handles_labels()
+#
+#     # # --- 新增：交换第5项和第6项 ---
+#     # handles[4], handles[5] = handles[5], handles[4]
+#     # # 交换 labels 列表中的第5个和第6个元素
+#     # labels[4], labels[5] = labels[5], labels[4]
+#     # # --- 交换结束 ---
+#
+#     ghost_handle = Patch(alpha=0)
+#     ghost_label = ""
+#
+#     # 3. 将占位项添加到列表末尾
+#     for _ in range(3):
+#         handles.append(ghost_handle)
+#         labels.append(ghost_label)
+#
+#     if ax.get_legend() is not None:
+#         ax.get_legend().remove()
+#
+#     # ... (创建 new_handles 的代码保持不变) ...
+#     new_handles = []
+#     for h in handles:
+#         if isinstance(h, Patch):
+#             new_handles.append(
+#                 Patch(facecolor=h.get_facecolor(), edgecolor=h.get_edgecolor(), linewidth=h.get_linewidth()))
+#         elif isinstance(h, Line2D):
+#             new_handles.append(Line2D([0], [0], color=h.get_color(), linestyle=h.get_linestyle(),
+#                                       linewidth=h.get_linewidth(), marker=h.get_marker(),
+#                                       markersize=h.get_markersize(), markerfacecolor=h.get_markerfacecolor(),
+#                                       markeredgecolor=h.get_markeredgecolor()))
+#         else:
+#             new_handles.append(h)
+#
+#     # 关键修改：应用新的布局参数
+#     fig.legend(handles=new_handles, labels=labels, loc='upper left',
+#                bbox_to_anchor=bbox_to_anchor,
+#                ncol=ncol,
+#                frameon=False,
+#                handlelength=1.0,
+#                handleheight=1.0,
+#                handletextpad=0.4,
+#                labelspacing=0.3,
+#                columnspacing=column_spacing  # <--- 控制列间距
+#                )
 
 def get_global_ylim(dict_df: Dict[str, pd.DataFrame], offset=0.01) -> tuple:
     """Calculate global y-limits (supporting positive and negative stacks). Exclude 'Total' column if present."""
@@ -373,7 +402,7 @@ def plot_13_layout(
     output_path: str,
     summary_ylim: tuple,
     desired_ticks: int = 5,
-    add_line=True,
+    total_name=None,
     bbox_to_anchor=[0.58, 0.82, 0.4, 0.1],
     stacked_area_pos_neg=stacked_area_pos_neg,
     draw_legend=draw_legend,
@@ -384,6 +413,7 @@ def plot_13_layout(
     ghost_legend_num=3,
     figsize=(22, 14),
     post_process=None,
+    y_labelpad=6
 ):
     """
     绘制复杂布局的经济收益图
@@ -397,6 +427,7 @@ def plot_13_layout(
     draw_legend: 图例绘制函数(ax, bbox_to_anchor, ncol, column_spacing)
     ylabel: Y轴标签
     """
+    all_dfs = filter_and_rename_dict_keys(all_dfs, title_map)
     fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.15, wspace=0.15)
     fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
@@ -420,16 +451,17 @@ def plot_13_layout(
     for i, (ax, title_key) in enumerate(zip(axes, title_names)):
         df = all_dfs[title_key]
         df = df[df.index >= config.START_YEAR]
-        title = title_map.get(title_key, title_key)
+        title = get_partial_match_title(title_key,title_map)
 
         stacked_area_pos_neg(
             ax, df, colors=colors,
             title_name=title,
             ylabel='' if i != 3 else ylabel,
             y_ticks_all=y_ticks_all,
-            add_line=add_line,
+            total_name=total_name,
             show_legend=False,
-            dividing_line=dividing_line
+            dividing_line=dividing_line,
+            y_labelpad=y_labelpad
         )
 
         x_data = df.index
@@ -484,125 +516,126 @@ def plot_13_layout(
     fig.show()
     print(f"✅ Saved to {output_path}")
 
-def plot_12_layout(
-    all_carbon: list,
-    all_bio: list,
-    title_carbon_names: list,
-    title_bio_names: list,
-    colors: list,
-    output_path: str,
-    carbon_ylim: tuple,
-    bio_ylim: tuple,
-    bbox_to_anchor,
-    stacked_area_pos_neg,
-    draw_legend,
-    ylabel: str = 'Cost (Billion AU$)',
-    dividing_line=0.5,
-    ncol=2,
-    column_spacing=-7,
-    figsize=(20, 12)
+
+def plot_25_layout(
+        all_dfs: dict,
+        title_map: dict,
+        colors: list,
+        output_path: str,
+        summary_ylim: tuple,
+        desired_ticks: int = 5,
+        total_name=None,
+        bbox_to_anchor=[0.2, -0.05, 0.6, 0.05],  # 调整图例到底部
+        stacked_area_pos_neg=stacked_area_pos_neg,
+        draw_legend=draw_legend,
+        ylabel: str = 'Net economic returns (Billion AU$)',
+        dividing_line=0.5,
+        ncol=1,  # 图例列数增加
+        column_spacing=1,
+        ghost_legend_num=3,
+        figsize=(25, 30),  # 增加图形尺寸
+        post_process=None,
+        y_labelpad=6
 ):
     """
-    绘制复杂布局的碳和生物成本图（3x5子图分布，前两为碳，后十为生物）。
-    all_carbon: list，长度为2，每个为df
-    all_bio: list，长度为10，每个为df
-    title_carbon_names: list，碳图标题
-    title_bio_names: list，生物图标题
-    colors: list，堆叠区颜色
-    output_path: 输出图文件路径
-    carbon_ylim: (ymin, ymax)，碳图Y轴范围
-    bio_ylim: (ymin, ymax)，生物图Y轴范围
+    绘制5x5布局的经济收益图（25张子图）
+    all_dfs: dict，key为title_names，value为df
+    title_map: dict，key为title_names，value为中文/显示名
+    colors: list，每个区域的颜色
+    output_path: 输出路径
+    summary_ylim: (ymin, ymax) Y轴范围元组
     bbox_to_anchor: 图例位置参数
-    stacked_area_pos_neg: 堆叠面积函数
-    draw_legend: 图例绘制函数
-    ylabel: 全局Y轴标签
-    dividing_line: 区域分割线线宽
-    ncol: 图例列数
-    column_spacing: 图例列间距
+    stacked_area_pos_neg: 区域图绘制函数(ax, df, colors, title_name, ylabel, show_legend)
+    draw_legend: 图例绘制函数(ax, bbox_to_anchor, ncol, column_spacing)
+    ylabel: Y轴标签
     """
+    all_dfs = filter_and_rename_dict_keys(all_dfs, title_map)
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(3, 5, figure=fig, hspace=0.5, wspace=0.2)
+    # 5行5列的网格布局
+    gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.15, wspace=0.15)
+    fig.subplots_adjust(left=0.06, right=0.97, top=0.97, bottom=0.05)  # 底部留出空间给图例
 
-    # --- Carbon 图（第一行前两个） ---
-    ax_carbon_list = []
-    for i in range(2):
-        ax = fig.add_subplot(gs[0, i])
-        stacked_area_pos_neg(
-            ax, all_carbon[i], colors=colors,
-            title_name=title_carbon_names[i],
-            ylabel='', show_legend=False,
-            dividing_line=dividing_line
-        )
-        ax.set_ylim(*carbon_ylim)
-        x_data = all_carbon[i].index
-        start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
-        tick_positions = [start_tick, middle_tick, end_tick]
-        ax.set_xticks(tick_positions)
-        ax.tick_params(axis='x', labelbottom=False)
-        ax_carbon_list.append(ax)
-    # 控制共享Y轴和刻度
-    ax_carbon_list[0].sharey(ax_carbon_list[1])
-    ax_carbon_list[1].tick_params(axis='y', labelleft=False)
-    ax_carbon_list[0].set_ylim(*carbon_ylim)
-    ax_carbon_list[0].yaxis.set_major_locator(MaxNLocator(4))
+    axes = []
+    # 创建25个子图，所有子图共享y轴
+    for row in range(5):
+        for col in range(5):
+            if row == 0 and col == 0:
+                axes.append(fig.add_subplot(gs[row, col]))
+            else:
+                axes.append(fig.add_subplot(gs[row, col], sharey=axes[0]))
 
-    # --- 图例区域（第一行后三个合并） ---
-    legend_ax = fig.add_subplot(gs[0, 2:])
-    legend_ax.axis('off')
+    legend_handles, legend_labels = None, None
 
-    # --- Bio 图（后两行） ---
-    ax_bio_list = []
-    shared_bio_ax = None
-    for i in range(len(all_bio)):
-        row = i // 5 + 1
+    title_names = list(all_dfs.keys())
+    y_ticks_all = get_y_axis_ticks(summary_ylim[0], summary_ylim[1],
+                                   desired_ticks=desired_ticks)
+
+    for i, (ax, title_key) in enumerate(zip(axes, title_names)):
+        df = all_dfs[title_key]
+        df = df[df.index >= config.START_YEAR]
+        title = get_partial_match_title(title_key, title_map)
+
+        # 确定当前子图的行列位置
+        row = i // 5
         col = i % 5
-        if shared_bio_ax is None:
-            ax = fig.add_subplot(gs[row, col])
-            shared_bio_ax = ax
-        else:
-            ax = fig.add_subplot(gs[row, col], sharey=shared_bio_ax)
+
         stacked_area_pos_neg(
-            ax, all_bio[i], colors=colors,
-            title_name=title_bio_names[i],
-            ylabel='', show_legend=False,
-            dividing_line=dividing_line
+            ax, df, colors=colors,
+            title_name=title,
+            ylabel = ylabel if (row == 2 and col == 0) else '',
+            y_ticks_all=y_ticks_all,
+            total_name=total_name,
+            show_legend=False,
+            dividing_line=dividing_line,
+            y_labelpad=y_labelpad
         )
-        # 控制Y轴刻度：只在最左边一列显示
-        if col != 0:
-            ax.tick_params(axis='y', labelleft=False)
-        # 控制X轴刻度：只在最下面一行显示
-        x_data = all_bio[i].index
-        start_tick, middle_tick, end_tick = x_data.min(), x_data[len(x_data) // 2], x_data.max()
-        tick_positions = [start_tick, middle_tick, end_tick]
+
+        x_data = df.index
+        x_min, x_max = x_data.min(), x_data.max()
+        tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+        tick_positions = [year for year in tick_positions if year in x_data]
+
         ax.set_xticks(tick_positions)
-        if row == 2:
+        ax.tick_params(axis='x', labelrotation=45)
+
+        # 只有最后一行（第5行，索引20-24）显示x轴标签
+        if row == 4:
             ax.tick_params(axis='x')
-            # x_labels = ax.get_xticklabels()
-            # if len(x_labels) >= 3:
-            #     x_labels[0].set_horizontalalignment('left')
-            #     x_labels[-1].set_horizontalalignment('right')
         else:
             ax.tick_params(axis='x', labelbottom=False)
-        ax_bio_list.append(ax)
-    # Y轴范围与刻度
-    shared_bio_ax.set_ylim(*bio_ylim)
-    locator = MaxNLocator(nbins=5, prune=None, min_n_ticks=5)
-    shared_bio_ax.yaxis.set_major_locator(locator)
 
-    # --- 全局Y轴标题 ---
-    fig.supylabel(ylabel, x=0.08, fontsize=24)
+        # 只有第一列（col==0）保留y轴标签
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
 
-    # --- 图例 ---
-    draw_legend(ax_carbon_list[0], bbox_to_anchor=bbox_to_anchor, ncol=ncol, column_spacing=column_spacing)
+        ax.figure.canvas.draw()
+
+        # 对最后一行除第一列外的子图：隐藏x轴最左边的刻度标签
+        if row == 4 and col != 0:
+            xtlabs = ax.get_xticklabels()
+            if xtlabs:
+                xtlabs[0].set_visible(False)
+
+        # 保存第一个子图的图例句柄和标签
+        if i == 0:
+            legend_handles, legend_labels = ax.get_legend_handles_labels()
+
+    if post_process:
+        axes = post_process(axes)
+
+    # 在底部绘制图例
+    if legend_handles:
+        draw_legend(axes[-1], bbox_to_anchor=bbox_to_anchor, ncol=ncol,
+                    column_spacing=column_spacing, ghost_legend_num=ghost_legend_num)
 
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))
+    output_path = os.path.join(output_path)
     fig.savefig(output_path, dpi=300)
     fig.show()
-    plt.close(fig)
     print(f"✅ Saved to {output_path}")
 
-def get_colors(merged_dict, mapping_file, sheet_name=None):
+def get_colors(merged_dict, mapping_file, sheet_name=None, total_name='Total'):
     """
     根据映射文件处理 merged_dict 中的每个表，忽略 `-`，并返回 data_dict 和 legend_colors。
 
@@ -631,15 +664,15 @@ def get_colors(merged_dict, mapping_file, sheet_name=None):
     for key, df in merged_dict.items():
         # 如果有 Total 列，就先取出来
         total_col = None
-        if 'Total' in df.columns:
-            total_col = df['Total']
-            df = df.drop(columns=['Total'])
+        if total_name in df.columns:
+            total_col = df[total_name]
+            df = df.drop(columns=[total_name])
         processed_df, legend_colors = process_single_df(df, mapping_df)
         # 合并 Total 列到最后
         if total_col is not None:
-            processed_df['Total'] = total_col
+            processed_df[total_name] = total_col
             # 强制 Total 为最后一列
-            cols = [c for c in processed_df.columns if c != 'Total'] + ['Total']
+            cols = [c for c in processed_df.columns if c != total_name] + [total_name]
             processed_df = processed_df[cols]
         data_dict[key] = processed_df
 
@@ -699,6 +732,16 @@ def process_single_df(df, mapping_df):
 
     return filtered_df, legend_colors
 
+def get_partial_match_title(title_key, title_map):
+    """
+    如果 title_map 的某个 key 是 title_key 的一部分，则返回对应的 value；
+    否则返回 title_key 本身。
+    """
+    for k, v in title_map.items():
+        if k in title_key:
+            return v
+    return title_key
+
 def plot_22_layout(
     all_dfs: dict,
     title_map: dict,
@@ -706,7 +749,7 @@ def plot_22_layout(
     output_path: str,
     summary_ylim: tuple,
     desired_ticks: int = 5,
-    add_line=True,
+    total_name=None,
     bbox_to_anchor=(0.44, 0.95),
     stacked_area_pos_neg=stacked_area_pos_neg,
     draw_legend=draw_legend,
@@ -721,6 +764,7 @@ def plot_22_layout(
     title_map为dict，key同上，value为标题。
     第一行前两列画图，第3-5列合并为图例。其余行每行5张。
     """
+    all_dfs = filter_and_rename_dict_keys(all_dfs, title_map, strict_match=True)
     fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(5, 5, figure=fig,
                            left=0.06, right=0.98, top=0.95, bottom=0.05,
@@ -746,7 +790,7 @@ def plot_22_layout(
             df = df[df.index >= config.START_YEAR]
             data_idx += 1
 
-            title = title_map.get(title_key, title_key)
+            title = get_partial_match_title(title_key, title_map)
 
             # 建轴（同列 sharey）
             ax = fig.add_subplot(gs[r, c], sharey=share_col[c])
@@ -759,7 +803,7 @@ def plot_22_layout(
                 ax, df, colors=colors,
                 title_name=title,
                 y_ticks_all=y_ticks_all,
-                add_line=add_line,
+                total_name=total_name,
                 ylabel=(ylabel if (c == 0 and r == 2) else ''),
                 show_legend=False,
                 dividing_line=dividing_line
@@ -936,7 +980,7 @@ def draw_12_price(
         ax = fig.add_subplot(gs[0, i])
         df_input = df.iloc[:, i].to_frame()
         draw_fit_line_ax(
-            ax, df_input, color=color, title_name=title_map.get(df.columns[i]),ci=ci
+            ax, df_input, color=color, title_name=get_partial_match_title(df.columns[i], title_map),ci=ci
         )
 
         ax.set_ylim(y_carbon_all[0],y_carbon_all[1])
@@ -961,7 +1005,7 @@ def draw_12_price(
         ax = fig.add_subplot(gs[row, col])
         df_input = df.iloc[:, i + 2].to_frame()
         draw_fit_line_ax(
-            ax, df_input, color=color, title_name=title_map.get(df.columns[i + 2]),ci=ci)
+            ax, df_input, color=color, title_name=get_partial_match_title(df.columns[i + 2], title_map),ci=ci)
         ax.set_ylim(y_bio_all[0], y_bio_all[1])
         ax.set_yticks(y_bio_all[2])
         ax.set_xticks(tick_positions)
@@ -1181,118 +1225,277 @@ def draw_fit_line_ax(ax, df, color='black', title_name='', order=2, ci=95):
         spine.set_color('black')
         spine.set_linewidth(1.2)
 
-def draw_10_price(
-    df2,
-    title_map,
-    color,
-    output_path,
-    desired_ticks=4,
-    ylabel=r"Carbon price for GHG and biodiversity (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
-    figsize=(24, 10),
-    legend_label_line="Nature-positive targets",
-    legend_label_shade="95% CI",
-    legend_loc="best",
-    legend_on_first_ax=True,
-    ylabel_pos=(-0.3, -0.2),  # (x, y) in axes coords
-    top_space_ratio=0.20,     # y 轴顶部额外空间比例
-    ci=95,
-):
+# def draw_10_price(
+#     df2,
+#     title_map,
+#     color,
+#     output_path,
+#     desired_ticks=4,
+#     ylabel=r"Carbon price for GHG and biodiversity (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
+#     figsize=(24, 10),
+#     legend_label_line="Nature-positive targets",
+#     legend_label_shade="95% CI",
+#     legend_loc="best",
+#     legend_on_first_ax=True,
+#     ylabel_pos=(-0.3, -0.2),  # (x, y) in axes coords
+#     top_space_ratio=0.20,     # y 轴顶部额外空间比例
+#     ci=95,
+# ):
+#     """
+#     画两行共 10 张子图（df2 的 10 列），每张做拟合并统一坐标与格式。
+#     依赖外部函数：draw_fit_line_ax(ax, df_input, color, title_name)
+#     """
+#     fig = plt.figure(figsize=figsize)
+#     gs = gridspec.GridSpec(2, 5, figure=fig, hspace=0.15, wspace=0.15)
+#     fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
+#
+#     # ---- 统一 x 轴刻度 ----
+#     x_data = df2.index
+#     x_min, x_max = x_data.min(), x_data.max()
+#     # x_middle = x_data[int(len(x_data) // 2)]
+#     # tick_positions = [x_min, x_middle, x_max]
+#
+#     tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+#     tick_positions = [year for year in tick_positions if year in x_data]
+#
+#     # ---- 统一 y 轴范围（根据全部10列）----
+#     bio_y = np.concatenate([df2.iloc[:, i].values for i in range(10)])
+#     bio_ymax = np.nanmax(bio_y)
+#     y0, y1 = 0.0, float(bio_ymax) * (1.0 + top_space_ratio)
+#
+#     # 也可用你自己的 get_y_axis_ticks：
+#     # y_min, y_max, ticks = get_y_axis_ticks(0, np.nanmax(bio_y), desired_ticks=desired_ticks)
+#
+#     def _int_fmt(x, pos):
+#         return f"{int(x)}"
+#     int_formatter = FuncFormatter(_int_fmt)
+#
+#     axes = []
+#     for i in range(10):
+#         row, col = divmod(i, 5)
+#         ax = fig.add_subplot(gs[row, col])
+#         df_input = df2.iloc[:, i].to_frame()
+#
+#         # 你的拟合画线函数（外部提供）
+#         draw_fit_line_ax(
+#             ax,
+#             df_input,
+#             color=color,
+#             title_name=get_partial_match_title(df2.columns[i], title_map),
+#             ci=ci
+#         )
+#
+#         # y 轴范围与刻度
+#         ax.set_ylim(y0, y1)
+#         ax.yaxis.set_major_locator(MaxNLocator(nbins=desired_ticks, integer=True))
+#         ax.yaxis.set_major_formatter(int_formatter)
+#
+#         # x 轴刻度
+#         ax.set_xticks(tick_positions)
+#         ax.tick_params(axis='x')
+#
+#         # 非首列不显示 y 轴刻度文本
+#         if col != 0:
+#             ax.tick_params(axis='y', labelleft=False)
+#         if row != 1:
+#             ax.tick_params(axis='x', labelbottom=False)
+#
+#         # if row == 1 and col == 0:
+#         #     ytlabs = ax.get_yticklabels()
+#         #     if ytlabs:
+#         #         ytlabs[0].set_visible(False)
+#         # if row == 1 and col > 0:
+#         #     xtlabs = ax.get_xticklabels()
+#         #     if xtlabs:
+#         #         xtlabs[0].set_visible(False)
+#
+#         axes.append(ax)
+#
+#     # y 轴标签放在第一个子图上，并上移
+#     axes[0].set_ylabel(ylabel)
+#     axes[0].yaxis.set_label_coords(-0.19, -0.03)
+#
+#     # legend：默认只在第一个子图里放，避免重复
+#     if legend_on_first_ax:
+#         line_handle = mlines.Line2D([], [], color=color, linewidth=2, label=legend_label_line)
+#         if ci is not None and ci > 0:
+#             shade_handle = Patch(color=color, alpha=0.25, label=legend_label_shade)
+#             axes[0].legend(handles=[line_handle, shade_handle], loc=legend_loc, frameon=False)
+#         else:
+#             axes[0].legend(handles=[line_handle], loc=legend_loc, frameon=False)
+#
+#     plt.savefig(output_path, dpi=300)
+#     plt.show()
+#     return fig, axes
+
+# def draw_22_price(
+#     df,
+#     title_map,
+#     output_path,
+#     desired_ticks=5,
+#     y_label="Shadow carbon price",
+#     figsize=(36, 40),
+#     ci=95,
+# ):
+#     fig = plt.figure(figsize=figsize)
+#     gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.15, wspace=0.15)
+#     fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
+#
+#     # ------ x轴刻度（所有数据统一） ------
+#     x_data = df.index
+#     x_min, x_max = x_data.min(), x_data.max()
+#     # x_middle = x_data[int(len(x_data) // 2)]
+#     # tick_positions = [x_min, x_middle, x_max]
+#
+#
+#     tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+#     tick_positions = [year for year in tick_positions if year in x_data]
+#
+#     # ------ Carbon图（第一行前两个） ------
+#     carbon_y = np.concatenate([df.iloc[:, i].values for i in range(2)])
+#     y_carbon_all = get_y_axis_ticks(0, np.nanmax(carbon_y), desired_ticks=desired_ticks)
+#     ax_list = []
+#     for i in range(2):
+#         ax = fig.add_subplot(gs[0, i])
+#         df_input = df.iloc[:, i].to_frame()
+#         draw_fit_line_ax(
+#             ax, df_input, color='black', title_name=get_partial_match_title(df.columns[i],title_map),ci=ci
+#         )
+#
+#         ax.set_ylim(y_carbon_all[0],y_carbon_all[1])
+#         ax.set_yticks(y_carbon_all[2])
+#         ax.set_xticks(tick_positions)
+#         ax.tick_params(axis='x', labelbottom=False)
+#         # if i != 0:
+#         #     ax.tick_params(axis='y', labelleft=False)
+#         ax_list.append(ax)
+#
+#     # ------ carbon price图（第2,3,4行） ------
+#     # 拼接两段需要画的所有数据
+#     bio_y = np.concatenate([
+#         # 第2、3行
+#         np.concatenate([df.iloc[:, i + 2].values for i in range(10)]),
+#         # 第3、4行
+#         np.concatenate([df.iloc[:, i + 7].values for i in range(10)])
+#     ])
+#     # 使用全量数据获取 y 轴范围和刻度
+#     y_bio_all = get_y_axis_ticks(0, np.nanmax(bio_y), desired_ticks=desired_ticks - 2)
+#
+#     # ----- 画第2、3行 -----
+#     for i in range(2, 12):
+#         row, col = (i - 2) // 5 + 1, (i - 2) % 5
+#         ax = fig.add_subplot(gs[row, col])
+#         df_input = df.iloc[:, i].to_frame()
+#         draw_fit_line_ax(
+#             ax, df_input, color='orange', title_name=get_partial_match_title(df.columns[i],title_map), ci=ci)
+#         ax.set_ylim(y_bio_all[0], y_bio_all[1])
+#         ax.set_yticks(y_bio_all[2])
+#         ax.set_xticks(tick_positions)
+#         ax.tick_params(axis='x', labelbottom=False)
+#         ax_list.append(ax)
+#
+#     # ----- 画第3、4行 -----
+#     for i in range(12, 22):
+#         row, col = (i - 2) // 5 + 1, (i - 2) % 5
+#         ax = fig.add_subplot(gs[row, col])
+#         df_input = df.iloc[:, i].to_frame()
+#         draw_fit_line_ax(
+#             ax, df_input, color='purple', title_name=get_partial_match_title(df.columns[i],title_map), ci=ci)
+#         ax.set_ylim(y_bio_all[0], y_bio_all[1])  # 用统一的 y_bio_all
+#         ax.set_yticks(y_bio_all[2])
+#         ax.set_xticks(tick_positions)
+#
+#         if row == 4:
+#             ax.tick_params(axis='x', labelbottom=True)
+#         else:
+#             ax.tick_params(axis='x', labelbottom=False)
+#
+#         ax_list.append(ax)
+#
+#     ax_list[0].set_ylabel(y_label)
+#     ax_list[0].yaxis.set_label_coords(-0.19, -1.8)
+#
+#
+#     # ------ 图例 ------
+#     if draw_legend:
+#         # 定义legend句柄
+#         handle_carbon = mlines.Line2D([], [], color='black', linewidth=2, label="Net-zero targets")
+#         handle_bio12 = mlines.Line2D([], [], color='orange', linewidth=2, label="Net-zero targets and nature-positive targets")
+#         handle_bio10 = mlines.Line2D([], [], color='purple', linewidth=2, label="Nature-positive targets")
+#
+#         shade_carbon = Patch(color='black', alpha=0.25, label="95% CI")
+#         shade_bio12 = Patch(color='orange', alpha=0.25, label="95% CI")
+#         shade_bio10 = Patch(color='purple', alpha=0.25, label="95% CI")
+#
+#         handles = [handle_carbon, shade_carbon, handle_bio12, shade_bio12, handle_bio10, shade_bio10]
+#
+#         fig.legend(
+#             handles=handles,
+#             loc='upper center',  # 可选: 'lower center', 'upper left', etc.
+#             bbox_to_anchor=(0.6, 0.95),  # (x, y)，1.04可以让图例在图像上方
+#             ncol=1,  # 每行3个图例（你有3组）
+#             frameon=False
+#         )
+#
+#     plt.savefig(output_path, dpi=300)
+#     plt.show()
+#     plt.close(fig)
+
+def filter_and_rename_dict_keys(data_dict, title_map, strict_match=False):
     """
-    画两行共 10 张子图（df2 的 10 列），每张做拟合并统一坐标与格式。
-    依赖外部函数：draw_fit_line_ax(ax, df_input, color, title_name)
+    只保留 data_dict 的 key 满足 title_map 某个 key 的项，
+    并将 key改成 title_map 的 value（格式化名字）。
+    strict_match=True 时，必须完全匹配；否则为包含（模糊）匹配。
+    匹配不到时直接 raise KeyError。
     """
-    fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(2, 5, figure=fig, hspace=0.15, wspace=0.15)
-    fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
+    new_dict = {}
+    matched_keys = set()
+    for orig_key, display_name in title_map.items():
+        found = False
+        for k in data_dict:
+            if (strict_match and k == orig_key) or (not strict_match and orig_key in k):
+                new_dict[display_name] = data_dict[k]
+                matched_keys.add(orig_key)
+                found = True
+                break
+        if not found:
+            raise KeyError(f"No match found for key: {orig_key}")
+    return new_dict
 
-    # ---- 统一 x 轴刻度 ----
-    x_data = df2.index
-    x_min, x_max = x_data.min(), x_data.max()
-    # x_middle = x_data[int(len(x_data) // 2)]
-    # tick_positions = [x_min, x_middle, x_max]
-
-    tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
-    tick_positions = [year for year in tick_positions if year in x_data]
-
-    # ---- 统一 y 轴范围（根据全部10列）----
-    bio_y = np.concatenate([df2.iloc[:, i].values for i in range(10)])
-    bio_ymax = np.nanmax(bio_y)
-    y0, y1 = 0.0, float(bio_ymax) * (1.0 + top_space_ratio)
-
-    # 也可用你自己的 get_y_axis_ticks：
-    # y_min, y_max, ticks = get_y_axis_ticks(0, np.nanmax(bio_y), desired_ticks=desired_ticks)
-
-    def _int_fmt(x, pos):
-        return f"{int(x)}"
-    int_formatter = FuncFormatter(_int_fmt)
-
-    axes = []
-    for i in range(10):
-        row, col = divmod(i, 5)
-        ax = fig.add_subplot(gs[row, col])
-        df_input = df2.iloc[:, i].to_frame()
-
-        # 你的拟合画线函数（外部提供）
-        draw_fit_line_ax(
-            ax,
-            df_input,
-            color=color,
-            title_name=title_map.get(df2.columns[i], df2.columns[i]),
-            ci=ci
-        )
-
-        # y 轴范围与刻度
-        ax.set_ylim(y0, y1)
-        ax.yaxis.set_major_locator(MaxNLocator(nbins=desired_ticks, integer=True))
-        ax.yaxis.set_major_formatter(int_formatter)
-
-        # x 轴刻度
-        ax.set_xticks(tick_positions)
-        ax.tick_params(axis='x')
-
-        # 非首列不显示 y 轴刻度文本
-        if col != 0:
-            ax.tick_params(axis='y', labelleft=False)
-        if row != 1:
-            ax.tick_params(axis='x', labelbottom=False)
-
-        # if row == 1 and col == 0:
-        #     ytlabs = ax.get_yticklabels()
-        #     if ytlabs:
-        #         ytlabs[0].set_visible(False)
-        # if row == 1 and col > 0:
-        #     xtlabs = ax.get_xticklabels()
-        #     if xtlabs:
-        #         xtlabs[0].set_visible(False)
-
-        axes.append(ax)
-
-    # y 轴标签放在第一个子图上，并上移
-    axes[0].set_ylabel(ylabel)
-    axes[0].yaxis.set_label_coords(-0.19, -0.03)
-
-    # legend：默认只在第一个子图里放，避免重复
-    if legend_on_first_ax:
-        line_handle = mlines.Line2D([], [], color=color, linewidth=2, label=legend_label_line)
-        if ci is not None and ci > 0:
-            shade_handle = Patch(color=color, alpha=0.25, label=legend_label_shade)
-            axes[0].legend(handles=[line_handle, shade_handle], loc=legend_loc, frameon=False)
-        else:
-            axes[0].legend(handles=[line_handle], loc=legend_loc, frameon=False)
-
-    plt.savefig(output_path, dpi=300)
-    plt.show()
-    return fig, axes
 
 def draw_22_price(
-    df,
-    title_map,
-    output_path,
-    desired_ticks=5,
-    y_label="Shadow carbon price",
-    figsize=(36, 40),
-    ci=95,
+        df_long,
+        title_map,
+        output_path,
+        start_year,
+        desired_ticks=5,
+        y_label="Shadow carbon price",
+        figsize=(36, 40),
+        ci=95,
 ):
+    """
+    绘制22个价格趋势图（5行5列布局，前3个空位）
+
+    参数:
+    df_long: 长格式DataFrame，包含列 ['scenario', 'Year', 'data']
+    title_map: dict，key为scenario名称，value为显示标题
+    output_path: 输出路径
+    start_year: 起始年份，只使用大于此年份的数据
+    desired_ticks: y轴刻度数量
+    y_label: y轴标签
+    figsize: 图形尺寸
+    ci: 置信区间
+    """
+    # 筛选年份
+    df_filtered = df_long[df_long['Year'] > start_year].copy()
+
+    # 按照title_map的顺序获取scenario列表
+    scenario_list = list(title_map.keys())
+
+    # 将长格式转换为宽格式，保持scenario顺序
+    df_pivot = df_filtered.pivot(index='Year', columns='scenario', values='data')
+    df = df_pivot[scenario_list]  # 按照title_map顺序重新排列列
+
     fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.15, wspace=0.15)
     fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
@@ -1300,30 +1503,27 @@ def draw_22_price(
     # ------ x轴刻度（所有数据统一） ------
     x_data = df.index
     x_min, x_max = x_data.min(), x_data.max()
-    # x_middle = x_data[int(len(x_data) // 2)]
-    # tick_positions = [x_min, x_middle, x_max]
-
-
     tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
     tick_positions = [year for year in tick_positions if year in x_data]
 
     # ------ Carbon图（第一行前两个） ------
     carbon_y = np.concatenate([df.iloc[:, i].values for i in range(2)])
     y_carbon_all = get_y_axis_ticks(0, np.nanmax(carbon_y), desired_ticks=desired_ticks)
+
     ax_list = []
     for i in range(2):
         ax = fig.add_subplot(gs[0, i])
         df_input = df.iloc[:, i].to_frame()
-        draw_fit_line_ax(
-            ax, df_input, color='black', title_name=title_map.get(df.columns[i]),ci=ci
-        )
+        scenario_name = df.columns[i]
+        display_title = title_map.get(scenario_name, scenario_name)
 
-        ax.set_ylim(y_carbon_all[0],y_carbon_all[1])
+        draw_fit_line_ax(
+            ax, df_input, color='black', title_name=display_title, ci=ci
+        )
+        ax.set_ylim(y_carbon_all[0], y_carbon_all[1])
         ax.set_yticks(y_carbon_all[2])
         ax.set_xticks(tick_positions)
         ax.tick_params(axis='x', labelbottom=False)
-        # if i != 0:
-        #     ax.tick_params(axis='y', labelleft=False)
         ax_list.append(ax)
 
     # ------ carbon price图（第2,3,4行） ------
@@ -1342,8 +1542,11 @@ def draw_22_price(
         row, col = (i - 2) // 5 + 1, (i - 2) % 5
         ax = fig.add_subplot(gs[row, col])
         df_input = df.iloc[:, i].to_frame()
+        scenario_name = df.columns[i]
+        display_title = title_map.get(scenario_name, scenario_name)
+
         draw_fit_line_ax(
-            ax, df_input, color='orange', title_name=title_map.get(df.columns[i]), ci=ci)
+            ax, df_input, color='orange', title_name=display_title, ci=ci)
         ax.set_ylim(y_bio_all[0], y_bio_all[1])
         ax.set_yticks(y_bio_all[2])
         ax.set_xticks(tick_positions)
@@ -1355,44 +1558,150 @@ def draw_22_price(
         row, col = (i - 2) // 5 + 1, (i - 2) % 5
         ax = fig.add_subplot(gs[row, col])
         df_input = df.iloc[:, i].to_frame()
+        scenario_name = df.columns[i]
+        display_title = title_map.get(scenario_name, scenario_name)
+
         draw_fit_line_ax(
-            ax, df_input, color='purple', title_name=title_map.get(df.columns[i]), ci=ci)
+            ax, df_input, color='purple', title_name=display_title, ci=ci)
         ax.set_ylim(y_bio_all[0], y_bio_all[1])  # 用统一的 y_bio_all
         ax.set_yticks(y_bio_all[2])
         ax.set_xticks(tick_positions)
-
         if row == 4:
             ax.tick_params(axis='x', labelbottom=True)
         else:
             ax.tick_params(axis='x', labelbottom=False)
-
         ax_list.append(ax)
 
     ax_list[0].set_ylabel(y_label)
     ax_list[0].yaxis.set_label_coords(-0.19, -1.8)
 
+    # 保存图形
+    if not os.path.exists(os.path.dirname(output_path)):
+        os.makedirs(os.path.dirname(output_path))
+    fig.savefig(output_path, dpi=300)
+    fig.show()
+    print(f"✅ Saved to {output_path}")
 
-    # ------ 图例 ------
-    if draw_legend:
-        # 定义legend句柄
-        handle_carbon = mlines.Line2D([], [], color='black', linewidth=2, label="Net-zero targets")
-        handle_bio12 = mlines.Line2D([], [], color='orange', linewidth=2, label="Net-zero targets and nature-positive targets")
-        handle_bio10 = mlines.Line2D([], [], color='purple', linewidth=2, label="Nature-positive targets")
 
-        shade_carbon = Patch(color='black', alpha=0.25, label="95% CI")
-        shade_bio12 = Patch(color='orange', alpha=0.25, label="95% CI")
-        shade_bio10 = Patch(color='purple', alpha=0.25, label="95% CI")
+def draw_10_price(
+        df_long,
+        title_map,
+        color,
+        output_path,
+        start_year,
+        desired_ticks=4,
+        ylabel=r"Carbon price for GHG and biodiversity (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
+        figsize=(24, 10),
+        legend_label_line="Nature-positive targets",
+        legend_label_shade="95% CI",
+        legend_loc="best",
+        legend_on_first_ax=True,
+        ylabel_pos=(-0.3, -0.2),  # (x, y) in axes coords
+        top_space_ratio=0.20,  # y 轴顶部额外空间比例
+        ci=95,
+):
+    """
+    画两行共 10 张子图，每张做拟合并统一坐标与格式。
 
-        handles = [handle_carbon, shade_carbon, handle_bio12, shade_bio12, handle_bio10, shade_bio10]
+    参数:
+    df_long: 长格式DataFrame，包含列 ['scenario', 'Year', 'data']
+    title_map: dict，key为scenario名称，value为显示标题
+    color: 线条颜色
+    output_path: 输出路径
+    start_year: 起始年份，只使用大于此年份的数据
+    desired_ticks: y轴刻度数量
+    ylabel: y轴标签
+    figsize: 图形尺寸
+    legend_label_line: 图例线条标签
+    legend_label_shade: 图例阴影标签
+    legend_loc: 图例位置
+    legend_on_first_ax: 是否只在第一个子图显示图例
+    ylabel_pos: y轴标签位置
+    top_space_ratio: y轴顶部额外空间比例
+    ci: 置信区间
+    """
+    # 筛选年份
+    df_filtered = df_long[df_long['Year'] > start_year].copy()
 
-        fig.legend(
-            handles=handles,
-            loc='upper center',  # 可选: 'lower center', 'upper left', etc.
-            bbox_to_anchor=(0.6, 0.95),  # (x, y)，1.04可以让图例在图像上方
-            ncol=1,  # 每行3个图例（你有3组）
-            frameon=False
+    # 按照title_map的顺序获取scenario列表
+    scenario_list = list(title_map.keys())
+
+    # 将长格式转换为宽格式，保持scenario顺序
+    df_pivot = df_filtered.pivot(index='Year', columns='scenario', values='data')
+    df2 = df_pivot[scenario_list]  # 按照title_map顺序重新排列列
+
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(2, 5, figure=fig, hspace=0.15, wspace=0.15)
+    fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
+
+    # ---- 统一 x 轴刻度 ----
+    x_data = df2.index
+    x_min, x_max = x_data.min(), x_data.max()
+    tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+    tick_positions = [year for year in tick_positions if year in x_data]
+
+    # ---- 统一 y 轴范围（根据全部10列）----
+    bio_y = np.concatenate([df2.iloc[:, i].values for i in range(10)])
+    bio_ymax = np.nanmax(bio_y)
+    y0, y1 = 0.0, float(bio_ymax) * (1.0 + top_space_ratio)
+
+    def _int_fmt(x, pos):
+        return f"{int(x)}"
+
+    int_formatter = FuncFormatter(_int_fmt)
+
+    axes = []
+    for i in range(10):
+        row, col = divmod(i, 5)
+        ax = fig.add_subplot(gs[row, col])
+        df_input = df2.iloc[:, i].to_frame()
+        scenario_name = df2.columns[i]
+        display_title = title_map.get(scenario_name, scenario_name)
+
+        # 你的拟合画线函数（外部提供）
+        draw_fit_line_ax(
+            ax,
+            df_input,
+            color=color,
+            title_name=display_title,
+            ci=ci
         )
 
+        # y 轴范围与刻度
+        ax.set_ylim(y0, y1)
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=desired_ticks, integer=True))
+        ax.yaxis.set_major_formatter(int_formatter)
+
+        # x 轴刻度
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x')
+
+        # 非首列不显示 y 轴刻度文本
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+        if row != 1:
+            ax.tick_params(axis='x', labelbottom=False)
+
+        axes.append(ax)
+
+    # y 轴标签放在第一个子图上，并上移
+    axes[0].set_ylabel(ylabel)
+    axes[0].yaxis.set_label_coords(-0.19, -0.03)
+
+    # legend：默认只在第一个子图里放，避免重复
+    if legend_on_first_ax:
+        line_handle = mlines.Line2D([], [], color=color, linewidth=2, label=legend_label_line)
+        if ci is not None and ci > 0:
+            shade_handle = Patch(color=color, alpha=0.25, label=legend_label_shade)
+            axes[0].legend(handles=[line_handle, shade_handle], loc=legend_loc, frameon=False)
+        else:
+            axes[0].legend(handles=[line_handle], loc=legend_loc, frameon=False)
+
+    # 保存图形
+    if not os.path.exists(os.path.dirname(output_path)):
+        os.makedirs(os.path.dirname(output_path))
     plt.savefig(output_path, dpi=300)
     plt.show()
-    plt.close(fig)
+    print(f"✅ Saved to {output_path}")
+
+    return fig, axes

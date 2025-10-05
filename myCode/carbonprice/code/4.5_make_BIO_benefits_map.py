@@ -86,7 +86,7 @@ legend_nbins = 3
 set_plot_style(font_size=15, font_family='Arial')
 
 # 参照/掩膜对齐（仅一次）
-ref_tif = f"{arr_path}/carbon_high/xr_total_cost_carbon_high_2050.tif"
+ref_tif = f"{arr_path}/carbon_high_50/xr_total_cost_carbon_high_50_2050.tif"
 src_tif = f"../Map/public_area.tif"
 aligned_tif = f"../Map/public_area_aligned.tif"
 align_raster_to_reference(src_tif, ref_tif, aligned_tif, resampling="nearest")

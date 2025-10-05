@@ -670,6 +670,10 @@ def add_annotation(fig, x, y, width=None, height=None, text="",
 
     if anchor == "center":
         if style == "box":
+            fig_width_inch, fig_height_inch = fig.get_size_inches()
+            aspect_ratio = fig_height_inch / fig_width_inch
+            height = width * aspect_ratio
+
             x0, y0 = x - width / 2, y - height / 2
             overlay.add_patch(patches.Rectangle(
                 (x0, y0), width, height,
@@ -691,6 +695,10 @@ def add_annotation(fig, x, y, width=None, height=None, text="",
 
     else:  # 左下角锚点
         if style == "box":
+            fig_width_inch, fig_height_inch = fig.get_size_inches()
+            aspect_ratio = fig_height_inch / fig_width_inch
+            height = width * aspect_ratio
+
             overlay.add_patch(patches.Rectangle(
                 (x, y), width, height,
                 facecolor=facecolor,

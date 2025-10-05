@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import time
+import socket
 
 from tqdm.auto import tqdm
 from typing import Literal
@@ -76,8 +77,10 @@ def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI'
         script_name = 'python_write_script.py'
     elif model_name == 'Report':
         script_name = 'python_report_script.py'
+    elif model_name == 'Zip':
+        script_name = 'python_zip_script.py'
     else:
-        raise ValueError('model_name must be either "Run" or "Write"!')
+        raise ValueError('model_name must be either "Run", "Write", "Report", or "Zip"!')
     shutil.copyfile(f'bash_scripts/{script_name}', f'{task_root_dir}/{col}/{script_name}')
     if platform == 'NCI':
         shutil.copyfile('bash_scripts/task_cmd.sh', f'{task_root_dir}/{col}/task_cmd.sh')
@@ -239,13 +242,13 @@ def check_platform_system(platform):
     """
     检查运行模式与操作系统是否匹配，不匹配则报错退出
     """
-    sys_type = os.name  # 'posix' (Linux/macOS), 'nt' (Windows)
-    if platform == 'Denethor' and sys_type != 'nt':
-        raise RuntimeError("Denethor just run on Windows, please switch to Windows or change platform to 'NCI' or 'HPC'.")
-    if platform == 'NCI' and sys_type != 'posix':
-        raise RuntimeError("NCI just run on Linux, please switch to Linux or change platform to 'Denethor'.")
-    if platform == 'HPC' and sys_type != 'posix':
-        raise RuntimeError("HPC just run on Linux, please switch to Linux or change platform to 'Denethor'.")
+    if platform not in ['Denethor', 'NCI','HPC']:
+        raise ValueError('Platform must be one of "Denethor", "NCI", or "HPC"!')
+
+    hostname = socket.gethostname()
+    if platform.lower() not in hostname.lower():
+        raise EnvironmentError(f"Platform '{platform}' does not match the current system hostname '{hostname}'. Please check your configuration.")
+
 
 def create_task_runs(
     task_root_dir:str,
@@ -254,19 +257,18 @@ def create_task_runs(
     n_workers:int=4,
     max_concurrent_tasks:int=300,
     use_parallel:bool=True,
-    model_name:Literal['Run','Write','Report']='Run'
+    model_name:Literal['Run','Write','Report','Zip']='Run'
 ) -> None:
     check_platform_system(platform)
     if platform == 'NCI':
         calculate_total_cost(custom_settings)
-    if platform not in ['Denethor', 'NCI','HPC']:
-        raise ValueError('Platform must be one of "Denethor", "NCI", or "HPC"!')
 
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
     custom_settings = custom_settings.set_index('Name') if 'Name' in custom_settings.columns else custom_settings
     # Replace TRUE/FALSE (Excel) with True/False (Python)
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
+    custom_settings = update_input_path(custom_settings)
     # Check if there are any custom settings
     if custom_settings.columns.size == 0:
         raise ValueError('No custom settings found in the settings_template.csv file!')
@@ -328,6 +330,7 @@ def update_settings(settings_dict: pd.DataFrame,job_name) -> pd.DataFrame:
     settings_dict['JOB_NAME'] = job_name
 
     return settings_dict
+
 
 
 def create_run_folders(task_root_dir:str, col:str, n_workers:int):
@@ -538,7 +541,20 @@ def create_grid_search_template(grid_dict, settings_name_dict=None, use_date=Fal
 
     return template_grid_search
 
+def update_input_path(df):
+    # 修改 INPUT_DIR 全行
+    new_input_dir = os.path.abspath("../../input").replace('\\', '/')
+    df.loc['INPUT_DIR', :] = new_input_dir
 
+    df.loc['RAW_DATA', :] = os.path.abspath("../../raw_data").replace('\\', '/')
 
+    # 修改 NO_GO_VECTORS 全行
+    new_no_go_vectors = {
+        'Winter cereals': f"{new_input_dir}/no_go_areas/no_go_Winter_cereals.shp",
+        'Environmental Plantings': f"{new_input_dir}/no_go_areas/no_go_Enviornmental_Plantings.shp"
+    }
+    df.loc['NO_GO_VECTORS', :] = [new_no_go_vectors] * df.shape[1]  # 每列都赋值同一个 dict
+
+    return df
 
 

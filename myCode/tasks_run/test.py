@@ -39,16 +39,16 @@ def clean_and_recompress(root_path, archive_root=True):
 def find_missing_reports_by_col(path):
     # 读取csv列名
     csv_path = os.path.join(path, "grid_search_template.csv")
-    df = pd.read_csv(csv_path)
+    df = pd.read_csv(csv_path,index_col=0)
     col_names = df.columns.tolist()
 
     missing_cols = []
     for col_name in col_names:
         new_path = os.path.join(path, str(col_name))
-        zip_path = os.path.join(new_path, "DATA_REPORT.zip")
+        zip_path = os.path.join(new_path, "Run_Archive.zip")
         if not os.path.exists(zip_path):
             missing_cols.append(col_name)
     return missing_cols
 
-path = "../../output/20251002_Cost_curve_task"
+path = "../../output/20251003_Paper2_Results_test"
 print(find_missing_reports_by_col(path))

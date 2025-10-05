@@ -6,6 +6,10 @@ from filelock import FileLock, Timeout
 import numpy as np
 import rasterio
 import os
+import zipfile
+from io import BytesIO
+import dill
+import gzip
 
 import tools.config as config
 
@@ -312,23 +316,17 @@ def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0):
 
     print(f"✅ 已保存: {tif_path}")
 
-def get_data_RES_path(output_path="output"):
-    """
-    获取 output 文件夹下第一个子文件夹的路径，并拼接文件名 'data_with_solution.pkl'。
-
-    参数:
-        output_path (str): output 文件夹路径，默认为 "output"。
-
-    返回:
-        str: 拼接后的 pkl 文件路径。如果没有子文件夹，返回 None。
-    """
-    # 获取所有子文件夹
-    # subfolders = [f for f in os.listdir(output_path) if os.path.isdir(os.path.join(output_path, f))]
-    subfolders = [f for f in os.listdir(output_path) if
-                  os.path.isdir(os.path.join(output_path, f)) and '2010-2050' in f]
-
-    pattern = os.path.join(os.path.join(output_path, subfolders[0]), "Data_RES*.gz")
-    found_file = glob.glob(pattern)[0]
-
-    # return os.path.join(output_path, subfolders[0], 'data_with_solution.pkl')
-    return found_file
+def get_data_RES(output_path="output"):
+    zip_path = os.path.join(output_path, 'Run_Archive.zip')
+    if not os.path.isfile(zip_path):
+        raise FileNotFoundError(f"未找到指定的 zip 文件: {zip_path}")
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        matches = [name for name in zf.namelist() if glob.fnmatch.fnmatch(os.path.basename(name), "Data_RES*.gz")]
+        if not matches:
+            raise FileNotFoundError("在 zip 文件中未找到匹配 'Data_RES*.gz' 的文件。")
+        # 读取 zip 内部 gz 文件内容为 bytes
+        gz_bytes = zf.read(matches[0])
+        # 用 BytesIO 包装后用 gzip.open 读取内容
+        with gzip.open(BytesIO(gz_bytes), 'rb') as f:
+            data = dill.load(f)
+        return data

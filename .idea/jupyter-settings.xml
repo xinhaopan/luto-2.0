@@ -7,7 +7,7 @@
           <value>
             <JupyterConnectionParameters>
               <option name="managed" value="true" />
-              <option name="sdkName" value="Remote Python 3.12.11 (sftp://xp7241@gadi.nci.org.au:22/home/582/xp7241/apps/miniforge3/envs/xpluto/bin/python)" />
+              <option name="sdkName" value="" />
             </JupyterConnectionParameters>
           </value>
         </entry>

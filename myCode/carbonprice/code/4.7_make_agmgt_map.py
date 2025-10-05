@@ -58,7 +58,7 @@ legend_nbins = 3
 # 统一样式
 set_plot_style(font_size=15, font_family='Arial')
 
-scenarios = ["Run_18_GHG_off_BIO_off_CUT_50", "Run_06_GHG_high_BIO_off_CUT_50", "Run_01_GHG_high_BIO_high_CUT_50"]
+scenarios = ["Run_25_GHG_off_BIO_off_CUT_50", "Run_06_GHG_high_BIO_off_CUT_50", "Run_01_GHG_high_BIO_high_CUT_50"]
 title_names = ['Reference', r'$\mathrm{NZ}_{\mathrm{high}}$',
                r'$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$']
 tif_title_list = ["Biochar", "Asparagopsis taxiformis", "Savanna burning", "Precision agriculture", "AgTech EI", "HIR - Beef", "HIR - Sheep"]

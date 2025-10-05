@@ -102,7 +102,7 @@ cost_cmap = LinearSegmentedColormap.from_list("cost", ["#FFFEC2", "#FA4F00", "#A
 # )
 # ==== 场景配置 ====
 scenarios = {
-    "carbon_high": {},
+    "carbon_high_50": {},
     "carbon_high_bio_50": {},
     "Counterfactual_carbon_high_bio_50": {}
 }
