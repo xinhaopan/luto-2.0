@@ -1261,28 +1261,28 @@ class Data:
         
   
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
-        if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
+        # if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
 
-            # Get the mask of 'priority degraded areas' for habitat conservation
-            conservation_performance_curve = pd.read_excel(
-                os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), 
-                sheet_name=performance_sheet
-            ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
-            
-            self.BIO_GBF2_MASK = bio_quality_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
-            self.BIO_GBF2_MASK_LDS = np.where(
-                self.SAVBURN_ELIGIBLE,
-                self.BIO_GBF2_MASK  - (self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS)),
-                self.BIO_GBF2_MASK
-            )
-            
-            self.BIO_GBF2_BASE_YR = np.einsum(
-                'j,mrj,r,r->r',
-                np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
-                self.AG_L_MRJ,      # lumap in proportion representation if resfactored
-                self.BIO_GBF2_MASK,
-                self.REAL_AREA
-            ) - (self.SAVBURN_ELIGIBLE * self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS) * self.REAL_AREA)
+        # Get the mask of 'priority degraded areas' for habitat conservation
+        conservation_performance_curve = pd.read_excel(
+            os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'),
+            sheet_name=performance_sheet
+        ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+
+        self.BIO_GBF2_MASK = bio_quality_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
+        self.BIO_GBF2_MASK_LDS = np.where(
+            self.SAVBURN_ELIGIBLE,
+            self.BIO_GBF2_MASK  - (self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS)),
+            self.BIO_GBF2_MASK
+        )
+
+        self.BIO_GBF2_BASE_YR = np.einsum(
+            'j,mrj,r,r->r',
+            np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
+            self.AG_L_MRJ,      # lumap in proportion representation if resfactored
+            self.BIO_GBF2_MASK,
+            self.REAL_AREA
+        ) - (self.SAVBURN_ELIGIBLE * self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS) * self.REAL_AREA)
               
         
         ###############################################################

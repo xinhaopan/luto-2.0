@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['Run_task_test'],
+    'TASK_NAME': ['Run_task_test1'],
     'KEEP_OUTPUTS': [False],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
@@ -50,6 +50,17 @@ grid_search = {
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
     'DYNAMIC_PRICE': [True],
+
+    "AG_MANAGEMENTS": [{
+        'Asparagopsis taxiformis': True,
+        'Precision Agriculture': True,
+        'Ecological Grazing': False,
+        'Savanna Burning': True,
+        'AgTech EI': True,
+        'Biochar': True,
+        'HIR - Beef': True,
+        'HIR - Sheep': True,
+    }],
 }
 settings_name_dict = {
     'GHG_EMISSIONS_LIMITS':'GHG',
