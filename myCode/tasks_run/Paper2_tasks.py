@@ -4,10 +4,10 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20251003_Paper2_Results'],
-    'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
+    'TASK_NAME': ['20251009_Paper2_Results'],
+    'KEEP_OUTPUTS': [False],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [2],
+    'NUMERIC_FOCUS': [3],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['60GB'],
     'NCPUS': ['15'],
@@ -51,6 +51,7 @@ grid_search = {
     'WATER_REGION_DEF': ['Drainage Division'],
     'WATER_CLIMATE_CHANGE_IMPACT': ['on'],
     # ----------------------------------- Demand settings --------------------------------
+    'DYNAMIC_PRICE': [True],
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
     #----------------------------------- other settings --------------------------------
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],

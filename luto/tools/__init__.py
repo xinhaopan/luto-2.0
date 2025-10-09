@@ -52,13 +52,13 @@ def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
         
-    with open(timestamp_path, 'w') as f: f.write(timestamp)
+    with open(timestamp_path, 'w', encoding='utf-8') as f: f.write(timestamp)
     return timestamp
 
 def read_timestamp():
     timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
     if os.path.exists(timestamp_path):
-        with open(timestamp_path, 'r') as f: timestamp = f.read()
+        with open(timestamp_path, 'r', encoding='utf-8') as f: timestamp = f.read()
     else:
         raise FileNotFoundError(f"Timestamp file not found at {timestamp_path}")
     return timestamp
@@ -561,7 +561,7 @@ class LogToFile:
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            with open(self.log_path_stdout, self.mode) as file_stdout, open(self.log_path_stderr, self.mode) as file_stderr:
+            with open(self.log_path_stdout, self.mode, encoding='utf-8') as file_stdout, open(self.log_path_stderr, self.mode) as file_stderr:
                 original_stdout = sys.stdout
                 original_stderr = sys.stderr
                 try:
@@ -614,7 +614,7 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
         interval (int): The interval in seconds to log the memory usage.
     '''
     
-    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode, encoding='utf-8') as file:
         while not stop_event.is_set():
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             process = psutil.Process(os.getpid())
