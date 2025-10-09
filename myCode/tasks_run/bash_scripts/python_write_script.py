@@ -1,12 +1,10 @@
-import dill
-import gzip
 import os
 import time
 from datetime import datetime
 import glob
 from luto.tools.write import write_outputs
 import luto.settings as settings
-import traceback
+import joblib
 import shutil, zipfile
 
 def print_with_time(message):
@@ -30,7 +28,7 @@ def get_first_subfolder_name(output_path="output"):
                       os.path.isdir(os.path.join(output_path, f)) and '2010-2050' in f]
         html_path = os.path.join(output_path, subfolders[0],"DATA_REPORT","data","map_layers","map_water_yield_NonAg.js")
 
-        pattern = os.path.join(os.path.join(output_path, subfolders[0]), "Data_RES*.gz")
+        pattern = os.path.join(os.path.join(output_path, subfolders[0]), "Data_RES*.lz4")
         found_file = glob.glob(pattern)[0]
 
         if not subfolders:
@@ -53,7 +51,6 @@ def get_first_subfolder_name(output_path="output"):
 
 # 调用函数并加载数据
 pkl_path = get_first_subfolder_name("output")
-# pkl_path = 'output/2025_03_30__20_17_18_RF15_2010-2050_snapshot/data_with_solution.gz'
 print_with_time(f"PKL file path: {pkl_path}")
 if not pkl_path or not os.path.exists(pkl_path):
     time.sleep(60)
@@ -65,11 +62,7 @@ else:
     # 如果文件存在，则加载并处理数据
     print_with_time(f"{pkl_path} Loading...")
 
-    with gzip.open(pkl_path, 'rb') as f:
-        data = dill.load(f)
-
-    # Update the timestamp
-    # data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
+    data = joblib.load(pkl_path)
 
     print_with_time("Writing outputs...")
     write_outputs(data)

@@ -5,6 +5,8 @@ import time
 from datetime import datetime
 import glob
 import shutil
+import joblib
+
 from luto import tools
 from luto.data import Data
 from luto import settings
@@ -32,7 +34,7 @@ def get_first_subfolder_name(output_path="output"):
                       os.path.isdir(os.path.join(output_path, f)) and '2010-2050' in f]
         html_path = os.path.join(output_path, subfolders[0],"DATA_REPORT","data","map_layers","map_water_yield_NonAg.js")
 
-        pattern = os.path.join(os.path.join(output_path, subfolders[0]), "Data_RES*.gz")
+        pattern = os.path.join(os.path.join(output_path, subfolders[0]), "Data_RES*.lz4")
         found_file = glob.glob(pattern)[0]
 
         if not subfolders:
@@ -89,8 +91,7 @@ else:
     # 如果文件存在，则加载并处理数据
     print_with_time(f"{pkl_path} Loading...")
 
-    with gzip.open(pkl_path, 'rb') as f:
-        data = dill.load(f)
+    data=joblib.load(pkl_path)
 
     # Update the timestamp
     # data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')

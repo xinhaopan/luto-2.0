@@ -7,6 +7,7 @@ import glob
 import shutil
 from luto.data import Data
 import zipfile
+import joblib
 
 
 def print_with_time(message):
@@ -28,7 +29,7 @@ def get_first_subfolder_name(output_path="output"):
         # subfolders = [f for f in os.listdir(output_path) if os.path.isdir(os.path.join(output_path, f))]
         subfolders = [f for f in os.listdir(output_path) if
                       os.path.isdir(os.path.join(output_path, f)) and '2010-2050' in f]
-        pattern = os.path.join(os.path.join(output_path, subfolders[0]), "Data_RES*.gz")
+        pattern = os.path.join(os.path.join(output_path, subfolders[0]), "Data_RES*.lz4")
         found_file = glob.glob(pattern)[0]
 
         if not subfolders:
@@ -83,8 +84,7 @@ else:
     # 如果文件存在，则加载并处理数据
     print_with_time(f"{pkl_path} Loading...")
 
-    with gzip.open(pkl_path, 'rb') as f:
-        data = dill.load(f)
+    data = joblib.load(pkl_path)
 
     # Update the timestamp
     # data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')

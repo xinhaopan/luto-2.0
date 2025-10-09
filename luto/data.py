@@ -43,6 +43,8 @@ from math import ceil
 from dataclasses import dataclass
 from scipy.ndimage import distance_transform_edt
 
+import time
+
 
 
 def dict2matrix(d, fromlist, tolist):
@@ -747,45 +749,109 @@ class Data:
         fr_dict = {"low": "FD_RISK_PERC_5TH", "med": "FD_RISK_MEDIAN", "high": "FD_RISK_PERC_95TH"}
         fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]
 
-        # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        self.EP_BLOCK_AVG_T_CO2_HA = (
-            (ds.EP_BLOCK_TREES_TOT_T_CO2_HA + ds.EP_BLOCK_DEBRIS_TOT_T_CO2_HA)
-            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-            + ds.EP_BLOCK_SOIL_TOT_T_CO2_HA
-        ).values / settings.CARBON_EFFECTS_WINDOW
+        def load_and_process_netcdf(filename, mask, fire_risk, risk_of_reversal, carbon_effects_window,
+                                    tree_var, debris_var, soil_var):
+            """
+            通用函数：
+            1. 读取 NetCDF 文件到内存；
+            2. 应用筛选和碳折减；
+            3. 返回平均每年 tCO2/ha；
+            4. 自动关闭并释放内存。
+            """
+            path = os.path.join(settings.INPUT_DIR, filename)
+            print(f"\tLoading {filename}...", flush=True)
 
-        # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        self.EP_BELT_AVG_T_CO2_HA = (
-            (ds.EP_BELT_TREES_T_CO2_HA + ds.EP_BELT_DEBRIS_T_CO2_HA)
-            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-            + ds.EP_BELT_SOIL_T_CO2_HA
-        ).values / settings.CARBON_EFFECTS_WINDOW
+            # 打开并立即加载进内存
+            ds = xr.open_dataset(path).load()
 
-        # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        self.EP_RIP_AVG_T_CO2_HA = (
-            (ds.EP_RIP_TREES_T_CO2_HA + ds.EP_RIP_DEBRIS_T_CO2_HA)
-            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-            + ds.EP_RIP_SOIL_T_CO2_HA
-        ).values / settings.CARBON_EFFECTS_WINDOW
+            # 提取指定年龄和掩码
+            ds_age = ds.sel(age=settings.CARBON_EFFECTS_WINDOW)
+            ds_masked = ds_age.sel(cell=mask)
 
-        # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        self.CP_BLOCK_AVG_T_CO2_HA = (
-            (ds.CP_BLOCK_TREES_T_CO2_HA + ds.CP_BLOCK_DEBRIS_T_CO2_HA)
-            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-            + ds.CP_BLOCK_SOIL_T_CO2_HA
-        ).values / settings.CARBON_EFFECTS_WINDOW
+            # 计算折减后的碳储量
+            arr = (
+                          (ds_masked[tree_var] + ds_masked[debris_var])
+                          * (fire_risk / 100)
+                          * (1 - risk_of_reversal)
+                          + ds_masked[soil_var]
+                  ).values / carbon_effects_window
 
-        # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        self.CP_BELT_AVG_T_CO2_HA = (
-            (ds.CP_BELT_TREES_T_CO2_HA + ds.CP_BELT_DEBRIS_T_CO2_HA)
-            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-            + ds.CP_BELT_SOIL_T_CO2_HA
-        ).values / settings.CARBON_EFFECTS_WINDOW
+            # 关闭数据集并释放内存
+            ds.close()
+            del ds, ds_age, ds_masked
+
+            return arr.astype(np.float32)
+
+        self.EP_BLOCK_AVG_T_CO2_HA = load_and_process_netcdf(
+            "tCO2_ha_ep_block.nc", self.MASK, fire_risk,
+            settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
+            "EP_BLOCK_TREES_TOT_T_CO2_HA", "EP_BLOCK_DEBRIS_TOT_T_CO2_HA", "EP_BLOCK_SOIL_TOT_T_CO2_HA"
+        )
+
+        self.EP_BELT_AVG_T_CO2_HA = load_and_process_netcdf(
+            "tCO2_ha_ep_belt.nc", self.MASK, fire_risk,
+            settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
+            "EP_BELT_TREES_T_CO2_HA", "EP_BELT_DEBRIS_T_CO2_HA", "EP_BELT_SOIL_T_CO2_HA"
+        )
+
+        self.EP_RIP_AVG_T_CO2_HA = load_and_process_netcdf(
+            "tCO2_ha_ep_rip.nc", self.MASK, fire_risk,
+            settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
+            "EP_RIP_TREES_T_CO2_HA", "EP_RIP_DEBRIS_T_CO2_HA", "EP_RIP_SOIL_T_CO2_HA"
+        )
+
+        self.CP_BLOCK_AVG_T_CO2_HA = load_and_process_netcdf(
+            "tCO2_ha_cp_block.nc", self.MASK, fire_risk,
+            settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
+            "CP_BLOCK_TREES_T_CO2_HA", "CP_BLOCK_DEBRIS_T_CO2_HA", "CP_BLOCK_SOIL_T_CO2_HA"
+        )
+
+        self.CP_BELT_AVG_T_CO2_HA = load_and_process_netcdf(
+            "tCO2_ha_cp_belt.nc", self.MASK, fire_risk,
+            settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
+            "CP_BELT_TREES_T_CO2_HA", "CP_BELT_DEBRIS_T_CO2_HA", "CP_BELT_SOIL_T_CO2_HA"
+        )
+
+
+        # # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
+        # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        # self.EP_BLOCK_AVG_T_CO2_HA = (
+        #     (ds.EP_BLOCK_TREES_TOT_T_CO2_HA + ds.EP_BLOCK_DEBRIS_TOT_T_CO2_HA)
+        #     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+        #     + ds.EP_BLOCK_SOIL_TOT_T_CO2_HA
+        # ).values / settings.CARBON_EFFECTS_WINDOW
+        #
+        # # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
+        # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        # self.EP_BELT_AVG_T_CO2_HA = (
+        #     (ds.EP_BELT_TREES_T_CO2_HA + ds.EP_BELT_DEBRIS_T_CO2_HA)
+        #     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+        #     + ds.EP_BELT_SOIL_T_CO2_HA
+        # ).values / settings.CARBON_EFFECTS_WINDOW
+        #
+        # # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
+        # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        # self.EP_RIP_AVG_T_CO2_HA = (
+        #     (ds.EP_RIP_TREES_T_CO2_HA + ds.EP_RIP_DEBRIS_T_CO2_HA)
+        #     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+        #     + ds.EP_RIP_SOIL_T_CO2_HA
+        # ).values / settings.CARBON_EFFECTS_WINDOW
+        #
+        # # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
+        # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        # self.CP_BLOCK_AVG_T_CO2_HA = (
+        #     (ds.CP_BLOCK_TREES_T_CO2_HA + ds.CP_BLOCK_DEBRIS_T_CO2_HA)
+        #     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+        #     + ds.CP_BLOCK_SOIL_T_CO2_HA
+        # ).values / settings.CARBON_EFFECTS_WINDOW
+        #
+        # # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
+        # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        # self.CP_BELT_AVG_T_CO2_HA = (
+        #     (ds.CP_BELT_TREES_T_CO2_HA + ds.CP_BELT_DEBRIS_T_CO2_HA)
+        #     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+        #     + ds.CP_BELT_SOIL_T_CO2_HA
+        # ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Agricultural land use to plantings raw transition costs:
         self.AG2EP_TRANSITION_COSTS_HA = np.load(
@@ -796,12 +862,12 @@ class Data:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             os.path.join(settings.INPUT_DIR, "ep_to_ag_tmatrix.npy")
         )  # shape: (28,)
-        
-        
+
+
         ##############################################################
         # Transition cost for all land use
         #############################################################
-        
+
         # Transition matrix from ag
         tmat_ag2ag_xr = xr.DataArray(
             self.AG_TMATRIX,
@@ -815,11 +881,11 @@ class Data:
         )
         tmat_from_ag_xr = xr.concat([tmat_ag2ag_xr, tmat_ag2non_ag_xr], dim='to_lu')                        # Combine ag2ag and ag2non-ag
         tmat_from_ag_xr.loc[:,'Destocked - natural land'] = self.AG_TO_DESTOCKED_NATURAL_COSTS_HA           # Ag to Destock-natural has its own values
-        
-        
+
+
         # Transition matrix of non-ag to unallocated-modified land (land clearing)
         tmat_wood_clear = np.load(os.path.join(settings.INPUT_DIR, 'transition_cost_clearing_forest.npz'))
-        
+
         tmat_clear_EP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_RP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_sheep_ag_forest = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.AF_PROPORTION
@@ -829,15 +895,15 @@ class Data:
         tmat_clear_beef_CP = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.CP_BELT_PROPORTION
         tmat_clear_BECCS = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_destocked_nat = tmat_wood_clear['tmat_clear_light_wood'] + tmat_wood_clear['tmat_clear_dense_wood']
-        
+
         tmat_costs = np.array([
             tmat_clear_EP, tmat_clear_RP, tmat_clear_sheep_ag_forest, tmat_clear_beef_ag_forest,
             tmat_clear_CP, tmat_clear_sheep_CP, tmat_clear_beef_CP, tmat_clear_BECCS, tmat_clear_destocked_nat
         ]).T
-        
-        
-        
-        
+
+
+
+
         # Transition matrix from non-ag
         tmat_non_ag2ag_xr = xr.DataArray(
             np.repeat(self.EP2AG_TRANSITION_COSTS_HA.reshape(1,-1), len(self.NON_AGRICULTURAL_LANDUSES), axis=0),
@@ -854,8 +920,8 @@ class Data:
         np.fill_diagonal(tmat_non_ag2non_ag_xr.values, 0)                                                   # Lu staty the same has 0 cost
         tmat_from_non_ag_xr = xr.concat([tmat_non_ag2ag_xr, tmat_non_ag2non_ag_xr], dim='to_lu')            # Combine non-ag2ag and non-ag2non-ag
         tmat_from_non_ag_xr.loc['Destocked - natural land', 'Unallocated - natural land'] = np.nan          # Destocked-natural can not transit to unallow-natural
-        
-   
+
+
         # Get the full transition cost matrix
         self.T_MAT = xr.concat([tmat_from_ag_xr, tmat_from_non_ag_xr], dim='from_lu')
         self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, [self.AGLU2DESC[i] for i in self.LU_NATURAL]] = np.nan       # non-ag2natural is not allowed
@@ -864,8 +930,7 @@ class Data:
 
 
         # tools.plot_t_mat(self.T_MAT)
-        
-        
+
 
         ###############################################################
         # Water data.

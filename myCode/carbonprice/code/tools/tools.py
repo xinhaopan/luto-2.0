@@ -6,11 +6,8 @@ from filelock import FileLock, Timeout
 import numpy as np
 import rasterio
 import os
+import joblib
 import zipfile
-from io import BytesIO
-import dill
-import gzip
-
 import tools.config as config
 
 
@@ -249,72 +246,6 @@ def create_xarray(years, base_path, env_category, env_name, mask=None,
     return ds
 
 
-# def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0):
-#     """
-#     将 xarray DataArray 转换为 GeoTIFF，正确处理 nodata 和掩膜
-#     """
-#     # 仅支持 1D 'cell'
-#     if "cell" not in da.dims or len(da.dims) != 1:
-#         raise ValueError(f"维度是 {da.dims}，只支持一维 'cell'。")
-#
-#     arr1d = da.values.astype(np.float32)
-#
-#     # 创建有效性掩膜（在转换前）
-#     valid_mask_1d = np.isfinite(arr1d)
-#
-#     # 将无效值替换为 nodata
-#     arr1d = np.where(valid_mask_1d, arr1d, nodata_value)
-#
-#     # 铺回 2D
-#     full_res_raw = (arr1d.size == data.LUMAP_NO_RESFACTOR.size)
-#     if full_res_raw:
-#         geo_meta = data.GEO_META_FULLRES.copy()
-#         arr_2d = np.full(data.NLUM_MASK.shape, nodata_value, dtype=np.float32)
-#         valid_mask_2d = np.zeros(data.NLUM_MASK.shape, dtype=bool)
-#         # 只在有效位置填充数据和掩膜
-#         mask_indices = np.where(data.NLUM_MASK)
-#         arr_2d[mask_indices] = arr1d
-#         valid_mask_2d[mask_indices] = valid_mask_1d
-#     else:
-#         geo_meta = data.GEO_META.copy()
-#         arr_2d = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
-#         valid_mask_2d = np.ones_like(arr_2d, dtype=bool)
-#
-#         # 标记掩膜区域为无效
-#         mask_condition = (arr_2d == data.MASK_LU_CODE) | (arr_2d == data.NODATA)
-#         valid_mask_2d[mask_condition] = False
-#         arr_2d[mask_condition] = nodata_value
-#
-#         # 填充有效数据
-#         data_condition = ~mask_condition
-#         data_indices = np.where(data_condition)
-#         arr_2d[data_indices] = arr1d
-#         valid_mask_2d[data_indices] = valid_mask_1d
-#
-#     # 确保所有无效位置都设为 nodata
-#     arr_2d = np.where(valid_mask_2d, arr_2d, nodata_value).astype(np.float32)
-#
-#     # 配置元数据
-#     meta = geo_meta.copy()
-#     meta.update(
-#         count=1,
-#         dtype="float32",
-#         nodata=nodata_value,  # 关键：设置 nodata 值
-#         compress="deflate",
-#         predictor=3,
-#         tiled=True,
-#         blockxsize=256,
-#         blockysize=256,
-#     )
-#
-#     os.makedirs(os.path.dirname(tif_path), exist_ok=True)
-#
-#     with rasterio.open(tif_path, "w", **meta) as dst:
-#         dst.write(arr_2d, 1)
-#         # 写入内部掩膜：255=有效，0=无效
-#         dst.write_mask((valid_mask_2d.astype(np.uint8) * 255))
-#
-#     print(f"✅ 已保存: {tif_path}")
 
 def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0):
     """
@@ -408,12 +339,11 @@ def get_data_RES(output_path="output"):
     if not os.path.isfile(zip_path):
         raise FileNotFoundError(f"未找到指定的 zip 文件: {zip_path}")
     with zipfile.ZipFile(zip_path, "r") as zf:
-        matches = [name for name in zf.namelist() if glob.fnmatch.fnmatch(os.path.basename(name), "Data_RES*.gz")]
+        matches = [name for name in zf.namelist() if glob.fnmatch.fnmatch(os.path.basename(name), "Data_RES*.lz4")]
         if not matches:
-            raise FileNotFoundError("在 zip 文件中未找到匹配 'Data_RES*.gz' 的文件。")
+            raise FileNotFoundError("在 zip 文件中未找到匹配 'Data_RES*.lz4' 的文件。")
         # 读取 zip 内部 gz 文件内容为 bytes
-        gz_bytes = zf.read(matches[0])
-        # 用 BytesIO 包装后用 gzip.open 读取内容
-        with gzip.open(BytesIO(gz_bytes), 'rb') as f:
-            data = dill.load(f)
+        data_path = zf.read(matches[0])
+        # 反序列化成 Python 对象
+        data = joblib.loads(data_path)
         return data
