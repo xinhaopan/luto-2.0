@@ -42,16 +42,16 @@ def plot_tif_grid(tif_title_list, figsize=(10, 10)):
 
 base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
 arr_path = f"{base_dir}/4_tif"
-out_dir = f"{base_dir}/5_map"
+out_dir = f"{base_dir}/3_Paper_figure"
 os.makedirs(out_dir, exist_ok=True)
 # price_cmap = LinearSegmentedColormap.from_list("price", ["#00ffff", "#ff00ff"])
 price_cmap = LinearSegmentedColormap.from_list("price", ["#ffff80", "#38e009","#1a93ab","#0c1078"])
 
 
 layer_overrides = {
-    'ghg_sol_price_carbon_high': {"custom_tick_values": [0,50,100]},
-    'ghg_sol_price_carbon_high_bio_50': {"custom_tick_values": [0,500,1000]},
-    'ghg_sol_price_Counterfactual_carbon_high_bio_50': {"custom_tick_values": [0,500,1000]},
+    # 'carbon_sol_price_carbon_high': {"custom_tick_values": [0,50,100]},
+    # 'carbon_sol_price_carbon_high_bio_50': {"custom_tick_values": [0,1000,2000]},
+    # 'carbon_sol_price_Counterfactual_carbon_high_bio_50': {"custom_tick_values": [0,500,1000]},
 }
 
 legend_nbins = 3

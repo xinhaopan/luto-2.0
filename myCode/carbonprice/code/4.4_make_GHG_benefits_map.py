@@ -78,7 +78,7 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
 # ==== Paths & global params ====
 base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
 arr_path = f"{base_dir}/4_tif"
-out_dir = f"{base_dir}/5_map"
+out_dir = f"{base_dir}/3_Paper_figure"
 os.makedirs(out_dir, exist_ok=True)
 
 legend_nbins = 3
@@ -106,31 +106,30 @@ scenarios = {
 
 # 成本组件的键（按行顺序）
 env_keys = [
-    "total_sol_ghg_benefit",
-    "GHG_ag_management",
+    # "total_sol_ghg_benefit",
+    # "GHG_ag_management",
     "GHG_non_ag",
 ]
 
 # 行标签（左侧）
 row_labels = [
-    'Total solution',
-    'Agricultural management',
+    # 'Total solution',
+    # 'Agricultural management',
     'Non-agriculture',
 ]
 
 # 列标题（顶部）
 column_titles = [
     r'Reference→$\mathrm{NZ}_{\mathrm{high}}$',
-    r'$\mathrm{NZ}_{\mathrm{high}}$→$\mathrm{GHG}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$',
+    r'$\mathrm{NZ}_{\mathrm{high}}$→$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$',
     r'Reference→$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$'
 ]
 
 # 可选覆盖
 layer_overrides = {
-    'total_sol_ghg_benefit': {"clip_percent": [1,99],"force_zero_center": True,},
-    'GHG_ag_management': {"clip_percent": [1,99],"force_zero_center": True,},
-    'GHG_non_ag': {"clip_percent": [1,99],"force_zero_center": True,},
-    # 'transition_cost_ag2non_ag_amortised_diff': {"clip_percent": [0, 95]},
+    # 'total_sol_ghg_benefit': {"clip_percent": [1,99],"force_zero_center": True,},
+    # 'GHG_ag_management': {"clip_percent": [1,99],"force_zero_center": True,},
+    'GHG_non_ag': {"clip_percent": [0,100],"force_zero_center": True,},
 }
 
 # ==== 创建网格图 ====
@@ -148,17 +147,17 @@ for col in range(ncols):
     ax.set_title(column_titles[col], fontsize=font_size, fontfamily=font_family, pad=5)
 
 # 添加行标签到每行第一列的左侧
-for row in range(nrows):
-    ax = axes[row * ncols]  # 每行第一列的子图索引：0, 3, 6, 9
-    ax.text(
-        -0.01, 0.5, row_labels[row],
-        fontsize=font_size,
-        fontfamily=font_family,
-        rotation=90,
-        va='center', ha='right',
-        transform=ax.transAxes,
-        clip_on=False
-    )
+# for row in range(nrows):
+#     ax = axes[row * ncols]  # 每行第一列的子图索引：0, 3, 6, 9
+#     ax.text(
+#         -0.01, 0.5, row_labels[row],
+#         fontsize=font_size,
+#         fontfamily=font_family,
+#         rotation=90,
+#         va='center', ha='right',
+#         transform=ax.transAxes,
+#         clip_on=False
+#     )
 
 # 设置字体
 plt.rcParams['font.family'] = font_family
@@ -169,7 +168,7 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 # 添加图例元素
-add_north_arrow(fig, 0.19, 0.008, size=0.012)
+add_north_arrow(fig, 0.19, 0.008, size=0.03)
 add_scalebar(fig, axes[0], 0.22, 0.014, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
 add_annotation(fig, 0.28, 0.018, width=0.015, text="State/Territory boundaries",

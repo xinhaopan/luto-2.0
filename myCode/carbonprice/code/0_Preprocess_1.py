@@ -694,20 +694,26 @@ def subtract_tifs(a_path, b_path, out_path):
         if (A.width, A.height) != (B.width, B.height) or A.transform != B.transform or A.crs != B.crs:
             raise ValueError("输入影像的大小/transform/CRS 不一致，请先重采样/重投影对齐。")
 
-        # 2) 读为 masked array（会自动将 nodata 屏蔽），再转为含 NaN 的数组
+        # 2) 读为 masked array，转为含 NaN 的数组
         arr_a = A.read(1, masked=True).filled(np.nan).astype(np.float32)
         arr_b = B.read(1, masked=True).filled(np.nan).astype(np.float32)
 
         arr_a[arr_a < 0] = np.nan
         arr_b[arr_b < 0] = np.nan
 
-        # 3) 相减
-        out = arr_a - arr_b
+        # 3) 记录全是nan的地方
+        all_nan_mask = np.isnan(arr_a) & np.isnan(arr_b)
 
-        # 4) 将 <0 的结果置为 NaN（其他位置原本的 NaN 将自动保留）
+        # 4) 做差，nan补0
+        arr_a_no_nan = np.nan_to_num(arr_a, nan=0.0)
+        arr_b_no_nan = np.nan_to_num(arr_b, nan=0.0)
+        out = arr_a_no_nan - arr_b_no_nan
+
+        # 5) 结果中，all_nan_mask设为nan，其余 ≤0 也设为nan
+        out[all_nan_mask] = np.nan
         out[out <= 0] = np.nan
 
-        # 5) 写出（Float32 + LZW 压缩；nodata 设为 NaN）
+        # 6) 写出
         nodata_value = -9999
         profile = A.profile.copy()
         profile.update(dtype="float32", compress="lzw", nodata=nodata_value)

@@ -19,14 +19,14 @@ plot_specs = [
     PlotSpec("xr_cost_non_ag",                         "non_ag", 1e3, r"Cost (Billion AU\$ yr$^{-1}$)",               1, None),
     PlotSpec("xr_transition_cost_ag2non_ag_amortised_diff","non_ag",1e3, r"Cost (Billion AU\$ yr$^{-1}$)",           1, None),
 
-    PlotSpec("xr_total_carbon",                        "cost",     1,  r"Change in GHG emission benefit (MtCO$_2$e yr$^{-1}$)",        1, "Total"),
-    PlotSpec("xr_total_bio",                           "cost",     1,  r"Change in biodiversity benefit (contribution-weighted area, Mha yr$^{-1}$)",        1, "Total"),
+    PlotSpec("xr_total_carbon",                        "cost",     1,  r"Change in GHG emissions (MtCO$_2$e yr$^{-1}$)",        1, "Total"),
+    PlotSpec("xr_total_bio",                           "cost",     1,  r"Change in biodiversity (contribution-weighted area, Mha yr$^{-1}$)",        1, "Total"),
 
-    PlotSpec("xr_GHG_ag_management",                   "am",       1,  r"Change in GHG emission benefit (MtCO$_2$e yr$^{-1}$)",        1, None),
-    PlotSpec("xr_GHG_non_ag",                          "non_ag",   1,  r"Change in GHG emission benefit (MtCO$_2$e yr$^{-1}$)",      1, None),
+    PlotSpec("xr_GHG_ag_management",                   "am",       1,  r"Change in GHG emissions (MtCO$_2$e yr$^{-1}$)",        1, None),
+    PlotSpec("xr_GHG_non_ag",                          "non_ag",   1,  r"Change in GHG emissions (MtCO$_2$e yr$^{-1}$)",      1, None),
 
-    PlotSpec("xr_biodiversity_GBF2_priority_ag_management", "am",     1,  r"Change in biodiversity benefit (contribution-weighted area, Mha yr$^{-1}$)",    1, None),
-    PlotSpec("xr_biodiversity_GBF2_priority_non_ag",        "non_ag", 1,  r"Change in biodiversity benefit (contribution-weighted area, Mha yr$^{-1}$)",  1, None),
+    PlotSpec("xr_biodiversity_GBF2_priority_ag_management", "am",     1,  r"Change in biodiversity (contribution-weighted area, Mha yr$^{-1}$)",    1, None),
+    PlotSpec("xr_biodiversity_GBF2_priority_non_ag",        "non_ag", 1,  r"Change in biodiversity (contribution-weighted area, Mha yr$^{-1}$)",  1, None),
 ]
 
 for spec in plot_specs:
@@ -38,7 +38,7 @@ for spec in plot_specs:
     output_path = os.path.join(output_dir, f'04_{input_file}.png')
     plot_22_layout(
         all_dfs=data_dict,
-        title_map=config.PROCESSED_TITLE_MAP,
+        title_map=config.CP_TITLE_MAP,
         colors=colors,
         output_path=output_path,
         summary_ylim=summary_ylim,

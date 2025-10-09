@@ -76,7 +76,7 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
 # ==== Paths & global params ====
 base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
 arr_path = f"{base_dir}/4_tif"
-out_dir = f"{base_dir}/5_map"
+out_dir = f"{base_dir}/3_Paper_figure"
 os.makedirs(out_dir, exist_ok=True)
 
 legend_nbins = 3
@@ -107,7 +107,7 @@ scenarios = {
 # 成本组件的键（按行顺序）
 env_keys = [
     "total_sol_cost",
-    "cost_agricultural_management",
+    # "cost_agricultural_management",
     "cost_non_ag",
     "transition_cost_ag2non_ag_amortised_diff",
 ]
@@ -115,7 +115,7 @@ env_keys = [
 # 行标签（左侧）
 row_labels = [
     'Total solution cost',
-    'Agricultural management cost',
+    # 'Agricultural management cost',
     'Non-agriculture cost',
     'Transition(ag→non-ag) cost',
 ]
@@ -129,10 +129,10 @@ column_titles = [
 
 # 可选覆盖
 layer_overrides = {
-    'total_cost': {"clip_percent": [1, 99]},
-    'cost_agricultural_management': {"clip_percent": [1, 99]},
-    'cost_non_ag': {"clip_percent": [1, 99]},
-    'transition_cost_ag2non_ag_amortised_diff': {"clip_percent": [1, 99]},
+    'total_cost': {"clip_percent": [0, 100]},
+    # 'cost_agricultural_management': {"clip_percent": [1, 99]},
+    'cost_non_ag': {"clip_percent": [0, 100]},
+    'transition_cost_ag2non_ag_amortised_diff': {"clip_percent": [1, 100]},
 }
 
 # ==== 创建网格图 ====
@@ -171,16 +171,16 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 # 添加图例元素
-add_north_arrow(fig, 0.18, 0.005, size=0.012)
-add_scalebar(fig, axes[0], 0.22, 0.009, length_km=500, fontsize=font_size,
+add_north_arrow(fig, 0.18, 0.015, size=0.012)
+add_scalebar(fig, axes[0], 0.22, 0.019, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=1.5)
-add_annotation(fig, 0.28, 0.013, width=0.015, text="State/Territory boundaries",
+add_annotation(fig, 0.28, 0.023, width=0.015, text="State/Territory boundaries",
                linewidth=1.5, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.472, 0.010, width=0.01, height=0.0075, linewidth=1.5,
+add_annotation(fig, 0.472, 0.020, width=0.01, height=0.0075, linewidth=1.5,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.54, 0.010, width=0.01, height=0.0075, linewidth=1.5,
+add_annotation(fig, 0.54, 0.020, width=0.01, height=0.0075, linewidth=1.5,
                text="Public, indigenous, urban, water bodies, and other land",
                style="box", facecolor="#808080", edgecolor="#808080",
                fontsize=font_size, fontfamily=font_family)

@@ -16,10 +16,10 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
     """
     nrows = len(tif_title_list)
     ncols = len(scenarios)
-    figsize = (ncols * 5, nrows * 4)
+    figsize = (ncols * 5, nrows * 4.2)
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.1, wspace=0.02,
-                           left=0.03, right=0.99, top=0.99, bottom=0.02)
+    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.12, wspace=0.02,
+                           left=0.03, right=0.99, top=0.99, bottom=0.04)
     axes = []
 
     for row, tif in enumerate(tif_title_list):
@@ -41,13 +41,14 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
                 title_y=0.95,
                 force_one_start=False,
                 custom_tick_values=[0, 0.5, 1],
+                create_colorbar=False
             )
             axes.append(ax)
     return fig, axes
 
 base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
 arr_path = f"{base_dir}/4_tif"
-out_dir = f"{base_dir}/5_map"
+out_dir = f"{base_dir}/3_Paper_figure"
 os.makedirs(out_dir, exist_ok=True)
 # price_cmap = LinearSegmentedColormap.from_list("price", ["#00ffff", "#ff00ff"])
 orig_cmap = plt.get_cmap("YlGn")
@@ -61,6 +62,9 @@ set_plot_style(font_size=15, font_family='Arial')
 scenarios = ["Run_21_GHG_off_BIO_off_CUT_50", "Run_06_GHG_high_BIO_off_CUT_50", "Run_01_GHG_high_BIO_high_CUT_50"]
 title_names = ['Reference', r'$\mathrm{NZ}_{\mathrm{high}}$',
                r'$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$']
+# scenarios = ["Run_21_GHG_off_BIO_off_CUT_50"]
+# title_names = ['Reference']
+
 tif_title_list = ["Biochar", "Asparagopsis taxiformis", "Savanna burning", "Precision agriculture", "AgTech EI", "HIR - Beef", "HIR - Sheep"]
 row_labels = ["Biochar", "Methane reduction (livestock)", "Early dry-season savanna burning", "Agricultural technology (fertiliser)", "Agricultural technology (energy)", "Managed regeneration (beef)", "Managed regeneration (sheep)"]
 
@@ -93,17 +97,27 @@ plt.rcParams['mathtext.it'] = font_family
 plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
+im = axes[0].images[0]
+cax = fig.add_axes([0.2, 0.03, 0.6, 0.015])  # [left, bottom, width, height]，可调整
+cbar = fig.colorbar(im, cax=cax, orientation='horizontal', extend='both')
+cbar.ax.xaxis.set_label_position('top')
+cbar.set_ticks([0, 0.25, 0.5, 0.75, 1])
+cbar.set_ticklabels(['0', '0.25', '0.50', '0.75', '1'])
+cbar.ax.tick_params(labelsize=font_size)
+cbar.set_label('Proportion', fontsize=font_size, fontfamily=font_family)
+
+
 # 添加图例元素
-add_north_arrow(fig, 0.14, 0.0005, size=0.012)
-add_scalebar(fig, axes[0], 0.17, 0.004, length_km=500, fontsize=font_size,
+add_north_arrow(fig, 0.14, 0.0001, size=0.012)
+add_scalebar(fig, axes[0], 0.17, 0.006, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
-add_annotation(fig, 0.23, 0.008, width=0.015, text="State/Territory boundaries",
+add_annotation(fig, 0.23, 0.010, width=0.015, text="State/Territory boundaries",
                linewidth=2, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.42, 0.006, width=0.01, height=0.0048, linewidth=2,
+add_annotation(fig, 0.42, 0.008, width=0.01, height=0.0048, linewidth=2,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.49, 0.006, width=0.01, height=0.0048, linewidth=2,
+add_annotation(fig, 0.49, 0.008, width=0.01, height=0.0048, linewidth=2,
                text="Public, indigenous, urban, water bodies, and other land",
                style="box", facecolor="#808080", edgecolor="#808080",
                fontsize=font_size, fontfamily=font_family)

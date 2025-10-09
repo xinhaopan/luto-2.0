@@ -1472,6 +1472,10 @@ def draw_22_price(
         y_label="Shadow carbon price",
         figsize=(36, 40),
         ci=95,
+        draw_legend=draw_legend,
+        ncol=1,
+        bbox_to_anchor=(0.44, 0.95),
+        column_spacing=1,
 ):
     """
     绘制22个价格趋势图（5行5列布局，前3个空位）
@@ -1487,7 +1491,7 @@ def draw_22_price(
     ci: 置信区间
     """
     # 筛选年份
-    df_filtered = df_long[df_long['Year'] > start_year].copy()
+    df_filtered = df_long[df_long['Year'] >= start_year].copy()
 
     # 按照title_map的顺序获取scenario列表
     scenario_list = list(title_map.keys())
@@ -1503,6 +1507,7 @@ def draw_22_price(
     # ------ x轴刻度（所有数据统一） ------
     x_data = df.index
     x_min, x_max = x_data.min(), x_data.max()
+
     tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
     tick_positions = [year for year in tick_positions if year in x_data]
 
@@ -1525,6 +1530,9 @@ def draw_22_price(
         ax.set_xticks(tick_positions)
         ax.tick_params(axis='x', labelbottom=False)
         ax_list.append(ax)
+
+        if i != 0:
+            ax.tick_params(axis='y', labelleft=False)
 
     # ------ carbon price图（第2,3,4行） ------
     # 拼接两段需要画的所有数据
@@ -1553,6 +1561,10 @@ def draw_22_price(
         ax.tick_params(axis='x', labelbottom=False)
         ax_list.append(ax)
 
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+
+
     # ----- 画第3、4行 -----
     for i in range(12, 22):
         row, col = (i - 2) // 5 + 1, (i - 2) % 5
@@ -1566,6 +1578,10 @@ def draw_22_price(
         ax.set_ylim(y_bio_all[0], y_bio_all[1])  # 用统一的 y_bio_all
         ax.set_yticks(y_bio_all[2])
         ax.set_xticks(tick_positions)
+
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+
         if row == 4:
             ax.tick_params(axis='x', labelbottom=True)
         else:
@@ -1575,6 +1591,28 @@ def draw_22_price(
     ax_list[0].set_ylabel(y_label)
     ax_list[0].yaxis.set_label_coords(-0.19, -1.8)
 
+    # ------ 图例 ------
+    if draw_legend:
+        # 定义legend句柄
+        handle_carbon = mlines.Line2D([], [], color='black', linewidth=2, label="Net-zero targets")
+        handle_bio12 = mlines.Line2D([], [], color='orange', linewidth=2,
+                                     label="Net-zero targets and nature-positive targets")
+        handle_bio10 = mlines.Line2D([], [], color='purple', linewidth=2, label="Nature-positive targets")
+
+        shade_carbon = Patch(color='black', alpha=0.25, label="95% CI")
+        shade_bio12 = Patch(color='orange', alpha=0.25, label="95% CI")
+        shade_bio10 = Patch(color='purple', alpha=0.25, label="95% CI")
+
+        handles = [handle_carbon, shade_carbon, handle_bio12, shade_bio12, handle_bio10, shade_bio10]
+
+        fig.legend(
+            handles=handles,
+            loc='upper center',  # 可选: 'lower center', 'upper left', etc.
+            bbox_to_anchor=(0.6, 0.95),  # (x, y)，1.04可以让图例在图像上方
+            ncol=1,  # 每行3个图例（你有3组）
+            frameon=False
+        )
+
     # 保存图形
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))
@@ -1582,6 +1620,118 @@ def draw_22_price(
     fig.show()
     print(f"✅ Saved to {output_path}")
 
+# def draw_22_price(
+#     df,
+#     title_map,
+#     output_path,
+#     desired_ticks=5,
+#     y_label="Shadow carbon price",
+#     figsize=(36, 40),
+#     ci=95,
+# ):
+#     fig = plt.figure(figsize=figsize)
+#     gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.15, wspace=0.15)
+#     fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
+#
+#     # ------ x轴刻度（所有数据统一） ------
+#     x_data = df.index
+#     x_min, x_max = x_data.min(), x_data.max()
+#     # x_middle = x_data[int(len(x_data) // 2)]
+#     # tick_positions = [x_min, x_middle, x_max]
+#
+#
+#     tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+#     tick_positions = [year for year in tick_positions if year in x_data]
+#
+#     # ------ Carbon图（第一行前两个） ------
+#     carbon_y = np.concatenate([df.iloc[:, i].values for i in range(2)])
+#     y_carbon_all = get_y_axis_ticks(0, np.nanmax(carbon_y), desired_ticks=desired_ticks)
+#     ax_list = []
+#     for i in range(2):
+#         ax = fig.add_subplot(gs[0, i])
+#         df_input = df.iloc[:, i].to_frame()
+#         draw_fit_line_ax(
+#             ax, df_input, color='black', title_name=title_map.get(df.columns[i]),ci=ci
+#         )
+#
+#         ax.set_ylim(y_carbon_all[0],y_carbon_all[1])
+#         ax.set_yticks(y_carbon_all[2])
+#         ax.set_xticks(tick_positions)
+#         ax.tick_params(axis='x', labelbottom=False)
+#         # if i != 0:
+#         #     ax.tick_params(axis='y', labelleft=False)
+#         ax_list.append(ax)
+#
+#     # ------ carbon price图（第2,3,4行） ------
+#     # 拼接两段需要画的所有数据
+#     bio_y = np.concatenate([
+#         # 第2、3行
+#         np.concatenate([df.iloc[:, i + 2].values for i in range(10)]),
+#         # 第3、4行
+#         np.concatenate([df.iloc[:, i + 7].values for i in range(10)])
+#     ])
+#     # 使用全量数据获取 y 轴范围和刻度
+#     y_bio_all = get_y_axis_ticks(0, np.nanmax(bio_y), desired_ticks=desired_ticks - 2)
+#
+#     # ----- 画第2、3行 -----
+#     for i in range(2, 12):
+#         row, col = (i - 2) // 5 + 1, (i - 2) % 5
+#         ax = fig.add_subplot(gs[row, col])
+#         df_input = df.iloc[:, i].to_frame()
+#         draw_fit_line_ax(
+#             ax, df_input, color='orange', title_name=title_map.get(df.columns[i]), ci=ci)
+#         ax.set_ylim(y_bio_all[0], y_bio_all[1])
+#         ax.set_yticks(y_bio_all[2])
+#         ax.set_xticks(tick_positions)
+#         ax.tick_params(axis='x', labelbottom=False)
+#         ax_list.append(ax)
+#
+#     # ----- 画第3、4行 -----
+#     for i in range(12, 22):
+#         row, col = (i - 2) // 5 + 1, (i - 2) % 5
+#         ax = fig.add_subplot(gs[row, col])
+#         df_input = df.iloc[:, i].to_frame()
+#         draw_fit_line_ax(
+#             ax, df_input, color='purple', title_name=title_map.get(df.columns[i]), ci=ci)
+#         ax.set_ylim(y_bio_all[0], y_bio_all[1])  # 用统一的 y_bio_all
+#         ax.set_yticks(y_bio_all[2])
+#         ax.set_xticks(tick_positions)
+#
+#         if row == 4:
+#             ax.tick_params(axis='x', labelbottom=True)
+#         else:
+#             ax.tick_params(axis='x', labelbottom=False)
+#
+#         ax_list.append(ax)
+#
+#     ax_list[0].set_ylabel(y_label)
+#     ax_list[0].yaxis.set_label_coords(-0.19, -1.8)
+#
+#
+#     # ------ 图例 ------
+#     if draw_legend:
+#         # 定义legend句柄
+#         handle_carbon = mlines.Line2D([], [], color='black', linewidth=2, label="Net-zero targets")
+#         handle_bio12 = mlines.Line2D([], [], color='orange', linewidth=2, label="Net-zero targets and nature-positive targets")
+#         handle_bio10 = mlines.Line2D([], [], color='purple', linewidth=2, label="Nature-positive targets")
+#
+#         shade_carbon = Patch(color='black', alpha=0.25, label="95% CI")
+#         shade_bio12 = Patch(color='orange', alpha=0.25, label="95% CI")
+#         shade_bio10 = Patch(color='purple', alpha=0.25, label="95% CI")
+#
+#         handles = [handle_carbon, shade_carbon, handle_bio12, shade_bio12, handle_bio10, shade_bio10]
+#
+#         fig.legend(
+#             handles=handles,
+#             loc='upper center',  # 可选: 'lower center', 'upper left', etc.
+#             bbox_to_anchor=(0.6, 0.95),  # (x, y)，1.04可以让图例在图像上方
+#             ncol=1,  # 每行3个图例（你有3组）
+#             frameon=False
+#         )
+#
+#     plt.savefig(output_path, dpi=300)
+#     plt.show()
+#     plt.close(fig)
 
 def draw_10_price(
         df_long,
@@ -1594,7 +1744,7 @@ def draw_10_price(
         figsize=(24, 10),
         legend_label_line="Nature-positive targets",
         legend_label_shade="95% CI",
-        legend_loc="best",
+        legend_loc="lower left", # best
         legend_on_first_ax=True,
         ylabel_pos=(-0.3, -0.2),  # (x, y) in axes coords
         top_space_ratio=0.20,  # y 轴顶部额外空间比例
@@ -1621,7 +1771,7 @@ def draw_10_price(
     ci: 置信区间
     """
     # 筛选年份
-    df_filtered = df_long[df_long['Year'] > start_year].copy()
+    df_filtered = df_long[df_long['Year'] >= start_year].copy()
 
     # 按照title_map的顺序获取scenario列表
     scenario_list = list(title_map.keys())

@@ -29,13 +29,13 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
 
     # 自动计算图像尺寸
     if figsize is None:
-        figsize = (ncols * 5, nrows * 4.5)
+        figsize = (ncols * 5, nrows * 5)
 
     fig = plt.figure(figsize=figsize)
 
     # 创建网格规范
     gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.2, wspace=0.03,
-                           left=0.03, right=0.99, top=0.995, bottom=0.015)
+                           left=0.03, right=0.99, top=0.995, bottom=0.03)
 
     axes_list = []
     scenario_names = list(scenarios.keys())
@@ -76,7 +76,7 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
 # ==== Paths & global params ====
 base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
 arr_path = f"{base_dir}/4_tif"
-out_dir = f"{base_dir}/5_map"
+out_dir = f"{base_dir}/3_Paper_figure"
 os.makedirs(out_dir, exist_ok=True)
 
 legend_nbins = 3
@@ -103,15 +103,15 @@ scenarios = {
 
 # 成本组件的键（按行顺序）
 env_keys = [
-    "total_sol_bio_benefit",
-    "biodiversity_GBF2_priority_ag_management",
+    # "total_sol_bio_benefit",
+    # "biodiversity_GBF2_priority_ag_management",
     "biodiversity_GBF2_priority_non_ag",
 ]
 
 # 行标签（左侧）
 row_labels = [
-    'Total solution',
-    'Agricultural management',
+    # 'Total solution',
+    # 'Agricultural management',
     'Non-agriculture',
 ]
 
@@ -126,8 +126,7 @@ column_titles = [
 layer_overrides = {
     "total_sol_bio_benefit": {"clip_percent": [1,99],"force_zero_center": True,'legend_bbox':(0.1, 0.02, 0.8, 0.9)},
     "biodiversity_GBF2_priority_ag_management": {"clip_percent": [1,99],"force_zero_center": True,'legend_bbox':(0.1, 0.02, 0.8, 0.9)},
-    "biodiversity_GBF2_priority_non_ag": {"clip_percent": [1,99],"force_zero_center": True,'legend_bbox':(0.1, 0.02, 0.8, 0.9)},
-    # 'transition_cost_ag2non_ag_amortised_diff': {"clip_percent": [0, 95]},
+    "biodiversity_GBF2_priority_non_ag": {"clip_percent": [0,100],"force_zero_center": True,'legend_bbox':(0.1, 0.02, 0.8, 0.9)},
 }
 
 # ==== 创建网格图 ====
@@ -145,17 +144,17 @@ for col in range(ncols):
     ax.set_title(column_titles[col], fontsize=font_size, fontfamily=font_family, pad=5)
 
 # 添加行标签到每行第一列的左侧
-for row in range(nrows):
-    ax = axes[row * ncols]  # 每行第一列的子图索引：0, 3, 6, 9
-    ax.text(
-        -0.01, 0.5, row_labels[row],
-        fontsize=font_size,
-        fontfamily=font_family,
-        rotation=90,
-        va='center', ha='right',
-        transform=ax.transAxes,
-        clip_on=False
-    )
+# for row in range(nrows):
+#     ax = axes[row * ncols]  # 每行第一列的子图索引：0, 3, 6, 9
+#     ax.text(
+#         -0.01, 0.5, row_labels[row],
+#         fontsize=font_size,
+#         fontfamily=font_family,
+#         rotation=90,
+#         va='center', ha='right',
+#         transform=ax.transAxes,
+#         clip_on=False
+#     )
 
 # 设置字体
 plt.rcParams['font.family'] = font_family
@@ -166,13 +165,13 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 # 添加图例元素
-add_north_arrow(fig, 0.21, 0.018, size=0.018)
-add_scalebar(fig, axes[0], 0.26, 0.029, length_km=500, fontsize=font_size,
+add_north_arrow(fig, 0.21, 0.048, size=0.03)
+add_scalebar(fig, axes[0], 0.26, 0.059, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
-add_annotation(fig, 0.33, 0.034, width=0.025, text="State/Territory boundaries",
+add_annotation(fig, 0.33, 0.063, width=0.025, text="State/Territory boundaries",
                linewidth=2, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.62, 0.030, width=0.014, height=0.0095, linewidth=2,
+add_annotation(fig, 0.62, 0.059, width=0.014, height=0.0095, linewidth=2,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
 add_annotation(fig, 0.20, 0.005, width=0.012, height=0.0095, linewidth=2,

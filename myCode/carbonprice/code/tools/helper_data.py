@@ -481,7 +481,7 @@ def build_sol_profit_and_cost_nc(
 
     # ---------- 1) 计算 profit(scenario, Year, type) ----------
     required_types = [
-        "AgMgt revenue", "AgMgt cost",
+        # "AgMgt revenue", "AgMgt cost",
         "Non-ag revenue", "Non-ag cost",
         "Transition(ag→non-ag) amortised cost",
     ]
@@ -497,7 +497,7 @@ def build_sol_profit_and_cost_nc(
         return da
 
     profit_list = [
-        (pick("AgMgt revenue") - pick("AgMgt cost")).expand_dims(type=["AgMgt profit"]),
+        # (pick("AgMgt revenue") - pick("AgMgt cost")).expand_dims(type=["AgMgt profit"]),
         (pick("Non-ag revenue") - pick("Non-ag cost")).expand_dims(type=["Non-ag profit"]),
         (-pick("Transition(ag→non-ag) amortised cost")).expand_dims(type=["Transition(ag→non-ag) amortised profit"]),
     ]

@@ -279,6 +279,7 @@ def efficient_tif_plot(
         title_name='',
         unit_name='',
         shp=None, line_color='black', line_width=2,
+        create_colorbar=True,
         legend_width="55%", legend_height="6%",
         legend_loc='lower left', legend_bbox_to_anchor=(0, 0, 1, 1),
         legend_borderpad=1, legend_nbins=5,
@@ -435,6 +436,11 @@ def efficient_tif_plot(
     cbar.ax.tick_params(length=char_ticks_length, pad=char_ticks_pad)
     if unit_name:
         cbar.set_label(unit_name, labelpad=unit_labelpad, family='Arial')
+
+    # === 隐藏colorbar但仍然返回对象 ===
+    if not create_colorbar:
+        cbar.ax.set_visible(False)
+        cbar.ax.remove()
 
     return im, cbar
 
@@ -813,6 +819,7 @@ def plot_tif_layer(
         title_y=0.9,
         unit_labelpad=5,
         char_ticks_length=1,
+        create_colorbar=True,
         legend_nbins=3,
         legend_bbox=(0.1, 0.10, 0.8, 0.9),
         clip_percent=None,
@@ -840,6 +847,7 @@ def plot_tif_layer(
         line_width=line_width,
         title_name=title,
         unit_name=unit,
+        create_colorbar=create_colorbar,
         legend_bbox_to_anchor=legend_bbox,
         legend_nbins=legend_nbins,
         title_y=title_y,
