@@ -5,7 +5,7 @@ from tools.helpers import create_task_runs
 import time
 # time.sleep(60*60*5)
 platform = "NCI"  # 可选值: 'HPC', 'Denethor', 'NCI'
-tasks = ['20251002_Cost_curve_task']
+tasks = ['20251009_Paper2_Results']
 input_path_dict = {"HPC": "/home/remote/s222552331/LUTO2_XH/LUTO2/input",
                     "Denethor": "N:/LUF-Modelling/LUTO2_XH/LUTO2/input",
                     "NCI": "/g/data/jk53/LUTO_XH/LUTO2/input"}
@@ -15,9 +15,9 @@ for task in tasks:
 
     update_values = {
         'WRITE_THREADS': 2,
-        'MEM': '28GB',
-        'NCPUS': 4,
-        'TIME': '4:00:00',
+        'MEM': '100GB',
+        'NCPUS': 25,
+        'TIME': '5:00:00',
         'INPUT_DIR': input_path_dict[platform],  # 根据平台选择输入路径
         'RAW_DATA': f"{input_path_dict[platform]}/raw_data",
         'NO_GO_VECTORS': {

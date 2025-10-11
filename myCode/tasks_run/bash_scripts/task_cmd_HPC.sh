@@ -163,6 +163,7 @@ mkdir -p "\$CUSTOM_TMPDIR"
 export TMPDIR="\$CUSTOM_TMPDIR"
 export TMP="\$CUSTOM_TMPDIR"
 export TEMP="\$CUSTOM_TMPDIR"
+export JOBLIB_TEMP_FOLDER="\$CUSTOM_TMPDIR"
 # Cleanup function (prevent accumulation of temporary files)
 cleanup() {
     echo "Cleaning up temporary files: \$CUSTOM_TMPDIR"

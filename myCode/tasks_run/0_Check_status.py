@@ -1,130 +1,138 @@
 import os
 import re
 import pandas as pd
+import glob
+import zipfile
+import io
 
-def parse_log(base_dir, run_dir,runing_file):
-    """
-    解析单个 run 的 simulation_log.txt
-    - EndYear: "Model finished in 2050"
-    - RunTime: "Total run time: 13:03:04"
-    - Memory : "Overall peak memory usage: 47.46 GB"
-    - Status : Completed / Failed / Running / Log not found
-    """
-    txt_path = os.path.join(base_dir, run_dir, 'output', 'simulation_log.txt')
-    result = {
-        "Name": run_dir,
-        "Status": "Running",  # 默认 Running
-        "EndYear": None,
-        "RunTime": None,
-        "Memory": None
+
+def get_max_memory_from_stream(stream):
+    """从文件流中解析内存使用情况，返回第二列的最大值。"""
+    max_mem = 0.0
+    for line in stream:
+        try:
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                mem_val = float(parts[-1])
+                if mem_val > max_mem:
+                    max_mem = mem_val
+        except (ValueError, IndexError):
+            continue  # 跳过格式不正确的行
+    return f"{max_mem:.3f} GB" if max_mem > 0 else None
+
+
+def parse_year_from_stream(stream):
+    """从文件流中解析 'Running for year XXXX' 并返回最大年份。"""
+    years = []
+    pat = re.compile(r"Running for year\s+(\d{4})")
+    for line in stream:
+        m = pat.search(line)
+        if m:
+            years.append(int(m.group(1)))
+    return max(years) if years else None
+
+
+def get_archived_run_info(archive_path):
+    """从 Run_Archive.zip 中提取最终年份和最大内存使用。"""
+    running_year, memory = None, None
+    try:
+        with zipfile.ZipFile(archive_path, 'r') as zf:
+            # 在压缩包中查找日志文件
+            stdout_log_path = next((name for name in zf.namelist() if 'LUTO_RUN__stdout.log' in name), None)
+            mem_log_path = next((name for name in zf.namelist() if
+                                 os.path.basename(name).startswith('RES_') and name.endswith('_mem_log.txt')), None)
+
+            if stdout_log_path:
+                with zf.open(stdout_log_path) as log_file:
+                    with io.TextIOWrapper(log_file, encoding='utf-8', errors='ignore') as text_stream:
+                        running_year = parse_year_from_stream(text_stream)
+            if mem_log_path:
+                with zf.open(mem_log_path) as mem_file:
+                    with io.TextIOWrapper(mem_file, encoding='utf-8', errors='ignore') as text_stream:
+                        memory = get_max_memory_from_stream(text_stream)
+
+    except (zipfile.BadZipFile, FileNotFoundError) as e:
+        print(f"Warning: Could not process archive {archive_path}. Reason: {e}")
+
+    return {
+        "RunningYear": running_year,
+        "Memory": memory,
+        "Simulation Status": "Success",
+        "Output Status": "Success"
     }
-
-    if not os.path.exists(txt_path):
-        result["Status"] = "Log not found"
-        return result
-
-    with open(txt_path, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            line = line.strip()
-
-            # 结束年份
-            m = re.search(r"Model finished in (\d{4})", line)
-            if m:
-                result["EndYear"] = int(m.group(1))
-
-            # 运行时间
-            m = re.search(r"Total run time:\s*([\d:]+)", line)
-            if m:
-                result["RunTime"] = m.group(1)
-
-            # 内存峰值
-            m = re.search(r"Overall peak memory usage:\s*([\d.]+\s*GB)", line)
-            if m:
-                result["Memory"] = m.group(1)
-
-            # 状态
-            if "Run completed." in line:
-                result["Status"] = "Completed"
-            elif "Run failed." in line:
-                result["Status"] = "Failed"
-    with open(runing_file, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            line = line.strip()
-            if "Warning: Gurobi solver did not find an optimal/suboptimal solution for year" in line:
-                result["Status"] = "Infeasible"
-            if "Infeasible model" in line:
-                result["Status"] = "Infeasible"
-
-    return result
 
 
 def get_first_subfolder(output_dir):
-    """获取 output/ 目录下的第一个子文件夹（按名称排序后取第一个）。"""
-    if not os.path.isdir(output_dir):
-        return None
-    subfolders = sorted(
-        f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f))
-    )
+    """获取 output/ 目录下的第一个子文件夹。"""
+    if not os.path.isdir(output_dir): return None
+    subfolders = sorted(f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f)))
     return subfolders[0] if subfolders else None
 
 
 def parse_running_year(runing_file):
-    """
-    从 LUTO_RUN__stdout.log 中抓取所有形如：
-      "Running for year 2034"
-    的年份，返回最大值。若没有匹配或文件不存在，返回 None。
-    """
-    if not runing_file or not os.path.exists(runing_file):
-        return None
-
-    years = []
-    pat = re.compile(r"Running for year\s+(\d{4})")
+    """从 LUTO_RUN__stdout.log 文件路径解析当前运行年份。"""
+    if not runing_file or not os.path.exists(runing_file): return None
     with open(runing_file, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            m = pat.search(line)
-            if m:
-                years.append(int(m.group(1)))
-    return max(years) if years else None
+        return parse_year_from_stream(f)
 
 
 if __name__ == "__main__":
-    base_dir = '../../output/20251003_Paper2_Results_NCI'
-    # base_dir = '../../output/20250921_Paper2_Results'
+    base_dir = '../../output/20251009_Paper2_Results'
     target_year = 2050
-
-    # 从 grid_search_template.csv 的列名里找 Run_* 作为 run 目录
     template_df = pd.read_csv(os.path.join(base_dir, 'grid_search_template.csv'), index_col=0)
     run_dirs = [col for col in template_df.columns if col.startswith('Run_')]
 
     rows = []
     for run_dir in run_dirs:
-        # 找 running 文件，解析 RunningYear
+        archive_path = os.path.join(base_dir, run_dir, 'Run_Archive.zip')
+
+        if os.path.exists(archive_path):
+            row = get_archived_run_info(archive_path)
+            row["Name"] = run_dir
+            rows.append(row)
+            continue
+
+        # --- 如果归档不存在，执行新的状态检查逻辑 ---
+        row = {
+            "Name": run_dir,
+            "RunningYear": None,
+            "Memory": None,
+            "Simulation Status": "Failed",  # 默认状态
+            "Output Status": "Failed"  # 默认状态
+        }
+
         output_dir = os.path.join(base_dir, run_dir, 'output')
         subfolder = get_first_subfolder(output_dir)
-        # 解析主日志
-        runing_file = (
-            os.path.join(output_dir, subfolder, 'LUTO_RUN__stdout.log')
-            if subfolder else None
-        )
-        row = parse_log(base_dir, run_dir,runing_file)
 
-        row["RunningYear"] = parse_running_year(runing_file)
+        if subfolder:
+            # 检查 lz4 文件是否存在以判断模拟是否完成
+            lz4_pattern = os.path.join(output_dir, subfolder, 'Data_RES*.lz4')
+            if glob.glob(lz4_pattern):
+                row["Simulation Status"] = "Success"
+                # 此情况下 Output Status 保持默认的 Failed
+
+            # 无论状态如何，都尝试获取运行年份和内存信息
+            runing_file = os.path.join(output_dir, subfolder, 'LUTO_RUN__stdout.log')
+            row["RunningYear"] = parse_running_year(runing_file)
+
+            mem_log_pattern = os.path.join(output_dir, subfolder, 'RES_*_mem_log.txt')
+            mem_log_files = glob.glob(mem_log_pattern)
+            if mem_log_files:
+                with open(mem_log_files[0], 'r', encoding='utf-8', errors='ignore') as f:
+                    row["Memory"] = get_max_memory_from_stream(f)
 
         rows.append(row)
 
-    results_df = pd.DataFrame(rows, columns=["Name","RunningYear", "EndYear", "RunTime", "Memory", "Status"])
-
-    # 保存状态表
+    results_df = pd.DataFrame(rows, columns=["Name", "RunningYear", "Memory", "Simulation Status", "Output Status"])
     out_excel = os.path.join(base_dir, 'run_status_report.xlsx')
     results_df.to_excel(out_excel, index=False)
+
+    # 设置 pandas 显示选项以完整显示 DataFrame
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_colwidth', None)
+
     print(results_df)
     print(f"✅ Run 状态表已保存: {out_excel}")
 
-    # # 筛选 EndYear != target_year
-    # not_target = results_df[results_df["EndYear"] != target_year]["Name"]
-    # if not not_target.empty:
-    #     print(f"\n以下运行的 EndYear 不是 {target_year}:")
-    #     for name in not_target:
-    #         print(" -", name)
-    # else:
-    #     print(f"\n所有运行的 EndYear 均为 {target_year} ✅")

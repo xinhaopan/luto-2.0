@@ -54,6 +54,7 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
+# _NETCDF_WRITE_LOCK = threading.Lock()
 
 def write_outputs(data: Data):
     """Write outputs using dynamic timestamp from read_timestamp."""
@@ -162,8 +163,13 @@ def save2nc(in_xr:xr.DataArray, save_path:str):
     loop_sel = valid_df.index.to_frame().to_dict('records')
     
     in_xr.attrs['valid_layers'] = str(loop_sel)
+    # 使用锁确保同一时间只有一个线程写入 NetCDF
+    # with _NETCDF_WRITE_LOCK:
+    #     in_xr.astype('float32')\
+    #         .to_netcdf(save_path, encoding=encoding, compute=False)\
+    #         .compute(scheduler='synchronous')
     in_xr.astype('float32')\
-        .to_netcdf(save_path, encoding=encoding, compute=False)\
+        .to_netcdf(save_path, encoding=encoding, compute=False) \
         .compute(scheduler='threads', num_workers=settings.WRITE_THREADS)
 
 
