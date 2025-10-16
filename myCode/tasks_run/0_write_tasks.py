@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_task_runs
 import time
 # time.sleep(60*60*5)
-platform = "NCI"  # 可选值: 'HPC', 'Denethor', 'NCI'
+platform = "HPC"  # 可选值: 'HPC', 'Denethor', 'NCI'
 tasks = ['20251009_Paper2_Results']
 input_path_dict = {"HPC": "/home/remote/s222552331/LUTO2_XH/LUTO2/input",
                     "Denethor": "N:/LUF-Modelling/LUTO2_XH/LUTO2/input",

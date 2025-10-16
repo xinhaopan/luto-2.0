@@ -5,9 +5,9 @@ import shutil
 # ==============================================================================
 #  配置区域
 # ==============================================================================
-CPU_CORES = 30 #90
-MEMORY_GB = "1350G" # "1500G"
-TIME_LIMIT = "0-720:00:00"
+CPU_CORES = 42 #90
+MEMORY_GB = "1200G" # "1500G"
+TIME_LIMIT = "0-72:00:00"
 
 PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"
 CONDA_ENV_NAME = "xpluto-fixed"

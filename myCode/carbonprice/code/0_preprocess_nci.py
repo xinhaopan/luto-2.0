@@ -6,7 +6,7 @@ import subprocess
 # ==============================================================================
 CPU_CORES = 45
 MEMORY_GB = "1400GB"          # PBS 用 GB
-TIME_LIMIT = "24:00:00"       # 一天
+TIME_LIMIT = "48:00:00"       # 一天
 PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"
 CONDA_ENV_NAME = "xpluto"
 SUBMISSION_SCRIPT_NAME = "submit_preprocess.pbs"

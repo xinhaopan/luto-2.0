@@ -33,11 +33,10 @@ def parse_year_from_stream(stream):
 
 
 def get_archived_run_info(archive_path):
-    """从 Run_Archive.zip 中提取最终年份和最大内存使用。"""
-    running_year, memory = None, None
+    """从 Run_Archive.zip 中提取信息，如果文件损坏则报告失败。"""
     try:
+        running_year, memory = None, None
         with zipfile.ZipFile(archive_path, 'r') as zf:
-            # 在压缩包中查找日志文件
             stdout_log_path = next((name for name in zf.namelist() if 'LUTO_RUN__stdout.log' in name), None)
             mem_log_path = next((name for name in zf.namelist() if
                                  os.path.basename(name).startswith('RES_') and name.endswith('_mem_log.txt')), None)
@@ -51,15 +50,22 @@ def get_archived_run_info(archive_path):
                     with io.TextIOWrapper(mem_file, encoding='utf-8', errors='ignore') as text_stream:
                         memory = get_max_memory_from_stream(text_stream)
 
+        # 成功读取归档文件
+        return {
+            "RunningYear": running_year,
+            "Memory": memory,
+            "Simulation Status": "Success",
+            "Output Status": "Success"
+        }
     except (zipfile.BadZipFile, FileNotFoundError) as e:
         print(f"Warning: Could not process archive {archive_path}. Reason: {e}")
-
-    return {
-        "RunningYear": running_year,
-        "Memory": memory,
-        "Simulation Status": "Success",
-        "Output Status": "Success"
-    }
+        # 无法打开或处理归档文件，返回失败状态
+        return {
+            "RunningYear": None,
+            "Memory": None,
+            "Simulation Status": "Failed",
+            "Output Status": "Failed"
+        }
 
 
 def get_first_subfolder(output_dir):
@@ -77,7 +83,7 @@ def parse_running_year(runing_file):
 
 
 if __name__ == "__main__":
-    base_dir = '../../output/20251009_Paper2_Results'
+    base_dir = '../../output/20251013_Paper2_Results'
     target_year = 2050
     template_df = pd.read_csv(os.path.join(base_dir, 'grid_search_template.csv'), index_col=0)
     run_dirs = [col for col in template_df.columns if col.startswith('Run_')]
@@ -97,8 +103,8 @@ if __name__ == "__main__":
             "Name": run_dir,
             "RunningYear": None,
             "Memory": None,
-            "Simulation Status": "Failed",  # 默认状态
-            "Output Status": "Failed"  # 默认状态
+            "Simulation Status": "Running",  # 默认状态
+            "Output Status": "Running"  # 默认状态
         }
 
         output_dir = os.path.join(base_dir, run_dir, 'output')

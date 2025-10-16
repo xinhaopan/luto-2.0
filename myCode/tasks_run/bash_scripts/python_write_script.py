@@ -58,23 +58,22 @@ def get_first_subfolder_name(output_path="output"):
 
 def is_zip_valid(path):
     """
-    检查 zip 文件是否完整且可读。
-    - 如果文件存在且CRC校验通过，返回 True。
-    - 如果文件不存在、损坏或不是zip文件，返回 False。
+    快速检查 zip 文件是否可读。
+    - 仅检查文件是否存在，以及zip文件头/目录是否可读。
+    - 不会进行耗时的完整CRC校验，速度快得多。
     """
     if not os.path.exists(path):
         return False
     try:
+        # 尝试打开文件并读取中央目录，这是一个快速操作。
+        # 如果文件尾部损坏或不是zip文件，会抛出 BadZipFile 异常。
         with zipfile.ZipFile(path, 'r') as zf:
-            # testzip() 会检查压缩包中所有文件的CRC。
-            # 如果有损坏的文件，它会返回该文件的名字，否则返回 None。
-            if zf.testzip() is not None:
-                print_with_time(f"CRC check failed for archive '{path}'. File is corrupted.")
-                return False
+            # 读取文件名列表是验证中央目录是否可读的快速方法。
+            zf.infolist()
     except zipfile.BadZipFile:
         print_with_time(f"File '{path}' is not a valid zip archive or is corrupted.")
         return False
-    # 如果所有检查都通过
+    # 如果能成功打开并读取目录，就认为它是有效的
     return True
 # --- 主要逻辑开始 ---
 

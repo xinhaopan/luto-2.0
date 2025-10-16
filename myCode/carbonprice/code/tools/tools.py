@@ -343,7 +343,7 @@ def get_data_RES(output_path="output"):
         if not matches:
             raise FileNotFoundError("在 zip 文件中未找到匹配 'Data_RES*.lz4' 的文件。")
         # 读取 zip 内部 gz 文件内容为 bytes
-        data_path = zf.read(matches[0])
-        # 反序列化成 Python 对象
-        data = joblib.loads(data_path)
+        with zf.open(matches[0], "r") as file_in_zip:
+            # joblib.load 可以直接处理这个文件对象
+            data = joblib.load(file_in_zip)
         return data

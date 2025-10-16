@@ -7,7 +7,7 @@ rename_dict = {
     '04_xr_total_carbon': 'Figure 04 Change in GHG emissions',
     '04_xr_total_bio': 'Figure 05 Change in Biodiversity',
     '05_Carbon_price_all_long': 'Figure 06 Shadow carbon price',
-    '05_biodiversity_price_long': 'Figure 07 Biodiversity price',
+    '05_biodiversity_price_long': 'Figure 07 Shadow biodiversity price',
     '06_cost_maps_line_clip': 'Figure 08 Cost maps',
     '06_Sol_price_maps_line': 'Figure 09 Shadow solution price maps',
 
