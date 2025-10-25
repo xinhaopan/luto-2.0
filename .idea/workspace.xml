@@ -4,8 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update: create productivity and FLC input data">
-      <change beforePath="$PROJECT_DIR$/luto/tools/write.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/tools/write.py" afterDir="false" />
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="merage: from jinzhu 20251025">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/luto/data.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/data.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Run_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Run_test.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -237,15 +239,7 @@
       <workItem from="1759558143790" duration="43153000" />
       <workItem from="1759636767905" duration="81533000" />
       <workItem from="1760161123508" duration="33763000" />
-      <workItem from="1760351223725" duration="61444000" />
-    </task>
-    <task id="LOCAL-00011" summary="update: run in HPC">
-      <option name="closed" value="true" />
-      <created>1758008167771</created>
-      <option name="number" value="00011" />
-      <option name="presentableId" value="LOCAL-00011" />
-      <option name="project" value="LOCAL" />
-      <updated>1758008167771</updated>
+      <workItem from="1760351223725" duration="62846000" />
     </task>
     <task id="LOCAL-00012" summary="update: run in nci">
       <option name="closed" value="true" />
@@ -631,7 +625,15 @@
       <option name="project" value="LOCAL" />
       <updated>1761350861820</updated>
     </task>
-    <option name="localTasksCounter" value="60" />
+    <task id="LOCAL-00060" summary="merage: from jinzhu 20251025">
+      <option name="closed" value="true" />
+      <created>1761352784092</created>
+      <option name="number" value="00060" />
+      <option name="presentableId" value="LOCAL-00060" />
+      <option name="project" value="LOCAL" />
+      <updated>1761352784092</updated>
+    </task>
+    <option name="localTasksCounter" value="61" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -672,7 +674,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update: output for draw map" />
     <MESSAGE value="update: merge from jinzhu 20250926" />
     <MESSAGE value="update: Clean up invalid scripts" />
     <MESSAGE value="update: draw map by hexagon" />
@@ -697,7 +698,8 @@
     <MESSAGE value="update: write output when failed" />
     <MESSAGE value="update: daily job" />
     <MESSAGE value="update: create productivity and FLC input data" />
-    <option name="LAST_COMMIT_MESSAGE" value="update: create productivity and FLC input data" />
+    <MESSAGE value="merage: from jinzhu 20251025" />
+    <option name="LAST_COMMIT_MESSAGE" value="merage: from jinzhu 20251025" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -869,7 +871,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_test_res.coverage" NAME="Paper2_tasks_test_res Coverage Results" MODIFIED="1757227959370" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$mem_test.coverage" NAME="mem_test Coverage Results" MODIFIED="1758007823018" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode" />
     <SUITE FILE_PATH="coverage/LUTO2$1_caculate.coverage" NAME="1_caculate Coverage Results" MODIFIED="1758110214755" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
-    <SUITE FILE_PATH="coverage/LUTO2$Run_test.coverage" NAME="Run_test Coverage Results" MODIFIED="1760002749896" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
+    <SUITE FILE_PATH="coverage/LUTO2$Run_test.coverage" NAME="Run_test Coverage Results" MODIFIED="1761353499324" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$4_make_hexagonal_data.coverage" NAME="4_make_hexagonal_data Coverage Results" MODIFIED="1758894830628" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Preprocess2.coverage" NAME="0_Preprocess2 Coverage Results" MODIFIED="1758547914441" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$2_draw_stackedarea.coverage" NAME="2_draw_stackedarea Coverage Results" MODIFIED="1757820537571" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
@@ -907,7 +909,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$3_make_map_all_legend.coverage" NAME="3_make_map_all_legend Coverage Results" MODIFIED="1758874260430" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$helper_plot.coverage" NAME="helper_plot Coverage Results" MODIFIED="1759653397586" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code/tools" />
     <SUITE FILE_PATH="coverage/LUTO2$4_3_make_map_all__1_.coverage" NAME="4.3_make_map_all (1) Coverage Results" MODIFIED="1759053513568" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
-    <SUITE FILE_PATH="coverage/LUTO2$0_runs_test.coverage" NAME="0_runs_test Coverage Results" MODIFIED="1759989437200" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/LUTO2$0_runs_test.coverage" NAME="0_runs_test Coverage Results" MODIFIED="1761352567978" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/LUTO2$2_draw_processed_data.coverage" NAME="2_draw_processed_data Coverage Results" MODIFIED="1760861523924" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_num2.coverage" NAME="Paper2_tasks_num2 Coverage Results" MODIFIED="1757312008894" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$0_transfer_html.coverage" NAME="0_transfer_html Coverage Results" MODIFIED="1758975762985" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
