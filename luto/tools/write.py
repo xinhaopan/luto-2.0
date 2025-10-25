@@ -1817,7 +1817,7 @@ def write_biodiversity_overall_quality_scores(data: Data, yr_cal, path):
 
 def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     ''' Biodiversity GBF2 only being written to disk when `BIODIVERSITY_TARGET_GBF_2` is not 'off' '''
-        
+
     # Unpack the ag managements and land uses
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
@@ -1853,20 +1853,13 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         dims=['lu'],
         coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
     )
-    am_impact_raj = xr.DataArray(
-        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]), 
-        dims=['idx', 'cell'], 
+    am_impact_ajr = xr.DataArray(
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]),
+        dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
             'cell': range(data.NCELLS)}
     ).unstack()
-
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
-    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_amrj], dim='am')
-    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_amrj], dim='lm')
-    am_impact_raj = xr.concat([am_impact_raj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_impact_raj], dim='am')
-
 
     # Get the total area of the priority degraded areas
     total_priority_degraded_area = GBF2_MASK_area_ha.sum()
@@ -1874,13 +1867,27 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     # Calculate xarray biodiversity GBF2 scores
     xr_gbf2_ag = priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
     xr_gbf2_non_ag = priority_degraded_area_score_r * non_ag_impact_k * non_ag_dvar_rk
-    xr_gbf2_am = priority_degraded_area_score_r * am_impact_raj * am_dvar_amrj
+    xr_gbf2_am = priority_degraded_area_score_r * am_impact_ajr * am_dvar_amrj
+
+    # Expand dimension (has to be after multiplication to avoid double counting)
+    xr_gbf2_ag = xr.concat([xr_gbf2_ag.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_gbf2_ag], dim='lm')
+    xr_gbf2_am = xr.concat([xr_gbf2_am.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_gbf2_am], dim='lm')
+    xr_gbf2_am = xr.concat([xr_gbf2_am.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_gbf2_am], dim='lu')
+
+    # Append the 'ALL' dimension from dvar file
+    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
+    xr_gbf2_ag_cat = xr.concat([ag_mosaic, xr_gbf2_ag], dim='lu')
+    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
+    xr_gbf2_non_ag_cat = xr.concat([non_ag_mosaic, xr_gbf2_non_ag], dim='lu')
+    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
+    xr_gbf2_am_cat = xr.concat([am_mosaic, xr_gbf2_am], dim='am')
 
     # Save xarray data to netCDF
     save2nc(xr_gbf2_ag_cat, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_{yr_cal}.nc'))
     save2nc(xr_gbf2_non_ag_cat, os.path.join(path, f'xr_biodiversity_GBF2_priority_non_ag_{yr_cal}.nc'))
     save2nc(xr_gbf2_am_cat, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_management_{yr_cal}.nc'))
 
+    # Do nothing if biodiversity limits are off and no need to report
     if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
         return 'Skipped: Biodiversity GBF2 scores not written as `BIODIVERSITY_TARGET_GBF_2` is set to "off"'
 
@@ -1958,15 +1965,6 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         )
     df.to_csv(os.path.join(path, f'biodiversity_GBF2_priority_scores_{yr_cal}.csv'), index=False)
-
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf2_ag_cat = xr.concat([ag_mosaic, xr_gbf2_ag], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf2_non_ag_cat = xr.concat([non_ag_mosaic, xr_gbf2_non_ag], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_gbf2_am_cat = xr.concat([am_mosaic, xr_gbf2_am], dim='am')
-
 
     return f"Biodiversity GBF2 priority scores written for year {yr_cal}"
 
