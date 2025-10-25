@@ -60,7 +60,7 @@ SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
-SCENARIO = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
+SCENARIO = 'SSP' + SSP[0]           # SSP1, SSP2, SSP3, SSP4, SSP5
 DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
 DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
 CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
@@ -68,8 +68,10 @@ IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports f
 WASTE = 1                           # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
+APPLY_DEMAND_MULTIPLIERS = True     # True or False. Whether to apply demand multipliers from AusTIME model.
+
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
-CO2_FERT = 'off'   # or 'off'
+CO2_FERT = 'off'   # 'on' or 'off'
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 CARBON_EFFECTS_WINDOW = 50 # 50, 60, 70, 80, or 90 
@@ -162,7 +164,7 @@ the model sensitive to variations in input data.
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(10, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_THREADS = min(4, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -367,12 +369,12 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 
 
 AG_MANAGEMENTS = {
-    'Asparagopsis taxiformis': False,
-    'Precision Agriculture': False,
+    'Asparagopsis taxiformis': True,
+    'Precision Agriculture': True,
     'Ecological Grazing': False,
     'Savanna Burning': True,
-    'AgTech EI': False,
-    'Biochar': False,
+    'AgTech EI': True,
+    'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
 }
@@ -442,10 +444,9 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 
 # Take data from 'GHG_targets.xlsx', 
 GHG_TARGETS_DICT = {
-    'off':      None,
-    'low':      '1.8C (67%) excl. avoided emis SCOPE1',
-    'medium':   '1.5C (50%) excl. avoided emis SCOPE1',
-    'high':     '1.5C (67%) excl. avoided emis SCOPE1',
+    'off':     None,
+    'low':    '1.8C 67%',
+    'high':   '1.5C 50%',
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
@@ -458,6 +459,8 @@ GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
     - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
 - Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions from land-use and livestock types)
     - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
+- When turning off the 'Carbon Planttings', including block/belt, use the following options:
+    - '1.5C 50%', '1.8C 67%'
 '''
   	  	  
 

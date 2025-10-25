@@ -43,8 +43,6 @@ from math import ceil
 from dataclasses import dataclass
 from scipy.ndimage import distance_transform_edt
 
-import time
-
 
 
 def dict2matrix(d, fromlist, tolist):
@@ -629,7 +627,7 @@ class Data:
         )
 
         # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
-        self.SOIL_CARBON_AVG_T_CO2_HA = (
+        self.SOIL_CARBON_AVG_T_CO2_HA_PER_YR = (
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
             * (44 / 12)  # Convert C to CO2e
             / settings.CARBON_EFFECTS_WINDOW
@@ -749,109 +747,45 @@ class Data:
         fr_dict = {"low": "FD_RISK_PERC_5TH", "med": "FD_RISK_MEDIAN", "high": "FD_RISK_PERC_95TH"}
         fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]
 
-        def load_and_process_netcdf(filename, mask, fire_risk, risk_of_reversal, carbon_effects_window,
-                                    tree_var, debris_var, soil_var):
-            """
-            通用函数：
-            1. 读取 NetCDF 文件到内存；
-            2. 应用筛选和碳折减；
-            3. 返回平均每年 tCO2/ha；
-            4. 自动关闭并释放内存。
-            """
-            path = os.path.join(settings.INPUT_DIR, filename)
-            print(f"\tLoading {filename}...", flush=True)
+        # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        self.EP_BLOCK_AVG_T_CO2_HA_PER_YR = (
+            (ds.EP_BLOCK_TREES_TOT_T_CO2_HA + ds.EP_BLOCK_DEBRIS_TOT_T_CO2_HA)
+            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ds.EP_BLOCK_SOIL_TOT_T_CO2_HA
+        ).values / settings.CARBON_EFFECTS_WINDOW
 
-            # 打开并立即加载进内存
-            ds = xr.open_dataset(path).load()
+        # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        self.EP_BELT_AVG_T_CO2_HA_PER_YR = (
+            (ds.EP_BELT_TREES_T_CO2_HA + ds.EP_BELT_DEBRIS_T_CO2_HA)
+            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ds.EP_BELT_SOIL_T_CO2_HA
+        ).values / settings.CARBON_EFFECTS_WINDOW
 
-            # 提取指定年龄和掩码
-            ds_age = ds.sel(age=settings.CARBON_EFFECTS_WINDOW)
-            ds_masked = ds_age.sel(cell=mask)
+        # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        self.EP_RIP_AVG_T_CO2_HA_PER_YR = (
+            (ds.EP_RIP_TREES_T_CO2_HA + ds.EP_RIP_DEBRIS_T_CO2_HA)
+            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ds.EP_RIP_SOIL_T_CO2_HA
+        ).values / settings.CARBON_EFFECTS_WINDOW
 
-            # 计算折减后的碳储量
-            arr = (
-                          (ds_masked[tree_var] + ds_masked[debris_var])
-                          * (fire_risk / 100)
-                          * (1 - risk_of_reversal)
-                          + ds_masked[soil_var]
-                  ).values / carbon_effects_window
+        # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        self.CP_BLOCK_AVG_T_CO2_HA_PER_YR = (
+            (ds.CP_BLOCK_TREES_T_CO2_HA + ds.CP_BLOCK_DEBRIS_T_CO2_HA)
+            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ds.CP_BLOCK_SOIL_T_CO2_HA
+        ).values / settings.CARBON_EFFECTS_WINDOW
 
-            # 关闭数据集并释放内存
-            ds.close()
-            del ds, ds_age, ds_masked
-
-            return arr.astype(np.float32)
-
-        self.EP_BLOCK_AVG_T_CO2_HA = load_and_process_netcdf(
-            "tCO2_ha_ep_block.nc", self.MASK, fire_risk,
-            settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
-            "EP_BLOCK_TREES_TOT_T_CO2_HA", "EP_BLOCK_DEBRIS_TOT_T_CO2_HA", "EP_BLOCK_SOIL_TOT_T_CO2_HA"
-        )
-
-        self.EP_BELT_AVG_T_CO2_HA = load_and_process_netcdf(
-            "tCO2_ha_ep_belt.nc", self.MASK, fire_risk,
-            settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
-            "EP_BELT_TREES_T_CO2_HA", "EP_BELT_DEBRIS_T_CO2_HA", "EP_BELT_SOIL_T_CO2_HA"
-        )
-
-        self.EP_RIP_AVG_T_CO2_HA = load_and_process_netcdf(
-            "tCO2_ha_ep_rip.nc", self.MASK, fire_risk,
-            settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
-            "EP_RIP_TREES_T_CO2_HA", "EP_RIP_DEBRIS_T_CO2_HA", "EP_RIP_SOIL_T_CO2_HA"
-        )
-
-        self.CP_BLOCK_AVG_T_CO2_HA = load_and_process_netcdf(
-            "tCO2_ha_cp_block.nc", self.MASK, fire_risk,
-            settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
-            "CP_BLOCK_TREES_T_CO2_HA", "CP_BLOCK_DEBRIS_T_CO2_HA", "CP_BLOCK_SOIL_T_CO2_HA"
-        )
-
-        self.CP_BELT_AVG_T_CO2_HA = load_and_process_netcdf(
-            "tCO2_ha_cp_belt.nc", self.MASK, fire_risk,
-            settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
-            "CP_BELT_TREES_T_CO2_HA", "CP_BELT_DEBRIS_T_CO2_HA", "CP_BELT_SOIL_T_CO2_HA"
-        )
-
-
-        # # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        # self.EP_BLOCK_AVG_T_CO2_HA = (
-        #     (ds.EP_BLOCK_TREES_TOT_T_CO2_HA + ds.EP_BLOCK_DEBRIS_TOT_T_CO2_HA)
-        #     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-        #     + ds.EP_BLOCK_SOIL_TOT_T_CO2_HA
-        # ).values / settings.CARBON_EFFECTS_WINDOW
-        #
-        # # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        # self.EP_BELT_AVG_T_CO2_HA = (
-        #     (ds.EP_BELT_TREES_T_CO2_HA + ds.EP_BELT_DEBRIS_T_CO2_HA)
-        #     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-        #     + ds.EP_BELT_SOIL_T_CO2_HA
-        # ).values / settings.CARBON_EFFECTS_WINDOW
-        #
-        # # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        # self.EP_RIP_AVG_T_CO2_HA = (
-        #     (ds.EP_RIP_TREES_T_CO2_HA + ds.EP_RIP_DEBRIS_T_CO2_HA)
-        #     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-        #     + ds.EP_RIP_SOIL_T_CO2_HA
-        # ).values / settings.CARBON_EFFECTS_WINDOW
-        #
-        # # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        # self.CP_BLOCK_AVG_T_CO2_HA = (
-        #     (ds.CP_BLOCK_TREES_T_CO2_HA + ds.CP_BLOCK_DEBRIS_T_CO2_HA)
-        #     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-        #     + ds.CP_BLOCK_SOIL_T_CO2_HA
-        # ).values / settings.CARBON_EFFECTS_WINDOW
-        #
-        # # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        # self.CP_BELT_AVG_T_CO2_HA = (
-        #     (ds.CP_BELT_TREES_T_CO2_HA + ds.CP_BELT_DEBRIS_T_CO2_HA)
-        #     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-        #     + ds.CP_BELT_SOIL_T_CO2_HA
-        # ).values / settings.CARBON_EFFECTS_WINDOW
+        # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        self.CP_BELT_AVG_T_CO2_HA_PER_YR = (
+            (ds.CP_BELT_TREES_T_CO2_HA + ds.CP_BELT_DEBRIS_T_CO2_HA)
+            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ds.CP_BELT_SOIL_T_CO2_HA
+        ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Agricultural land use to plantings raw transition costs:
         self.AG2EP_TRANSITION_COSTS_HA = np.load(
@@ -862,12 +796,12 @@ class Data:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             os.path.join(settings.INPUT_DIR, "ep_to_ag_tmatrix.npy")
         )  # shape: (28,)
-
-
+        
+        
         ##############################################################
         # Transition cost for all land use
         #############################################################
-
+        
         # Transition matrix from ag
         tmat_ag2ag_xr = xr.DataArray(
             self.AG_TMATRIX,
@@ -881,11 +815,11 @@ class Data:
         )
         tmat_from_ag_xr = xr.concat([tmat_ag2ag_xr, tmat_ag2non_ag_xr], dim='to_lu')                        # Combine ag2ag and ag2non-ag
         tmat_from_ag_xr.loc[:,'Destocked - natural land'] = self.AG_TO_DESTOCKED_NATURAL_COSTS_HA           # Ag to Destock-natural has its own values
-
-
+        
+        
         # Transition matrix of non-ag to unallocated-modified land (land clearing)
         tmat_wood_clear = np.load(os.path.join(settings.INPUT_DIR, 'transition_cost_clearing_forest.npz'))
-
+        
         tmat_clear_EP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_RP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_sheep_ag_forest = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.AF_PROPORTION
@@ -895,15 +829,15 @@ class Data:
         tmat_clear_beef_CP = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.CP_BELT_PROPORTION
         tmat_clear_BECCS = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_destocked_nat = tmat_wood_clear['tmat_clear_light_wood'] + tmat_wood_clear['tmat_clear_dense_wood']
-
+        
         tmat_costs = np.array([
             tmat_clear_EP, tmat_clear_RP, tmat_clear_sheep_ag_forest, tmat_clear_beef_ag_forest,
             tmat_clear_CP, tmat_clear_sheep_CP, tmat_clear_beef_CP, tmat_clear_BECCS, tmat_clear_destocked_nat
         ]).T
-
-
-
-
+        
+        
+        
+        
         # Transition matrix from non-ag
         tmat_non_ag2ag_xr = xr.DataArray(
             np.repeat(self.EP2AG_TRANSITION_COSTS_HA.reshape(1,-1), len(self.NON_AGRICULTURAL_LANDUSES), axis=0),
@@ -920,8 +854,8 @@ class Data:
         np.fill_diagonal(tmat_non_ag2non_ag_xr.values, 0)                                                   # Lu staty the same has 0 cost
         tmat_from_non_ag_xr = xr.concat([tmat_non_ag2ag_xr, tmat_non_ag2non_ag_xr], dim='to_lu')            # Combine non-ag2ag and non-ag2non-ag
         tmat_from_non_ag_xr.loc['Destocked - natural land', 'Unallocated - natural land'] = np.nan          # Destocked-natural can not transit to unallow-natural
-
-
+        
+   
         # Get the full transition cost matrix
         self.T_MAT = xr.concat([tmat_from_ag_xr, tmat_from_non_ag_xr], dim='from_lu')
         self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, [self.AGLU2DESC[i] for i in self.LU_NATURAL]] = np.nan       # non-ag2natural is not allowed
@@ -930,7 +864,8 @@ class Data:
 
 
         # tools.plot_t_mat(self.T_MAT)
-
+        
+        
 
         ###############################################################
         # Water data.
@@ -1039,9 +974,9 @@ class Data:
         nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
         
         # Get the carbon stock of unallowcated natural land
-        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = np.array(
+        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = np.array(
             nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk).to_numpy() / 100),  # everyting minus the fire DAMAGE
-        )
+        ) / settings.CARBON_EFFECTS_WINDOW
         
         
         ###############################################################
@@ -1070,17 +1005,50 @@ class Data:
         ###############################################################
         print("\tLoading demand data...", flush=True)
 
+        # Load demand multiplier data
+        AusTIME_multipliers = pd.read_excel(
+                f'{settings.INPUT_DIR}/AusTIMES_demand_multiplier.xlsx',
+                sheet_name=settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS].split(' ')[0] + ' Demand',
+                index_col=0,
+            ).T.reset_index(drop=True
+            ).rename(columns={
+                'Sorghum ':'winter cereals',    # the majority of winter cereals is Sorghum in Australia, so we map it this way
+                'Canola':'winter oilseeds',     # the majority of winter oilseeds is Canola in Australia, so we map it this way
+                'Sugar': 'sugar'
+            }).drop(columns=['Cottonseed']      # LUTO do not have cottonseed in our model
+            ).astype({'Year': int}
+            ).set_index('Year')
+
+        demand_multipliers = pd.DataFrame(
+            index=range(2010, AusTIME_multipliers.index.max() + 1),
+            columns=self.COMMODITIES,
+            data=1.0
+        )
+
+        demand_multipliers.loc[
+            AusTIME_multipliers.index,
+            AusTIME_multipliers.columns
+        ] = AusTIME_multipliers
+
+        demand_multipliers = demand_multipliers.T
+        demand_multipliers.columns.name = 'YEAR'
+        demand_multipliers.index.name = 'COMMODITY'
+
+
+
         # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
         dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'demand_projections.h5'))
 
         # Select the demand data under the running scenariobbryan-January
-        self.DEMAND_DATA = dd.loc[(settings.SCENARIO,
-                                   settings.DIET_DOM,
-                                   settings.DIET_GLOB,
-                                   settings.CONVERGENCE,
-                                   settings.IMPORT_TREND,
-                                   settings.WASTE,
-                                   settings.FEED_EFFICIENCY)].copy()
+        self.DEMAND_DATA = dd.loc[(
+            settings.SCENARIO,
+            settings.DIET_DOM,
+            settings.DIET_GLOB,
+            settings.CONVERGENCE,
+            settings.IMPORT_TREND,
+            settings.WASTE,
+            settings.FEED_EFFICIENCY)
+        ].copy()
 
         # Convert eggs from count to tonnes
         self.DEMAND_DATA.loc['eggs'] = self.DEMAND_DATA.loc['eggs'] * settings.EGGS_AVG_WEIGHT / 1000 / 1000
@@ -1091,6 +1059,11 @@ class Data:
         # Remove off-land commodities
         self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY not in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
+        if settings.APPLY_DEMAND_MULTIPLIERS:
+            print('The years before applying demand multipliers:', self.DEMAND_C.columns.min(), self.DEMAND_C.columns.max(), flush=True)
+            self.DEMAND_C = (self.DEMAND_C *  demand_multipliers).dropna(axis=1)
+            print("The years after applying demand multipliers:", self.DEMAND_C.columns.min(), self.DEMAND_C.columns.max(), flush=True)
+
         # Convert to numpy array of shape (91, 26)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
         
@@ -1099,7 +1072,7 @@ class Data:
         # are distorted more under higher resfactoring.
         self.D_CY *= (yr_cal_base_prod_data / self.D_CY[0])[None, :]
         
-        
+
         # Demand elasticity data
         demand_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').drop(columns=['Unnamed: 0'])
         demand_elasticity['demand_elasticity'] = demand_elasticity.eval('`Supply Elasticity (Es)` - `Demand Elasticity(ED)`')
@@ -1108,6 +1081,8 @@ class Data:
         demand_xr = xr.DataArray(self.DEMAND_C) 
         self.DEMAND_DELTA = (demand_xr - demand_xr.sel(YEAR=2010)) / demand_xr.sel(YEAR=2010)
         
+
+
 
 
         ###############################################################
@@ -1706,12 +1681,25 @@ class Data:
       
         return lumap_resfactored[*nearst_ind]
     
-    def get_elasticity_price_for_yr(self, yr:int) -> float:
-        demand_xr = xr.DataArray(self.DEMAND_C) 
-        demand_delta = (demand_xr - demand_xr.sel(YEAR=2010)) / demand_xr.sel(YEAR=2010)
+
+    def get_elasticity_multiplier(self, yr_cal):
+        '''
+        Get the elasticity multiplier for a given year and land use.
+        yr_cal: year (int).
         
-        
-    
+        Returns:
+            dict: A dictionary with land use as keys and elasticity multipliers as values.
+        '''
+        elasticity_multiplier = {
+            c: 1 + (self.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY=c) / self.DEMAND_ELASTICITY[c]).values
+            for c in self.DEMAND_DELTA.COMMODITY.values
+        }
+
+        if settings.DYNAMIC_PRICE:
+            return elasticity_multiplier
+        else:
+            return {k: 1 for k in elasticity_multiplier.keys()}
+
     
     def get_watershed_yield_components(self, valid_watershed_id:list[int] = None):
         """
