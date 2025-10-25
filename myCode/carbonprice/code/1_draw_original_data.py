@@ -108,7 +108,7 @@ for spec in plot_specs:
 plot_specs = [
     PlotSpec("xr_total_bio", "biodiversity_total", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", 'Total',[0.25, -0.068, 0.4, 0.1],None),
     PlotSpec("xr_biodiversity_GBF2_priority_ag_management", "am", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", None,[0.12, -0.068, 0.4, 0.1],None),
-    PlotSpec("xr_biodiversity_GBF2_priority_non_ag", "non_ag", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", None,[0.05, -0.068, 0.4, 0.1],None),
+    PlotSpec("xr_biodiversity_GBF2_priority_non_ag", "non_ag", r"Biodiversity (contribution-weighted area, Mha yr$^{-1}$)", None,[0.12, -0.068, 0.4, 0.1],None),
 ]
 
 for spec in plot_specs:
@@ -119,6 +119,9 @@ for spec in plot_specs:
     summary_ylim = get_global_ylim(data_dict)
 
     output_path = os.path.join(output_dir, f'03_{input_file}.png')
+    n_col = 4
+    if input_file == "xr_biodiversity_GBF2_priority_non_ag":
+        n_col = 3
     plot_25_layout(
         all_dfs=data_dict,
         title_map=config.ALL_TITLE_MAP,
@@ -128,7 +131,7 @@ for spec in plot_specs:
         total_name=total_name,
         ylabel=ylabel,
         bbox_to_anchor = bbox_to_anchor,
-        ncol = 4,
+        ncol = n_col,
         ghost_legend_num=0,
         post_process=post_process,
         y_labelpad=20

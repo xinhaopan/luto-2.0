@@ -168,7 +168,7 @@ plt.rcParams['mathtext.sf'] = font_family
 add_north_arrow(fig, 0.21, 0.048, size=0.03)
 add_scalebar(fig, axes[0], 0.26, 0.059, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
-add_annotation(fig, 0.33, 0.063, width=0.025, text="State/Territory boundaries",
+add_annotation(fig, 0.33, 0.068, width=0.025, text="State/Territory boundaries",
                linewidth=2, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
 add_annotation(fig, 0.62, 0.059, width=0.014, height=0.0095, linewidth=2,

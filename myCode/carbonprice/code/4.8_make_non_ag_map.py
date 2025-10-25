@@ -20,8 +20,8 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
     ncols = len(scenarios)
     figsize = (ncols * 5, nrows * 4.2)
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.1, wspace=0.02,
-                           left=0.05, right=0.99, top=0.99, bottom=0.04)
+    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.2, wspace=0.02,
+                           left=0.05, right=0.99, top=1, bottom=0.04)
     axes = []
 
     for row, tif in enumerate(tif_title_list):
@@ -68,13 +68,11 @@ scenarios = ["Run_21_GHG_off_BIO_off_CUT_50", "Run_06_GHG_high_BIO_off_CUT_50", 
 # Column headers for the plot grid
 title_names = ['Reference', r'$\mathrm{NZ}_{\mathrm{high}}$',
                r'$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$']
-tif_title_list = ["Destocked - natural land", "Carbon plantings (Block)", "Riparian plantings",
-                    "Environmental plantings", "Sheep agroforestry", "Beef agroforestry",
-                    "Sheep carbon plantings (Belt)", "Beef carbon plantings (Belt)"]
-row_labels = ["Destocked (natural land)", "Carbon plantings (monoculture)", "Riparian buffer restoration\n(mixed species)",
-                "Environmental plantings\n(mixed local native species)", "Agroforestry\n(mixed species + sheep)",
-                "Agroforestry\n(mixed species + beef)", "Farm forestry\n(hardwood timber + sheep)",
-                "Farm forestry\n(hardwood timber + beef)"]
+tif_title_list = ["Destocked - natural land",  "Riparian plantings",
+                    "Environmental plantings", "Sheep agroforestry", "Beef agroforestry"]
+row_labels = ["Destocked (natural land)","Riparian buffer restoration\n(mixed species)",
+                "Environmental plantings\n(mixed local native species)",
+              "Agroforestry\n(mixed species + sheep)","Agroforestry\n(mixed species + beef)", ]
 
 # --- Plotting ---
 fig, axes = plot_tif_grid(scenarios, tif_title_list, title_names)
@@ -107,7 +105,7 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 im = axes[0].images[0]
-cax = fig.add_axes([0.2, 0.03, 0.6, 0.015])  # [left, bottom, width, height]，可调整
+cax = fig.add_axes([0.2, 0.04, 0.6, 0.015])  # [left, bottom, width, height]，可调整
 cbar = fig.colorbar(im, cax=cax, orientation='horizontal', extend='both')
 cbar.ax.xaxis.set_label_position('top')
 cbar.set_ticks([0, 0.25, 0.5, 0.75, 1])

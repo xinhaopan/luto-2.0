@@ -50,8 +50,8 @@ price_cmap = LinearSegmentedColormap.from_list("price", ["#ffff80", "#38e009","#
 
 layer_overrides = {
     # 'carbon_sol_price_carbon_high': {"custom_tick_values": [0,50,100]},
-    # 'carbon_sol_price_carbon_high_bio_50': {"custom_tick_values": [0,1000,2000]},
-    # 'carbon_sol_price_Counterfactual_carbon_high_bio_50': {"custom_tick_values": [0,500,1000]},
+    'carbon_sol_price_carbon_high_bio_50': {"custom_tick_values": [0,1200,2400]},
+    'carbon_sol_price_Counterfactual_carbon_high_bio_50': {"custom_tick_values": [0,1200,2400]},
 }
 
 legend_nbins = 3
