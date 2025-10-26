@@ -4,10 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="merage: from jinzhu 20251025">
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="merage: fix bug when turn off GHG targets">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/luto/data.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Run_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Run_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_HPC.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_HPC.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -85,7 +86,7 @@
       <recent name="N:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\carbonprice\code" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.Run_test">
+  <component name="RunManager" selected="Python.Paper2_tasks_HPC">
     <configuration name="0_runs_test" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="LUTO2" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -100,28 +101,6 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/0_runs_test.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="1_labour_cost" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="LUTO2" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/1_labour_cost.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -152,7 +131,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="2_yieldncreass_ABARES" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="Paper2_tasks" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="LUTO2" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -160,12 +139,36 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
-      <option name="IS_MODULE_SDK" value="true" />
+      <option name="SDK_NAME" value="Remote Python 3.12.8 (sftp://s222552331@hpclogin.deakingpuhpc.deakin.edu.au:22/home/remote/s222552331/apps/miniforge3/envs/luto/bin/python3)" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/tasks_run" />
+      <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="N:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\Ag2050\1_Scripts\2_yieldncreass_ABARES.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Paper2_tasks_HPC" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="LUTO2" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="SDK_NAME" value="Remote Python 3.12.8 (sftp://s222552331@hpclogin.deakingpuhpc.deakin.edu.au:22/home/remote/s222552331/apps/miniforge3/envs/luto/bin/python3)" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/tasks_run" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_HPC.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -197,19 +200,19 @@
       <method v="2" />
     </configuration>
     <list>
+      <item itemvalue="Python.Paper2_tasks_HPC" />
       <item itemvalue="Python.0_runs_test" />
-      <item itemvalue="Python.1_labour_cost" />
-      <item itemvalue="Python.2_yieldncreass_ABARES" />
       <item itemvalue="Python.2_yieldncreass_ABARES (1)" />
+      <item itemvalue="Python.Paper2_tasks" />
       <item itemvalue="Python.Run_test" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.Paper2_tasks_HPC" />
+        <item itemvalue="Python.Paper2_tasks" />
         <item itemvalue="Python.Run_test" />
         <item itemvalue="Python.0_runs_test" />
         <item itemvalue="Python.2_yieldncreass_ABARES (1)" />
-        <item itemvalue="Python.1_labour_cost" />
-        <item itemvalue="Python.2_yieldncreass_ABARES" />
       </list>
     </recent_temporary>
   </component>
@@ -239,15 +242,7 @@
       <workItem from="1759558143790" duration="43153000" />
       <workItem from="1759636767905" duration="81533000" />
       <workItem from="1760161123508" duration="33763000" />
-      <workItem from="1760351223725" duration="62846000" />
-    </task>
-    <task id="LOCAL-00012" summary="update: run in nci">
-      <option name="closed" value="true" />
-      <created>1758019798401</created>
-      <option name="number" value="00012" />
-      <option name="presentableId" value="LOCAL-00012" />
-      <option name="project" value="LOCAL" />
-      <updated>1758019798401</updated>
+      <workItem from="1760351223725" duration="64632000" />
     </task>
     <task id="LOCAL-00013" summary="update: create mem minitor html">
       <option name="closed" value="true" />
@@ -633,7 +628,15 @@
       <option name="project" value="LOCAL" />
       <updated>1761352784092</updated>
     </task>
-    <option name="localTasksCounter" value="61" />
+    <task id="LOCAL-00061" summary="merage: fix bug when turn off GHG targets">
+      <option name="closed" value="true" />
+      <created>1761354030136</created>
+      <option name="number" value="00061" />
+      <option name="presentableId" value="LOCAL-00061" />
+      <option name="project" value="LOCAL" />
+      <updated>1761354030136</updated>
+    </task>
+    <option name="localTasksCounter" value="62" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -674,7 +677,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update: merge from jinzhu 20250926" />
     <MESSAGE value="update: Clean up invalid scripts" />
     <MESSAGE value="update: draw map by hexagon" />
     <MESSAGE value="update: draw map" />
@@ -699,7 +701,8 @@
     <MESSAGE value="update: daily job" />
     <MESSAGE value="update: create productivity and FLC input data" />
     <MESSAGE value="merage: from jinzhu 20251025" />
-    <option name="LAST_COMMIT_MESSAGE" value="merage: from jinzhu 20251025" />
+    <MESSAGE value="merage: fix bug when turn off GHG targets" />
+    <option name="LAST_COMMIT_MESSAGE" value="merage: fix bug when turn off GHG targets" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -866,7 +869,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$write_helper.coverage" NAME="write_helper Coverage Results" MODIFIED="1757334501514" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run/tools" />
     <SUITE FILE_PATH="coverage/LUTO2$01_caculate_price_with_mask.coverage" NAME="01_caculate_price_with_mask Coverage Results" MODIFIED="1758202106738" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$__init__.coverage" NAME="__init__ Coverage Results" MODIFIED="1757220761228" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code/tools" />
-    <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks.coverage" NAME="Paper2_tasks Coverage Results" MODIFIED="1760002697604" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
+    <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks.coverage" NAME="Paper2_tasks Coverage Results" MODIFIED="1761354200044" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_test.coverage" NAME="Paper2_tasks_test Coverage Results" MODIFIED="1758467029714" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_test_res.coverage" NAME="Paper2_tasks_test_res Coverage Results" MODIFIED="1757227959370" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$mem_test.coverage" NAME="mem_test Coverage Results" MODIFIED="1758007823018" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode" />
@@ -889,7 +892,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$07_make_map_all1.coverage" NAME="07_make_map_all1 Coverage Results" MODIFIED="1758637548283" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_num0.coverage" NAME="Paper2_tasks_num0 Coverage Results" MODIFIED="1758470046281" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_HPC_NUM0.coverage" NAME="Paper2_tasks_HPC_NUM0 Coverage Results" MODIFIED="1758480532460" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
-    <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_HPC.coverage" NAME="Paper2_tasks_HPC Coverage Results" MODIFIED="1758862991277" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
+    <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_HPC.coverage" NAME="Paper2_tasks_HPC Coverage Results" MODIFIED="1761354550362" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$temp_zip.coverage" NAME="temp_zip Coverage Results" MODIFIED="1759382996576" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/LUTO2$4_5_make_BIO_benefits_map.coverage" NAME="4.5_make_BIO_benefits_map Coverage Results" MODIFIED="1760862046608" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$test3.coverage" NAME="test3 Coverage Results" MODIFIED="1757995381914" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
