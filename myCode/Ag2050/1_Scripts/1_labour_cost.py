@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from tools import predit_growth_index
+from tools import predict_growth_index
 
 # ---------- 配置 ----------
 import pandas as pd
@@ -15,25 +15,24 @@ col0, col1 = df.columns[0], df.columns[1]
 df['Year'] = pd.to_datetime(df[col0], format='%b-%y', errors='coerce').dt.year
 df.rename(columns={col1: 'Cost'}, inplace=True)
 df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce')
-
 # 提取 Year 和 Cost，排序
 df = df[['Year', 'Cost']].dropna(subset=['Year']).sort_values('Year').reset_index(drop=True)
-
 # 获取2014年的成本值（第一个非NaN值）
 cost_2014 = df.loc[df['Year'] == 2014, 'Cost'].values[0]
-
 # 构造 2010–2013 年份的数据，用2014年的Cost填充
 pre_years = pd.DataFrame({'Year': [2010, 2011, 2012, 2013], 'Cost': cost_2014})
-
 # 合并补全的和原始数据，并排序
 df = pd.concat([pre_years, df], ignore_index=True).drop_duplicates('Year').sort_values('Year').reset_index(drop=True)
 
 # ---------- 预测增长指数并绘图 ----------
-ax, df_result = predit_growth_index(df, var_name='Labour Cost')
+ax, df_result = predict_growth_index(df, var_name='Labour Cost',base_year = 2010)
+handles, labels = ax.get_legend_handles_labels()
+ax.legend(handles, labels, loc='upper left', frameon=True)
+
 fig = ax.get_figure()
 fig.savefig('labour_cost_growth_index.png', dpi=300)
 fig.show()
-excel_path = "../0_original_data/cost_multipliers.xlsx"   # 把此处改为你的 Excel 文件路径
+excel_path = "../0_original_data/FLC_cost_multipliers.xlsx"   # 把此处改为你的 Excel 文件路径
 template_sheet = "FLC_multiplier"            # 模板表所在 sheet（0 表示第一个 sheet）
 
 # ---------- 读取模板 Excel ----------
@@ -109,7 +108,7 @@ for sheet_name, col_name in found_cols.items():
 # 如果文件存在，使用 mode='a' 并替换同名 sheet；否则新建文件
 mode = 'a' if p.exists() else 'w'
 # pandas >= 1.3 支持 if_sheet_exists 参数
-with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+with pd.ExcelWriter(excel_path, engine='openpyxl', mode=mode, if_sheet_exists='replace') as writer:
     for sheet_name, df_sheet in sheets_to_write.items():
         df_sheet.to_excel(writer, sheet_name=sheet_name, index=False)
 print(f"已将 {len(sheets_to_write)} 个 sheet 写入到 {excel_path}（同名 sheet 将被替换）。")

@@ -83,7 +83,7 @@ def parse_running_year(runing_file):
 
 
 if __name__ == "__main__":
-    base_dir = '../../output/20251013_Paper2_Results'
+    base_dir = '../../output/20251026_Paper2_Results'
     target_year = 2050
     template_df = pd.read_csv(os.path.join(base_dir, 'grid_search_template.csv'), index_col=0)
     run_dirs = [col for col in template_df.columns if col.startswith('Run_')]

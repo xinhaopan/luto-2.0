@@ -780,35 +780,41 @@ class Data:
 
             return arr.astype(np.float32)
 
-        self.EP_BLOCK_AVG_T_CO2_HA = load_and_process_netcdf(
+        # Load environmental plantings (block) GHG sequestration
+        self.EP_BLOCK_AVG_T_CO2_HA_PER_YR = load_and_process_netcdf(
             "tCO2_ha_ep_block.nc", self.MASK, fire_risk,
             settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
             "EP_BLOCK_TREES_TOT_T_CO2_HA", "EP_BLOCK_DEBRIS_TOT_T_CO2_HA", "EP_BLOCK_SOIL_TOT_T_CO2_HA"
         )
 
-        self.EP_BELT_AVG_T_CO2_HA = load_and_process_netcdf(
+        # Load environmental plantings (belt) GHG sequestration
+        self.EP_BELT_AVG_T_CO2_HA_PER_YR = load_and_process_netcdf(
             "tCO2_ha_ep_belt.nc", self.MASK, fire_risk,
             settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
             "EP_BELT_TREES_T_CO2_HA", "EP_BELT_DEBRIS_T_CO2_HA", "EP_BELT_SOIL_T_CO2_HA"
         )
 
-        self.EP_RIP_AVG_T_CO2_HA = load_and_process_netcdf(
+        # Load environmental plantings (riparian) GHG sequestration
+        self.EP_RIP_AVG_T_CO2_HA_PER_YR = load_and_process_netcdf(
             "tCO2_ha_ep_rip.nc", self.MASK, fire_risk,
             settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
             "EP_RIP_TREES_T_CO2_HA", "EP_RIP_DEBRIS_T_CO2_HA", "EP_RIP_SOIL_T_CO2_HA"
         )
 
-        self.CP_BLOCK_AVG_T_CO2_HA = load_and_process_netcdf(
+        # Load carbon plantings (block) GHG sequestration
+        self.CP_BLOCK_AVG_T_CO2_HA_PER_YR = load_and_process_netcdf(
             "tCO2_ha_cp_block.nc", self.MASK, fire_risk,
             settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
             "CP_BLOCK_TREES_T_CO2_HA", "CP_BLOCK_DEBRIS_T_CO2_HA", "CP_BLOCK_SOIL_T_CO2_HA"
         )
 
-        self.CP_BELT_AVG_T_CO2_HA = load_and_process_netcdf(
+        # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration
+        self.CP_BELT_AVG_T_CO2_HA_PER_YR = load_and_process_netcdf(
             "tCO2_ha_cp_belt.nc", self.MASK, fire_risk,
             settings.RISK_OF_REVERSAL, settings.CARBON_EFFECTS_WINDOW,
             "CP_BELT_TREES_T_CO2_HA", "CP_BELT_DEBRIS_T_CO2_HA", "CP_BELT_SOIL_T_CO2_HA"
         )
+
 
         # # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         # ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
