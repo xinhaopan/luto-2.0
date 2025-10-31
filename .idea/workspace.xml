@@ -4,36 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update: load CP and EP data in HPC">
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/2_model_test.py" afterDir="false" />
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update: upload productivity and FLC data">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/data.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/0_original_data/cost_multipliers.xlsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/0_original_data/yieldincreases_bau2022.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/0_original_data/yieldncreases_ABARES.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/0_original_data/yieldncreases_ABARES.xlsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/1_labour_cost.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/1_labour_cost.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/2_yieldncreass_ABARES.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/3_yieldncreass_ABARES.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/combined_productivity_plots.png" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/combined_productivity_plots.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/combined_productivity_results.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/combined_productivity_results.xlsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/df_result_processed.xlsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/growth_index_Business As Usual.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/growth_index_Stratified Societies.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/growth_index_Toward Sustainability.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/growth_index_plots.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/labour_cost_growth_index.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/output_by_scenario.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/output_by_scenario.xlsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/output_no_merge.xlsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/plot_scenario_Business As Usual.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/plot_scenario_Stratified Societies.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/plot_scenario_Toward Sustainability.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/test.ipynb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/4_yieldncress_FAO.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/tools.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/yieldncreases_ABARES.xlsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/tools/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/tools/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_mem_monitor.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_mem_monitor.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_HPC_1.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_HPC_1.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -200,7 +174,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="tools" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="tools (1)" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="LUTO2" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -208,12 +182,12 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
-      <option name="IS_MODULE_SDK" value="true" />
+      <option name="WORKING_DIRECTORY" value="//school-les-m.shares.deakin.edu.au/school-les-m/Planet-A/LUF-Modelling/LUTO2_XH/LUTO2/myCode/Ag2050/1_Scripts" />
+      <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/tools.py" />
+      <option name="SCRIPT_NAME" value="//school-les-m.shares.deakin.edu.au/school-les-m/Planet-A/LUF-Modelling/LUTO2_XH/LUTO2/myCode/Ag2050/1_Scripts/tools.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -227,15 +201,15 @@
       <item itemvalue="Python.2_model_test" />
       <item itemvalue="Python.3_yieldncreass_ABARES" />
       <item itemvalue="Python.3_yieldncreass_ABARES (1)" />
-      <item itemvalue="Python.tools" />
+      <item itemvalue="Python.tools (1)" />
     </list>
     <recent_temporary>
       <list>
         <item itemvalue="Python.1_labour_cost" />
+        <item itemvalue="Python.tools (1)" />
         <item itemvalue="Python.3_yieldncreass_ABARES (1)" />
         <item itemvalue="Python.3_yieldncreass_ABARES" />
         <item itemvalue="Python.2_model_test" />
-        <item itemvalue="Python.tools" />
       </list>
     </recent_temporary>
   </component>
@@ -265,23 +239,7 @@
       <workItem from="1759558143790" duration="43153000" />
       <workItem from="1759636767905" duration="81533000" />
       <workItem from="1760161123508" duration="33763000" />
-      <workItem from="1760351223725" duration="127605000" />
-    </task>
-    <task id="LOCAL-00014" summary="update: create excel for draw">
-      <option name="closed" value="true" />
-      <created>1758098433708</created>
-      <option name="number" value="00014" />
-      <option name="presentableId" value="LOCAL-00014" />
-      <option name="project" value="LOCAL" />
-      <updated>1758098433708</updated>
-    </task>
-    <task id="LOCAL-00015" summary="update: calculate carbon price with biodiversity and carbon price for biodiversity">
-      <option name="closed" value="true" />
-      <created>1758261709878</created>
-      <option name="number" value="00015" />
-      <option name="presentableId" value="LOCAL-00015" />
-      <option name="project" value="LOCAL" />
-      <updated>1758261709878</updated>
+      <workItem from="1760351223725" duration="131394000" />
     </task>
     <task id="LOCAL-00016" summary="update: write GHG &amp; BIO when off">
       <option name="closed" value="true" />
@@ -659,7 +617,23 @@
       <option name="project" value="LOCAL" />
       <updated>1761448007965</updated>
     </task>
-    <option name="localTasksCounter" value="63" />
+    <task id="LOCAL-00063" summary="update: calculate productivity and FLC">
+      <option name="closed" value="true" />
+      <created>1761821604556</created>
+      <option name="number" value="00063" />
+      <option name="presentableId" value="LOCAL-00063" />
+      <option name="project" value="LOCAL" />
+      <updated>1761821604556</updated>
+    </task>
+    <task id="LOCAL-00064" summary="update: upload productivity and FLC data">
+      <option name="closed" value="true" />
+      <created>1761821677309</created>
+      <option name="number" value="00064" />
+      <option name="presentableId" value="LOCAL-00064" />
+      <option name="project" value="LOCAL" />
+      <updated>1761821677309</updated>
+    </task>
+    <option name="localTasksCounter" value="65" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -700,8 +674,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update: draw map by hexagon" />
-    <MESSAGE value="update: draw map" />
     <MESSAGE value="update: run Nick task" />
     <MESSAGE value="update: create map" />
     <MESSAGE value="update: draw map area" />
@@ -725,7 +697,9 @@
     <MESSAGE value="merage: from jinzhu 20251025" />
     <MESSAGE value="merage: fix bug when turn off GHG targets" />
     <MESSAGE value="update: load CP and EP data in HPC" />
-    <option name="LAST_COMMIT_MESSAGE" value="update: load CP and EP data in HPC" />
+    <MESSAGE value="update: calculate productivity and FLC" />
+    <MESSAGE value="update: upload productivity and FLC data" />
+    <option name="LAST_COMMIT_MESSAGE" value="update: upload productivity and FLC data" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -912,6 +886,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_test_res.coverage" NAME="Paper2_tasks_test_res Coverage Results" MODIFIED="1757227959370" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$mem_test.coverage" NAME="mem_test Coverage Results" MODIFIED="1758007823018" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode" />
     <SUITE FILE_PATH="coverage/LUTO2$1_caculate.coverage" NAME="1_caculate Coverage Results" MODIFIED="1758110214755" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/LUTO2$tools__1_.coverage" NAME="tools (1) Coverage Results" MODIFIED="1761888919905" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="//school-les-m.shares.deakin.edu.au/school-les-m/Planet-A/LUF-Modelling/LUTO2_XH/LUTO2/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$Run_test.coverage" NAME="Run_test Coverage Results" MODIFIED="1761353499324" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$4_make_hexagonal_data.coverage" NAME="4_make_hexagonal_data Coverage Results" MODIFIED="1758894830628" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Preprocess2.coverage" NAME="0_Preprocess2 Coverage Results" MODIFIED="1758547914441" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
@@ -950,7 +925,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$4_3_make_cost_map__1_.coverage" NAME="4.3_make_cost_map (1) Coverage Results" MODIFIED="1759300375357" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$3_make_map_all_legend.coverage" NAME="3_make_map_all_legend Coverage Results" MODIFIED="1758874260430" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$helper_plot.coverage" NAME="helper_plot Coverage Results" MODIFIED="1759653397586" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code/tools" />
-    <SUITE FILE_PATH="coverage/LUTO2$3_yieldncreass_ABARES__1_.coverage" NAME="3_yieldncreass_ABARES (1) Coverage Results" MODIFIED="1761820515965" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
+    <SUITE FILE_PATH="coverage/LUTO2$3_yieldncreass_ABARES__1_.coverage" NAME="3_yieldncreass_ABARES (1) Coverage Results" MODIFIED="1761821041415" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$4_3_make_map_all__1_.coverage" NAME="4.3_make_map_all (1) Coverage Results" MODIFIED="1759053513568" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$0_runs_test.coverage" NAME="0_runs_test Coverage Results" MODIFIED="1761452033939" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/LUTO2$2_draw_processed_data.coverage" NAME="2_draw_processed_data Coverage Results" MODIFIED="1760861523924" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
@@ -958,7 +933,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_num2.coverage" NAME="Paper2_tasks_num2 Coverage Results" MODIFIED="1757312008894" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$0_transfer_html.coverage" NAME="0_transfer_html Coverage Results" MODIFIED="1758975762985" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$helper_map.coverage" NAME="helper_map Coverage Results" MODIFIED="1759885626663" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code/tools" />
-    <SUITE FILE_PATH="coverage/LUTO2$1_labour_cost.coverage" NAME="1_labour_cost Coverage Results" MODIFIED="1761789977558" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
+    <SUITE FILE_PATH="coverage/LUTO2$1_labour_cost.coverage" NAME="1_labour_cost Coverage Results" MODIFIED="1761889088816" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$3_make_map_all.coverage" NAME="3_make_map_all Coverage Results" MODIFIED="1758873988533" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$2_yieldncreass_ABARES__1_.coverage" NAME="2_yieldncreass_ABARES (1) Coverage Results" MODIFIED="1761286447957" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Preprocess.coverage" NAME="0_Preprocess Coverage Results" MODIFIED="1760438147412" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />

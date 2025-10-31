@@ -184,11 +184,11 @@ def predict_growth_index(df, var_name='labour cost', pi_level=0.75,base_year = 2
         df95[col + '_Index'] = df95[col] / base_val
 
     # 只保留绘图起始年份之后
-    df80 = df80[df80['Year'] >= base_year].copy()
-    df95 = df95[df95['Year'] >= base_year].copy()
+    df80 = df80[df80['Year'] >= draw_base_year].copy()
+    df95 = df95[df95['Year'] >= draw_base_year].copy()
 
     # 历史数据（指数）
-    df_hist = df[df['Year'] >= base_year].copy()
+    df_hist = df[df['Year'] >= draw_base_year].copy()
     df_hist['Growth_Index'] = df_hist['Cost'] / base_val
     df_hist['Scenario'] = 'Historical'
 
@@ -223,9 +223,9 @@ def predict_growth_index(df, var_name='labour cost', pi_level=0.75,base_year = 2
 
     # 历史点
     min_hist_year = int(df_hist['Year'].min())
-    if min_hist_year > base_year:
+    if min_hist_year > draw_base_year:
         # 生成需要补齐的年份区间
-        missing_years = list(range(base_year, min_hist_year))
+        missing_years = list(range(draw_base_year, min_hist_year))
 
         # 取第一个观测年的数值（例如 2014）
         first_row = df_hist.iloc[0]
@@ -294,8 +294,8 @@ def predict_growth_index(df, var_name='labour cost', pi_level=0.75,base_year = 2
                  fontsize=14, weight='bold')
     ax.set_xlabel('Year', fontsize=12)
     ax.set_ylabel('Growth Index', fontsize=12)
-    ax.set_xlim(base_year, end_year)
-    ax.set_xticks(range(base_year, end_year + 1, 5))
+    ax.set_xlim(draw_base_year, end_year)
+    ax.set_xticks(range(draw_base_year, end_year + 1, 5))
     ax.legend(loc='upper left', frameon=True, fontsize=9, ncol=1)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()

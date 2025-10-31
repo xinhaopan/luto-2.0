@@ -25,7 +25,7 @@ pre_years = pd.DataFrame({'Year': [2010, 2011, 2012, 2013], 'Cost': cost_2014})
 df = pd.concat([pre_years, df], ignore_index=True).drop_duplicates('Year').sort_values('Year').reset_index(drop=True)
 
 # ---------- 预测增长指数并绘图 ----------
-ax, df_result = predict_growth_index(df, var_name='Labour Cost',base_year = 2010)
+ax, df_result = predict_growth_index(df, var_name='Labour Cost',base_year = 2014)
 handles, labels = ax.get_legend_handles_labels()
 ax.legend(handles, labels, loc='upper left', frameon=True)
 
