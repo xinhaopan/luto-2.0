@@ -67,14 +67,14 @@ import seaborn as sns
 from scipy.stats import norm
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
-def predict_growth_index(df, var_name='labour cost', pi_level=0.75,base_year = 2010,model='UnobservedComponents'):
+def predict_growth_index(df, var_name='labour cost', pi_level=0.75,base_year = 2010,model='UnobservedComponents', use_index=True,draw_base_year = 2010):
     """
     ETS (additive trend, damped) 作为中心预测；绘制深蓝色整段拟合曲线；
     同时绘制 95% 与 80% 预测区间阴影（95% 更深、更底层），并保留四种情景彩色线。
     返回: ax, df_return(index=Year, cols=['Low','Medium','High','Very_High'])
     """
     # ---------------- 基本设置 ----------------
-    draw_base_year = 2010
+
 
     end_year = 2050
 
@@ -176,7 +176,10 @@ def predict_growth_index(df, var_name='labour cost', pi_level=0.75,base_year = 2
     # ---------------- 标准化（以 base_year 的 Mean 作为 1） ----------------
     if draw_base_year not in df80['Year'].values:
         raise ValueError(f"base_year={draw_base_year} 不在预测范围内，请检查数据年份。")
-    base_val = float(df.loc[df['Year'] == draw_base_year, 'Cost'].values[0])
+    if use_index:
+        base_val = float(df.loc[df['Year'] == draw_base_year, 'Cost'].values[0])
+    else:
+        base_val = 1
 
     for col in ['Mean', 'Lower', 'Upper', 'Very_High', 'Raw_SES_Mean']:
         df80[col + '_Index'] = df80[col] / base_val

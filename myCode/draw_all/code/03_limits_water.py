@@ -19,37 +19,93 @@ import settings
 # from helper import *
 
 
-def plot_shapefile_map(shapefile_path, gdf_column, df_colors, output_file='shapefile_plot.pdf', add_labels=True):
-    """读取Shapefile并绘制地图，可选择是否标注区域名称，输出PDF格式."""
+# def plot_shapefile_map(shapefile_path, gdf_column, df_colors, output_file='shapefile_plot.pdf', add_labels=True):
+#     """读取Shapefile并绘制地图，可选择是否标注区域名称，输出PDF格式."""
+#     import geopandas as gpd
+#     import matplotlib.pyplot as plt
+#
+#     df_colors = dict(zip(df_colors['desc'], df_colors['color']))
+#     font_size = 10
+#
+#     # 读取Shapefile
+#     gdf = gpd.read_file(shapefile_path)
+#
+#     # 创建图表
+#     fig, ax = plt.subplots(figsize=(12, 8))
+#
+#     # 绘制地图
+#     gdf.assign(color=gdf[gdf_column].map(df_colors)).plot(
+#         ax=ax, color=gdf[gdf_column].map(df_colors), edgecolor='gray'
+#     )
+#
+#     # 隐藏轴刻度
+#     ax.set_xticks([])
+#     ax.set_yticks([])
+#     ax.set_frame_on(False)
+#
+#     # 是否添加区域名称标注
+#     if add_labels:
+#         for idx, row in gdf.iterrows():
+#             centroid = row.geometry.centroid
+#             name = row[gdf_column]
+#
+#             # 特殊区域位置调整
+#             adjustments = {
+#                 'Murray-Darling Basin': (0, 1),
+#                 'South East Coast (NSW)': (0, 0),
+#                 'South Australian Gulf': (0, -1.5),
+#                 'North East Coast (QLD)': (0, -0.5),
+#                 'North Western Plateau': (0, -0.8),
+#                 'Timor Sea': (-1, 0.3),
+#                 'Carpentaria Coast': (0, 0.5),
+#                 'South West Coast': (1, -1),
+#                 'Pilbara-Gascoyne': (0, 0),
+#                 'Tanami': (0, -0.5),
+#                 'Lake Eyre Basin': (0.5, 0.5)
+#             }
+#
+#             dx, dy = adjustments.get(name, (0, 0))
+#             ax.text(centroid.x + dx, centroid.y + dy, name,
+#                     fontsize=font_size, ha='center', color='black')
+#
+#     plt.tight_layout()
+#
+#     # 存储为PDF
+#     plt.savefig(output_file, dpi=300, bbox_inches='tight', format='pdf')
+#     plt.show()
+#     plt.close(fig)  # 关闭figure避免内存占用
+def plot_shapefile_map(shapefile_path, gdf_column, df_colors, output_file='shapefile_plot.svg', add_labels=True):
+    """读取Shapefile并绘制地图，透明背景，矢量SVG格式，确保完整显示."""
     import geopandas as gpd
     import matplotlib.pyplot as plt
-
     df_colors = dict(zip(df_colors['desc'], df_colors['color']))
     font_size = 10
 
     # 读取Shapefile
     gdf = gpd.read_file(shapefile_path)
 
-    # 创建图表
-    fig, ax = plt.subplots(figsize=(12, 8))
+    # 创建图表 - 透明背景
+    fig, ax = plt.subplots(figsize=(14, 10), facecolor='none')  # 增大figsize
+    ax.patch.set_alpha(0)
 
     # 绘制地图
-    gdf.assign(color=gdf[gdf_column].map(df_colors)).plot(
-        ax=ax, color=gdf[gdf_column].map(df_colors), edgecolor='gray'
-    )
+    gdf.plot(ax=ax, color=gdf[gdf_column].map(df_colors), edgecolor='gray', linewidth=0.5)
+
+    # 关键：先获取当前轴的范围（绘制后自动计算的范围）
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
 
     # 隐藏轴刻度
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_frame_on(False)
+    ax.axis('equal')  # 保持纵横比
 
     # 是否添加区域名称标注
     if add_labels:
         for idx, row in gdf.iterrows():
             centroid = row.geometry.centroid
             name = row[gdf_column]
-
-            # 特殊区域位置调整
             adjustments = {
                 'Murray-Darling Basin': (0, 1),
                 'South East Coast (NSW)': (0, 0),
@@ -63,18 +119,24 @@ def plot_shapefile_map(shapefile_path, gdf_column, df_colors, output_file='shape
                 'Tanami': (0, -0.5),
                 'Lake Eyre Basin': (0.5, 0.5)
             }
-
             dx, dy = adjustments.get(name, (0, 0))
             ax.text(centroid.x + dx, centroid.y + dy, name,
                     fontsize=font_size, ha='center', color='black')
 
-    plt.tight_layout()
+    # 重新设置范围，加上边距用于标签
+    x_margin = (xlim[1] - xlim[0]) * 0.05
+    y_margin = (ylim[1] - ylim[0]) * 0.05
+    ax.set_xlim(xlim[0] - x_margin, xlim[1] + x_margin)
+    ax.set_ylim(ylim[0] - y_margin, ylim[1] + y_margin)
 
-    # 存储为PDF
-    plt.savefig(output_file, dpi=300, bbox_inches='tight', format='pdf')
+    # 保存 - 不使用bbox_inches='tight'
+    plt.savefig(output_file,
+                transparent=True,
+                facecolor='none',
+                dpi=600)
+
     plt.show()
-    plt.close(fig)  # 关闭figure避免内存占用
-
+    plt.close(fig)
 
 def add_label_to_image(image, label, position, font_size=60, color="black"):
     """在图像上添加标签"""
@@ -93,23 +155,31 @@ df_colors = pd.read_excel('tools/land use colors.xlsx', sheet_name='water')
 shapefile_path = '../../../../Map/Data/shp/Drainage Division/ADD_2016_AUST.shp'
 # plot_shapefile_map(shapefile_path, 'ADD_NAME16', df_colors, output_file='../output/03_drainage divisions.pdf')
 
-# 存储不带text标注的地图
 plot_shapefile_map(
     shapefile_path,
     'ADD_NAME16',
     df_colors,
-    output_file='../output/03_drainage divisions_with_text.pdf',
-    add_labels=True
-)
-
-# 存储带text标注的地图
-plot_shapefile_map(
-    shapefile_path,
-    'ADD_NAME16',
-    df_colors,
-    output_file='../output/03_drainage divisions.pdf',
+    output_file='../output/03_drainage divisions.png',
     add_labels=False
 )
+
+# # 存储不带text标注的地图
+# plot_shapefile_map(
+#     shapefile_path,
+#     'ADD_NAME16',
+#     df_colors,
+#     output_file='../output/03_drainage divisions_with_text.pdf',
+#     add_labels=True
+# )
+#
+# # 存储带text标注的地图
+# plot_shapefile_map(
+#     shapefile_path,
+#     'ADD_NAME16',
+#     df_colors,
+#     output_file='../output/03_drainage divisions.pdf',
+#     add_labels=False
+# )
 
 
 
