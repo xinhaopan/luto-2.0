@@ -1,0 +1,466 @@
+{
+  "train_y0": 1990,
+  "train_y1": 2014,
+  "future_y0": 2015,
+  "future_y1": 2050,
+  "trace_dir": "../2_processed_data/group_element_traces_AUS_scenarios_full",
+  "scaler_dir": "../2_processed_data/group_element_scalers_AUS",
+  "pairs": [
+    {
+      "group": "Animals live nes (heads)",
+      "element": "Export Quantity",
+      "trace_file": "trace_Animals_live_nes_heads___Export_Quantity.nc",
+      "scaler_file": "scaler_Animals_live_nes_heads___Export_Quantity.pkl"
+    },
+    {
+      "group": "Animals live nes (heads)",
+      "element": "Import Quantity",
+      "trace_file": "trace_Animals_live_nes_heads___Import_Quantity.nc",
+      "scaler_file": "scaler_Animals_live_nes_heads___Import_Quantity.pkl"
+    },
+    {
+      "group": "Apples and products",
+      "element": "Export Quantity",
+      "trace_file": "trace_Apples_and_products__Export_Quantity.nc",
+      "scaler_file": "scaler_Apples_and_products__Export_Quantity.pkl"
+    },
+    {
+      "group": "Apples and products",
+      "element": "Import Quantity",
+      "trace_file": "trace_Apples_and_products__Import_Quantity.nc",
+      "scaler_file": "scaler_Apples_and_products__Import_Quantity.pkl"
+    },
+    {
+      "group": "Bananas",
+      "element": "Import Quantity",
+      "trace_file": "trace_Bananas__Import_Quantity.nc",
+      "scaler_file": "scaler_Bananas__Import_Quantity.pkl"
+    },
+    {
+      "group": "Beans",
+      "element": "Import Quantity",
+      "trace_file": "trace_Beans__Import_Quantity.nc",
+      "scaler_file": "scaler_Beans__Import_Quantity.pkl"
+    },
+    {
+      "group": "Beverages, Alcoholic",
+      "element": "Export Quantity",
+      "trace_file": "trace_Beverages_Alcoholic__Export_Quantity.nc",
+      "scaler_file": "scaler_Beverages_Alcoholic__Export_Quantity.pkl"
+    },
+    {
+      "group": "Beverages, Alcoholic",
+      "element": "Import Quantity",
+      "trace_file": "trace_Beverages_Alcoholic__Import_Quantity.nc",
+      "scaler_file": "scaler_Beverages_Alcoholic__Import_Quantity.pkl"
+    },
+    {
+      "group": "Bovine Meat",
+      "element": "Export Quantity",
+      "trace_file": "trace_Bovine_Meat__Export_Quantity.nc",
+      "scaler_file": "scaler_Bovine_Meat__Export_Quantity.pkl"
+    },
+    {
+      "group": "Bovine Meat",
+      "element": "Import Quantity",
+      "trace_file": "trace_Bovine_Meat__Import_Quantity.nc",
+      "scaler_file": "scaler_Bovine_Meat__Import_Quantity.pkl"
+    },
+    {
+      "group": "Cattle (heads)",
+      "element": "Import Quantity",
+      "trace_file": "trace_Cattle_heads___Import_Quantity.nc",
+      "scaler_file": "scaler_Cattle_heads___Import_Quantity.pkl"
+    },
+    {
+      "group": "Cereals (nec)",
+      "element": "Export Quantity",
+      "trace_file": "trace_Cereals_nec___Export_Quantity.nc",
+      "scaler_file": "scaler_Cereals_nec___Export_Quantity.pkl"
+    },
+    {
+      "group": "Cereals (nec)",
+      "element": "Import Quantity",
+      "trace_file": "trace_Cereals_nec___Import_Quantity.nc",
+      "scaler_file": "scaler_Cereals_nec___Import_Quantity.pkl"
+    },
+    {
+      "group": "Cheese",
+      "element": "Export Quantity",
+      "trace_file": "trace_Cheese__Export_Quantity.nc",
+      "scaler_file": "scaler_Cheese__Export_Quantity.pkl"
+    },
+    {
+      "group": "Cheese",
+      "element": "Import Quantity",
+      "trace_file": "trace_Cheese__Import_Quantity.nc",
+      "scaler_file": "scaler_Cheese__Import_Quantity.pkl"
+    },
+    {
+      "group": "Coffee and tea",
+      "element": "Export Quantity",
+      "trace_file": "trace_Coffee_and_tea__Export_Quantity.nc",
+      "scaler_file": "scaler_Coffee_and_tea__Export_Quantity.pkl"
+    },
+    {
+      "group": "Coffee and tea",
+      "element": "Import Quantity",
+      "trace_file": "trace_Coffee_and_tea__Import_Quantity.nc",
+      "scaler_file": "scaler_Coffee_and_tea__Import_Quantity.pkl"
+    },
+    {
+      "group": "Cottonseed Oil",
+      "element": "Export Quantity",
+      "trace_file": "trace_Cottonseed_Oil__Export_Quantity.nc",
+      "scaler_file": "scaler_Cottonseed_Oil__Export_Quantity.pkl"
+    },
+    {
+      "group": "Cottonseed Oil",
+      "element": "Import Quantity",
+      "trace_file": "trace_Cottonseed_Oil__Import_Quantity.nc",
+      "scaler_file": "scaler_Cottonseed_Oil__Import_Quantity.pkl"
+    },
+    {
+      "group": "Eggs",
+      "element": "Export Quantity",
+      "trace_file": "trace_Eggs__Export_Quantity.nc",
+      "scaler_file": "scaler_Eggs__Export_Quantity.pkl"
+    },
+    {
+      "group": "Eggs",
+      "element": "Import Quantity",
+      "trace_file": "trace_Eggs__Import_Quantity.nc",
+      "scaler_file": "scaler_Eggs__Import_Quantity.pkl"
+    },
+    {
+      "group": "Fats, Animals, Raw",
+      "element": "Export Quantity",
+      "trace_file": "trace_Fats_Animals_Raw__Export_Quantity.nc",
+      "scaler_file": "scaler_Fats_Animals_Raw__Export_Quantity.pkl"
+    },
+    {
+      "group": "Fats, Animals, Raw",
+      "element": "Import Quantity",
+      "trace_file": "trace_Fats_Animals_Raw__Import_Quantity.nc",
+      "scaler_file": "scaler_Fats_Animals_Raw__Import_Quantity.pkl"
+    },
+    {
+      "group": "Fodder and Feeding Stuff",
+      "element": "Export Quantity",
+      "trace_file": "trace_Fodder_and_Feeding_Stuff__Export_Quantity.nc",
+      "scaler_file": "scaler_Fodder_and_Feeding_Stuff__Export_Quantity.pkl"
+    },
+    {
+      "group": "Fodder and Feeding Stuff",
+      "element": "Import Quantity",
+      "trace_file": "trace_Fodder_and_Feeding_Stuff__Import_Quantity.nc",
+      "scaler_file": "scaler_Fodder_and_Feeding_Stuff__Import_Quantity.pkl"
+    },
+    {
+      "group": "Fruits (nec)",
+      "element": "Export Quantity",
+      "trace_file": "trace_Fruits_nec___Export_Quantity.nc",
+      "scaler_file": "scaler_Fruits_nec___Export_Quantity.pkl"
+    },
+    {
+      "group": "Fruits (nec)",
+      "element": "Import Quantity",
+      "trace_file": "trace_Fruits_nec___Import_Quantity.nc",
+      "scaler_file": "scaler_Fruits_nec___Import_Quantity.pkl"
+    },
+    {
+      "group": "Grapes and products (excl wine)",
+      "element": "Export Quantity",
+      "trace_file": "trace_Grapes_and_products_excl_wine___Export_Quantity.nc",
+      "scaler_file": "scaler_Grapes_and_products_excl_wine___Export_Quantity.pkl"
+    },
+    {
+      "group": "Grapes and products (excl wine)",
+      "element": "Import Quantity",
+      "trace_file": "trace_Grapes_and_products_excl_wine___Import_Quantity.nc",
+      "scaler_file": "scaler_Grapes_and_products_excl_wine___Import_Quantity.pkl"
+    },
+    {
+      "group": "Groundnuts (Shelled Eq)",
+      "element": "Import Quantity",
+      "trace_file": "trace_Groundnuts_Shelled_Eq___Import_Quantity.nc",
+      "scaler_file": "scaler_Groundnuts_Shelled_Eq___Import_Quantity.pkl"
+    },
+    {
+      "group": "Hides and skins",
+      "element": "Import Quantity",
+      "trace_file": "trace_Hides_and_skins__Import_Quantity.nc",
+      "scaler_file": "scaler_Hides_and_skins__Import_Quantity.pkl"
+    },
+    {
+      "group": "Meat, Other",
+      "element": "Export Quantity",
+      "trace_file": "trace_Meat_Other__Export_Quantity.nc",
+      "scaler_file": "scaler_Meat_Other__Export_Quantity.pkl"
+    },
+    {
+      "group": "Meat, Other",
+      "element": "Import Quantity",
+      "trace_file": "trace_Meat_Other__Import_Quantity.nc",
+      "scaler_file": "scaler_Meat_Other__Import_Quantity.pkl"
+    },
+    {
+      "group": "Milk - Excluding Butter",
+      "element": "Export Quantity",
+      "trace_file": "trace_Milk_-_Excluding_Butter__Export_Quantity.nc",
+      "scaler_file": "scaler_Milk_-_Excluding_Butter__Export_Quantity.pkl"
+    },
+    {
+      "group": "Milk - Excluding Butter",
+      "element": "Import Quantity",
+      "trace_file": "trace_Milk_-_Excluding_Butter__Import_Quantity.nc",
+      "scaler_file": "scaler_Milk_-_Excluding_Butter__Import_Quantity.pkl"
+    },
+    {
+      "group": "Milk products (nec)",
+      "element": "Export Quantity",
+      "trace_file": "trace_Milk_products_nec___Export_Quantity.nc",
+      "scaler_file": "scaler_Milk_products_nec___Export_Quantity.pkl"
+    },
+    {
+      "group": "Milk products (nec)",
+      "element": "Import Quantity",
+      "trace_file": "trace_Milk_products_nec___Import_Quantity.nc",
+      "scaler_file": "scaler_Milk_products_nec___Import_Quantity.pkl"
+    },
+    {
+      "group": "Miscellaneous",
+      "element": "Export Quantity",
+      "trace_file": "trace_Miscellaneous__Export_Quantity.nc",
+      "scaler_file": "scaler_Miscellaneous__Export_Quantity.pkl"
+    },
+    {
+      "group": "Miscellaneous",
+      "element": "Import Quantity",
+      "trace_file": "trace_Miscellaneous__Import_Quantity.nc",
+      "scaler_file": "scaler_Miscellaneous__Import_Quantity.pkl"
+    },
+    {
+      "group": "Mutton & Goat Meat",
+      "element": "Export Quantity",
+      "trace_file": "trace_Mutton_Goat_Meat__Export_Quantity.nc",
+      "scaler_file": "scaler_Mutton_Goat_Meat__Export_Quantity.pkl"
+    },
+    {
+      "group": "Mutton & Goat Meat",
+      "element": "Import Quantity",
+      "trace_file": "trace_Mutton_Goat_Meat__Import_Quantity.nc",
+      "scaler_file": "scaler_Mutton_Goat_Meat__Import_Quantity.pkl"
+    },
+    {
+      "group": "Non-alcoholic Beverages",
+      "element": "Export Quantity",
+      "trace_file": "trace_Non-alcoholic_Beverages__Export_Quantity.nc",
+      "scaler_file": "scaler_Non-alcoholic_Beverages__Export_Quantity.pkl"
+    },
+    {
+      "group": "Non-alcoholic Beverages",
+      "element": "Import Quantity",
+      "trace_file": "trace_Non-alcoholic_Beverages__Import_Quantity.nc",
+      "scaler_file": "scaler_Non-alcoholic_Beverages__Import_Quantity.pkl"
+    },
+    {
+      "group": "Non-edible Crude Materials",
+      "element": "Export Quantity",
+      "trace_file": "trace_Non-edible_Crude_Materials__Export_Quantity.nc",
+      "scaler_file": "scaler_Non-edible_Crude_Materials__Export_Quantity.pkl"
+    },
+    {
+      "group": "Non-edible Crude Materials",
+      "element": "Import Quantity",
+      "trace_file": "trace_Non-edible_Crude_Materials__Import_Quantity.nc",
+      "scaler_file": "scaler_Non-edible_Crude_Materials__Import_Quantity.pkl"
+    },
+    {
+      "group": "Non-edible Fats and Oils",
+      "element": "Import Quantity",
+      "trace_file": "trace_Non-edible_Fats_and_Oils__Import_Quantity.nc",
+      "scaler_file": "scaler_Non-edible_Fats_and_Oils__Import_Quantity.pkl"
+    },
+    {
+      "group": "Nuts and products",
+      "element": "Export Quantity",
+      "trace_file": "trace_Nuts_and_products__Export_Quantity.nc",
+      "scaler_file": "scaler_Nuts_and_products__Export_Quantity.pkl"
+    },
+    {
+      "group": "Nuts and products",
+      "element": "Import Quantity",
+      "trace_file": "trace_Nuts_and_products__Import_Quantity.nc",
+      "scaler_file": "scaler_Nuts_and_products__Import_Quantity.pkl"
+    },
+    {
+      "group": "Offals, Edible",
+      "element": "Export Quantity",
+      "trace_file": "trace_Offals_Edible__Export_Quantity.nc",
+      "scaler_file": "scaler_Offals_Edible__Export_Quantity.pkl"
+    },
+    {
+      "group": "Offals, Edible",
+      "element": "Import Quantity",
+      "trace_file": "trace_Offals_Edible__Import_Quantity.nc",
+      "scaler_file": "scaler_Offals_Edible__Import_Quantity.pkl"
+    },
+    {
+      "group": "Oilseeds",
+      "element": "Export Quantity",
+      "trace_file": "trace_Oilseeds__Export_Quantity.nc",
+      "scaler_file": "scaler_Oilseeds__Export_Quantity.pkl"
+    },
+    {
+      "group": "Oilseeds",
+      "element": "Import Quantity",
+      "trace_file": "trace_Oilseeds__Import_Quantity.nc",
+      "scaler_file": "scaler_Oilseeds__Import_Quantity.pkl"
+    },
+    {
+      "group": "Peas",
+      "element": "Import Quantity",
+      "trace_file": "trace_Peas__Import_Quantity.nc",
+      "scaler_file": "scaler_Peas__Import_Quantity.pkl"
+    },
+    {
+      "group": "Pigmeat",
+      "element": "Export Quantity",
+      "trace_file": "trace_Pigmeat__Export_Quantity.nc",
+      "scaler_file": "scaler_Pigmeat__Export_Quantity.pkl"
+    },
+    {
+      "group": "Pigmeat",
+      "element": "Import Quantity",
+      "trace_file": "trace_Pigmeat__Import_Quantity.nc",
+      "scaler_file": "scaler_Pigmeat__Import_Quantity.pkl"
+    },
+    {
+      "group": "Potatoes and products",
+      "element": "Export Quantity",
+      "trace_file": "trace_Potatoes_and_products__Export_Quantity.nc",
+      "scaler_file": "scaler_Potatoes_and_products__Export_Quantity.pkl"
+    },
+    {
+      "group": "Potatoes and products",
+      "element": "Import Quantity",
+      "trace_file": "trace_Potatoes_and_products__Import_Quantity.nc",
+      "scaler_file": "scaler_Potatoes_and_products__Import_Quantity.pkl"
+    },
+    {
+      "group": "Poultry (1000 heads)",
+      "element": "Export Quantity",
+      "trace_file": "trace_Poultry_1000_heads___Export_Quantity.nc",
+      "scaler_file": "scaler_Poultry_1000_heads___Export_Quantity.pkl"
+    },
+    {
+      "group": "Poultry Meat",
+      "element": "Export Quantity",
+      "trace_file": "trace_Poultry_Meat__Export_Quantity.nc",
+      "scaler_file": "scaler_Poultry_Meat__Export_Quantity.pkl"
+    },
+    {
+      "group": "Poultry Meat",
+      "element": "Import Quantity",
+      "trace_file": "trace_Poultry_Meat__Import_Quantity.nc",
+      "scaler_file": "scaler_Poultry_Meat__Import_Quantity.pkl"
+    },
+    {
+      "group": "Pulses, Other and products",
+      "element": "Export Quantity",
+      "trace_file": "trace_Pulses_Other_and_products__Export_Quantity.nc",
+      "scaler_file": "scaler_Pulses_Other_and_products__Export_Quantity.pkl"
+    },
+    {
+      "group": "Pulses, Other and products",
+      "element": "Import Quantity",
+      "trace_file": "trace_Pulses_Other_and_products__Import_Quantity.nc",
+      "scaler_file": "scaler_Pulses_Other_and_products__Import_Quantity.pkl"
+    },
+    {
+      "group": "Rice and products",
+      "element": "Export Quantity",
+      "trace_file": "trace_Rice_and_products__Export_Quantity.nc",
+      "scaler_file": "scaler_Rice_and_products__Export_Quantity.pkl"
+    },
+    {
+      "group": "Rice and products",
+      "element": "Import Quantity",
+      "trace_file": "trace_Rice_and_products__Import_Quantity.nc",
+      "scaler_file": "scaler_Rice_and_products__Import_Quantity.pkl"
+    },
+    {
+      "group": "Sheep and goats  (heads)",
+      "element": "Export Quantity",
+      "trace_file": "trace_Sheep_and_goats_heads___Export_Quantity.nc",
+      "scaler_file": "scaler_Sheep_and_goats_heads___Export_Quantity.pkl"
+    },
+    {
+      "group": "Soyabeans",
+      "element": "Export Quantity",
+      "trace_file": "trace_Soyabeans__Export_Quantity.nc",
+      "scaler_file": "scaler_Soyabeans__Export_Quantity.pkl"
+    },
+    {
+      "group": "Soyabeans",
+      "element": "Import Quantity",
+      "trace_file": "trace_Soyabeans__Import_Quantity.nc",
+      "scaler_file": "scaler_Soyabeans__Import_Quantity.pkl"
+    },
+    {
+      "group": "Sugar ",
+      "element": "Export Quantity",
+      "trace_file": "trace_Sugar___Export_Quantity.nc",
+      "scaler_file": "scaler_Sugar___Export_Quantity.pkl"
+    },
+    {
+      "group": "Sugar ",
+      "element": "Import Quantity",
+      "trace_file": "trace_Sugar___Import_Quantity.nc",
+      "scaler_file": "scaler_Sugar___Import_Quantity.pkl"
+    },
+    {
+      "group": "Vegetables (nec)",
+      "element": "Export Quantity",
+      "trace_file": "trace_Vegetables_nec___Export_Quantity.nc",
+      "scaler_file": "scaler_Vegetables_nec___Export_Quantity.pkl"
+    },
+    {
+      "group": "Vegetables (nec)",
+      "element": "Import Quantity",
+      "trace_file": "trace_Vegetables_nec___Import_Quantity.nc",
+      "scaler_file": "scaler_Vegetables_nec___Import_Quantity.pkl"
+    },
+    {
+      "group": "Wheat and products",
+      "element": "Import Quantity",
+      "trace_file": "trace_Wheat_and_products__Import_Quantity.nc",
+      "scaler_file": "scaler_Wheat_and_products__Import_Quantity.pkl"
+    },
+    {
+      "group": "Wine",
+      "element": "Export Quantity",
+      "trace_file": "trace_Wine__Export_Quantity.nc",
+      "scaler_file": "scaler_Wine__Export_Quantity.pkl"
+    },
+    {
+      "group": "Wine",
+      "element": "Import Quantity",
+      "trace_file": "trace_Wine__Import_Quantity.nc",
+      "scaler_file": "scaler_Wine__Import_Quantity.pkl"
+    },
+    {
+      "group": "Wool",
+      "element": "Export Quantity",
+      "trace_file": "trace_Wool__Export_Quantity.nc",
+      "scaler_file": "scaler_Wool__Export_Quantity.pkl"
+    },
+    {
+      "group": "Wool",
+      "element": "Import Quantity",
+      "trace_file": "trace_Wool__Import_Quantity.nc",
+      "scaler_file": "scaler_Wool__Import_Quantity.pkl"
+    }
+  ]
+}
