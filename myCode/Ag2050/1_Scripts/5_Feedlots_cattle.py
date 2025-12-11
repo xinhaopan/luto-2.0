@@ -26,6 +26,7 @@ ax.set_ylabel('head')
 fig = ax.get_figure()
 fig.savefig('cattle_number.png', dpi=300)
 fig.show()
+df_result.to_csv('../2_processed_data/cattle_number_forecast.csv', index=True)
 
 # excel_path = "../0_original_data/FLC_cost_multipliers.xlsx"   # 把此处改为你的 Excel 文件路径
 # template_sheet = "FLC_multiplier"            # 模板表所在 sheet（0 表示第一个 sheet）

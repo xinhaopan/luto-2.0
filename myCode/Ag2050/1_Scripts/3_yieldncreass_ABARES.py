@@ -185,15 +185,13 @@ plt.show()
 # combined_df_result.to_excel("combined_productivity_results.xlsx", index=False)
 
 
-# 配置输出文件名
-out_path = Path("FLC_multipliers_by_scenario.xlsx")
-
 # 确保年份为索引且为整型（或可被识别的索引）
 df_result = combined_df_result
 df_result.index = df_result.index.astype(int)
+df_result.to_excel("../2_processed_data/ABARES_productivity_forecast.xlsx", index=True)
 
 # 获取模板的列（保留 MultiIndex 结构，如果有）
-df_template = pd.read_excel(output_file, header=[0, 1], sheet_name=1)
+df_template = pd.read_excel(output_file, header=[0, 1], sheet_name=1, index_col=0)
 template_cols = df_template.columns
 
 var_to_columns = {
@@ -256,8 +254,15 @@ with pd.ExcelWriter(output_file, engine="openpyxl", mode=mode) as writer:
 
         # 写入 Excel，创建新 sheet
         wb = writer.book
-        ws = wb.create_sheet(title=scenario.lower())
-        sheets_created.append(scenario.lower())
+        sheet_name = scenario.lower()
+
+        # 如果该名称的 sheet 已存在，先删除
+        if sheet_name in wb.sheetnames:
+            del wb[sheet_name]
+            print(f"  已删除旧的 sheet: {sheet_name}")
+
+        ws = wb.create_sheet(title=sheet_name)
+        sheets_created.append(sheet_name)
 
         col_level_0 = ['Year'] + [col[0] for col in df_out.columns[1:]]
         col_level_1 = [''] + [col[1] for col in df_out.columns[1:]]

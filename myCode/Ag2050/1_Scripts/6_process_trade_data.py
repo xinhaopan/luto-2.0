@@ -134,7 +134,7 @@ SSP2_PATH = "../0_original_data/data.ssp2.csv"
 GDPPC_PATH = "../0_original_data/gdp_pc_ppp_2005_wdi.csv"
 GRAVITY_PATH = "../0_original_data/dynamic gravity data AU od do.csv"
 
-OUT_CSV = "../2_processed_data/trade_model_data_all.csv"
+OUT_CSV = "../2_processed_data/trade_model_data_AUS_all.csv"
 
 
 # Check if Factor exists
@@ -196,6 +196,13 @@ tradeF_filtered = tradeF[
     (tradeF['Report ISO'] != "") &
     (tradeF['Partner Countries'] != "Antarctica") &
     (tradeF['Partner Countries'] != "Australia") &
+    (~tradeF['Element'].isin(["Export Value", "Import Value"]))
+]. copy()
+
+tradeF_filtered = tradeF[
+    tradeF['Report ISO'].notna() &
+    (tradeF['Report ISO'] != "") &
+    (tradeF['Partner Countries'] == "Australia") &
     (~tradeF['Element'].isin(["Export Value", "Import Value"]))
 ]. copy()
 
@@ -400,4 +407,4 @@ print(f"缺失值:\n{merged[['gdp_pc', 'Population.WB', 'Urban.population.pct.WB
 
 # 6) 保存
 df_complete = merged.dropna(subset=['gdp_pc', 'Population.WB', 'Urban.population.pct.WB', 'distance'])
-df_complete.to_csv('../2_processed_data/future_trade_2010_2050.csv', index=False)
+df_complete.to_csv('../2_processed_data/future_trade_AUS_2010_2050.csv', index=False)

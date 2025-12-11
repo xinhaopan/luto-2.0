@@ -55,6 +55,8 @@ print("读取到作物列名：", crop_cols)
 # 统一索引为整数年份
 df_result = df_result.copy()
 df_result.index = df_result.index.astype(int)
+df_result.loc[df_result.index <= 2014] = 1
+df_result.to_excel('../2_processed_data/labour_cost_forecast.xlsx', index=True)
 
 # 容错查找情景列名（尝试常见变体）
 def find_col(df, targets):
