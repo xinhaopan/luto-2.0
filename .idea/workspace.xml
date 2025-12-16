@@ -4,15 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update: draw input data for ag2050">
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/5.1_Feedlots_impact.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_ETS.py" afterDir="false" />
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update: predict export food demand by ETS">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/5_Feedlots_cattle.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/5_Feedlots_cattle.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_series.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_series.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/8_predict_timeseries.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/8_predict_timeseries.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/tets.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/tets.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/test.ipynb" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -291,15 +284,7 @@
       <workItem from="1760161123508" duration="33763000" />
       <workItem from="1760351223725" duration="145789000" />
       <workItem from="1762821617196" duration="5640000" />
-      <workItem from="1763039474688" duration="96008000" />
-    </task>
-    <task id="LOCAL-00020" summary="update: create price data">
-      <option name="closed" value="true" />
-      <created>1758428960784</created>
-      <option name="number" value="00020" />
-      <option name="presentableId" value="LOCAL-00020" />
-      <option name="project" value="LOCAL" />
-      <updated>1758428960784</updated>
+      <workItem from="1763039474688" duration="97392000" />
     </task>
     <task id="LOCAL-00021" summary="update: run carbon price test">
       <option name="closed" value="true" />
@@ -685,7 +670,15 @@
       <option name="project" value="LOCAL" />
       <updated>1765431827654</updated>
     </task>
-    <option name="localTasksCounter" value="69" />
+    <task id="LOCAL-00069" summary="update: predict export food demand by ETS">
+      <option name="closed" value="true" />
+      <created>1765511284785</created>
+      <option name="number" value="00069" />
+      <option name="presentableId" value="LOCAL-00069" />
+      <option name="project" value="LOCAL" />
+      <updated>1765511284786</updated>
+    </task>
+    <option name="localTasksCounter" value="70" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -726,7 +719,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Revert: some document" />
     <MESSAGE value="update: draw" />
     <MESSAGE value="update: draw solution price" />
     <MESSAGE value="update: shp and tif" />
@@ -751,7 +743,8 @@
     <MESSAGE value="update: FLC_cost_multipliers.xlsx" />
     <MESSAGE value="update: trade predit" />
     <MESSAGE value="update: draw input data for ag2050" />
-    <option name="LAST_COMMIT_MESSAGE" value="update: draw input data for ag2050" />
+    <MESSAGE value="update: predict export food demand by ETS" />
+    <option name="LAST_COMMIT_MESSAGE" value="update: predict export food demand by ETS" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
