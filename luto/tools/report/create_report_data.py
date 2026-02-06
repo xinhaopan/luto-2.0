@@ -26,7 +26,6 @@ from joblib import Parallel, delayed
 
 from luto.economics.off_land_commodity import get_demand_df
 from luto.tools.report.data_tools import get_all_files
-
 from luto.tools.report.data_tools.parameters import (
     AG_LANDUSE,
     COLORS,
@@ -117,7 +116,7 @@ def save_report_data(raw_data_dir:str):
 
     # Execute jobs in parallel
     num_jobs = len(jobs)
-    results = list(Parallel(n_jobs=num_jobs, return_as='generator')(jobs))
+    results = list(Parallel(n_jobs=num_jobs, return_as='generator_unordered')(jobs))
     for i, out in enumerate(results):
         if i < len(results) - 1:
             print(f"│   ├── {out}")
@@ -320,8 +319,9 @@ def process_area_data(files, SAVE_DIR, lu_group, colors_lu_category):
     return "Area data processing completed"
 
 
+
 def process_economics_data(files, SAVE_DIR):
-    """Process and save economics data (Section 3)."""
+    
     # -------------------- Get the revenue and cost data --------------------
     revenue_ag_df = files.query('base_name == "revenue_ag"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
@@ -358,33 +358,25 @@ def process_economics_data(files, SAVE_DIR):
     cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
-
+    cost_transition_ag2ag_df_non_all = cost_transition_ag2ag_df.query(
+        '`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL" '
+        ).copy()
 
     cost_transition_ag2non_ag_df = files.query('base_name == "cost_transition_ag2non_ag"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
+    cost_transition_ag2non_ag_df_non_all = cost_transition_ag2non_ag_df.query(
+        '`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL" '
+        ).copy()
 
-    cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag"').reset_index(drop=True)
+    cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2ag"').reset_index(drop=True)
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
-
-    economics_df = pd.concat(
-            [
-                revenue_ag_df,
-                revenue_am_df,
-                revenue_non_ag_df,
-                cost_ag_df,
-                cost_am_df,
-                cost_non_ag_df,
-                cost_transition_ag2ag_df,
-                cost_transition_ag2non_ag_df,
-                cost_transition_non_ag2ag_df
-            ]
-        ).round({'Value ($)': 2}
-        ).query('abs(`Value ($)`) > 1e-4'
-        ).reset_index(drop=True)
+    cost_transition_non_ag2ag_df_non_all = cost_transition_non_ag2ag_df.query(
+        '`From-land-use` != "ALL" and `To-land-use` != "ALL"'
+        ).copy()
 
     economics_df_non_all = pd.concat(
             [
@@ -394,9 +386,9 @@ def process_economics_data(files, SAVE_DIR):
                 cost_ag_df_non_all,
                 cost_am_df_non_all,
                 cost_non_ag_df,
-                cost_transition_ag2ag_df,
-                cost_transition_ag2non_ag_df,
-                cost_transition_non_ag2ag_df
+                cost_transition_ag2ag_df_non_all,
+                cost_transition_ag2non_ag_df_non_all,
+                cost_transition_non_ag2ag_df_non_all
             ]
         ).round({'Value ($)': 2}
         ).query('abs(`Value ($)`) > 1e-4'
@@ -424,14 +416,15 @@ def process_economics_data(files, SAVE_DIR):
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
         ).assign(Source='Revenue')
+        
     cost_df = pd.concat(
         [
             cost_ag_df_non_all,
             cost_am_df_non_all,
             cost_non_ag_df,
-            cost_transition_ag2ag_df,
-            cost_transition_ag2non_ag_df,
-            cost_transition_non_ag2ag_df
+            cost_transition_ag2ag_df_non_all,
+            cost_transition_ag2non_ag_df_non_all,
+            cost_transition_non_ag2ag_df_non_all
         ]
         ).groupby(['Year', 'region']
         )[['Value ($)']].sum(numeric_only=True
@@ -440,6 +433,7 @@ def process_economics_data(files, SAVE_DIR):
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
         ).assign(Source='Cost')
+        
     profit_df = revenue_df.merge(
         cost_df, on=['Year', 'region'], suffixes=('_revenue', '_cost')
         ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost']}
@@ -715,7 +709,7 @@ def process_economics_data(files, SAVE_DIR):
 
     # # -------------------- Transition cost for Ag2Ag --------------------
     # cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Value ($)'] * -1  # Convert from negative to positive
-    # group_cols = ['Type', 'From land-use', 'To land-use']
+    # group_cols = ['Type', 'From-land-use', 'To-land-use']
 
     # for idx, col in enumerate(group_cols):
     #     df_AUS = cost_transition_ag2ag_df\
@@ -758,7 +752,7 @@ def process_economics_data(files, SAVE_DIR):
 
     # # -------------------- Transition cost matrix for Ag2Ag --------------------
     # cost_transition_ag2ag_trans_mat_AUS = cost_transition_ag2ag_df\
-    #     .groupby(['Year','From land-use', 'To land-use'])\
+    #     .groupby(['Year','From-land-use', 'To-land-use'])\
     #     .sum(numeric_only=True)\
     #     .reset_index()\
     #     .round({'Value ($)': 2})\
@@ -766,7 +760,7 @@ def process_economics_data(files, SAVE_DIR):
     #     .assign(region='AUSTRALIA')
 
     # cost_transition_ag2ag_trans_mat_region_df = cost_transition_ag2ag_df\
-    #     .groupby(['Year','From land-use', 'To land-use', 'region'])\
+    #     .groupby(['Year','From-land-use', 'To-land-use', 'region'])\
     #     .sum(numeric_only=True)\
     #     .reset_index()\
     #     .round({'Value ($)': 2})
@@ -783,7 +777,7 @@ def process_economics_data(files, SAVE_DIR):
 
     #     out_dict_area.setdefault(region, {})
 
-    #     transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
+    #     transition_mat = df.pivot(index='From-land-use', columns='To-land-use', values='Value ($)')
     #     transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=AG_LANDUSE)
     #     transition_mat = transition_mat.fillna(0)
     #     total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
@@ -815,7 +809,7 @@ def process_economics_data(files, SAVE_DIR):
 
     # # -------------------- Transition cost for Ag2Non-Ag --------------------
     # cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Value ($)'] * -1  # Convert from negative to positive
-    # group_cols = ['Cost type', 'From land-use', 'To land-use']
+    # group_cols = ['Cost-type', 'From-land-use', 'To-land-use']
 
     # for idx, col in enumerate(group_cols):
     #     df_AUS = cost_transition_ag2non_ag_df\
@@ -858,14 +852,14 @@ def process_economics_data(files, SAVE_DIR):
 
     # # -------------------- Transition cost matrix for Ag2Non-Ag --------------------
     # cost_transition_ag2nonag_trans_mat_AUS = cost_transition_ag2non_ag_df\
-    #     .groupby(['Year','From land-use', 'To land-use'])\
+    #     .groupby(['Year','From-land-use', 'To-land-use'])\
     #     .sum(numeric_only=True)\
     #     .reset_index()\
     #     .round({'Value ($)': 2})\
     #     .assign(region='AUSTRALIA')
 
     # cost_transition_ag2nonag_trans_mat_region_df = cost_transition_ag2non_ag_df\
-    #     .groupby(['Year','From land-use', 'To land-use', 'region'])\
+    #     .groupby(['Year','From-land-use', 'To-land-use', 'region'])\
     #     .sum(numeric_only=True)\
     #     .reset_index()\
     #     .round({'Value ($)': 2})
@@ -882,7 +876,7 @@ def process_economics_data(files, SAVE_DIR):
 
     #     out_dict_area.setdefault(region, {})
 
-    #     transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
+    #     transition_mat = df.pivot(index='From-land-use', columns='To-land-use', values='Value ($)')
     #     transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=RENAME_NON_AG.values())
     #     transition_mat = transition_mat.fillna(0)
     #     total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
@@ -913,7 +907,7 @@ def process_economics_data(files, SAVE_DIR):
 
     # # -------------------- Transition cost for Non-Ag to Ag --------------------
     # cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Value ($)'] * -1  # Convert from negative to positive
-    # group_cols = ['Cost type', 'From land-use', 'To land-use']
+    # group_cols = ['Cost-type', 'From-land-use', 'To-land-use']
 
     # for idx, col in enumerate(group_cols):
     #     df_AUS = cost_transition_non_ag2ag_df\
@@ -957,14 +951,14 @@ def process_economics_data(files, SAVE_DIR):
 
     # # -------------------- Transition cost matrix for Non-Ag to Ag --------------------
     # cost_transition_nonag2ag_trans_mat_AUS = cost_transition_non_ag2ag_df\
-    #     .groupby(['Year','From land-use', 'To land-use'])\
+    #     .groupby(['Year','From-land-use', 'To-land-use'])\
     #     .sum(numeric_only=True)\
     #     .reset_index()\
     #     .round({'Value ($)': 2})\
     #     .assign(region='AUSTRALIA')
 
     # cost_transition_nonag2ag_trans_mat_region_df = cost_transition_non_ag2ag_df\
-    #     .groupby(['Year','From land-use', 'To land-use', 'region'])\
+    #     .groupby(['Year','From-land-use', 'To-land-use', 'region'])\
     #     .sum(numeric_only=True)\
     #     .reset_index()\
     #     .round({'Value ($)': 2})
@@ -981,7 +975,7 @@ def process_economics_data(files, SAVE_DIR):
 
     #     out_dict_area.setdefault(region, {})
 
-    #     transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
+    #     transition_mat = df.pivot(index='From-land-use', columns='To-land-use', values='Value ($)')
     #     transition_mat = transition_mat.reindex(index=RENAME_NON_AG.values(), columns=AG_LANDUSE)
     #     transition_mat = transition_mat.fillna(0)
     #     total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
@@ -1018,14 +1012,16 @@ def process_production_data(files, SAVE_DIR, years):
         .assign(group = lambda x: x['Commodity'].map(COMMIDOTY_GROUP.get))\
         .replace(RENAME_AM_NON_AG)\
         .query(f'Year.isin({years}) and abs(`Production (t/KL)`) > 1')\
+        .query('Commodity != "All"')\
         .round({'`Production (t/KL)`': 2})
 
     quantity_ag = quantity_df.query('Type == "Agricultural"').copy()
-    quantity_am = quantity_df.query('Type == "Agricultural Management"').copy()
-    quantity_non_ag = quantity_df.query('Type == "Non-Agricultural"').copy()
+    quantity_am = quantity_df.query('Type == "Agricultural_Management"').copy()
+    quantity_non_ag = quantity_df.query('Type == "Non_Agricultural"').copy()
 
     quantity_ag_non_all = quantity_ag.query('Water_supply != "ALL"').copy()
     quantity_am_non_all = quantity_am.query('Water_supply != "ALL"').copy()
+    
 
 
     # -------------------- Demand --------------------
@@ -1121,7 +1117,7 @@ def process_production_data(files, SAVE_DIR, years):
         out_dict = {'AUSTRALIA': demand_group.to_dict(orient='records')}
 
         filename = f'Production_overview_{_type}'
-        with open(fr'{SAVE_DIR}\{filename}.js', 'w') as f:
+        with open(fr'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
@@ -1192,7 +1188,7 @@ def process_production_data(files, SAVE_DIR, years):
         .reset_index()
 
     df_wide.columns = ['region', 'water', 'commodity', 'name', 'data']
-
+    
     df_wide_c_ALL = quantity_am\
         .groupby(['region', 'Water_supply', 'am','Year',])\
         .sum(numeric_only=True)\
@@ -1202,12 +1198,12 @@ def process_production_data(files, SAVE_DIR, years):
         .reset_index()
     df_wide_c_ALL['Commodity'] = 'ALL'
     df_wide_c_ALL.columns = ['region', 'water', 'name', 'data', 'commodity']
-
-
+    
+    
     df_wide = pd.concat([df_wide, df_wide_c_ALL], axis=0, ignore_index=True)
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_AM_NONAG[x])
-
+    
 
     out_dict = {}
     for (region, water, commodity), df in df_wide.groupby(['region', 'water', 'commodity']):
@@ -1282,6 +1278,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group, years):
     GHG_transition = GHG_files.query('base_name.str.contains("transition_penalty")').reset_index(drop=True)
     GHG_transition = pd.concat([pd.read_csv(path) for path in GHG_transition['path'] if not pd.read_csv(path).empty], ignore_index=True)
     GHG_transition = GHG_transition.replace(RENAME_AM_NON_AG).round({'Value (t CO2e)': 2})
+    GHG_transition = GHG_transition.query('Type != "ALL" and Water_supply != "ALL"').reset_index(drop=True)
 
     GHG_off_land = GHG_files.query('base_name.str.contains("offland_commodity")')
     GHG_off_land = pd.concat([pd.read_csv(path) for path in GHG_off_land['path']], ignore_index=True).round({'Value (t CO2e)': 2})
@@ -2271,7 +2268,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     df_wide.columns = ['region', 'water', 'am', 'name', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-
+    
     df_wide_all_am = bio_df_am\
         .groupby(['region', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
         .sum(numeric_only=True)\
@@ -2279,12 +2276,12 @@ def process_biodiversity_data(files, SAVE_DIR):
         .groupby(['region', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
         .reset_index()
-
+        
     df_wide_all_am.columns = ['region', 'water', 'name', 'data']
     df_wide_all_am['am'] = 'ALL'
     df_wide_all_am['type'] = 'column'
     df_wide_all_am['color'] = df_wide_all_am.apply(lambda x: COLORS_LU[x['name']], axis=1)
-
+    
     df_wide = pd.concat([df_wide, df_wide_all_am], ignore_index=True)
 
     out_dict = {}

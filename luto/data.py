@@ -119,14 +119,14 @@ class Data:
         self.obj_vals = {}
 
         print('')
-        print(f'Beginning data initialisation at RES{settings.RESFACTOR}...')
+        print(f'Data Initialization at RES{settings.RESFACTOR}')
 
         self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
 
         ###############################################################
         # Masking and spatial coarse graining.
         ###############################################################
-        print("\tSetting up masking and spatial course graining data...", flush=True)
+        print("├── Setting up masking and spatial course graining data", flush=True)
 
         # Set resfactor multiplier
         self.RESMULT = settings.RESFACTOR ** 2
@@ -177,7 +177,7 @@ class Data:
         ###############################################################
         # Load agricultural crop and livestock economic and yield data.
         ###############################################################
-        print("\tLoading agricultural crop and livestock data...", flush=True)
+        print("├── Loading agricultural crop and livestock data", flush=True)
         self.AGEC_CROPS = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agec_crops.h5"), where=self.MASK)
         self.AGEC_LVSTK = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agec_lvstk.h5"), where=self.MASK)
         
@@ -190,7 +190,7 @@ class Data:
         ###############################################################
         # Set up lists of land-uses, commodities etc.
         ###############################################################
-        print("\tSetting up lists of land uses, commodities, etc...", flush=True)
+        print("├── Setting up lists of land uses, commodities, etc.", flush=True)
 
         # Read in lexicographically ordered list of land-uses.
         self.AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(settings.INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
@@ -308,6 +308,15 @@ class Data:
 
         self.LU2PR = dict2matrix(self.LU2PR_DICT, self.AGRICULTURAL_LANDUSES, self.PRODUCTS)
 
+        self.lu2pr_xr = xr.DataArray(
+            self.LU2PR.astype(np.float32),
+            dims=['product', 'lu'],
+            coords={
+                'product': self.PRODUCTS,
+                'lu': self.AGRICULTURAL_LANDUSES
+            },
+        )
+
 
         # List of commodities. Everything lower case to avoid mistakes.
         # Basically collapse 'NATURAL LAND' and 'MODIFIED LAND' products and remove duplicates.
@@ -344,7 +353,16 @@ class Data:
 
         self.PR2CM = dict2matrix(self.CM2PR_DICT, self.COMMODITIES, self.PRODUCTS).T # Note the transpose.
         
-        
+        self.pr2cm_xr = xr.DataArray(
+            self.PR2CM.astype(np.float32),
+            dims=['Commodity', 'product'],
+            coords={
+                'Commodity': self.COMMODITIES,
+                'product': self.PRODUCTS
+            },
+        )
+
+
         # Get the land-use indices for each commodity.
         self.CM2LU_IDX = defaultdict(list)
         for c in self.COMMODITIES:
@@ -378,7 +396,7 @@ class Data:
         ###############################################################
         # Spatial layers.
         ###############################################################
-        print("\tSetting up spatial layers data...", flush=True)
+        print("├── Setting up spatial layers data", flush=True)
 
         # Actual hectares per cell, including projection corrections.
         self.REAL_AREA_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "real_area.h5")).to_numpy()
@@ -423,13 +441,36 @@ class Data:
         ###############################################################
         # Climate change impact data.
         ###############################################################
-        print("\tLoading climate change data...", flush=True)
+        print("├── Loading climate change data", flush=True)
 
         self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"), where=self.MASK
         )
         
-        
+        # Convert to xarray DataArray for easier indexing.
+        #   The YRS_CAL_BASE (2010) is not included in the climate change impact data,
+        #   so we add it here with a multiplier of 1.
+        self.CLIMATE_CHANGE_IMPACT_xr = (
+                xr.DataArray(self.CLIMATE_CHANGE_IMPACT)
+                .unstack('dim_1')
+                .rename({'dim_1_level_0':'lm', 'dim_1_level_1':'lu', 'dim_1_level_2':'year', 'CELL_ID':'cell'})
+                .assign_coords(cell=range(self.NCELLS))     # Cell index from now will be from 0 to NCELLS-1
+            )
+
+        CLIMATE_CHANGE_IMPACT_xr_base_year = (
+            self.CLIMATE_CHANGE_IMPACT_xr
+            .isel(year=0, drop=True)
+            .assign_coords(year=self.YR_CAL_BASE)
+            .expand_dims('year')
+            .notnull()
+            .astype(np.float32)
+        )
+
+        self.CLIMATE_CHANGE_IMPACT_xr = xr.concat(
+            [CLIMATE_CHANGE_IMPACT_xr_base_year,self.CLIMATE_CHANGE_IMPACT_xr],
+            dim='year'
+        )
+
         ###############################################################
         # Regional coverage layers, mainly for regional reporting.
         ###############################################################
@@ -444,7 +485,7 @@ class Data:
         ###############################################################
         # No-Go areas; Regional adoption constraints.
         ###############################################################
-        print("\tLoading no-go areas and regional adoption zones...", flush=True)
+        print("├── Loading no-go areas and regional adoption zones", flush=True)
    
         ##################### No-go areas
         self.NO_GO_LANDUSE_AG = []
@@ -516,15 +557,14 @@ class Data:
             ]
             
             # Check missing zones due to high resfactor
-            if len(self.REGIONAL_ADOPTION_TARGETS) > 0:
-                lost_zones = np.setdiff1d(
-                    self.REGIONAL_ADOPTION_TARGETS[settings.REGIONAL_ADOPTION_ZONE].unique(),
-                    np.unique(self.REGIONAL_ADOPTION_ZONES)
-                )
-                
-                if len(lost_zones) > 0:
-                    print(f" 	    WARNING: {len(lost_zones)} regional adoption zones have no cells due to (RES{settings.RESFACTOR}). Please check if this is expected.")
-                    self.REGIONAL_ADOPTION_TARGETS = self.REGIONAL_ADOPTION_TARGETS.query(f"{settings.REGIONAL_ADOPTION_ZONE} not in {list(lost_zones)}").reset_index(drop=True)
+            lost_zones = np.setdiff1d(
+                self.REGIONAL_ADOPTION_TARGETS[settings.REGIONAL_ADOPTION_ZONE].unique(),
+                np.unique(self.REGIONAL_ADOPTION_ZONES)
+            ) if len(self.REGIONAL_ADOPTION_TARGETS) > 0 else np.array([])
+
+            if len(lost_zones) > 0:
+                print(f"│   ⚠ WARNING: {len(lost_zones)} regional adoption zones have no cells due to (RES{settings.RESFACTOR}). Please check if this is expected.", flush=True)
+                self.REGIONAL_ADOPTION_TARGETS = self.REGIONAL_ADOPTION_TARGETS.query(f"{settings.REGIONAL_ADOPTION_ZONE} not in {list(lost_zones)}").reset_index(drop=True)
                 
             
 
@@ -533,7 +573,7 @@ class Data:
         ###############################################################
         # Livestock related data.
         ###############################################################
-        print("\tLoading livestock related data...", flush=True)
+        print("├── Loading livestock related data", flush=True)
 
         self.FEED_REQ = np.nan_to_num(
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "feed_req.h5"), where=self.MASK).to_numpy()
@@ -553,7 +593,7 @@ class Data:
         ###############################################################
         # Agricultural Management options data.
         ###############################################################
-        print("\tLoading agricultural management options' data...", flush=True)
+        print("├── Loading agricultural management options' data", flush=True)
 
         # Asparagopsis taxiformis data
         asparagopsis_file = os.path.join(settings.INPUT_DIR, "20250415_Bundle_MR.xlsx")
@@ -676,12 +716,17 @@ class Data:
         ###############################################################
         # Productivity data.
         ###############################################################
-        print("\tLoading productivity data...", flush=True)
+        print("├── Loading productivity data", flush=True)
 
         # Yield increases.
         fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
         self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
-
+        self.BAU_PROD_INCR_xr = (
+            xr.DataArray(self.BAU_PROD_INCR)
+            .unstack('dim_1')
+            .rename({'dim_1_level_0':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
+            .assign_coords(year=lambda x: x.year + self.YR_CAL_BASE)  # Adjust year to absolute year
+        )
 
 
 
@@ -689,7 +734,7 @@ class Data:
         # Auxiliary Spatial Layers
         # (spatial layers not required for production calculation)
         ###############################################################
-        print("\tLoading auxiliary spatial layers data...", flush=True)
+        print("├── Loading auxiliary spatial layers data", flush=True)
 
         # Load stream length data in metres of stream per cell
         self.STREAM_LENGTH = pd.read_hdf(
@@ -710,7 +755,7 @@ class Data:
         ###############################################################
         # Additional agricultural GHG data.
         ###############################################################
-        print("\tLoading additional agricultural GHG data...", flush=True)
+        print("├── Loading additional agricultural GHG data", flush=True)
 
 
         # Load greenhouse gas emissions from agriculture
@@ -734,7 +779,7 @@ class Data:
         ###############################################################
         # Non-agricultural data.
         ###############################################################
-        print("\tLoading non-agricultural data...", flush=True)
+        print("├── Loading non-agricultural data", flush=True)
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
@@ -939,7 +984,7 @@ class Data:
         ###############################################################
         # Water data.
         ###############################################################
-        print("\tLoading water data...", flush=True)
+        print("├── Loading water data", flush=True)
         
         # Initialize water constraints to avoid recalculating them every time.
         self.WATER_YIELD_LIMITS = None
@@ -1028,7 +1073,7 @@ class Data:
         ###############################################################
         # Carbon sequestration by natural lands.
         ###############################################################
-        print("\tLoading carbon sequestration by natural lands data...", flush=True)
+        print("├── Loading carbon sequestration by natural lands data", flush=True)
 
         '''
         ['NATURAL_LAND_AGB_TCO2_HA']
@@ -1055,28 +1100,76 @@ class Data:
         self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
-        print(f"\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production()        
+        print("├── Calculating base year productivity", flush=True)
+
+        (
+            self.prod_base_yr_potential_ag_mrp,
+            self.prod_base_yr_potential_non_ag_rp,
+            self.prod_base_yr_potential_am_amrp
+        ) = self.get_potential_production_lyr(self.YR_CAL_BASE)
+
+        (
+            self.prod_base_yr_actual_ag_mrc,
+            self.prod_base_yr_actual_non_ag_rc,
+            self.prod_base_yr_actual_am_amrc
+        ) = self.get_actual_production_lyr(self.YR_CAL_BASE)
+
+        yr_cal_base_prod_data = (
+            self.prod_base_yr_actual_ag_mrc.sum(['cell','lm'])
+            + self.prod_base_yr_actual_non_ag_rc.sum(['cell'])
+            + self.prod_base_yr_actual_am_amrc.sum(['cell', 'am', 'lm'])
+        ).compute().values
+
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
+
         
-        
-        
-        # Place holders for base year values; will be filled in the input_data module.
-        self.BASE_YR_economic_value = None
+        # Place holders for base year values
+        self.BASE_YR_economic_value = None                      # filled by `input_data.get_BASE_YR_economic_value`
         self.BASE_YR_production_t = yr_cal_base_prod_data
-        self.BASE_YR_GHG_t = None
-        self.BASE_YR_water_ML = None
-        self.BASE_YR_overall_bio_value = None
-        self.BASE_YR_GBF2_score = None
+        self.BASE_YR_GHG_t = None                               # filled by `input_data.get_BASE_YR_GHG_t`
+        self.BASE_YR_water_ML = None                            # filled by `input_data.get_BASE_YR_water_ML`
+        self.BASE_YR_overall_bio_value = None                   # filled by `input_data.get_BASE_YR_bio_quality_value`
+        self.BASE_YR_GBF2_score = None                          # filled by `input_data.get_BASE_YR_GBF2_score`
 
         ###############################################################
         # Demand data.
         ###############################################################
-        print("\tLoading demand data...", flush=True)
+        print("├── Loading demand data", flush=True)
+        
+        # Load demand multiplier data
+        AusTIME_multipliers = pd.read_excel(
+                f'{settings.INPUT_DIR}/AusTIMES_demand_multiplier.xlsx', 
+                sheet_name=settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS].split(' ')[0] + ' Demand', 
+                index_col=0,
+            ).T.reset_index(drop=True
+            ).rename(columns={
+                'Sorghum ':'winter cereals',    # the majority of winter cereals is Sorghum in Australia, so we map it this way
+                'Canola':'winter oilseeds',     # the majority of winter oilseeds is Canola in Australia, so we map it this way
+                'Sugar': 'sugar'
+            }).drop(columns=['Cottonseed']      # LUTO do not have cottonseed in our model
+            ).astype({'Year': int}
+            ).set_index('Year')
+            
+        demand_multipliers = pd.DataFrame(
+            index=range(2010, AusTIME_multipliers.index.max() + 1),
+            columns=self.COMMODITIES,
+            data=1.0
+        )
+        
+        demand_multipliers.loc[
+            AusTIME_multipliers.index,
+            AusTIME_multipliers.columns
+        ] = AusTIME_multipliers
+        
+        demand_multipliers = demand_multipliers.T
+        demand_multipliers.columns.name = 'YEAR'
+        demand_multipliers.index.name = 'COMMODITY'
+            
+
 
         # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
         dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'demand_projections.h5'))
-
+        
         # Select the demand data under the running scenariobbryan-January
         self.DEMAND_DATA = dd.loc[(
             settings.SCENARIO,
@@ -1097,59 +1190,35 @@ class Data:
         # Remove off-land commodities
         self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY not in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
-        if settings.APPLY_DEMAND_MULTIPLIERS and settings.GHG_EMISSIONS_LIMITS is not 'off':
-            # Load demand multiplier data
-            AusTIME_multipliers = pd.read_excel(
-                f'{settings.INPUT_DIR}/AusTIMES_demand_multiplier.xlsx',
-                sheet_name=settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS].split(' ')[0] + ' Demand',
-                index_col=0,
-            ).T.reset_index(drop=True
-                            ).rename(columns={
-                'Sorghum ': 'winter cereals',
-                # the majority of winter cereals is Sorghum in Australia, so we map it this way
-                'Canola': 'winter oilseeds',
-                # the majority of winter oilseeds is Canola in Australia, so we map it this way
-                'Sugar': 'sugar'
-            }).drop(columns=['Cottonseed']  # LUTO do not have cottonseed in our model
-                    ).astype({'Year': int}
-                             ).set_index('Year')
 
-            demand_multipliers = pd.DataFrame(
-                index=range(2010, AusTIME_multipliers.index.max() + 1),
-                columns=self.COMMODITIES,
-                data=1.0
-            )
-
-            demand_multipliers.loc[
-                AusTIME_multipliers.index,
-                AusTIME_multipliers.columns
-            ] = AusTIME_multipliers
-
-            demand_multipliers = demand_multipliers.T
-            demand_multipliers.columns.name = 'YEAR'
-            demand_multipliers.index.name = 'COMMODITY'
-
-            print('The years before applying demand multipliers:', self.DEMAND_C.columns.min(), self.DEMAND_C.columns.max(), flush=True)
+        if settings.APPLY_DEMAND_MULTIPLIERS:
+            print(f"│   ├── Years before applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
             self.DEMAND_C = (self.DEMAND_C *  demand_multipliers).dropna(axis=1)
-            print("The years after applying demand multipliers:", self.DEMAND_C.columns.min(), self.DEMAND_C.columns.max(), flush=True)
-
+            print(f"│   └── Years after applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
+        
         # Convert to numpy array of shape (91, 26)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
         
         # Adjust demand data to the production data calculated using the base year layers;
         # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops) 
         # are distorted more under higher resfactoring.
-        self.D_CY *= (yr_cal_base_prod_data / self.D_CY[0])[None, :]
-        
+        self.D_CY *= (self.BASE_YR_production_t / self.D_CY[0])[None, :]
+        self.D_CY_xr = xr.DataArray(
+            self.D_CY,
+            dims=['year','Commodity'],
+            coords={
+                'year':self.YR_CAL_BASE + np.arange(self.D_CY.shape[0]),
+                'Commodity':self.COMMODITIES
+            }
+        )
 
-        # Demand elasticity data
-        demand_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').drop(columns=['Unnamed: 0'])
-        demand_elasticity['demand_elasticity'] = demand_elasticity.eval('`Supply Elasticity (Es)` - `Demand Elasticity(ED)`')
-        self.DEMAND_ELASTICITY = demand_elasticity.set_index('Commodity')['demand_elasticity'].to_dict()
+        # Price elasticity data
+        demand_supply_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').drop(columns=['Unnamed: 0'])
+        demand_supply_elasticity = demand_supply_elasticity.sort_values('Commodity')    # Sort by commodity to ensure the order is correct
+        demand_supply_elasticity['Demand Elasticity(ED)'] = demand_supply_elasticity['Demand Elasticity(ED)'] * -1 # ED is subtracted from supply becase demand curve are given as negative numbers
         
-        demand_xr = xr.DataArray(self.DEMAND_C) 
-        self.DEMAND_DELTA = (demand_xr - demand_xr.sel(YEAR=2010)) / demand_xr.sel(YEAR=2010)
-        
+        self.elasticity_demand = demand_supply_elasticity['Demand Elasticity(ED)']
+        self.elasticity_supply = demand_supply_elasticity['Supply Elasticity (Es)']
 
 
 
@@ -1157,7 +1226,7 @@ class Data:
         ###############################################################
         # Carbon emissions from off-land commodities.
         ###############################################################
-        print("\tLoading off-land commodities' carbon emissions data...", flush=True)
+        print("├── Loading off-land commodities' carbon emissions data", flush=True)
 
         # Read the greenhouse gas intensity data
         off_land_ghg_intensity = pd.read_csv(f'{settings.INPUT_DIR}/agGHG_lvstk_off_land.csv')
@@ -1206,7 +1275,7 @@ class Data:
         ###############################################################
         # GHG targets data.
         ###############################################################
-        print("\tLoading GHG targets data...", flush=True)
+        print("├── Loading GHG targets data", flush=True)
         if settings.GHG_EMISSIONS_LIMITS != 'off':
             self.GHG_TARGETS = pd.read_excel(
                 os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
@@ -1218,7 +1287,7 @@ class Data:
         ###############################################################
         # Savanna burning data.
         ###############################################################
-        print("\tLoading savanna burning data...", flush=True)
+        print("├── Loading savanna burning data", flush=True)
 
         # Read in the dataframe
         savburn_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'cell_savanna_burning.h5'), where=self.MASK)
@@ -1241,7 +1310,7 @@ class Data:
         # Biodiversity priority conservation data. (GBF Target 2)
         ###############################################################
         
-        print("\tLoading biodiversity data...", flush=True)
+        print("├── Loading biodiversity data", flush=True)
         """
         Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
         Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -1290,7 +1359,7 @@ class Data:
             case 'USER_DEFINED':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['USER_DEFINED'].to_dict()
             case _:
-                print(f"WARNING!! Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'")
+                print(f"│   ⚠ WARNING: Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'", flush=True)
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}                 # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
@@ -1333,7 +1402,7 @@ class Data:
         # GBF3 biodiversity data. (NVIS and IBRA)
         ###############################################################
         if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
-            print("\tLoading GBF3 vegetation data (NVIS)...", flush=True)
+            print("│   ├── Loading GBF3 vegetation data (NVIS)", flush=True)
 
             # Read in the pre-1750 statistics and targets
             nvis_targets_df = pd.read_excel(
@@ -1396,7 +1465,7 @@ class Data:
 
 
         if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
-            print("\tLoading GBF3 bioregional data (IBRA)...", flush=True)
+            print("│   ├── Loading GBF3 bioregional data (IBRA)", flush=True)
 
             # Read in the pre-1750 statistics and targets
             ibra_targets_df = pd.read_excel(
@@ -1464,7 +1533,7 @@ class Data:
         ##########################################################################
         if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
 
-            print("\tLoading environmental significance data (SNES)...", flush=True)
+            print("│   ├── Loading environmental significance data (SNES)", flush=True)
             
             # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4)
             BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv').sort_values(by='SCIENTIFIC_NAME', ascending=True)
@@ -1484,8 +1553,9 @@ class Data:
 
             likely_maybe_union = set(self.BIO_GBF4_SNES_LIKELY_SEL).intersection(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
-                print(f"\tWARNING: {len(likely_maybe_union)} duplicate SNE species targets found, using 'LIKELY' targets only:")
-                [print(f"    {idx+1}) {name}") for idx, name in enumerate(likely_maybe_union)]
+                print(f"│   │   ⚠ WARNING: {len(likely_maybe_union)} duplicate SNE species targets found, using 'LIKELY' targets only:", flush=True)
+                for idx, name in enumerate(likely_maybe_union):
+                    print(f"│   │       ├── {idx+1}) {name}", flush=True)
                 self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
                 
             self.BIO_GBF4_SNES_SEL_ALL = self.BIO_GBF4_SNES_LIKELY_SEL + self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL
@@ -1501,7 +1571,7 @@ class Data:
         
         
         if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
-            print("\tLoading environmental significance data (ECNES)...", flush=True)
+            print("│   ├── Loading environmental significance data (ECNES)", flush=True)
         
         
             BIO_GBF4_ECNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv').sort_values(by='COMMUNITY', ascending=True)
@@ -1521,8 +1591,9 @@ class Data:
   
             likely_maybe_union = set(self.BIO_GBF4_ECNES_LIKELY_SEL).intersection(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
-                print(f"\tWARNING: {len(likely_maybe_union)} duplicate ECNES species targets found, using 'LIKELY' targets only:")
-                [print(f"    {idx+1}) {name}") for idx, name in enumerate(likely_maybe_union)]
+                print(f"│   │   ⚠ WARNING: {len(likely_maybe_union)} duplicate ECNES species targets found, using 'LIKELY' targets only:", flush=True)
+                for idx, name in enumerate(likely_maybe_union):
+                    print(f"│   │       ├── {idx+1}) {name}", flush=True)
                 self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
                  
             self.BIO_GBF4_ECNES_SEL_ALL = self.BIO_GBF4_ECNES_LIKELY_SEL + self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL
@@ -1544,7 +1615,7 @@ class Data:
         
         if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':
             
-            print("\tLoading Species suitability data...", flush=True)
+            print("│   ├── Loading Species suitability data", flush=True)
             
             # Read in the species data from Carla Archibald (noted as GBF-8)
             BIO_GBF8_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
@@ -1572,7 +1643,7 @@ class Data:
         ###############################################################
         # BECCS data.
         ###############################################################
-        print("\tLoading BECCS data...", flush=True)
+        print("└── Loading BECCS data", flush=True)
 
         # Load dataframe
         beccs_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'cell_BECCS_df.h5'), where=self.MASK)
@@ -1749,9 +1820,144 @@ class Data:
         )
       
         return lumap_resfactored[*nearst_ind]
-    
 
-    def get_elasticity_multiplier(self, yr_cal):
+
+
+    def get_potential_production_lyr(self, yr_cal:int):
+        '''
+        Return the potential production data for a given year as xarray DataArrays.
+        The returned DataArrays are spatial layers for `agricultural`, `non-agricultural`, and `agricultural management` commodities,
+        where each cell is the production potential of a commodity.
+
+        Note: the 'potential' means the production is calculated based on production potential matrices,
+        meaning the production is calculated without considering the actual land-use, but only using the quality marices.
+        '''
+
+        # Calculate year index (i.e., number of years since 2010)
+        yr_idx = yr_cal - self.YR_CAL_BASE
+
+        # Get lumap of base year
+        sim_year = sorted(set([self.YR_CAL_BASE]) | set(settings.SIM_YEARS))
+        if yr_cal == self.YR_CAL_BASE:
+            lumap = self.lumaps[self.YR_CAL_BASE]
+        else:
+            prev_year = sim_year[sim_year.index(yr_cal)-1]
+            lumap = self.lumaps[prev_year]
+
+        # Get commodity matrices
+        ag_q_mrp_xr = xr.DataArray(
+            ag_quantity.get_quantity_matrices(self, yr_idx).astype(np.float32),
+            dims=['lm','cell','product'],
+            coords={
+                'lm': self.LANDMANS,
+                'cell': range(self.NCELLS),
+                'product': self.PRODUCTS
+            },
+        ).assign_coords(
+            region=('cell', self.REGION_NRM_NAME),
+        )
+
+        non_ag_crk_xr = xr.DataArray(
+            non_ag_quantity.get_quantity_matrix(self, ag_q_mrp_xr, lumap).astype(np.float32),
+            dims=['Commodity', 'cell', 'lu'],
+            coords={
+                'Commodity': self.COMMODITIES,
+                'cell': range(self.NCELLS),
+                'lu': self.NON_AGRICULTURAL_LANDUSES
+            },
+        ).assign_coords(
+            region=('cell', self.REGION_NRM_NAME),
+        )
+
+        ag_man_q_amrp_xr = xr.DataArray(
+            np.stack(list(ag_quantity.get_agricultural_management_quantity_matrices(self, ag_q_mrp_xr, yr_idx).values())).astype(np.float32),
+            dims=['am', 'lm', 'cell', 'product'],
+            coords={
+                'am': self.AG_MAN_DESC,
+                'lm': self.LANDMANS,
+                'cell': np.arange(self.NCELLS),
+                'product': self.PRODUCTS
+            }
+        ).assign_coords(
+            region=('cell', self.REGION_NRM_NAME),
+        )
+
+        return (ag_q_mrp_xr.compute(), non_ag_crk_xr.compute(), ag_man_q_amrp_xr.compute())
+
+
+    def get_actual_production_lyr(self, yr_cal:int):
+        '''
+        Return the production data for a given year as xarray DataArrays.
+        The returned DataArrays are spatial layers where each cell is the production of a commodity.
+        Such as t/cell for apples, beef. Or ML/cell for milk.
+
+        Note: the 'actual' means the production is calculated based on true decision variables,
+        meaning the production is calculated based on actual land-use areas.
+        '''
+        # Get dvars and production potential matrices
+        if yr_cal == self.YR_CAL_BASE:
+            ag_X_mrj = self.AG_L_MRJ
+            non_ag_X_rk = self.NON_AG_L_RK
+            ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
+
+            ag_q_mrp_xr = self.prod_base_yr_potential_ag_mrp
+            non_ag_crk_xr = self.prod_base_yr_potential_non_ag_rp
+            ag_man_q_amrp_xr = self.prod_base_yr_potential_am_amrp
+
+        else: # In this case, the dvars are already appended from the solver
+            ag_X_mrj = self.ag_dvars[yr_cal]
+            non_ag_X_rk = self.non_ag_dvars[yr_cal]
+            ag_man_X_mrj = self.ag_man_dvars[yr_cal]
+
+            ag_q_mrp_xr, non_ag_crk_xr, ag_man_q_amrp_xr = self.get_potential_production_lyr(yr_cal)
+
+        # Convert dvar array to xr.DataArray; Chunk the data to reduce memory usage
+        ag_X_mrj_xr = tools.ag_mrj_to_xr(self, ag_X_mrj).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+        non_ag_X_rk_xr = tools.non_ag_rk_to_xr(self, non_ag_X_rk).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+        ag_man_X_amrj_xr = tools.am_mrj_to_xr(self, ag_man_X_mrj).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+
+        # Calculate the commodity production (BEFORE dimension expansion to avoid double counting)
+        #   Using xr.dot() instead of broadcasting for better memory efficiency and performance
+        ag_q_mrc = xr.dot((xr.dot(ag_X_mrj_xr, self.lu2pr_xr, dims=['lu']) * ag_q_mrp_xr), self.pr2cm_xr, dims=['product'])
+        non_ag_p_rc = xr.dot(non_ag_X_rk_xr, non_ag_crk_xr, dims=['lu'])
+        am_p_amrc = xr.dot((xr.dot(ag_man_X_amrj_xr, self.lu2pr_xr, dims=['lu']) * ag_man_q_amrp_xr), self.pr2cm_xr, dims=['product'])
+
+        return ag_q_mrc, non_ag_p_rc, am_p_amrc
+
+
+
+    def get_production_from_base_dvar_under_target_CCI_and_yield_change(self, yr_cal:int):
+        '''
+        Get the production aggregated stats (t/ML for each commodity) based on `YR_CAL_BASE` decision variables
+        but under the target CCI and yield change of the given year.
+
+        This function is used to calculate the 'what-if' production when there is not climate change impact and yield change
+        since the `YR_CAL_BASE`. This is useful for evaluating the supply-delta caused by climate change and yield change.
+        '''
+
+        # Convert np.array to xr.DataArray; Chunk the data to reduce memory usage
+        ag_X_mrj_xr = tools.ag_mrj_to_xr(self, self.AG_L_MRJ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+        non_ag_X_rk_xr = tools.non_ag_rk_to_xr(self, self.NON_AG_L_RK).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+        ag_man_X_amrj_xr = tools.am_mrj_to_xr(self, self.AG_MAN_L_MRJ_DICT).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+
+        # Get potential production layers
+        ag_q_mrp_xr_target_yr, non_ag_crk_xr_target_yr, ag_man_q_amrp_xr_target_yr = self.get_potential_production_lyr(yr_cal)
+
+        # Calculate total impact
+        ag_production_c = xr.dot(
+            xr.dot(ag_X_mrj_xr, self.lu2pr_xr, dims=['lu']) * ag_q_mrp_xr_target_yr, self.pr2cm_xr,
+            dim=['cell', 'lm','product']
+        ).compute()
+        non_ag_production_c = xr.dot(non_ag_X_rk_xr, non_ag_crk_xr_target_yr, dims=['cell', 'lu'])
+        am_p_amrc = xr.dot(
+            (xr.dot(ag_man_X_amrj_xr, self.lu2pr_xr, dims=['lu']) * ag_man_q_amrp_xr_target_yr), self.pr2cm_xr,
+            dims=['am', 'cell', 'lm','product']
+        )
+
+        return (ag_production_c.compute() + non_ag_production_c.compute() + am_p_amrc.compute())
+
+
+    def get_elasticity_multiplier(self, yr_cal:int):
         '''
         Get the elasticity multiplier for a given year and land use.
         yr_cal: year (int).
@@ -1759,17 +1965,28 @@ class Data:
         Returns:
             dict: A dictionary with land use as keys and elasticity multipliers as values.
         '''
-        elasticity_multiplier = {
-            c: 1 + (self.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY=c) / self.DEMAND_ELASTICITY[c]).values
-            for c in self.DEMAND_DELTA.COMMODITY.values
-        }
 
+        # Get supply delta (0-based ratio)
+        supply_base_dvar_base_productivity = self.BASE_YR_production_t
+        supply_base_dvar_target_productivity = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
+        delta_supply = (supply_base_dvar_target_productivity - supply_base_dvar_base_productivity) / supply_base_dvar_base_productivity
+
+        # Get demand delta (0-based ratio)
+        demand_base_year = self.D_CY_xr.sel(year=self.YR_CAL_BASE)
+        demand_target_year = self.D_CY_xr.sel(year=yr_cal)
+        delta_demand = (demand_target_year - demand_base_year) / demand_base_year
+
+        # Calculate price_multiplier (1-based ratio)
+        price_delta = (delta_demand - delta_supply) / (self.elasticity_demand + self.elasticity_supply)
+        elasticity_multiplier = (price_delta + 1).to_dataframe('multiplier')['multiplier'].to_dict()
+        
         if settings.DYNAMIC_PRICE:
             return elasticity_multiplier
         else:
             return {k: 1 for k in elasticity_multiplier.keys()}
-
     
+    
+
     def get_watershed_yield_components(self, valid_watershed_id:list[int] = None):
         """
         Get the water yield components for the specified watersheds.
@@ -1825,7 +2042,7 @@ class Data:
         self.WATERSHED_DISAPPEARING = [self.WATER_REGION_NAMES[i] for i in set(self.WATER_REGION_NAMES.keys()) - set(valid_watershed_id)]
         
         if self.WATERSHED_DISAPPEARING:
-            print(f"    WARNING! {len(self.WATERSHED_DISAPPEARING)} river regions are disappearing due to using high resolution factors.")
+            print(f"│   ⚠ WARNING: {len(self.WATERSHED_DISAPPEARING)} river regions are disappearing due to using high resolution factors.", flush=True)
             [print(f"       - {list(i)}") for i in np.array_split(self.WATERSHED_DISAPPEARING, len(self.WATERSHED_DISAPPEARING)//3)]
             self.WATER_REGION_NAMES = {k: v for k, v in self.WATER_REGION_NAMES.items() if k in valid_watershed_id}
             self.WATER_REGION_HIST_LEVEL = {k: v for k, v in self.WATER_REGION_HIST_LEVEL.items() if k in valid_watershed_id}
@@ -2165,54 +2382,6 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def get_production(self) -> np.ndarray:
-        """
-        Return total production of commodities for YR_CAL_BASE...
-        """
-        ag_X_mrj = self.AG_L_MRJ
-        non_ag_X_rk = self.NON_AG_L_RK
-        ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
-
-        # The year index for the base year (2010) is 0.
-        yr_idx = 0
-
-        ag_q_mrp = ag_quantity.get_quantity_matrices(self, yr_idx)
-
-        # Convert map of land-use in mrj format to mrp format using vectorization
-        ag_X_mrp = np.einsum('mrj,pj->mrp', ag_X_mrj, self.LU2PR.astype(bool))
-
-        # Sum quantities in product (PR/p) representation.
-        ag_q_p = np.einsum('mrp,mrp->p', ag_q_mrp, ag_X_mrp)
-
-        # Transform quantities to commodity (CM/c) representation.
-        ag_q_c = np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_q_p)
-
-        # Get the quantity of each commodity produced by non-agricultural land uses
-        q_crk = non_ag_quantity.get_quantity_matrix(self, ag_q_mrp, self.LUMAP)
-        non_ag_q_c = np.einsum('crk,rk->c', q_crk, non_ag_X_rk)
-
-        # Get quantities produced by agricultural management options
-        ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(self, ag_q_mrp, yr_idx)
-        ag_man_q_c = np.zeros(self.NCMS)
-        for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
-            if not settings.AG_MANAGEMENTS[am]:
-                continue
-            
-            am_j_list = [self.DESC2AGLU[lu] for lu in am_lus]
-            for j in am_j_list:
-                for p in range(self.NPRS):
-                    if self.LU2PR[p, j] ==0:
-                        continue
-                    dvar_mr = ag_man_X_mrj[am][:, :, j]
-                    ag_q_mr = ag_man_q_mrp[am][:, :, p]
-                    q_mr = dvar_mr * ag_q_mr
-                    
-                    for c in range(self.NCMS):
-                        if self.PR2CM[c, p] == 0:
-                            continue
-                        ag_man_q_c[c] += q_mr.sum()
-            
-        return ag_q_c + non_ag_q_c + ag_man_q_c
 
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:

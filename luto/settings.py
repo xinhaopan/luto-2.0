@@ -68,7 +68,9 @@ IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports f
 WASTE = 1                           # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
-APPLY_DEMAND_MULTIPLIERS = True     # True or False. Whether to apply demand multipliers from AusTIME model.
+# Set the demand and supply multipliers
+APPLY_DEMAND_MULTIPLIERS = False     # True or False. Whether to apply demand multipliers from AusTIME model.
+AG_YIELD_MULT = 1.15                # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
 CO2_FERT = 'off'   # 'on' or 'off'
@@ -112,7 +114,7 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Set whether to use demand elasticity when calculating commodity prices
-DYNAMIC_PRICE = True
+DYNAMIC_PRICE = False
 
 
 
@@ -163,8 +165,18 @@ the model sensitive to variations in input data.
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(4, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_PARALLEL = True                       # If to use parallel processing to write GeoTiffs: True or False
+WRITE_THREADS = min(6, os.cpu_count())      # The Threads to use for map making, only work with WRITE_PARALLEL = True
+
+WRITE_REPORT_MAX_MEM_GB = 64                # The maximum memory (in GB) to use for writing report layers.
+                                            #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13
+                                            #   (for example, for RESFACTOR = 5, the MEM usage will be 0.5 * (13/5)^2 = 3.4 GB).
+
+WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk during writeing process.
+                                            #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
+                                            #   This makes memory usage to be ~1/200 of the original size.
+
+
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -457,7 +469,7 @@ GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
 - Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
     - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
-- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions from land-use and livestock types)
+- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types)
     - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
 - When turning off the 'Carbon Planttings', including block/belt, use the following options:
     - '1.5C 50%', '1.8C 67%'
@@ -585,7 +597,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -615,8 +627,9 @@ Essentially, the biodiversity quality layer determines how important (0-100) a c
       related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act). 
     - If choosing one of the 'ECNES_likely|may' layers, you assume that the overal biodiversity is determined by ecological
       communities related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act).
-
-The MNES is a merge (simple concatenating) of the SNES and ECNES species communities. 
+    - If choosing one of the 'MNES_likely|may' layers, you assume that the overal biodiversity is determined by both SNES 
+      and ECNES species communities, where each community is treated as a species, and the Zonation algorith sees each
+      community and species equally important.
 
 To understand the 'Suitability' layer, refer to 
     https://academic.oup.com/gigascience/article/doi/10.1093/gigascience/giae002/7619364
