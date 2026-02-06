@@ -4,86 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update: predict feedlots cattle feed">
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/10_Process_export_predict.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/11_Feedlots_feed_ratios.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/12_cattle_FCR_scaled_paramsters.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/13_cattle_GHG_CR.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/5_Feedlots_percent.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/6_process_trade_data1.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_ETS_1.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_GAM.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/8_predict_timeseries1.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/deployment.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deployment.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/growth_index_2010_base.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/growth_index_data_driven.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/growth_index_english.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/growth_rate_scenarios_corrected.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/income_projection.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/6_process_trade_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/6_process_trade_data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_ETS.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_ETS.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/8_predict_timeseries.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/8_predict_timeseries.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/export_predictions_ets_all.png" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/export_predictions_ets_all.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bananas__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bananas__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beans__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beans__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beverages_Alcoholic__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beverages_Alcoholic__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beverages_Alcoholic__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beverages_Alcoholic__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bovine_Meat__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bovine_Meat__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bovine_Meat__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bovine_Meat__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cattle_heads___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cattle_heads___Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cereals_nec___Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cereals_nec___Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cereals_nec___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cereals_nec___Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cheese__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cheese__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cheese__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cheese__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Coffee_and_tea__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Coffee_and_tea__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Coffee_and_tea__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Coffee_and_tea__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cottonseed_Oil__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cottonseed_Oil__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cottonseed_Oil__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cottonseed_Oil__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Eggs__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Eggs__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Eggs__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Eggs__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fats_Animals_Raw__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fats_Animals_Raw__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fats_Animals_Raw__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fats_Animals_Raw__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fodder_and_Feeding_Stuff__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fodder_and_Feeding_Stuff__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fodder_and_Feeding_Stuff__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fodder_and_Feeding_Stuff__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fruits_nec___Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fruits_nec___Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fruits_nec___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fruits_nec___Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Grapes_and_products_excl_wine___Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Grapes_and_products_excl_wine___Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Grapes_and_products_excl_wine___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Grapes_and_products_excl_wine___Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Groundnuts_Shelled_Eq___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Groundnuts_Shelled_Eq___Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Hides_and_skins__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Hides_and_skins__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Meat_Other__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Meat_Other__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Meat_Other__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Meat_Other__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_-_Excluding_Butter__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_-_Excluding_Butter__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_-_Excluding_Butter__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_-_Excluding_Butter__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_products_nec___Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_products_nec___Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_products_nec___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_products_nec___Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Miscellaneous__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Miscellaneous__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Miscellaneous__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Miscellaneous__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Mutton_Goat_Meat__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Mutton_Goat_Meat__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Mutton_Goat_Meat__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Mutton_Goat_Meat__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-alcoholic_Beverages__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-alcoholic_Beverages__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-alcoholic_Beverages__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-alcoholic_Beverages__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Crude_Materials__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Crude_Materials__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Crude_Materials__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Crude_Materials__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Fats_and_Oils__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Fats_and_Oils__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Nuts_and_products__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Nuts_and_products__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Nuts_and_products__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Nuts_and_products__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Offals_Edible__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Offals_Edible__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Offals_Edible__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Offals_Edible__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Oilseeds__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Oilseeds__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Oilseeds__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Oilseeds__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Peas__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Peas__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Pigmeat__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Pigmeat__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Pigmeat__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Pigmeat__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Potatoes_and_products__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Potatoes_and_products__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Potatoes_and_products__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Potatoes_and_products__Import_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Poultry_1000_heads___Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Poultry_1000_heads___Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Poultry_Meat__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Poultry_Meat__Export_Quantity.nc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/tradeF_final.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/tradeF_final.xlsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/trade_model_data_AUS_all.csv" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/trade_model_data_AUS_all.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/productive_growth_index.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/test.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/data_check.ipynb" afterDir="false" />
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update: feedlots work">
+      <change beforePath="$PROJECT_DIR$/luto/data.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/data.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/luto/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/luto/tools/report/create_report_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/tools/report/create_report_data.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -340,31 +264,7 @@
       <workItem from="1760161123508" duration="33763000" />
       <workItem from="1760351223725" duration="145789000" />
       <workItem from="1762821617196" duration="5640000" />
-      <workItem from="1763039474688" duration="176930000" />
-    </task>
-    <task id="LOCAL-00022" summary="merge: from jinzhu 20250921">
-      <option name="closed" value="true" />
-      <created>1758444393752</created>
-      <option name="number" value="00022" />
-      <option name="presentableId" value="LOCAL-00022" />
-      <option name="project" value="LOCAL" />
-      <updated>1758444393752</updated>
-    </task>
-    <task id="LOCAL-00023" summary="undate: run 4">
-      <option name="closed" value="true" />
-      <created>1758468019051</created>
-      <option name="number" value="00023" />
-      <option name="presentableId" value="LOCAL-00023" />
-      <option name="project" value="LOCAL" />
-      <updated>1758468019051</updated>
-    </task>
-    <task id="LOCAL-00024" summary="Reset 20250919">
-      <option name="closed" value="true" />
-      <created>1758477706180</created>
-      <option name="number" value="00024" />
-      <option name="presentableId" value="LOCAL-00024" />
-      <option name="project" value="LOCAL" />
-      <updated>1758477706180</updated>
+      <workItem from="1763039474688" duration="178624000" />
     </task>
     <task id="LOCAL-00025" summary="merge: jinzhu 66bd5e5fd4fec2856a62fe2b9eb532684569610e for report on turn off">
       <option name="closed" value="true" />
@@ -734,7 +634,31 @@
       <option name="project" value="LOCAL" />
       <updated>1765864790348</updated>
     </task>
-    <option name="localTasksCounter" value="71" />
+    <task id="LOCAL-00071" summary="update: feedlots work">
+      <option name="closed" value="true" />
+      <created>1770338988268</created>
+      <option name="number" value="00071" />
+      <option name="presentableId" value="LOCAL-00071" />
+      <option name="project" value="LOCAL" />
+      <updated>1770338988268</updated>
+    </task>
+    <task id="LOCAL-00072" summary="update: feedlots work">
+      <option name="closed" value="true" />
+      <created>1770339065506</created>
+      <option name="number" value="00072" />
+      <option name="presentableId" value="LOCAL-00072" />
+      <option name="project" value="LOCAL" />
+      <updated>1770339065506</updated>
+    </task>
+    <task id="LOCAL-00073" summary="update: feedlots work">
+      <option name="closed" value="true" />
+      <created>1770339219406</created>
+      <option name="number" value="00073" />
+      <option name="presentableId" value="LOCAL-00073" />
+      <option name="project" value="LOCAL" />
+      <updated>1770339219406</updated>
+    </task>
+    <option name="localTasksCounter" value="74" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -762,7 +686,7 @@
                   <entry key="branch">
                     <value>
                       <list>
-                        <option value="origin/master" />
+                        <option value="Jinzhu/jinzhu" />
                       </list>
                     </value>
                   </entry>
@@ -775,7 +699,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update: draw solution price" />
     <MESSAGE value="update: shp and tif" />
     <MESSAGE value="merge: jinzhu 20251003" />
     <MESSAGE value="update: calculate price" />
@@ -800,7 +723,8 @@
     <MESSAGE value="update: draw input data for ag2050" />
     <MESSAGE value="update: predict export food demand by ETS" />
     <MESSAGE value="update: predict feedlots cattle feed" />
-    <option name="LAST_COMMIT_MESSAGE" value="update: predict feedlots cattle feed" />
+    <MESSAGE value="update: feedlots work" />
+    <option name="LAST_COMMIT_MESSAGE" value="update: feedlots work" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -894,11 +818,6 @@
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
           <line>671</line>
           <option name="timeStamp" value="133" />
-        </line-breakpoint>
-        <line-breakpoint suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/test1.py</url>
-          <line>32</line>
-          <option name="timeStamp" value="140" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/0_Preprocess.py</url>
