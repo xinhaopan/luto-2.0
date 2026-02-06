@@ -1,4 +1,3 @@
-
 from joblib import Parallel, delayed
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 from scipy.stats import norm
@@ -11,15 +10,18 @@ import pickle
 from pathlib import Path
 from matplotlib.gridspec import GridSpec
 
-
 warnings.filterwarnings("ignore")
 
 
 def train_single_pair_ets(df_pair: pd.DataFrame,
                           group_name: str,
-                          element_name: str) -> dict:
+                          element_name: str,
+                          align_to_history: bool = True) -> dict:
     """
     ETS (阻尼趋势) 时间序列模型
+
+    参数:
+        align_to_history:  是否将预测结果对齐到历史末年真实值（默认True）
 
     返回预测结果（含预测区间），用于后续画图
     """
@@ -28,7 +30,7 @@ def train_single_pair_ets(df_pair: pd.DataFrame,
     train_df = df_pair[(df_pair['year'] >= 1990) & (df_pair['year'] <= 2014)].copy()
 
     if len(train_df) < 5:
-        print(f"[SKIP] {group_name} - {element_name}:  数据不足")
+        print(f"[SKIP] {group_name} - {element_name}:   数据不足")
         return None
 
     train_df = train_df.sort_values('year').reset_index(drop=True)
@@ -106,10 +108,14 @@ def train_single_pair_ets(df_pair: pd.DataFrame,
     df80 = _to_pi_df(pred_80, 0.80)  # 80% 预测区间
     df95 = _to_pi_df(pred_95, 0.95)  # 95% 预测区间
 
-    # 7. 对齐历史数据（可选，避免预测与历史跳跃）
-    pred_mean_last = float(df80.loc[df80['Year'] == last_hist_year, 'Mean'].values[0])
-    offset_mean = y_last - pred_mean_last
-    # offset_mean = 0  # 如需关闭对齐，取消注释此行
+    # 7. 对齐历史数据（根据开关决定是否执行）
+    if align_to_history:
+        pred_mean_last = float(df80.loc[df80['Year'] == last_hist_year, 'Mean'].values[0])
+        offset_mean = y_last - pred_mean_last
+        print(f"    → 对齐偏移量: {offset_mean:.2f}")
+    else:
+        offset_mean = 0
+        print(f"    → 不对齐，使用原始预测")
 
     for dfp in (df80, df95):
         for col in ['Mean', 'Lower', 'Upper']:
@@ -124,16 +130,18 @@ def train_single_pair_ets(df_pair: pd.DataFrame,
         'df_80': df80,  # 包含 Year, Mean, Lower, Upper
         'df_95': df95,  # 包含 Year, Mean, Lower, Upper
         'last_hist_year': last_hist_year,
-        'model_type': 'ETS'
+        'model_type': 'ETS',
+        'aligned': align_to_history,
+        'offset': offset_mean
     }
 
 
-def train_one_pair_wrapper(group_name, element_name, df_pair):
+def train_one_pair_wrapper(group_name, element_name, df_pair, align_to_history):
     """
     包装函数，用于并行处理
     """
     try:
-        result = train_single_pair_ets(df_pair, group_name, element_name)
+        result = train_single_pair_ets(df_pair, group_name, element_name, align_to_history)
         return result
     except Exception as e:
         print(f"[ERROR] {group_name} - {element_name}: {e}")
@@ -143,6 +151,7 @@ def train_one_pair_wrapper(group_name, element_name, df_pair):
 def plot_all_exports_ets(df_hist: pd.DataFrame, trained_models: list, save_path: str):
     """
     使用 ETS 训练结果画图，所有Export商品在一张大图上
+    y轴最小值设为0
     """
 
     # 只选Export Quantity
@@ -159,7 +168,7 @@ def plot_all_exports_ets(df_hist: pd.DataFrame, trained_models: list, save_path:
     n_cols = 6
     n_rows = int(np.ceil(n_groups / n_cols))
 
-    print(f"布局:  {n_rows} 行 × {n_cols} 列")
+    print(f"布局:   {n_rows} 行 × {n_cols} 列")
 
     # 创建大图
     fig = plt.figure(figsize=(24, 3.5 * n_rows))
@@ -240,6 +249,9 @@ def plot_all_exports_ets(df_hist: pd.DataFrame, trained_models: list, save_path:
             x_min = 1988
         ax.set_xlim(x_min, 2052)
 
+        # 8. 设置y轴最小值为0
+        ax.set_ylim(bottom=0)
+
     # 隐藏多余的空白子图，并在最后一行放图例
     legend_placed = False
     for idx in range(n_groups, n_rows * n_cols):
@@ -270,18 +282,58 @@ def plot_all_exports_ets(df_hist: pd.DataFrame, trained_models: list, save_path:
 
     # 保存
     plt.savefig(save_path, dpi=150, bbox_inches='tight', pad_inches=0.1)
-    print(f"\n✓ 保存到:  {save_path}")
+    print(f"\n✓ 保存到:   {save_path}")
 
     plt.show()
     plt.close(fig)
 
     return fig
 
+
+def preprocess_like_r(df, deflator_file, commodity_map_file):
+    """模仿R代码的预处理步骤"""
+
+    # 1. 加载价格调整因子
+    deflator = pd.read_csv(deflator_file)
+
+    # 2. 加载商品映射和单位因子
+    commodity_map = pd.read_csv(commodity_map_file)
+    df = df.merge(commodity_map, on=["Item.Code", "Item"])
+
+    # 3. 价格调整
+    for year in range(1986, 2017):
+        def_value = deflator[deflator["Year"] == year]["GDP_def_2005"].values[0]
+        mask = (df["Unit"] == "1000 US$") & (df["year"] == year)
+        df.loc[mask, "trade"] = df.loc[mask, "trade"] / def_value
+
+    # 4. 应用单位因子
+    df["trade"] = df["trade"] * df["Factor"]
+
+    # 5. 处理未指定地区
+    total_exports = df.groupby(["year", "LUTO"])["trade"].sum().reset_index()
+    total_exports.columns = ["year", "LUTO", "total_exports"]
+
+    df_with_iso = df[df["ISO3.Code"].notna()]
+    subtotal = df_with_iso.groupby(["year", "LUTO"])["trade"].sum().reset_index()
+    subtotal.columns = ["year", "LUTO", "subtotal_exports"]
+
+    adjustment = total_exports.merge(subtotal, on=["year", "LUTO"])
+    adjustment["scale_factor"] = adjustment["total_exports"] / adjustment["subtotal_exports"]
+
+    df = df.merge(adjustment[["year", "LUTO", "scale_factor"]], on=["year", "LUTO"], how="left")
+    df["trade"] = df["trade"] * df["scale_factor"]
+
+    return df
+
 def main():
     # ========== 配置 ==========
     DATA_PATH = "../2_processed_data/trade_model_data_all.csv"
     OUTPUT_DIR = "../2_processed_data/trained_models_ets"
     N_JOBS = 50  # 并行任务数
+
+    # ========== 新增：对齐开关 ==========
+    ALIGN_TO_HISTORY = False  # True:  对齐到历史末年真实值; False: 使用原始预测
+    # ==================================
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
@@ -299,7 +351,8 @@ def main():
 
     # 获取所有 (group, element) 组合
     pairs = df_agg[["group", "Element"]].drop_duplicates()
-    print(f"总共 {len(pairs)} 个商品需要训练\n")
+    print(f"总共 {len(pairs)} 个商品需要训练")
+    print(f"对��模式: {'启用' if ALIGN_TO_HISTORY else '禁用'}\n")
 
     # ========== 准备任务 ==========
     tasks = []
@@ -313,22 +366,23 @@ def main():
         tasks.append((group_name, element_name, df_pair))
 
     # ========== 并行训练 ==========
-    print(f"开始并行训练 (n_jobs={N_JOBS})...\n")
+    print(f"开始并行训练 (n_jobs={N_JOBS}).. .\n")
     results = Parallel(n_jobs=N_JOBS, verbose=10)(
-        delayed(train_one_pair_wrapper)(g, e, df) for g, e, df in tasks
+        delayed(train_one_pair_wrapper)(g, e, df, ALIGN_TO_HISTORY) for g, e, df in tasks
     )
 
     # ========== 保存结果 ==========
     print("\n保存结果...")
     valid_results = [r for r in results if r is not None]
-    print(f"成功训练:  {len(valid_results)}/{len(tasks)}")
+    print(f"成功训练:   {len(valid_results)}/{len(tasks)}")
 
     # 保存为单个文件
-    output_file = Path(OUTPUT_DIR) / "all_trained_models_ets.pkl"
+    align_suffix = "_aligned" if ALIGN_TO_HISTORY else "_raw"
+    output_file = Path(OUTPUT_DIR) / f"all_trained_models_ets{align_suffix}.pkl"
     with open(output_file, 'wb') as f:
         pickle.dump(valid_results, f)
 
-    print(f"\n✓ 所有结果已保存到:  {output_file}")
+    print(f"\n✓ 所有结���已保存到:   {output_file}")
 
     # 显示样例
     print("\n样例结果:")
@@ -336,19 +390,21 @@ def main():
         df80 = result['df_80']
         print(f"\n[{i + 1}] {result['group']} - {result['element']}")
         print(f"    模型类型: {result['model_type']}")
-        print(f"    历史末年:  {result['last_hist_year']}")
+        print(f"    历史末年:   {result['last_hist_year']}")
+        print(f"    是否对齐: {result['aligned']}")
+        print(f"    偏移量:  {result['offset']:.2f}")
         print(f"    预测年份范围: {df80['Year'].min()} - {df80['Year'].max()}")
 
         # 显示 2050 年的预测
         pred_2050 = df80[df80['Year'] == 2050].iloc[0]
         print(f"    2050年预测: {pred_2050['Mean']:.2f}")
         print(f"    80% CI: [{pred_2050['Lower']:.2f}, {pred_2050['Upper']:.2f}]")
-    HIST_DATA_PATH = "../2_processed_data/trade_model_data_all.csv"
-    MODEL_FILE = "../2_processed_data/trained_models_ets/all_trained_models_ets.pkl"
-    OUTPUT_FILE = "./export_predictions_ets_all.png"
 
-    # ========== 加载数据 ==========
-    print("加载数据...")
+    # ========== 画图 ==========
+    HIST_DATA_PATH = "../2_processed_data/trade_model_data_all.csv"
+    OUTPUT_FILE = f"./export_predictions_ets_all{align_suffix}.png"
+
+    print("\n加载历史数据用于画图...")
 
     # 历史数据
     df_hist = pd.read_csv(HIST_DATA_PATH)
@@ -359,23 +415,105 @@ def main():
 
     # 聚合历史数据
     df_hist_agg = df_hist.groupby(["group", "Element", "year"], as_index=False)["trade"].sum()
+    df_hist_agg.to_excel(Path(OUTPUT_DIR) / "historical_data_aggregated.xlsx", index=False)
     print(f"历史数据: {len(df_hist_agg)} 行")
 
-    # ETS 训练结果
-    if not Path(MODEL_FILE).exists():
-        print(f"错误: 找不到模型文件 {MODEL_FILE}")
-        print("请先运行 ETS 训练代码!")
-        return
+    print(f"训练模型:   {len(valid_results)} 个\n")
 
-    with open(MODEL_FILE, 'rb') as f:
-        trained_models = pickle.load(f)
+    all_predictions = []
 
-    print(f"训练模型:  {len(trained_models)} 个\n")
+    for result in valid_results:
+        group = result['group']
+        element = result['element']
+        df80 = result['df_80'].copy()
+        df95 = result['df_95'].copy()
+
+        # 合并 80% 和 95% 置信区间
+        df_combined = df80[['Year', 'Mean', 'Lower', 'Upper']].copy()
+        df_combined.columns = ['Year', 'Mean', 'CI80_Lower', 'CI80_Upper']
+        df_combined['CI95_Lower'] = df95['Lower']
+        df_combined['CI95_Upper'] = df95['Upper']
+
+        # 添加分组信息和模型元数据
+        df_combined['Group'] = group
+        df_combined['Element'] = element
+        df_combined['Model_Type'] = result['model_type']
+        df_combined['Aligned'] = result['aligned']
+        df_combined['Offset'] = result['offset']
+        df_combined['Last_Hist_Year'] = result['last_hist_year']
+
+        all_predictions.append(df_combined)
+
+    # 合并所有结果为一个长格式 DataFrame
+    long_df = pd.concat(all_predictions, ignore_index=True)
+
+    # 调整列顺序（更易读）
+    long_df = long_df[[
+        'Group', 'Element', 'Year', 'Mean',
+        'CI80_Lower', 'CI80_Upper',
+        'CI95_Lower', 'CI95_Upper',
+        'Model_Type', 'Aligned', 'Offset', 'Last_Hist_Year'
+    ]]
+
+    # 按 Group, Element, Year 排序
+    long_df = long_df.sort_values(['Group', 'Element', 'Year']).reset_index(drop=True)
+
+    # 保存为 Excel
+    excel_file = Path(OUTPUT_DIR) / f"all_predictions_long_ets{align_suffix}.xlsx"
+    long_df.to_excel(excel_file, index=False, sheet_name='All_Predictions')
 
     # ========== 画图 ==========
-    plot_all_exports_ets(df_hist_agg, trained_models, OUTPUT_FILE)
+    plot_all_exports_ets(df_hist_agg, valid_results, OUTPUT_FILE)
+
+    # ========== 保存结果 ==========
+    print("\n保存结果...")
+    valid_results = [r for r in results if r is not None]
+    print(f"成功训练: {len(valid_results)}/{len(tasks)}")
+
+    # 1. 保存为 pickle
+    align_suffix = "_aligned" if ALIGN_TO_HISTORY else "_raw"
+    output_file = Path(OUTPUT_DIR) / f"all_trained_models_ets{align_suffix}.pkl"
+    with open(output_file, 'wb') as f:
+        pickle.dump(valid_results, f)
+    print(f"✓ Pickle 文件已保存到: {output_file}")
+
+    # 2. 保存为长格式 Excel
+    print("\n将结果保存为 Excel (长格式)...")
+    all_predictions = []
+
+    for result in valid_results:
+        group = result['group']
+        element = result['element']
+        df80 = result['df_80'].copy()
+        df95 = result['df_95'].copy()
+
+        df_combined = df80[['Year', 'Mean', 'Lower', 'Upper']].copy()
+        df_combined.columns = ['Year', 'Mean', 'CI80_Lower', 'CI80_Upper']
+        df_combined['CI95_Lower'] = df95['Lower']
+        df_combined['CI95_Upper'] = df95['Upper']
+        df_combined['Group'] = group
+        df_combined['Element'] = element
+        df_combined['Model_Type'] = result['model_type']
+        df_combined['Aligned'] = result['aligned']
+        df_combined['Offset'] = result['offset']
+        df_combined['Last_Hist_Year'] = result['last_hist_year']
+
+        all_predictions.append(df_combined)
+
+    long_df = pd.concat(all_predictions, ignore_index=True)
+    long_df = long_df[[
+        'Group', 'Element', 'Year', 'Mean',
+        'CI80_Lower', 'CI80_Upper',
+        'CI95_Lower', 'CI95_Upper',
+        'Model_Type', 'Aligned', 'Offset', 'Last_Hist_Year'
+    ]]
+    long_df = long_df.sort_values(['Group', 'Element', 'Year']).reset_index(drop=True)
+
+    excel_file = Path(OUTPUT_DIR) / f"all_predictions_long_ets{align_suffix}.xlsx"
+    long_df.to_excel(excel_file, index=False, sheet_name='All_Predictions')
 
     print("\n完成！")
+
 
 if __name__ == "__main__":
     main()

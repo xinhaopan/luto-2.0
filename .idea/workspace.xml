@@ -4,8 +4,86 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update: predict export food demand by ETS">
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update: predict feedlots cattle feed">
+      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/10_Process_export_predict.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/11_Feedlots_feed_ratios.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/12_cattle_FCR_scaled_paramsters.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/13_cattle_GHG_CR.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/5_Feedlots_percent.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/6_process_trade_data1.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_ETS_1.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_GAM.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/8_predict_timeseries1.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/deployment.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deployment.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/growth_index_2010_base.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/growth_index_data_driven.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/growth_index_english.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/growth_rate_scenarios_corrected.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/income_projection.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/6_process_trade_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/6_process_trade_data.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_ETS.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_ETS.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/8_predict_timeseries.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/8_predict_timeseries.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/export_predictions_ets_all.png" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/export_predictions_ets_all.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bananas__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bananas__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beans__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beans__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beverages_Alcoholic__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beverages_Alcoholic__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beverages_Alcoholic__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Beverages_Alcoholic__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bovine_Meat__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bovine_Meat__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bovine_Meat__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Bovine_Meat__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cattle_heads___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cattle_heads___Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cereals_nec___Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cereals_nec___Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cereals_nec___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cereals_nec___Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cheese__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cheese__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cheese__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cheese__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Coffee_and_tea__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Coffee_and_tea__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Coffee_and_tea__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Coffee_and_tea__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cottonseed_Oil__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cottonseed_Oil__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cottonseed_Oil__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Cottonseed_Oil__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Eggs__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Eggs__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Eggs__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Eggs__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fats_Animals_Raw__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fats_Animals_Raw__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fats_Animals_Raw__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fats_Animals_Raw__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fodder_and_Feeding_Stuff__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fodder_and_Feeding_Stuff__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fodder_and_Feeding_Stuff__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fodder_and_Feeding_Stuff__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fruits_nec___Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fruits_nec___Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fruits_nec___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Fruits_nec___Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Grapes_and_products_excl_wine___Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Grapes_and_products_excl_wine___Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Grapes_and_products_excl_wine___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Grapes_and_products_excl_wine___Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Groundnuts_Shelled_Eq___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Groundnuts_Shelled_Eq___Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Hides_and_skins__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Hides_and_skins__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Meat_Other__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Meat_Other__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Meat_Other__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Meat_Other__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_-_Excluding_Butter__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_-_Excluding_Butter__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_-_Excluding_Butter__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_-_Excluding_Butter__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_products_nec___Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_products_nec___Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_products_nec___Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Milk_products_nec___Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Miscellaneous__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Miscellaneous__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Miscellaneous__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Miscellaneous__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Mutton_Goat_Meat__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Mutton_Goat_Meat__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Mutton_Goat_Meat__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Mutton_Goat_Meat__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-alcoholic_Beverages__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-alcoholic_Beverages__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-alcoholic_Beverages__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-alcoholic_Beverages__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Crude_Materials__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Crude_Materials__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Crude_Materials__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Crude_Materials__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Fats_and_Oils__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Non-edible_Fats_and_Oils__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Nuts_and_products__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Nuts_and_products__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Nuts_and_products__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Nuts_and_products__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Offals_Edible__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Offals_Edible__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Offals_Edible__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Offals_Edible__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Oilseeds__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Oilseeds__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Oilseeds__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Oilseeds__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Peas__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Peas__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Pigmeat__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Pigmeat__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Pigmeat__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Pigmeat__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Potatoes_and_products__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Potatoes_and_products__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Potatoes_and_products__Import_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Potatoes_and_products__Import_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Poultry_1000_heads___Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Poultry_1000_heads___Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Poultry_Meat__Export_Quantity.nc" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/group_element_traces_AUS/trace_Poultry_Meat__Export_Quantity.nc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/tradeF_final.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/tradeF_final.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/trade_model_data_AUS_all.csv" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/trade_model_data_AUS_all.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/productive_growth_index.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/data_check.ipynb" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -84,8 +162,8 @@
       <recent name="N:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\carbonprice\code" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.8_predict_timeseries">
-    <configuration name="5.1_Feedlots_impact" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+  <component name="RunManager" selected="Python.7_train_time_GAM">
+    <configuration name="10_Process_export_predict" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="LUTO2" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -98,7 +176,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/5.1_Feedlots_impact.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/10_Process_export_predict.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -107,7 +185,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="5_Feedlots_cattle" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="11_Feedlots_feed_ratios (1)" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="LUTO2" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -120,7 +198,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/5_Feedlots_cattle.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/11_Feedlots_feed_ratios.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -129,7 +207,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="6_process_trade_data" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="12_cattle_FCR_scaled_paramsters" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="LUTO2" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -142,7 +220,29 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="N:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\Ag2050\1_Scripts\6_process_trade_data.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/12_cattle_FCR_scaled_paramsters.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="13_cattle_GHG_CR" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="LUTO2" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/13_cattle_GHG_CR.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -173,7 +273,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="7_train_time_ETS" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="7_train_time_GAM" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="LUTO2" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -186,51 +286,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_ETS.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="7_train_time_series" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="LUTO2" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_series.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="8_predict_timeseries" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="LUTO2" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/8_predict_timeseries.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_GAM.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -240,19 +296,19 @@
       <method v="2" />
     </configuration>
     <list>
-      <item itemvalue="Python.5.1_Feedlots_impact" />
-      <item itemvalue="Python.7_train_time_ETS" />
-      <item itemvalue="Python.7_train_time_series" />
-      <item itemvalue="Python.8_predict_timeseries" />
-      <item itemvalue="Python.5_Feedlots_cattle" />
+      <item itemvalue="Python.10_Process_export_predict" />
+      <item itemvalue="Python.11_Feedlots_feed_ratios (1)" />
+      <item itemvalue="Python.12_cattle_FCR_scaled_paramsters" />
+      <item itemvalue="Python.13_cattle_GHG_CR" />
+      <item itemvalue="Python.7_train_time_GAM" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.8_predict_timeseries" />
-        <item itemvalue="Python.7_train_time_ETS" />
-        <item itemvalue="Python.7_train_time_series" />
-        <item itemvalue="Python.5.1_Feedlots_impact" />
-        <item itemvalue="Python.5_Feedlots_cattle" />
+        <item itemvalue="Python.7_train_time_GAM" />
+        <item itemvalue="Python.13_cattle_GHG_CR" />
+        <item itemvalue="Python.12_cattle_FCR_scaled_paramsters" />
+        <item itemvalue="Python.10_Process_export_predict" />
+        <item itemvalue="Python.11_Feedlots_feed_ratios (1)" />
       </list>
     </recent_temporary>
   </component>
@@ -284,15 +340,7 @@
       <workItem from="1760161123508" duration="33763000" />
       <workItem from="1760351223725" duration="145789000" />
       <workItem from="1762821617196" duration="5640000" />
-      <workItem from="1763039474688" duration="97392000" />
-    </task>
-    <task id="LOCAL-00021" summary="update: run carbon price test">
-      <option name="closed" value="true" />
-      <created>1758430626276</created>
-      <option name="number" value="00021" />
-      <option name="presentableId" value="LOCAL-00021" />
-      <option name="project" value="LOCAL" />
-      <updated>1758430626276</updated>
+      <workItem from="1763039474688" duration="176930000" />
     </task>
     <task id="LOCAL-00022" summary="merge: from jinzhu 20250921">
       <option name="closed" value="true" />
@@ -678,7 +726,15 @@
       <option name="project" value="LOCAL" />
       <updated>1765511284786</updated>
     </task>
-    <option name="localTasksCounter" value="70" />
+    <task id="LOCAL-00070" summary="update: predict feedlots cattle feed">
+      <option name="closed" value="true" />
+      <created>1765864790348</created>
+      <option name="number" value="00070" />
+      <option name="presentableId" value="LOCAL-00070" />
+      <option name="project" value="LOCAL" />
+      <updated>1765864790348</updated>
+    </task>
+    <option name="localTasksCounter" value="71" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -719,7 +775,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update: draw" />
     <MESSAGE value="update: draw solution price" />
     <MESSAGE value="update: shp and tif" />
     <MESSAGE value="merge: jinzhu 20251003" />
@@ -744,7 +799,8 @@
     <MESSAGE value="update: trade predit" />
     <MESSAGE value="update: draw input data for ag2050" />
     <MESSAGE value="update: predict export food demand by ETS" />
-    <option name="LAST_COMMIT_MESSAGE" value="update: predict export food demand by ETS" />
+    <MESSAGE value="update: predict feedlots cattle feed" />
+    <option name="LAST_COMMIT_MESSAGE" value="update: predict feedlots cattle feed" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -884,6 +940,31 @@
           <line>60</line>
           <option name="timeStamp" value="251" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/myCode/Ag2050/1_Scripts/8_predict_timeseries1.py</url>
+          <line>316</line>
+          <option name="timeStamp" value="254" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/myCode/Ag2050/1_Scripts/7_train_time_ETS.py</url>
+          <line>418</line>
+          <option name="timeStamp" value="255" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/myCode/Ag2050/1_Scripts/6_process_trade_data1.py</url>
+          <line>394</line>
+          <option name="timeStamp" value="263" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/myCode/Ag2050/1_Scripts/11_Feedlots_feed_ratios.py</url>
+          <line>169</line>
+          <option name="timeStamp" value="276" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/myCode/Ag2050/1_Scripts/13_cattle_GHG_CR.py</url>
+          <line>13</line>
+          <option name="timeStamp" value="280" />
+        </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="jupyter-line">
           <url>notebook://N:/LUF-Modelling/LUTO2_XH/LUTO2/myCode/carbonprice/code/test.ipynb</url>
           <line>337</line>
@@ -900,6 +981,7 @@
     </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/LUTO2$5_Feedlots_percent.coverage" NAME="5_Feedlots_percent Coverage Results" MODIFIED="1770274534809" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$test.coverage" NAME="test Coverage Results" MODIFIED="1764635798750" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$0_mem_monitor.coverage" NAME="0_mem_monitor Coverage Results" MODIFIED="1761570371718" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$08_campara_df.coverage" NAME="08_campara_df Coverage Results" MODIFIED="1758708811855" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
@@ -936,9 +1018,13 @@
     <SUITE FILE_PATH="coverage/LUTO2$1_make_excel.coverage" NAME="1_make_excel Coverage Results" MODIFIED="1758091460647" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$03_draw_carbon_bio.coverage" NAME="03_draw_carbon&amp;bio Coverage Results" MODIFIED="1758105949163" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$02_Draw_cost_sector.coverage" NAME="02_Draw_cost_sector Coverage Results" MODIFIED="1758077465556" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/LUTO2$12_cattle_FCR_scaled_paramsters.coverage" NAME="12_cattle_FCR_scaled_paramsters Coverage Results" MODIFIED="1770304202889" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$Check_status.coverage" NAME="Check_status Coverage Results" MODIFIED="1758543326638" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$helper_data.coverage" NAME="helper_data Coverage Results" MODIFIED="1758589688862" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code/tools" />
     <SUITE FILE_PATH="coverage/LUTO2$5_draw_hexagonal_map.coverage" NAME="5_draw_hexagonal_map Coverage Results" MODIFIED="1758897204031" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/LUTO2$10_Process_export_predict.coverage" NAME="10_Process_export_predict Coverage Results" MODIFIED="1770298943796" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
+    <SUITE FILE_PATH="coverage/LUTO2$8_predict_timeseries1.coverage" NAME="8_predict_timeseries1 Coverage Results" MODIFIED="1768454566547" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
+    <SUITE FILE_PATH="coverage/LUTO2$11_cattle_paramters.coverage" NAME="11_cattle_paramters Coverage Results" MODIFIED="1770276206656" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$4_2_draw_hexagonal_map.coverage" NAME="4.2_draw_hexagonal_map Coverage Results" MODIFIED="1758949661042" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Preprocess_1.coverage" NAME="0_Preprocess_1 Coverage Results" MODIFIED="1759884472490" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Check_status.coverage" NAME="0_Check_status Coverage Results" MODIFIED="1761570379501" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
@@ -956,8 +1042,8 @@
     <SUITE FILE_PATH="coverage/LUTO2$task_price_test.coverage" NAME="task_price_test Coverage Results" MODIFIED="1757662644680" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$9_draw_figure.coverage" NAME="9_draw_figure Coverage Results" MODIFIED="1765430324510" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$02_draw_profit.coverage" NAME="02_draw_profit Coverage Results" MODIFIED="1758730238846" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
-    <SUITE FILE_PATH="coverage/LUTO2$8_predict_timeseries.coverage" NAME="8_predict_timeseries Coverage Results" MODIFIED="1765505930188" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
-    <SUITE FILE_PATH="coverage/LUTO2$7_train_time_ETS.coverage" NAME="7_train_time_ETS Coverage Results" MODIFIED="1765504895502" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
+    <SUITE FILE_PATH="coverage/LUTO2$8_predict_timeseries.coverage" NAME="8_predict_timeseries Coverage Results" MODIFIED="1768450568401" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
+    <SUITE FILE_PATH="coverage/LUTO2$7_train_time_ETS.coverage" NAME="7_train_time_ETS Coverage Results" MODIFIED="1770118047024" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$draw_area.coverage" NAME="draw_area Coverage Results" MODIFIED="1758203838772" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$6_map_trade_data__1_.coverage" NAME="6_map_trade_data (1) Coverage Results" MODIFIED="1764632738661" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$07_make_map_all.coverage" NAME="07_make_map_all Coverage Results" MODIFIED="1758793427628" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
@@ -968,8 +1054,10 @@
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_HPC_1_NO_GHG.coverage" NAME="Paper2_tasks_HPC_1_NO_GHG Coverage Results" MODIFIED="1759006898631" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$create_data.coverage" NAME="create_data Coverage Results" MODIFIED="1758196866820" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$temp_repair_report.coverage" NAME="temp_repair_report Coverage Results" MODIFIED="1758862402216" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/LUTO2$6_process_trade_data1.coverage" NAME="6_process_trade_data1 Coverage Results" MODIFIED="1770180091295" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$0_preprocess_hpc1.coverage" NAME="0_preprocess_hpc1 Coverage Results" MODIFIED="1759643109547" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$2_test.coverage" NAME="2_test Coverage Results" MODIFIED="1761784882431" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
+    <SUITE FILE_PATH="coverage/LUTO2$13_cattle_GHG_CR.coverage" NAME="13_cattle_GHG_CR Coverage Results" MODIFIED="1770304898944" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$01_draw_profit.coverage" NAME="01_draw_profit Coverage Results" MODIFIED="1758090244448" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$4_3_make_cost_map__1_.coverage" NAME="4.3_make_cost_map (1) Coverage Results" MODIFIED="1759300375357" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$3_make_map_all_legend.coverage" NAME="3_make_map_all_legend Coverage Results" MODIFIED="1758874260430" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
@@ -986,14 +1074,17 @@
     <SUITE FILE_PATH="coverage/LUTO2$3_make_map_all.coverage" NAME="3_make_map_all Coverage Results" MODIFIED="1758873988533" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$2_yieldncreass_ABARES__1_.coverage" NAME="2_yieldncreass_ABARES (1) Coverage Results" MODIFIED="1761286447957" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Preprocess.coverage" NAME="0_Preprocess Coverage Results" MODIFIED="1762415268169" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/LUTO2$11_Feedlots_feed_ratios__1_.coverage" NAME="11_Feedlots_feed_ratios (1) Coverage Results" MODIFIED="1770294927899" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$4_6_make_price_map.coverage" NAME="4.6_make_price_map Coverage Results" MODIFIED="1760861380822" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$3_yieldncreass_ABARES.coverage" NAME="3_yieldncreass_ABARES Coverage Results" MODIFIED="1765430682477" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$4_3_make_cost_map.coverage" NAME="4.3_make_cost_map Coverage Results" MODIFIED="1760861255302" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$5_Feedlots_cattle.coverage" NAME="5_Feedlots_cattle Coverage Results" MODIFIED="1765435518777" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
+    <SUITE FILE_PATH="coverage/LUTO2$7_train_time_ETS_1.coverage" NAME="7_train_time_ETS_1 Coverage Results" MODIFIED="1769434556628" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$3_make_map_all1.coverage" NAME="3_make_map_all1 Coverage Results" MODIFIED="1758880009578" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$mem_monitor.coverage" NAME="mem_monitor Coverage Results" MODIFIED="1758703226961" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$3_draw_average_price.coverage" NAME="3_draw_average_price Coverage Results" MODIFIED="1759401020207" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$write_tasks.coverage" NAME="write_tasks Coverage Results" MODIFIED="1758684757360" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
+    <SUITE FILE_PATH="coverage/LUTO2$6_process_trade_data.coverage" NAME="6_process_trade_data Coverage Results" MODIFIED="1770175459312" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$dash.coverage" NAME="dash Coverage Results" MODIFIED="1758030222367" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="F:/xinhao/miniforge/envs/xpluto/Lib/site-packages/dash" />
     <SUITE FILE_PATH="coverage/LUTO2$report_tasks.coverage" NAME="report_tasks Coverage Results" MODIFIED="1758451500872" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_without_CP.coverage" NAME="Paper2_tasks_without_CP Coverage Results" MODIFIED="1760334283227" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
@@ -1008,6 +1099,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$0_preprocess_hpc.coverage" NAME="0_preprocess_hpc Coverage Results" MODIFIED="1761570322208" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$1_write_report__1_.coverage" NAME="1_write_report (1) Coverage Results" MODIFIED="1759472683786" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/LUTO2$4_7_make_agmgt_map.coverage" NAME="4.7_make_agmgt_map Coverage Results" MODIFIED="1760861279675" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/LUTO2$7_train_time_GAM.coverage" NAME="7_train_time_GAM Coverage Results" MODIFIED="1770333327779" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$5_Rename_figure.coverage" NAME="5_Rename_figure Coverage Results" MODIFIED="1760862192969" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_test_HPC.coverage" NAME="Paper2_tasks_test_HPC Coverage Results" MODIFIED="1759487286054" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$4_0_make_map_all.coverage" NAME="4.0_make_map_all Coverage Results" MODIFIED="1759402023021" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />

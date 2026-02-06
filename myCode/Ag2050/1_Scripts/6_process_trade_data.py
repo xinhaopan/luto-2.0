@@ -191,20 +191,21 @@ print("✓ Added ISO codes")
 
 
 # 创建过滤后的版本用于子总量
-tradeF_filtered = tradeF[
-    tradeF['Report ISO'].notna() &
-    (tradeF['Report ISO'] != "") &
-    (tradeF['Partner Countries'] != "Antarctica") &
-    (tradeF['Partner Countries'] != "Australia") &
-    (~tradeF['Element'].isin(["Export Value", "Import Value"]))
-]. copy()
+tradeF_aus = tradeF[
+    (tradeF['Reporter Countries'] == 'Australia') &  # ✅ 改为报告国是澳大利亚
+    (tradeF['Report ISO'] == 'AUS')                  # ✅ 确认ISO代码
+].copy()
 
-tradeF_filtered = tradeF[
-    tradeF['Report ISO'].notna() &
-    (tradeF['Report ISO'] != "") &
-    (tradeF['Partner Countries'] == "Australia") &
-    (~tradeF['Element'].isin(["Export Value", "Import Value"]))
-]. copy()
+print(f"澳大利亚作为报告国的数据: {len(tradeF_aus):,} 行")
+
+# 第二步：过滤掉不需要的数据
+tradeF_filtered = tradeF_aus[
+    (tradeF_aus['Partner Countries'] != 'Australia') &      # ✅ 排除对自己的贸易
+    (tradeF_aus['Partner Countries'] != 'Antarctica') &     # 排除南极洲
+    (tradeF_aus['Partner ISO'].notna()) &                   # 必须有ISO代码
+    (tradeF_aus['Partner ISO'] != '') &
+    (~tradeF_aus['Element'].isin(['Export Value', 'Import Value']))
+].copy()
 
 # =============================================================================
 # 定义商品组（排除特定组和Unknown）
@@ -223,6 +224,10 @@ tradeF_final = tradeF_filtered[
     tradeF_filtered['LUTO'].notna() &
     (~tradeF_filtered['LUTO'].isin(exclude_groups))
     ].copy()
+
+
+
+
 tradeF_final.to_excel("../2_processed_data/tradeF_final.xlsx", index=False)
 
 # ---------------------------
@@ -408,3 +413,21 @@ print(f"缺失值:\n{merged[['gdp_pc', 'Population.WB', 'Urban.population.pct.WB
 # 6) 保存
 df_complete = merged.dropna(subset=['gdp_pc', 'Population.WB', 'Urban.population.pct.WB', 'distance'])
 df_complete.to_csv('../2_processed_data/future_trade_AUS_2010_2050.csv', index=False)
+
+df_saved = pd.read_csv("../2_processed_data/trade_model_data_AUS_all.csv")
+
+# 筛选2010年、Export Quantity、Sugar相关商品
+sugar_2010 = df_saved[
+    (df_saved['year'] == 2010) &
+    (df_saved['Element'] == 'Export Quantity') &
+    (df_saved['group'].str.contains('Sugar ', case=False, na=False))
+]
+
+# 计算总量
+total_sugar_export = sugar_2010['trade'].sum()
+
+print(f"\n2010年澳大利亚Sugar出口总量: {total_sugar_export:,.2f} 吨")
+print(f"\nSugar相关商品明细:")
+sugar_by_group = sugar_2010.groupby('group')['trade'].sum().sort_values(ascending=False)
+for group, value in sugar_by_group.items():
+    print(f"  {group}: {value:,.2f}")
