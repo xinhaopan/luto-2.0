@@ -1,0 +1,46 @@
+Group,Category,AgS1_Rule,AgS2_Rule,AgS3_Rule,AgS4_Rule
+Animals live nes (heads),Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Apples and products,Horticulture,CI95_Upper,CI80_Upper,Mean,Static
+Bananas,Horticulture,CI95_Upper,CI80_Upper,Mean,Static
+Beans,Plant-based proteins,CI95_Upper,CI80_Upper,Mean,Static
+"Beverages, Alcoholic",Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Bovine Meat,Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Cattle (heads),Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Cereals (nec),Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Cheese,Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Coffee and tea,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Cottonseed Oil,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Eggs,Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+"Fats, Animals, Raw",Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Fodder and Feeding Stuff,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Fruits (nec),Horticulture,CI95_Upper,CI80_Upper,Mean,Static
+Grapes and products (excl wine),Horticulture,CI95_Upper,CI80_Upper,Mean,Static
+Groundnuts (Shelled Eq),Plant-based proteins,CI95_Upper,CI80_Upper,Mean,Static
+Hides and skins,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+"Meat, Other",Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Milk - Excluding Butter,Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Milk products (nec),Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Miscellaneous,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Mutton & Goat Meat,Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Non-alcoholic Beverages,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Non-edible Crude Materials,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Non-edible Fats and Oils,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Nuts and products,Horticulture,CI95_Upper,CI80_Upper,Mean,Static
+"Offals, Edible",Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Oilseeds,Plant-based proteins,CI95_Upper,CI80_Upper,Mean,Static
+Peas,Plant-based proteins,CI95_Upper,CI80_Upper,Mean,Static
+Pigmeat,Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Pigs (heads),Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Potatoes and products,Horticulture,CI95_Upper,CI80_Upper,Mean,Static
+Poultry (1000 heads),Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Poultry Meat,Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+"Pulses, Other and products",Plant-based proteins,CI95_Upper,CI80_Upper,Mean,Static
+Rice and products,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Seafood,Horticulture,CI95_Upper,CI80_Upper,Mean,Static
+Sheep and goats  (heads),Ruminants/Monogastrics/Dairy,CI95_Upper,CI80_Upper,Mean,Static
+Soyabeans,Plant-based proteins,CI95_Upper,CI80_Upper,Mean,Static
+Sugar ,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Vegetables (nec),Horticulture,CI95_Upper,CI80_Upper,Mean,Static
+Wheat and products,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Wine,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static
+Wool,Food & Fibre,CI95_Upper,CI80_Upper,Mean,Static

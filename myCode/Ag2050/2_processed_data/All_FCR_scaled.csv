@@ -1,0 +1,62 @@
+stage,SPREAD,FCR_scaled
+long,Animal by-product,0.0
+long,Cotton,0.02343063263758425
+long,Crop by-product,0.2863089418983435
+long,Hay,1.5057401106169535
+long,Nuts,0.0
+long,Sugar,0.0
+long,Summer Cereals,0.23280676588703697
+long,Summer Legumes,0.0
+long,Summer Oilseeds,0.0
+long,Summer cereals,2.065786067750635
+long,Vegetables,0.0
+long,Winter Cereals,0.5454651278029612
+long,Winter Legumes,0.005623351833020175
+long,Winter Oilseeds,0.0
+long,Winter cereals,2.9787927132776693
+long,Winter oilseeds,0.010686251886197918
+mid,Animal by-product,0.0
+mid,Cotton,0.0268965135389856
+mid,Crop by-product,0.32866002601009575
+mid,Hay,0.7233660237642157
+mid,Nuts,0.0
+mid,Sugar,0.0
+mid,Summer Cereals,0.2672437585233608
+mid,Summer Legumes,0.0
+mid,Summer Oilseeds,0.0
+mid,Summer cereals,0.8963999468827422
+mid,Vegetables,0.0
+mid,Winter Cereals,0.6261508351875846
+mid,Winter Legumes,0.006455163249356493
+mid,Winter Oilseeds,0.0
+mid,Winter cereals,1.183381268619712
+mid,Winter oilseeds,0.036971194563791256
+short,Animal by-product,0.0
+short,Cotton,0.03088482250804077
+short,Crop by-product,0.3773948825782533
+short,Hay,0.7495755195502256
+short,Nuts,0.0
+short,Sugar,0.0
+short,Summer Cereals,0.30687159643989304
+short,Summer Legumes,0.0
+short,Summer Oilseeds,0.0
+short,Summer cereals,0.7454355053469812
+short,Vegetables,0.0
+short,Winter Cereals,0.7189986679871891
+short,Winter Legumes,0.007412357401929727
+short,Winter Oilseeds,0.0
+short,Winter cereals,0.5912074697579507
+short,Winter oilseeds,0.014127758985254714
+land,Winter Legumes,0.0099970699253692
+land,Nuts,0.0
+land,Crop by-product,0.508993674485944
+land,Sugar,0.0
+land,Hay,0.817760319895207
+land,Winter Oilseeds,0.0
+land,Summer Cereals,0.413878694910288
+land,Animal by-product,0.0
+land,Vegetables,0.0
+land,Summer Legumes,0.0
+land,Winter Cereals,0.96971578276082
+land,Summer Oilseeds,0.0
+land,Cotton,0.041654458022372

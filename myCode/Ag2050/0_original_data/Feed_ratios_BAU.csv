@@ -1,0 +1,144 @@
+"Livestock","SPREAD","Ratio","FCR_BAU","FCR_High","Crop_fraction","LW_DW","FCR_scaled"
+"Aquaculture","Crop by-product",0,1.014,0.78,1,1,0
+"Aquaculture","Sugar",0,1.014,0.78,1,1,0
+"Aquaculture","Nuts",0,1.014,0.78,1,1,0
+"Aquaculture","Summer Cereals",0,1.014,0.78,1,1,0
+"Aquaculture","Animal by-product",0.512002630713581,1.014,0.78,1,1,0.519170667543571
+"Aquaculture","Hay",0,1.014,0.78,1,1,0
+"Aquaculture","Vegetables",0,1.014,0.78,1,1,0
+"Aquaculture","Cotton",0,1.014,0.78,1,1,0
+"Aquaculture","Winter Cereals",0.175600131535679,1.014,0.78,1,1,0.178058533377179
+"Aquaculture","Winter Legumes",0,1.014,0.78,1,1,0
+"Aquaculture","Summer Legumes",0,1.014,0.78,1,1,0
+"Aquaculture","Summer Oilseeds",0,1.014,0.78,1,1,0
+"Aquaculture","Winter Oilseeds",0.31239723775074,1.014,0.78,1,1,0.31677079907925
+"Beef","Winter Legumes",0.00361950395560075,9.20666666666667,6.4,0.15,0.5,0.00999706992536928
+"Beef","Nuts",0,9.20666666666667,6.4,0.15,0.5,0
+"Beef","Crop by-product",0.184284458539444,9.20666666666667,6.4,0.15,0.5,0.508993674485944
+"Beef","Sugar",0,9.20666666666667,6.4,0.15,0.5,0
+"Beef","Hay",0.296075423568141,9.20666666666667,6.4,0.15,0.5,0.817760319895207
+"Beef","Winter Oilseeds",0,9.20666666666667,6.4,0.15,0.5,0
+"Beef","Summer Cereals",0.149847463761871,9.20666666666667,6.4,0.15,0.5,0.413878694910288
+"Beef","Animal by-product",0,9.20666666666667,6.4,0.15,0.5,0
+"Beef","Vegetables",0,9.20666666666667,6.4,0.15,0.5,0
+"Beef","Summer Legumes",0,9.20666666666667,6.4,0.15,0.5,0
+"Beef","Winter Cereals",0.351091883693273,9.20666666666667,6.4,0.15,0.5,0.96971578276082
+"Beef","Summer Oilseeds",0,9.20666666666667,6.4,0.15,0.5,0
+"Beef","Cotton",0.0150812664816698,9.20666666666667,6.4,0.15,0.5,0.041654458022372
+"Chicken","Crop by-product",0,2.01,1.6,1,0.81,0
+"Chicken","Sugar",0,2.01,1.6,1,0.81,0
+"Chicken","Summer Cereals",0.110856488112289,2.01,1.6,1,0.81,0.275088322352717
+"Chicken","Winter Legumes",0.0391864795187625,2.01,1.6,1,0.81,0.0972405232502626
+"Chicken","Nuts",0,2.01,1.6,1,0.81,0
+"Chicken","Winter Cereals",0.576453738183901,2.01,1.6,1,0.81,1.43045927623413
+"Chicken","Cotton",0,2.01,1.6,1,0.81,0
+"Chicken","Vegetables",0,2.01,1.6,1,0.81,0
+"Chicken","Hay",0,2.01,1.6,1,0.81,0
+"Chicken","Summer Oilseeds",0.0274992838728158,2.01,1.6,1,0.81,0.0682389636843948
+"Chicken","Animal by-product",0,2.01,1.6,1,0.81,0
+"Chicken","Summer Legumes",0.17324548839874,2.01,1.6,1,0.81,0.429905471211687
+"Chicken","Winter Oilseeds",0.0727585219134918,2.01,1.6,1,0.81,0.180548924748295
+"Cultured","Animal by-product",0,2,2,1,1,0
+"Cultured","Sugar",0,2,2,1,1,0
+"Cultured","Winter Oilseeds",0,2,2,1,1,0
+"Cultured","Nuts",0,2,2,1,1,0
+"Cultured","Vegetables",0,2,2,1,1,0
+"Cultured","Hay",0,2,2,1,1,0
+"Cultured","Winter Legumes",0,2,2,1,1,0
+"Cultured","Crop by-product",0,2,2,1,1,0
+"Cultured","Summer Oilseeds",0,2,2,1,1,0
+"Cultured","Cotton",0,2,2,1,1,0
+"Cultured","Summer Cereals",0,2,2,1,1,0
+"Cultured","Summer Legumes",0,2,2,1,1,0
+"Cultured","Winter Cereals",1,2,2,1,1,2
+"Eggs","Animal by-product",0,2.22,1.8,1,1,0
+"Eggs","Winter Legumes",0,2.22,1.8,1,1,0
+"Eggs","Sugar",0,2.22,1.8,1,1,0
+"Eggs","Hay",0,2.22,1.8,1,1,0
+"Eggs","Nuts",0,2.22,1.8,1,1,0
+"Eggs","Crop by-product",0,2.22,1.8,1,1,0
+"Eggs","Vegetables",0,2.22,1.8,1,1,0
+"Eggs","Cotton",0,2.22,1.8,1,1,0
+"Eggs","Summer Oilseeds",0,2.22,1.8,1,1,0
+"Eggs","Summer Cereals",0.146033941586423,2.22,1.8,1,1,0.32419535032186
+"Eggs","Winter Oilseeds",0.0696919721232111,2.22,1.8,1,1,0.154716178113529
+"Eggs","Winter Cereals",0.587487365005054,2.22,1.8,1,1,1.30422195031122
+"Eggs","Summer Legumes",0.196786721285311,2.22,1.8,1,1,0.436866521253391
+"Insects","Animal by-product",0,1.418,1.418,1,1,0
+"Insects","Nuts",0,1.418,1.418,1,1,0
+"Insects","Sugar",0,1.418,1.418,1,1,0
+"Insects","Cotton",0,1.418,1.418,1,1,0
+"Insects","Crop by-product",0,1.418,1.418,1,1,0
+"Insects","Winter Legumes",0,1.418,1.418,1,1,0
+"Insects","Hay",0,1.418,1.418,1,1,0
+"Insects","Vegetables",0.564174894217207,1.418,1.418,1,1,0.8
+"Insects","Winter Oilseeds",0,1.418,1.418,1,1,0
+"Insects","Summer Cereals",0.435825105782793,1.418,1.418,1,1,0.618
+"Insects","Summer Oilseeds",0,1.418,1.418,1,1,0
+"Insects","Summer Legumes",0,1.418,1.418,1,1,0
+"Insects","Winter Cereals",0,1.418,1.418,1,1,0
+"Milk","Winter Legumes",0,1.36,0.714285714285714,0.4,1,0
+"Milk","Sugar",0,1.36,0.714285714285714,0.4,1,0
+"Milk","Winter Cereals",0.349478847332925,1.36,0.714285714285714,0.4,1,0.190116492949111
+"Milk","Crop by-product",0.0367872470876763,1.36,0.714285714285714,0.4,1,0.0200122624156959
+"Milk","Vegetables",0,1.36,0.714285714285714,0.4,1,0
+"Milk","Nuts",0,1.36,0.714285714285714,0.4,1,0
+"Milk","Winter Oilseeds",0.0306560392397302,1.36,0.714285714285714,0.4,1,0.0166768853464132
+"Milk","Summer Cereals",0,1.36,0.714285714285714,0.4,1,0
+"Milk","Animal by-product",0,1.36,0.714285714285714,0.4,1,0
+"Milk","Hay",0.583077866339669,1.36,0.714285714285714,0.4,1,0.31719435928878
+"Milk","Cotton",0,1.36,0.714285714285714,0.4,1,0
+"Milk","Summer Oilseeds",0,1.36,0.714285714285714,0.4,1,0
+"Milk","Summer Legumes",0,1.36,0.714285714285714,0.4,1,0
+"PlantBased","Sugar",0,0.42,0.42,1,1,0
+"PlantBased","Summer Cereals",0,0.42,0.42,1,1,0
+"PlantBased","Winter Legumes",0,0.42,0.42,1,1,0
+"PlantBased","Vegetables",0,0.42,0.42,1,1,0
+"PlantBased","Hay",0,0.42,0.42,1,1,0
+"PlantBased","Winter Cereals",0.357142857142857,0.42,0.42,1,1,0.15
+"PlantBased","Crop by-product",0,0.42,0.42,1,1,0
+"PlantBased","Animal by-product",0,0.42,0.42,1,1,0
+"PlantBased","Summer Legumes",0.642857142857143,0.42,0.42,1,1,0.27
+"PlantBased","Winter Oilseeds",0,0.42,0.42,1,1,0
+"PlantBased","Cotton",0,0.42,0.42,1,1,0
+"PlantBased","Nuts",0,0.42,0.42,1,1,0
+"PlantBased","Summer Oilseeds",0,0.42,0.42,1,1,0
+"Pork","Nuts",0,3.14,2.7,1,0.7,0
+"Pork","Summer Oilseeds",0,3.14,2.7,1,0.7,0
+"Pork","Winter Legumes",0.0536587172270775,3.14,2.7,1,0.7,0.240697674418605
+"Pork","Animal by-product",0,3.14,2.7,1,0.7,0
+"Pork","Sugar",0,3.14,2.7,1,0.7,0
+"Pork","Winter Oilseeds",0.0714708932010073,3.14,2.7,1,0.7,0.320598006644518
+"Pork","Winter Cereals",0.743889794104577,3.14,2.7,1,0.7,3.33687707641196
+"Pork","Crop by-product",0.00833209894830396,3.14,2.7,1,0.7,0.037375415282392
+"Pork","Vegetables",0,3.14,2.7,1,0.7,0
+"Pork","Hay",0,3.14,2.7,1,0.7,0
+"Pork","Cotton",0,3.14,2.7,1,0.7,0
+"Pork","Summer Cereals",0.10965042215968,3.14,2.7,1,0.7,0.491860465116279
+"Pork","Summer Legumes",0.0129980743593542,3.14,2.7,1,0.7,0.0583056478405316
+"Sheep","Sugar",0,6,4,0.15,0.5,0
+"Sheep","Nuts",0,6,4,0.15,0.5,0
+"Sheep","Winter Legumes",0.023289246693502,6,4,0.15,0.5,0.0419206440483036
+"Sheep","Vegetables",0,6,4,0.15,0.5,0
+"Sheep","Winter Oilseeds",0.0244393329499712,6,4,0.15,0.5,0.0439907993099482
+"Sheep","Summer Cereals",0,6,4,0.15,0.5,0
+"Sheep","Animal by-product",0,6,4,0.15,0.5,0
+"Sheep","Summer Oilseeds",0,6,4,0.15,0.5,0
+"Sheep","Hay",0.741374353076481,6,4,0.15,0.5,1.33447383553767
+"Sheep","Winter Cereals",0.210897067280046,6,4,0.15,0.5,0.379614721104083
+"Sheep","Crop by-product",0,6,4,0.15,0.5,0
+"Sheep","Summer Legumes",0,6,4,0.15,0.5,0
+"Sheep","Cotton",0,6,4,0.15,0.5,0
+"SoyMilk","Sugar",0.69060773480663,0.095,0.095,1,1,0.0656077348066298
+"SoyMilk","Crop by-product",0,0.095,0.095,1,1,0
+"SoyMilk","Animal by-product",0,0.095,0.095,1,1,0
+"SoyMilk","Summer Cereals",0.30939226519337,0.095,0.095,1,1,0.0293922651933702
+"SoyMilk","Nuts",0,0.095,0.095,1,1,0
+"SoyMilk","Winter Legumes",0,0.095,0.095,1,1,0
+"SoyMilk","Hay",0,0.095,0.095,1,1,0
+"SoyMilk","Winter Cereals",0,0.095,0.095,1,1,0
+"SoyMilk","Summer Oilseeds",0,0.095,0.095,1,1,0
+"SoyMilk","Vegetables",0,0.095,0.095,1,1,0
+"SoyMilk","Summer Legumes",0,0.095,0.095,1,1,0
+"SoyMilk","Cotton",0,0.095,0.095,1,1,0
+"SoyMilk","Winter Oilseeds",0,0.095,0.095,1,1,0
