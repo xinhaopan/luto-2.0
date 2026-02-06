@@ -69,7 +69,7 @@ def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
 
 
 
-def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI','HPC'], max_concurrent_tasks,model_name):
+def submit_task(task_root_dir: str, col: str, platform: Literal['aquila', 'Denethor','NCI','HPC'], max_concurrent_tasks,model_name):
     # 复制bash和python脚本到对应目录
     if model_name == 'Run':
         script_name = 'python_script.py'
@@ -117,7 +117,7 @@ def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI'
     try:
         with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
              open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
-            if platform == 'Denethor':
+            if platform == 'Denethor' or platform == 'aquila':
                 result = subprocess.run(['python', script_name],
                                         cwd=f'{task_root_dir}/{col}',
                                         stdout=std_file, stderr=err_file)
@@ -130,7 +130,7 @@ def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI'
                                         cwd=f'{task_root_dir}/{col}',
                                         stdout=std_file, stderr=err_file)
             else:
-                raise ValueError('platform must be either "Denethor", "NCI", or "HPC"!')
+                raise ValueError('platform must be either "aquila", "Denethor", "NCI", or "HPC"!')
 
         if result.returncode == 0:
             print(f"[SUCCESS] Task for {col} finished successfully (submitted)!")
@@ -141,7 +141,7 @@ def submit_task(task_root_dir: str, col: str, platform: Literal['Denethor','NCI'
         print(f"[ERROR] Exception occurred for task {col}: {e}")
 
 
-def submit_write_task(task_root_dir: str, col: str, platform: Literal['Denethor', 'NCI', 'HPC'], max_concurrent_tasks: int):
+def submit_write_task(task_root_dir: str, col: str, platform: Literal['aquila', 'Denethor', 'NCI', 'HPC'], max_concurrent_tasks: int):
     # 1. 复制/准备 shell 脚本（如果需要）
     settings_path = f'{task_root_dir}/{col}/luto/settings_bash.py'
     if os.path.exists(settings_path):
@@ -211,7 +211,7 @@ def submit_write_task(task_root_dir: str, col: str, platform: Literal['Denethor'
     print(f"[START] Submitting write_output task for {col} in platform: {platform}")
     try:
         with open(std_log, 'w') as std_file, open(err_log, 'w') as err_file:
-            if platform == 'Denethor':
+            if platform == 'Denethor' or platform == 'aquila':
                 # 本地直接运行
                 result = subprocess.run(['python', 'write_output.py'],
                                        cwd=f'{task_root_dir}/{col}',
@@ -227,7 +227,7 @@ def submit_write_task(task_root_dir: str, col: str, platform: Literal['Denethor'
                                        cwd=f'{task_root_dir}/{col}',
                                        stdout=std_file, stderr=err_file)
             else:
-                raise ValueError('platform must be either "Denethor", "NCI" or "HPC"!')
+                raise ValueError('platform must be either "aquila",  "Denethor", "NCI" or "HPC"!')
 
         if result.returncode == 0:
             print(f"[SUCCESS] Write output task for {col} finished successfully (submitted)!")
@@ -242,8 +242,8 @@ def check_platform_system(platform):
     """
     检查运行模式与操作系统是否匹配，不匹配则报错退出
     """
-    if platform not in ['Denethor', 'NCI','HPC']:
-        raise ValueError('Platform must be one of "Denethor", "NCI", or "HPC"!')
+    if platform not in ['aquila', 'Denethor', 'NCI','HPC']:
+        raise ValueError('Platform must be one of "aquila",  "Denethor", "NCI", or "HPC"!')
 
     hostname = socket.gethostname()
     if platform.lower() not in hostname.lower():
@@ -253,7 +253,7 @@ def check_platform_system(platform):
 def create_task_runs(
     task_root_dir:str,
     custom_settings:pd.DataFrame,
-    platform:Literal['Denathor','NCI','HPC']='single',
+    platform:Literal['aquila', 'Denathor','NCI','HPC']='single',
     n_workers:int=4,
     max_concurrent_tasks:int=300,
     use_parallel:bool=True,
