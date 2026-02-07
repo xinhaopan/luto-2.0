@@ -8,7 +8,8 @@ platform = "HPC"  # 可选值: 'HPC', 'Denethor', 'NCI'
 tasks = ['20251009_Paper2_Results']
 input_path_dict = {"HPC": "/home/remote/s222552331/LUTO2_XH/LUTO2/input",
                     "Denethor": "N:/LUF-Modelling/LUTO2_XH/LUTO2/input",
-                    "NCI": "/g/data/jk53/LUTO_XH/LUTO2/input"}
+                    "NCI": "/g/data/jk53/LUTO_XH/LUTO2/input",
+                    "aquila": "F:/Users/s222552331/Work/LUTO2_XH/luto-2.0/input"}
 for task in tasks:
     task_root_dir = f'../../output/{task}'
     grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)

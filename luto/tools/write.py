@@ -266,8 +266,38 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
 
     # Save to netcdf
     save2nc(ag_map_stack.sel(layer=valid_layers_ag), os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))
-    save2nc(non_ag_map_stack.sel(layer=valid_layers_non_ag), os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))
-    save2nc(am_map_stack.sel(layer=valid_layers_am), os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))
+    # save2nc(non_ag_map_stack.sel(layer=valid_layers_non_ag), os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))
+    # save2nc(am_map_stack.sel(layer=valid_layers_am), os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))
+
+    if yr_cal == 2010:
+        # ---- non-ag ----
+        if len(valid_layers_non_ag) == 0:
+            mi_nonag = pd.MultiIndex.from_tuples([("ALL",)], names=["lu"])
+            non_ag_out = xr.DataArray(
+                np.zeros((data.NCELLS, 1), dtype=np.float32),
+                dims=["cell", "layer"],
+                coords={"cell": np.arange(data.NCELLS), "layer": mi_nonag},
+                name="data",
+            )
+        else:
+            non_ag_out = non_ag_map_stack.sel(layer=valid_layers_non_ag)
+        save2nc(non_ag_out, os.path.join(path, f"xr_dvar_non_ag_{yr_cal}.nc"))
+
+        # ---- am ----
+        if len(valid_layers_am) == 0:
+            mi_am = pd.MultiIndex.from_tuples([("ALL", "ALL", "ALL")], names=["am", "lm", "lu"])
+            am_out = xr.DataArray(
+                np.zeros((data.NCELLS, 1), dtype=np.float32),
+                dims=["cell", "layer"],
+                coords={"cell": np.arange(data.NCELLS), "layer": mi_am},
+                name="data",
+            )
+        else:
+            am_out = am_map_stack.sel(layer=valid_layers_am)
+        save2nc(am_out, os.path.join(path, f"xr_dvar_am_{yr_cal}.nc"))
+    else:
+        save2nc(non_ag_map_stack.sel(layer=valid_layers_non_ag), os.path.join(path, f"xr_dvar_non_ag_{yr_cal}.nc"))
+        save2nc(am_map_stack.sel(layer=valid_layers_am), os.path.join(path, f"xr_dvar_am_{yr_cal}.nc"))
 
     # Write landuse mosaic map
     lumap_xr_ALL= xr.DataArray(data.lumaps[yr_cal].astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
@@ -591,9 +621,11 @@ def write_profit_nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     if yr_idx == 0:
         trans_cost_ag2nonag = xr.DataArray(
-            np.zeros((1, data.NCELLS)).astype(np.float32),
+            np.zeros((1, data.NCELLS,len(data.NON_AGRICULTURAL_LANDUSES))).astype(np.float32),
+            dims=("Type", "cell", "lu"),
             coords={
                 'Type': ['Transition-cost-ag2nonag'],
+                'lu': data.NON_AGRICULTURAL_LANDUSES,
                 'cell': range(data.NCELLS),
             }
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
@@ -1868,7 +1900,17 @@ def write_ghg_total(data: Data, yr_cal, path):
         ghg_emissions = data.prod_data[yr_cal]['GHG']
     else:
         # Using xr.dot() for memory efficiency
-        ghg_emissions = xr.dot(ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True), data.ag_dvars[settings.SIM_YEARS[0]])
+        ghg_mat = xr.DataArray(
+            ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True),
+            dims=("lm", "cell", "lu"),
+            coords={"lm": data.LANDMANS, "cell": range(data.NCELLS), "lu": data.AGRICULTURAL_LANDUSES}
+        )
+        ag_mat = xr.DataArray(
+            data.ag_dvars[settings.SIM_YEARS[0]],
+            dims=("lm", "cell", "lu"),
+            coords={"lm": data.LANDMANS, "cell": range(data.NCELLS), "lu": data.AGRICULTURAL_LANDUSES},
+        )
+        ghg_emissions = xr.dot(ghg_mat, ag_mat, dims="lu")
 
     # Save GHG emissions to file
     df = pd.DataFrame({
