@@ -551,3 +551,25 @@ def compute_land_use_change_metrics(input_file, use_parallel=True):
         # 文件不存在，创建新文件
         with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
             new_result_df.to_excel(writer, sheet_name=input_file)
+
+def align_columns_with_legend(data_dict, legend_colors):
+    """
+    确保字典中每个 DataFrame 都包含 legend_colors 中的所有列
+
+    参数:
+        data_dict: 包含多个 DataFrame 的字典
+        legend_colors: 包含列名的字典
+
+    返回:
+        更新后的字典
+    """
+    required_columns = list(legend_colors.keys())
+
+    for table_name, df in data_dict.items():
+        # 找出缺失的列
+        missing_cols = set(required_columns) - set(df.columns)
+
+        if missing_cols:
+            for col in sorted(missing_cols):
+                df[col] = 0
+    return data_dict

@@ -24,6 +24,8 @@ transition_dict = get_dict_data(input_files, 'GHG_emissions_separate_transition_
 
 ghg_dict = concatenate_dicts_by_year([ag_dict, am_dict, non_ag_dict, transition_dict])
 ghg_group_dict = aggregate_by_mapping(ghg_dict, 'tools/land use group.xlsx', 'desc', 'lu_group', summary_col_name='Net emissions')
+
+
 ghg_target_dict = get_dict_data(input_files, "GHG_emissions", 'Emissions (t CO2e)', 'Variable')
 ghg_target_dict = rename_and_filter_columns(ghg_target_dict, ['GHG_EMISSIONS_LIMIT_TCO2e'], ['Objectives'])
 ghg_group_dict = concatenate_dicts_by_year([ghg_group_dict, ghg_target_dict])

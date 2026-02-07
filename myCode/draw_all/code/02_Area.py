@@ -38,6 +38,7 @@ area_non_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filte
 area_non_ag_dict,legend_colors = get_colors(area_non_ag_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
 y_range, y_ticks = calculate_y_axis_range(area_non_ag_dict,3)
 output_png = '../output/02_area_non_ag_group'
+area_non_ag_dict = align_columns_with_legend(area_non_ag_dict, legend_colors)
 plot_Combination_figures(area_non_ag_dict, output_png, input_files, plot_stacked_area, legend_colors,
                             n_rows=3, n_cols=3, font_size=font_size, x_range=(2010, 2050), y_range=y_range,
                              x_ticks=20, y_ticks=y_ticks,

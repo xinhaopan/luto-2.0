@@ -622,7 +622,7 @@ def get_y_axis_ticks(min_value, max_value, desired_ticks=5):
     return min_v, max_v, ticks.tolist()  # 根据需要转回列表
 
 
-def calculate_y_axis_range(data_dict, desired_ticks=5,use_parallel=True, n_jobs=-1):
+def calculate_y_axis_range(data_dict, desired_ticks=5,use_parallel=False, n_jobs=-1):
     """
     并行计算所有 DataFrame 的 (max, min) 值，并计算 y 轴范围和间隔
     """

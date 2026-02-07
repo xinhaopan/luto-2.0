@@ -33,7 +33,7 @@ def get_first_subfolder_name(output_path="output"):
             return None
 
         first_subfolder = subfolders[0]
-        html_path = os.path.join(output_path, first_subfolder, "DATA_REPORT", "data", "map_layers", "map_water_yield_NonAg.js")
+        html_path = os.path.join(output_path, first_subfolder, "DATA_REPORT", "data", "map_layers", "map_water_yield_NonAg1.js")
 
         # 检查最终报告文件是否已存在，如果存在则无需再处理
         if os.path.exists(html_path):

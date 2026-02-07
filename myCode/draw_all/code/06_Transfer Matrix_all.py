@@ -14,7 +14,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import matplotlib.ticker as mticker
 
 def calculate_transition_matrix(land_use_data_path, area_column='Area (ha)',
-                               from_column='From land-use', to_column='To land-use'):
+                               from_column='From-land-use', to_column='To-land-use'):
     """
     计算土地使用变化的转移矩阵，直接使用原始土地使用类型，不进行分组。
     保持 From 和 To 列中土地使用类型的原始顺序。
@@ -40,6 +40,9 @@ def calculate_transition_matrix(land_use_data_path, area_column='Area (ha)',
     # 从 To 列中移除 BECCS
     land_use_data = land_use_data[land_use_data['To'] != 'BECCS']
     land_use_data = land_use_data[land_use_data['From'] != 'BECCS']
+
+    land_use_data = land_use_data[land_use_data['To'] != 'ALL']
+    land_use_data = land_use_data[land_use_data['From'] != 'ALL']
 
     # 获取 From 和 To 列中土地使用类型的原始顺序
     unique_land_uses = []
@@ -174,6 +177,10 @@ def plot_single_transition_matrix(matrix, labels=None, output_path="transition_m
 
 # 示例用法
 file_dir = get_path(input_files[4])
+pd.concat([
+        pd.read_csv(f"{file_dir}/out_2050/transition_matrix_ag2ag_start_end.csv"),
+        pd.read_csv(f"{file_dir}/out_2050/transition_matrix_ag2non_ag_start_end.csv")
+    ]).to_csv(f"{file_dir}/out_2050/transition_matrix_2010_2050.csv", index=False)
 land_use_data_path = os.path.join(file_dir, 'out_2050/transition_matrix_2010_2050.csv')
 matrice = calculate_transition_matrix(land_use_data_path)
 

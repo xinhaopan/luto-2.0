@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import cf_xarray as cfxr
+import rasterio
 
 from joblib import Parallel, delayed
 
@@ -34,6 +35,7 @@ from luto import settings
 from luto import tools
 from luto.data import Data
 
+from luto.tools.spatializers import create_2d_map
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.report.data_tools.parameters import GHG_NAMES
 from luto.tools.report.create_report_layers import save_report_layer
@@ -198,7 +200,9 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_biodiversity_GBF4_SNES_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF4_ECNES_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF8_scores_groups)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_GBF8_scores_species)(data, yr_cal, path_yr)
+        delayed(write_biodiversity_GBF8_scores_species)(data, yr_cal, path_yr),
+
+        delayed(write_files)(data, yr_cal, path_yr),
     ]
 
     return tasks
@@ -319,6 +323,34 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
     }).to_netcdf(os.path.join(path, f'xr_map_template_{yr_cal}.nc'))
 
     return f"Mosaic maps written for year {yr_cal}"
+
+
+def write_files(data: Data, yr_cal, path):
+    """Writes numpy arrays and geotiffs to file"""
+    print(f'Writing numpy arrays and geotiff outputs for {yr_cal}')
+
+    # Get the Agricultural Management applied to each pixel
+    ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _, v in data.ag_man_dvars[yr_cal].items()]).T  # (r, am)
+    ag_man_dvar_mask = ag_man_dvar.sum(
+        1) > 0.01  # Meaning that they have at least 1% of agricultural management applied
+    ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1  # Start from 1
+    ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0).astype(np.float32)
+
+    # Get the non-agricultural landuse for each pixel
+    non_ag_dvar = data.non_ag_dvars[yr_cal]  # (r, k)
+    non_ag_dvar_mask = non_ag_dvar.sum(
+        1) > 0.01  # Meaning that they have at least 1% of non-agricultural landuse applied
+    non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE  # Start from 100
+    non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0).astype(np.float32)
+
+    with rasterio.open(os.path.join(path, f'lumap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lumap, \
+            rasterio.open(os.path.join(path, f'lmmap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lmmap, \
+            rasterio.open(os.path.join(path, f'ammap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_ammap, \
+            rasterio.open(os.path.join(path, f'non_ag_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_non_ag:
+        dst_lumap.write_band(1, create_2d_map(data, data.lumaps[yr_cal]))
+        dst_lmmap.write_band(1, create_2d_map(data, data.lmmaps[yr_cal]))
+        dst_ammap.write_band(1, create_2d_map(data, ag_man_dvar_argmax))
+        dst_non_ag.write_band(1, create_2d_map(data, non_ag_dvar_argmax))
 
 
 
@@ -1910,7 +1942,7 @@ def write_ghg_total(data: Data, yr_cal, path):
             dims=("lm", "cell", "lu"),
             coords={"lm": data.LANDMANS, "cell": range(data.NCELLS), "lu": data.AGRICULTURAL_LANDUSES},
         )
-        ghg_emissions = xr.dot(ghg_mat, ag_mat, dims="lu")
+        ghg_emissions = xr.dot(ghg_mat, ag_mat, dims="lu").sum().values
 
     # Save GHG emissions to file
     df = pd.DataFrame({

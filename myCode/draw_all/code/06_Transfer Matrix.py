@@ -12,7 +12,7 @@ from tools.plot_helper import *
 
 
 def calculate_transition_matrix(land_use_data_path, mapping_data_path, area_column='Area (ha)',
-                                        from_column='From land-use', to_column='To land-use',
+                                        from_column='From-land-use', to_column='To-land-use',
                                         desc_column='desc', ag_non_ag_group_column='ag_non_ag_group'):
     """
     Calculate a transition matrix for land-use changes, ordered by the 'ag_non_ag_group' column in the mapping data.
@@ -227,6 +227,10 @@ mapping_data_path = 'tools/land use group.xlsx'
 matrices = []
 for input_dir in input_files:
     file_dir = get_path(input_dir)
+    pd.concat([
+        pd.read_csv(f"{file_dir}/out_2050/transition_matrix_ag2ag_start_end.csv"),
+        pd.read_csv(f"{file_dir}/out_2050/transition_matrix_ag2non_ag_start_end.csv")
+    ]).to_csv(f"{file_dir}/out_2050/transition_matrix_2010_2050.csv", index=False)
     land_use_data_path = os.path.join(file_dir, 'out_2050/transition_matrix_2010_2050.csv')
     matrice = calculate_transition_matrix(land_use_data_path, mapping_data_path)
     matrices.append(matrice / 1e6)

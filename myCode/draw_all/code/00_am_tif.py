@@ -1,6 +1,7 @@
 import rasterio
 import numpy as np
 import os
+import glob
 from tools.parameters import *
 from tools.data_helper import *
 
@@ -22,6 +23,15 @@ def shift_tif_values(input_tif, output_tif):
     # 写入新 tif 文件
     with rasterio.open(output_tif, 'w', **profile) as dst:
         dst.write(new_data, 1)
+
+
+for input_name in input_files:
+    path = get_path(input_name)
+
+    for file in glob.glob(f"{path}/**/*.csv", recursive=True):
+        df = pd.read_csv(file)
+        df = df[~df.isin(['ALL', 'AUSTRALIA']).any(axis=1)]
+        df.to_csv(file, index=False)
 
 for input_name in input_files:
     path = get_path(input_name)

@@ -48,7 +48,7 @@ plot_Combination_figures(bio_dict, output_png, input_files, plot_stacked_area, l
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
-csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Water Net Yield (ML)', 'Landuse'
+csv_name, value_column_name, filter_column_name = 'water_yield_separate_watershed', 'Water Net Yield (ML)', 'Landuse'
 water_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Type'], condition_value=['Agricultural Landuse'])
 water_dict,legend_colors = get_colors(water_dict, 'tools/land use colors.xlsx', sheet_name='ag')
 output_png = '../output/07_S1_Water_ag.png'
