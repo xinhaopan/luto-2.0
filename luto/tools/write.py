@@ -203,6 +203,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_biodiversity_GBF8_scores_species)(data, yr_cal, path_yr),
 
         delayed(write_files)(data, yr_cal, path_yr),
+        delayed(write_quantity_separate_landuse)(data, yr_cal, path_yr),
     ]
 
     return tasks
@@ -327,31 +328,71 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
 
 def write_files(data: Data, yr_cal, path):
     """Writes numpy arrays and geotiffs to file"""
-    print(f'Writing numpy arrays and geotiff outputs for {yr_cal}')
+    if yr_cal == 2050:
+        print(f'Writing numpy arrays and geotiff outputs for {yr_cal}')
 
-    # Get the Agricultural Management applied to each pixel
-    ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _, v in data.ag_man_dvars[yr_cal].items()]).T  # (r, am)
-    ag_man_dvar_mask = ag_man_dvar.sum(
-        1) > 0.01  # Meaning that they have at least 1% of agricultural management applied
-    ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1  # Start from 1
-    ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0).astype(np.float32)
+        # Get the Agricultural Management applied to each pixel
+        ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _, v in data.ag_man_dvars[yr_cal].items()]).T  # (r, am)
+        ag_man_dvar_mask = ag_man_dvar.sum(
+            1) > 0.01  # Meaning that they have at least 1% of agricultural management applied
+        ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1  # Start from 1
+        ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0).astype(np.float32)
 
-    # Get the non-agricultural landuse for each pixel
-    non_ag_dvar = data.non_ag_dvars[yr_cal]  # (r, k)
-    non_ag_dvar_mask = non_ag_dvar.sum(
-        1) > 0.01  # Meaning that they have at least 1% of non-agricultural landuse applied
-    non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE  # Start from 100
-    non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0).astype(np.float32)
+        # Get the non-agricultural landuse for each pixel
+        non_ag_dvar = data.non_ag_dvars[yr_cal]  # (r, k)
+        non_ag_dvar_mask = non_ag_dvar.sum(
+            1) > 0.01  # Meaning that they have at least 1% of non-agricultural landuse applied
+        non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE  # Start from 100
+        non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0).astype(np.float32)
 
-    with rasterio.open(os.path.join(path, f'lumap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lumap, \
-            rasterio.open(os.path.join(path, f'lmmap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lmmap, \
-            rasterio.open(os.path.join(path, f'ammap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_ammap, \
-            rasterio.open(os.path.join(path, f'non_ag_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_non_ag:
-        dst_lumap.write_band(1, create_2d_map(data, data.lumaps[yr_cal]))
-        dst_lmmap.write_band(1, create_2d_map(data, data.lmmaps[yr_cal]))
-        dst_ammap.write_band(1, create_2d_map(data, ag_man_dvar_argmax))
-        dst_non_ag.write_band(1, create_2d_map(data, non_ag_dvar_argmax))
+        with rasterio.open(os.path.join(path, f'lumap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lumap, \
+                rasterio.open(os.path.join(path, f'lmmap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lmmap, \
+                rasterio.open(os.path.join(path, f'ammap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_ammap, \
+                rasterio.open(os.path.join(path, f'non_ag_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_non_ag:
+            dst_lumap.write_band(1, create_2d_map(data, data.lumaps[yr_cal]))
+            dst_lmmap.write_band(1, create_2d_map(data, data.lmmaps[yr_cal]))
+            dst_ammap.write_band(1, create_2d_map(data, ag_man_dvar_argmax))
+            dst_non_ag.write_band(1, create_2d_map(data, non_ag_dvar_argmax))
 
+        # Collapse the land management dimension (m -> [dry, irr])
+        ag_dvar_rj = np.einsum('mrj -> rj', data.ag_dvars[yr_cal])
+        ag_dvar_rm = np.einsum('mrj -> rm', data.ag_dvars[yr_cal])
+        non_ag_rk = np.einsum('rk -> rk', data.non_ag_dvars[yr_cal])
+        ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in data.ag_man_dvars[yr_cal].items()}
+
+        # Get the desc2dvar table.
+        ag_dvar_map = pd.DataFrame(
+            {'Category': 'Ag_LU', 'lu_desc': data.AGRICULTURAL_LANDUSES, 'dvar_idx': range(data.N_AG_LUS)}
+            ).assign(dvar=[ag_dvar_rj[:, j] for j in range(data.N_AG_LUS)]
+                     ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+        non_ag_dvar_map = pd.DataFrame(
+            {'Category': 'Non-Ag_LU', 'lu_desc': data.NON_AGRICULTURAL_LANDUSES, 'dvar_idx': range(data.N_NON_AG_LUS)}
+            ).assign(dvar=[non_ag_rk[:, k] for k in range(data.N_NON_AG_LUS)]
+                     ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+        lm_dvar_map = pd.DataFrame({'Category': 'Land_Mgt', 'lu_desc': data.LANDMANS, 'dvar_idx': range(data.NLMS)}
+                                   ).assign(dvar=[ag_dvar_rm[:, j] for j in range(data.NLMS)]
+                                            ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+        ag_man_map = pd.concat([
+            pd.DataFrame({'Category': 'Ag_Mgt', 'lu_desc': am, 'dvar_idx': [0]}
+                         ).assign(dvar=[np.einsum('rj -> r', am_dvar_rj)]
+                                  ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+            for am, am_dvar_rj in ag_man_rj_dict.items()
+        ])
+
+        # Export to GeoTiff
+        desc2dvar_df = pd.concat([ag_dvar_map, ag_man_map, non_ag_dvar_map, lm_dvar_map])
+        lucc_separate_dir = os.path.join(path, 'lucc_separate')
+        os.makedirs(lucc_separate_dir, exist_ok=True)
+        for _, row in desc2dvar_df.iterrows():
+            category = row['Category']
+            dvar_idx = row['dvar_idx']
+            desc = row['lu_desc']
+            dvar = create_2d_map(data, row['dvar'].astype(np.float32))
+            fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
+            lucc_separate_path = os.path.join(lucc_separate_dir, fname)
+
+            with rasterio.open(lucc_separate_path, 'w+', **data.GEO_META) as dst:
+                dst.write_band(1, dvar)
 
 
 def write_quantity_total(data: Data, yr_cal, path):
@@ -515,7 +556,90 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
     return f"Separate quantity production written for year {yr_cal}"
 
+def write_quantity_separate_landuse(data: Data, yr_cal, path):
+    index_levels = ['Landuse Type', 'Landuse subtype', 'Landuse', 'Land management', 'Production (tonnes, KL)']
+    if yr_cal == data.YR_CAL_BASE:
+        ag_X_mrj = data.AG_L_MRJ
+        non_ag_X_rk = data.NON_AG_L_RK
+        ag_man_X_mrj = data.AG_MAN_L_MRJ_DICT
 
+    else:
+        ag_X_mrj = tools.lumap2ag_l_mrj(data.lumaps[yr_cal], data.lmmaps[yr_cal])
+        non_ag_X_rk = tools.lumap2non_ag_l_mk(data.lumaps[yr_cal], len(settings.NON_AG_LAND_USES.keys()))
+        ag_man_X_mrj = data.ag_man_dvars[yr_cal]
+
+    # Calculate year index (i.e., number of years since 2010)
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    ag_q_mrp = ag_quantity.get_quantity_matrices(data, yr_idx)
+    # Convert map of land-use in mrj format to mrp format using vectorization
+    ag_X_mrp = np.einsum('mrj,pj->mrp', ag_X_mrj, data.LU2PR.astype(bool))
+
+    # Sum quantities in product (PR/p) representation.
+    ag_qu_mrp = np.einsum('mrp,mrp->mrp', ag_q_mrp, ag_X_mrp)
+    ag_qu_mrj = np.einsum('mrp,pj->mrj', ag_qu_mrp, data.LU2PR.astype(bool))
+    ag_jm = np.einsum('mrj->jm', ag_qu_mrj)
+    ag_df = pd.DataFrame(
+        ag_jm.reshape(-1).tolist(),
+        index=pd.MultiIndex.from_product(
+            [['Agricultural Landuse'],
+             ['Agricultural Landuse'],
+             data.AGRICULTURAL_LANDUSES,
+             data.LANDMANS])).reset_index()
+    ag_df.columns = index_levels
+
+    # Get the quantity by non-agricultural land uses----------------------------------------------------------------
+    q_crk = non_ag_quantity.get_quantity_matrix(data, ag_q_mrp, data.LUMAP)
+    non_ag_k = np.einsum('crk,rk->k', q_crk, non_ag_X_rk)
+    non_ag_df = pd.DataFrame(
+        non_ag_k,
+        index=pd.MultiIndex.from_product(
+            [['Non-agricultural Landuse'],
+             ['Non-Agricultural Landuse'],
+             settings.NON_AG_LAND_USES.keys(),
+             ['None']])).reset_index()
+    non_ag_df.columns = index_levels
+
+    # Get the quantity of  by agricultural management-----------------------------------------------------------------
+    ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, yr_idx)
+    j2p = {j: [p for p in range(data.NPRS) if data.LU2PR[p, j]]
+           for j in range(data.N_AG_LUS)}
+    # 创建一个字典存储结果
+    ag_man_q_mrj_dict = {}
+    for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
+        if not settings.AG_MANAGEMENTS[am]:
+            continue
+        am_j_list = [data.DESC2AGLU[lu] for lu in am_lus]
+        current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
+        for j in am_j_list:
+            for p in j2p[j]:
+                current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
+
+        ag_man_qu_mrp = np.einsum('mrp,mrp->mrp', ag_man_q_mrp[am], current_ag_man_X_mrp)
+        # print(am,np.sum(ag_man_qu_mrp),np.sum(ag_man_q_mrp[am]),np.sum(current_ag_man_X_mrp))
+        ag_man_qu_mrj = np.einsum('mrp,pj->mrj', ag_man_qu_mrp, data.LU2PR.astype(bool))
+        ag_man_q_mrj_dict[am] = ag_man_qu_mrj
+
+    AM_dfs = []
+    for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
+        if not settings.AG_MANAGEMENTS[am]:
+            continue
+        am_mrj = ag_man_q_mrj_dict[am]
+        am_jm = np.einsum('mrj->jm', am_mrj)
+        df_am = pd.DataFrame(
+            am_jm.reshape(-1).tolist(),
+            index=pd.MultiIndex.from_product([
+                ['Agricultural Management'],
+                [am],
+                data.AGRICULTURAL_LANDUSES,
+                data.LANDMANS
+            ])).reset_index()
+        df_am.columns = index_levels
+        AM_dfs.append(df_am)
+    AM_df = pd.concat(AM_dfs)
+
+
+    df = pd.concat([ag_df, non_ag_df, AM_df])
+    df.to_csv(os.path.join(path, f'quantity_production_kt_separate_{yr_cal}.csv'), index=False)
 
 def write_profit_ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     '''

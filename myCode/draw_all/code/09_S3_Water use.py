@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath('../../../luto'))
 # 导入 settings.py
 import settings
 
-csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Water Net Yield (ML)', 'Type'
+csv_name, value_column_name, filter_column_name = 'water_yield_separate_watershed', 'Water Net Yield (ML)', 'Type'
 water_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 water_public_dict = get_dict_data(input_files, 'water_yield_limits_and_public_land',
                                  'Water yield outside LUTO (ML)')
@@ -47,7 +47,7 @@ plot_Combination_figures(water_dict, output_png, input_files, plot_stacked_area_
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
 
-csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Water Net Yield (ML)',  'Landuse'
+csv_name, value_column_name, filter_column_name = 'water_yield_separate_watershed', 'Water Net Yield (ML)',  'Landuse'
 water_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Type'], condition_value=['Agricultural Landuse'])
 water_ag_group_dict = aggregate_by_mapping(water_ag_dict, 'tools/land use group.xlsx', 'desc', 'ag_group')
 water_ag_group_dict,legend_colors = get_colors(water_ag_group_dict, 'tools/land use colors.xlsx', sheet_name='ag_group')
@@ -58,7 +58,7 @@ plot_Combination_figures(water_ag_group_dict, output_png, input_files, plot_stac
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
-csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Water Net Yield (ML)',  'Agri-Management'
+csv_name, value_column_name, filter_column_name = 'water_yield_separate_watershed', 'Water Net Yield (ML)',  'Agri-Management'
 water_am_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Type'], condition_value=['Agricultural Management'])
 water_am_dict,legend_colors = get_colors(water_am_dict, 'tools/land use colors.xlsx', sheet_name='am')
 output_png = '../output/09_S3_water_am'
@@ -68,8 +68,8 @@ plot_Combination_figures(water_am_dict, output_png, input_files, plot_stacked_ar
                              x_ticks=20, y_ticks=y_ticks,
                              legend_position=(0.5, -0.25), show_legend='last', legend_n_rows=2)
 
-csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Water Net Yield (ML)', 'Landuse'
-water_non_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Type'], condition_value=['Non-Agricultural Landuse'])
+csv_name, value_column_name, filter_column_name = 'water_yield_separate_watershed', 'Water Net Yield (ML)', 'Landuse'
+water_non_ag_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,condition_column_name=['Type'], condition_value=['Non-Agricultural Land-use'])
 water_non_ag_dict,legend_colors = get_colors(water_non_ag_dict, 'tools/land use colors.xlsx', sheet_name='non_ag')
 output_png = '../output/09_S3_water_non-ag'
 y_range, y_ticks = calculate_y_axis_range(water_non_ag_dict,3)

@@ -42,7 +42,7 @@ def compute_2050_water_difference_series(water_yield_dict, water_public_dict, wa
 
 
 
-csv_name, value_column_name, filter_column_name = 'water_yield_separate', 'Water Net Yield (ML)', 'Region'
+csv_name, value_column_name, filter_column_name = 'water_yield_separate_watershed', 'Water Net Yield (ML)', 'Region'
 water_yield_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name)
 water_public_dict = get_dict_data(input_files, 'water_yield_limits_and_public_land',
                                  'Water yield outside LUTO (ML)',filter_column_name)
