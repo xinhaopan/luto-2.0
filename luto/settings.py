@@ -169,10 +169,10 @@ WRITE_PARALLEL = True                       # If to use parallel processing to w
 WRITE_THREADS = min(6, os.cpu_count())      # The Threads to use for map making, only work with WRITE_PARALLEL = True
 
 WRITE_REPORT_MAX_MEM_GB = 64                # The maximum memory (in GB) to use for writing report layers.
-                                            #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13
+                                            #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13 
                                             #   (for example, for RESFACTOR = 5, the MEM usage will be 0.5 * (13/5)^2 = 3.4 GB).
 
-WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk during writeing process.
+WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk during writeing process. 
                                             #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
                                             #   This makes memory usage to be ~1/200 of the original size.
 
@@ -377,7 +377,21 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 
     'HIR - Beef':               ['Beef - natural land'],
     'HIR - Sheep':              ['Sheep - natural land'],
-}
+    'Utility Solar PV':         [# Unallocated lands
+                                'Unallocated - modified land',
+                                # Livestock
+                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                # Cropping:
+                                'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'],
+    'Onshore Wind':             [#Unallocated lands
+                                'Unallocated - modified land',
+                                # Livestock
+                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                # Cropping:
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+                                # Intensive Cropping:
+                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']
+                                }
 
 
 AG_MANAGEMENTS = {
@@ -389,6 +403,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
+    'Utility Solar PV': True,
+    'Onshore Wind': True,
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -406,6 +422,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
+    'Utility Solar PV': False,
+    'Onshore Wind': False,
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural
@@ -438,6 +456,48 @@ HIR_CEILING_PERCENTAGE = 0.9
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 
+
+
+# ---------------------------------------------------------------------------- #
+# Renewable energy parameters
+# ---------------------------------------------------------------------------- #
+RENEWABLE_ENERGY_CONSTRAINTS = 'off'         # 'on' or 'off'
+
+RENEWABLES_OPTIONS = [
+    'Utility Solar PV',
+    'Onshore Wind'
+]
+
+RENEWABLE_TARGET_SCENARIO =  'CNS25 - Accelerated Transition' # one of 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
+'''
+The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+One of 'CNS25 - Accelerated Transition' or 'CNS25 - Current Targets', 
+'''
+
+RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; currently (20260205) only support STATE.
+'''
+The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+Options include "STATE" or "NRM". Currently (20260205) only support STATE.
+'''
+
+RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR = {
+    "Utility Solar PV": 0.45,
+    "Onshore Wind": 0.4,
+}
+'''
+The per/ha capacity (Mw/ha) for each renewable energy management type.
+'''
+
+
+RENEWABLES_ADOPTION_LIMITS = {
+    'Utility Solar PV': 1.0,        # Maximum proportion of land that can be used for Utility Solar PV
+    'Onshore Wind': 1.0,            # Maximum proportion of land that can be used for Onshore Wind
+}
+'''
+The maximum proportion of land that can be used for each renewable energy management type.
+For example, if RENEWABLES_ADOPTION_LIMITS['Utility Solar PV'] = 0.5, then at most 50% of 
+the land can be used for Utility Solar PV.
+'''
 
 
 
