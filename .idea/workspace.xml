@@ -4,8 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for check">
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks.py" afterDir="false" />
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for 'BIODIVERSITY'">
+      <change afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_NCI_years5.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -306,15 +308,7 @@
       <workItem from="1762821617196" duration="5640000" />
       <workItem from="1763039474688" duration="178624000" />
       <workItem from="1770437199177" duration="7275000" />
-      <workItem from="1770529653324" duration="15275000" />
-    </task>
-    <task id="LOCAL-00031" summary="update: draw cost, GHG, BIO">
-      <option name="closed" value="true" />
-      <created>1758607410886</created>
-      <option name="number" value="00031" />
-      <option name="presentableId" value="LOCAL-00031" />
-      <option name="project" value="LOCAL" />
-      <updated>1758607410886</updated>
+      <workItem from="1770529653324" duration="16543000" />
     </task>
     <task id="LOCAL-00032" summary="update: draw cost, GHG, BIO">
       <option name="closed" value="true" />
@@ -700,7 +694,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770806623631</updated>
     </task>
-    <option name="localTasksCounter" value="80" />
+    <task id="LOCAL-00080" summary="update for 'BIODIVERSITY'">
+      <option name="closed" value="true" />
+      <created>1770807121570</created>
+      <option name="number" value="00080" />
+      <option name="presentableId" value="LOCAL-00080" />
+      <option name="project" value="LOCAL" />
+      <updated>1770807121570</updated>
+    </task>
+    <option name="localTasksCounter" value="81" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -741,7 +743,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update: draw carbon price map" />
     <MESSAGE value="update: draw carbon solution price" />
     <MESSAGE value="merge: from jinzhu 20251009" />
     <MESSAGE value="update: load tree carbon data" />
@@ -766,7 +767,8 @@
     <MESSAGE value="fix: draw paper1 figure 20260208" />
     <MESSAGE value="Run with new CP" />
     <MESSAGE value="update for check" />
-    <option name="LAST_COMMIT_MESSAGE" value="update for check" />
+    <MESSAGE value="update for 'BIODIVERSITY'" />
+    <option name="LAST_COMMIT_MESSAGE" value="update for 'BIODIVERSITY'" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -873,7 +875,7 @@
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py</url>
-          <line>125</line>
+          <line>129</line>
           <option name="timeStamp" value="150" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
@@ -950,6 +952,11 @@
           <url>file://$PROJECT_DIR$/myCode/draw_all/code/08_Food demand.py</url>
           <line>29</line>
           <option name="timeStamp" value="287" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py</url>
+          <line>116</line>
+          <option name="timeStamp" value="288" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="jupyter-line">
           <url>notebook://N:/LUF-Modelling/LUTO2_XH/LUTO2/myCode/carbonprice/code/test.ipynb</url>
@@ -1075,7 +1082,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$6_map_trade_data__1_.coverage" NAME="6_map_trade_data (1) Coverage Results" MODIFIED="1764632738661" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/luto_2_0$08_S2_Food_demand.coverage" NAME="08_S2_Food demand Coverage Results" MODIFIED="1770530966126" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/draw_all/code" />
     <SUITE FILE_PATH="coverage/LUTO2$4_0_create_tif.coverage" NAME="4.0_create_tif Coverage Results" MODIFIED="1759377085398" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
-    <SUITE FILE_PATH="coverage/luto_2_0$0_Check_status.coverage" NAME="0_Check_status Coverage Results" MODIFIED="1770806495051" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
+    <SUITE FILE_PATH="coverage/luto_2_0$0_Check_status.coverage" NAME="0_Check_status Coverage Results" MODIFIED="1770809624135" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$8_predict_timeseries1.coverage" NAME="8_predict_timeseries1 Coverage Results" MODIFIED="1768454566547" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$5_1_Feedlots_impact.coverage" NAME="5.1_Feedlots_impact Coverage Results" MODIFIED="1765438296961" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/luto_2_0$04_GHG.coverage" NAME="04_GHG Coverage Results" MODIFIED="1770517929271" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/draw_all/code" />

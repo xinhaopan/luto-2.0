@@ -83,7 +83,7 @@ def parse_running_year(runing_file):
 
 
 if __name__ == "__main__":
-    task_name = '20260210_Paper1_Results_aquila_test_5'
+    task_name = '20260210_Paper1_Results_aquila_test'
     base_dir = f'../../output/{task_name}'
     target_year = 2050
     template_df = pd.read_csv(os.path.join(base_dir, 'grid_search_template.csv'), index_col=0)
@@ -117,6 +117,10 @@ if __name__ == "__main__":
             if glob.glob(lz4_pattern):
                 row["Simulation Status"] = "Success"
                 # 此情况下 Output Status 保持默认的 Failed
+            else:
+                error_log_pattern = os.path.join(output_dir, 'error_log.txt')
+                if glob.glob(error_log_pattern):
+                    row["Simulation Status"] = "Failed"
 
             # 无论状态如何，都尝试获取运行年份和内存信息
             runing_file = os.path.join(output_dir, subfolder, 'LUTO_RUN__stdout.log')
