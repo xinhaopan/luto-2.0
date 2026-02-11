@@ -83,7 +83,8 @@ def parse_running_year(runing_file):
 
 
 if __name__ == "__main__":
-    base_dir = '../../output/20251026_Paper2_Results'
+    task_name = '20260210_Paper1_Results_aquila_test_5'
+    base_dir = f'../../output/{task_name}'
     target_year = 2050
     template_df = pd.read_csv(os.path.join(base_dir, 'grid_search_template.csv'), index_col=0)
     run_dirs = [col for col in template_df.columns if col.startswith('Run_')]
@@ -130,7 +131,7 @@ if __name__ == "__main__":
         rows.append(row)
 
     results_df = pd.DataFrame(rows, columns=["Name", "RunningYear", "Memory", "Simulation Status", "Output Status"])
-    out_excel = os.path.join(base_dir, 'run_status_report.xlsx')
+    out_excel = os.path.join(base_dir, f'{task_name}_run_status_report.xlsx')
     results_df.to_excel(out_excel, index=False)
 
     # 设置 pandas 显示选项以完整显示 DataFrame
