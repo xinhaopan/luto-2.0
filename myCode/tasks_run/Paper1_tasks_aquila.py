@@ -42,10 +42,10 @@ grid_search = {
         'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
         'high': {2030: 0.30, 2050: 0.50, 2100: 0.50},
     }],
-    'BIODIVERSTIY_TARGET_GBF_3': ['off'],
-    'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],
-    'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],
-    'BIODIVERSTIY_TARGET_GBF_8': ['off'],
+    'BIODIVERSITY_TARGET_GBF_3': ['off'],
+    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],
+    'BIODIVERSITY_TARGET_GBF_8': ['off'],
 
     # ----------------------------------- Water settings --------------------------------
     'WATER_LIMITS': ['on'],

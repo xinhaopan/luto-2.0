@@ -4,12 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="Run with new CP">
-      <change afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_aquila_test_10.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_aquila_test_5.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_NCI.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_NCI.py" afterDir="false" />
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for check">
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -310,15 +306,7 @@
       <workItem from="1762821617196" duration="5640000" />
       <workItem from="1763039474688" duration="178624000" />
       <workItem from="1770437199177" duration="7275000" />
-      <workItem from="1770529653324" duration="14973000" />
-    </task>
-    <task id="LOCAL-00030" summary="update: calculate price data">
-      <option name="closed" value="true" />
-      <created>1758540649354</created>
-      <option name="number" value="00030" />
-      <option name="presentableId" value="LOCAL-00030" />
-      <option name="project" value="LOCAL" />
-      <updated>1758540649354</updated>
+      <workItem from="1770529653324" duration="15275000" />
     </task>
     <task id="LOCAL-00031" summary="update: draw cost, GHG, BIO">
       <option name="closed" value="true" />
@@ -704,7 +692,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770727748903</updated>
     </task>
-    <option name="localTasksCounter" value="79" />
+    <task id="LOCAL-00079" summary="update for check">
+      <option name="closed" value="true" />
+      <created>1770806623631</created>
+      <option name="number" value="00079" />
+      <option name="presentableId" value="LOCAL-00079" />
+      <option name="project" value="LOCAL" />
+      <updated>1770806623631</updated>
+    </task>
+    <option name="localTasksCounter" value="80" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -745,7 +741,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update: carbon price calculation" />
     <MESSAGE value="update: draw carbon price map" />
     <MESSAGE value="update: draw carbon solution price" />
     <MESSAGE value="merge: from jinzhu 20251009" />
@@ -770,7 +765,8 @@
     <MESSAGE value="fix: draw paper1 figure 20260207" />
     <MESSAGE value="fix: draw paper1 figure 20260208" />
     <MESSAGE value="Run with new CP" />
-    <option name="LAST_COMMIT_MESSAGE" value="Run with new CP" />
+    <MESSAGE value="update for check" />
+    <option name="LAST_COMMIT_MESSAGE" value="update for check" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
