@@ -294,7 +294,7 @@ def get_onshore_wind_effect_t_mrj(data, yr_idx):
     wind_lus = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
     
     if not settings.AG_MANAGEMENTS.get('Onshore Wind', False):
-        return np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
+        return np.zeros((data.NLMS, data.NCELLS, len(wind_lus)), dtype=np.float32)
 
     # Get upfront installation cost map (AUD/Cell)
     capex_map = data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Onshore Wind')['Cost_of_install_AUD_ha'] * data.REAL_AREA
