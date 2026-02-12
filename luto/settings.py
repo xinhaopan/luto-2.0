@@ -403,8 +403,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': True,
-    'Onshore Wind': True,
+    'Utility Solar PV': False,
+    'Onshore Wind':False,
 }
 """
 The dictionary below contains a master list of all agricultural management options and
