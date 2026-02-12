@@ -7,7 +7,7 @@ grid_search = {
     'TASK_NAME': ['20260210_Paper1_Results_aquila_test_10'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    'NUMERIC_FOCUS': [3],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['12GB'],
     'NCPUS': ['3'],

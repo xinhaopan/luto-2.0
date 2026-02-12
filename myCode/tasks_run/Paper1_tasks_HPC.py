@@ -7,12 +7,12 @@ grid_search = {
     'TASK_NAME': ['20260210_Paper1_Results_HPC'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    'NUMERIC_FOCUS': [3],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['150GB'],
     'NCPUS': ['8'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['120:00:00'],
+    'TIME': ['240:00:00'],
 
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     # ---------------------------------- Model settings ------------------------------

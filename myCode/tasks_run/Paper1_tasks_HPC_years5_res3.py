@@ -1,13 +1,17 @@
 import os
 import numpy as np
 import pandas as pd
+import os, sys
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
     'TASK_NAME': ['20260211_Paper1_Results_HPC_years5_RES3'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    'NUMERIC_FOCUS': [3],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['120GB'],
     'NCPUS': ['8'],

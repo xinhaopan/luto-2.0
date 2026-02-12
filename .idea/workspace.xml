@@ -4,8 +4,20 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for run resfactor 4">
-      <change afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_HPC_years5_res3.py" afterDir="false" />
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for run resfactor 3 years 5">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_HPC.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_HPC.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_HPC_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_HPC_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_HPC_years5.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_HPC_years5.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_HPC_years5_res3.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_HPC_years5_res3.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_NCI.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_NCI.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_NCI_RES4.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_NCI_RES4.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_NCI_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_NCI_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_aquila.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_aquila.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_aquila_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_aquila_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_aquila_test_10.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_aquila_test_10.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_aquila_test_5.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper1_tasks_aquila_test_5.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -306,15 +318,7 @@
       <workItem from="1762821617196" duration="5640000" />
       <workItem from="1763039474688" duration="178624000" />
       <workItem from="1770437199177" duration="7275000" />
-      <workItem from="1770529653324" duration="36330000" />
-    </task>
-    <task id="LOCAL-00035" summary="update: output for draw map">
-      <option name="closed" value="true" />
-      <created>1758854016012</created>
-      <option name="number" value="00035" />
-      <option name="presentableId" value="LOCAL-00035" />
-      <option name="project" value="LOCAL" />
-      <updated>1758854016012</updated>
+      <workItem from="1770529653324" duration="37459000" />
     </task>
     <task id="LOCAL-00036" summary="update: merge from jinzhu 20250926">
       <option name="closed" value="true" />
@@ -700,7 +704,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770880925883</updated>
     </task>
-    <option name="localTasksCounter" value="84" />
+    <task id="LOCAL-00084" summary="update for run resfactor 3 years 5">
+      <option name="closed" value="true" />
+      <created>1770881687100</created>
+      <option name="number" value="00084" />
+      <option name="presentableId" value="LOCAL-00084" />
+      <option name="project" value="LOCAL" />
+      <updated>1770881687100</updated>
+    </task>
+    <option name="localTasksCounter" value="85" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -741,7 +753,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update: write output when turn off bio" />
     <MESSAGE value="update: write output when failed" />
     <MESSAGE value="update: daily job" />
     <MESSAGE value="update: create productivity and FLC input data" />
@@ -766,7 +777,8 @@
     <MESSAGE value="update for check status" />
     <MESSAGE value="update for run years 5" />
     <MESSAGE value="update for run resfactor 4" />
-    <option name="LAST_COMMIT_MESSAGE" value="update for run resfactor 4" />
+    <MESSAGE value="update for run resfactor 3 years 5" />
+    <option name="LAST_COMMIT_MESSAGE" value="update for run resfactor 3 years 5" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
