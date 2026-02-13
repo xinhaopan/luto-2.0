@@ -1003,7 +1003,8 @@ def main(task_dir, njobs):
     tprint("\n--- 文件copy ---")
 
     for input_file in list(dict.fromkeys(input_files)):
-        origin_path_name = os.path.join(task_dir, input_file,'Run_Archive.zip')
+        # origin_path_name = os.path.join(task_dir, input_file,'Run_Archive.zip')
+        origin_path_name = get_path(config.TASK_NAME, input_file)
         target_path_name = os.path.join(output_path, input_file)
         tprint(f"  -> 正在copy: {origin_path_name}")
         copy_files = cost_files + revenue_files + carbon_files + bio_files + area_files

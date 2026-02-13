@@ -32,6 +32,20 @@ def parse_year_from_stream(stream):
     return max(years) if years else None
 
 
+def check_report_created(runing_file):
+    """检查 LUTO_RUN__stdout.log 文件中是否包含 'Report created successfully'。"""
+    if not runing_file or not os.path.exists(runing_file):
+        return False
+    try:
+        with open(runing_file, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if "Report created successfully" in line:
+                    return True
+    except Exception as e:
+        print(f"Warning: Could not read {runing_file}. Reason: {e}")
+    return False
+
+
 def get_archived_run_info(archive_path):
     """从 Run_Archive.zip 中提取信息，如果文件损坏则报告失败。"""
     try:
@@ -50,7 +64,7 @@ def get_archived_run_info(archive_path):
                     with io.TextIOWrapper(mem_file, encoding='utf-8', errors='ignore') as text_stream:
                         memory = get_max_memory_from_stream(text_stream)
 
-        # 成功读取归档文件
+        # 成功读���归档文件
         return {
             "RunningYear": running_year,
             "Memory": memory,
@@ -83,7 +97,7 @@ def parse_running_year(runing_file):
 
 
 if __name__ == "__main__":
-    task_name = '20260210_Paper1_Results_aquila_test_10'
+    task_name = '20260210_Paper1_Results_aquila'
     base_dir = f'../../output/{task_name}'
     target_year = 2050
     template_df = pd.read_csv(os.path.join(base_dir, 'grid_search_template.csv'), index_col=0)
@@ -112,18 +126,22 @@ if __name__ == "__main__":
         subfolder = get_first_subfolder(output_dir)
 
         if subfolder:
+            runing_file = os.path.join(output_dir, subfolder, 'LUTO_RUN__stdout.log')
+
             # 检查 lz4 文件是否存在以判断模拟是否完成
             lz4_pattern = os.path.join(output_dir, subfolder, 'Data_RES*.lz4')
             if glob.glob(lz4_pattern):
                 row["Simulation Status"] = "Success"
-                # 此情况下 Output Status 保持默认的 Failed
             else:
                 error_log_pattern = os.path.join(output_dir, 'error_log.txt')
                 if glob.glob(error_log_pattern):
                     row["Simulation Status"] = "Failed"
 
+            # 检查是否存在 "Report created successfully"
+            if check_report_created(runing_file):
+                row["Output Status"] = "Success"
+
             # 无论状态如何，都尝试获取运行年份和内存信息
-            runing_file = os.path.join(output_dir, subfolder, 'LUTO_RUN__stdout.log')
             row["RunningYear"] = parse_running_year(runing_file)
 
             mem_log_pattern = os.path.join(output_dir, subfolder, 'RES_*_mem_log.txt')
@@ -146,4 +164,3 @@ if __name__ == "__main__":
 
     print(results_df)
     print(f"✅ Run 状态表已保存: {out_excel}")
-

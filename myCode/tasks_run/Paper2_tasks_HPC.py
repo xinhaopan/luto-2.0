@@ -4,13 +4,13 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20251026_Paper2_Results'],
-    'KEEP_OUTPUTS': [False],  # If False, only keep report HTML
+    'TASK_NAME': ['20260213_Paper2_Results_HPC'],
+    'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [3],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['80GB'],
-    'NCPUS': ['4'],
+    'MEM': ['60GB'],
+    'NCPUS': ['15'],
     'WRITE_THREADS': ['2'],
     'TIME': ['48:00:00'],
 
@@ -29,6 +29,12 @@ grid_search = {
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'CARBON_EFFECTS_WINDOW': [60],
+    'GHG_TARGETS_DICT': [{
+        'off': None,
+        'low': '1.8C (67%) excl. avoided emis SCOPE1',
+        'medium': '1.5C (50%) excl. avoided emis SCOPE1',
+        'high': '1.5C (67%) excl. avoided emis SCOPE1',
+    }],
 
     # ----------------------------- Biodiversity settings -------------------------------
     'GBF2_CONSTRAINT_TYPE': ['hard'],
@@ -51,20 +57,10 @@ grid_search = {
     'WATER_REGION_DEF': ['Drainage Division'],
     'WATER_CLIMATE_CHANGE_IMPACT': ['on'],
     # ----------------------------------- Demand settings --------------------------------
-    'DYNAMIC_PRICE': [True],
+    'DYNAMIC_PRICE': [False],
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
     #----------------------------------- other settings --------------------------------
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],
-    "AG_MANAGEMENTS": [{
-        'Asparagopsis taxiformis': True,
-        'Precision Agriculture': True,
-        'Ecological Grazing': False,
-        'Savanna Burning': True,
-        'AgTech EI': True,
-        'Biochar': True,
-        'HIR - Beef': True,
-        'HIR - Sheep': True,
-    }],
 }
 
 conditional_rules = [

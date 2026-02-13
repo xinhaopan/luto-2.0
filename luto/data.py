@@ -1166,37 +1166,6 @@ class Data:
         # Demand data.
         ###############################################################
         print("├── Loading demand data", flush=True)
-        
-        # Load demand multiplier data
-        AusTIME_multipliers = pd.read_excel(
-                f'{settings.INPUT_DIR}/AusTIMES_demand_multiplier.xlsx', 
-                sheet_name=settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS].split(' ')[0] + ' Demand', 
-                index_col=0,
-            ).T.reset_index(drop=True
-            ).rename(columns={
-                'Sorghum ':'winter cereals',    # the majority of winter cereals is Sorghum in Australia, so we map it this way
-                'Canola':'winter oilseeds',     # the majority of winter oilseeds is Canola in Australia, so we map it this way
-                'Sugar': 'sugar'
-            }).drop(columns=['Cottonseed']      # LUTO do not have cottonseed in our model
-            ).astype({'Year': int}
-            ).set_index('Year')
-            
-        demand_multipliers = pd.DataFrame(
-            index=range(2010, AusTIME_multipliers.index.max() + 1),
-            columns=self.COMMODITIES,
-            data=1.0
-        )
-        
-        demand_multipliers.loc[
-            AusTIME_multipliers.index,
-            AusTIME_multipliers.columns
-        ] = AusTIME_multipliers
-        
-        demand_multipliers = demand_multipliers.T
-        demand_multipliers.columns.name = 'YEAR'
-        demand_multipliers.index.name = 'COMMODITY'
-            
-
 
         # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
         dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'demand_projections.h5'))
@@ -1223,11 +1192,43 @@ class Data:
         
         
         if settings.APPLY_DEMAND_MULTIPLIERS:
+            # Load demand multiplier data
+            AusTIME_multipliers = pd.read_excel(
+                f'{settings.INPUT_DIR}/AusTIMES_demand_multiplier.xlsx',
+                sheet_name=settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS].split(' ')[0] + ' Demand',
+                index_col=0,
+            ).T.reset_index(drop=True
+                            ).rename(columns={
+                'Sorghum ': 'winter cereals',
+                # the majority of winter cereals is Sorghum in Australia, so we map it this way
+                'Canola': 'winter oilseeds',
+                # the majority of winter oilseeds is Canola in Australia, so we map it this way
+                'Sugar': 'sugar'
+            }).drop(columns=['Cottonseed']  # LUTO do not have cottonseed in our model
+                    ).astype({'Year': int}
+                             ).set_index('Year')
+
+            demand_multipliers = pd.DataFrame(
+                index=range(2010, AusTIME_multipliers.index.max() + 1),
+                columns=self.COMMODITIES,
+                data=1.0
+            )
+
+            demand_multipliers.loc[
+                AusTIME_multipliers.index,
+                AusTIME_multipliers.columns
+            ] = AusTIME_multipliers
+
+            demand_multipliers = demand_multipliers.T
+            demand_multipliers.columns.name = 'YEAR'
+            demand_multipliers.index.name = 'COMMODITY'
             print(f"│   ├── Years before applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
             self.DEMAND_C = (self.DEMAND_C *  demand_multipliers).dropna(axis=1)
             print(f"│   └── Years after applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
-        
-        # Convert to numpy array of shape (91, 26)
+        else:
+            self.DEMAND_C = self.DEMAND_C.dropna(axis=1)
+
+            # Convert to numpy array of shape (91, 26)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
         
         # Adjust demand data to the production data calculated using the base year layers;
