@@ -5,7 +5,7 @@ from tools.helpers import create_task_runs
 import time
 # time.sleep(60*60*5)
 platform = "aquila"  # 可选值: 'HPC', 'Denethor', 'NCI',"aquila"
-tasks = ['20260208_Paper1_Results_res13_test']
+tasks = ['20260211_Paper1_Results_NCI']
 input_path_dict = {"HPC": "/home/remote/s222552331/LUTO2_XH/LUTO2/input",
                     "Denethor": "N:/LUF-Modelling/LUTO2_XH/LUTO2/input",
                     "NCI": "/g/data/jk53/LUTO_XH/LUTO2/input",
@@ -18,7 +18,7 @@ for task in tasks:
         'WRITE_THREADS': 2,
         'MEM': '100GB',
         'NCPUS': 25,
-        'TIME': '5:00:00',
+        'TIME': '20:00:00',
         'INPUT_DIR': input_path_dict[platform],  # 根据平台选择输入路径
         'RAW_DATA': f"{input_path_dict[platform]}/raw_data",
         'NO_GO_VECTORS': {

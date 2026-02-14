@@ -2099,20 +2099,24 @@ class Data:
         float
             The priority degrade areas conservation target for the given year.
         """
-        
+        target_config = settings.GBF2_TARGETS_DICT.get(settings.BIODIVERSITY_TARGET_GBF_2)
+        if target_config is None:
+            # 使用和 'low' 相同的结构，所有目标都是0
+            target_config = {2030: 0, 2050: 0, 2100: 0}
+
         bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA).sum()
         bio_habitat_score_base_yr_sum = self.BIO_GBF2_BASE_YR.sum()
         bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
 
         bio_habitat_target_proportion = [
             bio_habitat_score_base_yr_proportion + ((1 - bio_habitat_score_base_yr_proportion) * i)
-            for i in settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].values()
+            for i in target_config.values()
         ]
 
         targets_key_years = {
             self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
             **dict(zip(
-                settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].keys(), 
+                target_config.keys(),
                 bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)
             ))
         }

@@ -204,6 +204,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
 
         delayed(write_files)(data, yr_cal, path_yr),
         delayed(write_quantity_separate_landuse)(data, yr_cal, path_yr),
+        write_files_separate(data, yr_cal, path_yr)
     ]
 
     return tasks
@@ -4212,7 +4213,50 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     return f"Biodiversity GBF8 species scores written for year {yr_cal}"
 
 
+def write_files_separate(data: Data, yr_cal, path):
+    '''Write raw decision variables to separate GeoTiffs'''
 
+    print(f'Write raw decision variables to separate GeoTiffs for {yr_cal}')
+
+    # Collapse the land management dimension (m -> [dry, irr])
+    ag_dvar_rj = np.einsum('mrj -> rj', data.ag_dvars[yr_cal])
+    ag_dvar_rm = np.einsum('mrj -> rm', data.ag_dvars[yr_cal])
+    non_ag_rk = np.einsum('rk -> rk', data.non_ag_dvars[yr_cal])
+    ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in data.ag_man_dvars[yr_cal].items()}
+
+    # Get the desc2dvar table.
+    ag_dvar_map = pd.DataFrame(
+        {'Category': 'Ag_LU', 'lu_desc': data.AGRICULTURAL_LANDUSES, 'dvar_idx': range(data.N_AG_LUS)}
+        ).assign(dvar=[ag_dvar_rj[:, j] for j in range(data.N_AG_LUS)]
+                 ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+    non_ag_dvar_map = pd.DataFrame(
+        {'Category': 'Non-Ag_LU', 'lu_desc': data.NON_AGRICULTURAL_LANDUSES, 'dvar_idx': range(data.N_NON_AG_LUS)}
+        ).assign(dvar=[non_ag_rk[:, k] for k in range(data.N_NON_AG_LUS)]
+                 ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+    lm_dvar_map = pd.DataFrame({'Category': 'Land_Mgt', 'lu_desc': data.LANDMANS, 'dvar_idx': range(data.NLMS)}
+                               ).assign(dvar=[ag_dvar_rm[:, j] for j in range(data.NLMS)]
+                                        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+    ag_man_map = pd.concat([
+        pd.DataFrame({'Category': 'Ag_Mgt', 'lu_desc': am, 'dvar_idx': [0]}
+                     ).assign(dvar=[np.einsum('rj -> r', am_dvar_rj)]
+                              ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+        for am, am_dvar_rj in ag_man_rj_dict.items()
+    ])
+
+    # Export to GeoTiff
+    desc2dvar_df = pd.concat([ag_dvar_map, ag_man_map, non_ag_dvar_map, lm_dvar_map])
+    lucc_separate_dir = os.path.join(path, 'lucc_separate')
+    os.makedirs(lucc_separate_dir, exist_ok=True)
+    for _, row in desc2dvar_df.iterrows():
+        category = row['Category']
+        dvar_idx = row['dvar_idx']
+        desc = row['lu_desc']
+        dvar = create_2d_map(data, row['dvar'].astype(np.float32))
+        fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
+        lucc_separate_path = os.path.join(lucc_separate_dir, fname)
+
+        with rasterio.open(lucc_separate_path, 'w+', **data.GEO_META) as dst:
+            dst.write_band(1, dvar)
 
 
 
