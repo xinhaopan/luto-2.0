@@ -4,15 +4,15 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260217_Paper1_Results_aquila_test'],
+    'TASK_NAME': ['20260206_Paper1_Results_res13_EP_test'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [3],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['12GB'],
-    'NCPUS': ['3'],
+    'MEM': ['120GB'],
+    'NCPUS': ['8'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['8:00:00'],
+    'TIME': ['48:00:00'],
 
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     # ---------------------------------- Model settings ------------------------------
@@ -24,7 +24,7 @@ grid_search = {
     'SIM_YEARS': [[i for i in range(2010,2051,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['low','medium','high'],
+    'GHG_EMISSIONS_LIMITS': ['off'],
     'GHG_TARGETS_DICT': [{
             'off':     None,
             'low':    '1.8C (67%) excl. avoided emis SCOPE1',
@@ -54,7 +54,6 @@ grid_search = {
 
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
-
 }
 settings_name_dict = {
     'GHG_EMISSIONS_LIMITS':'GHG',

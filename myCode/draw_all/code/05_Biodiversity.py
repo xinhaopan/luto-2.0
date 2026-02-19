@@ -22,10 +22,9 @@ csv_name, value_column_name, filter_column_name = 'biodiversity_GBF2_priority_sc
 bio_dict = get_dict_data(input_files, csv_name, value_column_name, filter_column_name,unit_adopt=False)
 bio_dict,legend_colors = get_colors(bio_dict, 'tools/land use colors.xlsx', sheet_name='lu')
 
-bio_target_dict = get_dict_data(input_files, "biodiversity_GBF2_priority_scores", 'Priority Target (%)', 'Landuse',['Landuse','Type'],['Apples','Agricultural Landuse'],unit_adopt=False)
+bio_target_dict = get_dict_data(input_files, "biodiversity_GBF2_priority_scores", 'Priority Target (%)', 'Landuse',['Landuse','Type','region','Water_supply'],['Apples','Agricultural Landuse','ACT','Dryland'],unit_adopt=False)
 # point_dict = rename_and_filter_columns(bio_target_dict, ['Biodiversity score limit','Solve biodiversity score'], ['Constraints','Score'],-10)
 point_dict = rename_and_filter_columns(bio_target_dict, ['Apples'], ['Targets'])
-
 point_colors = ['red']
 # y_range, y_ticks = calculate_y_axis_range(bio_dict)
 y_range, y_ticks = calculate_y_axis_range(bio_dict,3)

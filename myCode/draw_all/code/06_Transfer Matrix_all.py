@@ -55,10 +55,42 @@ def calculate_transition_matrix(land_use_data_path, area_column='Area (ha)',
     # 按原始土地使用类型分组并计算面积总和
     transition_matrix = land_use_data.groupby(['From', 'To'])[area_column].sum().unstack(fill_value=0)
 
-    # 确保矩阵包含所有唯一的土地使用类型，并保持原始顺序
-    transition_matrix = transition_matrix.reindex(index=unique_land_uses, columns=unique_land_uses, fill_value=0)
-    # print(transition_matrix)
+    # ===== 自定义排序逻辑 =====
+    # 定义要放到最后的非农业土地类型（按指定顺序）
+    non_ag_order = [
+        'Environmental Plantings',
+        'Riparian Plantings',
+        'Sheep Agroforestry',
+        'Beef Agroforestry',
+        'Carbon Plantings (Block)',
+        'Sheep Carbon Plantings (Belt)',
+        'Beef Carbon Plantings (Belt)',
+        'Destocked - natural land'
+    ]
+
+    # 获取所有唯一的土地使用类型
+    all_land_uses = set(transition_matrix.index) | set(transition_matrix.columns)
+
+    # 分离农业和非农业土地类型
+    ag_land_uses = sorted([lu for lu in all_land_uses if lu not in non_ag_order])
+    non_ag_land_uses = [lu for lu in non_ag_order if lu in all_land_uses]
+
+    # 组合：农业类型（字母排序） + 非农业类型（指定顺序）
+    unique_land_uses = ag_land_uses + non_ag_land_uses
+
+    # 重新索引以保持顺序
+    transition_matrix = transition_matrix.reindex(
+        index=unique_land_uses,
+        columns=unique_land_uses,
+        fill_value=0
+    )
+
     return transition_matrix
+
+    # # 确保矩阵包含所有唯一的土地使用类型，并保持原始顺序
+    # transition_matrix = transition_matrix.reindex(index=unique_land_uses, columns=unique_land_uses, fill_value=0)
+    # # print(transition_matrix)
+    # return transition_matrix
 
 def save_colorbar(cax, output_path, font_size=10):
     """

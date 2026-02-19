@@ -244,4 +244,4 @@ label_mapping = {
     'Unallocated - natural land': 'UN',
     'Non-agricultural land-use': 'NA'
 }
-plot_all_transition_matrices(matrices, labels,label_mapping, output_path="../output/06_transition_matrix_all")
+plot_all_transition_matrices(matrices, labels,label_mapping, output_path="../output/06_transition_matrix")

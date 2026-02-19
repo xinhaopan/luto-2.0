@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional, Iterable
 import glob
 import shutil, tempfile, time, random
 import xarray as xr
@@ -8,6 +8,7 @@ import rasterio
 import os
 import joblib
 import zipfile
+import pandas as pd
 import tools.config as config
 
 
@@ -75,8 +76,6 @@ def get_path(task_name, path_name):
             f"Current directory content for {output_path}: {os.listdir(output_path) if os.path.exists(output_path) else 'Directory not found'}")
 
 
-
-
 def save2nc(
         in_xr,
         save_path: str,
@@ -88,66 +87,99 @@ def save2nc(
         lock_path: str | None = None,
         compute_before_write: bool = True,
         max_retries: int = 5,
-        retry_delay: float = 1.0
+        retry_delay: float = 1.0,
+        encode_multi_index: bool = True,
+        layer_dim: str = "layer"
 ):
-    # 目录
+    import cf_xarray as cfxr
+    import pandas as pd
+
     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
 
-    # 统一为 DataArray
-    if isinstance(in_xr, xr.Dataset):
+    # Dask chunking
+    chunks_size = None
+    if hasattr(in_xr, 'sizes'):
+        chunks_size = {
+            dim: (size if dim == 'cell' else 1)
+            for dim, size in in_xr.sizes.items()
+        }
+        in_xr = in_xr.chunk(chunks_size)
+
+    # 转换为 Dataset
+    if isinstance(in_xr, xr.DataArray):
+        var_name = in_xr.name or "data"
+        ds = in_xr.to_dataset(name=var_name)
+    elif isinstance(in_xr, xr.Dataset):
         if len(in_xr.data_vars) != 1:
             raise ValueError(f"输入 Dataset 含 {len(in_xr.data_vars)} 个变量，需单变量。")
         var_name = next(iter(in_xr.data_vars))
-        da = in_xr[var_name]
-    elif isinstance(in_xr, xr.DataArray):
-        da = in_xr
-        var_name = da.name or "data"
+        ds = in_xr
     else:
         raise TypeError("in_xr 必须是 xarray.DataArray 或 单变量 xarray.Dataset")
 
-    if da.name != var_name:
-        da = da.rename(var_name)
+    # MultiIndex 编码
+    if encode_multi_index and layer_dim in ds.dims:
+        if layer_dim in ds.indexes and isinstance(ds.indexes[layer_dim], pd.MultiIndex):
+            ds = cfxr.encode_multi_index_as_compress(ds, layer_dim)
 
-    # 仅保留维度坐标，剔除非维度坐标（避免写出失败）
-    coords_to_drop = set(da.coords) - set(da.dims)
-    if coords_to_drop:
-        da = da.drop_vars(coords_to_drop, errors="ignore")
+    # 去除非维度坐标
+    for data_var in ds.data_vars:
+        coords_to_drop = set(ds[data_var].coords) - set(ds[data_var].dims)
+        if coords_to_drop:
+            ds = ds.drop_vars(coords_to_drop, errors="ignore")
 
-    # 预先计算，避免写出时仍有 dask 依赖
+    # 预计算
     if compute_before_write:
-        da = da.load()
+        ds = ds.load()
 
-    # 编码
-    enc = {var_name: {"dtype": "float32"}}
-    if compress:
-        enc[var_name].update({"zlib": True, "complevel": 4})
-    if hasattr(da.data, "chunks") and da.data.chunks is not None:
-        enc[var_name]["chunksizes"] = da.chunks
+    # ===== 编码设置 =====
+    enc = {}
 
-    # ✅ 关键修改：锁文件管理
+    # 数据变量编码
+    for var in ds.data_vars:
+        enc[var] = {"dtype": "float32"}
+        if compress:
+            enc[var].update({"zlib": True, "complevel": 4})
+
+        if chunks_size is not None:
+            chunk_tuple = tuple(
+                chunks_size.get(dim, ds.sizes[dim])
+                for dim in ds[var].dims
+            )
+            enc[var]["chunksizes"] = chunk_tuple
+
+    # ✅ 关键修复：字符串坐标编码
+    for coord in ds.coords:
+        coord_data = ds.coords[coord]
+        # 检查是否是字符串类型
+        if coord_data.dtype.kind in ('U', 'S', 'O'):
+            # 计算最大字符串长度
+            try:
+                if coord_data.size > 0:
+                    max_len = max(len(str(x)) for x in coord_data.values.flat)
+                    # 设置足够长的字符串类型
+                    enc[coord] = {'dtype': f'U{max_len}'}
+            except Exception:
+                # 如果计算失败，转换为 object 类型
+                ds = ds.assign_coords({coord: coord_data.astype(object)})
+
+    # 文件锁和保存
     lockfile = lock_path or (save_path + ".lock")
     save_dir = os.path.dirname(save_path) or "."
-
-    # ✅ 修改1：创建FileLock对象但不立即使用
     file_lock = FileLock(lockfile, timeout=lock_timeout)
 
     try:
-        # ✅ 修改2：使用acquire()和release()方法
         file_lock.acquire()
         try:
-            # 二次检查
             if os.path.exists(save_path) and not allow_overwrite:
                 raise FileExistsError(f"目标已存在且不允许覆盖：{save_path}")
 
-            # 独立临时文件路径（先关闭句柄，避免 Windows 上无法 move）
             with tempfile.NamedTemporaryFile(dir=save_dir, suffix=".nc", delete=False) as tmp_file:
                 temp_path = tmp_file.name
 
             try:
-                # 写入临时文件（xarray 会在函数返回时关闭句柄）
-                da.astype("float32").to_netcdf(path=temp_path, engine=engine, encoding=enc)
+                ds.to_netcdf(path=temp_path, engine=engine, encoding=enc)
 
-                # 原子移动（带重试，处理偶发 PermissionError/杀毒软件扫描占用等）
                 for attempt in range(max_retries):
                     try:
                         shutil.move(temp_path, save_path)
@@ -167,7 +199,6 @@ def save2nc(
                         pass
                 raise
         finally:
-            # ✅ 修改3：确保释放锁
             try:
                 file_lock.release()
             except Exception as e:
@@ -175,42 +206,109 @@ def save2nc(
     except Timeout:
         raise TimeoutError(f"获取写锁超时（{lock_timeout}s）：{lockfile}")
     finally:
-        # ✅ 修改4：强制清理锁文件
         try:
             if os.path.exists(lockfile):
                 os.remove(lockfile)
-                print(f"已清理锁文件: {lockfile}")
         except Exception as e:
             print(f"警告：清理锁文件失败 {lockfile}: {e}")
 
-
-
-def filter_all_from_dims(ds: Union[xr.Dataset, xr.DataArray]) -> Union[xr.Dataset, xr.DataArray]:
+def _ensure_layer_multiindex_strict(
+    da: xr.DataArray,
+    layer_dim: str = "layer",
+    level_order: Optional[Iterable[str]] = None,
+) -> xr.DataArray:
     """
-    从 xarray 对象的所有维度中筛选并移除值为 'ALL' 的坐标。
-
-    该函数会遍历对象的所有维度，检查其坐标是否包含字符串 'ALL'。
-    如果包含，则只选择不等于 'ALL' 的部分。
-
-    Args:
-        ds (Union[xr.Dataset, xr.DataArray]): 需要进行筛选的 xarray 数据集或数据数组。
-
-    Returns:
-        Union[xr.Dataset, xr.DataArray]: 一个新的、经过筛选的 xarray 对象。
+    严格确保 da 的 layer 是 MultiIndex。
+    规则：
+    - 如果 layer 已经是 MultiIndex：直接返回
+    - 否则要求存在 coords(dims=(layer,)) 的 level 变量（如 am/lm/lu/source...）
+      用 set_index(layer=[...]) 构造 MultiIndex
+    - 如果没有 level 变量：直接报错（因为无法还原）
     """
-    # 将输入对象作为筛选的起点
-    filtered_ds = ds
+    if layer_dim not in da.dims:
+        return da
 
-    # 遍历所有维度名称
-    for dim_name in ds.dims:
-        # 安全检查：确保维度有关联的坐标，并且坐标是字符串类型
-        if dim_name in ds.coords and ds[dim_name].dtype.kind in ['U', 'S', 'O']:
-            # 检查坐标值中是否含有 'ALL'
-            if np.isin(ds[dim_name].values, ['ALL']).any():
-                # 使用 .sel() 和布尔索引来选择不等于 'ALL' 的部分
-                filtered_ds = filtered_ds.sel({dim_name: filtered_ds[dim_name] != 'ALL'})
+    idx = da.indexes.get(layer_dim, None)
+    if isinstance(idx, pd.MultiIndex):
+        return da
 
-    return filtered_ds
+    layer_level_vars = [
+        c for c in da.coords
+        if c != layer_dim and da.coords[c].dims == (layer_dim,)
+    ]
+    if not layer_level_vars:
+        raise ValueError(
+            f"'{layer_dim}' is not a MultiIndex and no layer-level coords exist to rebuild it. "
+            f"Available coords with dims=('layer',): {layer_level_vars}"
+        )
+
+    if level_order is not None:
+        level_order = list(level_order)
+        layer_level_vars = (
+            [c for c in level_order if c in layer_level_vars]
+            + [c for c in layer_level_vars if c not in level_order]
+        )
+
+    return da.set_index({layer_dim: layer_level_vars})
+
+
+def filter_all_from_dims(
+    obj: Union[xr.Dataset, xr.DataArray],
+    layer_dim: str = "layer",
+    strict_layer_multiindex: bool = True,
+    layer_level_order: Optional[Iterable[str]] = None,
+) -> Union[xr.Dataset, xr.DataArray]:
+    """
+    同时过滤：
+    1) 正常 dims 中坐标值为 'ALL' 的部分
+    2) 如果存在 (cell, layer) 且 'ALL' 出现在 layer-level coords（dims=('layer',)），也过滤掉这些 layer
+
+    不使用 try；如果 strict 且 layer 无法成为 MultiIndex，则直接报错。
+    """
+
+    def _filter_da(da: xr.DataArray) -> xr.DataArray:
+        out = da
+        filter_words = ['ALL', 'AUSTRALIA']
+
+        # ---------- A) 过滤真正 dims 中的 ALL ----------
+        for filter_word in filter_words:
+            for dim in list(out.dims):
+                if dim in out.coords and out[dim].dtype.kind in ("U", "S", "O"):
+                    vals = out[dim].values
+                    if np.isin(vals, [filter_word]).any():
+                        out = out.sel({dim: out[dim] != filter_word})
+
+            # ---------- B) 过滤 layer-level coords 中的 ALL ----------
+            if layer_dim in out.dims:
+                layer_level_vars = [
+                    c for c in out.coords
+                    if c != layer_dim and out.coords[c].dims == (layer_dim,)
+                ]
+                if layer_level_vars:
+                    if strict_layer_multiindex:
+                        out = _ensure_layer_multiindex_strict(
+                            out, layer_dim=layer_dim, level_order=layer_level_order
+                        )
+
+                    idx = out.indexes.get(layer_dim, None)
+                    if strict_layer_multiindex and not isinstance(idx, pd.MultiIndex):
+                        raise ValueError(
+                            f"Expected '{layer_dim}' to be MultiIndex after ensure, got {type(idx)}"
+                        )
+
+                    if isinstance(idx, pd.MultiIndex):
+                        keep = np.ones(len(idx), dtype=bool)
+                        for lvl in idx.names:
+                            keep &= (idx.get_level_values(lvl) != filter_word)
+                        out = out.isel({layer_dim: keep})
+
+        return out
+
+    if isinstance(obj, xr.Dataset):
+        new_vars = {v: _filter_da(obj[v]) for v in obj.data_vars}
+        return xr.Dataset(new_vars, attrs=obj.attrs)
+
+    return _filter_da(obj)
 
 
 def create_xarray(years, base_path, env_category, env_name, mask=None,
@@ -246,11 +344,29 @@ def create_xarray(years, base_path, env_category, env_name, mask=None,
     return ds
 
 
-
-def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0):
+def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0,
+              max_retries: int = 5, retry_delay: float = 2.0):
     """
     将 xarray DataArray 转换为 GeoTIFF，正确处理 nodata 和掩膜
+
+    Parameters
+    ----------
+    data : 数据对象（包含地理元数据）
+    da : xr.DataArray
+        输入数据
+    tif_path : str
+        输出 .tif 路径
+    nodata_value : float
+        NoData 值
+    max_retries : int
+        删除旧文件的最大重试次数
+    retry_delay : float
+        重试延迟（秒）
     """
+    import time
+    import gc
+    from filelock import FileLock, Timeout
+
     # 仅支持 1D 'cell'
     if "cell" not in da.dims or len(da.dims) != 1:
         raise ValueError(f"维度是 {da.dims}，只支持一维 'cell'。")
@@ -305,45 +421,120 @@ def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0):
         blockysize=256,
     )
 
+    # ===== 确保目录存在 =====
     os.makedirs(os.path.dirname(tif_path), exist_ok=True)
 
-    # 删除已存在的文件及其关联文件
-    if os.path.exists(tif_path):
+    # ===== 使用文件锁 =====
+    lock_path = tif_path + ".lock"
+    file_lock = FileLock(lock_path, timeout=300)
+
+    try:
+        with file_lock:
+            # 删除已存在的文件及其关联文件（带重试）
+            if os.path.exists(tif_path):
+                for attempt in range(max_retries):
+                    try:
+                        # 尝试修改权限
+                        try:
+                            os.chmod(tif_path, 0o777)
+                        except:
+                            pass
+
+                        # 删除主文件
+                        os.remove(tif_path)
+
+                        # 删除常见的关联文件
+                        for ext in ['.aux.xml', '.ovr', '.msk', '.tfw', '.prj']:
+                            aux_file = tif_path + ext
+                            if os.path.exists(aux_file):
+                                try:
+                                    os.remove(aux_file)
+                                except:
+                                    pass
+
+                        # 删除可能的其他扩展名
+                        base = os.path.splitext(tif_path)[0]
+                        for ext in ['.aux.xml', '.ovr', '.msk', '.tfw', '.prj']:
+                            aux_file = base + ext
+                            if os.path.exists(aux_file):
+                                try:
+                                    os.remove(aux_file)
+                                except:
+                                    pass
+
+                        # 删除成功，跳出重试循环
+                        break
+
+                    except (PermissionError, OSError) as e:
+                        if attempt < max_retries - 1:
+                            wait_time = retry_delay * (1.5 ** attempt)
+                            print(f"⚠️ 删除 {os.path.basename(tif_path)} 失败"
+                                  f"（尝试 {attempt + 1}/{max_retries}），"
+                                  f"{wait_time:.1f}s 后重试...")
+                            time.sleep(wait_time)
+                            gc.collect()  # 强制垃圾回收
+                        else:
+                            print(f"❌ 无法删除文件 {os.path.basename(tif_path)}: {e}")
+                            print(f"   提示：请关闭占用该文件的程序（QGIS、ArcGIS等）")
+                            raise
+
+            # 写入文件（带重试）
+            for attempt in range(max_retries):
+                try:
+                    with rasterio.open(tif_path, "w", **meta) as dst:
+                        dst.write(arr_2d, 1)
+                        # 写入内部掩膜：255=有效，0=无效
+                        dst.write_mask((valid_mask_2d.astype(np.uint8) * 255))
+
+                    # print(f"✅ 已保存: {os.path.basename(tif_path)}")
+                    break
+
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (1.5 ** attempt)
+                        print(f"⚠️ 写入 {os.path.basename(tif_path)} 失败"
+                              f"（尝试 {attempt + 1}/{max_retries}）: {e}")
+                        time.sleep(wait_time)
+                        gc.collect()
+                    else:
+                        print(f"❌ 写入失败 {os.path.basename(tif_path)}: {e}")
+                        raise
+
+    except Timeout:
+        print(f"❌ 获取文件锁超时: {os.path.basename(tif_path)}")
+        raise
+
+    finally:
+        # 清理锁文件
         try:
-            # 删除主文件
-            os.remove(tif_path)
-            # 删除常见的关联文件
-            for ext in ['.aux.xml', '.ovr', '.msk', '.tfw', '.prj']:
-                aux_file = tif_path + ext
-                if os.path.exists(aux_file):
-                    os.remove(aux_file)
-            # 删除可能的其他扩展名
-            base = os.path.splitext(tif_path)[0]
-            for ext in ['.aux.xml', '.ovr', '.msk', '.tfw', '.prj']:
-                aux_file = base + ext
-                if os.path.exists(aux_file):
-                    os.remove(aux_file)
-        except Exception as e:
-            print(f"⚠️ 删除旧文件时出错: {e}")
-            # 继续尝试写入
+            if os.path.exists(lock_path):
+                os.remove(lock_path)
+        except:
+            pass
 
-    with rasterio.open(tif_path, "w", **meta) as dst:
-        dst.write(arr_2d, 1)
-        # 写入内部掩膜：255=有效，0=无效
-        dst.write_mask((valid_mask_2d.astype(np.uint8) * 255))
+def get_data_RES(task_name, path_name, use_zip=False):
+    """
+    获取指定路径下的输出子目录。
+    - path_name: 任务名称或路径名称
+    - 返回: 输出子目录的完整路径
+    """
+    if use_zip:
+        output_path = f"../../../output/{task_name}/{path_name}"
+        zip_path = os.path.join(output_path, 'Run_Archive.zip')
+        if not os.path.isfile(zip_path):
+            raise FileNotFoundError(f"未找到指定的 zip 文件: {zip_path}")
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            matches = [name for name in zf.namelist() if glob.fnmatch.fnmatch(os.path.basename(name), "Data_RES*.lz4")]
+            if not matches:
+                raise FileNotFoundError("在 zip 文件中未找到匹配 'Data_RES*.lz4' 的文件。")
+            # 读取 zip 内部 gz 文件内容为 bytes
+            with zf.open(matches[0], "r") as file_in_zip:
+                # joblib.load 可以直接处理这个文件对象
+                data = joblib.load(file_in_zip)
+    else:
+        output_path = get_path(task_name, path_name)
+        pattern = os.path.join(output_path, "Data_RES*.lz4")
+        pkl_path = glob.glob(pattern)[0]
+        data = joblib.load(pkl_path)
 
-    print(f"✅ 已保存: {tif_path}")
-
-def get_data_RES(output_path="output"):
-    zip_path = os.path.join(output_path, 'Run_Archive.zip')
-    if not os.path.isfile(zip_path):
-        raise FileNotFoundError(f"未找到指定的 zip 文件: {zip_path}")
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        matches = [name for name in zf.namelist() if glob.fnmatch.fnmatch(os.path.basename(name), "Data_RES*.lz4")]
-        if not matches:
-            raise FileNotFoundError("在 zip 文件中未找到匹配 'Data_RES*.lz4' 的文件。")
-        # 读取 zip 内部 gz 文件内容为 bytes
-        with zf.open(matches[0], "r") as file_in_zip:
-            # joblib.load 可以直接处理这个文件对象
-            data = joblib.load(file_in_zip)
-        return data
+    return data

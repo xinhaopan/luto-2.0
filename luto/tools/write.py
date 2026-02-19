@@ -146,7 +146,7 @@ def create_report(data: Data):
    
    
 def save2nc(in_xr:xr.DataArray, save_path:str):
-    
+
     # Ensure dask chunking: keep 'cell' chunks as full length, others as 1
     chunks_size = {dim: (size if dim == 'cell' else 1) for dim, size in in_xr.sizes.items()}
     in_xr = in_xr.chunk(chunks_size)
@@ -162,6 +162,17 @@ def save2nc(in_xr:xr.DataArray, save_path:str):
         }
     }
     in_xr.to_netcdf(save_path, encoding=encoding)
+
+def safe_select_all(da, dim_name='lu'):
+    """安全地选择 'ALL' 层，不存在则创建全 0 层"""
+    if 'ALL' in da.coords.get(dim_name, []):
+        return da.sel({dim_name: 'ALL'})
+    else:
+        return xr.DataArray(
+            np.zeros(da.sizes['cell'], dtype=da.dtype),
+            coords={'cell': da.coords['cell']},
+            dims=['cell']
+        ).assign_coords({dim_name: 'ALL'})
 
 
 
@@ -522,9 +533,14 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     ag_mosaic = cfxr.decode_compress_to_multi_index(
         xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer')['data'
         ].sel(lu='ALL', lm='ALL').rename({'lu':'Commodity'})
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #     xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+    #     ].sel(lu='ALL').rename({'lu':'Commodity'})
+
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
-        ].sel(lu='ALL').rename({'lu':'Commodity'})
+        ], 'lu').rename({'lu':'Commodity'})
+
     am_mosaic = cfxr.decode_compress_to_multi_index(
         xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer')['data'
         ].sel(am='ALL', lm='ALL').sel(lu='ALL').rename({'lu':'Commodity'})
@@ -1164,6 +1180,9 @@ def write_revenue_cost_ag_man(data: Data, yr_cal, path):
     xr_revenue_am_stack = xr_revenue_am.stack(layer=['am','lm','lu']).sel(layer=valid_layers_revenue)
     xr_cost_am_stack = xr_cost_am.stack(layer=['am','lm','lu']).sel(layer=valid_layers_cost)
 
+    save2nc(xr_revenue_am_stack, os.path.join(path, f'xr_revenue_agricultural_management_{yr_cal}.nc'))
+    save2nc(xr_cost_am_stack, os.path.join(path, f'xr_cost_agricultural_management_{yr_cal}.nc'))
+
     # Get valid mosaic layers
     am_mosaic_ds = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
@@ -1262,9 +1281,10 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     non_ag_cost_valid_layers = xr_cost_non_ag.stack(layer=['lu']).sel(layer=valid_cost_layers)
 
     # Get valid mosaic layers
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
+
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu').expand_dims('lu').stack(layer=['lu'])
 
     # Combine valid layers from dvar and mosaic
     xr_revenue_non_ag_cat = xr.concat([non_ag_mosaic, non_ag_rev_valid_layers], dim='layer').drop_vars('region').compute()
@@ -1771,9 +1791,26 @@ def write_dvar_area(data: Data, yr_cal, path):
     area_non_ag_valid_layers = area_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers)
 
     # Get valid mosaic layers
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #     xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    # )['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
+
+    ds = cfxr.decode_compress_to_multi_index(
         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-    )['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
+    )['data']
+
+    # 判断并处理
+    if 'ALL' in ds.coords.get('lu', []):
+        all_layer = ds.sel(lu='ALL')
+    else:
+        # 创建全 0 的数组（只需要 cell 维度）
+        all_layer = xr.DataArray(
+            np.zeros(ds.sizes['cell'], dtype=ds.dtype),
+            coords={'cell': ds.coords['cell']},
+            dims=['cell']
+        ).assign_coords(lu='ALL')
+
+    non_ag_mosaic = all_layer.expand_dims('lu').stack(layer=['lu'])
 
     # Combine valid layers from dvar and mosaic
     area_non_ag_cat = xr.concat([non_ag_mosaic, area_non_ag_valid_layers], dim='layer')
@@ -2227,9 +2264,14 @@ def write_ghg_non_agricultural(data: Data, yr_cal: int, path: str):
     non_ag_ghg_valid_layers = xr_ghg_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_ghg_layers)
 
     # Get mosaic - simply expand and stack (no filtering for NonAg)
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-    )['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #     xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    # )['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
+
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu').expand_dims('lu').stack(layer=['lu'])
+
 
     # Combine and compute
     xr_ghg_non_ag_cat = xr.concat([non_ag_mosaic, non_ag_ghg_valid_layers], dim='layer').drop_vars('region').compute()
@@ -2627,9 +2669,14 @@ def write_water(data: Data, yr_cal, path):
     )
     xr_ag_wny_cat = xr.concat([ag_mosaic, xr_ag_wny], dim='lu').stack(layer=['lm', 'lu'])
 
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'].sel(lu=['ALL']
-    )
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #     xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'].sel(lu=['ALL']
+    # )
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu')
+
+
     xr_non_ag_wny_cat = xr.concat([non_ag_mosaic, xr_non_ag_wny], dim='lu').stack(layer=['lu'])
 
     am_mosaic = cfxr.decode_compress_to_multi_index(
@@ -2778,9 +2825,12 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     ag_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
         )['data'].sel(lu='ALL', lm='ALL')
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    #     )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu').drop_vars('layer', errors='ignore').expand_dims('lu')
     am_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
         )['data'].sel(am='ALL', lm='ALL', lu='ALL')
@@ -2968,9 +3018,12 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     ag_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
         )['data'].sel(lu='ALL', lm='ALL')
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    #     )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu').drop_vars('layer', errors='ignore').expand_dims('lu')
     am_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
         )['data'].sel(am='ALL', lm='ALL', lu='ALL')
@@ -3168,9 +3221,12 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     ag_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
         )['data'].sel(lu='ALL', lm='ALL')
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    #     )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu').drop_vars('layer', errors='ignore').expand_dims('lu')
     am_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
         )['data'].sel(am='ALL', lm='ALL', lu='ALL')
@@ -3368,9 +3424,12 @@ def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
     ag_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
         )['data'].sel(lu='ALL', lm='ALL')
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    #     )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu').drop_vars('layer', errors='ignore').expand_dims('lu')
     am_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
         )['data'].sel(am='ALL', lm='ALL', lu='ALL')
@@ -3567,9 +3626,12 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     ag_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
         )['data'].sel(lu='ALL', lm='ALL')
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    #     )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu').drop_vars('layer', errors='ignore').expand_dims('lu')
     am_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
         )['data'].sel(am='ALL', lm='ALL', lu='ALL')
@@ -3765,9 +3827,12 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     ag_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
         )['data'].sel(lu='ALL', lm='ALL')
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    #     )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu').drop_vars('layer', errors='ignore').expand_dims('lu')
     am_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
         )['data'].sel(am='ALL', lm='ALL', lu='ALL')
@@ -3964,9 +4029,12 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     ag_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
         )['data'].sel(lu='ALL', lm='ALL')
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    #     )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu').drop_vars('layer', errors='ignore').expand_dims('lu')
     am_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
         )['data'].sel(am='ALL', lm='ALL', lu='ALL')
@@ -4173,9 +4241,12 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     ag_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
         )['data'].sel(lu='ALL', lm='ALL')
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    # non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    #         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    #     )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    non_ag_mosaic = safe_select_all(cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ], 'lu').drop_vars('layer', errors='ignore').expand_dims('lu')
     am_mosaic = cfxr.decode_compress_to_multi_index(
             xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
         )['data'].sel(am='ALL', lm='ALL', lu='ALL')

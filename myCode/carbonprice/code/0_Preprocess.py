@@ -5,7 +5,8 @@ import time
 import gzip
 import threading
 from datetime import datetime
-from typing import Sequence, Optional, Union, Dict, Tuple
+from typing import Sequence, Optional, Union, Dict, Tuple, Iterable
+import cf_xarray as cfxr
 
 # --- Third-party ---
 import numpy as np
@@ -52,43 +53,28 @@ def get_main_data_variable_name(ds: xr.Dataset) -> str:
     else:
         raise ValueError(f"错误：数据集中包含多个数据变量: {data_vars_list}。")
 
+
 def sum_dims_if_exist(
-    nc_path: str,
-    vars: Optional[Sequence[str]] = None,   # 指定只处理哪些变量；None=处理全部
-    dims = ['lm',"source","Type","GHG_source","Cost type","From water-supply","To water-supply"],
-    engine: Optional[str] = "h5netcdf",           # 例如 "h5netcdf" 或 "netcdf4"
-    chunks="auto",                           # 大文件建议保留懒加载
-    keep_attrs: bool = True,
-    finalize: str = "compute",                  # "lazy" | "persist" | "compute"
+        nc_path: str,
+        vars: Optional[Sequence[str]] = None,
+        dims=['lm', "source", "Type", "GHG_source", "Cost type", "From water-supply", "To water-supply"],
+        engine: Optional[str] = "h5netcdf",
+        chunks="auto",
+        keep_attrs: bool = True,
+        finalize: str = "compute",
+        save_inplace: bool = True,
 ):
     """
     打开 NetCDF 文件，对给定的维度（如果该变量里存在）执行 sum 归约。
-    返回 xarray.Dataset（默认懒计算）。
 
     参数
     ----
-    nc_path : str
-        NetCDF 文件路径
-    dims : str | list[str]
-        想要求和的维度名集合；仅当维度存在于变量中时才会被求和
-    vars : list[str] | None
-        仅处理这些变量；None 表示处理所有 data_vars
-    engine : str | None
-        xarray 后端引擎（如 "h5netcdf"）
-    chunks : "auto" | dict | None
-        dask 分块设置
-    keep_attrs : bool
-        归约时是否保留 attrs
-    finalize : "lazy" | "persist" | "compute"
-        返回前是否触发计算：
-        - "lazy"：不计算（默认）
-        - "persist"：把结果持久在内存（适合反复用）
-        - "compute"：直接计算成 numpy-backed
-
-    返回
-    ----
-    xr.Dataset
+    save_inplace : bool, default=False
+        如果为 True，处理后保存到原文件；否则返回 Dataset
     """
+    import shutil
+    import tempfile
+
     if isinstance(dims, str):
         dims = [dims]
 
@@ -99,7 +85,7 @@ def sum_dims_if_exist(
         return da.sum(dim=present, keep_attrs=keep_attrs, skipna=True) if present else da
 
     if vars is None:
-        out = ds.map(_reduce)  # 对所有变量应用
+        out = ds.map(_reduce)
     else:
         missing = [v for v in vars if v not in ds.data_vars]
         if missing:
@@ -109,13 +95,19 @@ def sum_dims_if_exist(
             out[v] = _reduce(ds[v])
 
     if finalize == "compute":
-        res = out.compute()
-        ds.close()
-        return res
-    if finalize == "persist":
-        res = out.persist()
-        ds.close()
-        return res
+        out = out.compute()
+    elif finalize == "persist":
+        out = out.persist()
+
+    ds.close()
+
+    # ===== 新增：保存到原文件 =====
+    if save_inplace:
+        temp_path = nc_path + ".tmp"
+        out.to_netcdf(temp_path, engine=engine)
+        shutil.move(temp_path, nc_path)
+        return nc_path
+
     return out
 
 def amortize_costs(data_path_name, amortize_file, years, njobs=0, rate=0.07, horizon=60):
@@ -298,46 +290,169 @@ def extract_files_from_zip(
         allow_missing_2010: bool = True
 ) -> Dict[Tuple[str, int], bytes]:
     """
-    一次性从 zip 提取所有需要的文件到内存
+    从 zip 文件或目录中提取所有需要的文件到内存
+
+    参数:
+        zip_path: zip文件路径 或 已解压的目录路径
+        copy_files: 需要复制的文件前缀列表
+        years: 年份列表
+        allow_missing_2010: 是否允许2010年文件缺失
 
     返回: {(var_prefix, year): file_bytes} 字典
     """
     files_dict = {}
 
-    tprint(f"Extracting all files from {os.path.basename(zip_path)}...")
-    with zipfile.ZipFile(zip_path, 'r') as zf:
-        all_names = set(zf.namelist())
+    # 判断是zip文件还是目录
+    if os.path.isfile(zip_path) and zipfile.is_zipfile(zip_path):
+        # 情况1: 是zip文件，按原逻辑处理
+        tprint(f"Extracting all files from {os.path.basename(zip_path)}...")
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            all_names = set(zf.namelist())
+
+            for var_prefix in copy_files:
+                for year in years:
+                    src_file_in_zip = f"out_{year}/{var_prefix}_{year}.nc"
+
+                    if src_file_in_zip in all_names:
+                        files_dict[(var_prefix, year)] = zf.read(src_file_in_zip)
+                        tprint(f"  Extracted: {src_file_in_zip}")
+                    elif allow_missing_2010 and year == 2010:
+                        tprint(f"  Skipped: {src_file_in_zip} (missing but allowed)")
+                        files_dict[(var_prefix, year)] = None  # 标记为跳过
+                    else:
+                        tprint(f"  Warning: {src_file_in_zip} not found")
+                        files_dict[(var_prefix, year)] = None
+
+    elif os.path.isdir(zip_path):
+        # 情况2: 是已解压的目录，直接读取文件
+        tprint(f"Reading files from directory {os.path.basename(zip_path)}...")
 
         for var_prefix in copy_files:
             for year in years:
-                src_file_in_zip = f"out_{year}/{var_prefix}_{year}.nc"
+                src_file_path = os.path.join(zip_path, f"out_{year}", f"{var_prefix}_{year}.nc")
 
-                if src_file_in_zip in all_names:
-                    files_dict[(var_prefix, year)] = zf.read(src_file_in_zip)
-                    tprint(f"  Extracted: {src_file_in_zip}")
+                if os.path.exists(src_file_path):
+                    with open(src_file_path, 'rb') as f:
+                        files_dict[(var_prefix, year)] = f.read()
+                    tprint(f"  Read: out_{year}/{var_prefix}_{year}.nc")
                 elif allow_missing_2010 and year == 2010:
-                    tprint(f"  Skipped: {src_file_in_zip} (missing but allowed)")
+                    tprint(f"  Skipped: out_{year}/{var_prefix}_{year}.nc (missing but allowed)")
                     files_dict[(var_prefix, year)] = None  # 标记为跳过
                 else:
-                    tprint(f"  Warning: {src_file_in_zip} not found")
+                    tprint(f"  Warning: out_{year}/{var_prefix}_{year}.nc not found")
                     files_dict[(var_prefix, year)] = None
+
+    else:
+        raise ValueError(f"Invalid path: {zip_path} is neither a valid zip file nor a directory")
 
     tprint(f"Extraction complete: {sum(1 for v in files_dict.values() if v is not None)} files loaded")
     return files_dict
 
 
+def reduce_layered_da(
+    da: xr.DataArray,
+    dims_to_sum: Sequence[str],
+    layer_dim: str = "layer",
+    keep_attrs: bool = True,
+    skipna: bool = True,
+    layer_level_order: Optional[Iterable[str]] = None,
+) -> xr.DataArray:
+    """
+    输入：da dims 通常为 ('cell','layer')，且 layer 是 MultiIndex（或可由 layer-level coords 严格重建）
+    输出：仍为 ('cell','layer')，并保持 layer 为 MultiIndex（多级索引坐标可恢复、可 sel）
+
+    不使用 try；无法 unstack 就直接报错。
+    """
+
+    def _ensure_layer_multiindex_strict(
+            da: xr.DataArray,
+            layer_dim: str = "layer",
+            level_order: Optional[Iterable[str]] = None,
+    ) -> xr.DataArray:
+        """
+        严格确保 da 的 layer 是 MultiIndex。
+        规则：
+        - 如果 layer 已经是 MultiIndex：直接返回
+        - 否则要求存在 coords(dims=(layer,)) 的 level 变量（如 am/lm/lu/source...）
+          用 set_index(layer=[...]) 构造 MultiIndex
+        - 如果没有 level 变量：直接报错（因为无法还原）
+        """
+        if layer_dim not in da.dims:
+            return da
+
+        idx = da.indexes.get(layer_dim, None)
+        if isinstance(idx, pd.MultiIndex):
+            return da
+
+        layer_level_vars = [
+            c for c in da.coords
+            if c != layer_dim and da.coords[c].dims == (layer_dim,)
+        ]
+        if not layer_level_vars:
+            raise ValueError(
+                f"'{layer_dim}' is not a MultiIndex and no layer-level coords exist to rebuild it. "
+                f"Available coords with dims=('layer',): {layer_level_vars}"
+            )
+
+        if level_order is not None:
+            level_order = list(level_order)
+            layer_level_vars = (
+                    [c for c in level_order if c in layer_level_vars]
+                    + [c for c in layer_level_vars if c not in level_order]
+            )
+
+        return da.set_index({layer_dim: layer_level_vars})
+
+    if not np.issubdtype(da.dtype, np.number):
+        return da
+
+    if layer_dim not in da.dims:
+        present = [d for d in dims_to_sum if d in da.dims]
+        return da.sum(dim=present, keep_attrs=keep_attrs, skipna=skipna) if present else da
+
+    # 1) 严格确保 layer 是 MultiIndex
+    da = _ensure_layer_multiindex_strict(
+        da, layer_dim=layer_dim, level_order=layer_level_order
+    )
+
+    # 2) unstack：layer -> 多维 dims
+    da_u = da.unstack(layer_dim)
+
+    # 3) 求和
+    present = [d for d in dims_to_sum if d in da_u.dims]
+    if present:
+        da_u = da_u.sum(dim=present, keep_attrs=keep_attrs, skipna=skipna)
+
+    # 4) stack 回 layer：把除 cell 以外的 dims 全部 stack
+    stack_levels = [d for d in da_u.dims if d != "cell"]
+    if layer_level_order is not None:
+        layer_level_order = list(layer_level_order)
+        stack_levels = (
+            [d for d in layer_level_order if d in stack_levels]
+            + [d for d in stack_levels if d not in layer_level_order]
+        )
+
+    if stack_levels:
+        return da_u.stack({layer_dim: stack_levels})
+
+    return da_u
+
+
 def process_single_file_from_memory(
-        file_bytes: bytes,
-        var_prefix: str,
-        year: int,
-        target_path_name: str,
-        dims_to_sum=('lm', 'source', 'Type', 'GHG_source', 'Cost type', 'From water-supply', 'To water-supply'),
-        # dims_to_sum=('source',),
-        engine: str = "h5netcdf",
-        chunks="auto",
+    file_bytes: bytes,
+    var_prefix: str,
+    year: int,
+    target_path_name: str,
+    dims_to_sum=("lm", "source", "Type", "GHG_source", "Cost type",
+                "From water-supply", "To water-supply"),
+    engine: str = "h5netcdf",
+    chunks="auto",
+    layer_level_order=None,
 ) -> str:
     """
     处理已经在内存中的文件（无需锁，可并行）
+    - 严格：不使用 try
+    - 强制 decode_compress_to_multi_index
     """
     if file_bytes is None:
         return f"⏭️ Skipped: {var_prefix}_{year}.nc"
@@ -348,21 +463,45 @@ def process_single_file_from_memory(
 
     tprint(f"Processing: {var_prefix}_{year}.nc")
 
-    def _reduce_one(da: xr.DataArray) -> xr.DataArray:
-        if not np.issubdtype(da.dtype, np.number):
-            return da
-        present_dims = [d for d in dims_to_sum if d in da.dims]
-        if present_dims:
-            return da.sum(dim=present_dims, keep_attrs=True, skipna=True)
-        return da
-
     with io.BytesIO(file_bytes) as bio:
         with xr.open_dataset(bio, engine=engine, chunks=chunks) as ds:
-            ds = filter_all_from_dims(ds)
-            ds_filled = ds.fillna(0)
-            out = ds_filled.map(_reduce_one).load()
+            # ✅ 关键：先 decode（严格，不用 try；decode 失败就直接报错）
+            ds = cfxr.decode_compress_to_multi_index(ds, "layer")
 
-    save2nc(out, dst_file)
+            # ✅ 再 fillna
+            ds = ds.fillna(0)
+
+            out_vars = {}
+            for v in ds.data_vars:
+                da = ds[v]
+
+                da = filter_all_from_dims(
+                    da,
+                    layer_dim="layer",
+                    strict_layer_multiindex=True,
+                    layer_level_order=layer_level_order,
+                )
+
+                da = reduce_layered_da(
+                    da,
+                    dims_to_sum=dims_to_sum,
+                    layer_dim="layer",
+                    keep_attrs=True,
+                    skipna=True,
+                    layer_level_order=layer_level_order,
+                )
+
+                out_vars[v] = da
+
+            out = xr.Dataset(out_vars, attrs=ds.attrs).load()
+            if 'layer' in out.dims:
+                idx = out.indexes.get('layer')
+                if isinstance(idx, pd.MultiIndex):
+                    # 例如：layer(lu, lm) → 变成 lu × lm 两个独立维度
+                    out = out.unstack('layer')
+
+    save2nc(out["data"] if "data" in out.data_vars else out[list(out.data_vars)[0]], dst_file)
+    sum_dims_if_exist(dst_file)
     return f"✅ Processed: {var_prefix}_{year}.nc"
 
 # ==============================================================================
@@ -484,6 +623,7 @@ def caculate_diff_two_scenarios(input_all_names, output_names, output_path, year
                 env_diff = ds_0 - ds_1
             else:
                 env_diff = ds_1 - ds_0
+            env_diff = env_diff.compute()
         # 保存结果
         output_dir = os.path.join(output_path, output_subdir, str(year))
         os.makedirs(output_dir, exist_ok=True)
@@ -999,7 +1139,7 @@ def main(task_dir, njobs):
     # --- 第一批任务 (拆分为两个独立的组) ---
     # ----------------------------------------------------------------------------
     # ===========================================================================
-    # --- 阶段 1: 文件处理 ---
+    # # --- 阶段 1: 文件处理 ---
     tprint("\n--- 文件copy ---")
 
     for input_file in list(dict.fromkeys(input_files)):
@@ -1396,7 +1536,7 @@ def main(task_dir, njobs):
     files = ['xr_cost_agricultural_management', 'xr_cost_non_ag', 'xr_transition_cost_ag2non_ag_amortised_diff',
              'xr_GHG_ag_management', 'xr_GHG_non_ag', 'xr_biodiversity_GBF2_priority_ag_management',
              'xr_biodiversity_GBF2_priority_non_ag']
-    dim_names = ['am', 'lu', 'To land-use', 'am', 'lu', 'am', 'lu']
+    dim_names = ['am', 'lu', 'To-land-use', 'am', 'lu', 'am', 'lu']
 
     for file, dim_name in zip(files, dim_names):
         summarize_to_type(
@@ -1415,7 +1555,7 @@ def main(task_dir, njobs):
              'xr_biodiversity_GBF2_priority_ag_management','xr_biodiversity_GBF2_priority_non_ag',
              'xr_GHG_ag_management','xr_GHG_non_ag',
              'xr_cost_agricultural_management', 'xr_cost_non_ag', 'xr_transition_cost_ag2non_ag_amortised']
-    dim_names = ['am','lu','am','lu','am','lu','am', 'lu', 'To land-use']
+    dim_names = ['am','lu','am','lu','am','lu','am', 'lu', 'To-land-use']
 
     for file, dim_name in zip(files, dim_names):
         summarize_to_type(
@@ -1435,7 +1575,7 @@ def main(task_dir, njobs):
 
     tif_dir = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif"
     output_path = f"../../../output/{config.TASK_NAME}/carbon_price/0_base_data"
-    data = get_data_RES(f"../../../output/{config.TASK_NAME}/{input_files_0[0]}")
+    data = get_data_RES(config.TASK_NAME, input_files_0[0])
 
     cost_file_parts = ['total_cost', 'cost_agricultural_management', 'cost_non_ag',
                        'transition_cost_ag2non_ag_amortised_diff']

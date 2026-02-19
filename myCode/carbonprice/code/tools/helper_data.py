@@ -11,6 +11,7 @@ from typing import List, Dict, Any
 from contextlib import suppress
 from pathlib import Path
 import math
+import cf_xarray as cfxr
 
 
 from tools.tools import get_path, get_year, save2nc, filter_all_from_dims
@@ -51,7 +52,6 @@ def summarize_to_type(
         da0 = filter_all_from_dims(da0)
         if keep_dim not in da0.dims:
             raise ValueError(f"示例文件中不包含 keep_dim='{keep_dim}'，实际维度为 {da0.dims}")
-        type_coord = da0.coords[keep_dim].values
 
     # --- 2) 逐 scenario 处理 ---
 
@@ -69,7 +69,6 @@ def summarize_to_type(
                 da_processed = da.sum(dim=sum_dims, keep_attrs=False) / scale
                 if keep_dim != "type":
                     da_processed = da_processed.rename({keep_dim: "type"})
-                da_processed = da_processed.sel(type=type_coord)
                 da_processed = da_processed.expand_dims({"Year": [y], "scenario": [s]})
                 da_processed.name = var_name
                 da_processed = da_processed.load()  # 读入内存，关闭文件句柄
@@ -92,7 +91,7 @@ def summarize_to_type(
             if len(valid_year_results) == 0:
                 continue
 
-            da_year = xr.concat(valid_year_results, dim="Year")
+            da_year = xr.concat(valid_year_results, dim="Year", join='outer', fill_value=0)
             per_scenario.append(da_year)  # 读入内存，关闭文件句柄
 
     else:
@@ -101,7 +100,7 @@ def summarize_to_type(
                 delayed(process_single_file)(s, y) for y in years
             )
             valid_year_results = [r for r in year_results if r is not None]
-            return xr.concat(valid_year_results, dim="Year") if valid_year_results else None
+            return xr.concat(valid_year_results, dim="Year", join='outer', fill_value=0) if valid_year_results else None
 
         per_scenario = [process_scenario(s,n_jobs) for s in scenarios]
         per_scenario = [r for r in per_scenario if r is not None]
@@ -325,6 +324,7 @@ def summarize_to_category(
 
     print(f"✅ 保存 NetCDF: {out_nc} | shape={da.shape} dims={da.dims}")
     return da
+
 
 def build_profit_and_cost_nc(
     economic_da: xr.DataArray,
