@@ -455,7 +455,7 @@ def get_destocked_from_ag(
     removal_cost_r = np.nan_to_num(removal_cost_r)
     removal_cost_r = tools.amortise(removal_cost_r * data.REAL_AREA)
  
-    est_costs_r = removal_cost_r + trans_cost_r
+    est_costs_r = removal_cost_r # + trans_cost_r
         
     # Water costs; Assume destocked land is dryland
     w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA

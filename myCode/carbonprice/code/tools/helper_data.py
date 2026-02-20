@@ -110,7 +110,7 @@ def summarize_to_type(
 
     # --- 3) 按 scenario 拼接 ---
     print("Concatenating scenarios...")
-    out_da = xr.concat(per_scenario, dim="scenario")
+    out_da = xr.concat(per_scenario, dim="scenario", join='outer', fill_value=0)
     out_da = out_da.transpose("scenario", "Year", "type")
     out_da.name = var_name
     out_da = out_da.astype(dtype, copy=False)
@@ -372,7 +372,7 @@ def build_profit_and_cost_nc(
         (-pick("Transition(ag→non-ag) amortised cost")).expand_dims(type=["Transition(ag→non-ag) amortised profit"]),
     ]
 
-    profit_da = xr.concat(profit_list, dim="type")
+    profit_da = xr.concat(profit_list, dim="type", join='outer', fill_value=0)
     profit_da.name = "data"
 
     # 如果需要固定维度顺序（比如 scenario, year, type）：
@@ -391,7 +391,7 @@ def build_profit_and_cost_nc(
     diffs = []
     for scen in input_files_1:
         diffs.append(profit_da.sel(scenario=baseline) - profit_da.sel(scenario=scen))
-    carbon_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(carbon_names))
+    carbon_cost = xr.concat(diffs, dim="policy", join='outer', fill_value=0).assign_coords(policy=list(carbon_names))
 
     # B) carbon_bio：input_files_1[i] - input_files_2[idx]
     if len(input_files_2) % len(input_files_1) != 0:
@@ -403,14 +403,14 @@ def build_profit_and_cost_nc(
         i = k // bio_nums
         scen1 = input_files_1[i]
         diffs.append(profit_da.sel(scenario=scen1) - profit_da.sel(scenario=scen2))
-    carbon_bio_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(carbon_bio_names))
+    carbon_bio_cost = xr.concat(diffs, dim="policy", join='outer', fill_value=0).assign_coords(policy=list(carbon_bio_names))
 
     # C) counter：input_files_2 的前 bio_nums 个与 baseline
     diffs = []
     for i in range(len(counter_carbon_bio_names)):
         scen2 = input_files_2[i]
         diffs.append(profit_da.sel(scenario=baseline) - profit_da.sel(scenario=scen2))
-    counter_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(counter_carbon_bio_names))
+    counter_cost = xr.concat(diffs, dim="policy", join='outer', fill_value=0).assign_coords(policy=list(counter_carbon_bio_names))
 
     # 可选把 Total 作为额外的 type 追加
     def append_total(da, add_total=add_total):
@@ -418,7 +418,7 @@ def build_profit_and_cost_nc(
             return da
         total = da.sum(dim="type")
         total = total.expand_dims({"type": ["Total"]})
-        da2 = xr.concat([da, total], dim="type")
+        da2 = xr.concat([da, total], dim="type", join='outer', fill_value=0)
         return da2
 
     carbon_cost = append_total(carbon_cost)
@@ -442,7 +442,7 @@ def build_profit_and_cost_nc(
     counter_cost_sc  = tag_and_rename(counter_cost,  "counter_carbon_bio")
 
     # 合并：(scenario, Year, type)
-    all_cost = xr.concat([carbon_cost_sc, carbon_bio_sc, counter_cost_sc], dim="scenario")
+    all_cost = xr.concat([carbon_cost_sc, carbon_bio_sc, counter_cost_sc], dim="scenario", join='outer', fill_value=0)
     type_vals = all_cost.coords["type"].values
     new_type_vals = [v.replace(" profit", "") for v in type_vals]
     all_cost = all_cost.assign_coords(type=("type", new_type_vals))
@@ -502,7 +502,7 @@ def build_sol_profit_and_cost_nc(
         (-pick("Transition(ag→non-ag) amortised cost")).expand_dims(type=["Transition(ag→non-ag) amortised profit"]),
     ]
 
-    profit_da = xr.concat(profit_list, dim="type")
+    profit_da = xr.concat(profit_list, dim="type", join='outer', fill_value=0)
     profit_da.name = "data"
 
     # 如果需要固定维度顺序（比如 scenario, year, type）：
@@ -521,7 +521,7 @@ def build_sol_profit_and_cost_nc(
     diffs = []
     for scen in input_files_1:
         diffs.append(profit_da.sel(scenario=baseline) - profit_da.sel(scenario=scen))
-    carbon_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(carbon_names))
+    carbon_cost = xr.concat(diffs, dim="policy", join='outer', fill_value=0).assign_coords(policy=list(carbon_names))
 
     # B) carbon_bio：input_files_1[i] - input_files_2[idx]
     if len(input_files_2) % len(input_files_1) != 0:
@@ -533,14 +533,14 @@ def build_sol_profit_and_cost_nc(
         i = k // bio_nums
         scen1 = input_files_1[i]
         diffs.append(profit_da.sel(scenario=scen1) - profit_da.sel(scenario=scen2))
-    carbon_bio_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(carbon_bio_names))
+    carbon_bio_cost = xr.concat(diffs, dim="policy", join='outer', fill_value=0).assign_coords(policy=list(carbon_bio_names))
 
     # C) counter：input_files_2 的前 bio_nums 个与 baseline
     diffs = []
     for i in range(len(counter_carbon_bio_names)):
         scen2 = input_files_2[i]
         diffs.append(profit_da.sel(scenario=baseline) - profit_da.sel(scenario=scen2))
-    counter_cost = xr.concat(diffs, dim="policy").assign_coords(policy=list(counter_carbon_bio_names))
+    counter_cost = xr.concat(diffs, dim="policy", join='outer', fill_value=0).assign_coords(policy=list(counter_carbon_bio_names))
 
     # 可选把 Total 作为额外的 type 追加
     def append_total(da, add_total=add_total):
@@ -548,7 +548,7 @@ def build_sol_profit_and_cost_nc(
             return da
         total = da.sum(dim="type")
         total = total.expand_dims({"type": ["Total"]})
-        da2 = xr.concat([da, total], dim="type")
+        da2 = xr.concat([da, total], dim="type", join='outer', fill_value=0)
         return da2
 
     carbon_cost = append_total(carbon_cost)
@@ -572,7 +572,7 @@ def build_sol_profit_and_cost_nc(
     counter_cost_sc  = tag_and_rename(counter_cost,  "counter_carbon_bio")
 
     # 合并：(scenario, Year, type)
-    all_cost = xr.concat([carbon_cost_sc, carbon_bio_sc, counter_cost_sc], dim="scenario")
+    all_cost = xr.concat([carbon_cost_sc, carbon_bio_sc, counter_cost_sc], dim="scenario", join='outer', fill_value=0)
     type_vals = all_cost.coords["type"].values
     new_type_vals = [v.replace(" profit", "") for v in type_vals]
     all_cost = all_cost.assign_coords(type=("type", new_type_vals))
@@ -639,9 +639,9 @@ def make_prices_nc(output_names):
         bio_list.append(_collapse_to_year(bio_da, scen))
 
     # 合并所有情景
-    cost_all = xr.concat(cost_list, dim='scenario')
-    carbon_all = xr.concat(car_list, dim='scenario')
-    bio_all = xr.concat(bio_list, dim='scenario')
+    cost_all = xr.concat(cost_list, dim='scenario', join='outer', fill_value=0)
+    carbon_all = xr.concat(car_list, dim='scenario', join='outer', fill_value=0)
+    bio_all = xr.concat(bio_list, dim='scenario', join='outer', fill_value=0)
 
 
     carbon_price = cost_all / carbon_all
@@ -706,9 +706,9 @@ def make_sol_prices_nc(output_names):
         bio_list.append(_collapse_to_year(bio_da, scen))
 
     # 合并所有情景
-    cost_all = xr.concat(cost_list, dim='scenario')
-    carbon_all = xr.concat(car_list, dim='scenario')
-    bio_all = xr.concat(bio_list, dim='scenario')
+    cost_all = xr.concat(cost_list, dim='scenario', join='outer', fill_value=0)
+    carbon_all = xr.concat(car_list, dim='scenario', join='outer', fill_value=0)
+    bio_all = xr.concat(bio_list, dim='scenario', join='outer', fill_value=0)
 
 
     carbon_price = cost_all / carbon_all
