@@ -586,6 +586,11 @@ class LogToFile:
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
         self.mode = mode
+        
+        if not os.path.exists(os.path.dirname(self.log_path_stdout)):
+            os.makedirs(os.path.dirname(self.log_path_stdout))
+        if not os.path.exists(os.path.dirname(self.log_path_stderr)):
+            os.makedirs(os.path.dirname(self.log_path_stderr))
 
     def __call__(self, func):
         @functools.wraps(func)

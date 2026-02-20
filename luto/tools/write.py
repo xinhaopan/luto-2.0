@@ -2384,7 +2384,7 @@ def write_water(data: Data, yr_cal, path):
         ).sum(['cell']
         ).to_dataframe('Water Net Yield (ML)'
         ).reset_index(
-        ).assign(Type='Agricultural Landuse'
+        ).assign(Type='Agricultural land-use'
         ).infer_objects(copy=False
         ).replace({'region_water': data.WATER_REGION_NAMES})
     non_ag_wny = xr_non_ag_wny.groupby('region_water'
@@ -2406,7 +2406,7 @@ def write_water(data: Data, yr_cal, path):
         ).rename(columns={
             'region_water': 'Region',
             'lu':'Landuse',
-            'am':'Agri-Management',
+            'am':'Agricultural Management',
             'lm':'Water Supply'}
         ).infer_objects(copy=False
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
@@ -2460,7 +2460,7 @@ def write_water(data: Data, yr_cal, path):
 
     # Water net yield for watershed regions
     wny_inside_luto_sum = wny_inside_luto\
-        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
+        .query('`Water Supply` != "ALL" and `Agricultural Management` != "ALL"')\
         .groupby('Region')[['Water Net Yield (ML)']]\
         .sum()
     wny_inside_luto_sum = xr.DataArray(
@@ -2496,7 +2496,7 @@ def write_water(data: Data, yr_cal, path):
         ).sum(['cell']
         ).to_dataframe('Water Net Yield (ML)'
         ).reset_index(
-        ).assign(Type='Agricultural Landuse'
+        ).assign(Type='Agricultural land-use'
         ).infer_objects(copy=False
         ).replace({'region_NRM': data.WATER_REGION_NAMES})
     non_ag_wny = (non_ag_w_rk * non_ag_dvar_rj
@@ -2520,7 +2520,7 @@ def write_water(data: Data, yr_cal, path):
         ).rename(columns={
             'region_water': 'Region',
             'lu':'Landuse',
-            'am':'Agri-Management',
+            'am':'Agricultural Management',
             'lm':'Water Supply'}
         ).infer_objects(copy=False
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
@@ -2624,13 +2624,13 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).assign(Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] / base_yr_score) * 100) 
-        ).assign(Type='Agricultural Landuse', Year=yr_cal)
+        ).assign(Type='Agricultural land-use', Year=yr_cal)
     priority_ag_AUS = (xr_priority_ag
         ).sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).assign(Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] / base_yr_score) * 100) 
-        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA'
+        ).assign(Type='Agricultural land-use', Year=yr_cal, region='AUSTRALIA'
         ).query('`Area Weighted Score (ha)` > 1')
 
     priority_non_ag_region = (xr_priority_non_ag
@@ -2677,7 +2677,7 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
         ).rename(columns={
             'lu':'Landuse',
             'lm':'Water_supply',
-            'am':'Agri-Management',
+            'am':'Agricultural Management',
             'Relative_Contribution_Percentage':'Contribution Relative to Base Year Level (%)'}
         ).reset_index(drop=True
         ).infer_objects(copy=False
@@ -2826,7 +2826,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).assign(Relative_Contribution_Percentage = lambda x:((x['Area Weighted Score (ha)'] / total_priority_degraded_area) * 100)
-        ).assign(Type='Agricultural Landuse', Year=yr_cal)
+        ).assign(Type='Agricultural land-use', Year=yr_cal)
     GBF2_score_non_ag_region = xr_gbf2_non_ag.groupby('region'
         ).sum(['cell']
         ).to_dataframe('Area Weighted Score (ha)'
@@ -2845,7 +2845,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).assign(Relative_Contribution_Percentage = lambda x:((x['Area Weighted Score (ha)'] / total_priority_degraded_area) * 100)
-        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA')
+        ).assign(Type='Agricultural land-use', Year=yr_cal, region='AUSTRALIA')
     GBF2_score_non_ag_AUS = xr_gbf2_non_ag.sum(['cell']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
@@ -2866,7 +2866,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     if GBF2_score_ag.empty:
         GBF2_score_ag.loc[0] = 0
         GBF2_score_ag = GBF2_score_ag.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_score_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural Landuse', 'Apples', yr_cal]
+        GBF2_score_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural land-use', 'Apples', yr_cal]
 
     if GBF2_score_non_ag.empty:
         GBF2_score_non_ag.loc[0] = 0
@@ -2887,7 +2887,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).rename(columns={
             'lu':'Landuse',
             'lm':'Water_supply',
-            'am':'Agri-Management',
+            'am':'Agricultural Management',
             'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)',
             'Priority_Target':'Priority Target (%)'}
         ).reset_index(drop=True
@@ -3040,7 +3040,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         ).reset_index(
         ).merge(veg_base_score_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal)
+        ).assign(Type='Agricultural land-use', Year=yr_cal)
 
     GBF3_score_am_region = xr_gbf3_am.groupby('region'
         ).sum('cell'
@@ -3065,7 +3065,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         ).reset_index(
         ).merge(veg_base_score_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA')
+        ).assign(Type='Agricultural land-use', Year=yr_cal, region='AUSTRALIA')
 
     GBF3_score_am_AUS = xr_gbf3_am.sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
@@ -3102,7 +3102,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         ).rename(columns={
             'lu':'Landuse',
             'lm':'Water_supply',
-            'am':'Agri-Management',
+            'am':'Agricultural Management',
             'group':'Vegetation Group',
             'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'}
         ).reset_index(drop=True
@@ -3255,7 +3255,7 @@ def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
         ).reset_index(
         ).merge(bioregion_base_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal)
+        ).assign(Type='Agricultural land-use', Year=yr_cal)
 
     GBF3_IBRA_score_am_region = xr_gbf3_ibra_am.groupby('region'
         ).sum('cell'
@@ -3280,7 +3280,7 @@ def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
         ).reset_index(
         ).merge(bioregion_base_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA')
+        ).assign(Type='Agricultural land-use', Year=yr_cal, region='AUSTRALIA')
 
     GBF3_IBRA_score_am_AUS = xr_gbf3_ibra_am.sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
@@ -3317,7 +3317,7 @@ def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
         ).rename(columns={
             'lu':'Landuse',
             'lm':'Water_supply',
-            'am':'Agri-Management',
+            'am':'Agricultural Management',
             'group':'IBRA Bioregion',
             'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'}
         ).reset_index(drop=True
@@ -3474,7 +3474,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal)
+        ).assign(Type='Agricultural land-use', Year=yr_cal)
         
     GBF4_score_am_region = xr_gbf4_snes_am.groupby('region'
         ).sum('cell').to_dataframe('Area Weighted Score (ha)'
@@ -3498,7 +3498,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA')
+        ).assign(Type='Agricultural land-use', Year=yr_cal, region='AUSTRALIA')
         
     GBF4_score_am_AUS = xr_gbf4_snes_am.sum('cell').to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
@@ -3532,7 +3532,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).rename(columns={
             'lu':'Landuse',
             'lm':'Water_supply',
-            'am':'Agri-Management',
+            'am':'Agricultural Management',
             'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)',
             'Target_by_Percent':'Target by Percent (%)'}).reset_index(drop=True
         ).infer_objects(copy=False
@@ -3691,7 +3691,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal)
+        ).assign(Type='Agricultural land-use', Year=yr_cal)
 
     GBF4_score_am_region = xr_gbf4_ecnes_am.groupby('region'
         ).sum('cell').to_dataframe('Area Weighted Score (ha)'
@@ -3713,7 +3713,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA')
+        ).assign(Type='Agricultural land-use', Year=yr_cal, region='AUSTRALIA')
 
     GBF4_score_am_AUS = xr_gbf4_ecnes_am.sum('cell').to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
@@ -3744,7 +3744,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).rename(columns={
             'lu':'Landuse',
             'lm':'Water_supply',
-            'am':'Agri-Management',
+            'am':'Agricultural Management',
             'Relative_Contribution_Percentage': 'Contribution Relative to Pre-1750 Level (%)',
             'Target_by_Percent': 'Target by Percent (%)'}
         ).reset_index(drop=True
@@ -3900,7 +3900,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal)
+        ).assign(Type='Agricultural land-use', Year=yr_cal)
         
     GBF8_scores_groups_am_region = xr_gbf8_groups_am.groupby('region'
         ).sum('cell'
@@ -3925,7 +3925,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA')
+        ).assign(Type='Agricultural land-use', Year=yr_cal, region='AUSTRALIA')
         
     GBF8_scores_groups_am_AUS = xr_gbf8_groups_am.sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
@@ -3959,7 +3959,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
             'group': 'Group',
             'lu': 'Landuse',
             'lm': 'Water_supply',
-            'am': 'Agri-Management',
+            'am': 'Agricultural Management',
             'Relative_Contribution_Percentage': 'Contribution Relative to Pre-1750 Level (%)'}
         ).reset_index(drop=True
         ).infer_objects(copy=False
@@ -4123,7 +4123,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal)
+        ).assign(Type='Agricultural land-use', Year=yr_cal)
 
     GBF8_scores_species_am_region = xr_gbf8_species_am.groupby('region'
         ).sum('cell'
@@ -4148,7 +4148,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA')
+        ).assign(Type='Agricultural land-use', Year=yr_cal, region='AUSTRALIA')
 
     GBF8_scores_species_am_AUS = xr_gbf8_species_am.sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
@@ -4183,7 +4183,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
             'species': 'Species',
             'lu': 'Landuse',
             'lm': 'Water_supply',
-            'am': 'Agri-Management',
+            'am': 'Agricultural Management',
             'Relative_Contribution_Percentage': 'Contribution Relative to Pre-1750 Level (%)'}
         ).reset_index(drop=True
         ).infer_objects(copy=False

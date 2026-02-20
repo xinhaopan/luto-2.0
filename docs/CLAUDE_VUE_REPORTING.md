@@ -142,10 +142,10 @@ All reporting views follow the progressive selection pattern:
 
 - **Chart Data** (when loaded):
   - `BIO_quality_overview_1_Type`: `Region → [series]` (always loaded - simplified overview)
-  - `BIO_GBF2_overview_1_Type`: `Region → [series]` (conditional - Agricultural Landuse, Agricultural Management, Non-Agricultural Land-use)
+  - `BIO_GBF2_overview_1_Type`: `Region → [series]` (conditional - Agricultural land-use, Agricultural Management, Non-Agricultural Land-use)
   - `BIO_GBF2_split_Ag_1_Landuse`: `Region → [series]` (conditional - simplified, no Water/AgMgt levels)
   - `BIO_GBF2_split_Am_1_Landuse`: `Region → [series]` (conditional - simplified, no Water/AgMgt levels)
-  - `BIO_GBF2_split_Am_2_Agri-Management`: `Region → [series]` (conditional - with AgMgt categories: `"ALL"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`)
+  - `BIO_GBF2_split_Am_2_Agricultural Management`: `Region → [series]` (conditional - with AgMgt categories: `"ALL"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`)
   - `BIO_GBF2_split_NonAg_1_Landuse`: `Region → [series]` (conditional - simplified)
   - `BIO_GBF3_NVIS_*`, `BIO_GBF3_IBRA_*`, `BIO_GBF4_*`, `BIO_GBF8_*`: Similar structures for other GBF targets (conditional loading)
 
@@ -212,7 +212,7 @@ All reporting views follow the progressive selection pattern:
 3. **Special Cases**:
    - Economics: Handle dual Cost/Revenue series in same array with combined watcher pattern
    - NonAg: Handle simplified structures without Water/AgMgt levels
-   - Biodiversity: **Dynamic/Conditional Loading** - GBF data conditionally loaded based on scenario settings; Quality data always available; mixed structures where most use simplified `Region → [series]`, but `BIO_*_Am_2_Agri-Management` files have AgMgt categories; map data follows standard patterns with some NonAg files simplified; views must adapt to potentially missing GBF data
+   - Biodiversity: **Dynamic/Conditional Loading** - GBF data conditionally loaded based on scenario settings; Quality data always available; mixed structures where most use simplified `Region → [series]`, but `BIO_*_Am_2_Agricultural Management` files have AgMgt categories; map data follows standard patterns with some NonAg files simplified; views must adapt to potentially missing GBF data
 4. **UI Conditions**: Use proper `v-if` conditions based on category selections
 5. **Data Access**: Use optional chaining (`?.`) for safe property access
 6. **Code Consistency**: All views must follow the same cascade watcher pattern for maintainability

@@ -591,9 +591,9 @@ reprojected_array, transform = reproject(
 
 ```python
 # Convert float values to RGBA color using legend mapping
-from luto.tools.report.data_tools import get_map_legend, hex_color_to_numeric
+from luto.tools.report.data_tools import build_map_legend, hex_color_to_numeric
 
-colors = get_map_legend()  # Returns color legend dictionary for all map types
+colors = build_map_legend()  # Returns color legend dictionary for all map types
 color_hex = colors['float']['legend']  # Get float value color mapping
 
 # Map float values to RGBA (Red, Green, Blue, Alpha)
