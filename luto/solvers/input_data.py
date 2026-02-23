@@ -137,7 +137,7 @@ class SolverInputData:
 
     @property
     def n_ag_lus(self):
-        # Number of agricultural landuses
+        # Number of Agricultural land-uses
         return self.ag_g_mrj.shape[2]
 
     @property

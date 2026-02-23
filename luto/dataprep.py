@@ -67,10 +67,10 @@ def create_new_dataset():
     renewable_energy_inpath = 'N:/Data-Master/Renewable Energy/processed'
     
 
-
     # Set data output paths
     raw_data = RAW_DATA + '/' # '../raw_data/'
     outpath = INPUT_DIR + '/'
+
 
     # Delete the data folders' contents
     for file in os.scandir(outpath):
@@ -207,9 +207,10 @@ def create_new_dataset():
     
     # Copy renewable energy data files
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_targets.csv', outpath + 'renewable_targets.csv')
-    shutil.copyfile(f'{renewable_energy_inpath}/renewable_elec_price_AUD_MWh.csv', outpath + 'renewable_elec_price_AUD_MWh.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_layers_1D.nc', outpath + 'renewable_energy_layers_1D.nc')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_bundle.csv', outpath + 'renewable_energy_bundle.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_solar.csv', outpath + 'renewable_price_AUD_MWh_solar.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_wind.csv', outpath + 'renewable_price_AUD_MWh_wind.csv')
 
 
 

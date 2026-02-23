@@ -126,8 +126,7 @@ DYNAMIC_PRICE = False
 RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2010,2051,10))
-
+SIM_YEARS =  list(range(2010, 2051, 1))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -201,9 +200,9 @@ BARRIER_CONVERGENCE_TOLERANCE = 1e-5      # Range from 1e-2 to 1e-8 (default), t
 CROSSOVER = 0
 
 # Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
-SCALE_FLAG = -1     # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
+SCALE_FLAG = 0      # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
 NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
-BARHOMOGENOUS = 1   # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
+BARHOMOGENOUS = -1   # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = min(32, os.cpu_count())
@@ -382,7 +381,7 @@ AG_MANAGEMENTS_TO_LAND_USES = {
                                 # Livestock
                                 'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
                                 # Cropping:
-                                'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'],
+                                'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'], 
     'Onshore Wind':             [#Unallocated lands
                                 'Unallocated - modified land',
                                 # Livestock
@@ -391,7 +390,7 @@ AG_MANAGEMENTS_TO_LAND_USES = {
                                 'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
                                 # Intensive Cropping:
                                 'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']
-                                }
+                                }                                
 
 
 AG_MANAGEMENTS = {
@@ -403,8 +402,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': False,
-    'Onshore Wind':False,
+    'Utility Solar PV': None,   # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
+    'Onshore Wind': None,       # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -422,8 +421,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': False,
-    'Onshore Wind': False,
+    'Utility Solar PV': True,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
+    'Onshore Wind': True,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural
@@ -463,6 +462,15 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 # ---------------------------------------------------------------------------- #
 RENEWABLE_ENERGY_CONSTRAINTS = 'off'         # 'on' or 'off'
 
+if RENEWABLE_ENERGY_CONSTRAINTS == 'on':
+    AG_MANAGEMENTS['Utility Solar PV'] = True
+    AG_MANAGEMENTS['Onshore Wind'] = True
+elif RENEWABLE_ENERGY_CONSTRAINTS == 'off':
+    AG_MANAGEMENTS['Utility Solar PV'] = False
+    AG_MANAGEMENTS['Onshore Wind'] = False
+else:
+    raise ValueError("Invalid value for RENEWABLE_ENERGY_CONSTRAINTS. Must be 'on' or 'off'.")
+
 RENEWABLES_OPTIONS = [
     'Utility Solar PV',
     'Onshore Wind'
@@ -474,15 +482,15 @@ The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` 
 One of 'CNS25 - Accelerated Transition' or 'CNS25 - Current Targets', 
 '''
 
-RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; currently (20260205) only support STATE.
+RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
 '''
 The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
 Options include "STATE" or "NRM". Currently (20260205) only support STATE.
 '''
 
-RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR = {
+INSTALL_CAPACITY_MW_HA = {
     "Utility Solar PV": 0.45,
-    "Onshore Wind": 0.4,
+    "Onshore Wind": 0.04,
 }
 '''
 The per/ha capacity (Mw/ha) for each renewable energy management type.
@@ -583,6 +591,22 @@ The weight of the deviations from target in the objective function.
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'                     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off climate change impact on water yields.
+'''
+    When 'on', model will consider water yield change driven by climate change.
+
+    Note the cxtreme CCI target relaxation (see water.py:get_water_target_inside_LUTO_by_CCI):
+    1. Compute extreme CCI delta per region: the minimum water yield change across all SIM_YEARS
+       (via get_water_delta_by_extreme_CCI_for_whole_region), assuming land use stays constant,
+       combining inside-LUTO Ag-land and outside-LUTO CCI deltas.
+    2. Compute extreme scenario water availability per region:
+           wny_extreme_CCI = wny_inside_LUTO + wny_outside_LUTO - wreq_domestic + CCI_extreme_stress
+       where wreq_domestic is domestic/industrial water demand (positive), and CCI_extreme_stress
+       is the worst-case yield reduction from step 1 (negative).
+    3. Compare against historical target: wny_hist_target = hist_level * WATER_STRESS
+    4. If wny_extreme_CCI < wny_hist_target, the target is relaxed to wny_extreme_CCI to avoid
+       solver infeasibility. The inside-LUTO target = relaxed_target - wny_outside_LUTO.
+       Otherwise, the standard target applies: wny_hist_target - wny_outside_LUTO.
+'''
 
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
@@ -613,7 +637,20 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
     https://chinawaterrisk.org/resources/analysis-reviews/aqueduct-global-water-stress-rankings/ 
 """
 
-WATER_STRESS = 0.6                                      # Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield
+WATER_STRESS = 0.6
+'''
+    Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield.
+    The safe and just Earth system boundaries suggests a water stress of. We tried but it would lead to infeasibility
+    issues in the model.
+
+    There are two notes for calculating the water yield targets at watershed regions level:
+     - The domestic/industrial water use is subtracted from total available water when computing
+       the extreme climate scenario yield: wny_extreme_CCI = inside + outside - domestic + CCI_extreme_stress
+     - If the extreme climate change scenario makes a region's water yield fall below the historical
+       target (hist_level * WATER_STRESS), the target is relaxed to the extreme scenario level to
+       avoid infeasibility. The inside-LUTO target is then derived by subtracting the outside-LUTO
+       contribution: wny_inside_LUTO_target = raw_target - wny_outside_LUTO
+'''
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water can cause infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1
@@ -657,7 +694,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 

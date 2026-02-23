@@ -34,6 +34,7 @@ from luto import settings
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
+from luto.tools.inspect_iis import analyze_iis
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -190,16 +191,20 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
             print(f'Warning: The results are still written to disk, but will not be optimal.')
             print('!' * 100)
 
-            # 🎯 Step 1: Compute the IIS
-            luto_solver.gurobi_model.computeIIS()
+            # Save model and compute IIS for debugging
+            model_path = f"{data.path}/debug_model_{base_year}_{target_year}.mps"
+            luto_solver.gurobi_model.write(model_path)
+            print(f"Saved Gurobi model to {model_path}")
 
-            # 📄 Step 2: Write the IIS to a file for easy analysis
-            # This is the most useful step. The .ilp file will contain ONLY the conflicting constraints.
-            iis_filename = f"model_iis_{target_year}.ilp"
-            luto_solver.gurobi_model.write(iis_filename)
+            if luto_solver.gurobi_model.Status == GRB.INFEASIBLE:
+                print("Computing IIS (Irreducible Inconsistent Subsystem)...")
+                luto_solver.gurobi_model.computeIIS()
+                iis_path = f"{data.path}/debug_model_{base_year}_{target_year}.ilp"
+                luto_solver.gurobi_model.write(iis_path)
+                print(f"Analyzed IIS and saved to {iis_path}")
+                analyze_iis(iis_path, data)
 
             print('\n')
-            
             break
 
 
