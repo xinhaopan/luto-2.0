@@ -32,7 +32,6 @@ import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.agricultural.water as ag_water
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
-from luto.tools.spatializers import upsample_array
 
 from collections import defaultdict
 from typing import Any, Literal, Optional

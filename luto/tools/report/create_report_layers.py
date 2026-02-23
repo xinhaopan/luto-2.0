@@ -36,6 +36,7 @@ from luto.tools.report.data_tools import (
     tuple_dict_to_nested,
 )
 from luto.tools.report.data_tools.parameters import (
+    COLOR_AG,
     COLOR_AM, 
     COLOR_NON_AG, 
     COLOR_LUMAP, 
@@ -177,7 +178,7 @@ def save_report_layer(raw_data_dir:str):
     files = files.query(f'Year.isin({sorted(settings.SIM_YEARS)})')
     
     # Get legend info
-    legend_ag = build_map_legend(COLOR_LUMAP)
+    legend_ag = build_map_legend(COLOR_AG)
     legend_am = build_map_legend(COLOR_AM)
     legend_non_ag = build_map_legend(COLOR_NON_AG)
     legend_lumap =  build_map_legend(COLOR_LUMAP)

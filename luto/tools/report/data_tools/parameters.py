@@ -281,7 +281,7 @@ COLORS_PLOT = {
     # --- Land-use types ---
     'Agricultural land-use':                    "#7EB87A",
     'Agricultural Management':                  "#D5F100",
-    'Non-Agricultural Land-use':                "#A0A0A0",
+    'Non-Agricultural Land-use':                "#8C8888",
 
     # --- GHG overview ---
     'Unallocated natural to modified':          "#C8A876",
