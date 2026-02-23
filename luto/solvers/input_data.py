@@ -119,6 +119,7 @@ class SolverInputData:
     limits: dict                                                        # Targets to use.
     desc2aglu: dict                                                     # Map of agricultural land use descriptions to codes.
     real_area: np.ndarray                                               # Area of each cell, indexed by cell (r)
+    ag_mask_proportion_r: np.ndarray                                    # Initial (2010) total agricultural land proportion per cell (r).
                 
     @property
     def ncms(self):
@@ -955,6 +956,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     limits=get_limits(data, target_year, scale_factors)
     desc2aglu=data.DESC2AGLU
     real_area=data.REAL_AREA
+    ag_mask_proportion_r=data.AG_MASK_PROPORTION_R
 
     land_use_culling.apply_agricultural_land_use_culling(
         ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj
@@ -1027,5 +1029,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         pr2cm_cp,
         limits,
         desc2aglu,
-        real_area
+        real_area,
+        ag_mask_proportion_r
     )

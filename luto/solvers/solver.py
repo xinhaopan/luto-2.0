@@ -209,6 +209,7 @@ class LutoSolver:
                     ub=1, name=f"X_ag_irr_{j}_{r}".replace(" ", "_")
                 )
 
+
     def _setup_non_ag_vars(self):
         print("│   ├── setting up decision variables for non-agricultural land uses...")
         self.X_non_ag_vars_kr = np.zeros(
@@ -461,16 +462,18 @@ class LutoSolver:
         x_ag_irr_vars = self.X_ag_irr_vars_jr[:, cells]
         x_non_ag_vars = self.X_non_ag_vars_kr[:, cells]
 
-        # Create an array indexed by cell that contains the sums of each cell's variables.
-        # Then, loop through the array and add the constraint that each expression must equal 1.
+        # Constrain total (ag + non-ag) land per cell to equal the initial (2010) agricultural proportion. 
+        #   E.g., under resfactoring, a cell may only be 25% agricultural in the base year, 
+        #   so total allocation must equal that fraction.
+        ag_mask = self._input_data.ag_mask_proportion_r
         X_sum_r = (
             x_ag_dry_vars.sum(axis=0)
             + x_ag_irr_vars.sum(axis=0)
             + x_non_ag_vars.sum(axis=0)
         )
-        for r, expr in zip(cells, X_sum_r):
+        for r, expr, ub in zip(cells, X_sum_r, ag_mask[cells]):
             self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(
-                expr == 1, 
+                expr == ub,
                 name=f"const_cell_usage_{r}"
             )
 

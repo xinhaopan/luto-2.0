@@ -429,8 +429,15 @@ class Data:
         
         # Initial (2010) ag decision variable (X_mrj).
         self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "lmmap.h5")).to_numpy()
-        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj() 
+        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj()
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
+        
+        # Initial (2010) maximum ag dvar proportion
+        #   For example, if a cell has 0.2 of ag land-use at beginning,
+        #   then, the sum(ag + non_ag) in the following years should be <= 0.2.
+        #   This is used as a constraint in the solver to prevent the model 
+        #   from allocating more agricultural land than the initial proportion.
+        self.AG_MASK_PROPORTION_R =  self.AG_L_MRJ.sum(0).sum(1)
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
         self.LU_RESFACTOR_CELLS = pd.DataFrame({
