@@ -42,3 +42,12 @@ anthropic.yml
 *.log
 *.7z
 nul
+
+# Xinhao
+myCode/draw_all/output/**
+myCode/tasks_run/rsync/from_HPC/temp_0_log_file.txt
+myCode/tasks_run/rsync/from_NCI/temp_0_log_file.txt
+myCode/draw_all/code/Assets/basemap.tif
+myCode/draw_all/code/Assets/shp/output_shapefile.shp
+.vscode-upload.json
+.claude/settings.local.json

@@ -1512,7 +1512,7 @@ def draw_22_price(
     tick_positions = [year for year in tick_positions if year in x_data]
 
     # ------ Carbon图（第一行前两个） ------
-    carbon_y = np.concatenate([df.iloc[:, i].values for i in range(2)])
+    carbon_y = np.concatenate([df.iloc[:, i].values for i in range(12)])
     y_carbon_all = get_y_axis_ticks(0, np.nanmax(carbon_y), desired_ticks=desired_ticks)
 
     ax_list = []

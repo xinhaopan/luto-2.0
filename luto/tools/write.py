@@ -204,7 +204,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
 
         delayed(write_files)(data, yr_cal, path_yr),
         delayed(write_quantity_separate_landuse)(data, yr_cal, path_yr),
-        write_files_separate(data, yr_cal, path_yr)
+        delayed(write_files_separate)(data, yr_cal, path_yr),
     ]
 
     return tasks

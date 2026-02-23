@@ -4,18 +4,28 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for run paper 2 without CP">
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for run paper 2 code">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/0_Preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/0_Preprocess.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/luto/data.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/data.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/luto/tools/write.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/tools/write.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/tools/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/tools/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_write_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_write_tasks.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_test.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_F:/Users/s222552331/Work/LUTO2_XH/luto-2.0" value="32HZZwPIJb5L4ZTisGisEcZoD6b" />
+    </persistenceIdMap>
+  </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="1451" />
+    <option name="cachedIndexableFilesCount" value="1437" />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -79,68 +89,68 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.00_am_tif.executor": "Run",
-    "Python.01_Maping all.executor": "Run",
-    "Python.02_Area.executor": "Run",
-    "Python.04_GHG.executor": "Run",
-    "Python.05_Biodiversity.executor": "Run",
-    "Python.06_Transfer Matrix.executor": "Run",
-    "Python.06_Transfer Matrix_all.executor": "Run",
-    "Python.07_S1_Area ag.executor": "Run",
-    "Python.08_Food demand.executor": "Run",
-    "Python.08_Food demand_dry_irr.executor": "Run",
-    "Python.08_S2_Food demand.executor": "Run",
-    "Python.08_S2_Food demand_table.executor": "Run",
-    "Python.09_S3_Water dry_irr.executor": "Run",
-    "Python.09_S3_Water use.executor": "Run",
-    "Python.09_S3_Water use_tables.executor": "Run",
-    "Python.0_Check_status.executor": "Run",
-    "Python.0_Preprocess.executor": "Run",
-    "Python.0_runs_test.executor": "Run",
-    "Python.0_write_tasks.executor": "Run",
-    "Python.10_Area_table.executor": "Run",
-    "Python.12_ag_moves.executor": "Run",
-    "Python.1_draw_original_data.executor": "Run",
-    "Python.1_write_test.executor": "Run",
-    "Python.2_draw_processed_data.executor": "Run",
-    "Python.3.0_draw_average_price.executor": "Run",
-    "Python.3.1_draw_sol_average_price.executor": "Run",
-    "Python.Paper1_tasks.executor": "Run",
-    "Python.Paper1_tasks_aquila.executor": "Run",
-    "Python.Paper1_tasks_aquila_test.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_10.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_5.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_e6.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_e6_1.executor": "Run",
-    "Python.Paper1_tasks_test.executor": "Run",
-    "Python.Paper1_tasks_test_EP.executor": "Run",
-    "Python.Paper1_tasks_test_hard.executor": "Run",
-    "Python.Paper2_tasks.executor": "Run",
-    "Python.Paper2_tasks_test.executor": "Run",
-    "Python.helper_data.executor": "Debug",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "WebServerToolWindowFactoryState": "true",
-    "ai.playground.ignore.import.keys.banner.in.settings": "true",
-    "database.data.extractors.current.export.id": "Comma-separated (CSV)_id",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "F:/Users/s222552331/Work/LUTO2_XH/luto-2.0/myCode/tasks_run",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.00_am_tif.executor&quot;: &quot;Run&quot;,
+    &quot;Python.01_Maping all.executor&quot;: &quot;Run&quot;,
+    &quot;Python.02_Area.executor&quot;: &quot;Run&quot;,
+    &quot;Python.04_GHG.executor&quot;: &quot;Run&quot;,
+    &quot;Python.05_Biodiversity.executor&quot;: &quot;Run&quot;,
+    &quot;Python.06_Transfer Matrix.executor&quot;: &quot;Run&quot;,
+    &quot;Python.06_Transfer Matrix_all.executor&quot;: &quot;Run&quot;,
+    &quot;Python.07_S1_Area ag.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_Food demand.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_Food demand_dry_irr.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_S2_Food demand.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_S2_Food demand_table.executor&quot;: &quot;Run&quot;,
+    &quot;Python.09_S3_Water dry_irr.executor&quot;: &quot;Run&quot;,
+    &quot;Python.09_S3_Water use.executor&quot;: &quot;Run&quot;,
+    &quot;Python.09_S3_Water use_tables.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_Check_status.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_Preprocess.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_runs_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_write_tasks.executor&quot;: &quot;Run&quot;,
+    &quot;Python.10_Area_table.executor&quot;: &quot;Run&quot;,
+    &quot;Python.12_ag_moves.executor&quot;: &quot;Run&quot;,
+    &quot;Python.1_draw_original_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.1_write_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.2_draw_processed_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.3.0_draw_average_price.executor&quot;: &quot;Run&quot;,
+    &quot;Python.3.1_draw_sol_average_price.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_10.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_5.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_e6.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_e6_1.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_test_EP.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_test_hard.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper2_tasks.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper2_tasks_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.helper_data.executor&quot;: &quot;Debug&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;true&quot;,
+    &quot;ai.playground.ignore.import.keys.banner.in.settings&quot;: &quot;true&quot;,
+    &quot;database.data.extractors.current.export.id&quot;: &quot;Comma-separated (CSV)_id&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;F:/Users/s222552331/Work/LUTO2_XH/luto-2.0/myCode/tasks_run&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="F:\Users\s222552331\Work\LUTO2_XH\luto-2.0\myCode\tasks_run" />
@@ -154,8 +164,8 @@
       <recent name="N:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\carbonprice\code" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.0_Preprocess">
-    <configuration name="0_Preprocess" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+  <component name="RunManager" selected="Python.2_draw_processed_data">
+    <configuration name="1_draw_original_data" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="luto-2.0" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -170,7 +180,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="RUN_TOOL" value="" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/carbonprice/code/0_Preprocess.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/carbonprice/code/1_draw_original_data.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -227,6 +237,30 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="3.1_draw_sol_average_price" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="luto-2.0" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/carbonprice/code" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="RUN_TOOL" value="" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/carbonprice/code/3.1_draw_sol_average_price.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="Paper2_tasks_test" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="luto-2.0" />
       <option name="ENV_FILES" value="" />
@@ -251,44 +285,20 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="helper_data" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="luto-2.0" />
-      <option name="ENV_FILES" value="" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/myCode/carbonprice/code/tools" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="RUN_TOOL" value="" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_data.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
     <list>
-      <item itemvalue="Python.Paper2_tasks_test" />
-      <item itemvalue="Python.0_Preprocess" />
+      <item itemvalue="Python.1_draw_original_data" />
       <item itemvalue="Python.2_draw_processed_data" />
       <item itemvalue="Python.3.0_draw_average_price" />
-      <item itemvalue="Python.helper_data" />
+      <item itemvalue="Python.3.1_draw_sol_average_price" />
+      <item itemvalue="Python.Paper2_tasks_test" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.0_Preprocess" />
-        <item itemvalue="Python.Paper2_tasks_test" />
-        <item itemvalue="Python.3.0_draw_average_price" />
-        <item itemvalue="Python.helper_data" />
         <item itemvalue="Python.2_draw_processed_data" />
+        <item itemvalue="Python.3.1_draw_sol_average_price" />
+        <item itemvalue="Python.3.0_draw_average_price" />
+        <item itemvalue="Python.1_draw_original_data" />
+        <item itemvalue="Python.Paper2_tasks_test" />
       </list>
     </recent_temporary>
   </component>
@@ -344,15 +354,9 @@
       <workItem from="1771477010316" duration="9002000" />
       <workItem from="1771486081983" duration="15360000" />
       <workItem from="1771548631599" duration="2710000" />
-      <workItem from="1771563220775" duration="13121000" />
-    </task>
-    <task id="LOCAL-00042" summary="update: draw map area">
-      <option name="closed" value="true" />
-      <created>1759391210224</created>
-      <option name="number" value="00042" />
-      <option name="presentableId" value="LOCAL-00042" />
-      <option name="project" value="LOCAL" />
-      <updated>1759391210224</updated>
+      <workItem from="1771563220775" duration="15308000" />
+      <workItem from="1771837514735" duration="7138000" />
+      <workItem from="1771848841383" duration="68000" />
     </task>
     <task id="LOCAL-00043" summary="Revert: some document">
       <option name="closed" value="true" />
@@ -738,7 +742,15 @@
       <option name="project" value="LOCAL" />
       <updated>1771564739780</updated>
     </task>
-    <option name="localTasksCounter" value="91" />
+    <task id="LOCAL-00091" summary="update for run paper 2 code">
+      <option name="closed" value="true" />
+      <created>1771835030419</created>
+      <option name="number" value="00091" />
+      <option name="presentableId" value="LOCAL-00091" />
+      <option name="project" value="LOCAL" />
+      <updated>1771835030419</updated>
+    </task>
+    <option name="localTasksCounter" value="92" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -766,7 +778,7 @@
                   <entry key="branch">
                     <value>
                       <list>
-                        <option value="master" />
+                        <option value="Jinzhu/jinzhu" />
                       </list>
                     </value>
                   </entry>
@@ -779,7 +791,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update: upload productivity and FLC data" />
     <MESSAGE value="update: FLC_cost_multipliers.xlsx" />
     <MESSAGE value="update: trade predit" />
     <MESSAGE value="update: draw input data for ag2050" />
@@ -804,7 +815,8 @@
     <MESSAGE value="add write_files_separate and fix bug for biodiversity write when turn off" />
     <MESSAGE value="update for run paper 2" />
     <MESSAGE value="update for run paper 2 without CP" />
-    <option name="LAST_COMMIT_MESSAGE" value="update for run paper 2 without CP" />
+    <MESSAGE value="update for run paper 2 code" />
+    <option name="LAST_COMMIT_MESSAGE" value="update for run paper 2 code" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -966,7 +978,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/luto/tools/write.py</url>
-          <line>820</line>
+          <line>795</line>
           <option name="timeStamp" value="281" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -1112,7 +1124,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$test3.coverage" NAME="test3 Coverage Results" MODIFIED="1757995381914" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$data.coverage" NAME="data Coverage Results" MODIFIED="1761452030206" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/luto" />
     <SUITE FILE_PATH="coverage/LUTO2$1_draw_original_data.coverage" NAME="1_draw_original_data Coverage Results" MODIFIED="1760861238933" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
-    <SUITE FILE_PATH="coverage/luto_2_0$1_draw_original_data.coverage" NAME="1_draw_original_data Coverage Results" MODIFIED="1771474496695" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/luto_2_0$1_draw_original_data.coverage" NAME="1_draw_original_data Coverage Results" MODIFIED="1771846187878" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$0_runs_test.coverage" NAME="0_runs_test Coverage Results" MODIFIED="1761452033939" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Preprocess.coverage" NAME="0_Preprocess Coverage Results" MODIFIED="1762415268169" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$06_create_map_data.coverage" NAME="06_create_map_data Coverage Results" MODIFIED="1758792558609" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
@@ -1154,7 +1166,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$mem_test.coverage" NAME="mem_test Coverage Results" MODIFIED="1758007823018" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Preprocess_1.coverage" NAME="0_Preprocess_1 Coverage Results" MODIFIED="1759884472490" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$1_make_excel.coverage" NAME="1_make_excel Coverage Results" MODIFIED="1758091460647" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
-    <SUITE FILE_PATH="coverage/luto_2_0$Paper2_tasks_test.coverage" NAME="Paper2_tasks_test Coverage Results" MODIFIED="1771564532380" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
+    <SUITE FILE_PATH="coverage/luto_2_0$Paper2_tasks_test.coverage" NAME="Paper2_tasks_test Coverage Results" MODIFIED="1771845042518" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/luto_2_0$Paper1_tasks_aquila.coverage" NAME="Paper1_tasks_aquila Coverage Results" MODIFIED="1770923647808" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$2_draw_stackedarea.coverage" NAME="2_draw_stackedarea Coverage Results" MODIFIED="1757820537571" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$3_9_create_tif.coverage" NAME="3.9_create_tif Coverage Results" MODIFIED="1759112947358" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
@@ -1177,7 +1189,7 @@
     <SUITE FILE_PATH="coverage/luto_2_0$0_Check_status.coverage" NAME="0_Check_status Coverage Results" MODIFIED="1770979870802" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$8_predict_timeseries1.coverage" NAME="8_predict_timeseries1 Coverage Results" MODIFIED="1768454566547" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$5_1_Feedlots_impact.coverage" NAME="5.1_Feedlots_impact Coverage Results" MODIFIED="1765438296961" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
-    <SUITE FILE_PATH="coverage/luto_2_0$3_1_draw_sol_average_price.coverage" NAME="3.1_draw_sol_average_price Coverage Results" MODIFIED="1771477175408" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/luto_2_0$3_1_draw_sol_average_price.coverage" NAME="3.1_draw_sol_average_price Coverage Results" MODIFIED="1771846544582" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/luto_2_0$04_GHG.coverage" NAME="04_GHG Coverage Results" MODIFIED="1771292308203" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/draw_all/code" />
     <SUITE FILE_PATH="coverage/LUTO2$7_export_forecast.coverage" NAME="7_export_forecast Coverage Results" MODIFIED="1764635076537" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/luto_2_0$Paper1_tasks_aquila_test_e6.coverage" NAME="Paper1_tasks_aquila_test_e6 Coverage Results" MODIFIED="1770924712779" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
@@ -1187,7 +1199,7 @@
     <SUITE FILE_PATH="coverage/luto_2_0$10_Area_table.coverage" NAME="10_Area_table Coverage Results" MODIFIED="1771289812468" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/draw_all/code" />
     <SUITE FILE_PATH="coverage/luto_2_0$Paper1_tasks_aquila_test_10.coverage" NAME="Paper1_tasks_aquila_test_10 Coverage Results" MODIFIED="1770924726780" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$Paper2_tasks_num.coverage" NAME="Paper2_tasks_num Coverage Results" MODIFIED="1758468204730" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
-    <SUITE FILE_PATH="coverage/luto_2_0$0_write_tasks.coverage" NAME="0_write_tasks Coverage Results" MODIFIED="1771327840416" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
+    <SUITE FILE_PATH="coverage/luto_2_0$0_write_tasks.coverage" NAME="0_write_tasks Coverage Results" MODIFIED="1771837732436" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$3_9_create_tif__1_.coverage" NAME="3.9_create_tif (1) Coverage Results" MODIFIED="1759065758337" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$05_make_map_all.coverage" NAME="05_make_map_all Coverage Results" MODIFIED="1758152149668" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/luto_2_0$00_am_tif.coverage" NAME="00_am_tif Coverage Results" MODIFIED="1771289640444" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/draw_all/code" />
@@ -1200,7 +1212,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$mem_monitor.coverage" NAME="mem_monitor Coverage Results" MODIFIED="1758703226961" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$02_Draw_cost_sector.coverage" NAME="02_Draw_cost_sector Coverage Results" MODIFIED="1758077465556" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$temp_repair_report.coverage" NAME="temp_repair_report Coverage Results" MODIFIED="1758862402216" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/luto_2_0$3_0_draw_average_price.coverage" NAME="3.0_draw_average_price Coverage Results" MODIFIED="1771564033481" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/luto_2_0$3_0_draw_average_price.coverage" NAME="3.0_draw_average_price Coverage Results" MODIFIED="1771846439377" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$4_3_make_cost_map__1_.coverage" NAME="4.3_make_cost_map (1) Coverage Results" MODIFIED="1759300375357" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$0_create_zip.coverage" NAME="0_create_zip Coverage Results" MODIFIED="1759627918048" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Preprocess2.coverage" NAME="0_Preprocess2 Coverage Results" MODIFIED="1758547914441" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
@@ -1208,7 +1220,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$11_cattle_paramters.coverage" NAME="11_cattle_paramters Coverage Results" MODIFIED="1770276206656" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
     <SUITE FILE_PATH="coverage/LUTO2$01_Draw_pointline.coverage" NAME="01_Draw_pointline Coverage Results" MODIFIED="1758077365578" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$3_make_map_all.coverage" NAME="3_make_map_all Coverage Results" MODIFIED="1758873988533" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
-    <SUITE FILE_PATH="coverage/luto_2_0$2_draw_processed_data.coverage" NAME="2_draw_processed_data Coverage Results" MODIFIED="1771477283571" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/luto_2_0$2_draw_processed_data.coverage" NAME="2_draw_processed_data Coverage Results" MODIFIED="1771846871907" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/luto_2_0$Paper1_tasks_aquila_test.coverage" NAME="Paper1_tasks_aquila_test Coverage Results" MODIFIED="1771329541608" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$03_limits_water.coverage" NAME="03_limits_water Coverage Results" MODIFIED="1763083447462" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/draw_all/code" />
     <SUITE FILE_PATH="coverage/LUTO2$7_train_time_series.coverage" NAME="7_train_time_series Coverage Results" MODIFIED="1765503302624" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
@@ -1238,5 +1250,15 @@
     <SUITE FILE_PATH="coverage/LUTO2$08_campara_df.coverage" NAME="08_campara_df Coverage Results" MODIFIED="1758708811855" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$3_0_draw_average_price.coverage" NAME="3.0_draw_average_price Coverage Results" MODIFIED="1760861245284" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$6_process_trade_data1.coverage" NAME="6_process_trade_data1 Coverage Results" MODIFIED="1770180091295" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/Ag2050/1_Scripts" />
+  </component>
+  <component name="github-copilot-workspace">
+    <instructionFileLocations>
+      <option value=".github/instructions" />
+      <option value=".github/instructions" />
+    </instructionFileLocations>
+    <promptFileLocations>
+      <option value=".github/prompts" />
+      <option value=".github/prompts" />
+    </promptFileLocations>
   </component>
 </project>
