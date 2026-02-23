@@ -4,15 +4,15 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20251003_Paper2_Results_NCI'],
-    'KEEP_OUTPUTS': [False],  # If False, only keep report HTML
+    'TASK_NAME': ['20260223_Paper2_Results_NCI'],
+    'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [2],
+    'NUMERIC_FOCUS': [3],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['60GB'],
-    'NCPUS': ['15'],
+    'MEM': ['40GB'],
+    'NCPUS': ['10'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['48:00:00'],
+    'TIME': ['15:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['high', 'low', 'off'],
     'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],
@@ -29,6 +29,12 @@ grid_search = {
     'GHG_CONSTRAINT_TYPE': ['hard'],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'CARBON_EFFECTS_WINDOW': [60],
+    'GHG_TARGETS_DICT': [{
+        'off': None,
+        'low': '1.8C (67%) excl. avoided emis SCOPE1',
+        'medium': '1.5C (50%) excl. avoided emis SCOPE1',
+        'high': '1.5C (67%) excl. avoided emis SCOPE1',
+    }],
 
     # ----------------------------- Biodiversity settings -------------------------------
     'GBF2_CONSTRAINT_TYPE': ['hard'],
@@ -51,9 +57,21 @@ grid_search = {
     'WATER_REGION_DEF': ['Drainage Division'],
     'WATER_CLIMATE_CHANGE_IMPACT': ['on'],
     # ----------------------------------- Demand settings --------------------------------
+    'DYNAMIC_PRICE': [False],
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
     #----------------------------------- other settings --------------------------------
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],
+    'NON_AG_LAND_USES': [{
+        'Environmental Plantings': True,
+        'Riparian Plantings': True,
+        'Sheep Agroforestry': True,
+        'Beef Agroforestry': True,
+        'Carbon Plantings (Block)': False,
+        'Sheep Carbon Plantings (Belt)': False,
+        'Beef Carbon Plantings (Belt)': False,
+        'BECCS': False,
+        'Destocked - natural land': True,
+    }]
 }
 
 conditional_rules = [
@@ -84,7 +102,7 @@ settings_name_dict = {
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
-# grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
-grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
+grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
 print(grid_search_settings_df.columns)
+# grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
 create_task_runs(task_root_dir, grid_search_settings_df, platform="NCI", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)

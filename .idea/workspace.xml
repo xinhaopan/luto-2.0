@@ -4,15 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for run paper 2 code">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+    <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="merge from jinzhu 20260223">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/data.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/tools/write.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/tools/write.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/tools/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/tools/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_write_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_write_tasks.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_NCI.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_NCI.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -164,7 +159,7 @@
       <recent name="N:\LUF-Modelling\LUTO2_XH\LUTO2\myCode\carbonprice\code" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.2_draw_processed_data">
+  <component name="RunManager" selected="Python.1_draw_original_data">
     <configuration name="1_draw_original_data" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="luto-2.0" />
       <option name="ENV_FILES" value="" />
@@ -287,17 +282,17 @@
     </configuration>
     <list>
       <item itemvalue="Python.1_draw_original_data" />
-      <item itemvalue="Python.2_draw_processed_data" />
-      <item itemvalue="Python.3.0_draw_average_price" />
       <item itemvalue="Python.3.1_draw_sol_average_price" />
       <item itemvalue="Python.Paper2_tasks_test" />
+      <item itemvalue="Python.2_draw_processed_data" />
+      <item itemvalue="Python.3.0_draw_average_price" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.1_draw_original_data" />
+        <item itemvalue="Python.3.0_draw_average_price" />
         <item itemvalue="Python.2_draw_processed_data" />
         <item itemvalue="Python.3.1_draw_sol_average_price" />
-        <item itemvalue="Python.3.0_draw_average_price" />
-        <item itemvalue="Python.1_draw_original_data" />
         <item itemvalue="Python.Paper2_tasks_test" />
       </list>
     </recent_temporary>
@@ -356,15 +351,7 @@
       <workItem from="1771548631599" duration="2710000" />
       <workItem from="1771563220775" duration="15308000" />
       <workItem from="1771837514735" duration="7138000" />
-      <workItem from="1771848841383" duration="68000" />
-    </task>
-    <task id="LOCAL-00043" summary="Revert: some document">
-      <option name="closed" value="true" />
-      <created>1759393254129</created>
-      <option name="number" value="00043" />
-      <option name="presentableId" value="LOCAL-00043" />
-      <option name="project" value="LOCAL" />
-      <updated>1759393254129</updated>
+      <workItem from="1771848841383" duration="2868000" />
     </task>
     <task id="LOCAL-00044" summary="update: draw">
       <option name="closed" value="true" />
@@ -750,7 +737,15 @@
       <option name="project" value="LOCAL" />
       <updated>1771835030419</updated>
     </task>
-    <option name="localTasksCounter" value="92" />
+    <task id="LOCAL-00092" summary="merge from jinzhu 20260223">
+      <option name="closed" value="true" />
+      <created>1771849445858</created>
+      <option name="number" value="00092" />
+      <option name="presentableId" value="LOCAL-00092" />
+      <option name="project" value="LOCAL" />
+      <updated>1771849445858</updated>
+    </task>
+    <option name="localTasksCounter" value="93" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -791,7 +786,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="update: FLC_cost_multipliers.xlsx" />
     <MESSAGE value="update: trade predit" />
     <MESSAGE value="update: draw input data for ag2050" />
     <MESSAGE value="update: predict export food demand by ETS" />
@@ -816,7 +810,8 @@
     <MESSAGE value="update for run paper 2" />
     <MESSAGE value="update for run paper 2 without CP" />
     <MESSAGE value="update for run paper 2 code" />
-    <option name="LAST_COMMIT_MESSAGE" value="update for run paper 2 code" />
+    <MESSAGE value="merge from jinzhu 20260223" />
+    <option name="LAST_COMMIT_MESSAGE" value="merge from jinzhu 20260223" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1056,6 +1051,16 @@
           <line>926</line>
           <option name="timeStamp" value="312" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/myCode/carbonprice/code/1_draw_original_data.py</url>
+          <line>68</line>
+          <option name="timeStamp" value="314" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
+          <line>305</line>
+          <option name="timeStamp" value="315" />
+        </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="jupyter-line">
           <url>notebook://N:/LUF-Modelling/LUTO2_XH/LUTO2/myCode/carbonprice/code/test.ipynb</url>
           <line>337</line>
@@ -1124,7 +1129,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$test3.coverage" NAME="test3 Coverage Results" MODIFIED="1757995381914" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$data.coverage" NAME="data Coverage Results" MODIFIED="1761452030206" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/luto" />
     <SUITE FILE_PATH="coverage/LUTO2$1_draw_original_data.coverage" NAME="1_draw_original_data Coverage Results" MODIFIED="1760861238933" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
-    <SUITE FILE_PATH="coverage/luto_2_0$1_draw_original_data.coverage" NAME="1_draw_original_data Coverage Results" MODIFIED="1771846187878" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/luto_2_0$1_draw_original_data.coverage" NAME="1_draw_original_data Coverage Results" MODIFIED="1771850670540" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$0_runs_test.coverage" NAME="0_runs_test Coverage Results" MODIFIED="1761452033939" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Preprocess.coverage" NAME="0_Preprocess Coverage Results" MODIFIED="1762415268169" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$06_create_map_data.coverage" NAME="06_create_map_data Coverage Results" MODIFIED="1758792558609" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
@@ -1212,7 +1217,7 @@
     <SUITE FILE_PATH="coverage/LUTO2$mem_monitor.coverage" NAME="mem_monitor Coverage Results" MODIFIED="1758703226961" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$02_Draw_cost_sector.coverage" NAME="02_Draw_cost_sector Coverage Results" MODIFIED="1758077465556" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$temp_repair_report.coverage" NAME="temp_repair_report Coverage Results" MODIFIED="1758862402216" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/luto_2_0$3_0_draw_average_price.coverage" NAME="3.0_draw_average_price Coverage Results" MODIFIED="1771846439377" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
+    <SUITE FILE_PATH="coverage/luto_2_0$3_0_draw_average_price.coverage" NAME="3.0_draw_average_price Coverage Results" MODIFIED="1771849944749" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$4_3_make_cost_map__1_.coverage" NAME="4.3_make_cost_map (1) Coverage Results" MODIFIED="1759300375357" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />
     <SUITE FILE_PATH="coverage/LUTO2$0_create_zip.coverage" NAME="0_create_zip Coverage Results" MODIFIED="1759627918048" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/tasks_run" />
     <SUITE FILE_PATH="coverage/LUTO2$0_Preprocess2.coverage" NAME="0_Preprocess2 Coverage Results" MODIFIED="1758547914441" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/myCode/carbonprice/code" />

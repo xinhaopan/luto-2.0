@@ -290,7 +290,7 @@ def get_global_ylim(dict_df: Dict[str, pd.DataFrame], offset=0.01) -> tuple:
 
     for df in dict_df.values():
         # 如果有 'Total' 列，先排除
-        df_proc = df.drop(columns=['Total']) if 'Total' in df.columns else df
+        df_proc = df.drop(columns=['Total', 'Net economic return'], errors='ignore')
 
         arr = np.nan_to_num(df_proc.to_numpy(dtype=float), nan=0.0)
 
@@ -1512,8 +1512,9 @@ def draw_22_price(
     tick_positions = [year for year in tick_positions if year in x_data]
 
     # ------ Carbon图（第一行前两个） ------
-    carbon_y = np.concatenate([df.iloc[:, i].values for i in range(12)])
-    y_carbon_all = get_y_axis_ticks(0, np.nanmax(carbon_y), desired_ticks=desired_ticks)
+    carbon_y = np.concatenate([df.iloc[:, i].values for i in range(2)])
+    # y_carbon_all = get_y_axis_ticks(0, np.nanmax(carbon_y), desired_ticks=desired_ticks)
+    y_carbon_all = get_y_axis_ticks(0, 150, desired_ticks=desired_ticks)
 
     ax_list = []
     for i in range(2):
