@@ -34,6 +34,7 @@ window.HomeView = {
       'Agricultural Management': 'Ag Mgt',
       'Non-Agricultural Land-use': 'Non-Ag',
     };
+    const rankSubcategoryOrder = ['Agricultural land-use', 'Agricultural Management', 'Non-Agricultural Land-use'];
     const availableRankSubcategories = ref([]);
 
     // Default selections
@@ -243,12 +244,12 @@ window.HomeView = {
           'Non-Ag': window[chartOverview_ghg_Nonag['name']],
         },
         'Production': {
-          'Off-target achievement': window[chartOverview_prod_achieve['name']],
           'Overview': window[chartOverview_prod_overview['name']],
           'Domestic': window[chartOverview_prod_domestic['name']],
           'Exports': window[chartOverview_prod_export['name']],
           'Imports': window[chartOverview_prod_import['name']],
           'Feed': window[chartOverview_prod_feed['name']],
+          'Off-target achievement': window[chartOverview_prod_achieve['name']],
         },
         'Water': {
           'Overview': window[chartOverview_water_sum['name']],
@@ -301,7 +302,8 @@ window.HomeView = {
 
     watch(selectChartCategory, (newCategory) => {
       availableChartSubCategories.value = Object.keys(ChartData.value[selectChartCategory.value])
-      availableRankSubcategories.value = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
+      const rankKeys = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
+      availableRankSubcategories.value = rankKeys.sort((a, b) => rankSubcategoryOrder.indexOf(a) - rankSubcategoryOrder.indexOf(b));
       selectChartSubCategory.value = availableChartSubCategories.value[0];
       selectRankingSubCategory.value = availableRankSubcategories.value[0] || 'N/A';
     });

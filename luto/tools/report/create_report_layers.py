@@ -35,6 +35,7 @@ from luto.tools.report.data_tools import (
     rename_reorder_hierarchy,
     tuple_dict_to_nested,
 )
+
 from luto.tools.report.data_tools.parameters import (
     COLOR_AG,
     COLOR_AM, 
@@ -42,6 +43,7 @@ from luto.tools.report.data_tools.parameters import (
     COLOR_LUMAP, 
     COLORS_FLOAT,
 )
+
 
 
 

@@ -58,6 +58,11 @@ window.MapService = {
       'Lumap': { 'path': 'data/map_layers/map_dvar_lumap.js', 'name': 'map_dvar_lumap' },
     },
     'Economics': {
+      'Profit': {
+        'Ag': { 'path': 'data/map_layers/map_profit_Ag.js', 'name': 'map_profit_Ag' },
+        'Ag Mgt': { 'path': 'data/map_layers/map_profit_Am.js', 'name': 'map_profit_Am' },
+        'Non-Ag': { 'path': 'data/map_layers/map_profit_NonAg.js', 'name': 'map_profit_NonAg' },
+      },
       'Cost': {
         'Ag': { 'path': 'data/map_layers/map_cost_Ag.js', 'name': 'map_cost_Ag' },
         'Ag Mgt': { 'path': 'data/map_layers/map_cost_Am.js', 'name': 'map_cost_Am' },

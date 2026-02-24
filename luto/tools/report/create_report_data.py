@@ -429,7 +429,7 @@ def process_economics_data(files, SAVE_DIR):
         ).drop(columns=['Value ($)_revenue', 'Value ($)_cost']
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
-        ).assign(Source='Total')
+        ).assign(Source='Profit')
 
     ranking_df = pd.concat([revenue_df, cost_df, profit_df]).assign(color= lambda x: x['Rank'].map(get_rank_color))
 
@@ -1106,6 +1106,9 @@ def process_production_data(files, SAVE_DIR, years):
             .groupby(['Type', 'group'])[['Year', 'Quantity (tonnes, KL)']]\
             .apply(lambda x: x[['Year', 'Quantity (tonnes, KL)']].values.tolist())\
             .reset_index()
+            
+        if _type == 'Exports':
+            demand_group['Quantity (tonnes, KL)'] *= -1  # Convert exports to positive values for visualization
 
         demand_group = demand_group.drop(columns=['Type'])
         demand_group.columns = ['name', 'data']

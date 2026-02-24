@@ -26,7 +26,7 @@ window.EconomicsView = {
     };
 
     // Available selections for Economics
-    const availableCostRevenue = ["Cost", "Revenue"];
+    const availableCostRevenue = ["Profit", "Cost", "Revenue"];
     const availableCategories = ["Ag", "Ag Mgt", "Non-Ag"];
     const availableAgMgt = ref([]);
     const availableWater = ref([]);
@@ -97,7 +97,6 @@ window.EconomicsView = {
           },
         },
         series: seriesData || [],
-        colors: window["Supporting_info"].colors,
       };
     });
 
@@ -106,6 +105,9 @@ window.EconomicsView = {
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
       // Load data
+      await loadScript(mapRegister["Profit"]["Ag"]["path"], mapRegister["Profit"]["Ag"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Profit"]["Ag Mgt"]["path"], mapRegister["Profit"]["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Profit"]["Non-Ag"]["path"], mapRegister["Profit"]["Non-Ag"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Cost"]["Ag"]["path"], mapRegister["Cost"]["Ag"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Cost"]["Ag Mgt"]["path"], mapRegister["Cost"]["Ag Mgt"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Cost"]["Non-Ag"]["path"], mapRegister["Cost"]["Non-Ag"]["name"], VIEW_NAME);

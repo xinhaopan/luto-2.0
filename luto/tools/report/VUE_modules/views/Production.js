@@ -100,7 +100,6 @@ window.ProductionView = {
           },
         },
         series: seriesData || [],
-        colors: window["Supporting_info"].colors,
       };
     });
 

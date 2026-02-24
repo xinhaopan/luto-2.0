@@ -102,7 +102,6 @@ window.AreaView = {
           },
         },
         series: seriesData || [],
-        colors: window["Supporting_info"].colors,
       }
     });
 
