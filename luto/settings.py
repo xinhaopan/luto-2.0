@@ -70,7 +70,10 @@ FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
 # Set the demand and supply multipliers
 APPLY_DEMAND_MULTIPLIERS = True     # True or False. Whether to apply demand multipliers from AusTIME model.
-AG_YIELD_MULT = 1.15                # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
+
+# Productivity trend; 
+PRODUCTIVITY_TREND = 'BAU'           # 'BAU', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'
+
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
 CO2_FERT = 'off'   # 'on' or 'off'
@@ -263,11 +266,11 @@ The options are:
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
-    'Sheep Agroforestry': True,
+    'Sheep Agroforestry': True,    
     'Beef Agroforestry': True,
     'Carbon Plantings (Block)': True,
-    'Sheep Carbon Plantings (Belt)': True,
-    'Beef Carbon Plantings (Belt)': True,
+    'Sheep Carbon Plantings (Belt)': False, # [20260224] Truned off due to FullCAM (CP-Belt) issue
+    'Beef Carbon Plantings (Belt)': False,  # [20260224] Truned off due to FullCAM (CP-Belt) issue
     'BECCS': False,
     'Destocked - natural land': True,
 }
@@ -421,8 +424,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': True,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
-    'Onshore Wind': True,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
+    'Utility Solar PV': False,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
+    'Onshore Wind': False,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural

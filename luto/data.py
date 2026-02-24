@@ -794,14 +794,27 @@ class Data:
         print("├── Loading productivity data", flush=True)
 
         # Yield increases.
-        fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
-        self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
-        self.BAU_PROD_INCR_xr = (
-            xr.DataArray(self.BAU_PROD_INCR)
+        if settings.PRODUCTIVITY_TREND == 'BAU':
+            fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
+            productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
+            productivity_trend.index = productivity_trend.index + self.YR_CAL_BASE  # Adjust year to absolute year
+            productivity_trend.index.name = 'Year'
+        else: 
+            fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_ag_2050.xlsx")
+            productivity_trend = pd.read_excel(
+                fpath, 
+                sheet_name=f'{settings.PRODUCTIVITY_TREND.lower()}', 
+                header=[0, 1],
+                index_col=0
+            ).astype(np.float32)
+            
+        # Convert to xarray for easier accessing.
+        self.PRODUCTIVITY_MUL_xr = (
+            xr.DataArray(productivity_trend)
             .unstack('dim_1')
-            .rename({'dim_1_level_0':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
-            .assign_coords(year=lambda x: x.year + self.YR_CAL_BASE)  # Adjust year to absolute year
+            .rename({'Year':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
         )
+
 
 
 
@@ -1962,9 +1975,9 @@ class Data:
             return self.DEMAND_ELASTICITY_MUL[yr_cal]
 
         # Get supply delta (0-based ratio)
-        supply_base_dvar_base_productivity = self.BASE_YR_production_t
-        supply_base_dvar_target_productivity = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
-        delta_supply = (supply_base_dvar_target_productivity - supply_base_dvar_base_productivity) / supply_base_dvar_base_productivity
+        supply_base_dvar_base_production = self.BASE_YR_production_t
+        supply_base_dvar_target_production = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
+        delta_supply = (supply_base_dvar_target_production - supply_base_dvar_base_production) / supply_base_dvar_base_production
 
         # Get demand delta (0-based ratio)
         demand_base_year = self.D_CY_xr.sel(year=self.YR_CAL_BASE)

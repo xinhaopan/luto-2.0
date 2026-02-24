@@ -65,17 +65,18 @@ def create_new_dataset():
     bio_GBF8_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_NES_Zonation_inpath = bio_GBF4_inpath
     renewable_energy_inpath = 'N:/Data-Master/Renewable Energy/processed'
+    ag_yield_trend = 'N:/Data-Master/AG 2050/'
     
 
     # Set data output paths
-    raw_data = RAW_DATA + '/' # '../raw_data/'
+    raw_data = RAW_DATA + '/'
     outpath = INPUT_DIR + '/'
 
 
-    # Delete the data folders' contents
-    for file in os.scandir(outpath):
-        if file.name != '.gitignore':
-            os.remove(file.path)
+    # # Delete the data folders' contents
+    # for file in os.scandir(outpath):
+    #     if file.name != '.gitignore':
+    #         os.remove(file.path)
 
 
     # Copy raw data files from their source into raw_data folder for further processing
@@ -93,11 +94,15 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'SA2_crop_GHG_data.h5', raw_data + 'SA2_crop_GHG_data.h5')
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
+    
+    # Yiled trend data
+    shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
+    shutil.copyfile(ag_yield_trend + 'yieldncreases_ABARES.xlsx', outpath + 'yieldincreases_ag_2050.xlsx')
 
     
     # Demand and elasticity data
     shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
-    shutil.copyfile(f'{demand_elasticity_inpath}/Elasticities_Table.csv', outpath + 'demand_elasticity.csv')
+    shutil.copyfile(f'{demand_elasticity_inpath}/Elasticities_Table_20260224.csv', outpath + 'demand_elasticity.csv')
     shutil.copyfile(f'{luto_1D_inpath}/20260220_CNS25 Pathways AusTIMES data.xlsx', outpath + 'AusTIMES_demand_multiplier.xlsx')
     
     # Read raw BECCS data from CSIRO and save as HDF5
@@ -105,7 +110,6 @@ def create_new_dataset():
 
 
     # Copy data straight to LUTO input folder, no processing required
-    shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 

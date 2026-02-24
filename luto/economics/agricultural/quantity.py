@@ -136,8 +136,6 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     lu = f'{lvstype.capitalize()} - {vegtype}'
     yield_pot *= get_ccimpact(data, lu, lm, yr_idx)
 
-    # Here we can add a productivity multiplier for sustainable intensification to increase pasture growth and yield potential (i.e., head/ha)
-    yield_pot *= settings.AG_YIELD_MULT  # ***Still to do***, now [20251027] only use a constant multiplier from settings
 
     return yield_pot
 
@@ -164,7 +162,7 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
     lvstype, vegtype = lvs_veg_types(pr)
 
     # Get the yield potential. Since [20251027], here uses a constant multiplier from settings for production intensification
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx) * settings.AG_YIELD_MULT
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
     # Determine base quantity case-by-case.
 
@@ -266,7 +264,7 @@ def get_quantity(data, pr, lm, yr_idx):
         raise KeyError(f"Land use '{pr}' not found in data.")
 
     # Apply productivity increase multiplier by product. 
-    q *= data.BAU_PROD_INCR[lm, pr][yr_idx]
+    q *= data.PRODUCTIVITY_MUL_xr.sel(lm=lm, product=pr, year=data.YR_CAL_BASE + yr_idx).item()
 
     return q
 
