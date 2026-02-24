@@ -338,7 +338,7 @@ def _analyze_iis_inner(filepath: str, data):
                     free_terms.append((var_name, coeff))
 
             prefix = f"  [{idx+1}/{n_global}] " if n_global > 1 else "  "
-            print(f"\n{prefix}Constraint: {label}", flush=True)
+            print(f"  {prefix}Constraint: {label}", flush=True)
             print(f"  Variables: {len(terms)} total, {len(locked_terms)} locked, {len(free_terms)} free", flush=True)
             print(flush=True)
 
@@ -369,7 +369,7 @@ def _analyze_iis_inner(filepath: str, data):
 
         # Summarize cell-level constraints
         if cell_constraints:
-            print(f"\n  Cell-level: {len(cell_constraints)} constraints", end="", flush=True)
+            print(f"  Cell-level: {len(cell_constraints)} constraints", end="", flush=True)
             n_cell_locked = sum(
                 1 for _, body in cell_constraints
                 for var in re.findall(r'(X_[A-Za-z0-9_]+)', body)
@@ -377,8 +377,6 @@ def _analyze_iis_inner(filepath: str, data):
             )
             if n_cell_locked:
                 print(f" ({n_cell_locked} variables locked by bounds)", flush=True)
-            else:
-                print(flush=True)
 
         # Standalone bounds not in any constraint
         all_body_vars = set()
