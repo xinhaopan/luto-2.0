@@ -33,7 +33,7 @@ from luto.settings import INPUT_DIR, RAW_DATA
 
 
 
-def create_new_dataset():
+def create_new_dataset(refresh=False):
     """Creates a new LUTO input dataset from source data"""
 
     # Set up a timer and print the time
@@ -73,10 +73,8 @@ def create_new_dataset():
     outpath = INPUT_DIR + '/'
 
 
-    # # Delete the data folders' contents
-    # for file in os.scandir(outpath):
-    #     if file.name != '.gitignore':
-    #         os.remove(file.path)
+    # Remove existing files in the output folder, except for .gitignore, if refresh is True
+    if refresh: [os.remove(f.path) for f in os.scandir(outpath) if f.name != '.gitignore']
 
 
     # Copy raw data files from their source into raw_data folder for further processing

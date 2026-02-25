@@ -802,6 +802,13 @@ class Data:
             productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
             productivity_trend.index = productivity_trend.index + self.YR_CAL_BASE  # Adjust year to absolute year
             productivity_trend.index.name = 'Year'
+            
+            # Convert to xarray for easier accessing.
+            self.PRODUCTIVITY_MUL_xr = (
+                xr.DataArray(productivity_trend)
+                .unstack('dim_1')
+                .rename({'Year':'year', 'dim_1_level_0':'lm', 'dim_1_level_1':'product'})
+            )
         else: 
             fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_ag_2050.xlsx")
             productivity_trend = pd.read_excel(
@@ -811,12 +818,12 @@ class Data:
                 index_col=0
             ).astype(np.float32)
             
-        # Convert to xarray for easier accessing.
-        self.PRODUCTIVITY_MUL_xr = (
-            xr.DataArray(productivity_trend)
-            .unstack('dim_1')
-            .rename({'Year':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
-        )
+            # Convert to xarray for easier accessing.
+            self.PRODUCTIVITY_MUL_xr = (
+                xr.DataArray(productivity_trend)
+                .unstack('dim_1')
+                .rename({'Year':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
+            )
 
 
 
