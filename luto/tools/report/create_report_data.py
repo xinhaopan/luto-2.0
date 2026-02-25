@@ -312,38 +312,38 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
 def process_economics_data(files, SAVE_DIR):
     
     # -------------------- Get the revenue and cost data --------------------
-    revenue_ag_df = files.query('base_name == "revenue_ag"').reset_index(drop=True)
+    revenue_ag_df = files.query('base_name == "economics_ag_revenue"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
     revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (revenue)')
     revenue_ag_df_non_all = revenue_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
 
-    cost_ag_df = files.query('base_name == "cost_ag"').reset_index(drop=True)
+    cost_ag_df = files.query('base_name == "economics_ag_cost"').reset_index(drop=True)
     cost_ag_df = pd.concat([pd.read_csv(path) for path in cost_ag_df['path']], ignore_index=True)
     cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (cost)')
     cost_ag_df['Value ($)'] = cost_ag_df['Value ($)'] * -1          # Convert cost to negative value
     cost_ag_df_non_all = cost_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
 
-    revenue_am_df = files.query('base_name == "revenue_agricultural_management"').reset_index(drop=True)
+    revenue_am_df = files.query('base_name == "economics_am_revenue"').reset_index(drop=True)
     revenue_am_df = pd.concat([pd.read_csv(path) for path in revenue_am_df['path']], ignore_index=True)
     revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (revenue)')
     revenue_am_df_non_all = revenue_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL"')
 
-    cost_am_df = files.query('base_name == "cost_agricultural_management"').reset_index(drop=True)
+    cost_am_df = files.query('base_name == "economics_am_cost"').reset_index(drop=True)
     cost_am_df = pd.concat([pd.read_csv(path) for path in cost_am_df['path']], ignore_index=True)
     cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (cost)')
     cost_am_df['Value ($)'] = cost_am_df['Value ($)'] * -1          # Convert cost to negative value
     cost_am_df_non_all = cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL"')
 
-    revenue_non_ag_df = files.query('base_name == "revenue_non_ag"').reset_index(drop=True)
+    revenue_non_ag_df = files.query('base_name == "economics_non_ag_revenue"').reset_index(drop=True)
     revenue_non_ag_df = pd.concat([pd.read_csv(path) for path in revenue_non_ag_df['path']], ignore_index=True)
     revenue_non_ag_df = revenue_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-Agricultural Land-use (revenue)')
 
-    cost_non_ag_df = files.query('base_name == "cost_non_ag"').reset_index(drop=True)
+    cost_non_ag_df = files.query('base_name == "economics_non_ag_cost"').reset_index(drop=True)
     cost_non_ag_df = pd.concat([pd.read_csv(path) for path in cost_non_ag_df['path']], ignore_index=True)
     cost_non_ag_df = cost_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-Agricultural Land-use (cost)')
     cost_non_ag_df['Value ($)'] = cost_non_ag_df['Value ($)'] * -1  # Convert cost to negative value
 
-    cost_transition_ag2ag_df = files.query('base_name == "cost_transition_ag2ag"').reset_index(drop=True)
+    cost_transition_ag2ag_df = files.query('base_name == "economics_ag_transition_ag2ag"').reset_index(drop=True)
     cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
@@ -351,7 +351,7 @@ def process_economics_data(files, SAVE_DIR):
         '`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL" '
         ).copy()
 
-    cost_transition_ag2non_ag_df = files.query('base_name == "cost_transition_ag2non_ag"').reset_index(drop=True)
+    cost_transition_ag2non_ag_df = files.query('base_name == "economics_ag_transition_ag2non_ag"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
@@ -359,7 +359,7 @@ def process_economics_data(files, SAVE_DIR):
         '`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL" '
         ).copy()
 
-    cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2ag"').reset_index(drop=True)
+    cost_transition_non_ag2ag_df = files.query('base_name == "economics_non_ag_transition_non_ag2ag"').reset_index(drop=True)
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value

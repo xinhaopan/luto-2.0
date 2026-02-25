@@ -360,62 +360,62 @@ def save_report_layer(raw_data_dir:str):
     #        5) Profit/Revenue/Cost/Transition         #
     ####################################################
     
-    # ---------------- Profit ---------------- 
-    profit_ag = files.query('base_name == "xr_profit_ag"')
+    # ---------------- Profit ----------------
+    profit_ag = files.query('base_name == "xr_economics_ag_profit"')
     get_map2json(profit_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_profit_Ag.js')
     print('│   ├── Profit Ag layer saved.')
-    
-    profit_am = files.query('base_name == "xr_profit_agMgt"')
+
+    profit_am = files.query('base_name == "xr_economics_am_profit"')
     get_map2json(profit_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_profit_Am.js')
     print('│   ├── Profit Am layer saved.')
-    
-    profit_nonag = files.query('base_name == "xr_profit_non_ag"')
+
+    profit_nonag = files.query('base_name == "xr_economics_non_ag_profit"')
     get_map2json(profit_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_profit_NonAg.js')
     print('│   ├── Profit Non-Ag layer saved.')
-    
-    
-    # ---------------- Revenue ---------------- 
-    revenue_ag = files.query('base_name == "xr_revenue_ag"')
+
+
+    # ---------------- Revenue ----------------
+    revenue_ag = files.query('base_name == "xr_economics_ag_revenue"')
     get_map2json(revenue_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_revenue_Ag.js')
     print('│   ├── Revenue Ag layer saved.')
 
-    revenue_am = files.query('base_name == "xr_revenue_agricultural_management"')
+    revenue_am = files.query('base_name == "xr_economics_am_revenue"')
     get_map2json(revenue_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_revenue_Am.js')
     print('│   ├── Revenue Am layer saved.')
 
-    revenue_nonag = files.query('base_name == "xr_revenue_non_ag"')
+    revenue_nonag = files.query('base_name == "xr_economics_non_ag_revenue"')
     get_map2json(revenue_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_revenue_NonAg.js')
     print('│   ├── Revenue Non-Ag layer saved.')
-    
 
-    # ---------------- Cost ---------------- 
-    cost_ag = files.query('base_name == "xr_cost_ag"')
+
+    # ---------------- Cost ----------------
+    cost_ag = files.query('base_name == "xr_economics_ag_cost"')
     get_map2json(cost_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_Ag.js')
     print('│   ├── Cost Ag layer saved.')
 
-    cost_am = files.query('base_name == "xr_cost_agricultural_management"')
+    cost_am = files.query('base_name == "xr_economics_am_cost"')
     get_map2json(cost_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_Am.js')
     print('│   ├── Cost Am layer saved.')
 
-    cost_nonag = files.query('base_name == "xr_cost_non_ag"')
+    cost_nonag = files.query('base_name == "xr_economics_non_ag_cost"')
     get_map2json(cost_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_NonAg.js')
     print('│   ├── Cost Non-Ag layer saved.')
 
-    
-    # ---------------- Transition Cost ---------------- 
-    cost_trans_ag2ag = files.query('base_name == "xr_cost_transition_ag2ag"')
+
+    # ---------------- Transition Cost ----------------
+    cost_trans_ag2ag = files.query('base_name == "xr_economics_ag_transition_ag2ag_detail"')
     get_map2json(cost_trans_ag2ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_trans_ag2ag.js')
     print('│   ├── Transition Cost Ag2Ag layer saved.')
-    
-    cost_trans_ag2nonag = files.query('base_name == "xr_transition_cost_ag2non_ag"')
+
+    cost_trans_ag2nonag = files.query('base_name == "xr_economics_ag_transition_ag2non_ag_detail"')
     get_map2json(cost_trans_ag2nonag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_trans_ag2nonag.js')
     print('│   ├── Transition Cost Ag2NonAg layer saved.')
-    
-    # AgMgt has 0 transition cost, so skipping 
-    # cost_ag_man = files.query('base_name == "xr_cost_agricultural_management"')
-    
+
+    # AgMgt has 0 transition cost, so skipping
+    # cost_ag_man = files.query('base_name == "xr_economics_am_transition"')
+
     # Non-Ag to Ag transition cost is not allowed, so skipping
-    # cost_trans_nonag2ag = files.query('base_name == "xr_cost_transition_non_ag2ag"')
+    # cost_trans_nonag2ag = files.query('base_name == "xr_economics_non_ag_transition_non_ag2ag"')
     
     
 
