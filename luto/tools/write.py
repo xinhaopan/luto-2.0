@@ -641,7 +641,7 @@ def write_economics_ag(data: Data, yr_cal, path):
     save_csv(ag_rev_jms,         {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type'}, os.path.join(path, f'economics_ag_revenue_{yr_cal}.csv'))
     save_csv(ag_cost_jms,        {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type'}, os.path.join(path, f'economics_ag_cost_{yr_cal}.csv'))
     save_csv(ag2ag_cost_jms,     {'lu': 'To_Land-use',        'lm': 'Water_supply', 'source': 'Type'}, os.path.join(path, f'economics_ag_transition_ag2ag_{yr_cal}.csv'))
-    save_csv(non_ag2ag_cost_jms, {'from_lu': 'From_Land-use', 'lm': 'Water_supply', 'source': 'Type'}, os.path.join(path, f'economics_non_ag_transition_non_ag2ag_{yr_cal}.csv'))
+    save_csv(non_ag2ag_cost_jms, {'from_lu': 'From_Land-use', 'lm': 'Water_supply', 'source': 'Type'}, os.path.join(path, f'economics_ag_transition_non_ag2ag_{yr_cal}.csv'))
     save_csv(profit_ag_jms,      {'lu': 'Land-use',           'lm': 'Water_supply'},                   os.path.join(path, f'economics_ag_profit_{yr_cal}.csv'))
 
 
@@ -689,7 +689,7 @@ def write_economics_ag(data: Data, yr_cal, path):
     save2nc(valid_layers_stack_rev,         os.path.join(path, f'xr_economics_ag_revenue_{yr_cal}.nc'))
     save2nc(valid_layers_stack_cost,        os.path.join(path, f'xr_economics_ag_cost_{yr_cal}.nc'))
     save2nc(valid_ag2ag_cost_layers,        os.path.join(path, f'xr_economics_ag_transition_ag2ag_{yr_cal}.nc'))
-    save2nc(valid_non_ag2ag_cost_layers,    os.path.join(path, f'xr_economics_non_ag_transition_non_ag2ag_{yr_cal}.nc'))
+    save2nc(valid_non_ag2ag_cost_layers,    os.path.join(path, f'xr_economics_ag_transition_non_ag2ag_{yr_cal}.nc'))
     save2nc(valid_profit_ag_layers,         os.path.join(path, f'xr_economics_ag_profit_{yr_cal}.nc'))
     
 
@@ -797,9 +797,16 @@ def write_economics_ag_man(data: Data, yr_cal, path):
         ).stack(layer=['am', 'lm', 'lu'])
 
     # Load mosaic once
-    am_mosaic = cfxr.decode_compress_to_multi_index(
-        xr.load_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
-    )['data'].sel(am='ALL').sel(lu='ALL').sel(lm='ALL')
+    if yr_cal == data.YR_CAL_BASE:
+        am_mosaic = xr.DataArray(
+            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32) * np.nan,
+            dims=['am', 'lm', 'lu', 'cell'],
+            coords={'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['am', 'lm', 'lu'])
+    else:
+        am_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.load_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+        )['data'].sel(am='ALL').sel(lu='ALL').sel(lm='ALL')
 
     def build_valid_stack(xr_da, valid_layers):
         if len(valid_layers) == 0:
@@ -900,7 +907,7 @@ def write_economics_non_ag(data: Data, yr_cal, path):
     rename_map = {'lu': 'Land-use'}
     save_csv(revenue_df,  rename_map, os.path.join(path, f'economics_non_ag_revenue_{yr_cal}.csv'))
     save_csv(cost_df,     rename_map, os.path.join(path, f'economics_non_ag_cost_{yr_cal}.csv'))
-    save_csv(t_non_ag_df, rename_map, os.path.join(path, f'economics_non_ag_transition_nonAg2nonAg_{yr_cal}.csv'))
+    save_csv(t_non_ag_df, rename_map, os.path.join(path, f'economics_non_ag_transition_non_ag2non_ag_{yr_cal}.csv'))
     save_csv(t_ag_df,     rename_map, os.path.join(path, f'economics_non_ag_transition_non_ag2ag_{yr_cal}.csv'))
     save_csv(profit_df,   rename_map, os.path.join(path, f'economics_non_ag_profit_{yr_cal}.csv'))
 
@@ -919,11 +926,18 @@ def write_economics_non_ag(data: Data, yr_cal, path):
         ).stack(layer=['lu'])
 
     # Load mosaic once
-    non_ag_mosaic = (
-        cfxr.decode_compress_to_multi_index(
-            xr.load_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').expand_dims(lu=['ALL']).stack(layer=['lu'])
-    )
+    if yr_cal_sim_pre is None:
+        non_ag_mosaic = xr.DataArray(
+            np.zeros((data.NCELLS, 1), dtype=np.float32) * np.nan,
+            dims=['cell', 'lu'],
+            coords={'cell': range(data.NCELLS), 'lu': ['ALL']}
+        ).stack(layer=['lu'])
+    else:
+        non_ag_mosaic = (
+            cfxr.decode_compress_to_multi_index(
+                xr.load_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+            )['data'].sel(lu='ALL').expand_dims(lu=['ALL']).stack(layer=['lu'])
+        )
 
     def build_valid_stack(xr_da, valid_layers):
         if valid_layers.empty:
@@ -940,7 +954,7 @@ def write_economics_non_ag(data: Data, yr_cal, path):
     # Save to netcdf
     save2nc(xr_revenue_non_ag_cat,   os.path.join(path, f'xr_economics_non_ag_revenue_{yr_cal}.nc'))
     save2nc(xr_cost_non_ag_cat,      os.path.join(path, f'xr_economics_non_ag_cost_{yr_cal}.nc'))
-    save2nc(xr_non_ag_to_non_ag_cat, os.path.join(path, f'xr_economics_non_ag_transition_nonAg2nonAg_{yr_cal}.nc'))
+    save2nc(xr_non_ag_to_non_ag_cat, os.path.join(path, f'xr_economics_non_ag_transition_non_ag2non_ag_{yr_cal}.nc'))
     save2nc(xr_non_ag_to_ag_cat,     os.path.join(path, f'xr_economics_non_ag_transition_non_ag2ag_{yr_cal}.nc'))
     save2nc(xr_profit_non_ag_cat,    os.path.join(path, f'xr_economics_non_ag_profit_{yr_cal}.nc'))
 
@@ -1051,7 +1065,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         
     # Write to csv
     pd.concat([cost_df_region, cost_df_AUS]
-        ).to_csv(os.path.join(path, f'cost_transition_ag2ag_{yr_cal}.csv'), index=False)
+        ).to_csv(os.path.join(path, f'transition_cost_ag2ag_{yr_cal}.csv'), index=False)
         
 
     # ------------------------- Stack array, get valid layers -------------------------
@@ -1072,7 +1086,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
 
     # Save the compact filtered array
-    save2nc(cost_xr_stacked, os.path.join(path, f'xr_economics_ag_transition_ag2ag_detail_{yr_cal}.nc'))
+    save2nc(cost_xr_stacked, os.path.join(path, f'xr_transition_cost_ag2ag_{yr_cal}.nc'))
 
     return f"Agricultural to agricultural transition cost written for year {yr_cal}"
 
@@ -1189,7 +1203,7 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     pd.concat([cost_df_AUS, cost_df_region]
         ).infer_objects(copy=False
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{yr_cal}.csv'), index=False)
+        ).to_csv(os.path.join(path, f'transition_cost_ag2non_ag_{yr_cal}.csv'), index=False)
 
 
     # ------------------------- Stack array, get valid layers -------------------------
@@ -1208,7 +1222,7 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
         ).sel(layer=valid_layers_transition)
 
     # Save valid layers
-    save2nc(cost_xr_stacked, os.path.join(path, f'xr_economics_ag_transition_ag2non_ag_detail_{yr_cal}.nc'))
+    save2nc(cost_xr_stacked, os.path.join(path, f'xr_transition_cost_ag2non_ag_{yr_cal}.nc'))
 
     return f"Agricultural to non-agricultural transition cost written for year {yr_cal}"
 
@@ -1301,7 +1315,7 @@ def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     pd.concat([cost_df_AUS, cost_df_region]
         ).infer_objects(copy=False
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).to_csv(os.path.join(path, f'cost_transition_non_ag2ag_{yr_cal}.csv'), index=False)
+        ).to_csv(os.path.join(path, f'transition_cost_non_ag2ag_{yr_cal}.csv'), index=False)
         
     # ------------------------- Stack array, get valid layers -------------------------
     '''
@@ -1690,44 +1704,44 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
 def write_crosstab(data: Data, yr_cal, path):
     """Write out land-use and production data"""
 
-    if yr_cal > data.YR_CAL_BASE:
+    if yr_cal == data.YR_CAL_BASE:
+        return "Skip land-use transition calculation for the base year."
 
+    simulated_year_list = sorted(list(data.lumaps.keys()))
+    yr_idx_sim = simulated_year_list.index(yr_cal)
+    yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
     
-        simulated_year_list = sorted(list(data.lumaps.keys()))
-        yr_idx_sim = simulated_year_list.index(yr_cal)
-        yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
-        
-        # Check if yr_cal_sim_pre meets the requirement
-        assert yr_cal_sim_pre >= data.YR_CAL_BASE and yr_cal_sim_pre < yr_cal,\
-            f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {data.YR_CAL_BASE} and < {yr_cal}"
+    # Check if yr_cal_sim_pre meets the requirement
+    assert yr_cal_sim_pre >= data.YR_CAL_BASE and yr_cal_sim_pre < yr_cal,\
+        f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {data.YR_CAL_BASE} and < {yr_cal}"
 
-        lumap_pre = data.lumaps[yr_cal_sim_pre]
-        lumap = data.lumaps[yr_cal]
+    lumap_pre = data.lumaps[yr_cal_sim_pre]
+    lumap = data.lumaps[yr_cal]
+    
+    crosstab = pd.crosstab(lumap_pre,  [lumap, data.REGION_NRM_NAME], values=data.REAL_AREA, aggfunc=lambda x:x.sum(), margins = False
+        ).unstack(
+        ).reset_index(
+        ).rename(
+            columns={
+                'row_0': 'From-land-use', 
+                'NRM_NAME': 'region', 
+                'col_0':'To-land-use', 
+                0: 'Area (ha)'
+            }
+        ).dropna(
+        ).infer_objects(copy=False
+        ).replace({'From-land-use': data.ALLLU2DESC, 'To-land-use': data.ALLLU2DESC})
         
-        crosstab = pd.crosstab(lumap_pre,  [lumap, data.REGION_NRM_NAME], values=data.REAL_AREA, aggfunc=lambda x:x.sum(), margins = False
-            ).unstack(
-            ).reset_index(
-            ).rename(
-                columns={
-                    'row_0': 'From-land-use', 
-                    'NRM_NAME': 'region', 
-                    'col_0':'To-land-use', 
-                    0: 'Area (ha)'
-                }
-            ).dropna(
-            ).infer_objects(copy=False
-            ).replace({'From-land-use': data.ALLLU2DESC, 'To-land-use': data.ALLLU2DESC})
-            
-        switches = (crosstab.groupby('From-land-use')['Area (ha)'].sum() - crosstab.groupby('To-land-use')['Area (ha)'].sum()
-            ).reset_index(
-            ).rename(columns={'index':'Landuse'})
-        
-        
-        crosstab['Year'] = yr_cal
-        switches['Year'] = yr_cal
-   
-        crosstab.to_csv(os.path.join(path, f'crosstab-lumap_{yr_cal}.csv'), index=False)
-        switches.to_csv(os.path.join(path, f'switches-lumap_{yr_cal}.csv'), index=False)
+    switches = (crosstab.groupby('From-land-use')['Area (ha)'].sum() - crosstab.groupby('To-land-use')['Area (ha)'].sum()
+        ).reset_index(
+        ).rename(columns={'index':'Landuse'})
+    
+    
+    crosstab['Year'] = yr_cal
+    switches['Year'] = yr_cal
+
+    crosstab.to_csv(os.path.join(path, f'crosstab-lumap_{yr_cal}.csv'), index=False)
+    switches.to_csv(os.path.join(path, f'switches-lumap_{yr_cal}.csv'), index=False)
 
     return f"Land-use cross-tabulation and switches written for year {yr_cal}"
 

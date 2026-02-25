@@ -403,11 +403,11 @@ def save_report_layer(raw_data_dir:str):
 
 
     # ---------------- Transition Cost ----------------
-    cost_trans_ag2ag = files.query('base_name == "xr_economics_ag_transition_ag2ag_detail"')
+    cost_trans_ag2ag = files.query('base_name == "xr_transition_cost_ag2ag"')
     get_map2json(cost_trans_ag2ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_trans_ag2ag.js')
     print('│   ├── Transition Cost Ag2Ag layer saved.')
 
-    cost_trans_ag2nonag = files.query('base_name == "xr_economics_ag_transition_ag2non_ag_detail"')
+    cost_trans_ag2nonag = files.query('base_name == "xr_transition_cost_ag2non_ag"')
     get_map2json(cost_trans_ag2nonag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_trans_ag2nonag.js')
     print('│   ├── Transition Cost Ag2NonAg layer saved.')
 

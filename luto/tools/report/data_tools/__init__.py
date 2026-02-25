@@ -52,6 +52,7 @@ def extract_dtype_from_path(path):
             'economics_ag':['economics_ag_'],
             'economics_am':['economics_am_'],
             'economics_non_ag':['economics_non_ag_'],
+            'transition_cost':['transition_cost_'],
             'biodiversity':['biodiversity'],
             # Metrics xarrays
             'xarray_layer':['xr_'],
