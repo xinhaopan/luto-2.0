@@ -1067,7 +1067,7 @@ def get_transition_matrix_nonag2ag(data: Data, yr_idx, lumap, lmmap, separate=Fa
     return np.add.reduce(non_ag_to_agr_t_matrices)
 
 
-def get_non_ag_transition_matrix(data: Data) -> np.ndarray:
+def get_non_ag_to_non_ag_transition_matrix(data: Data) -> np.ndarray:
     """
     Get the matrix that contains transition costs for non-agricultural land uses. 
     There are no transition costs for non-agricultural land uses, therefore the matrix is filled with zeros.

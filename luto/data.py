@@ -93,6 +93,9 @@ class Data:
     Contains all data required for the LUTO model to run. Loads all data upon initialisation.
     """
 
+    # Restore identity-based hashing (dataclass __eq__ silently sets __hash__ = None)
+    __hash__ = object.__hash__
+
     def __init__(self) -> None:
         """
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
