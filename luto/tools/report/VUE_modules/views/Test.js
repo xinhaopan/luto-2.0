@@ -1,5 +1,5 @@
 window.Test = {
-  template: `
+  template: /*html*/`
     <!-- Title for map and chart -->
 
         <div class="flex mr-4 gap-4 mb-4">

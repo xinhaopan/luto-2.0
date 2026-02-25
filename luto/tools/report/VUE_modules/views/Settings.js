@@ -2,6 +2,7 @@ window.SettingsView = {
   setup(props, { emit }) {
     const { ref, onMounted, watch, computed } = Vue;
     const loadScript = window.loadScript;
+    const VIEW_NAME = "Settings";
 
     // Tab management
     const activeTab = ref('settings');
@@ -219,7 +220,7 @@ window.SettingsView = {
       }
     });
 
-    return {
+    const _state = {
       activeTab,
       searchTerm,
       activeFilter,
@@ -229,9 +230,11 @@ window.SettingsView = {
       getValueClass,
       chartMemLogData,
     };
+    window._debug[VIEW_NAME] = _state;
+    return _state;
   },
 
-  template: `
+  template: /*html*/`
     <div class="min-h-screen p-5" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
       <div class="max-w-7xl mx-auto" style="backdrop-filter: blur(16px); background: rgba(255, 255, 255, 0.95);" class="rounded-3xl p-8 shadow-2xl">
         

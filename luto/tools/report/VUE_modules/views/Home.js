@@ -311,7 +311,7 @@ window.HomeView = {
     // Memory cleanup on component unmount
     onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
 
-    return {
+    const _state = {
       yearIndex,
       runScenario,
       dataLoaded,
@@ -335,10 +335,12 @@ window.HomeView = {
       selectRankingColors,
       selectRanking,
     };
+    window._debug[VIEW_NAME] = _state;
+    return _state;
   },
 
   // This template is a fallback that will be replaced by the loaded template
-  template: `
+  template: /*html*/`
     <div v-if="dataLoaded">
       <div class="flex flex-col">
 

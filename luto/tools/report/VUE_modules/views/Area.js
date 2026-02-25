@@ -231,7 +231,7 @@ window.AreaView = {
       window.MemoryService.cleanupViewData(VIEW_NAME);
     });
 
-    return {
+    const _state = {
       yearIndex,
       selectYear,
       selectRegion,
@@ -254,8 +254,10 @@ window.AreaView = {
       isDrawerOpen,
       toggleDrawer,
     };
+    window._debug[VIEW_NAME] = _state;
+    return _state;
   },
-  template: `
+  template: /*html*/`
     <div class="relative w-full h-screen">
 
 

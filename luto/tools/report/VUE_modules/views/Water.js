@@ -223,7 +223,7 @@ window.WaterView = {
       }
     });
 
-    return {
+    const _state = {
       yearIndex,
       selectYear,
       selectRegion,
@@ -246,8 +246,10 @@ window.WaterView = {
       isDrawerOpen,
       toggleDrawer,
     };
+    window._debug[VIEW_NAME] = _state;
+    return _state;
   },
-  template: `
+  template: /*html*/`
     <div class="relative w-full h-screen">
 
       <!-- Region selection dropdown -->
