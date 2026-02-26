@@ -9,6 +9,7 @@ from osgeo import gdal, osr
 from rasterio.warp import reproject, Resampling
 import rasterio
 
+
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
@@ -870,33 +871,33 @@ def plot_tif_layer(
         plt.close(fig)
 
 
-def safe_plot(*, tif_path, title, unit, cmap, outfile=None, ax=None,**kwargs):
-    """既支持单图保存，也支持子图绘制"""
-    if ax is None:
-        print(f"[INFO] Plotting {tif_path}")
-        os.makedirs(os.path.dirname(outfile), exist_ok=True)
-    else:
-        print(f"[INFO] Plotting {tif_path} to subplot: {title}")
-
-    if not os.path.exists(tif_path):
-        print(f"[SKIP] Not found: {tif_path}")
-        if ax is not None:
-            # 在子图上显示错误信息
-            ax.text(0.5, 0.5, f"File not found:\n{os.path.basename(tif_path)}",
-                    ha='center', va='center', transform=ax.transAxes,
-                    fontsize=8, color='red')
-            ax.set_title(title, fontsize=10)
-        return
-
-    plot_tif_layer(
-        tif_path=tif_path,
-        title=title,
-        unit=unit,
-        cmap=cmap,
-        outfile=outfile,
-        ax=ax,
-        **kwargs
-    )
+# def safe_plot(*, tif_path, title, unit, cmap, outfile=None, ax=None,**kwargs):
+#     """既支持单图保存，也支持子图绘制"""
+#     if ax is None:
+#         print(f"[INFO] Plotting {tif_path}")
+#         os.makedirs(os.path.dirname(outfile), exist_ok=True)
+#     else:
+#         print(f"[INFO] Plotting {tif_path} to subplot: {title}")
+#
+#     if not os.path.exists(tif_path):
+#         print(f"[SKIP] Not found: {tif_path}")
+#         if ax is not None:
+#             # 在子图上显示错误信息
+#             ax.text(0.5, 0.5, f"File not found:\n{os.path.basename(tif_path)}",
+#                     ha='center', va='center', transform=ax.transAxes,
+#                     fontsize=8, color='red')
+#             ax.set_title(title, fontsize=10)
+#         return
+#
+#     plot_tif_layer(
+#         tif_path=tif_path,
+#         title=title,
+#         unit=unit,
+#         cmap=cmap,
+#         outfile=outfile,
+#         ax=ax,
+#         **kwargs
+#     )
 
 
 
@@ -1073,3 +1074,121 @@ def draw_combined_plot(
     plt.close(fig)
 
     return fig
+
+
+
+
+def create_zero_tif_from_template(template_path, output_path):
+    """
+    根据模板 TIF 创建一个值全为 0 的 TIF 文件
+
+    Parameters
+    ----------
+    template_path : str
+        模板 TIF 文件路径
+    output_path : str
+        输出 TIF 文件路径
+    """
+    with rasterio.open(template_path) as src:
+        # 获取元数据
+        meta = src.meta.copy()
+
+        # 创建全 0 数组
+        zeros = np.zeros((src.height, src.width), dtype=meta['dtype'])
+
+        # 确保输出目录存在
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # 写入新文件
+        with rasterio.open(output_path, 'w', **meta) as dst:
+            dst.write(zeros, 1)
+            # 复制掩膜（如果有）
+            if src.dataset_mask().any():
+                dst.write_mask(src.dataset_mask())
+
+    print(f"✅ 已创建全0文件: {os.path.basename(output_path)}")
+
+
+def check_and_create_missing_tifs(tif_paths):
+    """
+    检查并创建缺失的 TIF 文件
+
+    Parameters
+    ----------
+    tif_paths : list
+        所有需要的 TIF 文件路径列表
+
+    Returns
+    -------
+    existing_paths : list
+        存在的文件路径
+    created_paths : list
+        新创建的文件路径
+    """
+    existing = []
+    missing = []
+
+    # 1. 检查哪些存在、哪些不存在
+    print("=" * 60)
+    print("检查 TIF 文件...")
+    for path in tif_paths:
+        if os.path.exists(path):
+            existing.append(path)
+        else:
+            missing.append(path)
+
+    print(f"  ✅ 存在: {len(existing)} 个")
+    print(f"  ❌ 缺失: {len(missing)} 个")
+
+    # 2. 如果有缺失的，使用第一个存在的作为模板创建
+    created = []
+    if missing and existing:
+        template_path = existing[0]  # 使用第一个存在的文件作为模板
+        print(f"\n使用模板: {os.path.basename(template_path)}")
+        print("创建缺失文件:")
+
+        for missing_path in missing:
+            try:
+                create_zero_tif_from_template(template_path, missing_path)
+                created.append(missing_path)
+            except Exception as e:
+                print(f"  ❌ 创建失败 {os.path.basename(missing_path)}: {e}")
+
+    elif missing and not existing:
+        print("\n⚠️ 警告：没有任何存在的文件作为模板！")
+
+    print("=" * 60)
+
+    return existing, created
+
+
+
+
+# safe_plot 函数可以简化（因为文件肯定存在了）
+def safe_plot(*, tif_path, title, unit, cmap, outfile=None, ax=None, **kwargs):
+    """既支持单图保存，也支持子图绘制"""
+    if ax is None:
+        print(f"[INFO] Plotting {tif_path}")
+        os.makedirs(os.path.dirname(outfile), exist_ok=True)
+    else:
+        print(f"[INFO] Plotting {tif_path} to subplot: {title}")
+
+    # 现在可以假设文件一定存在
+    if not os.path.exists(tif_path):
+        print(f"[ERROR] File still missing: {tif_path}")
+        if ax is not None:
+            ax.text(0.5, 0.5, f"Error: File not found",
+                    ha='center', va='center', transform=ax.transAxes,
+                    fontsize=10, color='red')
+            ax.set_title(title, fontsize=10)
+        return
+
+    plot_tif_layer(
+        tif_path=tif_path,
+        title=title,
+        unit=unit,
+        cmap=cmap,
+        outfile=outfile,
+        ax=ax,
+        **kwargs
+    )

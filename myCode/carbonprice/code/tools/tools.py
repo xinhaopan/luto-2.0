@@ -9,6 +9,8 @@ import os
 import joblib
 import zipfile
 import pandas as pd
+import gc
+import sys
 import tools.config as config
 
 
@@ -353,7 +355,7 @@ def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0,
     ----------
     data : 数据对象（包含地理元数据）
     da : xr.DataArray
-        输入数据
+        输入数据（必须是一维，维度名为 'cell'）
     tif_path : str
         输出 .tif 路径
     nodata_value : float
@@ -363,47 +365,75 @@ def nc_to_tif(data, da, tif_path: str, nodata_value: float = -9999.0,
     retry_delay : float
         重试延迟（秒）
     """
-    import time
-    import gc
-    from filelock import FileLock, Timeout
-
     # 仅支持 1D 'cell'
     if "cell" not in da.dims or len(da.dims) != 1:
         raise ValueError(f"维度是 {da.dims}，只支持一维 'cell'。")
 
-    arr1d = da.values.astype(np.float32)
+    arr = da.values.astype(np.float32)
 
-    # 创建有效性掩膜（在转换前）
-    valid_mask_1d = np.isfinite(arr1d)
+    # ========== 根据数据长度判断类型并转换为 2D ==========
+    # 参考 arr_to_xr 的逻辑
+    if arr.size == data.LUMASK.size:
+        # ===== 情况1: 全分辨率原始数据 (LUMASK.size = 6956407) =====
+        geo_meta = data.GEO_META_FULLRES.copy()
+        arr_2d = np.full(data.NLUM_MASK.shape, nodata_value, dtype=np.float32)
 
-    # 将无效值替换为 nodata
-    arr1d = np.where(valid_mask_1d, arr1d, nodata_value)
+        # 创建有效性掩膜（1D）
+        valid_mask_1d = np.isfinite(arr)
+        arr_safe = np.where(valid_mask_1d, arr, nodata_value)
 
-    # 铺回 2D
-    full_res_raw = (arr1d.size == data.LUMAP_NO_RESFACTOR.size)
-    if full_res_raw:
+        # 使用 np.place 填充数据到 2D
+        np.place(arr_2d, data.NLUM_MASK, arr_safe)
+
+        # 创建 2D 有效性掩膜
+        valid_mask_2d = np.zeros(data.NLUM_MASK.shape, dtype=bool)
+        np.place(valid_mask_2d, data.NLUM_MASK, valid_mask_1d)
+
+    elif arr.size == data.LUMASK.sum():
+        # ===== 情况2: 部分有效的全分辨率数据 (LUMASK.sum()) =====
+        # 【关键修复】先创建一个与 LUMASK.size 相同长度的全 0 数组
+        arr_fulllen = np.zeros(data.NCELLS, dtype=np.float32)
+        valid_mask_fulllen = np.zeros(data.NCELLS, dtype=bool)
+
+        # 创建有效性掩膜
+        valid_mask_1d = np.isfinite(arr)
+
+        # 【关键】将 arr 填充到 arr_fulllen 的有效位置
+        # data.MASK 是一个布尔数组，长度为 data.NCELLS
+        # arr 的长度应该等于 data.MASK.sum()
+        arr_fulllen[data.MASK] = np.where(valid_mask_1d, arr, nodata_value)
+        valid_mask_fulllen[data.MASK] = valid_mask_1d
+
+        # 再映射到 2D
         geo_meta = data.GEO_META_FULLRES.copy()
         arr_2d = np.full(data.NLUM_MASK.shape, nodata_value, dtype=np.float32)
         valid_mask_2d = np.zeros(data.NLUM_MASK.shape, dtype=bool)
-        # 只在有效位置填充数据和掩膜
-        mask_indices = np.where(data.NLUM_MASK)
-        arr_2d[mask_indices] = arr1d
-        valid_mask_2d[mask_indices] = valid_mask_1d
+
+        np.place(arr_2d, data.NLUM_MASK, arr_fulllen)
+        np.place(valid_mask_2d, data.NLUM_MASK, valid_mask_fulllen)
+
     else:
+        # ===== 情况3: 重采样数据 (data.NCELLS) =====
         geo_meta = data.GEO_META.copy()
         arr_2d = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
-        valid_mask_2d = np.ones_like(arr_2d, dtype=bool)
 
-        # 标记掩膜区域为无效
+        # 创建有效性掩膜
+        valid_mask_1d = np.isfinite(arr)
+        arr_safe = np.where(valid_mask_1d, arr, nodata_value)
+
+        # 使用与 arr_to_xr 相同的方式填充
+        arr_2d[*data.COORD_ROW_COL_RESFACTORED] = arr_safe
+
+        # 创建 2D 有效性掩膜
+        valid_mask_2d = np.ones(arr_2d.shape, dtype=bool)
+
+        # 先将数据位置的掩膜设置为对应的有效性
+        valid_mask_2d[*data.COORD_ROW_COL_RESFACTORED] = valid_mask_1d
+
+        # 标记掩膜区域和 NODATA 区域为无效
         mask_condition = (arr_2d == data.MASK_LU_CODE) | (arr_2d == data.NODATA)
         valid_mask_2d[mask_condition] = False
         arr_2d[mask_condition] = nodata_value
-
-        # 填充有效数据
-        data_condition = ~mask_condition
-        data_indices = np.where(data_condition)
-        arr_2d[data_indices] = arr1d
-        valid_mask_2d[data_indices] = valid_mask_1d
 
     # 确保所有无效位置都设为 nodata
     arr_2d = np.where(valid_mask_2d, arr_2d, nodata_value).astype(np.float32)
@@ -518,6 +548,8 @@ def get_data_RES(task_name, path_name, use_zip=False):
     - path_name: 任务名称或路径名称
     - 返回: 输出子目录的完整路径
     """
+    LUTO2_ROOT = f"../../../output/{task_name}/{path_name}"
+    sys.path.insert(0, LUTO2_ROOT)
     if use_zip:
         output_path = f"../../../output/{task_name}/{path_name}"
         zip_path = os.path.join(output_path, 'Run_Archive.zip')

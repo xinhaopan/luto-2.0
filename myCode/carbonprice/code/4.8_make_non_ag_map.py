@@ -5,7 +5,7 @@ import cartopy.crs as ccrs
 import os
 
 import tools.config as config
-from tools.helper_map import (safe_plot, add_scalebar, add_north_arrow, add_annotation, align_raster_to_reference)
+from tools.helper_map import (check_and_create_missing_tifs, safe_plot, add_scalebar, add_north_arrow, add_annotation, align_raster_to_reference)
 from tools.helper_plot import set_plot_style
 import cmocean
 import matplotlib.colors as mcolors
@@ -19,34 +19,63 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
     nrows = len(tif_title_list)
     ncols = len(scenarios)
     figsize = (ncols * 5, nrows * 4.2)
+
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.2, wspace=0.02,
-                           left=0.05, right=0.99, top=1, bottom=0.04)
+    gs = gridspec.GridSpec(
+        nrows, ncols, figure=fig, hspace=-0.2, wspace=0.02,
+        left=0.05, right=0.99, top=1, bottom=0.04
+    )
     axes = []
+
+    # ---------- 1) 先收集所有 tif 路径 ----------
+    tif_paths = []
+    cell_jobs = []  # 保存每个子图需要的信息，后面画图用
 
     for row, tif in enumerate(tif_title_list):
         for col, scenario in enumerate(scenarios):
-            title_name = ''
-            if row == 0:
-                title_name = title_names[col]
+            title_name = title_names[col] if row == 0 else ""
+
             if tif == "Total":
-                tif_path = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/xr_total_area_non_agricultural_landuse_{scenario}_2050.tif"
+                tif_path = (
+                    f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/"
+                    f"xr_total_area_non_agricultural_landuse_{scenario}_2050.tif"
+                )
                 title_name = title_names[col]
             else:
-                tif_path = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/xr_area_non_agricultural_landuse_{scenario}_{tif}_2050.tif"
-            ax = fig.add_subplot(gs[row, col], projection=ccrs.PlateCarree())
-            safe_plot(
-                tif_path=tif_path,
-                title=title_name,
-                ax=ax,
-                unit='%',
-                cmap=area_cmap,
-                title_y=0.95,
-                force_one_start=False,
-                custom_tick_values=[0, 0.5, 1],
-                create_colorbar=False
-            )
-            axes.append(ax)
+                tif_path = (
+                    f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/"
+                    f"xr_area_non_agricultural_landuse_{scenario}_{tif}_2050.tif"
+                )
+
+            tif_paths.append(tif_path)
+            cell_jobs.append((row, col, tif_path, title_name))
+
+    # ---------- 2) 关键：绘图前检查并创建缺失 tif ----------
+    # 直接调用你写的函数即可
+    existing, created = check_and_create_missing_tifs(tif_paths)
+
+    # 可选：如果缺失但没有模板，就提前提示（避免后面每个子图都报 not found）
+    if len(existing) == 0 and len(tif_paths) > 0:
+        print("[ERROR] 所有 tif 都不存在，无法用模板创建缺失文件。")
+        # 这里仍然可以继续画，safe_plot 会在子图上写 File not found
+        # return fig, axes  # 你也可以选择直接返回
+
+    # ---------- 3) 画图 ----------
+    for row, col, tif_path, title_name in cell_jobs:
+        ax = fig.add_subplot(gs[row, col], projection=ccrs.PlateCarree())
+        safe_plot(
+            tif_path=tif_path,
+            title=title_name,
+            ax=ax,
+            unit='%',
+            cmap=area_cmap,
+            title_y=0.95,
+            force_one_start=False,
+            custom_tick_values=[0, 0.5, 1],
+            create_colorbar=False
+        )
+        axes.append(ax)
+
     return fig, axes
 
 

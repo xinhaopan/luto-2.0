@@ -6,7 +6,7 @@ import os
 import matplotlib.colors as mcolors
 
 import tools.config as config
-from tools.helper_map import (safe_plot, add_scalebar, add_north_arrow, add_annotation, align_raster_to_reference)
+from tools.helper_map import (check_and_create_missing_tifs, safe_plot, add_scalebar, add_north_arrow, add_annotation, align_raster_to_reference)
 from tools.helper_plot import set_plot_style
 import cmocean
 def plot_tif_grid(scenarios, tif_title_list, title_names):
@@ -21,6 +21,31 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
     gs = gridspec.GridSpec(nrows, ncols, figure=fig, hspace=-0.12, wspace=0.02,
                            left=0.03, right=0.99, top=0.99, bottom=0.04)
     axes = []
+
+    # ---------- 1) 先收集所有 tif 路径 ----------
+    tif_paths = []
+    cell_jobs = []  # 保存每个子图需要的信息，后面画图用
+
+    for row, tif in enumerate(tif_title_list):
+        for col, scenario in enumerate(scenarios):
+            title_name = title_names[col] if row == 0 else ""
+            if tif == "Total":
+                tif_path = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/xr_total_area_agricultural_management_{scenario}_2050.tif"
+            else:
+                tif_path = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/xr_area_agricultural_management_{scenario}_{tif}_2050.tif"
+
+            tif_paths.append(tif_path)
+            cell_jobs.append((row, col, tif_path, title_name))
+
+    # ---------- 2) 关键：绘图前检查并创建缺失 tif ----------
+    # 直接调用你写的函数即可
+    existing, created = check_and_create_missing_tifs(tif_paths)
+
+    # 可选：如果缺失但没有模板，就提前提示（避免后面每个子图都报 not found）
+    if len(existing) == 0 and len(tif_paths) > 0:
+        print("[ERROR] 所有 tif 都不存在，无法用模板创建缺失文件。")
+        # 这里仍然可以继续画，safe_plot 会在子图上写 File not found
+        # return fig, axes  # 你也可以选择直接返回
 
     for row, tif in enumerate(tif_title_list):
         for col,scenario in enumerate(scenarios):

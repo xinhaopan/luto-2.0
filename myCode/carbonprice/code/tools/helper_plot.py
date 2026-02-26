@@ -14,6 +14,7 @@ from matplotlib.ticker import FuncFormatter, MaxNLocator
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from pygam import LinearGAM, s
+from matplotlib.ticker import StrMethodFormatter
 
 import re
 from typing import List, Optional, Dict
@@ -621,7 +622,7 @@ def plot_25_layout(
             legend_handles, legend_labels = ax.get_legend_handles_labels()
 
     if post_process:
-        axes = post_process(axes)
+        axes = post_process(axes,title_names, title_map)
 
     # 在底部绘制图例
     if legend_handles:
@@ -1512,9 +1513,8 @@ def draw_22_price(
     tick_positions = [year for year in tick_positions if year in x_data]
 
     # ------ Carbon图（第一行前两个） ------
-    carbon_y = np.concatenate([df.iloc[:, i].values for i in range(2)])
-    # y_carbon_all = get_y_axis_ticks(0, np.nanmax(carbon_y), desired_ticks=desired_ticks)
-    y_carbon_all = get_y_axis_ticks(0, 150, desired_ticks=desired_ticks)
+    carbon_y = np.concatenate([df.iloc[:, i].values for i in range(22)])
+    y_carbon_all = get_y_axis_ticks(0, np.nanmax(carbon_y), desired_ticks=desired_ticks)
 
     ax_list = []
     for i in range(2):
@@ -1544,7 +1544,7 @@ def draw_22_price(
         np.concatenate([df.iloc[:, i + 7].values for i in range(10)])
     ])
     # 使用全量数据获取 y 轴范围和刻度
-    y_bio_all = get_y_axis_ticks(0, np.nanmax(bio_y), desired_ticks=desired_ticks - 2)
+    y_bio_all = get_y_axis_ticks(0, np.nanmax(bio_y), desired_ticks=desired_ticks)
 
     # ----- 画第2、3行 -----
     for i in range(2, 12):
@@ -1596,9 +1596,8 @@ def draw_22_price(
     if draw_legend:
         # 定义legend句柄
         handle_carbon = mlines.Line2D([], [], color='black', linewidth=2, label="Net-zero targets")
-        handle_bio12 = mlines.Line2D([], [], color='orange', linewidth=2,
-                                     label="Net-zero targets and nature-positive targets")
-        handle_bio10 = mlines.Line2D([], [], color='purple', linewidth=2, label="Nature-positive targets")
+        handle_bio12 = mlines.Line2D([], [], color='orange', linewidth=2, label="Nature-positive targets")
+        handle_bio10 = mlines.Line2D([], [], color='purple', linewidth=2, label="Net-zero targets and nature-positive targets")
 
         shade_carbon = Patch(color='black', alpha=0.25, label="95% CI")
         shade_bio12 = Patch(color='orange', alpha=0.25, label="95% CI")
@@ -1851,6 +1850,219 @@ def draw_10_price(
     # 保存图形
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))
+    plt.savefig(output_path, dpi=300)
+    plt.show()
+    print(f"✅ Saved to {output_path}")
+
+    return fig, axes
+
+def draw_10_price_skip_0_5(
+        df_long,
+        title_map,
+        color,
+        output_path,
+        start_year,
+        desired_ticks=4,
+        ylabel=r"Carbon price for GHG and biodiversity (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
+        figsize=(24, 10),
+        legend_label_line="Nature-positive targets",
+        legend_label_shade="95% CI",
+        legend_loc="lower left", # best
+        legend_on_first_ax=True,
+        ylabel_pos=(-0.3, -0.2),  # (x, y) in axes coords
+        top_space_ratio=0.20,  # y 轴顶部额外空间比例
+        ci=95,
+):
+    """
+    画两行共 10 张子图，但跳过第1张(index 0)和第6张(index 5)。
+    """
+    # 筛选年份
+    df_filtered = df_long[df_long['Year'] >= start_year].copy()
+
+    # 按照title_map的顺序获取scenario列表
+    scenario_list = list(title_map.keys())
+
+    # 将长格式转换为宽格式，保持scenario顺序
+    df_pivot = df_filtered.pivot(index='Year', columns='scenario', values='data')
+    df2 = df_pivot[scenario_list]  # 按照title_map顺序重新排列列
+
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(2, 5, figure=fig, hspace=0.15, wspace=0.15)
+    fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
+
+    # ---- 统一 x 轴刻度 ----
+    x_data = df2.index
+    x_min, x_max = x_data.min(), x_data.max()
+    tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+    tick_positions = [year for year in tick_positions if year in x_data]
+
+    # ---- 统一 y 轴范围（排除被跳过的列）----
+    valid_indices = [i for i in range(10) if i not in [0, 5]]
+    bio_y = np.concatenate([df2.iloc[:, i].values for i in valid_indices])
+    bio_ymax = np.nanmax(bio_y)
+    y0, y1 = 0.0, float(bio_ymax) * (1.0 + top_space_ratio)
+
+    def _int_fmt(x, pos):
+        return f"{int(x)}"
+
+    int_formatter = FuncFormatter(_int_fmt)
+
+    axes = []
+    for i in range(10):
+        if i in [0, 5]:
+            continue
+
+        row, col = divmod(i, 5)
+        ax = fig.add_subplot(gs[row, col])
+        df_input = df2.iloc[:, i].to_frame()
+        scenario_name = df2.columns[i]
+        display_title = title_map.get(scenario_name, scenario_name)
+
+        # 你的拟合画线函数（外部提供）
+        draw_fit_line_ax(ax, df_input, color=color, title_name=display_title, ci=ci)
+
+        # y 轴范围与刻度
+        ax.set_ylim(y0, y1)
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=desired_ticks, integer=True))
+        ax.yaxis.set_major_formatter(int_formatter)
+
+        # x 轴刻度
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x')
+
+        # 非第二列（col=1）不显示 y 轴刻度文本（因为第一列col=0被跳过了）
+        if col != 1:
+            ax.tick_params(axis='y', labelleft=False)
+        
+        # 非最后一行不显示 x 轴刻度文本
+        if row != 1:
+            ax.tick_params(axis='x', labelbottom=False)
+
+        axes.append(ax)
+
+    # y 轴标签放在第一个绘制的子图上（即 axes[0]，对应原始 index 1）
+    if axes:
+        axes[0].set_ylabel(ylabel)
+        axes[0].yaxis.set_label_coords(-0.19, -0.03)
+
+    # legend：默认只在第一个绘制的子图里放
+    if legend_on_first_ax and axes:
+        line_handle = mlines.Line2D([], [], color=color, linewidth=2, label=legend_label_line)
+        if ci is not None and ci > 0:
+            shade_handle = Patch(color=color, alpha=0.25, label=legend_label_shade)
+            axes[0].legend(handles=[line_handle, shade_handle], loc=legend_loc, frameon=False)
+        else:
+            axes[0].legend(handles=[line_handle], loc=legend_loc, frameon=False)
+
+    # 保存图形
+    if not os.path.exists(os.path.dirname(output_path)):
+        os.makedirs(os.path.dirname(output_path))
+    plt.savefig(output_path, dpi=300)
+    plt.show()
+    print(f"✅ Saved to {output_path}")
+
+    return fig, axes
+
+def draw_10_price_keep_5_and_10_one_row(
+        df_long,
+        title_map,
+        color,
+        output_path,
+        start_year,
+        desired_ticks=4,
+        ylabel=r"Carbon price for GHG and biodiversity (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
+        figsize=(12, 4.5),
+        legend_label_line="Nature-positive targets",
+        legend_label_shade="95% CI",
+        legend_loc="upper right",
+        legend_on_first_ax=True,
+        top_space_ratio=0.20,
+        ci=95,
+):
+    """
+    只保留第5张(index=4)和第10张(index=9)子图，放到一行（1x2）。
+    """
+    # 筛选年份
+    df_filtered = df_long[df_long['Year'] >= start_year].copy()
+
+    # 按照title_map的顺序获取scenario列表
+    scenario_list = list(title_map.keys())
+
+    # 长转宽，并按 scenario 顺序排列
+    df_pivot = df_filtered.pivot(index='Year', columns='scenario', values='data')
+    df2 = df_pivot[scenario_list]
+
+    # 只保留第5张和第10张（1-based: 5,10 => 0-based: 4,9）
+    keep_indices = [4, 9]
+    keep_indices = [i for i in keep_indices if i < df2.shape[1]]
+    if len(keep_indices) != 2:
+        raise ValueError(f"df2 只有 {df2.shape[1]} 列，无法保留第5和第10张（需要至少10列）。")
+
+    # ---- 统一 x 轴刻度 ----
+    x_data = df2.index
+    # x_min, x_max = x_data.min(), x_data.max()
+    x_min, x_max = x_data.min(), x_data.max()
+    tick_positions = list(range(int(x_min), int(x_max) + 1, 5))
+    tick_positions = [year for year in tick_positions if year in x_data]
+
+    # ---- 统一 y 轴范围（只用保留的两列）----
+    bio_y = np.concatenate([df2.iloc[:, i].values for i in keep_indices])
+    bio_ymax = np.nanmax(bio_y)
+    y0, y1 = 0.0, float(bio_ymax) * (1.0 + top_space_ratio)
+
+    def _int_fmt(x, pos):
+        return f"{int(x)}"
+
+    int_formatter = FuncFormatter(_int_fmt)
+
+    # ---- 画图：1行2列 ----
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(1, 2, figure=fig, hspace=0.15, wspace=0.15)
+    fig.subplots_adjust(left=0.15, right=0.97, top=0.92, bottom=0.12)
+
+    axes = []
+    for pos, idx in enumerate(keep_indices):
+        ax = fig.add_subplot(gs[0, pos])
+
+        df_input = df2.iloc[:, idx].to_frame()
+        scenario_name = df2.columns[idx]
+        display_title = title_map.get(scenario_name, scenario_name)
+
+        # 你的拟合画线函数（外部提供）
+        draw_fit_line_ax(ax, df_input, color=color, title_name=display_title, ci=ci)
+
+        # y 轴范围与刻度
+        ax.set_ylim(y0, y1)
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=desired_ticks, integer=True))
+        ax.yaxis.set_major_formatter(int_formatter)
+        ax.yaxis.set_major_formatter(StrMethodFormatter('{x:,.0f}'))
+        # x 轴刻度
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x')
+
+        # 右图不显示 y tick label（可选：保持干净）
+        if pos == 1:
+            ax.tick_params(axis='y', labelleft=False)
+
+        axes.append(ax)
+
+    # y 轴标签放在左图
+    if axes:
+        axes[0].set_ylabel(ylabel, multialignment='center')
+
+    # legend：默认只在左图放
+    if legend_on_first_ax and axes:
+        line_handle = mlines.Line2D([], [], color=color, linewidth=2, label=legend_label_line)
+        if ci is not None and ci > 0:
+            shade_handle = Patch(color=color, alpha=0.25, label=legend_label_shade)
+            axes[0].legend(handles=[line_handle, shade_handle], loc=legend_loc, frameon=False)
+        else:
+            axes[0].legend(handles=[line_handle], loc=legend_loc, frameon=False)
+
+    # 保存图形
+    out_dir = os.path.dirname(output_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     plt.savefig(output_path, dpi=300)
     plt.show()
     print(f"✅ Saved to {output_path}")

@@ -2,7 +2,7 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 import tools.config as config
-from tools.helper_plot import set_plot_style, draw_12_price, draw_10_price, draw_22_price
+from tools.helper_plot import set_plot_style, draw_12_price, draw_10_price, draw_22_price,draw_10_price_keep_5_and_10_one_row
 
 def recalculate_carbon_price(df):
     scenario_list = [
@@ -47,3 +47,5 @@ set_plot_style(30)
 draw_22_price(df_carbon_long, config.CP_TITLE_MAP,output_path=f"{output_dir}/05_Carbon_solution_price_all",start_year=config.START_YEAR, desired_ticks=5,  y_label=r"Shadow carbon price (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",ci=95)
 set_plot_style(20)
 draw_10_price(df_bio_long,config.BP_TITLE_MAP,'green',f"{output_dir}/05_biodiversity_solution_price.png",start_year=config.START_YEAR,desired_ticks=5,ylabel="Biodiversity price (AU\$ contribution-weighted area ha$^{-1}$ yr$^{-1}$)",ci=95)
+set_plot_style(15)
+draw_10_price_keep_5_and_10_one_row(df_bio_long,config.BP_TITLE_MAP,'green',f"{output_dir}/05_biodiversity_solution_price_long_5_10.png",start_year=2030,desired_ticks=5,ylabel = r"Biodiversity price(AU\$ " + "\n" + r"contribution-weighted area ha$^{-1}$ yr$^{-1}$)",ci=95)
