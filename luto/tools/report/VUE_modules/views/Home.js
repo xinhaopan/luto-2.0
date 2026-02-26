@@ -1,4 +1,5 @@
 window.HomeView = {
+  name: 'HomeView',
 
   setup() {
 
@@ -420,12 +421,11 @@ window.HomeView = {
                 class="flex-1 max-w-[150px] pt-2 pl-2"
                 v-model="yearIndex"
                 size="small"
-                :show-tooltip="false"
                 :min="0"
                 :max="availableYears.length - 1"
                 :step="1"
                 :format-tooltip="index => availableYears[index]"
-                :marks="availableYears.reduce((acc, year, index) => ({ ...acc, [index]: year }), {})"
+                :show-stops="true"
                 @input="(index) => { yearIndex = index; }"
               />
             </div>

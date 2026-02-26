@@ -1,4 +1,5 @@
 window.SettingsView = {
+  name: 'SettingsView',
   setup(props, { emit }) {
     const { ref, onMounted, watch, computed } = Vue;
     const loadScript = window.loadScript;

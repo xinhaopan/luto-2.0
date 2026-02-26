@@ -1,4 +1,5 @@
 window.ProductionView = {
+  name: 'ProductionView',
   setup() {
     const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
 
@@ -267,12 +268,11 @@ window.ProductionView = {
           v-if="availableYears && availableYears.length > 0"
           v-model="yearIndex"
           size="small"
-          :show-tooltip="false"
           :min="0"
           :max="availableYears.length - 1"
           :step="1"
           :format-tooltip="index => availableYears[index]"
-          :marks="availableYears.reduce((acc, year, index) => ({ ...acc, [index]: year }), {})"
+          :show-stops="true"
           @input="(index) => { yearIndex = index; selectYear = availableYears[index]; }"
         />
       </div>

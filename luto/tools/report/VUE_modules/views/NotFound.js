@@ -1,4 +1,5 @@
 window.NotFound = {
+  name: 'NotFound',
   setup() {
     return {};
   },
