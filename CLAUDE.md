@@ -47,7 +47,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - Cascade watcher implementation
 - Data hierarchies for all modules (Area, Economics, GHG, Production, Water, Biodiversity, DVAR)
 - Chart vs Map data structures
-- Special cases (Economics dual series, Biodiversity conditional loading)
+- Special cases (Economics dual map-types, GHG Ag Source level, Biodiversity multi-metric, Water Am chart series-by-AgMgt)
 - File structure (views, data, services, routes)
 
 ## Quick Reference
@@ -357,26 +357,33 @@ The LUTO reporting system uses Vue.js 3 with a progressive selection pattern for
 
 ### JSON Output Hierarchies (Map vs Chart)
 
-**IMPORTANT**: Map and Chart JSON files have different dimension hierarchies:
+Map and Chart JSON files have different dimension hierarchies. See [CLAUDE_VUE_REPORTING.md](docs/CLAUDE_VUE_REPORTING.md) for the full per-module table.
 
-**Map JSON (Spatial Layers)**:
-- **Ag**: `lm → lu → source (if applicable for GHG/Economics) → year`
-- **Am**: `am → lm → lu → source (if applicable) → year`
+**Map JSON (Spatial Layers)** — ends at `year → {img_str, bounds, min_max}`:
+- **Ag**: `lm → lu → year` (standard); `lm → source → lu → year` (GHG/Economics)
+- **Am**: `am → lm → lu → year` (standard); no source in Am for GHG
 - **NonAg**: `lu → year`
 
-**Chart JSON (Time Series)**:
-- **Ag**: `region → lm → lu` (array of series)
-- **Am**: `region → lm → lu → source (if applicable) → am` (array of series)
-- **NonAg**: `region → lu` (array of series)
+**Chart JSON (Time Series)** — ends at `[series array]`:
+- **Ag**: `region → lm → lu` (standard); `region → lm → source → [series(name=LU)]` (GHG)
+- **Am**: `region → lm → lu → [series(name=AgMgt)]`; source removed from Am in GHG/Water
+- **NonAg**: `region → [series(name=LU)]`
 
-**Key Difference**: Map JSON places `source` before `year`, while Chart JSON places `source` before the final series array (Am only). See [CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md) for detailed examples.
+**`source` dimension** appears only in **Ag** for GHG (emission type) and Economics (cost/revenue type). Am no longer has a source level.
+
+**Valid Layers Pattern** — two approaches:
+- **Economics** (revenue/cost/profit/transitions): `ALL` = dvar mosaic (categorical) — load dvar, filter, concat
+- **GHG / Biodiversity / Water / Production**: `ALL` = sum aggregate — `xr.concat([data.sum('dim'), data], 'dim')` before stacking
+
+See [CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md) for detailed examples.
 
 ### Vue.js Progressive Selection Hierarchies
 
 - **Standard Full**: Category → AgMgt → Water → Landuse
-- **Standard Simple**: Category → Water → Landuse
+- **Biodiversity**: Metric → Category → AgMgt → Water → Landuse
 - **NonAg Simplified**: Category → Landuse
 - **DVAR Simplified**: Category → Landuse/AgMgt → Year
+- **Economics Extended**: Category → MapType → (AgMgt) → Water → (Source) → Landuse
 
 ## Getting Started
 
