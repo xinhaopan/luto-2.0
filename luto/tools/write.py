@@ -104,9 +104,13 @@ def _save2nc(in_xr: xr.DataArray, save_path: str):
     )
 
 
-def _get_abs_magnitude(arr: xr.DataArray, dim='cell'):
+def _get_cell_magnitude(arr: xr.DataArray, dim='cell'):
     idx = np.abs(arr).argmax(dim=dim).compute()
-    return arr.isel(cell=idx).to_pandas().to_dict()
+    mag = arr.isel(cell=idx).to_pandas()
+    if mag.size == 1:
+        return mag.item()
+    else:
+        return arr.isel(cell=idx).to_pandas().to_dict()
 
 
 # ── Output writing ────────────────────────────────────────────────────────────
@@ -501,9 +505,9 @@ def write_dvar_area(data: Data, yr_cal, path):
     # Records cell magnitudes
     return (f"Decision variable areas written for year {yr_cal}", {
         'area': {
-            'ag':     (yr_cal, _get_abs_magnitude(area_ag.sel(lm='ALL'))),
-            'non_ag': (yr_cal, _get_abs_magnitude(area_non_ag)),
-            'am':     (yr_cal, _get_abs_magnitude(area_am.sel(lm='ALL', lu='ALL'))),
+            'ag':     (yr_cal, _get_cell_magnitude(area_ag.sel(lm='ALL'))),
+            'non_ag': (yr_cal, _get_cell_magnitude(area_non_ag)),
+            'am':     (yr_cal, _get_cell_magnitude(area_am.sel(lm='ALL', lu='ALL'))),
         }
     })
 
@@ -694,9 +698,9 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     # Record max cell value for report generation later (e.g., for setting colorbar limits)
     return (f"Separate quantity production written for year {yr_cal}", {
         'Production': {
-            'ag':     (yr_cal, _get_abs_magnitude(ag_q_mrc.sel(lm='ALL'))),
-            'non_ag': (yr_cal, _get_abs_magnitude(non_ag_p_rc)),
-            'am':     (yr_cal, _get_abs_magnitude(am_p_amrc.sel(lm='ALL').transpose('Commodity', ...))),
+            'ag':     (yr_cal, _get_cell_magnitude(ag_q_mrc.sel(lm='ALL'))),
+            'non_ag': (yr_cal, _get_cell_magnitude(non_ag_p_rc)),
+            'am':     (yr_cal, _get_cell_magnitude(am_p_amrc.sel(lm='ALL').transpose('Commodity', ...))),
         }
     })
 
@@ -711,12 +715,13 @@ def write_economics_ag(data: Data, yr_cal, path):
 
     # --- local helpers (mechanical patterns, no domain logic) ---
 
-    def add_all(da, dim):
+    def add_all(da, dims):
         """Prepend an ALL-aggregate slice along dim."""
-        return xr.concat(
-            [da.sum(dim=dim, keepdims=True).assign_coords({dim: ['ALL']}), da],
-            dim=dim
-        )
+        for dim in dims:
+            ds = da.sum(dim=dim, keepdims=True).assign_coords({dim: ['ALL']})
+            da = xr.concat([ds, da], dim=dim)
+        return da
+
 
     def to_region_and_aus_df(da, group_dims):
         """Aggregate xarray to region-level DataFrame; return (AUS+region combined, AUS only).
@@ -826,18 +831,16 @@ def write_economics_ag(data: Data, yr_cal, path):
     xr_profit_ag      = ag_dvar_mrj * profit_ag
 
     # Prepend ALL-aggregate slices (must be after multiplication to avoid double counting)
-    for dim in ['lu', 'lm', 'source']:
-        xr_ag_rev         = add_all(xr_ag_rev, dim)
-        xr_ag_cost        = add_all(xr_ag_cost, dim)
-        xr_ag2ag_cost     = add_all(xr_ag2ag_cost, dim)
-        xr_non_ag2ag_cost = add_all(xr_non_ag2ag_cost, dim)
-        
+    xr_ag_rev         = add_all(xr_ag_rev, ['lu', 'lm', 'source'])
+    xr_ag_cost        = add_all(xr_ag_cost, ['lu', 'lm', 'source'])
+    xr_ag2ag_cost     = add_all(xr_ag2ag_cost, ['lu', 'lm', 'source'])
+    xr_non_ag2ag_cost = add_all(xr_non_ag2ag_cost, ['lu', 'lm', 'source'])
     
     # Non ag transition to ag has additional 'from_lu' dimension to aggregate    
-    xr_non_ag2ag_cost = add_all(xr_non_ag2ag_cost, 'from_lu')  
-    
+    xr_non_ag2ag_cost = add_all(xr_non_ag2ag_cost, ['from_lu']) 
+     
     # Profit only has lm to expand
-    xr_profit_ag = add_all(xr_profit_ag, 'lm') 
+    xr_profit_ag = add_all(xr_profit_ag, ['lm', 'lu']) 
 
 
     # ------------------------- Chunk level aggregation -------------------------
@@ -887,11 +890,11 @@ def write_economics_ag(data: Data, yr_cal, path):
     # Record cell magnitudes for report generation later (e.g., for setting colorbar limits)
     return (f"Agricultural revenue and cost written for year {yr_cal}", {
         'Economics_ag': {
-            'ag_revenue':     (yr_cal, _get_abs_magnitude(xr_ag_rev.sel(lm='ALL', source='ALL'))),
-            'ag_cost':        (yr_cal, _get_abs_magnitude(xr_ag_cost.sel(lm='ALL', source='ALL'))),
-            'ag2ag_cost':     (yr_cal, _get_abs_magnitude(xr_ag2ag_cost.sel(lm='ALL', source='ALL'))),
-            'non_ag2ag_cost': (yr_cal, _get_abs_magnitude(xr_non_ag2ag_cost.sel(lm='ALL', source='ALL', from_lu='ALL'))),
-            'profit_ag':      (yr_cal, _get_abs_magnitude(xr_profit_ag.sel(lm='ALL'))),
+            'ag_revenue':     (yr_cal, _get_cell_magnitude(xr_ag_rev.sel(lm='ALL', source='ALL'))),
+            'ag_cost':        (yr_cal, _get_cell_magnitude(xr_ag_cost.sel(lm='ALL', source='ALL'))),
+            'ag2ag_cost':     (yr_cal, _get_cell_magnitude(xr_ag2ag_cost.sel(lm='ALL', source='ALL'))),
+            'non_ag2ag_cost': (yr_cal, _get_cell_magnitude(xr_non_ag2ag_cost.sel(lm='ALL', source='ALL', from_lu='ALL'))),
+            'profit_ag':      (yr_cal, _get_cell_magnitude(xr_profit_ag.sel(lm='ALL'))),
         }
     })
 
@@ -905,12 +908,12 @@ def write_economics_ag_man(data: Data, yr_cal, path):
 
     # --- local helpers (mechanical patterns, no domain logic) ---
 
-    def add_all(da, dim):
+    def add_all(da, dims):
         """Prepend an ALL-aggregate slice along dim."""
-        return xr.concat(
-            [da.sum(dim=dim, keepdims=True).assign_coords({dim: ['ALL']}), da],
-            dim=dim
-        )
+        for dim in dims:
+            ds = da.sum(dim=dim, keepdims=True).assign_coords({dim: ['ALL']})
+            da = xr.concat([ds, da], dim=dim)
+        return da
 
     def to_region_and_aus_df(da, group_dims):
         """Aggregate xarray to region-level DataFrame; return (AUS+region combined, AUS only).
@@ -958,11 +961,10 @@ def write_economics_ag_man(data: Data, yr_cal, path):
     xr_profit_am  = xr_revenue_am - (xr_cost_am + xr_trans_am)
 
     # Prepend ALL-aggregate slices (must be after multiplication to avoid double counting)
-    for dim in ['lm', 'lu', 'am']:
-        xr_revenue_am = add_all(xr_revenue_am, dim)
-        xr_cost_am    = add_all(xr_cost_am, dim)
-        xr_trans_am   = add_all(xr_trans_am, dim)
-        xr_profit_am  = add_all(xr_profit_am, dim)
+    xr_revenue_am = add_all(xr_revenue_am, ['lm', 'lu', 'am'])
+    xr_cost_am    = add_all(xr_cost_am, ['lm', 'lu', 'am'])
+    xr_trans_am   = add_all(xr_trans_am, ['lm', 'lu', 'am'])
+    xr_profit_am  = add_all(xr_profit_am, ['lm', 'lu', 'am'])
 
     # ------------------------- Regional level aggregation -------------------------
     revenue_am_df, revenue_am_df_AUS = to_region_and_aus_df(xr_revenue_am, ['region', 'am', 'lm', 'lu'])
@@ -1010,10 +1012,10 @@ def write_economics_ag_man(data: Data, yr_cal, path):
     # Record cell magnitudes for report generation later (e.g., for setting colorbar limits)
     return (f"Agricultural Management revenue and cost written for year {yr_cal}", {
         'Economics_am': {
-            'am_revenue':    (yr_cal, _get_abs_magnitude(xr_revenue_am.sel(lm='ALL', lu='ALL'))),
-            'am_cost':       (yr_cal, _get_abs_magnitude(xr_cost_am.sel(lm='ALL', lu='ALL'))),
-            'am_transition': (yr_cal, _get_abs_magnitude(xr_trans_am.sel(lm='ALL', lu='ALL'))),
-            'am_profit':     (yr_cal, _get_abs_magnitude(xr_profit_am.sel(lm='ALL', lu='ALL'))),
+            'am_revenue':    (yr_cal, _get_cell_magnitude(xr_revenue_am.sel(lm='ALL', lu='ALL'))),
+            'am_cost':       (yr_cal, _get_cell_magnitude(xr_cost_am.sel(lm='ALL', lu='ALL'))),
+            'am_transition': (yr_cal, _get_cell_magnitude(xr_trans_am.sel(lm='ALL', lu='ALL'))),
+            'am_profit':     (yr_cal, _get_cell_magnitude(xr_profit_am.sel(lm='ALL', lu='ALL'))),
         }
     })
 
@@ -1027,6 +1029,13 @@ def write_economics_non_ag(data: Data, yr_cal, path):
     yr_cal_sim_pre = sorted(list(data.lumaps.keys()))[sorted(list(data.lumaps.keys())).index(yr_cal) - 1] if yr_idx > 0 else None
 
     # --- local helpers (mechanical patterns, no domain logic) ---
+
+    def add_all(da, dims):
+        """Prepend an ALL-aggregate slice along dim."""
+        for dim in dims:
+            ds = da.sum(dim=dim, keepdims=True).assign_coords({dim: ['ALL']})
+            da = xr.concat([ds, da], dim=dim)
+        return da
 
     def to_region_and_aus_df(da, group_dims):
         """Aggregate xarray to region-level DataFrame; return (AUS+region combined, AUS only).
@@ -1084,6 +1093,13 @@ def write_economics_non_ag(data: Data, yr_cal, path):
     xr_non_ag_to_ag     = non_ag_dvar * ag_to_non_ag_mat
     xr_non_ag_profit    = non_ag_dvar * non_ag_profit_mat
 
+    # Prepend ALL-aggregate slices (must be after multiplication to avoid double counting)
+    xr_revenue_non_ag   = add_all(xr_revenue_non_ag,   ['lu'])
+    xr_cost_non_ag      = add_all(xr_cost_non_ag,      ['lu'])
+    xr_non_ag_to_non_ag = add_all(xr_non_ag_to_non_ag, ['lu'])
+    xr_non_ag_to_ag     = add_all(xr_non_ag_to_ag,     ['lu'])
+    xr_non_ag_profit    = add_all(xr_non_ag_profit,    ['lu'])
+
     # ------------------------- Regional level aggregation -------------------------
     revenue_df,  revenue_df_AUS  = to_region_and_aus_df(xr_revenue_non_ag,   ['region', 'lu'])
     cost_df,     cost_df_AUS     = to_region_and_aus_df(xr_cost_non_ag,      ['region', 'lu'])
@@ -1100,60 +1116,38 @@ def write_economics_non_ag(data: Data, yr_cal, path):
     save_csv(profit_df,   rename_map, os.path.join(path, f'economics_non_ag_profit_{yr_cal}.csv'))
 
     # ------------------------- Stack array, get valid layers -------------------------
-    valid_layers_rev      = pd.MultiIndex.from_frame(revenue_df_AUS[['lu']]).sort_values()
-    valid_layers_cost     = pd.MultiIndex.from_frame(cost_df_AUS[['lu']]).sort_values()
-    valid_layers_t_non_ag = pd.MultiIndex.from_frame(t_non_ag_df_AUS[['lu']]).sort_values()
-    valid_layers_t_ag     = pd.MultiIndex.from_frame(t_ag_df_AUS[['lu']]).sort_values()
-    valid_layers_profit   = pd.MultiIndex.from_frame(profit_df_AUS[['lu']]).sort_values()
+    def valid_layers(df):
+        if df.empty:
+            return pd.MultiIndex.from_tuples([('ALL',)], names=['lu'])
+        return pd.MultiIndex.from_frame(df[['lu']]).sort_values()
 
-    def make_zero_stack():
-        return xr.DataArray(
-            np.zeros((1, data.NCELLS), dtype=np.float32),
-            dims=['lu', 'cell'],
-            coords={'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['lu'])
+    valid_layers_rev      = valid_layers(revenue_df_AUS)
+    valid_layers_cost     = valid_layers(cost_df_AUS)
+    valid_layers_t_non_ag = valid_layers(t_non_ag_df_AUS)
+    valid_layers_t_ag     = valid_layers(t_ag_df_AUS)
+    valid_layers_profit   = valid_layers(profit_df_AUS)
 
-    # Load mosaic once
-    if yr_cal_sim_pre is None:
-        non_ag_mosaic = xr.DataArray(
-            np.zeros((data.NCELLS, 1), dtype=np.float32) * np.nan,
-            dims=['cell', 'lu'],
-            coords={'cell': range(data.NCELLS), 'lu': ['ALL']}
-        ).stack(layer=['lu'])
-    else:
-        non_ag_mosaic = (
-            cfxr.decode_compress_to_multi_index(
-                xr.load_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-            )['data'].sel(lu='ALL').expand_dims(lu=['ALL']).stack(layer=['lu'])
-        )
-
-    def build_valid_stack(xr_da, valid_layers):
-        if valid_layers.empty:
-            return make_zero_stack()
-        xr_da_stack = xr_da.stack(layer=['lu']).sel(layer=valid_layers)
-        return xr.concat([non_ag_mosaic, xr_da_stack], dim='layer').drop_vars('region').compute()
-
-    xr_revenue_non_ag_cat   = build_valid_stack(xr_revenue_non_ag,   valid_layers_rev)
-    xr_cost_non_ag_cat      = build_valid_stack(xr_cost_non_ag,      valid_layers_cost)
-    xr_non_ag_to_non_ag_cat = build_valid_stack(xr_non_ag_to_non_ag, valid_layers_t_non_ag)
-    xr_non_ag_to_ag_cat     = build_valid_stack(xr_non_ag_to_ag,     valid_layers_t_ag)
-    xr_profit_non_ag_cat    = build_valid_stack(xr_non_ag_profit,    valid_layers_profit)
+    valid_layers_stack_rev      = xr_revenue_non_ag.stack(layer=['lu']).sel(layer=valid_layers_rev).drop_vars('region').compute()
+    valid_layers_stack_cost     = xr_cost_non_ag.stack(layer=['lu']).sel(layer=valid_layers_cost).drop_vars('region').compute()
+    valid_layers_stack_t_non_ag = xr_non_ag_to_non_ag.stack(layer=['lu']).sel(layer=valid_layers_t_non_ag).drop_vars('region').compute()
+    valid_layers_stack_t_ag     = xr_non_ag_to_ag.stack(layer=['lu']).sel(layer=valid_layers_t_ag).drop_vars('region').compute()
+    valid_layers_stack_profit   = xr_non_ag_profit.stack(layer=['lu']).sel(layer=valid_layers_profit).drop_vars('region').compute()
 
     # Save to netcdf
-    _save2nc(xr_revenue_non_ag_cat,   os.path.join(path, f'xr_economics_non_ag_revenue_{yr_cal}.nc'))
-    _save2nc(xr_cost_non_ag_cat,      os.path.join(path, f'xr_economics_non_ag_cost_{yr_cal}.nc'))
-    _save2nc(xr_non_ag_to_non_ag_cat, os.path.join(path, f'xr_economics_non_ag_transition_non_ag2non_ag_{yr_cal}.nc'))
-    _save2nc(xr_non_ag_to_ag_cat,     os.path.join(path, f'xr_economics_non_ag_transition_non_ag2ag_{yr_cal}.nc'))
-    _save2nc(xr_profit_non_ag_cat,    os.path.join(path, f'xr_economics_non_ag_profit_{yr_cal}.nc'))
-    
+    _save2nc(valid_layers_stack_rev,      os.path.join(path, f'xr_economics_non_ag_revenue_{yr_cal}.nc'))
+    _save2nc(valid_layers_stack_cost,     os.path.join(path, f'xr_economics_non_ag_cost_{yr_cal}.nc'))
+    _save2nc(valid_layers_stack_t_non_ag, os.path.join(path, f'xr_economics_non_ag_transition_non_ag2non_ag_{yr_cal}.nc'))
+    _save2nc(valid_layers_stack_t_ag,     os.path.join(path, f'xr_economics_non_ag_transition_non_ag2ag_{yr_cal}.nc'))
+    _save2nc(valid_layers_stack_profit,   os.path.join(path, f'xr_economics_non_ag_profit_{yr_cal}.nc'))
+
     # Record cell magnitudes for report generation later (e.g., for setting colorbar limits)
     return (f"Non-agricultural revenue and cost written for year {yr_cal}", {
         'Economics_non_ag': {
-            'non_ag_revenue':        (yr_cal, _get_abs_magnitude(xr_revenue_non_ag)),
-            'non_ag_cost':           (yr_cal, _get_abs_magnitude(xr_cost_non_ag)),
-            'non_ag_to_non_ag_cost': (yr_cal, _get_abs_magnitude(xr_non_ag_to_non_ag)),
-            'non_ag_to_ag_cost':     (yr_cal, _get_abs_magnitude(xr_non_ag_to_ag)),
-            'non_ag_profit':         (yr_cal, _get_abs_magnitude(xr_non_ag_profit)),
+            'non_ag_revenue':        (yr_cal, _get_cell_magnitude(xr_revenue_non_ag.sel(lu='ALL'))),
+            'non_ag_cost':           (yr_cal, _get_cell_magnitude(xr_cost_non_ag.sel(lu='ALL'))),
+            'non_ag_to_non_ag_cost': (yr_cal, _get_cell_magnitude(xr_non_ag_to_non_ag.sel(lu='ALL'))),
+            'non_ag_to_ag_cost':     (yr_cal, _get_cell_magnitude(xr_non_ag_to_ag.sel(lu='ALL'))),
+            'non_ag_profit':         (yr_cal, _get_cell_magnitude(xr_non_ag_profit.sel(lu='ALL'))),
         }
     })
 

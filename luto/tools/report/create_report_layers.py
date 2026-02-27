@@ -129,12 +129,14 @@ def get_map2json(
             hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
 
             # Determine if this layer should use integer legend
-            if isinstance(legend_int_level, dict):
+            if legend_int_level is None:
+                isInt = False
+            elif isinstance(legend_int_level, dict):
                 isInt = legend_int_level.items() <= sel.items()
             elif isinstance(legend_int_level, str):
                 isInt = legend_int_level in sel.keys()
             else:
-                raise ValueError('legend_int_level must be either a dict or a str')
+                raise ValueError('legend_int_level must be None, a dict, or a str')
 
             # Set legend and metadata based on type
             if isInt:
@@ -362,53 +364,53 @@ def save_report_layer(raw_data_dir:str):
     
     # ---------------- Profit ----------------
     profit_ag = files.query('base_name == "xr_economics_ag_profit"')
-    get_map2json(profit_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_profit.js')
+    get_map2json(profit_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_profit.js')
     print('│   ├── Economics Ag profit layer saved.')
 
     profit_am = files.query('base_name == "xr_economics_am_profit"')
-    get_map2json(profit_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_profit.js')
+    get_map2json(profit_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_profit.js')
     print('│   ├── Economics Am profit layer saved.')
 
     profit_nonag = files.query('base_name == "xr_economics_non_ag_profit"')
-    get_map2json(profit_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_profit.js')
+    get_map2json(profit_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_profit.js')
     print('│   ├── Economics NonAg profit layer saved.')
 
 
     # ---------------- Revenue ----------------
     revenue_ag = files.query('base_name == "xr_economics_ag_revenue"')
-    get_map2json(revenue_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_revenue.js')
+    get_map2json(revenue_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_revenue.js')
     print('│   ├── Economics Ag revenue layer saved.')
 
     revenue_am = files.query('base_name == "xr_economics_am_revenue"')
-    get_map2json(revenue_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_revenue.js')
+    get_map2json(revenue_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_revenue.js')
     print('│   ├── Economics Am revenue layer saved.')
 
     revenue_nonag = files.query('base_name == "xr_economics_non_ag_revenue"')
-    get_map2json(revenue_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_revenue.js')
+    get_map2json(revenue_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_revenue.js')
     print('│   ├── Economics NonAg revenue layer saved.')
 
 
     # ---------------- Cost ----------------
     cost_ag = files.query('base_name == "xr_economics_ag_cost"')
-    get_map2json(cost_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_cost.js')
+    get_map2json(cost_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_cost.js')
     print('│   ├── Economics Ag cost layer saved.')
 
     cost_am = files.query('base_name == "xr_economics_am_cost"')
-    get_map2json(cost_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_cost.js')
+    get_map2json(cost_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_cost.js')
     print('│   ├── Economics Am cost layer saved.')
 
     cost_nonag = files.query('base_name == "xr_economics_non_ag_cost"')
-    get_map2json(cost_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_cost.js')
+    get_map2json(cost_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_cost.js')
     print('│   ├── Economics NonAg cost layer saved.')
 
 
     # ---------------- Transition Cost ----------------
-    cost_trans_ag2ag = files.query('base_name == "xr_transition_cost_ag2ag"')
-    get_map2json(cost_trans_ag2ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2ag.js')
+    cost_trans_ag2ag = files.query('base_name == "xr_economics_ag_transition_ag2ag"')
+    get_map2json(cost_trans_ag2ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2ag.js')
     print('│   ├── Economics Ag transition ag2ag layer saved.')
 
-    cost_trans_ag2nonag = files.query('base_name == "xr_transition_cost_ag2non_ag"')
-    get_map2json(cost_trans_ag2nonag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2nonag.js')
+    cost_trans_ag2nonag = files.query('base_name == "xr_economics_ag_transition_non_ag2ag"')
+    get_map2json(cost_trans_ag2nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2nonag.js')
     print('│   ├── Economics Ag transition ag2nonag layer saved.')
 
     # AgMgt has 0 transition cost, so skipping

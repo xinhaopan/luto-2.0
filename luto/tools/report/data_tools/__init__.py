@@ -192,8 +192,8 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Beef lexp': 'Beef live export'
         }.get(commodity, commodity)
         
-    # 3-2: Profit/Revenue/Cost
-    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu'}
+    # 3-2: Profit/Revenue/Cost/Source
+    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu', 'from_lu'}
     for key in leftover_keys:
         sel_rename[key] = {
             'Operation-cost': 'Cost (operation)',
@@ -202,10 +202,12 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Transition-cost-nonag2ag': 'Cost (trans NonAg2Ag)',
             'Transition-cost-agMgt': 'Cost (trans AgMgt)',
         }.get(sel[key], sel[key])
-        
-    # 4 last: 'lu'
+
+    # 4 last: 'lu' or 'from_lu' (treated identically as the land-use selection level)
     if 'lu' in sel:
         sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
+    elif 'from_lu' in sel:
+        sel_rename['from_lu'] = RENAME_AM_NON_AG.get(sel['from_lu'], sel['from_lu'])
 
     return sel_rename
 

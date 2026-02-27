@@ -58,20 +58,22 @@ window.MapService = {
       'Lumap': { 'path': 'data/map_layers/map_dvar_lumap.js', 'name': 'map_dvar_lumap' },
     },
     'Economics': {
-      'Profit': {
-        'Ag': { 'path': 'data/map_layers/map_economics_Ag_profit.js', 'name': 'map_economics_Ag_profit' },
-        'Ag Mgt': { 'path': 'data/map_layers/map_economics_Am_profit.js', 'name': 'map_economics_Am_profit' },
-        'Non-Ag': { 'path': 'data/map_layers/map_economics_NonAg_profit.js', 'name': 'map_economics_NonAg_profit' },
+      'Ag': {
+        'Profit':                { 'path': 'data/map_layers/map_economics_Ag_profit.js',               'name': 'map_economics_Ag_profit' },
+        'Revenue':               { 'path': 'data/map_layers/map_economics_Ag_revenue.js',              'name': 'map_economics_Ag_revenue' },
+        'Cost':                  { 'path': 'data/map_layers/map_economics_Ag_cost.js',                 'name': 'map_economics_Ag_cost' },
+        'Transition (Ag2Ag)':    { 'path': 'data/map_layers/map_economics_Ag_transition_ag2ag.js',    'name': 'map_economics_Ag_transition_ag2ag' },
+        'Transition (Ag2NonAg)': { 'path': 'data/map_layers/map_economics_Ag_transition_ag2nonag.js', 'name': 'map_economics_Ag_transition_ag2nonag' },
       },
-      'Cost': {
-        'Ag': { 'path': 'data/map_layers/map_economics_Ag_cost.js', 'name': 'map_economics_Ag_cost' },
-        'Ag Mgt': { 'path': 'data/map_layers/map_economics_Am_cost.js', 'name': 'map_economics_Am_cost' },
-        'Non-Ag': { 'path': 'data/map_layers/map_economics_NonAg_cost.js', 'name': 'map_economics_NonAg_cost' },
+      'Ag Mgt': {
+        'Profit':  { 'path': 'data/map_layers/map_economics_Am_profit.js',  'name': 'map_economics_Am_profit' },
+        'Revenue': { 'path': 'data/map_layers/map_economics_Am_revenue.js', 'name': 'map_economics_Am_revenue' },
+        'Cost':    { 'path': 'data/map_layers/map_economics_Am_cost.js',    'name': 'map_economics_Am_cost' },
       },
-      'Revenue': {
-        'Ag': { 'path': 'data/map_layers/map_economics_Ag_revenue.js', 'name': 'map_economics_Ag_revenue' },
-        'Ag Mgt': { 'path': 'data/map_layers/map_economics_Am_revenue.js', 'name': 'map_economics_Am_revenue' },
-        'Non-Ag': { 'path': 'data/map_layers/map_economics_NonAg_revenue.js', 'name': 'map_economics_NonAg_revenue' },
+      'Non-Ag': {
+        'Profit':  { 'path': 'data/map_layers/map_economics_NonAg_profit.js',  'name': 'map_economics_NonAg_profit' },
+        'Revenue': { 'path': 'data/map_layers/map_economics_NonAg_revenue.js', 'name': 'map_economics_NonAg_revenue' },
+        'Cost':    { 'path': 'data/map_layers/map_economics_NonAg_cost.js',    'name': 'map_economics_NonAg_cost' },
       },
     },
     'GHG': {
