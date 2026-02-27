@@ -1,4 +1,5 @@
 window.HomeView = {
+  name: 'HomeView',
 
   setup() {
 
@@ -34,6 +35,7 @@ window.HomeView = {
       'Agricultural Management': 'Ag Mgt',
       'Non-Agricultural Land-use': 'Non-Ag',
     };
+    const rankSubcategoryOrder = ['Agricultural land-use', 'Agricultural Management', 'Non-Agricultural Land-use'];
     const availableRankSubcategories = ref([]);
 
     // Default selections
@@ -243,12 +245,12 @@ window.HomeView = {
           'Non-Ag': window[chartOverview_ghg_Nonag['name']],
         },
         'Production': {
-          'Off-target achievement': window[chartOverview_prod_achieve['name']],
           'Overview': window[chartOverview_prod_overview['name']],
           'Domestic': window[chartOverview_prod_domestic['name']],
           'Exports': window[chartOverview_prod_export['name']],
           'Imports': window[chartOverview_prod_import['name']],
           'Feed': window[chartOverview_prod_feed['name']],
+          'Off-target achievement': window[chartOverview_prod_achieve['name']],
         },
         'Water': {
           'Overview': window[chartOverview_water_sum['name']],
@@ -301,7 +303,8 @@ window.HomeView = {
 
     watch(selectChartCategory, (newCategory) => {
       availableChartSubCategories.value = Object.keys(ChartData.value[selectChartCategory.value])
-      availableRankSubcategories.value = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
+      const rankKeys = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
+      availableRankSubcategories.value = rankKeys.sort((a, b) => rankSubcategoryOrder.indexOf(a) - rankSubcategoryOrder.indexOf(b));
       selectChartSubCategory.value = availableChartSubCategories.value[0];
       selectRankingSubCategory.value = availableRankSubcategories.value[0] || 'N/A';
     });
@@ -309,7 +312,7 @@ window.HomeView = {
     // Memory cleanup on component unmount
     onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
 
-    return {
+    const _state = {
       yearIndex,
       runScenario,
       dataLoaded,
@@ -333,10 +336,12 @@ window.HomeView = {
       selectRankingColors,
       selectRanking,
     };
+    window._debug[VIEW_NAME] = _state;
+    return _state;
   },
 
   // This template is a fallback that will be replaced by the loaded template
-  template: `
+  template: /*html*/`
     <div v-if="dataLoaded">
       <div class="flex flex-col">
 
@@ -416,12 +421,11 @@ window.HomeView = {
                 class="flex-1 max-w-[150px] pt-2 pl-2"
                 v-model="yearIndex"
                 size="small"
-                :show-tooltip="false"
                 :min="0"
                 :max="availableYears.length - 1"
                 :step="1"
                 :format-tooltip="index => availableYears[index]"
-                :marks="availableYears.reduce((acc, year, index) => ({ ...acc, [index]: year }), {})"
+                :show-stops="true"
                 @input="(index) => { yearIndex = index; }"
               />
             </div>

@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251129_RES1_MEM_TEST/"
+TASK_ROOT_DIR = "F:/Users/jinzhu/TEMP"
 
 
 # Set the grid search parameters
@@ -48,7 +48,7 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR': [1],
-    'SIM_YEARS': [[2020, 2050]],                                # Years to run the model 
+    'SIM_YEARS': [[2020, 2050]],                                            # Years to run the model
     'WRITE_THREADS': [2],
     
  
@@ -61,7 +61,6 @@ grid_search = {
     'SSP': ['245'],                                                         # '126', '245', '370', '585'
     'CARBON_EFFECTS_WINDOW': [60],
     'CO2_FERT': ['off'],                                                    # 'on' or 'off'
-    'AG_YIELD_MULT': [1.0],                                                 # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
     'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
     'NON_AG_LAND_USES' : [{
         'Environmental Plantings': True,
@@ -94,7 +93,7 @@ grid_search = {
 
 
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low'],                                        # 'off', 'low', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low'],                                        # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
@@ -104,7 +103,6 @@ grid_search = {
     'WATER_REGION_DEF':['Drainage Division'],                               # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
     'WATER_LIMITS': ['on'],                                                 # 'on' or 'off'
     'WATER_CONSTRAINT_TYPE': ['hard'],                                      # 'hard' or 'soft'
-    'WATER_PENALTY': [1e-5],
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
@@ -118,13 +116,18 @@ grid_search = {
 
     # --------------- Biodiversity settings - GBF 3 ---------------
     'BIODIVERSITY_TARGET_GBF_3_NVIS': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
-    
+    'BIODIVERSITY_TARGET_GBF_3_IBRA': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
+
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.
     'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                             # 'on' or 'off'.
 
     # --------------- Biodiversity settings - GBF 8 ---------------
     'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
+
+    # --------------- Renewable energy ---------------
+    'RENEWABLE_ENERGY_CONSTRAINTS': ['on'],                                 # 'on' or 'off'
+    'RENEWABLE_TARGET_SCENARIO': ['CNS25 - Accelerated Transition'],        # 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
 
     ###############################################################
     # Scenario settings for the model run

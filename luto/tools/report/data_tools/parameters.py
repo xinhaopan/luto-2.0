@@ -281,7 +281,7 @@ COLORS_PLOT = {
     # --- Land-use types ---
     'Agricultural land-use':                    "#7EB87A",
     'Agricultural Management':                  "#D5F100",
-    'Non-Agricultural Land-use':                "#A0A0A0",
+    'Non-Agricultural Land-use':                "#8C8888",
 
     # --- GHG overview ---
     'Unallocated natural to modified':          "#C8A876",
@@ -428,8 +428,8 @@ COLOR_AG = {
     19: ('Summer legumes',              '#757448'),
     20: ('Summer oilseeds',             '#d8b6b4'),
     21: ('Tropical stone fruit',        '#408dd5'),
-    22: ('Unallocated - modified land', '#000000'),
-    23: ('Unallocated - natural land',  '#c8d3db'),
+    22: ('Unallocated - modified land', "#706F6F"),
+    23: ('Unallocated - natural land',  "#afb6bb"),
     24: ('Vegetables',                  '#a88571'),
     25: ('Winter cereals',              '#fcb819'),
     26: ('Winter legumes',              '#49482a'),

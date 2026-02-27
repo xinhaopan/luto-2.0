@@ -30,6 +30,7 @@ import pandas as pd
 from luto.data import Data
 from luto import settings
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
+from functools import lru_cache
 
 
 def get_ghg_crop(data:Data, lu, lm, aggregate):
@@ -222,6 +223,7 @@ def get_ghg_matrix(data:Data, lm, yr_idx, aggregate):
         
 
 
+@lru_cache(maxsize=1)
 def get_ghg_matrices(data:Data, yr_idx, aggregate=True):
     """
     Return g_mrj matrix <unit: t/cell> as 3D Numpy array.

@@ -31,6 +31,7 @@ from luto.data import Data
 import luto.settings as settings
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
+from functools import lru_cache
 
 
 def get_cost_crop(data:Data, lu, lm, yr_idx):
@@ -230,6 +231,7 @@ def get_cost_matrix(data:Data, lm, yr_idx):
     return cost.fillna(0)
 
 
+@lru_cache(maxsize=1)
 def get_cost_matrices(data:Data, yr_idx, aggregate=True):
     """
     Return agricultural c_mrj matrix <unit: $/cell> as 3D Numpy array.

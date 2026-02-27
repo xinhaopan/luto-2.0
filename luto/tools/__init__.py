@@ -23,11 +23,13 @@
 Pure helper functions and other tools.
 """
 
+import re
 import sys
 import os.path
 import time
 import traceback
 import functools
+from contextlib import redirect_stdout, redirect_stderr
 
 import pandas as pd
 import numpy as np
@@ -49,13 +51,13 @@ def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
         
-    with open(timestamp_path, 'w', encoding='utf-8') as f: f.write(timestamp)
+    with open(timestamp_path, 'w') as f: f.write(timestamp)
     return timestamp
 
 def read_timestamp():
     timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
     if os.path.exists(timestamp_path):
-        with open(timestamp_path, 'r', encoding='utf-8') as f: timestamp = f.read()
+        with open(timestamp_path, 'r') as f: timestamp = f.read()
     else:
         raise FileNotFoundError(f"Timestamp file not found at {timestamp_path}")
     return timestamp
@@ -581,61 +583,48 @@ def set_path() -> str:
                 os.mkdir(p)
   
 
+class _TeeIO:
+    """Write to both an original stream and a log file, adding timestamps."""
+
+    _ts_re = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} - ')
+
+    def __init__(self, orig_stream, file):
+        self._orig = orig_stream
+        self._file = file
+
+    def write(self, buf):
+        if buf.strip() and not self._ts_re.match(buf):
+            buf = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {buf}"
+        self._file.write(buf)
+        self._orig.write(buf)
+
+    def flush(self):
+        self._file.flush()
+
+
 class LogToFile:
-    def __init__(self, log_path, mode:str='a'):
+    def __init__(self, log_path, mode: str = 'a'):
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
         self.mode = mode
-        
-        if not os.path.exists(os.path.dirname(self.log_path_stdout)):
-            os.makedirs(os.path.dirname(self.log_path_stdout))
-        if not os.path.exists(os.path.dirname(self.log_path_stderr)):
-            os.makedirs(os.path.dirname(self.log_path_stderr))
+        os.makedirs(os.path.dirname(self.log_path_stdout), exist_ok=True)
+        os.makedirs(os.path.dirname(self.log_path_stderr), exist_ok=True)
 
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            with open(self.log_path_stdout, self.mode, encoding='utf-8') as file_stdout, open(self.log_path_stderr, self.mode) as file_stderr:
-                original_stdout = sys.stdout
-                original_stderr = sys.stderr
+            with (
+                open(self.log_path_stdout, self.mode) as f_out,
+                open(self.log_path_stderr, self.mode) as f_err,
+                redirect_stdout(_TeeIO(sys.stdout, f_out)),
+                redirect_stderr(_TeeIO(sys.stderr, f_err)),
+            ):
                 try:
-                    sys.stdout = self.StreamToLogger(file_stdout, original_stdout)
-                    sys.stderr = self.StreamToLogger(file_stderr, original_stderr)
                     return func(*args, **kwargs)
-                except Exception as e:
-                    # Capture the full traceback
-                    exc_info = traceback.format_exc()
-                    # Log the traceback to stderr log before re-raising the exception
-                    sys.stderr.write(exc_info + '\n')
-                    raise  # Re-raise the caught exception to propagate it
-                finally:
-                    # Reset stdout and stderr
-                    sys.stdout = original_stdout
-                    sys.stderr = original_stderr
+                except Exception:
+                    sys.stderr.write(traceback.format_exc() + '\n')
+                    raise
         return wrapper
-
-    class StreamToLogger(object):
-        def __init__(self, file, orig_stream=None):
-            self.file = file
-            self.orig_stream = orig_stream
-
-        def write(self, buf):
-            if buf.strip():  # Check if buf is just whitespace/newline
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                formatted_buf = f"{timestamp} - {buf}"
-            else:
-                formatted_buf = buf  # If buf is just a newline/whitespace, don't prepend timestamp
-
-            # Write to the original stream if it exists
-            if self.orig_stream:
-                self.orig_stream.write(formatted_buf)
-            
-            # Write to the log file
-            self.file.write(formatted_buf)
-
-        def flush(self):
-            # Ensure content is written to disk
-            self.file.flush()
             
             
 
@@ -648,7 +637,7 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
         interval (int): The interval in seconds to log the memory usage.
     '''
     
-    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode, encoding='utf-8') as file:
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
         while not stop_event.is_set():
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             process = psutil.Process(os.getpid())

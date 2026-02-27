@@ -35,12 +35,15 @@ from luto.tools.report.data_tools import (
     rename_reorder_hierarchy,
     tuple_dict_to_nested,
 )
+
 from luto.tools.report.data_tools.parameters import (
+    COLOR_AG,
     COLOR_AM, 
     COLOR_NON_AG, 
     COLOR_LUMAP, 
     COLORS_FLOAT,
 )
+
 
 
 
@@ -126,12 +129,14 @@ def get_map2json(
             hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
 
             # Determine if this layer should use integer legend
-            if isinstance(legend_int_level, dict):
+            if legend_int_level is None:
+                isInt = False
+            elif isinstance(legend_int_level, dict):
                 isInt = legend_int_level.items() <= sel.items()
             elif isinstance(legend_int_level, str):
                 isInt = legend_int_level in sel.keys()
             else:
-                raise ValueError('legend_int_level must be either a dict or a str')
+                raise ValueError('legend_int_level must be None, a dict, or a str')
 
             # Set legend and metadata based on type
             if isInt:
@@ -177,7 +182,7 @@ def save_report_layer(raw_data_dir:str):
     files = files.query(f'Year.isin({sorted(settings.SIM_YEARS)})')
     
     # Get legend info
-    legend_ag = build_map_legend(COLOR_LUMAP)
+    legend_ag = build_map_legend(COLOR_AG)
     legend_am = build_map_legend(COLOR_AM)
     legend_non_ag = build_map_legend(COLOR_NON_AG)
     legend_lumap =  build_map_legend(COLOR_LUMAP)
@@ -242,177 +247,177 @@ def save_report_layer(raw_data_dir:str):
     
     # Overall priority
     bio_overall_ag = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag"')
-    get_map2json(bio_overall_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
+    get_map2json(bio_overall_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
     print('│   ├── Biodiversity Overall Ag layer saved.')
 
     bio_overall_am = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag_management"')
-    get_map2json(bio_overall_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
+    get_map2json(bio_overall_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
     print('│   ├── Biodiversity Overall Am layer saved.')
 
     bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
-    get_map2json(bio_overall_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
+    get_map2json(bio_overall_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
     print('│   ├── Biodiversity Overall Non-Ag layer saved.')
 
 
     # GBF2
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
-        get_map2json(bio_GBF2_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
+        get_map2json(bio_GBF2_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
         print('│   ├── Biodiversity GBF2 Ag layer saved.')
 
         bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
-        get_map2json(bio_GBF2_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
+        get_map2json(bio_GBF2_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
         print('│   ├── Biodiversity GBF2 Am layer saved.')
 
         bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
-        get_map2json(bio_GBF2_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
+        get_map2json(bio_GBF2_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
         print('│   ├── Biodiversity GBF2 Non-Ag layer saved.')
-        
+
     # GBF3-NVIS
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         bio_GBF3_NVIS_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag"')
-        get_map2json(bio_GBF3_NVIS_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
+        get_map2json(bio_GBF3_NVIS_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
         print('│   ├── Biodiversity GBF3_NVIS Ag layer saved.')
 
         bio_GBF3_NVIS_am = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag_management"')
-        get_map2json(bio_GBF3_NVIS_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js')
+        get_map2json(bio_GBF3_NVIS_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js')
         print('│   ├── Biodiversity GBF3_NVIS Am layer saved.')
 
         bio_GBF3_NVIS_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_non_ag"')
-        get_map2json(bio_GBF3_NVIS_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js')
+        get_map2json(bio_GBF3_NVIS_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js')
         print('│   ├── Biodiversity GBF3_NVIS Non-Ag layer saved.')
-        
+
     # GBF3-IBRA
     if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
         bio_GBF3_IBRA_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag"')
-        get_map2json(bio_GBF3_IBRA_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Ag.js')
+        get_map2json(bio_GBF3_IBRA_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Ag.js')
         print('│   ├── Biodiversity GBF3_IBRA Ag layer saved.')
 
         bio_GBF3_IBRA_am = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag_management"')
-        get_map2json(bio_GBF3_IBRA_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Am.js')
+        get_map2json(bio_GBF3_IBRA_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Am.js')
         print('│   ├── Biodiversity GBF3_IBRA Am layer saved.')
 
         bio_GBF3_IBRA_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_non_ag"')
-        get_map2json(bio_GBF3_IBRA_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_NonAg.js')
+        get_map2json(bio_GBF3_IBRA_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_NonAg.js')
         print('│   ├── Biodiversity GBF3_IBRA Non-Ag layer saved.')
-    
+
     # GBF4-SNES
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
         bio_GBF4_SNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag"')
-        get_map2json(bio_GBF4_SNES_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js')
+        get_map2json(bio_GBF4_SNES_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js')
         print('│   ├── Biodiversity GBF4_SNES Ag layer saved.')
 
         bio_GBF4_SNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag_management"')
-        get_map2json(bio_GBF4_SNES_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js')
+        get_map2json(bio_GBF4_SNES_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js')
         print('│   ├── Biodiversity GBF4_SNES Am layer saved.')
 
         bio_GBF4_SNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_non_ag"')
-        get_map2json(bio_GBF4_SNES_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js')
+        get_map2json(bio_GBF4_SNES_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js')
         print('│   ├── Biodiversity GBF4_SNES Non-Ag layer saved.')
-        
+
     # GBF4_ECNES
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
         bio_GBF4_ECNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag"')
-        get_map2json(bio_GBF4_ECNES_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js')
+        get_map2json(bio_GBF4_ECNES_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js')
         print('│   ├── Biodiversity GBF4_ECNES Ag layer saved.')
 
         bio_GBF4_ECNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag_management"')
-        get_map2json(bio_GBF4_ECNES_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js')
+        get_map2json(bio_GBF4_ECNES_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js')
         print('│   ├── Biodiversity GBF4_ECNES Am layer saved.')
 
         bio_GBF4_ECNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_non_ag"')
-        get_map2json(bio_GBF4_ECNES_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js')
+        get_map2json(bio_GBF4_ECNES_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js')
         print('│   ├── Biodiversity GBF4_ECNES Non-Ag layer saved.')
-        
+
     # GBF8
     if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':
         bio_GBF8_ag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag"')
-        get_map2json(bio_GBF8_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js')
+        get_map2json(bio_GBF8_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js')
         print('│   ├── Biodiversity GBF8 Ag layer saved.')
 
         bio_GBF8_am = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag_management"')
-        get_map2json(bio_GBF8_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js')
+        get_map2json(bio_GBF8_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js')
         print('│   ├── Biodiversity GBF8 Am layer saved.')
 
         bio_GBF8_nonag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_non_ag"')
-        get_map2json(bio_GBF8_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js')
+        get_map2json(bio_GBF8_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js')
         print('│   ├── Biodiversity GBF8 Non-Ag layer saved.')
 
         bio_GBF8_ag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag"')
-        get_map2json(bio_GBF8_ag_group, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js')
+        get_map2json(bio_GBF8_ag_group, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js')
         print('│   ├── Biodiversity GBF8 Groups Ag layer saved.')
 
         bio_GBF8_am_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag_management"')
-        get_map2json(bio_GBF8_am_group, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js')
+        get_map2json(bio_GBF8_am_group, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js')
         print('│   ├── Biodiversity GBF8 Groups Am layer saved.')
 
         bio_GBF8_nonag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_non_ag"')
-        get_map2json(bio_GBF8_nonag_group, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js')
+        get_map2json(bio_GBF8_nonag_group, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js')
         print('│   ├── Biodiversity GBF8 Groups Non-Ag layer saved.')
 
     
 
 
     ####################################################
-    #        5) Profit/Revenue/Cost/Transition         #
+    #                    5) Economics                  #
     ####################################################
     
-    # ---------------- Profit ---------------- 
-    profit_ag = files.query('base_name == "xr_profit_ag"')
-    get_map2json(profit_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_profit_Ag.js')
-    print('│   ├── Profit Ag layer saved.')
-    
-    profit_am = files.query('base_name == "xr_profit_agMgt"')
-    get_map2json(profit_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_profit_Am.js')
-    print('│   ├── Profit Am layer saved.')
-    
-    profit_nonag = files.query('base_name == "xr_profit_non_ag"')
-    get_map2json(profit_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_profit_NonAg.js')
-    print('│   ├── Profit Non-Ag layer saved.')
-    
-    
-    # ---------------- Revenue ---------------- 
-    revenue_ag = files.query('base_name == "xr_revenue_ag"')
-    get_map2json(revenue_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_revenue_Ag.js')
-    print('│   ├── Revenue Ag layer saved.')
+    # ---------------- Profit ----------------
+    profit_ag = files.query('base_name == "xr_economics_ag_profit"')
+    get_map2json(profit_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_profit.js')
+    print('│   ├── Economics Ag profit layer saved.')
 
-    revenue_am = files.query('base_name == "xr_revenue_agricultural_management"')
-    get_map2json(revenue_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_revenue_Am.js')
-    print('│   ├── Revenue Am layer saved.')
+    profit_am = files.query('base_name == "xr_economics_am_profit"')
+    get_map2json(profit_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_profit.js')
+    print('│   ├── Economics Am profit layer saved.')
 
-    revenue_nonag = files.query('base_name == "xr_revenue_non_ag"')
-    get_map2json(revenue_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_revenue_NonAg.js')
-    print('│   ├── Revenue Non-Ag layer saved.')
-    
+    profit_nonag = files.query('base_name == "xr_economics_non_ag_profit"')
+    get_map2json(profit_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_profit.js')
+    print('│   ├── Economics NonAg profit layer saved.')
 
-    # ---------------- Cost ---------------- 
-    cost_ag = files.query('base_name == "xr_cost_ag"')
-    get_map2json(cost_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_Ag.js')
-    print('│   ├── Cost Ag layer saved.')
 
-    cost_am = files.query('base_name == "xr_cost_agricultural_management"')
-    get_map2json(cost_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_Am.js')
-    print('│   ├── Cost Am layer saved.')
+    # ---------------- Revenue ----------------
+    revenue_ag = files.query('base_name == "xr_economics_ag_revenue"')
+    get_map2json(revenue_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_revenue.js')
+    print('│   ├── Economics Ag revenue layer saved.')
 
-    cost_nonag = files.query('base_name == "xr_cost_non_ag"')
-    get_map2json(cost_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_NonAg.js')
-    print('│   ├── Cost Non-Ag layer saved.')
+    revenue_am = files.query('base_name == "xr_economics_am_revenue"')
+    get_map2json(revenue_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_revenue.js')
+    print('│   ├── Economics Am revenue layer saved.')
 
-    
-    # ---------------- Transition Cost ---------------- 
-    cost_trans_ag2ag = files.query('base_name == "xr_cost_transition_ag2ag"')
-    get_map2json(cost_trans_ag2ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_trans_ag2ag.js')
-    print('│   ├── Transition Cost Ag2Ag layer saved.')
-    
-    cost_trans_ag2nonag = files.query('base_name == "xr_transition_cost_ag2non_ag"')
-    get_map2json(cost_trans_ag2nonag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_cost_trans_ag2nonag.js')
-    print('│   ├── Transition Cost Ag2NonAg layer saved.')
-    
-    # AgMgt has 0 transition cost, so skipping 
-    # cost_ag_man = files.query('base_name == "xr_cost_agricultural_management"')
-    
+    revenue_nonag = files.query('base_name == "xr_economics_non_ag_revenue"')
+    get_map2json(revenue_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_revenue.js')
+    print('│   ├── Economics NonAg revenue layer saved.')
+
+
+    # ---------------- Cost ----------------
+    cost_ag = files.query('base_name == "xr_economics_ag_cost"')
+    get_map2json(cost_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_cost.js')
+    print('│   ├── Economics Ag cost layer saved.')
+
+    cost_am = files.query('base_name == "xr_economics_am_cost"')
+    get_map2json(cost_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_cost.js')
+    print('│   ├── Economics Am cost layer saved.')
+
+    cost_nonag = files.query('base_name == "xr_economics_non_ag_cost"')
+    get_map2json(cost_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_cost.js')
+    print('│   ├── Economics NonAg cost layer saved.')
+
+
+    # ---------------- Transition Cost ----------------
+    cost_trans_ag2ag = files.query('base_name == "xr_economics_ag_transition_ag2ag"')
+    get_map2json(cost_trans_ag2ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2ag.js')
+    print('│   ├── Economics Ag transition ag2ag layer saved.')
+
+    cost_trans_ag2nonag = files.query('base_name == "xr_economics_ag_transition_non_ag2ag"')
+    get_map2json(cost_trans_ag2nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2nonag.js')
+    print('│   ├── Economics Ag transition ag2nonag layer saved.')
+
+    # AgMgt has 0 transition cost, so skipping
+    # cost_ag_man = files.query('base_name == "xr_economics_am_transition"')
+
     # Non-Ag to Ag transition cost is not allowed, so skipping
-    # cost_trans_nonag2ag = files.query('base_name == "xr_cost_transition_non_ag2ag"')
+    # cost_trans_nonag2ag = files.query('base_name == "xr_economics_non_ag_transition_non_ag2ag"')
     
     
 
@@ -424,15 +429,15 @@ def save_report_layer(raw_data_dir:str):
     files_ghg = files.query('base_name.str.contains("GHG")')
 
     ghg_ag = files_ghg.query('base_name == "xr_GHG_ag"')
-    get_map2json(ghg_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
+    get_map2json(ghg_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
     print('│   ├── GHG Ag layer saved.')
 
     ghg_am = files_ghg.query('base_name == "xr_GHG_ag_management"')
-    get_map2json(ghg_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
+    get_map2json(ghg_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
     print('│   ├── GHG Am layer saved.')
 
     ghg_nonag = files_ghg.query('base_name == "xr_GHG_non_ag"')
-    get_map2json(ghg_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
+    get_map2json(ghg_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
     print('│   ├── GHG Non-Ag layer saved.')
 
 

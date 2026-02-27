@@ -42,10 +42,6 @@ def extract_dtype_from_path(path):
     """
     # Define the output categories and its corresponding file patterns
     f_cat = {
-            # decision variables (npy files)
-            'ag_X_mrj':['ag_X_mrj'],
-            'ag_man_X_mrj':['ag_man_X_mrj'],
-            'non_ag_X_rk':['non_ag_X_rk'],
             # CSVs
             'GHG':['GHG'],
             'water':['water'],
@@ -53,19 +49,11 @@ def extract_dtype_from_path(path):
             'area':['area'],
             'transition_matrix':['transition_matrix'],
             'quantity':['quantity'],
-            'revenue':['revenue'],
-            'cost':['cost'],
-            'profit':['profit'],
+            'economics_ag':['economics_ag_'],
+            'economics_am':['economics_am_'],
+            'economics_non_ag':['economics_non_ag_'],
+            'transition_cost':['transition_cost_'],
             'biodiversity':['biodiversity'],
-            # Maps (GeoTIFFs)
-            'ammap':['ammap'],
-            'lumap':['lumap'],
-            'lmmap':['lmmap'],
-            'non_ag':['non_ag'],
-            'Ag_LU':['Ag_LU'], 
-            'Ag_Mgt':['Ag_Mgt'],
-            'Land_Mgt':['Land_Mgt'],
-            'Non-Ag':['Non-Ag'],
             # Metrics xarrays
             'xarray_layer':['xr_'],
     }
@@ -204,8 +192,8 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Beef lexp': 'Beef live export'
         }.get(commodity, commodity)
         
-    # 3-2: Profit/Revenue/Cost
-    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu'}
+    # 3-2: Profit/Revenue/Cost/Source
+    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu', 'from_lu'}
     for key in leftover_keys:
         sel_rename[key] = {
             'Operation-cost': 'Cost (operation)',
@@ -214,10 +202,12 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Transition-cost-nonag2ag': 'Cost (trans NonAg2Ag)',
             'Transition-cost-agMgt': 'Cost (trans AgMgt)',
         }.get(sel[key], sel[key])
-        
-    # 4 last: 'lu'
+
+    # 4 last: 'lu' or 'from_lu' (treated identically as the land-use selection level)
     if 'lu' in sel:
         sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
+    elif 'from_lu' in sel:
+        sel_rename['from_lu'] = RENAME_AM_NON_AG.get(sel['from_lu'], sel['from_lu'])
 
     return sel_rename
 

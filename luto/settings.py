@@ -70,7 +70,10 @@ FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
 # Set the demand and supply multipliers
 APPLY_DEMAND_MULTIPLIERS = False     # True or False. Whether to apply demand multipliers from AusTIME model.
-AG_YIELD_MULT = 1.15                # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
+
+# Productivity trend;
+PRODUCTIVITY_TREND = 'BAU'           # 'BAU', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'
+
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
 CO2_FERT = 'off'   # 'on' or 'off'
@@ -123,7 +126,7 @@ DYNAMIC_PRICE = False
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS =  list(range(2010, 2051, 1))
@@ -421,8 +424,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': True,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
-    'Onshore Wind': True,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
+    'Utility Solar PV': False,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
+    'Onshore Wind': False,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural
@@ -490,7 +493,7 @@ Options include "STATE" or "NRM". Currently (20260205) only support STATE.
 
 INSTALL_CAPACITY_MW_HA = {
     "Utility Solar PV": 0.45,
-    "Onshore Wind": 0.04,
+    "Onshore Wind": 0.04,  
 }
 '''
 The per/ha capacity (Mw/ha) for each renewable energy management type.
@@ -637,7 +640,7 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
     https://chinawaterrisk.org/resources/analysis-reviews/aqueduct-global-water-stress-rankings/ 
 """
 
-WATER_STRESS = 0.6
+WATER_STRESS = 0.6                                      
 '''
     Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield.
     The safe and just Earth system boundaries suggests a water stress of. We tried but it would lead to infeasibility

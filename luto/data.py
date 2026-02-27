@@ -32,7 +32,6 @@ import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.agricultural.water as ag_water
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
-from luto.tools.spatializers import upsample_array
 
 from collections import defaultdict
 from typing import Any, Literal, Optional
@@ -94,6 +93,9 @@ class Data:
     Contains all data required for the LUTO model to run. Loads all data upon initialisation.
     """
 
+    # Restore identity-based hashing (dataclass __eq__ silently sets __hash__ = None)
+    __hash__ = object.__hash__
+
     def __init__(self) -> None:
         """
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
@@ -147,20 +149,20 @@ class Data:
             self.GEO_META_FULLRES['nodata'] = self.NODATA                                                               # Set the nodata value to -9999
 
 
-        # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap
+        # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap 
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
         self.LUMASK_2D_FULLRES = np.nan_to_num(arr_to_xr(self, self.LUMASK))
-
+        
 
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
-
+            
             # Get 2D coarsed array, where True means the res*res neighbourhood having >=1 land-use cells
             rf_mask = self.NLUM_MASK.copy()
             have_lu_cells = maximum_filter(self.LUMASK_2D_FULLRES, size=settings.RESFACTOR)
             have_lu_cell_downsampled = have_lu_cells[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR]
 
-            # Get 2D fullres array, where True means
+            # Get 2D fullres array, where True means 
             #   - the cell is the center of a res*res neighbourhood ABD
             #   - having >=1 land-use cells
             lu_mask_fullres = np.zeros_like(rf_mask, dtype=bool)
@@ -169,16 +171,16 @@ class Data:
             # Get the coords (row, col) of the cells that are the center of a res*res neighbourhood having >=1 land-use cells
             self.COORD_ROW_COL_FULLRES = np.argwhere(rf_mask & lu_mask_fullres).T
             self.COORD_ROW_COL_RESFACTORED = (self.COORD_ROW_COL_FULLRES - (settings.RESFACTOR//2)) // settings.RESFACTOR
-
+            
             # Get the 1D MASK for resfactoring all input datasets
             #   - the length is the number cells in Australia (land only).
             #   - the True values are the center of a res*res neighbourhood having >=1 land-use cells
             rf_mask[self.COORD_ROW_COL_FULLRES[0], self.COORD_ROW_COL_FULLRES[1]] = 2
             self.MASK = np.where(rf_mask[np.nonzero(self.NLUM_MASK)] == 2, True, False)
-
+            
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR]
             self.GEO_META = self.update_geo_meta()
-
+            
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
             self.GEO_META = self.GEO_META_FULLRES
@@ -430,8 +432,15 @@ class Data:
         
         # Initial (2010) ag decision variable (X_mrj).
         self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "lmmap.h5")).to_numpy()
-        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj() 
+        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj()
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
+
+        # Initial (2010) maximum ag dvar proportion
+        #   For example, if a cell has 0.2 of ag land-use at beginning,
+        #   then, the sum(ag + non_ag) in the following years should be <= 0.2.
+        #   This is used as a constraint in the solver to prevent the model
+        #   from allocating more agricultural land than the initial proportion.
+        self.AG_MASK_PROPORTION_R =  self.AG_L_MRJ.sum(0).sum(1)
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
         self.LU_RESFACTOR_CELLS = pd.DataFrame({
@@ -510,7 +519,7 @@ class Data:
         
         self.REGION_STATE_NAME2CODE = REGION_STATE_r.groupby('STE_NAME11', observed=True)['STE_CODE11'].first().to_dict()
         self.REGION_STATE_NAME2CODE = dict(sorted(self.REGION_STATE_NAME2CODE.items()))     # Make sure the dict is sorted by state name, makes it consistent with renewable target.
-
+        
         if 'Other Territories' in self.REGION_STATE_NAME2CODE:
             self.REGION_STATE_NAME2CODE.pop('Other Territories')                            # Remove 'Other Territories' from the dict.
         
@@ -788,14 +797,34 @@ class Data:
         print("├── Loading productivity data", flush=True)
 
         # Yield increases.
-        fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
-        self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
-        self.BAU_PROD_INCR_xr = (
-            xr.DataArray(self.BAU_PROD_INCR)
-            .unstack('dim_1')
-            .rename({'dim_1_level_0':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
-            .assign_coords(year=lambda x: x.year + self.YR_CAL_BASE)  # Adjust year to absolute year
-        )
+        if settings.PRODUCTIVITY_TREND == 'BAU':
+            fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
+            productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
+            productivity_trend.index = productivity_trend.index + self.YR_CAL_BASE  # Adjust year to absolute year
+            productivity_trend.index.name = 'Year'
+
+            # Convert to xarray for easier accessing.
+            self.PRODUCTIVITY_MUL_xr = (
+                xr.DataArray(productivity_trend)
+                .unstack('dim_1')
+                .rename({'Year':'year', 'dim_1_level_0':'lm', 'dim_1_level_1':'product'})
+            )
+        else:
+            fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_ag_2050.xlsx")
+            productivity_trend = pd.read_excel(
+                fpath,
+                sheet_name=f'{settings.PRODUCTIVITY_TREND.lower()}',
+                header=[0, 1],
+                index_col=0
+            ).astype(np.float32)
+
+            # Convert to xarray for easier accessing.
+            self.PRODUCTIVITY_MUL_xr = (
+                xr.DataArray(productivity_trend)
+                .unstack('dim_1')
+                .rename({'Year':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
+            )
+
 
 
 
@@ -1198,7 +1227,7 @@ class Data:
 
         # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
         dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'demand_projections.h5'))
-        
+
         # Select the demand data under the running scenariobbryan-January
         self.DEMAND_DATA = dd.loc[(
             settings.SCENARIO,
@@ -1218,8 +1247,8 @@ class Data:
 
         # Remove off-land commodities
         self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY not in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
-        
-        
+
+
         if settings.APPLY_DEMAND_MULTIPLIERS:
             # Load demand multiplier data
             AusTIME_multipliers = pd.read_excel(
@@ -1257,7 +1286,7 @@ class Data:
             print(f"│   └── Years after applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
         else:
             self.DEMAND_C = self.DEMAND_C.dropna(axis=1)
-        
+
         # Convert to numpy array of shape (91, 26)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
         self.D_CY_xr = xr.DataArray(
@@ -1624,7 +1653,7 @@ class Data:
             snes_arr_likely = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_SEL, presence='LIKELY')
             snes_arr_likely_maybe = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE')
             snes_arr = xr.concat([snes_arr_likely, snes_arr_likely_maybe], dim='species')
-            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_average_fraction_from_int_map(arr) for arr in snes_arr])
+            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_average_fraction_from_int_map(arr) for arr in snes_arr]) 
         
         
         if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
@@ -1806,7 +1835,7 @@ class Data:
             for idx_w, _ in enumerate(self.LANDMANS):
                 # Get the cells with the same ID and water supply
                 lu_arr = (self.LUMAP_NO_RESFACTOR == idx_lu) * (self.LMMAP_NO_RESFACTOR == idx_w)
-                lumap_mrj[idx_w, :, idx_lu] = self.get_average_fraction_from_int_map(lu_arr)
+                lumap_mrj[idx_w, :, idx_lu] = self.get_average_fraction_from_int_map(lu_arr)        
                     
         return lumap_mrj
     
@@ -1815,15 +1844,15 @@ class Data:
         '''
         Calculate the average value for each resfactored cell, given the input arr is masked by the land-use mask
         (has a length of the number of cells in the full-resolution 1D array, i.e., 6956407).
-
-        For example, with a 5x5 resfactor, if there are only 7 cells exist, the average value for this
+        
+        For example, with a 5x5 resfactor, if there are only 7 cells exist, the average value for this 
         resfactored cell will be the (sum of 7 cells) / 25.
-
+        
         Args:
             arr (np.ndarray): A 1D array containing the values for the full-resolution array, should be the length of the number of cells in the full-resolution array (i.e., 6956407)
             
         Returns:
-            np.ndarray: A 1D array containing the average values for each cell in the
+            np.ndarray: A 1D array containing the average values for each cell in the 
             resfactored array, with the same length as the number of cells in the resfactored array (i.e., 6956407)
         '''
         
@@ -1832,7 +1861,7 @@ class Data:
 
         arr_2d_xr = xr.DataArray(arr_2d, dims=['y', 'x'])
         arr_2d_xr_resfactored = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').mean()
-        arr_2d_xr_resfactored = arr_2d_xr_resfactored.values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]]
+        arr_2d_xr_resfactored = arr_2d_xr_resfactored.values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]] 
 
         return arr_2d_xr_resfactored[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
 
@@ -2015,9 +2044,9 @@ class Data:
             return self.DEMAND_ELASTICITY_MUL[yr_cal]
 
         # Get supply delta (0-based ratio)
-        supply_base_dvar_base_productivity = self.BASE_YR_production_t
-        supply_base_dvar_target_productivity = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
-        delta_supply = (supply_base_dvar_target_productivity - supply_base_dvar_base_productivity) / supply_base_dvar_base_productivity
+        supply_base_dvar_base_production = self.BASE_YR_production_t
+        supply_base_dvar_target_production = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
+        delta_supply = (supply_base_dvar_target_production - supply_base_dvar_base_production) / supply_base_dvar_base_production
 
         # Get demand delta (0-based ratio)
         demand_base_year = self.D_CY_xr.sel(year=self.YR_CAL_BASE)

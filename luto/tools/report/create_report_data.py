@@ -312,38 +312,38 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
 def process_economics_data(files, SAVE_DIR):
     
     # -------------------- Get the revenue and cost data --------------------
-    revenue_ag_df = files.query('base_name == "revenue_ag"').reset_index(drop=True)
+    revenue_ag_df = files.query('base_name == "economics_ag_revenue"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
     revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (revenue)')
     revenue_ag_df_non_all = revenue_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
 
-    cost_ag_df = files.query('base_name == "cost_ag"').reset_index(drop=True)
+    cost_ag_df = files.query('base_name == "economics_ag_cost"').reset_index(drop=True)
     cost_ag_df = pd.concat([pd.read_csv(path) for path in cost_ag_df['path']], ignore_index=True)
     cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (cost)')
     cost_ag_df['Value ($)'] = cost_ag_df['Value ($)'] * -1          # Convert cost to negative value
     cost_ag_df_non_all = cost_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
 
-    revenue_am_df = files.query('base_name == "revenue_agricultural_management"').reset_index(drop=True)
+    revenue_am_df = files.query('base_name == "economics_am_revenue"').reset_index(drop=True)
     revenue_am_df = pd.concat([pd.read_csv(path) for path in revenue_am_df['path']], ignore_index=True)
     revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (revenue)')
     revenue_am_df_non_all = revenue_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL"')
 
-    cost_am_df = files.query('base_name == "cost_agricultural_management"').reset_index(drop=True)
+    cost_am_df = files.query('base_name == "economics_am_cost"').reset_index(drop=True)
     cost_am_df = pd.concat([pd.read_csv(path) for path in cost_am_df['path']], ignore_index=True)
     cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (cost)')
     cost_am_df['Value ($)'] = cost_am_df['Value ($)'] * -1          # Convert cost to negative value
     cost_am_df_non_all = cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL"')
 
-    revenue_non_ag_df = files.query('base_name == "revenue_non_ag"').reset_index(drop=True)
+    revenue_non_ag_df = files.query('base_name == "economics_non_ag_revenue"').reset_index(drop=True)
     revenue_non_ag_df = pd.concat([pd.read_csv(path) for path in revenue_non_ag_df['path']], ignore_index=True)
     revenue_non_ag_df = revenue_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-Agricultural Land-use (revenue)')
 
-    cost_non_ag_df = files.query('base_name == "cost_non_ag"').reset_index(drop=True)
+    cost_non_ag_df = files.query('base_name == "economics_non_ag_cost"').reset_index(drop=True)
     cost_non_ag_df = pd.concat([pd.read_csv(path) for path in cost_non_ag_df['path']], ignore_index=True)
     cost_non_ag_df = cost_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-Agricultural Land-use (cost)')
     cost_non_ag_df['Value ($)'] = cost_non_ag_df['Value ($)'] * -1  # Convert cost to negative value
 
-    cost_transition_ag2ag_df = files.query('base_name == "cost_transition_ag2ag"').reset_index(drop=True)
+    cost_transition_ag2ag_df = files.query('base_name == "transition_cost_ag2ag"').reset_index(drop=True)
     cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
@@ -351,7 +351,7 @@ def process_economics_data(files, SAVE_DIR):
         '`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL" '
         ).copy()
 
-    cost_transition_ag2non_ag_df = files.query('base_name == "cost_transition_ag2non_ag"').reset_index(drop=True)
+    cost_transition_ag2non_ag_df = files.query('base_name == "transition_cost_ag2non_ag"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
@@ -359,7 +359,7 @@ def process_economics_data(files, SAVE_DIR):
         '`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL" '
         ).copy()
 
-    cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2ag"').reset_index(drop=True)
+    cost_transition_non_ag2ag_df = files.query('base_name == "transition_cost_non_ag2ag"').reset_index(drop=True)
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
@@ -429,7 +429,7 @@ def process_economics_data(files, SAVE_DIR):
         ).drop(columns=['Value ($)_revenue', 'Value ($)_cost']
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
-        ).assign(Source='Total')
+        ).assign(Source='Profit')
 
     ranking_df = pd.concat([revenue_df, cost_df, profit_df]).assign(color= lambda x: x['Rank'].map(get_rank_color))
 
@@ -1097,6 +1097,7 @@ def process_production_data(files, SAVE_DIR, years):
 
     # seperate plot data
     for _type in ['Domestic', 'Exports', 'Imports', 'Feed']:
+        
         demand_group = DEMAND_DATA_long\
             .query('Type == @_type')\
             .groupby(['Year', 'Type', 'group'])[['Quantity (tonnes, KL)']]\
@@ -1106,7 +1107,7 @@ def process_production_data(files, SAVE_DIR, years):
             .groupby(['Type', 'group'])[['Year', 'Quantity (tonnes, KL)']]\
             .apply(lambda x: x[['Year', 'Quantity (tonnes, KL)']].values.tolist())\
             .reset_index()
-
+            
         demand_group = demand_group.drop(columns=['Type'])
         demand_group.columns = ['name', 'data']
         demand_group['type'] = 'column'
