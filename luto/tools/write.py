@@ -2178,8 +2178,11 @@ def write_water(data: Data, yr_cal, path):
 
     # Expand dimension (has to be after calculation to avoid double counting)
     xr_ag_wny = xr.concat([xr_ag_wny.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_ag_wny], dim='lm')
+    xr_ag_wny = xr.concat([xr_ag_wny.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_ag_wny], dim='lu')
+    xr_non_ag_wny = xr.concat([xr_non_ag_wny.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_non_ag_wny], dim='lu')
     xr_am_wny = xr.concat([xr_am_wny.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_am_wny], dim='lm')
     xr_am_wny = xr.concat([xr_am_wny.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_am_wny], dim='lu')
+    xr_am_wny = xr.concat([xr_am_wny.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), xr_am_wny], dim='am')
 
     ag_wny = xr_ag_wny.groupby('region_water'
         ).sum(['cell']
@@ -2330,35 +2333,9 @@ def write_water(data: Data, yr_cal, path):
     wny_NRM.to_csv(os.path.join(path, f'water_yield_separate_NRM_{yr_cal}.csv'), index=False)
 
 
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = cfxr.decode_compress_to_multi_index(
-        xr.load_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer')['data'].sel(lu=['ALL']
-    )
-    xr_ag_wny_cat = xr.concat([ag_mosaic, xr_ag_wny], dim='lu').stack(layer=['lm', 'lu'])
-    
-    if non_ag_wny['Water Net Yield (ML)'].abs().sum() < 1e-3:
-        xr_non_ag_wny_cat = xr.DataArray(
-            np.zeros((1, data.NCELLS), dtype=np.float32),
-            dims=['lu', 'cell'],
-            coords={'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['lu'])
-    else:
-        non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.load_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'].sel(lu=['ALL']
-        )
-        xr_non_ag_wny_cat = xr.concat([non_ag_mosaic, xr_non_ag_wny], dim='lu').stack(layer=['lu'])
-    
-    if am_wny['Water Net Yield (ML)'].abs().sum() < 1e-3:
-        xr_am_wny_cat = xr.DataArray(
-            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['am', 'lm', 'lu', 'cell'],
-            coords={'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['am', 'lm', 'lu'])
-    else:
-        am_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.load_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer')['data'].sel(am=['ALL']
-        ).unstack('layer').expand_dims('am')
-        xr_am_wny_cat = xr.concat([am_mosaic, xr_am_wny], dim='am').stack(layer=['am', 'lm', 'lu'])
+    xr_ag_wny_cat = xr_ag_wny.stack(layer=['lm', 'lu'])
+    xr_non_ag_wny_cat = xr_non_ag_wny.stack(layer=['lu'])
+    xr_am_wny_cat = xr_am_wny.stack(layer=['am', 'lm', 'lu'])
 
     _save2nc(xr_ag_wny_cat, os.path.join(path, f'xr_water_yield_ag_{yr_cal}.nc'))
     _save2nc(xr_non_ag_wny_cat, os.path.join(path, f'xr_water_yield_non_ag_{yr_cal}.nc'))
