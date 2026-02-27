@@ -614,8 +614,8 @@ class LogToFile:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             with (
-                open(self.log_path_stdout, self.mode) as f_out,
-                open(self.log_path_stderr, self.mode) as f_err,
+                open(self.log_path_stdout, self.mode, encoding="utf-8") as f_out,
+                open(self.log_path_stderr, self.mode, encoding="utf-8") as f_err,
                 redirect_stdout(_TeeIO(sys.stdout, f_out)),
                 redirect_stderr(_TeeIO(sys.stderr, f_err)),
             ):
@@ -637,7 +637,7 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
         interval (int): The interval in seconds to log the memory usage.
     '''
     
-    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode, encoding="utf-8") as file:
         while not stop_event.is_set():
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             process = psutil.Process(os.getpid())

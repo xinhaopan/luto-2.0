@@ -1224,12 +1224,12 @@ def main(task_dir, njobs):
             data_path_name = os.path.join(output_path, list(dict.fromkeys(input_files))[i])
             amortize_costs(data_path_name, amortize_files[0], years, njobs=njobs)
     else:
-        Parallel(n_jobs=7, backend="loky")(
+        Parallel(n_jobs=5, backend="loky")(
             delayed(amortize_costs)(
                 os.path.join(output_path, run_name),  # data_path_name
                 amortize_files[0],  # 你的第二个参数
                 years,
-                njobs=math.ceil(njobs/7)  # 传给内部的并行参数（若有）
+                njobs=1  # 传给内部的并行参数（若有）
             )
             for run_name in list(list(dict.fromkeys(input_files)))
         )

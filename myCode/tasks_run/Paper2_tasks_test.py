@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260223_Paper2_Results_test'],
+    'TASK_NAME': ['20260227_Paper2_Results_test'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [3],
@@ -66,9 +66,9 @@ grid_search = {
         'Riparian Plantings': True,
         'Sheep Agroforestry': True,
         'Beef Agroforestry': True,
-        'Carbon Plantings (Block)': False,
-        'Sheep Carbon Plantings (Belt)': False,
-        'Beef Carbon Plantings (Belt)': False,
+        'Carbon Plantings (Block)': True,
+        'Sheep Carbon Plantings (Belt)': True,
+        'Beef Carbon Plantings (Belt)': True,
         'BECCS': False,
         'Destocked - natural land': True,
     }]
