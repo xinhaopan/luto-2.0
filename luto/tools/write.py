@@ -1834,6 +1834,7 @@ def write_ghg_agricultural(data: Data, yr_cal: int, path: str):
     # Expand dimension (has to be after multiplication to avoid double counting)
     ghg_e = xr.concat([ghg_e.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ghg_e], dim='lm')
     ghg_e = xr.concat([ghg_e.sum(dim='GHG_source', keepdims=True).assign_coords(GHG_source=['ALL']), ghg_e], dim='GHG_source')
+    ghg_e = xr.concat([ghg_e.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), ghg_e], dim='lu')
 
     # Regional level aggregation
     ghg_df_region = ghg_e.groupby('region'
@@ -1866,26 +1867,7 @@ def write_ghg_agricultural(data: Data, yr_cal: int, path: str):
 
     # Get valid data layers (before renaming/replacing)
     valid_ghg_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['lm', 'GHG_source', 'lu']]).sort_values()
-    ag_ghg_valid_layers = ghg_e.stack(layer=['lm', 'GHG_source', 'lu']).sel(layer=valid_ghg_layers)
-
-    # Get valid mosaic layers
-    ag_mosaic = cfxr.decode_compress_to_multi_index(
-        xr.load_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
-    )['data'].sel(lu=['ALL'], lm=['ALL'])
-
-    ag_mosaic_ghg = ag_mosaic.where(ghg_e.sum(dim='lu').transpose('cell', ...)).expand_dims(lu=['ALL'])
-
-    ag_mosaic_ghg_stack = ag_mosaic_ghg.stack(layer=['lm', 'GHG_source', 'lu'])
-
-    ag_mosaic_ghg_stack = ag_mosaic_ghg_stack.sel(
-        layer=(
-            ag_mosaic_ghg_stack['layer']['lm'].isin(valid_ghg_layers.get_level_values('lm')) &
-            ag_mosaic_ghg_stack['layer']['GHG_source'].isin(valid_ghg_layers.get_level_values('GHG_source'))
-        )
-    )
-
-    # Combine valid layers from dvar and mosaic
-    valid_layers_stack_ghg = xr.concat([ag_ghg_valid_layers, ag_mosaic_ghg_stack], dim='layer').drop_vars('region').compute()
+    valid_layers_stack_ghg = ghg_e.stack(layer=['lm', 'GHG_source', 'lu']).sel(layer=valid_ghg_layers).drop_vars('region').compute()
 
     _save2nc(valid_layers_stack_ghg, os.path.join(path, f'xr_GHG_ag_{yr_cal}.nc'))
     
@@ -1921,6 +1903,9 @@ def write_ghg_non_agricultural(data: Data, yr_cal: int, path: str):
     # Calculate GHG emissions for non-agricultural land use
     xr_ghg_non_ag = non_ag_dvar_rk * non_ag_g_rk
 
+    # Expand dimension (has to be after multiplication to avoid double counting)
+    xr_ghg_non_ag = xr.concat([xr_ghg_non_ag.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_ghg_non_ag], dim='lu')
+
     # Regional level aggregation
     ghg_df_region = xr_ghg_non_ag.groupby('region'
         ).sum('cell'
@@ -1955,15 +1940,7 @@ def write_ghg_non_agricultural(data: Data, yr_cal: int, path: str):
         ).stack(layer=['lu'])
 
     else:
-        non_ag_ghg_valid_layers = xr_ghg_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_ghg_layers)
-
-        # Get mosaic - simply expand and stack (no filtering for NonAg)
-        non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.load_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
-
-        # Combine and compute
-        xr_ghg_non_ag_cat = xr.concat([non_ag_mosaic, non_ag_ghg_valid_layers], dim='layer').drop_vars('region').compute()
+        xr_ghg_non_ag_cat = xr_ghg_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_ghg_layers).drop_vars('region').compute()
 
     # Save xarray data to netCDF
     _save2nc(xr_ghg_non_ag_cat, os.path.join(path, f'xr_GHG_non_ag_{yr_cal}.nc'))
@@ -1999,6 +1976,7 @@ def write_ghg_agricultural_management(data: Data, yr_cal: int, path: str):
     # Expand dimension (has to be after multiplication to avoid double counting)
     xr_ghg_ag_man = xr.concat([xr_ghg_ag_man.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_ghg_ag_man], dim='lm')
     xr_ghg_ag_man = xr.concat([xr_ghg_ag_man.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_ghg_ag_man], dim='lu')
+    xr_ghg_ag_man = xr.concat([xr_ghg_ag_man.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), xr_ghg_ag_man], dim='am')
 
     # Regional level aggregation
     ghg_df_region = xr_ghg_ag_man.groupby('region'
@@ -2036,28 +2014,7 @@ def write_ghg_agricultural_management(data: Data, yr_cal: int, path: str):
         ).stack(layer=['am', 'lm', 'lu'])
 
     else:
-        am_ghg_valid_layers = xr_ghg_ag_man.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_ghg_layers)
-
-        # Get valid mosaic layers
-        am_mosaic = cfxr.decode_compress_to_multi_index(
-            xr.load_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
-        )['data'].sel(am='ALL', lm='ALL', lu='ALL')
-
-        am_mosaic_ghg = am_mosaic.where(
-            xr_ghg_ag_man.sum('am').transpose('cell', ...)
-        ).expand_dims('am')
-
-        # Stack mosaic and filter by lm and lu (NOT am)
-        am_mosaic_ghg_stack = am_mosaic_ghg.stack(layer=['am', 'lm', 'lu'])
-        am_mosaic_ghg_stack = am_mosaic_ghg_stack.sel(
-            layer=(
-                am_mosaic_ghg_stack['layer']['lm'].isin(valid_am_ghg_layers.get_level_values('lm')) &
-                am_mosaic_ghg_stack['layer']['lu'].isin(valid_am_ghg_layers.get_level_values('lu'))
-            )
-        )
-
-        # Combine valid layers from dvar and mosaic
-        valid_layers_stack_am_ghg = xr.concat([am_ghg_valid_layers, am_mosaic_ghg_stack], dim='layer').drop_vars('region').compute()
+        valid_layers_stack_am_ghg = xr_ghg_ag_man.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_ghg_layers).drop_vars('region').compute()
 
     # Save xarray data to netCDF
     _save2nc(valid_layers_stack_am_ghg, os.path.join(path, f'xr_GHG_ag_management_{yr_cal}.nc'))

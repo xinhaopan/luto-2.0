@@ -429,15 +429,15 @@ def save_report_layer(raw_data_dir:str):
     files_ghg = files.query('base_name.str.contains("GHG")')
 
     ghg_ag = files_ghg.query('base_name == "xr_GHG_ag"')
-    get_map2json(ghg_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
+    get_map2json(ghg_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
     print('│   ├── GHG Ag layer saved.')
 
     ghg_am = files_ghg.query('base_name == "xr_GHG_ag_management"')
-    get_map2json(ghg_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
+    get_map2json(ghg_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
     print('│   ├── GHG Am layer saved.')
 
     ghg_nonag = files_ghg.query('base_name == "xr_GHG_non_ag"')
-    get_map2json(ghg_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
+    get_map2json(ghg_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
     print('│   ├── GHG Non-Ag layer saved.')
 
 
