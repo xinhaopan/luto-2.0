@@ -627,7 +627,13 @@ For agricultural products, the quantity is calculated as:
     quantity_am = quantity_ag * (re_productivity_multiplier - 1)    # If ag-man applied, an additional quantity is introduced (positive or negative) depending on the multiplier.
 
 For renewable products, the quantity is calculated as:
-    quantity = Natural_energy * re_nature_energy_capture_percent * (1 - re_remain_percent_after_distribution) * 365 * 24 * real_area
+    quantity = (
+        INSTALL_CAPACITY_MW_HA 
+        * capacity_factor_multiplier 
+        * (1 - re_remain_percent_after_distribution) 
+        * 365 * 24 
+        * real_area
+    )
 '''
 
 
@@ -648,12 +654,12 @@ def get_quantity_renewable(data, re_type: str, yr_idx: int):
     
     re_lyr = data.RENEWABLE_LAYERS.sel(Type=re_type, year=yr_cal)
     
-    re_nature_energy_capture_percent = re_lyr['capacity_factor_multiplier']
-    re_percent_remain_after_distribution = re_lyr['distribution_loss_factor_multiplier']
+    capacity_factor_multiplier = re_lyr['capacity_factor_multiplier']
+    distribution_loss_factor_multiplier = re_lyr['distribution_loss_factor_multiplier']
     yield_per_ha = (
         settings.INSTALL_CAPACITY_MW_HA[re_type] 
-        * re_nature_energy_capture_percent          
-        * re_percent_remain_after_distribution 
+        * capacity_factor_multiplier            # Range 0-1, indicates how much installed capacity is converted to electricity on average over the year.
+        * distribution_loss_factor_multiplier   # Range 0-1, indicates how much electricity was sent to customers.
         * 365 * 24
     )
 
