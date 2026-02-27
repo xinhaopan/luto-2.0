@@ -4,15 +4,15 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260223_Paper2_Results_NCI'],
+    'TASK_NAME': ['20260226_Paper2_Results_NCI'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [3],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['40GB'],
-    'NCPUS': ['10'],
+    'MEM': ['60GB'],
+    'NCPUS': ['15'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['15:00:00'],
+    'TIME': ['48:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['high', 'low', 'off'],
     'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],
@@ -66,9 +66,9 @@ grid_search = {
         'Riparian Plantings': True,
         'Sheep Agroforestry': True,
         'Beef Agroforestry': True,
-        'Carbon Plantings (Block)': False,
-        'Sheep Carbon Plantings (Belt)': False,
-        'Beef Carbon Plantings (Belt)': False,
+        'Carbon Plantings (Block)':  True,
+        'Sheep Carbon Plantings (Belt)':  True,
+        'Beef Carbon Plantings (Belt)':  True,
         'BECCS': False,
         'Destocked - natural land': True,
     }]

@@ -1,7 +1,7 @@
 import math
 
 N_JOBS = math.ceil(41 / 1)
-TASK_NAME = "20260223_Paper2_Results_NCI" # "20250922_Paper2_Results_NCI"  #
+TASK_NAME = "20260226_Paper2_Results_NCI" # "20250922_Paper2_Results_NCI"  #
 
 COST_DICT = {
     'cost_am': [

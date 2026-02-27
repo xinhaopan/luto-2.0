@@ -127,8 +127,8 @@ class TailFollower:
 # 在本机启动网页服务
 # 访问 http://127.0.0.1:8050
 # ============ 必填：连接 & 文件配置 ============
-platform = "HPC"  # "HPC" 或 "NCI"
-mem_file = "20251026_Paper2_Results"
+platform = "NCI"  # "HPC" 或 "NCI"
+mem_file = "20260226_Paper2_Results_NCI"
 mem_path = f"{mem_file}/carbon_price/mem_log.txt"
 
 cfg = ssh_config(platform)
@@ -190,4 +190,4 @@ def update_graph(_):
 
     return fig, f"Max: {max_val:.3f} @ {max_ts.strftime('%Y-%m-%d %H:%M:%S')}"
 
-app.run_server(debug=False, host="127.0.0.1", port=8050)
+app.run(debug=False, host="127.0.0.1", port=8050)

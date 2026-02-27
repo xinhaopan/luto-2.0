@@ -15,9 +15,9 @@ ghg_per_kg = ghg_ave/prod_ave
 
 prod_df = pd.read_csv('../2_processed_data/cattle_production_by_stage.csv')
 land_cr = ghg_per_kg
-short_cr = 9.9 * 468 / (468 * 0.6817 * (1-0.008))
-mid_cr = 9.4 * 652 / (652 * 0.6817 * (1-0.007))
-long_cr = 10.6 * 784 / (784 * 0.6817 * (1-0.021))
+short_cr = 27.25 * 672.6 / (468 * 0.6817 * (1-0.008)) / 1e3
+mid_cr = 27.25 * 554.6 / (652 * 0.6817 * (1-0.007)) / 1e3
+long_cr = 27.25 * 784 / (784 * 0.6817 * (1-0.021)) / 1e3
 cr_map = {
     "land": land_cr,
     "short": short_cr,

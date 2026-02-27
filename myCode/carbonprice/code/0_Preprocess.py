@@ -21,6 +21,8 @@ from rasterio.features import rasterize
 import io
 import zipfile
 from threading import Lock
+import sys
+sys.path.insert(0, "../../../")
 
 
 # --- Local packages ---

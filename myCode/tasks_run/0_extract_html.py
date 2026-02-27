@@ -84,4 +84,4 @@ def run_extreme_pipeline(input_folder):
 if __name__ == "__main__":
     # 使用你指定的 output 目录
     os.chdir(r'F:\Users\s222552331\Work\LUTO2_XH\luto-2.0\output')
-    run_extreme_pipeline("20260223_Paper2_Results_NCI")
+    run_extreme_pipeline("20260226_Paper2_Results_NCI")

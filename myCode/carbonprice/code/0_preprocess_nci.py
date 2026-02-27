@@ -4,13 +4,13 @@ import subprocess
 # ==============================================================================
 #  配置区域
 # ==============================================================================
-CPU_CORES = 45
-MEMORY_GB = "1400GB"          # PBS 用 GB
-TIME_LIMIT = "48:00:00"       # 一天
+CPU_CORES = 48
+MEMORY_GB = "192GB"          # PBS 用 GB
+TIME_LIMIT = "24:00:00"       # 一天
 PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"
 CONDA_ENV_NAME = "xpluto"
 SUBMISSION_SCRIPT_NAME = "submit_preprocess.pbs"
-
+queue_name = "normal" # "hugmem" "normalsr" https://opus.nci.org.au/spaces/Help/pages/90308823/Queue+Limits
 
 def create_and_submit_hpc_job():
     """
@@ -20,7 +20,7 @@ def create_and_submit_hpc_job():
 
     pbs_script_content = f"""#!/bin/bash
 #PBS -N carbon_preprocess
-#PBS -q hugemem
+#PBS -q {queue_name}
 #PBS -l ncpus={CPU_CORES}
 #PBS -l mem={MEMORY_GB}
 #PBS -l walltime={TIME_LIMIT}
