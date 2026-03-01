@@ -4,13 +4,13 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260213_Paper2_Results'],
+    'TASK_NAME': ['20260226_Paper2_Results_aquila'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [3],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['80GB'],
-    'NCPUS': ['20'],
+    'MEM': ['68GB'],
+    'NCPUS': ['17'],
     'WRITE_THREADS': ['2'],
     'TIME': ['48:00:00'],
 
@@ -66,9 +66,9 @@ grid_search = {
         'Riparian Plantings': True,
         'Sheep Agroforestry': True,
         'Beef Agroforestry': True,
-        'Carbon Plantings (Block)':False,
-        'Sheep Carbon Plantings (Belt)': False,
-        'Beef Carbon Plantings (Belt)': False,
+        'Carbon Plantings (Block)':  True,
+        'Sheep Carbon Plantings (Belt)':  True,
+        'Beef Carbon Plantings (Belt)':  True,
         'BECCS': False,
         'Destocked - natural land': True,
     }]
@@ -102,7 +102,7 @@ settings_name_dict = {
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
-grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
-print(grid_search_settings_df.columns)
-# grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
+# grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
+# print(grid_search_settings_df.columns)
+grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
 create_task_runs(task_root_dir, grid_search_settings_df, platform="aquila", n_workers=min(len(grid_search_settings_df.columns), 50),use_parallel=True)

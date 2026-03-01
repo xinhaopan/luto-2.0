@@ -5,6 +5,7 @@ import glob
 import zipfile
 import io
 import time
+import subprocess
 
 
 def get_max_memory_from_stream(stream):
@@ -169,17 +170,19 @@ def parse_running_year(runing_file):
 
 
 def get_dir_size_mb(directory):
-    """计算目录下所有文件的总大小（MB）。"""
+    """用 du -sb 快速计算目录大小（MB），适合 HPC Lustre 文件系统。"""
     if not directory or not os.path.isdir(directory):
         return None
-    total = 0
-    for root, _, files in os.walk(directory):
-        for fn in files:
-            try:
-                total += os.path.getsize(os.path.join(root, fn))
-            except Exception:
-                continue
-    return round(total / 1e6, 3)
+    try:
+        result = subprocess.run(
+            ['du', '-sb', directory],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0:
+            return round(int(result.stdout.split()[0]) / 1e6, 1)
+    except Exception:
+        pass
+    return None
 
 
 def check_stderr_errors(stderr_file):
@@ -197,7 +200,7 @@ def check_stderr_errors(stderr_file):
 
 
 if __name__ == "__main__":
-    task_name = '20260301_Paper2_Results_test'
+    task_name = '20260226_Paper2_Results_aquila'
     base_dir = f'../../output/{task_name}'
     target_year = 2050
     template_df = pd.read_csv(os.path.join(base_dir, 'grid_search_template.csv'), index_col=0)

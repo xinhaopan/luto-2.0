@@ -270,38 +270,41 @@ def filter_all_from_dims(
 
     def _filter_da(da: xr.DataArray) -> xr.DataArray:
         out = da
-        filter_words = ['ALL', 'AUSTRALIA']
+        filter_set = ['ALL', 'AUSTRALIA']  # checked together in one np.isin call
 
-        # ---------- A) 过滤真正 dims 中的 ALL ----------
-        for filter_word in filter_words:
-            for dim in list(out.dims):
-                if dim in out.coords and out[dim].dtype.kind in ("U", "S", "O"):
-                    vals = out[dim].values
-                    if np.isin(vals, [filter_word]).any():
-                        out = out.sel({dim: out[dim] != filter_word})
+        # ---------- A) 过滤真正 dims 中的 filter_set ----------
+        # One pass over dims; np.isin checks all filter words at once.
+        for dim in list(out.dims):
+            if dim in out.coords and out[dim].dtype.kind in ("U", "S", "O"):
+                vals = out[dim].values
+                bad = np.isin(vals, filter_set)
+                if bad.any():
+                    out = out.isel({dim: ~bad})
 
-            # ---------- B) 过滤 layer-level coords 中的 ALL ----------
-            if layer_dim in out.dims:
-                layer_level_vars = [
-                    c for c in out.coords
-                    if c != layer_dim and out.coords[c].dims == (layer_dim,)
-                ]
-                if layer_level_vars:
-                    if strict_layer_multiindex:
-                        out = _ensure_layer_multiindex_strict(
-                            out, layer_dim=layer_dim, level_order=layer_level_order
-                        )
+        # ---------- B) 过滤 layer-level coords 中的 filter_set ----------
+        # Moved outside the filter_word loop so MultiIndex is rebuilt only once.
+        if layer_dim in out.dims:
+            layer_level_vars = [
+                c for c in out.coords
+                if c != layer_dim and out.coords[c].dims == (layer_dim,)
+            ]
+            if layer_level_vars:
+                if strict_layer_multiindex:
+                    out = _ensure_layer_multiindex_strict(
+                        out, layer_dim=layer_dim, level_order=layer_level_order
+                    )
 
-                    idx = out.indexes.get(layer_dim, None)
-                    if strict_layer_multiindex and not isinstance(idx, pd.MultiIndex):
-                        raise ValueError(
-                            f"Expected '{layer_dim}' to be MultiIndex after ensure, got {type(idx)}"
-                        )
+                idx = out.indexes.get(layer_dim, None)
+                if strict_layer_multiindex and not isinstance(idx, pd.MultiIndex):
+                    raise ValueError(
+                        f"Expected '{layer_dim}' to be MultiIndex after ensure, got {type(idx)}"
+                    )
 
-                    if isinstance(idx, pd.MultiIndex):
-                        keep = np.ones(len(idx), dtype=bool)
-                        for lvl in idx.names:
-                            keep &= (idx.get_level_values(lvl) != filter_word)
+                if isinstance(idx, pd.MultiIndex):
+                    keep = np.ones(len(idx), dtype=bool)
+                    for lvl in idx.names:
+                        keep &= ~np.isin(idx.get_level_values(lvl), filter_set)
+                    if not keep.all():
                         out = out.isel({layer_dim: keep})
 
         return out

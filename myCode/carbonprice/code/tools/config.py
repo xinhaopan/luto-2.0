@@ -1,7 +1,7 @@
 import math
 
 N_JOBS = math.ceil(41 / 1)
-TASK_NAME = "20260226_Paper2_Results_NCI" # "20250922_Paper2_Results_NCI"  #
+TASK_NAME = "20260301_Paper2_Results_test" # "20250922_Paper2_Results_NCI"  #
 
 COST_DICT = {
     'cost_am': [
@@ -31,15 +31,15 @@ COST_DICT = {
 
 
 KEY_TO_COLUMN_MAP = {
-    "xr_cost_ag": "Ag cost",
-    "xr_cost_agricultural_management": "AgMgt cost",
-    "xr_cost_non_ag": "Non-ag cost",
-    "xr_cost_transition_ag2ag": "Transition(ag→ag) cost",
+    "xr_economics_ag_cost": "Ag cost",
+    "xr_economics_am_cost": "AgMgt cost",
+    "xr_economics_non_ag_cost": "Non-ag cost",
+    "xr_transition_cost_ag2ag": "Transition(ag→ag) cost",
     "xr_transition_cost_ag2non_ag": "Transition(ag→non-ag) cost",
     "xr_transition_cost_ag2non_ag_amortised": "Transition(ag→non-ag) amortised cost",
-    "xr_revenue_ag": "Ag revenue",
-    "xr_revenue_agricultural_management": "AgMgt revenue",
-    "xr_revenue_non_ag": "Non-ag revenue",
+    "xr_economics_ag_revenue": "Ag revenue",
+    "xr_economics_am_revenue": "AgMgt revenue",
+    "xr_economics_non_ag_revenue": "Non-ag revenue",
 
     # GHG Files
     "xr_GHG_ag": "Ag GHG",
@@ -72,7 +72,7 @@ START_YEAR = 2025
 COLUMN_NAME = ["Ag", "AM",  "Non-ag", "Transition(ag2ag)","Transition(ag2non-ag)"]
 
 
-economic_files = ['xr_cost_ag', 'xr_cost_agricultural_management', 'xr_cost_non_ag', 'xr_cost_transition_ag2ag','xr_transition_cost_ag2non_ag','xr_transition_cost_ag2non_ag_amortised','xr_revenue_ag', 'xr_revenue_agricultural_management', 'xr_revenue_non_ag']
+economic_files = ['xr_economics_ag_cost', 'xr_economics_am_cost', 'xr_economics_non_ag_cost', 'xr_transition_cost_ag2ag','xr_transition_cost_ag2non_ag','xr_transition_cost_ag2non_ag_amortised','xr_economics_ag_revenue', 'xr_economics_am_revenue', 'xr_economics_non_ag_revenue']
 carbon_files = ['xr_GHG_ag', 'xr_GHG_ag_management', 'xr_GHG_non_ag', 'xr_transition_GHG']
 bio_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_biodiversity_GBF2_priority_ag_management','xr_biodiversity_GBF2_priority_non_ag']
 

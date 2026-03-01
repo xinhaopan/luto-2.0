@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 from rasterio.warp import reproject, Resampling
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches

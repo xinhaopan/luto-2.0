@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import seaborn as sns
 import matplotlib as mpl
+mpl.use('Agg')
 import xarray as xr
 
 from matplotlib import gridspec

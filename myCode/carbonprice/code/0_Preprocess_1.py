@@ -511,7 +511,7 @@ def aggregate_and_save_cost(year, output_path, cost_names):
         'xr_cost_ag',
         'xr_cost_agricultural_management',
         'xr_cost_non_ag',
-        'xr_cost_transition_ag2ag_diff',
+        'xr_transition_cost_ag2ag_diff',
     ]
     # 注意：你的输入名带有 _diff，这里兼容并据此判断 am_type
     add_variants = [
@@ -959,9 +959,9 @@ def main(task_dir, njobs):
     tprint(f"任务目录: {task_dir}")
 
     area_files = ['xr_area_agricultural_landuse', 'xr_area_agricultural_management','xr_area_non_agricultural_landuse']
-    cost_files = ['xr_cost_ag', 'xr_cost_agricultural_management', 'xr_cost_non_ag', 'xr_cost_transition_ag2ag',
+    cost_files = ['xr_economics_ag_cost', 'xr_economics_am_cost', 'xr_economics_non_ag_cost', 'xr_transition_cost_ag2ag',
                   'xr_transition_cost_ag2non_ag']
-    revenue_files = ['xr_revenue_ag', 'xr_revenue_agricultural_management', 'xr_revenue_non_ag']
+    revenue_files = ['xr_economics_ag_revenue', 'xr_economics_am_revenue', 'xr_economics_non_ag_revenue']
     carbon_files = ['xr_GHG_ag', 'xr_GHG_ag_management', 'xr_GHG_non_ag', 'xr_transition_GHG']
     bio_files = ['xr_biodiversity_GBF2_priority_ag', 'xr_biodiversity_GBF2_priority_ag_management',
                  'xr_biodiversity_GBF2_priority_non_ag']
@@ -972,7 +972,7 @@ def main(task_dir, njobs):
     economic_files = config.economic_files
     env_files = carbon_files + bio_files
 
-    economic_sol_files = ['xr_cost_agricultural_management', 'xr_cost_non_ag', 'xr_transition_cost_ag2non_ag_amortised', 'xr_revenue_ag','xr_revenue_agricultural_management', 'xr_revenue_non_ag']
+    economic_sol_files = ['xr_economics_am_cost', 'xr_economics_non_ag_cost', 'xr_transition_cost_ag2non_ag_amortised', 'xr_economics_ag_revenue','xr_economics_am_revenue', 'xr_economics_non_ag_revenue']
 
     input_files_0 = config.input_files_0
     input_files_1 = config.input_files_1
@@ -1144,7 +1144,7 @@ def main(task_dir, njobs):
 #
 #     ##--- 阶段 5: 转型成本差值计算 (仅独立部分) ---
 #     tprint("\n--- 阶段 5: 转型成本差值计算 ---")
-#     independent_tran_files = ['xr_cost_transition_ag2ag', 'xr_transition_cost_ag2non_ag',
+#     independent_tran_files = ['xr_transition_cost_ag2ag', 'xr_transition_cost_ag2non_ag',
 #                               'xr_transition_cost_ag2non_ag_amortised']
 #     for tran_file in independent_tran_files:
 #         tprint(f"Processing transition cost file: {tran_file}...")

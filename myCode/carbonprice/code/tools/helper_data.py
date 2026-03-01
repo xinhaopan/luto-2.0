@@ -1,21 +1,16 @@
 import os
-from typing import List, Dict, Any, Optional
-import numpy as np
-import xarray as xr
-
-import os
-import xarray as xr
-from joblib import Parallel, delayed
-import pandas as pd
-from typing import List, Dict, Any
+import math
 from contextlib import suppress
 from pathlib import Path
-import math
-import cf_xarray as cfxr
+from typing import List, Dict, Any, Optional
 
+import numpy as np
+import pandas as pd
+import xarray as xr
+import cf_xarray as cfxr
+from joblib import Parallel, delayed
 
 from tools.tools import get_path, get_year, save2nc, filter_all_from_dims
-from tools.tools import get_path,get_year,filter_all_from_dims
 import tools.config as config
 
 
@@ -269,7 +264,7 @@ def summarize_to_category(
             nc_path = os.path.join(input_path, f'{year}', f'{file}_{year}.nc')
         if not os.path.exists(nc_path):
             raise FileNotFoundError(f"未找到文件: {nc_path}")
-        with xr.open_dataarray(nc_path) as da:
+        with xr.open_dataarray(nc_path, engine="h5netcdf") as da:
             filtered = filter_all_from_dims(da).load()
             return filtered.sum().item()
 
@@ -590,139 +585,78 @@ def build_sol_profit_and_cost_nc(
         "cost_all": all_cost,  # 合并后的总结果 (scenario, Year, type) + 辅助坐标 category
     }
 
-def make_prices_nc(output_names):
+def _make_prices_nc_impl(
+    output_names,
+    cost_file: str,
+    carbon_file: str,
+    bio_file: str,
+    carbon_out: str,
+    bio_out: str,
+):
     """
-    从 xr_total_cost.nc / xr_total_carbon.nc / xr_total_bio.nc 读取数据，
-    对每个情景只保留 (scenario, Year)，其余维度（若存在）全部按和聚合；
-    然后计算：
-        carbon_price = total_cost / total_carbon
-        bio_price    = total_cost / total_bio
-    合并所有情景 -> 两个 DataArray：(scenario, Year)，并保存到 out_dir。
+    Shared implementation for make_prices_nc / make_sol_prices_nc.
+
+    Reads three pre-computed (scenario, Year, ...) DataArrays, selects the
+    requested scenarios, sums away any extra dimensions, then computes and
+    saves carbon_price = cost / carbon and bio_price = cost / bio.
     """
     out_dir = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
-    base = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
-    cost_da = xr.open_dataarray(os.path.join(base, 'xr_total_cost.nc'))
-    carbon_da = xr.open_dataarray(os.path.join(base, 'xr_total_carbon.nc'))
-    bio_da = xr.open_dataarray(os.path.join(base, 'xr_total_bio.nc'))
 
-    def _collapse_to_year(da_all: xr.DataArray, scen_name: str) -> xr.DataArray:
-        """
-        选中单个情景，除 Year 外的所有维度求和，返回维度仅 (scenario, Year) 的 DataArray。
-        """
-        da = da_all.sel(scenario=scen_name)
-
-        # 需要保留的维度：Year（和 scenario 这个坐标）
-        keep = {'Year'}
-        # 允许有/无 Year 这一坐标（某些数据可能命名不同，必要时在外面改名）
-        sum_dims = [d for d in da.dims if d not in keep]
-
+    def _load_and_collapse(fname: str) -> xr.DataArray:
+        """Load file, select output_names scenarios, collapse extra dims."""
+        with xr.open_dataarray(os.path.join(out_dir, fname), engine="h5netcdf") as da:
+            da = da.sel(scenario=output_names).load()
+        sum_dims = [d for d in da.dims if d not in {'scenario', 'Year'}]
         if sum_dims:
             da = da.sum(dim=sum_dims, skipna=True)
-
-        # 确保有 scenario 维度（如果被掉了就补回来）
-        if 'scenario' not in da.dims:
-            da = da.expand_dims({'scenario': [scen_name]})
-        else:
-            # 把单场景的坐标设置为该 scen_name（防止保留了原坐标数组）
-            da = da.assign_coords(scenario=[scen_name])
-
-        # 维度顺序统一成 (scenario, Year)（若 Year 不存在，这里会报错，需保证 Year 维存在）
         if 'Year' in da.dims:
             da = da.transpose('scenario', 'Year')
         return da
 
-    # 聚合每个情景
-    cost_list, car_list, bio_list = [], [], []
-    for scen in output_names:
-        cost_list.append(_collapse_to_year(cost_da, scen))
-        car_list.append(_collapse_to_year(carbon_da, scen))
-        bio_list.append(_collapse_to_year(bio_da, scen))
-
-    # 合并所有情景
-    cost_all = xr.concat(cost_list, dim='scenario', join='outer', fill_value=0)
-    carbon_all = xr.concat(car_list, dim='scenario', join='outer', fill_value=0)
-    bio_all = xr.concat(bio_list, dim='scenario', join='outer', fill_value=0)
-
+    cost_all   = _load_and_collapse(cost_file)
+    carbon_all = _load_and_collapse(carbon_file)
+    bio_all    = _load_and_collapse(bio_file)
 
     carbon_price = cost_all / carbon_all
-    bio_price = cost_all / bio_all
-
+    bio_price    = cost_all / bio_all
     carbon_price.name = 'data'
-    bio_price.name = 'data'
+    bio_price.name    = 'data'
 
-    # 保存
     os.makedirs(out_dir, exist_ok=True)
-    save2nc(carbon_price, os.path.join(out_dir, 'xr_carbon_price.nc'))
-    save2nc(bio_price, os.path.join(out_dir, 'xr_bio_price.nc'))
+    save2nc(carbon_price, os.path.join(out_dir, carbon_out))
+    save2nc(bio_price,    os.path.join(out_dir, bio_out))
 
     return carbon_price, bio_price
+
+
+def make_prices_nc(output_names):
+    """
+    Compute carbon_price and bio_price from xr_total_cost / carbon / bio NetCDFs.
+    Selects the requested scenarios, collapses extra dims, saves results.
+    """
+    return _make_prices_nc_impl(
+        output_names,
+        cost_file   = 'xr_total_cost.nc',
+        carbon_file = 'xr_total_carbon.nc',
+        bio_file    = 'xr_total_bio.nc',
+        carbon_out  = 'xr_carbon_price.nc',
+        bio_out     = 'xr_bio_price.nc',
+    )
+
 
 def make_sol_prices_nc(output_names):
     """
-    从 xr_total_cost.nc / xr_total_carbon.nc / xr_total_bio.nc 读取数据，
-    对每个情景只保留 (scenario, Year)，其余维度（若存在）全部按和聚合；
-    然后计算：
-        carbon_price = total_cost / total_carbon
-        bio_price    = total_cost / total_bio
-    合并所有情景 -> 两个 DataArray：(scenario, Year)，并保存到 out_dir。
+    Compute carbon_price and bio_price from xr_total_sol_cost / carbon / bio NetCDFs.
+    Selects the requested scenarios, collapses extra dims, saves results.
     """
-    out_dir = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
-    base = f'../../../output/{config.TASK_NAME}/carbon_price/1_draw_data'
-    cost_da = xr.open_dataarray(os.path.join(base, 'xr_total_sol_cost.nc'))
-    carbon_da = xr.open_dataarray(os.path.join(base, 'xr_total_sol_carbon.nc'))
-    bio_da = xr.open_dataarray(os.path.join(base, 'xr_total_sol_bio.nc'))
-
-    def _collapse_to_year(da_all: xr.DataArray, scen_name: str) -> xr.DataArray:
-        """
-        选中单个情景，除 Year 外的所有维度求和，返回维度仅 (scenario, Year) 的 DataArray。
-        """
-        da = da_all.sel(scenario=scen_name)
-
-        # 需要保留的维度：Year（和 scenario 这个坐标）
-        keep = {'Year'}
-        # 允许有/无 Year 这一坐标（某些数据可能命名不同，必要时在外面改名）
-        sum_dims = [d for d in da.dims if d not in keep]
-
-        if sum_dims:
-            da = da.sum(dim=sum_dims, skipna=True)
-
-        # 确保有 scenario 维度（如果被掉了就补回来）
-        if 'scenario' not in da.dims:
-            da = da.expand_dims({'scenario': [scen_name]})
-        else:
-            # 把单场景的坐标设置为该 scen_name（防止保留了原坐标数组）
-            da = da.assign_coords(scenario=[scen_name])
-
-        # 维度顺序统一成 (scenario, Year)（若 Year 不存在，这里会报错，需保证 Year 维存在）
-        if 'Year' in da.dims:
-            da = da.transpose('scenario', 'Year')
-        return da
-
-    # 聚合每个情景
-    cost_list, car_list, bio_list = [], [], []
-    for scen in output_names:
-        cost_list.append(_collapse_to_year(cost_da, scen))
-        car_list.append(_collapse_to_year(carbon_da, scen))
-        bio_list.append(_collapse_to_year(bio_da, scen))
-
-    # 合并所有情景
-    cost_all = xr.concat(cost_list, dim='scenario', join='outer', fill_value=0)
-    carbon_all = xr.concat(car_list, dim='scenario', join='outer', fill_value=0)
-    bio_all = xr.concat(bio_list, dim='scenario', join='outer', fill_value=0)
-
-
-    carbon_price = cost_all / carbon_all
-    bio_price = cost_all / bio_all
-
-    carbon_price.name = 'data'
-    bio_price.name = 'data'
-
-    # 保存
-    os.makedirs(out_dir, exist_ok=True)
-    save2nc(carbon_price, os.path.join(out_dir, 'xr_carbon_sol_price.nc'))
-    save2nc(bio_price, os.path.join(out_dir, 'xr_bio_sol_price.nc'))
-
-    return carbon_price, bio_price
+    return _make_prices_nc_impl(
+        output_names,
+        cost_file   = 'xr_total_sol_cost.nc',
+        carbon_file = 'xr_total_sol_carbon.nc',
+        bio_file    = 'xr_total_sol_bio.nc',
+        carbon_out  = 'xr_carbon_sol_price.nc',
+        bio_out     = 'xr_bio_sol_price.nc',
+    )
 
 def summarize_netcdf_to_excel(
         input_file: str,
@@ -772,7 +706,7 @@ def summarize_netcdf_to_excel(
 
             # Check for file existence before trying to open
             if os.path.exists(file_path):
-                with xr.open_dataarray(file_path,chunks='auto') as da:
+                with xr.open_dataarray(file_path, engine="h5netcdf", chunks='auto') as da:
                     filtered_da = filter_all_from_dims(da).load()
                     total_sum = filtered_da.sum().item()
             else:

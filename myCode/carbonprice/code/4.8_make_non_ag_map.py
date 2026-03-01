@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib import gridspec
 from matplotlib.colors import LinearSegmentedColormap
@@ -22,8 +24,8 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
 
     fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(
-        nrows, ncols, figure=fig, hspace=-0.2, wspace=0.02,
-        left=0.05, right=0.99, top=1, bottom=0.04
+        nrows, ncols, figure=fig, hspace=-0.15, wspace=0.02,
+        left=0.05, right=0.99, top=1, bottom=0.03
     )
     axes = []
 
@@ -97,11 +99,26 @@ scenarios = ["Run_21_GHG_off_BIO_off_CUT_50", "Run_06_GHG_high_BIO_off_CUT_50", 
 # Column headers for the plot grid
 title_names = ['Reference', r'$\mathrm{NZ}_{\mathrm{high}}$',
                r'$\mathrm{NZ}_{\mathrm{high}}$,$\mathrm{NP}_{\mathrm{50}}$']
-tif_title_list = ["Destocked - natural land",  "Riparian plantings",
-                    "Environmental plantings", "Sheep agroforestry", "Beef agroforestry"]
-row_labels = ["Destocked (natural land)","Riparian buffer restoration\n(mixed species)",
-                "Environmental plantings\n(mixed local native species)",
-              "Agroforestry\n(mixed species + sheep)","Agroforestry\n(mixed species + beef)", ]
+tif_title_list = [
+    "Destocked - natural land",
+    "Carbon plantings (Block)",
+    "Environmental plantings",
+    "Riparian plantings",
+    "Sheep carbon plantings (Belt)",
+    "Beef carbon plantings (Belt)",
+    "Sheep agroforestry",
+    "Beef agroforestry",
+]
+row_labels = [
+    "Destocked\n(natural land)",
+    "Carbon plantings\n(block)",
+    "Environmental plantings\n(mixed local native species)",
+    "Riparian buffer restoration\n(mixed species)",
+    "Farm forestry\n(hardwood + sheep)",
+    "Farm forestry\n(hardwood + beef)",
+    "Agroforestry\n(mixed species + sheep)",
+    "Agroforestry\n(mixed species + beef)",
+]
 
 # --- Plotting ---
 fig, axes = plot_tif_grid(scenarios, tif_title_list, title_names)
@@ -134,7 +151,7 @@ plt.rcParams['mathtext.bf'] = font_family
 plt.rcParams['mathtext.sf'] = font_family
 
 im = axes[0].images[0]
-cax = fig.add_axes([0.2, 0.04, 0.6, 0.015])  # [left, bottom, width, height]，可调整
+cax = fig.add_axes([0.2, 0.025, 0.6, 0.01])  # [left, bottom, width, height]
 cbar = fig.colorbar(im, cax=cax, orientation='horizontal', extend='both')
 cbar.ax.xaxis.set_label_position('top')
 cbar.set_ticks([0, 0.25, 0.5, 0.75, 1])
@@ -143,18 +160,16 @@ cbar.ax.tick_params(labelsize=font_size)
 cbar.set_label('Proportion', fontsize=font_size, fontfamily=font_family)
 
 # --- Add Legend and Annotations ---
-# Coordinates are adjusted for the new tall figure layout
-# 添加图例元素
-add_north_arrow(fig, 0.14, 0.001, size=0.012)
-add_scalebar(fig, axes[0], 0.17, 0.009, length_km=500, fontsize=font_size,
+add_north_arrow(fig, 0.14, 0.001, size=0.009)
+add_scalebar(fig, axes[0], 0.17, 0.007, length_km=500, fontsize=font_size,
              fontfamily=font_family, linewidth=2)
-add_annotation(fig, 0.23, 0.012, width=0.015, text="State/Territory boundaries",
+add_annotation(fig, 0.23, 0.009, width=0.015, text="State/Territory boundaries",
                linewidth=2, style="line", linecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.42, 0.01, width=0.009, height=0.0045, linewidth=2,
+add_annotation(fig, 0.42, 0.007, width=0.009, height=0.004, linewidth=2,
                text="No data", style="box", facecolor="white", edgecolor="black",
                fontsize=font_size, fontfamily=font_family)
-add_annotation(fig, 0.49, 0.01, width=0.009, height=0.0045, linewidth=2,
+add_annotation(fig, 0.49, 0.007, width=0.009, height=0.004, linewidth=2,
                text="Public, indigenous, urban, water bodies, and other land",
                style="box", facecolor="#808080", edgecolor="#808080",
                fontsize=font_size, fontfamily=font_family)
