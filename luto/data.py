@@ -2151,7 +2151,7 @@ class Data:
             # 使用和 'low' 相同的结构，所有目标都是0
             target_config = {2030: 0, 2050: 0, 2100: 0}
 
-        bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA).sum()
+        bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA * self.AG_MASK_PROPORTION_R).sum()
         bio_habitat_score_base_yr_sum = self.BIO_GBF2_BASE_YR.sum()
         bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
 
