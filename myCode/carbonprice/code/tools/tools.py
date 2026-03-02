@@ -2,6 +2,7 @@ from typing import Union, Optional, Iterable
 import glob
 import shutil, tempfile, time, random
 import xarray as xr
+import cf_xarray as cfxr
 from filelock import FileLock, Timeout
 import numpy as np
 import rasterio
@@ -12,6 +13,36 @@ import pandas as pd
 import gc
 import sys
 import tools.config as config
+
+
+def decode_layer_multiindex_if_possible(
+    obj: Union[xr.Dataset, xr.DataArray],
+    layer_dim: str = "layer",
+) -> Union[xr.Dataset, xr.DataArray]:
+    """Decode cf_xarray compressed layer to MultiIndex when metadata is complete."""
+
+    def _decode_ds(ds: xr.Dataset) -> xr.Dataset:
+        if layer_dim not in ds.dims or isinstance(ds.indexes.get(layer_dim), pd.MultiIndex):
+            return ds
+        if layer_dim not in ds.variables:
+            return ds
+
+        compress_attr = ds[layer_dim].attrs.get("compress", "")
+        level_names = [n for n in str(compress_attr).split() if n]
+        if not level_names:
+            return ds
+        if any(name not in ds.variables for name in level_names):
+            return ds
+
+        return cfxr.decode_compress_to_multi_index(ds, layer_dim)
+
+    if isinstance(obj, xr.Dataset):
+        return _decode_ds(obj)
+
+    da_name = obj.name or "data"
+    ds = obj.to_dataset(name=da_name)
+    ds = _decode_ds(ds)
+    return ds[da_name]
 
 
 def get_year(parent_dir):
@@ -124,9 +155,13 @@ def save2nc(
         if layer_dim in ds.indexes and isinstance(ds.indexes[layer_dim], pd.MultiIndex):
             ds = cfxr.encode_multi_index_as_compress(ds, layer_dim)
 
-    # 去除非维度坐标
+    # 去除非维度坐标（保留 cfxr 辅助坐标：dims=(layer_dim,) 的坐标用于 MultiIndex 解码）
+    _cfxr_aux = {
+        c for c in ds.coords
+        if c != layer_dim and ds.coords[c].dims == (layer_dim,)
+    }
     for data_var in ds.data_vars:
-        coords_to_drop = set(ds[data_var].coords) - set(ds[data_var].dims)
+        coords_to_drop = (set(ds[data_var].coords) - set(ds[data_var].dims)) - _cfxr_aux
         if coords_to_drop:
             ds = ds.drop_vars(coords_to_drop, errors="ignore")
 
@@ -310,8 +345,10 @@ def filter_all_from_dims(
         return out
 
     if isinstance(obj, xr.Dataset):
-        new_vars = {v: _filter_da(obj[v]) for v in obj.data_vars}
-        return xr.Dataset(new_vars, attrs=obj.attrs)
+        filtered_vars = [_filter_da(obj[v]).to_dataset(name=v) for v in obj.data_vars]
+        out = xr.merge(filtered_vars, join="outer", compat="override")
+        out.attrs = obj.attrs
+        return out
 
     return _filter_da(obj)
 

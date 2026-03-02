@@ -358,7 +358,7 @@ score by 20% (compared to 'pre-1750' land), thus the biodiversity contribution o
 
 # Functions to calculate biodiversity scores for pre-1750 times.
 def get_GBF2_MASK_area(data:Data) -> np.ndarray:
-    return data.BIO_GBF2_MASK * data.REAL_AREA
+    return data.BIO_GBF2_MASK * data.REAL_AREA * data.AG_MASK_PROPORTION_R
 
 def get_GBF3_NVIS_matrices_vr(data:Data) -> np.ndarray:
     """
@@ -369,7 +369,7 @@ def get_GBF3_NVIS_matrices_vr(data:Data) -> np.ndarray:
     np.ndarray
         indexed (v, r) where v is NVIS vegetation group and r is cell
     """
-    return data.GBF3_NVIS_LAYERS_LDS * data.REAL_AREA
+    return data.GBF3_NVIS_LAYERS_LDS * data.REAL_AREA * data.AG_MASK_PROPORTION_R
 
 
 def get_GBF3_IBRA_matrices_vr(data:Data) -> np.ndarray:

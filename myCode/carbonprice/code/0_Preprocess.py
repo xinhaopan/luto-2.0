@@ -43,7 +43,14 @@ from tools.helper_data import (
     summarize_to_category,
     summarize_to_type,
 )
-from tools.tools import filter_all_from_dims, get_data_RES, get_path, nc_to_tif, save2nc
+from tools.tools import (
+    decode_layer_multiindex_if_possible,
+    filter_all_from_dims,
+    get_data_RES,
+    get_path,
+    nc_to_tif,
+    save2nc,
+)
 
 
 # ==============================================================================
@@ -221,6 +228,82 @@ def reduce_layered_da(
     return da_u
 
 
+def sum_multilevel_layers_pandas(
+    da: xr.DataArray,
+    levels_to_sum: Sequence[str],
+    layer_dim: str = "layer",
+    keep_attrs: bool = True,
+) -> xr.DataArray:
+    """Sum over specific MultiIndex levels using pandas groupby (memory-efficient).
+
+    Unlike reduce_layered_da which unstacks to a full Cartesian-product dense array
+    (causing a large memory spike), this function uses pandas groupby on the stacked
+    MultiIndex, so the intermediate never exceeds N_cells × N_existing_combos.
+    The result keeps only ACTUALLY-EXISTING combinations in the MultiIndex (true
+    sparse), so saved files are also more compact than the expanded form.
+
+    Parameters
+    ----------
+    da            : DataArray with dims (cell, layer) where 'layer' is a MultiIndex.
+    levels_to_sum : MultiIndex level names to aggregate out.
+    layer_dim     : name of the stacked/MultiIndex dimension.
+    """
+    idx = da.indexes.get(layer_dim)
+    if not isinstance(idx, pd.MultiIndex):
+        raise ValueError(f"'{layer_dim}' must be a pandas MultiIndex; got {type(idx)}")
+
+    levels_in_mi = list(idx.names)
+    levels_to_sum_present = [l for l in levels_to_sum if l in levels_in_mi]
+    levels_to_keep = [l for l in levels_in_mi if l not in levels_to_sum]
+
+    if not levels_to_sum_present:
+        return da  # nothing to sum
+
+    # to_series() converts (cell, layer-MultiIndex) → pandas Series without full
+    # expansion: size = N_cells × N_existing_combos, no NaN inflation.
+    series = da.to_series()
+
+    if not levels_to_keep:
+        # Sum over ALL MultiIndex levels → result is just (cell,)
+        summed = series.groupby(level='cell').sum()
+        da_out = xr.DataArray(
+            summed.values.astype(da.dtype),
+            dims=['cell'],
+            coords={'cell': summed.index.values},
+        )
+        if keep_attrs:
+            da_out.attrs = da.attrs
+        return da_out
+
+    # Group by (cell, *kept levels) — stays sparse; no Cartesian expansion
+    groupby_keys = ['cell'] + levels_to_keep
+    summed = series.groupby(level=groupby_keys).sum()
+
+    # Unstack ONLY the kept levels.  Columns = existing (kept-level) combos only
+    # → 2-D array of shape (N_cells, N_existing_kept_combos).
+    df = summed.unstack(levels_to_keep)
+
+    # Ensure columns are always a pd.MultiIndex (even for a single kept level)
+    if not isinstance(df.columns, pd.MultiIndex):
+        df.columns = pd.MultiIndex.from_arrays([df.columns.values], names=levels_to_keep)
+
+    layer_mi = df.columns  # MultiIndex with only actually-existing combinations
+
+    da_out = xr.DataArray(
+        df.values.astype(da.dtype),
+        dims=['cell', layer_dim],
+        coords={
+            'cell': df.index.values,
+            **{lvl: (layer_dim, layer_mi.get_level_values(lvl)) for lvl in layer_mi.names},
+        },
+    )
+    da_out = da_out.set_index({layer_dim: list(layer_mi.names)})
+
+    if keep_attrs:
+        da_out.attrs = da.attrs
+    return da_out
+
+
 # ==============================================================================
 # File I/O
 # ==============================================================================
@@ -298,7 +381,14 @@ def process_single_file_from_memory(
     chunks="auto",
     layer_level_order=None,
 ) -> str:
-    """Process an in-memory NetCDF file: decode MultiIndex, fill NaN, sum dims, save."""
+    """Process an in-memory NetCDF file: decode MultiIndex, fill NaN, sum dims, save.
+
+    Uses pandas-groupby sum instead of xarray unstack so the intermediate array
+    is only N_cells × N_existing_combos — no full Cartesian-product expansion.
+    The output is saved in compressed MultiIndex format (save2nc handles encoding).
+    Downstream functions reconstruct the MultiIndex via filter_all_from_dims /
+    _ensure_layer_multiindex_strict, so no changes are needed there.
+    """
     if file_bytes is None:
         return f"Skipped: {var_prefix}_{year}.nc"
 
@@ -314,37 +404,37 @@ def process_single_file_from_memory(
             out_vars = {}
             for v in ds.data_vars:
                 da = ds[v]
+                if not np.issubdtype(da.dtype, np.number):
+                    continue
                 da = filter_all_from_dims(
                     da,
                     layer_dim="layer",
                     strict_layer_multiindex=True,
                     layer_level_order=layer_level_order,
                 )
-                da = reduce_layered_da(
-                    da,
-                    dims_to_sum=dims_to_sum,
-                    layer_dim="layer",
-                    keep_attrs=True,
-                    skipna=True,
-                    layer_level_order=layer_level_order,
-                )
+                if "layer" in da.dims:
+                    # Memory-efficient: groupby sum over MultiIndex levels —
+                    # avoids the full unstack → dense array → re-stack cycle.
+                    levels_to_sum = [
+                        l for l in dims_to_sum
+                        if l in da.indexes["layer"].names
+                    ]
+                    if levels_to_sum:
+                        da = sum_multilevel_layers_pandas(
+                            da, levels_to_sum=levels_to_sum, layer_dim="layer"
+                        )
+                else:
+                    # No MultiIndex layer: fall back to regular dim sum
+                    present = [d for d in dims_to_sum if d in da.dims]
+                    if present:
+                        da = da.sum(dim=present, keep_attrs=True, skipna=True)
                 out_vars[v] = da
 
-            out = xr.Dataset(out_vars, attrs=ds.attrs).load()
-            if 'layer' in out.dims:
-                idx = out.indexes.get('layer')
-                if isinstance(idx, pd.MultiIndex):
-                    out = out.unstack('layer')
+            out_ds = xr.Dataset(out_vars, attrs=ds.attrs).load()
 
-    # Apply the same dim reduction as sum_dims_if_exist, but in memory to avoid
-    # a redundant write→reopen→reduce→write cycle (data is already loaded).
-    _EXTRA_DIMS = ('lm', 'source', 'Type', 'GHG_source', 'Cost type',
-                   'From water-supply', 'To water-supply')
-    final_da = out["data"] if "data" in out.data_vars else out[list(out.data_vars)[0]]
-    present = [d for d in _EXTRA_DIMS if d in final_da.dims]
-    if present:
-        final_da = final_da.sum(dim=present, keep_attrs=True, skipna=True)
-    save2nc(final_da, dst_file)
+    # save2nc auto-encodes MultiIndex on 'layer' — no manual unstack needed.
+    final_var = "data" if "data" in out_ds.data_vars else list(out_ds.data_vars)[0]
+    save2nc(out_ds[final_var], dst_file)
     return f"Processed: {var_prefix}_{year}.nc"
 
 
@@ -375,8 +465,16 @@ def copy_single_file(
     def _reduce_one(da: xr.DataArray) -> xr.DataArray:
         if not np.issubdtype(da.dtype, np.number):
             return da
-        present_dims = [d for d in dims_to_sum if d in da.dims]
-        return da.sum(dim=present_dims, keep_attrs=True, skipna=True) if present_dims else da
+        # Sum over plain dims (for files that have not yet been encoded as MultiIndex)
+        present_plain = [d for d in dims_to_sum if d in da.dims]
+        if present_plain:
+            da = da.sum(dim=present_plain, keep_attrs=True, skipna=True)
+        # Sum over MultiIndex levels (for cfxr-encoded files where levels are not plain dims)
+        if "layer" in da.dims and isinstance(da.indexes.get("layer"), pd.MultiIndex):
+            mi_levels_to_sum = [l for l in dims_to_sum if l in da.indexes["layer"].names]
+            if mi_levels_to_sum:
+                da = sum_multilevel_layers_pandas(da, levels_to_sum=mi_levels_to_sum)
+        return da
 
     with xr.open_dataset(src_file, engine=engine, chunks=chunks) as ds:
         ds = filter_all_from_dims(ds)
@@ -420,6 +518,19 @@ def amortize_costs(data_path_name, amortize_file, years, njobs=0, rate=0.07, hor
         chunks={"cell": 'auto', "year": 1},  # one chunk per year → isel loads only 1 file at a time
     ).assign_coords(year=valid_years)
 
+    # Preserve cf_xarray compressed-layer metadata/coords (e.g. From-land-use, To-land-use)
+    # so amortised outputs can still be decoded back to MultiIndex.
+    layer_attrs = {}
+    layer_level_coords = {}
+    if "layer" in all_costs_ds.variables:
+        layer_attrs = dict(all_costs_ds["layer"].attrs)
+        compress_attr = str(layer_attrs.get("compress", ""))
+        level_names = [n for n in compress_attr.split() if n]
+        for level_name in level_names:
+            if level_name in all_costs_ds.variables:
+                v = all_costs_ds[level_name]
+                layer_level_coords[level_name] = (v.dims, v.values)
+
     cost_variable_name = get_main_data_variable_name(all_costs_ds)
     pv_values_all_years = all_costs_ds[cost_variable_name]
 
@@ -460,7 +571,13 @@ def amortize_costs(data_path_name, amortize_file, years, njobs=0, rate=0.07, hor
         out_dir = os.path.join(data_path_name, f"{y}")
         os.makedirs(out_dir, exist_ok=True)
         out_path = os.path.join(out_dir, f"{amortize_file}_amortised_{y}.nc")
-        ds_y = xr.Dataset({'data': amortized_by_affect_year.sel(year=y)})
+        ds_y = xr.Dataset({"data": amortized_by_affect_year.sel(year=y)})
+        if layer_level_coords:
+            ds_y = ds_y.assign_coords({
+                name: (dims, values) for name, (dims, values) in layer_level_coords.items()
+            })
+        if "layer" in ds_y.variables and layer_attrs:
+            ds_y["layer"].attrs.update(layer_attrs)
         save2nc(ds_y, out_path)
 
     if njobs > 0:
@@ -480,6 +597,8 @@ def calculate_and_save_single_diff(diff_file, year, data_path_name):
 
     # 2. Open and align the two datasets
     with xr.open_dataset(src_file_0) as ds_0, xr.open_dataset(src_file_1) as ds_1:
+        ds_0 = decode_layer_multiindex_if_possible(ds_0)
+        ds_1 = decode_layer_multiindex_if_possible(ds_1)
         ds_0, ds_1 = xr.align(ds_0, ds_1, join='outer', fill_value=0)
         ds_res = ds_0 - ds_1
 
@@ -513,12 +632,21 @@ def calculate_diff_two_scenarios(input_all_names, output_names, output_path, yea
 
         with xr.open_dataset(run0_path, chunks='auto') as ds_0, \
                 xr.open_dataset(run1_path, chunks='auto') as ds_1:
+            ds_0 = decode_layer_multiindex_if_possible(ds_0)
+            ds_1 = decode_layer_multiindex_if_possible(ds_1)
             ds_0 = filter_all_from_dims(ds_0)
             ds_1 = filter_all_from_dims(ds_1)
             ds_0, ds_1 = xr.align(ds_0, ds_1, join='outer', fill_value=0)
+            # Capture MultiIndex AFTER alignment (alignment may change layer values)
+            _layer_mi = ds_0.indexes.get('layer') if isinstance(ds_0.indexes.get('layer'), pd.MultiIndex) else None
             # GHG: higher is worse, so diff is ds_0 - ds_1; costs: ds_1 - ds_0
             env_diff = (ds_0 - ds_1) if 'GHG' in env_file_basename else (ds_1 - ds_0)
             env_diff = env_diff.compute()
+        # Restore MultiIndex if Dataset arithmetic lost it
+        if (_layer_mi is not None and 'layer' in env_diff.dims
+                and not isinstance(env_diff.indexes.get('layer'), pd.MultiIndex)):
+            _aux = {n: ('layer', _layer_mi.get_level_values(n)) for n in _layer_mi.names}
+            env_diff = env_diff.assign_coords(_aux).set_index({'layer': list(_layer_mi.names)})
 
         output_dir = os.path.join(output_path, output_subdir, str(year))
         os.makedirs(output_dir, exist_ok=True)
@@ -564,6 +692,8 @@ def calculate_profit_for_run(year, out_path, run_name, cost_basename, revenue_ba
 
     with xr.open_dataset(cost_file, chunks='auto') as ds_cost, \
             xr.open_dataset(revenue_file, chunks='auto') as ds_revenue:
+        ds_revenue = decode_layer_multiindex_if_possible(ds_revenue)
+        ds_cost = decode_layer_multiindex_if_possible(ds_cost)
         ds_revenue = filter_all_from_dims(ds_revenue).fillna(0)
         ds_cost = filter_all_from_dims(ds_cost).fillna(0)
 
@@ -571,7 +701,15 @@ def calculate_profit_for_run(year, out_path, run_name, cost_basename, revenue_ba
         total_cost = ds_cost.sum(dim='source') if 'source' in ds_cost.dims else ds_cost
 
         total_revenue, total_cost = xr.align(total_revenue, total_cost, join='outer', fill_value=0)
+        # Capture MultiIndex AFTER alignment (alignment may change layer values)
+        _layer_mi = (total_revenue.indexes.get('layer')
+                     if isinstance(total_revenue.indexes.get('layer'), pd.MultiIndex) else None)
         profit = total_revenue - total_cost
+        # Restore MultiIndex if Dataset arithmetic lost it
+        if (_layer_mi is not None and 'layer' in profit.dims
+                and not isinstance(profit.indexes.get('layer'), pd.MultiIndex)):
+            _aux = {n: ('layer', _layer_mi.get_level_values(n)) for n in _layer_mi.names}
+            profit = profit.assign_coords(_aux).set_index({'layer': list(_layer_mi.names)})
 
     profit_out_path = os.path.join(out_path, run_name, str(year))
     os.makedirs(profit_out_path, exist_ok=True)
@@ -818,10 +956,10 @@ def xarrays_to_tifs_by_type(env_cat, file_part, base_dir, tif_dir, data,
     """Output one total GeoTIFF plus one per coordinate value along sum_dim."""
     print(f"Processing {env_cat} - {file_part} by {sum_dim}")
     input_path = f"{base_dir}/{env_cat}/2050/xr_{file_part}_2050.nc"
-    da = xr.open_dataarray(input_path)
-
-    if sum_dim not in da.dims:
-        raise ValueError(f"{sum_dim} not in data dims {da.dims}.")
+    with xr.open_dataset(input_path, chunks="auto") as ds:
+        ds = decode_layer_multiindex_if_possible(ds)
+        da_name = "data" if "data" in ds.data_vars else list(ds.data_vars)[0]
+        da = filter_all_from_dims(ds[da_name]).load()
 
     # 1. Total (sum all non-cell dims)
     da_total = da.sum(dim=[d for d in da.dims if d != 'cell'])
@@ -835,8 +973,22 @@ def xarrays_to_tifs_by_type(env_cat, file_part, base_dir, tif_dir, data,
 
     # 2. Per coordinate value along sum_dim
     results = [out_total_tif]
-    for coord_val in da[sum_dim].values:
-        da_slice = da.sel({sum_dim: coord_val})
+    if sum_dim in da.dims:
+        coord_values = da[sum_dim].values
+        slicer = lambda x: da.sel({sum_dim: x})
+    else:
+        layer_idx = da.indexes.get("layer")
+        if not (
+            "layer" in da.dims
+            and isinstance(layer_idx, pd.MultiIndex)
+            and sum_dim in layer_idx.names
+        ):
+            raise ValueError(f"{sum_dim} not in data dims {da.dims}.")
+        coord_values = pd.Index(layer_idx.get_level_values(sum_dim)).unique().tolist()
+        slicer = lambda x: da.isel(layer=(layer_idx.get_level_values(sum_dim) == x))
+
+    for coord_val in coord_values:
+        da_slice = slicer(coord_val)
         da_out = da_slice.sum(dim=[d for d in da_slice.dims if d != 'cell'])
         if per_ha:
             da_out = da_out / data.REAL_AREA

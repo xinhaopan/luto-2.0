@@ -1082,7 +1082,7 @@ def get_non_ag_to_non_ag_transition_matrix(data: Data) -> np.ndarray:
 
 
 
-def get_to_non_ag_exclude_matrices(data: Data, lumap) -> np.ndarray:
+def get_to_non_ag_exclude_matrices(data: Data, lumap, base_year: int | None = None) -> np.ndarray:
     """
     Get the non-agricultural exclusions matrix.
 
@@ -1108,13 +1108,40 @@ def get_to_non_ag_exclude_matrices(data: Data, lumap) -> np.ndarray:
     # Get transition costs for to_non_ag 2D array (r, k)
     t_ik = data.T_MAT.sel(to_lu=data.NON_AGRICULTURAL_LANDUSES).copy()
     lumap2desc = np.vectorize(data.ALLLU2DESC.get, otypes=[str])
-    ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)                            
-    
-    t_rk = np.ones((data.NCELLS, len(data.NON_AGRICULTURAL_LANDUSES))).astype(np.float32)    # Empty ones_rj array to be filled with transition flag (1 allow, 0 not allow)
-    t_rk[ag_cells, :] = t_ik[lumap[ag_cells]]                                                # For ag cells in the base year lumap, get transition cost (np.nan is not-allow) for them
-    t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(lumap[non_ag_cells]))               # For non-ag cells in the base year lumap, get transition cost (np.nan is not-allow) for them
-    t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(data.LUMAP[non_ag_cells]))          # For non-ag cells, find its ag status in BASE_YR (2010), then get transition cost based on these 2010-ag status
-    t_rk = np.where(np.isnan(t_rk), 0, 1).astype(np.int8)  
+    ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
+
+    # Legacy availability from categorical lumap (binary 0/1).
+    legacy_t_rk = np.ones((data.NCELLS, len(data.NON_AGRICULTURAL_LANDUSES)), dtype=np.float32)
+    legacy_t_rk[ag_cells, :] = t_ik[lumap[ag_cells]]
+    legacy_t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(lumap[non_ag_cells]))
+    legacy_t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(data.LUMAP[non_ag_cells]))
+    legacy_t_rk = np.where(np.isnan(legacy_t_rk), 0.0, 1.0).astype(np.float32)
+
+    mode = settings.TRANSITION_AVAILABILITY_MODE
+    if mode == "share":
+        # Share-driven availability for agricultural cells only.
+        # For non-ag cells, keep legacy behaviour to preserve non-ag reversibility rules.
+        if base_year is not None and base_year in data.ag_dvars:
+            ag_l_mrj = data.ag_dvars[base_year]
+        else:
+            ag_l_mrj = data.AG_L_MRJ
+        ag_share_rj = np.nan_to_num(ag_l_mrj.sum(axis=0), nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+        ag_share_rj = np.clip(ag_share_rj, 0.0, 1.0)
+
+        n_ag = ag_share_rj.shape[1]
+        n_k = len(data.NON_AGRICULTURAL_LANDUSES)
+        allow_jk = np.zeros((n_ag, n_k), dtype=np.float32)
+        from_lu_index = set(t_ik.coords["from_lu"].values.tolist())
+        for j in range(n_ag):
+            from_lu = data.AGLU2DESC.get(j, None)
+            if from_lu is not None and from_lu in from_lu_index:
+                allow_jk[j, :] = np.where(np.isnan(t_ik.sel(from_lu=from_lu)), 0.0, 1.0).astype(np.float32)
+        frac_t_rk = ag_share_rj @ allow_jk
+
+        t_rk = legacy_t_rk.copy()
+        t_rk[ag_cells, :] = frac_t_rk[ag_cells, :]
+    else:
+        t_rk = legacy_t_rk
 
     # No-go exclusion; user-defined layer specifying which land-use are not disallowd at where
     no_go_x_rk = np.ones((data.NCELLS, data.N_NON_AG_LUS))  

@@ -10,7 +10,13 @@ import xarray as xr
 import cf_xarray as cfxr
 from joblib import Parallel, delayed
 
-from tools.tools import get_path, get_year, save2nc, filter_all_from_dims
+from tools.tools import (
+    decode_layer_multiindex_if_possible,
+    filter_all_from_dims,
+    get_path,
+    get_year,
+    save2nc,
+)
 import tools.config as config
 
 
@@ -43,9 +49,17 @@ def summarize_to_type(
     if not os.path.exists(sample_path):
         raise FileNotFoundError(f"未找到{sample_path}，无法确定 type 坐标。")
 
-    with xr.open_dataarray(sample_path, chunks=chunks) as da0:
-        da0 = filter_all_from_dims(da0)
-        if keep_dim not in da0.dims:
+    with xr.open_dataset(sample_path, chunks=chunks) as ds0:
+        ds0 = decode_layer_multiindex_if_possible(ds0)
+        da_name0 = "data" if "data" in ds0.data_vars else list(ds0.data_vars)[0]
+        da0 = filter_all_from_dims(ds0[da_name0])
+        _in_dims = keep_dim in da0.dims
+        _in_layer_mi = (
+            "layer" in da0.dims
+            and isinstance(da0.indexes.get("layer"), pd.MultiIndex)
+            and keep_dim in da0.indexes["layer"].names
+        )
+        if not (_in_dims or _in_layer_mi):
             raise ValueError(f"示例文件中不包含 keep_dim='{keep_dim}'，实际维度为 {da0.dims}")
 
     # --- 2) 逐 scenario 处理 ---
@@ -58,15 +72,31 @@ def summarize_to_type(
         if not os.path.exists(path):
             return None
         try:
-            with xr.open_dataarray(path, chunks=chunks) as da:
-                da = filter_all_from_dims(da)
-                sum_dims = [d for d in da.dims if d != keep_dim]
-                da_processed = da.sum(dim=sum_dims, keep_attrs=False) / scale
+            with xr.open_dataset(path, chunks=chunks) as ds:
+                ds = decode_layer_multiindex_if_possible(ds)
+                da_name = "data" if "data" in ds.data_vars else list(ds.data_vars)[0]
+                da = filter_all_from_dims(ds[da_name])
+                layer_idx = da.indexes.get("layer")
+                if (
+                    "layer" in da.dims
+                    and isinstance(layer_idx, pd.MultiIndex)
+                    and keep_dim in layer_idx.names
+                ):
+                    series = da.load().to_series()
+                    grouped = series.groupby(level=keep_dim).sum() / scale
+                    da_processed = xr.DataArray(
+                        grouped.values.astype(dtype),
+                        coords={keep_dim: grouped.index.values},
+                        dims=[keep_dim],
+                    )
+                else:
+                    sum_dims = [d for d in da.dims if d != keep_dim]
+                    da_processed = da.sum(dim=sum_dims, keep_attrs=False) / scale
                 if keep_dim != "type":
                     da_processed = da_processed.rename({keep_dim: "type"})
                 da_processed = da_processed.expand_dims({"Year": [y], "scenario": [s]})
                 da_processed.name = var_name
-                da_processed = da_processed.load()  # 读入内存，关闭文件句柄
+                da_processed = da_processed.load()
             return da_processed
         except Exception as e:
             print(f"Error opening {path}: {e}")
@@ -120,7 +150,7 @@ def summarize_to_type(
 
     print("Saving to NetCDF...")
     save2nc(out_da, output_path)
-    print(f"✅ Saved to {output_path}")
+    print(f"Saved to {output_path}")
 
     return out_da
 

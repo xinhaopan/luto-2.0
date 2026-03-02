@@ -1475,14 +1475,20 @@ class Data:
             self.BIO_GBF2_MASK
         )
 
-        self.BIO_GBF2_BASE_YR = np.einsum(
-            'j,mrj,r,r->r',
-            np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
-            self.AG_L_MRJ,      # lumap in proportion representation if resfactored
-            self.BIO_GBF2_MASK,
-            self.REAL_AREA
-        ) - (self.SAVBURN_ELIGIBLE * self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS) * self.REAL_AREA)
-              
+        self.BIO_GBF2_BASE_YR = (
+                np.einsum(
+                    'j,mrj,r,r->r',
+                    np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
+                    self.AG_L_MRJ,      # lumap in proportion representation if resfactored
+                    self.BIO_GBF2_MASK,
+                    self.REAL_AREA
+                ) - (
+                    self.SAVBURN_ELIGIBLE 
+                    * self.BIO_GBF2_MASK 
+                    * (1 - settings.BIO_CONTRIBUTION_LDS) 
+                    * self.REAL_AREA
+                )
+            ) * self.AG_MASK_PROPORTION_R
         
         ###############################################################
         # GBF3 biodiversity data. (NVIS and IBRA)

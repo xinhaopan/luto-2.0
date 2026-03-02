@@ -1,0 +1,49 @@
+#!/bin/bash
+#PBS -N carbon_preprocess
+#PBS -q normalsr
+#PBS -l ncpus=60
+#PBS -l mem=240GB
+#PBS -l walltime=24:00:00
+#PBS -o pbs_output_$PBS_JOBID.out
+#PBS -e pbs_error_$PBS_JOBID.err
+#PBS -l wd
+
+# === 关键：声明项目与存储资源 ===
+#PBS -l storage=gdata/jk53
+
+echo "========================================================="
+echo "JobID: $PBS_JOBID"
+echo "Host : $(hostname)"
+echo "Start: $(date)"
+echo "WD   : $PWD"
+echo "========================================================="
+
+# 确保在提交目录运行（-l wd 已经会这样做，这里再次确保）
+cd "$PBS_O_WORKDIR" || exit 1
+
+# --- 步骤 1: 加载你的 shell 配置（含 conda 初始化） ---
+echo "source ~/.bashrc"
+source ~/.bashrc || echo "警告: source ~/.bashrc 失败，继续尝试激活 conda"
+
+# --- 步骤 2: 激活 Conda 环境 ---
+echo "activating conda env: xpluto"
+conda activate xpluto
+if [ $? -ne 0 ]; then
+    echo "错误: 无法激活 Conda 环境 'xpluto'"
+    exit 1
+fi
+
+echo "Python: $(which python)"
+python --version
+echo "---------------------------------------------------------"
+
+# --- 步骤 3: 执行 Python 脚本 ---
+echo "运行: python 0_Preprocess.py"
+python 0_Preprocess.py
+rc=$?
+
+echo "========================================================="
+echo "结束时间: $(date)"
+echo "退出码: $rc"
+echo "========================================================="
+exit $rc
