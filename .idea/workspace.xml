@@ -5,13 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for paper3">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/0_runs_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/0_runs_test.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/tools/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/tools/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/0_Preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/0_Preprocess.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/luto/economics/non_agricultural/transitions.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/economics/non_agricultural/transitions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/tools/~$land use colors.xlsx" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_HPC.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_HPC.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_NCI.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_NCI.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_test.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -24,7 +20,7 @@
     </persistenceIdMap>
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="1442" />
+    <option name="cachedIndexableFilesCount" value="1448" />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -88,81 +84,81 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.0.1_create_GBF2_targets_csv.executor": "Run",
-    "Python.00_am_tif.executor": "Run",
-    "Python.01_Maping all.executor": "Run",
-    "Python.02_Area.executor": "Run",
-    "Python.04_GHG.executor": "Run",
-    "Python.05_Biodiversity.executor": "Run",
-    "Python.06_Transfer Matrix.executor": "Run",
-    "Python.06_Transfer Matrix_all.executor": "Debug",
-    "Python.07_S1_Area ag.executor": "Run",
-    "Python.08_Food demand.executor": "Run",
-    "Python.08_Food demand_dry_irr.executor": "Run",
-    "Python.08_S2_Food demand.executor": "Run",
-    "Python.08_S2_Food demand_table.executor": "Run",
-    "Python.09_S3_Water dry_irr.executor": "Run",
-    "Python.09_S3_Water use.executor": "Run",
-    "Python.09_S3_Water use_tables.executor": "Run",
-    "Python.0_Check_status.executor": "Run",
-    "Python.0_Preprocess.executor": "Run",
-    "Python.0_extract_html.executor": "Run",
-    "Python.0_mem_monitor.executor": "Run",
-    "Python.0_runs_test.executor": "Run",
-    "Python.0_transfer_html.executor": "Run",
-    "Python.0_write_tasks.executor": "Run",
-    "Python.10_Area_table.executor": "Run",
-    "Python.12_ag_moves.executor": "Run",
-    "Python.13_cattle_GHG_CR.executor": "Run",
-    "Python.1_draw_original_data.executor": "Run",
-    "Python.1_write_test.executor": "Run",
-    "Python.2_draw_processed_data.executor": "Run",
-    "Python.3.0_draw_average_price.executor": "Run",
-    "Python.3.1_draw_sol_average_price.executor": "Run",
-    "Python.4.0_create_tif.executor": "Run",
-    "Python.4.3_make_cost_map.executor": "Run",
-    "Python.4.4_make_GHG_benefits_map.executor": "Run",
-    "Python.4.5_make_BIO_benefits_map.executor": "Run",
-    "Python.4.6_make_price_map.executor": "Run",
-    "Python.4.7_make_agmgt_map.executor": "Run",
-    "Python.4.8_make_non_ag_map.executor": "Run",
-    "Python.5_Rename_figure.executor": "Run",
-    "Python.Paper1_tasks.executor": "Run",
-    "Python.Paper1_tasks_aquila.executor": "Run",
-    "Python.Paper1_tasks_aquila_test.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_10.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_5.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_e6.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_e6_1.executor": "Run",
-    "Python.Paper1_tasks_test.executor": "Run",
-    "Python.Paper1_tasks_test_EP.executor": "Run",
-    "Python.Paper1_tasks_test_hard.executor": "Run",
-    "Python.Paper2_tasks.executor": "Run",
-    "Python.Paper2_tasks_test.executor": "Run",
-    "Python.helper_data.executor": "Debug",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "WebServerToolWindowFactoryState": "true",
-    "ai.playground.ignore.import.keys.banner.in.settings": "true",
-    "database.data.extractors.current.export.id": "Comma-separated (CSV)_id",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "F:/Users/s222552331/Work/LUTO2_XH/luto-2.0/myCode/Ag2050/1_Scripts",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "File.Encoding",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.0.1_create_GBF2_targets_csv.executor&quot;: &quot;Run&quot;,
+    &quot;Python.00_am_tif.executor&quot;: &quot;Run&quot;,
+    &quot;Python.01_Maping all.executor&quot;: &quot;Run&quot;,
+    &quot;Python.02_Area.executor&quot;: &quot;Run&quot;,
+    &quot;Python.04_GHG.executor&quot;: &quot;Run&quot;,
+    &quot;Python.05_Biodiversity.executor&quot;: &quot;Run&quot;,
+    &quot;Python.06_Transfer Matrix.executor&quot;: &quot;Run&quot;,
+    &quot;Python.06_Transfer Matrix_all.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.07_S1_Area ag.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_Food demand.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_Food demand_dry_irr.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_S2_Food demand.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_S2_Food demand_table.executor&quot;: &quot;Run&quot;,
+    &quot;Python.09_S3_Water dry_irr.executor&quot;: &quot;Run&quot;,
+    &quot;Python.09_S3_Water use.executor&quot;: &quot;Run&quot;,
+    &quot;Python.09_S3_Water use_tables.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_Check_status.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_Preprocess.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_extract_html.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_mem_monitor.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_runs_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_transfer_html.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_write_tasks.executor&quot;: &quot;Run&quot;,
+    &quot;Python.10_Area_table.executor&quot;: &quot;Run&quot;,
+    &quot;Python.12_ag_moves.executor&quot;: &quot;Run&quot;,
+    &quot;Python.13_cattle_GHG_CR.executor&quot;: &quot;Run&quot;,
+    &quot;Python.1_draw_original_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.1_write_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.2_draw_processed_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.3.0_draw_average_price.executor&quot;: &quot;Run&quot;,
+    &quot;Python.3.1_draw_sol_average_price.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.0_create_tif.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.3_make_cost_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.4_make_GHG_benefits_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.5_make_BIO_benefits_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.6_make_price_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.7_make_agmgt_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.8_make_non_ag_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.5_Rename_figure.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_10.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_5.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_e6.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_e6_1.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_test_EP.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_test_hard.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper2_tasks.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper2_tasks_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.helper_data.executor&quot;: &quot;Debug&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;true&quot;,
+    &quot;ai.playground.ignore.import.keys.banner.in.settings&quot;: &quot;true&quot;,
+    &quot;database.data.extractors.current.export.id&quot;: &quot;Comma-separated (CSV)_id&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;F:/Users/s222552331/Work/LUTO2_XH/luto-2.0/myCode/Ag2050/1_Scripts&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;File.Encoding&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="F:\Users\s222552331\Work\LUTO2_XH\luto-2.0\myCode\Ag2050\1_Scripts" />
@@ -373,6 +369,7 @@
       <workItem from="1772088687073" duration="5573000" />
       <workItem from="1772148333962" duration="3056000" />
       <workItem from="1772159764072" duration="12677000" />
+      <workItem from="1772423235602" duration="180000" />
     </task>
     <task id="LOCAL-00047" summary="merge: jinzhu 20251003">
       <option name="closed" value="true" />
@@ -854,22 +851,22 @@
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>315</line>
+          <line>316</line>
           <option name="timeStamp" value="46" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>291</line>
+          <line>292</line>
           <option name="timeStamp" value="47" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>451</line>
+          <line>452</line>
           <option name="timeStamp" value="63" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>1000</line>
+          <line>1001</line>
           <option name="timeStamp" value="85" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
@@ -899,7 +896,7 @@
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>740</line>
+          <line>741</line>
           <option name="timeStamp" value="122" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
@@ -914,7 +911,7 @@
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>99</line>
+          <line>100</line>
           <option name="timeStamp" value="131" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
@@ -924,27 +921,27 @@
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>672</line>
+          <line>673</line>
           <option name="timeStamp" value="133" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/4.4_make_GHG_benefits_map.py</url>
-          <line>27</line>
+          <line>29</line>
           <option name="timeStamp" value="145" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py</url>
-          <line>147</line>
+          <line>306</line>
           <option name="timeStamp" value="150" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>768</line>
+          <line>769</line>
           <option name="timeStamp" value="152" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>56</line>
+          <line>57</line>
           <option name="timeStamp" value="154" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
@@ -1009,32 +1006,32 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_data.py</url>
-          <line>393</line>
+          <line>418</line>
           <option name="timeStamp" value="304" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_data.py</url>
-          <line>424</line>
+          <line>449</line>
           <option name="timeStamp" value="305" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_data.py</url>
-          <line>444</line>
+          <line>469</line>
           <option name="timeStamp" value="306" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_data.py</url>
-          <line>892</line>
+          <line>856</line>
           <option name="timeStamp" value="307" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_data.py</url>
-          <line>822</line>
+          <line>786</line>
           <option name="timeStamp" value="308" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/carbonprice/code/tools/helper_data.py</url>
-          <line>926</line>
+          <line>890</line>
           <option name="timeStamp" value="312" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="jupyter-line">
