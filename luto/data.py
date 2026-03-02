@@ -1483,12 +1483,12 @@ class Data:
                     self.BIO_GBF2_MASK,
                     self.REAL_AREA
                 ) - (
-                    self.SAVBURN_ELIGIBLE 
-                    * self.BIO_GBF2_MASK 
-                    * (1 - settings.BIO_CONTRIBUTION_LDS) 
+                    self.SAVBURN_ELIGIBLE
+                    * self.BIO_GBF2_MASK
+                    * (1 - settings.BIO_CONTRIBUTION_LDS)
                     * self.REAL_AREA
                 )
-            ) * self.AG_MASK_PROPORTION_R
+            )
         
         ###############################################################
         # GBF3 biodiversity data. (NVIS and IBRA)

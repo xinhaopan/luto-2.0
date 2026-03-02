@@ -200,7 +200,7 @@ def check_stderr_errors(stderr_file):
 
 
 if __name__ == "__main__":
-    task_name = '20260226_Paper2_Results_aquila'
+    task_name = '20260303_Paper2_Results_test_1'
     base_dir = f'../../output/{task_name}'
     target_year = 2050
     template_df = pd.read_csv(os.path.join(base_dir, 'grid_search_template.csv'), index_col=0)
