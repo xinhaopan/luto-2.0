@@ -69,7 +69,7 @@ def get_GBF2_target_list_start_to_2050(
     if target_config is None:
         target_config = {2030: 0, 2050: 0, 2100: 0}
 
-    bio_habitat_score_baseline_sum = (data.BIO_GBF2_MASK * data.REAL_AREA).sum()
+    bio_habitat_score_baseline_sum = (data.BIO_GBF2_MASK * data.REAL_AREA * data.AG_MASK_PROPORTION_R).sum()
     bio_habitat_score_base_yr_sum = data.BIO_GBF2_BASE_YR.sum()
     bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
 

@@ -128,7 +128,7 @@ class TailFollower:
 # 访问 http://127.0.0.1:8050
 # ============ 必填：连接 & 文件配置 ============
 platform = "NCI"  # "HPC" 或 "NCI"
-mem_file = "20260302_Paper2_Results_NCI"
+mem_file = "20260303_Paper2_Results_NCI"
 mem_path = f"{mem_file}/carbon_price/mem_log.txt"
 
 cfg = ssh_config(platform)
