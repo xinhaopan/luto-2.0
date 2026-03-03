@@ -5,9 +5,9 @@ import io
 import math
 import os
 import shutil
+import subprocess
 import threading
 import time
-import zipfile
 from datetime import datetime
 from typing import Dict, Iterable, Optional, Sequence, Tuple, Union
 
@@ -1575,17 +1575,15 @@ def main(task_dir, njobs):
     tprint(f"Total elapsed time: {total_time / 3600:.2f} hours")
     tprint("=" * 80)
 
-    # --- Compress 0_base_data to zip and remove original folder ---
-    zip_path = output_path + '.zip'
-    tprint(f"\nCompressing {output_path} -> {zip_path} ...")
-    with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
-        for root, dirs, files in os.walk(output_path):
-            for file in files:
-                file_abs = os.path.join(root, file)
-                arcname = os.path.relpath(file_abs, os.path.dirname(output_path))
-                zf.write(file_abs, arcname)
+    # Pack 0_base_data into a tar archive (no compression, fast) and remove the folder
+    tar_path = output_path + '.tar'
+    tprint(f"\nPacking {output_path} -> {tar_path}")
+    subprocess.run(
+        ['tar', '-cf', tar_path, '-C', os.path.dirname(output_path), os.path.basename(output_path)],
+        check=True
+    )
     shutil.rmtree(output_path)
-    tprint(f"Done. Original folder removed.")
+    tprint(f"Packed and removed original folder. Archive: {tar_path}")
 
 
 def run(task_dir, njobs):
