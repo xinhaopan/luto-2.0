@@ -71,17 +71,19 @@ def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
 
 def submit_task(task_root_dir: str, col: str, platform: Literal['aquila', 'Denethor','NCI','HPC'], max_concurrent_tasks,model_name):
     # 复制bash和python脚本到对应目录
-    if model_name == 'Run':
-        script_name = 'python_script.py'
-    elif model_name == 'Write':
-        script_name = 'python_write_script.py'
-    elif model_name == 'Report':
-        script_name = 'python_report_script.py'
-    elif model_name == 'Zip':
-        script_name = 'python_zip_script.py'
-    else:
+    # All modes share python_script.py; flag files control which branch runs
+    _FLAG_MAP = {
+        'Run':    None,
+        'Write':  'write_mode.flag',
+        'Report': 'report_mode.flag',
+        'Zip':    'zip_mode.flag',
+    }
+    if model_name not in _FLAG_MAP:
         raise ValueError('model_name must be either "Run", "Write", "Report", or "Zip"!')
+    script_name = 'python_script.py'
     shutil.copyfile(f'bash_scripts/{script_name}', f'{task_root_dir}/{col}/{script_name}')
+    if _FLAG_MAP[model_name]:
+        open(f'{task_root_dir}/{col}/{_FLAG_MAP[model_name]}', 'w').close()
     if platform == 'NCI':
         shutil.copyfile('bash_scripts/task_cmd.sh', f'{task_root_dir}/{col}/task_cmd.sh')
     elif platform == 'HPC':

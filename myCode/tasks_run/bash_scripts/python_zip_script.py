@@ -1,13 +1,9 @@
-import dill
-import gzip
 import os
 import time
 from datetime import datetime
 import glob
-import shutil
-from luto.data import Data
-import zipfile
 import joblib
+from python_script import create_zip
 
 
 def print_with_time(message):
@@ -46,31 +42,6 @@ def get_first_subfolder_name(output_path="output"):
         return None
 
 
-def create_zip(data: Data):
-    """Create report using dynamic timestamp from read_timestamp."""
-    report_dir = f"{data.path}"
-    archive_path = './Run_Archive.zip'
-
-    # Zip the output directory, and remove the original directory
-    with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, dirs, files in os.walk(report_dir):
-            for file in files:
-                abs_path = os.path.join(root, file)
-                rel_path = os.path.relpath(abs_path, start=report_dir)
-                zipf.write(abs_path, arcname=rel_path)
-
-    # Remove all files after archiving
-    for item in os.listdir('.'):
-        if item != 'Run_Archive.zip':
-            try:
-                if os.path.isfile(item) or os.path.islink(item):
-                    os.unlink(item)
-                elif os.path.isdir(item):
-                    shutil.rmtree(item)
-            except Exception as e:
-                print(f"Failed to delete {item}. Reason: {e}")
-
-
 # 调用函数并加载数据
 pkl_path = get_first_subfolder_name("output")
 print_with_time(f"PKL file path: {pkl_path}")
@@ -89,6 +60,6 @@ else:
     # Update the timestamp
     # data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
-    print_with_time("Writing report...")
-    create_zip(data)
-    print_with_time("Report created successfully.")
+    print_with_time("Archiving results...")
+    report_zip_path = create_zip(data)
+    print_with_time(f"Archiving complete. Report zip: {report_zip_path}")

@@ -6,6 +6,7 @@ import zipfile
 import io
 import time
 import subprocess
+from datetime import datetime
 
 
 def get_max_memory_from_stream(stream):
@@ -200,159 +201,191 @@ def check_stderr_errors(stderr_file):
 
 
 if __name__ == "__main__":
-    task_name = '20260303_Paper2_Results_test_1'
-    base_dir = f'../../output/{task_name}'
+    # 输出运行时间
+    print("="*80)
+    print(f"脚本运行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*80)
+    
+    # 支持检查多个任务
+    task_names = [
+        '20260226_Paper2_Results_aquila',
+        '20260303_Paper2_Results_test',
+        # 可以在此添加更多任务名称
+    ]
     target_year = 2050
-    template_df = pd.read_csv(os.path.join(base_dir, 'grid_search_template.csv'), index_col=0)
-    run_dirs = [col for col in template_df.columns if col.startswith('Run_')]
 
-    rows = []
-    for run_dir in run_dirs:
-        archive_path = os.path.join(base_dir, run_dir, 'Run_Archive.zip')
-
-        if os.path.exists(archive_path):
-            row = get_archived_run_info(archive_path)
-            row["Name"] = run_dir
-            rows.append(row)
+    # 遍历每个任务
+    for task_name in task_names:
+        print(f"\n{'='*80}")
+        print(f"正在检查任务: {task_name}")
+        print(f"{'='*80}\n")
+        
+        base_dir = f'../../output/{task_name}'
+        
+        # 检查任务目录是否存在
+        if not os.path.exists(base_dir):
+            print(f"⚠️  任务目录不存在: {base_dir}")
             continue
+        
+        template_file = os.path.join(base_dir, 'grid_search_template.csv')
+        if not os.path.exists(template_file):
+            print(f"⚠️  未找到模板文件: {template_file}")
+            continue
+            
+        template_df = pd.read_csv(template_file, index_col=0)
+        run_dirs = [col for col in template_df.columns if col.startswith('Run_')]
 
-        # --- 如果归档不存在，执行新的状态检查逻辑 ---
-        row = {
-            "Name": run_dir,
-            "RunningYear": None,
-            "Memory": None,
-            "Solver Status": "Running",  # 默认状态
-            "Output Status": "Running",  # 默认状态
-            "ArchiveExists": False,
-            "ArchiveSize_MB": None,
-            "Num_Data_RES_lz4": 0,
-            "StdErr_Errors": None,
-            "Output_Files_MB": None,
-            "Stdout_LastModified": None,
-        }
+        rows = []
+        for run_dir in run_dirs:
+            archive_path = os.path.join(base_dir, run_dir, 'Run_Archive.zip')
 
-        output_dir = os.path.join(base_dir, run_dir, 'output')
-        subfolder = get_first_subfolder(output_dir)
+            if os.path.exists(archive_path):
+                row = get_archived_run_info(archive_path)
+                row["Name"] = run_dir
+                rows.append(row)
+                continue
 
-        # 搜集候选检查目录：output 根目录以及第一个子文件夹（如果有）
-        candidate_dirs = [output_dir]
-        if subfolder:
-            candidate_dirs.append(os.path.join(output_dir, subfolder))
+            # --- 如果归档不存在，执行新的状态检查逻辑 ---
+            row = {
+                "Name": run_dir,
+                "RunningYear": None,
+                "Memory": None,
+                "Solver Status": "Running",  # 默认状态
+                "Output Status": "Running",  # 默认状态
+                "ArchiveExists": False,
+                "ArchiveSize_MB": None,
+                "Num_Data_RES_lz4": 0,
+                "StdErr_Errors": None,
+                "Output_Files_MB": None,
+                "Stdout_LastModified": None,
+            }
 
-        # 在所有候选目录中查找 Data_RES*.lz4 文件（累计计数）
-        total_lz4 = 0
-        for d in candidate_dirs:
-            lz4_pattern = os.path.join(d, 'Data_RES*.lz4')
-            lz4_files = glob.glob(lz4_pattern)
-            total_lz4 += len(lz4_files)
-        if total_lz4 > 0:
-            row["Num_Data_RES_lz4"] = total_lz4
+            output_dir = os.path.join(base_dir, run_dir, 'output')
+            subfolder = get_first_subfolder(output_dir)
 
-        # 检查 error_log（根目录或子目录）以判断是否失败
-        error_found = False
-        for d in candidate_dirs:
-            error_log_pattern = os.path.join(d, 'error_log.txt')
-            if glob.glob(error_log_pattern):
-                error_found = True
-                break
+            # 搜集候选检查目录：output 根目录以及第一个子文件夹（如果有）
+            candidate_dirs = [output_dir]
+            if subfolder:
+                candidate_dirs.append(os.path.join(output_dir, subfolder))
 
-        # 查找 stdout：优先使用子文件夹（如果存在），否则在根目录查找
-        runing_file = None
-        for d in candidate_dirs[::-1]:
-            candidate_stdout = os.path.join(d, 'LUTO_RUN__stdout.log')
-            if os.path.exists(candidate_stdout):
-                runing_file = candidate_stdout
-                break
+            # 在所有候选目录中查找 Data_RES*.lz4 文件（累计计数）
+            total_lz4 = 0
+            for d in candidate_dirs:
+                lz4_pattern = os.path.join(d, 'Data_RES*.lz4')
+                lz4_files = glob.glob(lz4_pattern)
+                total_lz4 += len(lz4_files)
+            if total_lz4 > 0:
+                row["Num_Data_RES_lz4"] = total_lz4
 
-        # 检查是否存在 "Report created successfully"
-        if runing_file and check_report_created(runing_file):
-            row["Output Status"] = "Success"
+            # 检查 error_log（根目录或子目录）以判断是否失败
+            error_found = False
+            for d in candidate_dirs:
+                error_log_pattern = os.path.join(d, 'error_log.txt')
+                if glob.glob(error_log_pattern):
+                    error_found = True
+                    break
 
-        # 获取运行年份和内存信息（优先子文件夹的 mem log）
-        if runing_file:
-            row["RunningYear"] = parse_running_year(runing_file)
-            try:
-                with open(runing_file, 'r', encoding='utf-8', errors='ignore') as rf:
-                    txt = rf.read().splitlines()
-                    solver_state = parse_solver_state_from_stream(txt)
-                    if solver_state:
-                        row["Solver Status"] = solver_state
-                    elif total_lz4 > 0:
-                        # Output files exist → assume solver completed successfully
+            # 查找 stdout：优先使用子文件夹（如果存在），否则在根目录查找
+            runing_file = None
+            for d in candidate_dirs[::-1]:
+                candidate_stdout = os.path.join(d, 'LUTO_RUN__stdout.log')
+                if os.path.exists(candidate_stdout):
+                    runing_file = candidate_stdout
+                    break
+
+            # 检查是否存在 "Report created successfully"
+            if runing_file and check_report_created(runing_file):
+                row["Output Status"] = "Success"
+
+            # 获取运行年份和内存信息（优先子文件夹的 mem log）
+            if runing_file:
+                row["RunningYear"] = parse_running_year(runing_file)
+                try:
+                    with open(runing_file, 'r', encoding='utf-8', errors='ignore') as rf:
+                        txt = rf.read().splitlines()
+                        solver_state = parse_solver_state_from_stream(txt)
+                        if solver_state:
+                            row["Solver Status"] = solver_state
+                        elif total_lz4 > 0:
+                            # Output files exist → assume solver completed successfully
+                            row["Solver Status"] = 'Optimal'
+                        elif error_found:
+                            row["Solver Status"] = 'Error'
+                        else:
+                            row["Solver Status"] = 'Running'
+                except Exception:
+                    if total_lz4 > 0:
                         row["Solver Status"] = 'Optimal'
                     elif error_found:
                         row["Solver Status"] = 'Error'
                     else:
-                        row["Solver Status"] = 'Running'
-            except Exception:
+                        row["Solver Status"] = 'Unknown'
+            else:
+                # 没有 stdout 的情况下，用 lz4 或 error 判定
                 if total_lz4 > 0:
                     row["Solver Status"] = 'Optimal'
                 elif error_found:
                     row["Solver Status"] = 'Error'
                 else:
                     row["Solver Status"] = 'Unknown'
-        else:
-            # 没有 stdout 的情况下，用 lz4 或 error 判定
-            if total_lz4 > 0:
-                row["Solver Status"] = 'Optimal'
-            elif error_found:
-                row["Solver Status"] = 'Error'
-            else:
-                row["Solver Status"] = 'Unknown'
 
-        # mem log
-        mem_found = False
-        for d in candidate_dirs:
-            mem_log_pattern = os.path.join(d, 'RES_*_mem_log.txt')
-            mem_log_files = glob.glob(mem_log_pattern)
-            if mem_log_files:
-                with open(mem_log_files[0], 'r', encoding='utf-8', errors='ignore') as f:
-                    row["Memory"] = get_max_memory_from_stream(f)
-                mem_found = True
-                break
+            # mem log
+            mem_found = False
+            for d in candidate_dirs:
+                mem_log_pattern = os.path.join(d, 'RES_*_mem_log.txt')
+                mem_log_files = glob.glob(mem_log_pattern)
+                if mem_log_files:
+                    with open(mem_log_files[0], 'r', encoding='utf-8', errors='ignore') as f:
+                        row["Memory"] = get_max_memory_from_stream(f)
+                    mem_found = True
+                    break
 
-        # stderr 错误摘要（在候选目录中查找）
-        stderr_summary = None
-        for d in candidate_dirs:
-            stderr_file = os.path.join(d, 'LUTO_RUN__stderr.log')
-            stderr_summary = check_stderr_errors(stderr_file)
-            if stderr_summary:
-                row["StdErr_Errors"] = stderr_summary
-                break
+            # stderr 错误摘要（在候选目录中查找）
+            stderr_summary = None
+            for d in candidate_dirs:
+                stderr_file = os.path.join(d, 'LUTO_RUN__stderr.log')
+                stderr_summary = check_stderr_errors(stderr_file)
+                if stderr_summary:
+                    row["StdErr_Errors"] = stderr_summary
+                    break
 
-        # 输出文件夹大小（优先子文件夹），以及 stdout 最后修改时间
-        out_dir_for_size = candidate_dirs[-1] if len(candidate_dirs) > 1 else candidate_dirs[0]
-        row["Output_Files_MB"] = get_dir_size_mb(out_dir_for_size)
-        if runing_file and os.path.exists(runing_file):
-            try:
-                mtime = os.path.getmtime(runing_file)
-                row["Stdout_LastModified"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(mtime))
-            except Exception:
-                row["Stdout_LastModified"] = None
+            # 输出文件夹大小（优先子文件夹），以及 stdout 最后修改时间
+            out_dir_for_size = candidate_dirs[-1] if len(candidate_dirs) > 1 else candidate_dirs[0]
+            row["Output_Files_MB"] = get_dir_size_mb(out_dir_for_size)
+            if runing_file and os.path.exists(runing_file):
+                try:
+                    mtime = os.path.getmtime(runing_file)
+                    row["Stdout_LastModified"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(mtime))
+                except Exception:
+                    row["Stdout_LastModified"] = None
 
-        rows.append(row)
+            rows.append(row)
 
-    results_df = pd.DataFrame(rows, columns=[
-        "Name",
-        "RunningYear",
-        "Memory",
-        "Solver Status",
-        "Output Status",
-        # "ArchiveExists",
-        # "ArchiveSize_MB",
-        # "Num_Data_RES_lz4",
-        # "StdErr_Errors",
-        # "Output_Files_MB",
-        # "Stdout_LastModified",
-    ])
-    out_excel = os.path.join(base_dir, f'{task_name}_run_status_report.xlsx')
-    results_df.to_excel(out_excel, index=False)
+        results_df = pd.DataFrame(rows, columns=[
+            "Name",
+            "RunningYear",
+            "Memory",
+            "Solver Status",
+            "Output Status",
+            # "ArchiveExists",
+            # "ArchiveSize_MB",
+            # "Num_Data_RES_lz4",
+            # "StdErr_Errors",
+            # "Output_Files_MB",
+            # "Stdout_LastModified",
+        ])
+        out_excel = os.path.join(base_dir, f'{task_name}_run_status_report.xlsx')
+        results_df.to_excel(out_excel, index=False)
 
-    # 设置 pandas 显示选项以完整显示 DataFrame
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.width', None)
-    pd.set_option('display.max_colwidth', None)
+        # 设置 pandas 显示选项以完整显示 DataFrame
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+        pd.set_option('display.width', None)
+        pd.set_option('display.max_colwidth', None)
 
-    print(results_df)
-    print(f"✅ Run 状态表已保存: {out_excel}")
+        print(results_df)
+        print(f"✅ Run 状态表已保存: {out_excel}")
+    
+    print(f"\n{'='*80}")
+    print(f"✅ 所有任务检查完成！共检查了 {len(task_names)} 个任务")
+    print(f"{'='*80}")

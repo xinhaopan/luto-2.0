@@ -337,12 +337,13 @@ def extract_files_from_zip(
     if os.path.isfile(zip_path) and zipfile.is_zipfile(zip_path):
         tprint(f"Extracting files from {os.path.basename(zip_path)}...")
         with zipfile.ZipFile(zip_path, 'r') as zf:
-            all_names = set(zf.namelist())
+            all_names = zf.namelist()
             for var_prefix in copy_files:
                 for year in years:
-                    src = f"out_{year}/{var_prefix}_{year}.nc"
-                    if src in all_names:
-                        files_dict[(var_prefix, year)] = zf.read(src)
+                    target_suffix = f"out_{year}/{var_prefix}_{year}.nc"
+                    matches = [n for n in all_names if n == target_suffix or n.endswith('/' + target_suffix)]
+                    if matches:
+                        files_dict[(var_prefix, year)] = zf.read(matches[0])
                     elif allow_missing_2010 and year == 2010:
                         files_dict[(var_prefix, year)] = None
                     else:
@@ -1217,7 +1218,12 @@ def main(task_dir, njobs):
     # ==========================================================================
     tprint("\n--- Stage 1: File copy ---")
     for input_file in unique_input_files:
-        origin_path_name = get_path(config.TASK_NAME, input_file)
+        _run_dir = f"../../../output/{config.TASK_NAME}/{input_file}"
+        _zip_file = os.path.join(_run_dir, 'Run_Archive.zip')
+        if os.path.isfile(_zip_file):
+            origin_path_name = _zip_file
+        else:
+            origin_path_name = get_path(config.TASK_NAME, input_file)
         target_path_name = os.path.join(output_path, input_file)
         tprint(f"  -> Copying: {origin_path_name}")
 
@@ -1479,7 +1485,9 @@ def main(task_dir, njobs):
     # Stage 8: TIF export
     # ==========================================================================
     tif_dir = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif"
-    data = get_data_RES(config.TASK_NAME, input_files_0[0])
+    _run_dir_0 = f"../../../output/{config.TASK_NAME}/{input_files_0[0]}"
+    _use_zip_0 = os.path.isfile(os.path.join(_run_dir_0, 'Run_Archive.zip'))
+    data = get_data_RES(config.TASK_NAME, input_files_0[0], use_zip=_use_zip_0)
 
     cost_file_parts    = ['total_cost', 'cost_agricultural_management', 'cost_non_ag',
                           'transition_cost_ag2non_ag_amortised_diff']
@@ -1566,6 +1574,18 @@ def main(task_dir, njobs):
     tprint("All tasks complete.")
     tprint(f"Total elapsed time: {total_time / 3600:.2f} hours")
     tprint("=" * 80)
+
+    # --- Compress 0_base_data to zip and remove original folder ---
+    zip_path = output_path + '.zip'
+    tprint(f"\nCompressing {output_path} -> {zip_path} ...")
+    with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(output_path):
+            for file in files:
+                file_abs = os.path.join(root, file)
+                arcname = os.path.relpath(file_abs, os.path.dirname(output_path))
+                zf.write(file_abs, arcname)
+    shutil.rmtree(output_path)
+    tprint(f"Done. Original folder removed.")
 
 
 def run(task_dir, njobs):

@@ -5,8 +5,8 @@ import time
 # ==============================================================================
 #  配置区域
 # ==============================================================================
-CPU_CORES = 50
-MEMORY_GB = "200GB"          # PBS 用 GB
+CPU_CORES = 60
+MEMORY_GB = "240GB"          # PBS 用 GB
 TIME_LIMIT = "12:00:00"       # 一天
 PYTHON_SCRIPT_TO_RUN = "0_Preprocess.py"
 CONDA_ENV_NAME = "xpluto"
@@ -47,27 +47,33 @@ def wait_for_other_jobs_to_complete():
             lines = result.stdout.strip().split('\n')
             
             # 过滤出运行中或排队的任务
-            # qstat 的输出格式: Job id, Name, User, Time Use, S, Queue
+            # qstat 的输出格式: Job ID, Username, Queue, Jobname, SessID, NDS, TSK, Memory, Time, S, Elapsed Time
             # S (状态): R = 运行中, Q = 排队, C = 已完成
+            # 状态列位置: parts[9]
             active_jobs = []
             
             for line in lines:
-                if line.strip() == "" or "Job id" in line or "-" in line[:10]:
+                # 跳过空行、标题行和分隔线
+                if line.strip() == "" or "Job ID" in line or "---" in line:
                     continue
                 
                 parts = line.split()
-                if len(parts) >= 5:
-                    job_id = parts[0]
-                    job_name = parts[1]
-                    job_status = parts[4]  # 状态列
-                    
-                    # 只关注运行中(R)和排队(Q)的任务
-                    if job_status in ['R', 'Q']:
-                        active_jobs.append({
-                            'id': job_id,
-                            'name': job_name,
-                            'status': '运行中' if job_status == 'R' else '排队'
-                        })
+                if len(parts) >= 10:  # 确保至少有10个部分
+                    try:
+                        job_id = parts[0]
+                        job_name = parts[3]  # Jobname 在位置 3
+                        job_status = parts[9]  # 状态在位置 9
+                        
+                        # 只关注运行中(R)和排队(Q)的任务
+                        if job_status in ['R', 'Q']:
+                            active_jobs.append({
+                                'id': job_id,
+                                'name': job_name,
+                                'status': '运行中' if job_status == 'R' else '排队'
+                            })
+                    except (IndexError, ValueError):
+                        # 跳过解析异常的行
+                        continue
             
             if not active_jobs:
                 print("✅ 没有检测到其他正在运行的任务，可以提交新任务")

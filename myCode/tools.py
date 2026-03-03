@@ -152,7 +152,7 @@ def plot_memory_usage(
 
 
 if __name__ == "__main__":
-    log = "F:/Users/s222552331/Work/LUTO2_XH/luto-2.0/output/20260301_Paper2_Results_test/carbon_price/mem_log.txt"
+    log = r"F:\Users\s222552331\Work\LUTO2_XH\luto-2.0\output\20260226_Paper2_Results_NCI\Run_01_GHG_high_BIO_high_CUT_50\output\2026_03_01__16_39_28_RF5_2010-2050\RES_5_mem_log.txt"
     print_memory_summary(log)
     plot_memory_usage(log)
     

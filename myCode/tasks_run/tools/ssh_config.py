@@ -11,7 +11,7 @@ def ssh_config(platform="HPC"):
     # 定义 SSH 连接配置
     if platform == "NCI":
         ssh_config = {
-            "linux_host": "gadi.nci.org.au",
+            "linux_host": "gadi-dm.nci.org.au",  # 使用Data Mover节点，专为大文件传输优化
             "linux_port": 22,
             "linux_username": "xp7241",
             "private_key_path": r"C:\Users\s222552331\.ssh\id_rsa",

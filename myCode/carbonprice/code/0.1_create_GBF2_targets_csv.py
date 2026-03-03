@@ -26,14 +26,34 @@ def get_GBF2_target_list_start_to_2050(
 
     def _import_settings_from_output(task_name: str, filename: str):
         """
-        从输出目录按路径导入 settings.py
+        从输出目录按路径导入 settings.py。
+        优先从文件系统读取，若已压缩为 Run_Archive.zip 则从 zip 内提取再导入。
         期望路径: ../../../output/{task_name}/{filename}/luto/settings.py
         """
-        settings_path = os.path.abspath(
-            os.path.join("../../../output", task_name, filename, "luto", "settings.py")
-        )
-        if not os.path.isfile(settings_path):
-            raise FileNotFoundError(f"settings.py 不存在: {settings_path}")
+        import zipfile, tempfile, sys
+
+        run_dir = os.path.abspath(os.path.join("../../../output", task_name, filename))
+        settings_path = os.path.join(run_dir, "luto", "settings.py")
+
+        if os.path.isfile(settings_path):
+            # 未压缩 — 直接从文件系统加载
+            pass
+        else:
+            # 已压缩 — 从 Run_Archive.zip 中提取 settings.py
+            zip_path = os.path.join(run_dir, "Run_Archive.zip")
+            if not os.path.isfile(zip_path):
+                raise FileNotFoundError(f"settings.py 及 Run_Archive.zip 均不存在: {run_dir}")
+            with zipfile.ZipFile(zip_path, 'r') as zf:
+                all_names = zf.namelist()
+                target_suffix = "luto/settings.py"
+                matches = [n for n in all_names if n == target_suffix or n.endswith('/' + target_suffix)]
+                if not matches:
+                    raise FileNotFoundError(f"Run_Archive.zip 中未找到 luto/settings.py: {zip_path}")
+                content = zf.read(matches[0])
+            tmp_dir = tempfile.mkdtemp()
+            settings_path = os.path.join(tmp_dir, "settings.py")
+            with open(settings_path, 'wb') as f:
+                f.write(content)
 
         spec = importlib.util.spec_from_file_location("custom_luto_settings", settings_path)
         if spec is None or spec.loader is None:
@@ -124,7 +144,9 @@ def precompute_gbf2_targets_csv(
     years = list(range(int(start_year), int(end_year) + 1))
 
     def compute_one(fn: str):
-        data = get_data_RES(task_name, fn)
+        _run_dir = os.path.abspath(os.path.join("../../../output", task_name, fn))
+        _use_zip = os.path.isfile(os.path.join(_run_dir, 'Run_Archive.zip'))
+        data = get_data_RES(task_name, fn, use_zip=_use_zip)
         targets = get_GBF2_target_list_start_to_2050(
             data=data,
             task_name=task_name,
