@@ -769,7 +769,7 @@ def plot_22_layout(
     all_dfs = filter_and_rename_dict_keys(all_dfs, title_map, strict_match=True)
     fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(5, 5, figure=fig,
-                           left=0.06, right=0.98, top=0.95, bottom=0.05,
+                           left=0.06, right=0.91, top=0.95, bottom=0.05,
                            wspace=0.15, hspace=0.14)
 
     axes = np.empty((5, 5), dtype=object)
@@ -860,7 +860,26 @@ def plot_22_layout(
 
     # --- 图例 ---
     draw_legend(axes[0,0], bbox_to_anchor=bbox_to_anchor, ncol=ncol, column_spacing=column_spacing)
-    fig.subplots_adjust(left=0.05, right=0.98, top=0.97, bottom=0.03)
+    fig.subplots_adjust(left=0.05, right=0.91, top=0.97, bottom=0.03)
+
+    # --- 行分组标签（右侧竖排） ---
+    fs = plt.rcParams['font.size']
+    offset = 0.015
+    # Row 0: 只有两列，标签紧贴 col 1 右侧
+    b = gs[0, 1].get_position(fig)
+    fig.text(b.x1 + offset, (b.y0 + b.y1) / 2, "Under NZ targets",
+             rotation=270, va='center', ha='center', fontsize=fs)
+    # Rows 1-2: 标签紧贴 col 4 右侧，垂直居中于两行
+    b1 = gs[1, 4].get_position(fig)
+    b2 = gs[2, 4].get_position(fig)
+    fig.text(b1.x1 + offset, (b2.y0 + b1.y1) / 2, "Under NP targets",
+             rotation=270, va='center', ha='center', fontsize=fs)
+    # Rows 3-4: 标签紧贴 col 4 右侧，垂直居中于两行
+    b3 = gs[3, 4].get_position(fig)
+    b4 = gs[4, 4].get_position(fig)
+    fig.text(b3.x1 + offset, (b4.y0 + b3.y1) / 2, "Under NZ and NP targets",
+             rotation=270, va='center', ha='center', fontsize=fs)
+
     # --- 保存 ---
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))
@@ -1504,7 +1523,7 @@ def draw_22_price(
 
     fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.15, wspace=0.15)
-    fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
+    fig.subplots_adjust(left=0.06, right=0.91, top=0.95, bottom=0.05)
 
     # ------ x轴刻度（所有数据统一） ------
     x_data = df.index
@@ -1592,6 +1611,24 @@ def draw_22_price(
 
     ax_list[0].set_ylabel(y_label)
     ax_list[0].yaxis.set_label_coords(-0.19, -1.8)
+
+    # ------ 行分组标签（右侧竖排） ------
+    fs = plt.rcParams['font.size']
+    offset = 0.015
+    # Row 0: 只有两列，标签紧贴 col 1 右侧
+    b = gs[0, 1].get_position(fig)
+    fig.text(b.x1 + offset, (b.y0 + b.y1) / 2, "Under NZ targets",
+             rotation=270, va='center', ha='center', fontsize=fs)
+    # Rows 1-2: 标签紧贴 col 4 右侧，垂直居中于两行
+    b1 = gs[1, 4].get_position(fig)
+    b2 = gs[2, 4].get_position(fig)
+    fig.text(b1.x1 + offset, (b2.y0 + b1.y1) / 2, "Under NP targets",
+             rotation=270, va='center', ha='center', fontsize=fs)
+    # Rows 3-4: 标签紧贴 col 4 右侧，垂直居中于两行
+    b3 = gs[3, 4].get_position(fig)
+    b4 = gs[4, 4].get_position(fig)
+    fig.text(b3.x1 + offset, (b4.y0 + b3.y1) / 2, "Under NZ and NP targets",
+             rotation=270, va='center', ha='center', fontsize=fs)
 
     # ------ 图例 ------
     if draw_legend:
@@ -1747,6 +1784,7 @@ def draw_10_price(
         legend_label_shade="95% CI",
         legend_loc="lower left", # best
         legend_on_first_ax=True,
+        legend_ax_index=0,  # 图例放在哪个子图，0=第一行第一个，5=第二行第一个
         ylabel_pos=(-0.3, -0.2),  # (x, y) in axes coords
         top_space_ratio=0.20,  # y 轴顶部额外空间比例
         ci=95,
@@ -1766,7 +1804,8 @@ def draw_10_price(
     legend_label_line: 图例线条标签
     legend_label_shade: 图例阴影标签
     legend_loc: 图例位置
-    legend_on_first_ax: 是否只在第一个子图显示图例
+    legend_on_first_ax: 是否只在指定子图显示图例
+    legend_ax_index: 图例所在子图的索引（0=第一行第一个，5=第二行第一个）
     ylabel_pos: y轴标签位置
     top_space_ratio: y轴顶部额外空间比例
     ci: 置信区间
@@ -1839,14 +1878,15 @@ def draw_10_price(
     axes[0].set_ylabel(ylabel)
     axes[0].yaxis.set_label_coords(-0.19, -0.03)
 
-    # legend：默认只在第一个子图里放，避免重复
+    # legend：默认只在指定子图里放，避免重复
     if legend_on_first_ax:
+        legend_ax_index = min(legend_ax_index, len(axes) - 1)
         line_handle = mlines.Line2D([], [], color=color, linewidth=2, label=legend_label_line)
         if ci is not None and ci > 0:
             shade_handle = Patch(color=color, alpha=0.25, label=legend_label_shade)
-            axes[0].legend(handles=[line_handle, shade_handle], loc=legend_loc, frameon=False)
+            axes[legend_ax_index].legend(handles=[line_handle, shade_handle], loc=legend_loc, frameon=False)
         else:
-            axes[0].legend(handles=[line_handle], loc=legend_loc, frameon=False)
+            axes[legend_ax_index].legend(handles=[line_handle], loc=legend_loc, frameon=False)
 
     # 保存图形
     if not os.path.exists(os.path.dirname(output_path)):

@@ -46,6 +46,8 @@ df_bio_long = bio_price_da.to_dataframe().reset_index()
 set_plot_style(30)
 draw_22_price(df_carbon_long, config.CP_TITLE_MAP,output_path=f"{output_dir}/05_Carbon_price_all_long.png",start_year=config.START_YEAR, desired_ticks=5,  y_label=r"Shadow carbon price (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",ci=95)
 set_plot_style(20)
-draw_10_price(df_bio_long,config.BP_TITLE_MAP,'green',f"{output_dir}/05_biodiversity_price_long.png",start_year=config.START_YEAR,desired_ticks=5,ylabel=r"Biodiversity price (AU\$ contribution-weighted area ha$^{-1}$ yr$^{-1}$)",ci=95)
-set_plot_style(15)
-draw_10_price_keep_5_and_10_one_row(df_bio_long,config.BP_TITLE_MAP,'green',f"{output_dir}/05_biodiversity_price_long_5_10.png",start_year=2030,desired_ticks=5,ylabel = r"Biodiversity price(AU\$ " + "\n" + r"contribution-weighted area ha$^{-1}$ yr$^{-1}$)",ci=95)
+draw_10_price(df_bio_long,config.BP_TITLE_MAP,'green',f"{output_dir}/05_biodiversity_price_long.png",start_year=config.START_YEAR,
+    desired_ticks=5,ylabel=r"shadow biodiversity price (AU\$ contribution-weighted area ha$^{-1}$ yr$^{-1}$)",ci=95,
+    legend_ax_index=5,       # 第二行第一个图
+    legend_loc="upper left")
+# draw_10_price_keep_5_and_10_one_row(df_bio_long,config.BP_TITLE_MAP,'green',f"{output_dir}/05_biodiversity_price_long_5_10.png",start_year=2030,desired_ticks=5,ylabel = r"shadow biodiversity price(AU\$ " + "\n" + r"contribution-weighted area ha$^{-1}$ yr$^{-1}$)",ci=95)

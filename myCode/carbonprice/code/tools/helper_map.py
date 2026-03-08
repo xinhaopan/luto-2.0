@@ -290,6 +290,8 @@ def efficient_tif_plot(
         custom_tick_values=False,
         force_zero_center=False,  # 新增：强制以0为中心（用于偏差、异常等）
         force_one_start=False,  # 新增：强制从0开始（用于成本、距离等非负概念）
+        vmin_override=None,  # 强制指定vmin，跳过自动计算（用于多图共享色标）
+        vmax_override=None,  # 强制指定vmax，跳过自动计算（用于多图共享色标）
 ):
     """
     改进的栅格绘图函数，支持多种数据类型的归一化策略
@@ -347,7 +349,16 @@ def efficient_tif_plot(
         vmax_clipped = vmax_real
 
     # ===== 改进的归一化策略 =====
-    if force_zero_center:
+    if vmin_override is not None or vmax_override is not None:
+        # 策略0：强制覆盖vmin/vmax（用于多图共享色标）
+        vmin_plot = float(vmin_override) if vmin_override is not None else (1.0 if force_one_start else vmin_clipped)
+        vmax_plot = float(vmax_override) if vmax_override is not None else vmax_clipped
+        if force_one_start:
+            data = np.where(data < 1, np.nan, data)
+        nb = max(int(legend_nbins), 2)
+        _, _, ticks_list = get_y_axis_ticks(vmin_plot, vmax_plot, desired_ticks=nb, strict_count=strict_count)
+        tick_vals = np.asarray(ticks_list, dtype=float)
+    elif force_zero_center:
         # 策略1：以0为中心（适合偏差、变化、异常等）
         # 例如：数据范围 [-30, 100] -> 色标范围 [-100, 100]
         max_abs = max(abs(vmin_clipped), abs(vmax_clipped))
@@ -826,7 +837,9 @@ def plot_tif_layer(
         clip_percent=None,
         force_zero_center=False,
         force_one_start=False,
-        strict_count=True
+        strict_count=True,
+        vmin_override=None,
+        vmax_override=None,
 ):
     """通用绘制函数：既可以保存单图，也可以在指定ax上绘制"""
 
@@ -859,7 +872,9 @@ def plot_tif_layer(
         clip_percent=clip_percent,
         force_zero_center=force_zero_center,
         force_one_start=force_one_start,
-        strict_count=strict_count
+        strict_count=strict_count,
+        vmin_override=vmin_override,
+        vmax_override=vmax_override,
     )
     aligned_tif = f"../Map/public_area_aligned.tif"
     add_binary_gray_layer(ax, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)

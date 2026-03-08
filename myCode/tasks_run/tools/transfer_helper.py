@@ -128,10 +128,9 @@ if __name__ == "__main__":
 # ==============================================================================
 
 _DEFAULT_RSYNC_OPTIONS = [
-    "-avz",          # archive mode, verbose, compress
-    "--progress",    # 显示进度
-    "--partial",     # 保留部分传输的文件
-    "--timeout=300", # 超时设置（秒）
+    "-av",           # archive mode, verbose（不加 -z：NetCDF已压缩，再压缩浪费CPU）
+    "--progress",    # 占位，_run_rsync 会替换为 --info=progress2（整体进度）
+    "--partial",     # 保留部分传输的文件（断点续传）
 ]
 
 
@@ -139,7 +138,11 @@ def _log(message, level="INFO", log_file="rsync_download.log"):
     """记录日志消息到控制台和文件"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_msg = f"[{timestamp}] [{level}] {message}"
-    print(log_msg)
+    try:
+        print(log_msg)
+    except UnicodeEncodeError:
+        print(log_msg.encode(sys.stdout.encoding or "ascii", errors="replace")
+                     .decode(sys.stdout.encoding or "ascii"))
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(log_msg + "\n")
 
@@ -154,6 +157,25 @@ def _windows_path_to_wsl(windows_path):
         path_without_drive = windows_path[2:].replace('\\', '/')
         return f"/mnt/{drive}{path_without_drive}"
     return windows_path.replace('\\', '/')
+
+
+def _ensure_wsl_key_permissions(windows_key_path, log_file="rsync_download.log"):
+    """将SSH密钥复制到WSL原生文件系统并设置600权限（解决NTFS挂载777权限问题）。
+    返回WSL中可用的密钥路径。
+    """
+    wsl_key = _windows_path_to_wsl(windows_key_path)
+    key_name = os.path.basename(windows_key_path)
+    wsl_safe_path = f"~/.ssh/luto_{key_name}"
+    cmd = f"mkdir -p ~/.ssh && cp {wsl_key} {wsl_safe_path} && chmod 600 {wsl_safe_path} && echo OK"
+    try:
+        result = subprocess.run(["wsl", "bash", "-c", cmd],
+                                capture_output=True, text=True, timeout=10)
+        if result.returncode == 0 and "OK" in result.stdout:
+            _log(f"SSH密钥已同步到WSL: {wsl_safe_path}（权限600）", "INFO", log_file)
+            return wsl_safe_path
+    except Exception as e:
+        _log(f"同步SSH密钥到WSL失败: {e}，回退使用 {wsl_key}", "WARNING", log_file)
+    return wsl_key
 
 
 def _build_ssh_command(remote_host, remote_command, ssh_key_path=None, log_file="rsync_download.log"):
@@ -259,7 +281,7 @@ def _download_tar_file(remote_host, remote_tar_path, local_dir, ssh_key_path=Non
                 _log("使用WSL运行rsync", log_file=log_file)
         cmd = ["rsync", "-av", "--progress", "--partial"]
         if ssh_key_path:
-            key = _windows_path_to_wsl(ssh_key_path) if use_wsl else ssh_key_path
+            key = _ensure_wsl_key_permissions(ssh_key_path, log_file) if use_wsl else ssh_key_path
             cmd.extend(["-e", f"ssh -i {key}"])
         cmd.append(f"{remote_host}:{remote_tar_path}")
         if use_wsl:
@@ -269,17 +291,16 @@ def _download_tar_file(remote_host, remote_tar_path, local_dir, ssh_key_path=Non
             _log(f"本地目标路径(WSL): {wsl_local}", log_file=log_file)
         else:
             cmd.append(local_tar_path)
-        _log(f"执行命令: {' '.join(cmd)}", log_file=log_file)
         start_time = time.time()
-        result = subprocess.run(cmd, text=True, capture_output=False)
+        success = _run_rsync(cmd, log_file)
         elapsed = time.time() - start_time
         _log(f"下载耗时: {elapsed:.1f}s ({elapsed/60:.1f}min)", log_file=log_file)
-        if result.returncode == 0 and os.path.exists(local_tar_path):
+        if success and os.path.exists(local_tar_path):
             size_gb = os.path.getsize(local_tar_path) / (1024**3)
             _log(f"✓ tar文件下载完成！大小: {size_gb:.2f} GB", "SUCCESS", log_file)
             return local_tar_path
         else:
-            _log(f"✗ 下载失败，退出码: {result.returncode}", "ERROR", log_file)
+            _log("✗ 下载失败", "ERROR", log_file)
             return None
     except Exception as e:
         _log(f"✗ 下载过程出错: {e}", "ERROR", log_file)
@@ -323,13 +344,9 @@ def _delete_remote_files(remote_host, remote_dir, remote_tar_path, ssh_key_path=
     """删除远程tar文件和源目录，返回True/False"""
     _log("=" * 80, log_file=log_file)
     _log("删除远程文件...", log_file=log_file)
-    if confirm_delete:
-        _log(f"准备删除远程目录: {remote_dir}", "WARNING", log_file)
-        _log(f"准备删除远程tar: {remote_tar_path}", "WARNING", log_file)
-        response = input("确认删除远程文件? (yes/no): ").strip().lower()
-        if response != "yes":
-            _log("取消删除远程文件", log_file=log_file)
-            return False
+    if not confirm_delete:
+        _log("跳过删除远程文件（confirm_delete=False）", log_file=log_file)
+        return False
     try:
         delete_cmd = f"rm -f '{remote_tar_path}' && rm -rf '{remote_dir}'"
         ssh_cmd, _ = _build_ssh_command(remote_host, delete_cmd, ssh_key_path, log_file)
@@ -370,7 +387,7 @@ def _build_rsync_command(remote_host, remote_dir, local_base_dir, ssh_key_path=N
     local_target += "/"
     cmd = ["rsync"] + rsync_options
     if ssh_key_path:
-        key = _windows_path_to_wsl(ssh_key_path) if use_wsl else ssh_key_path
+        key = _ensure_wsl_key_permissions(ssh_key_path, log_file) if use_wsl else ssh_key_path
         cmd.extend(["-e", f"ssh -i {key}"])
     cmd.extend([remote_source, local_target])
     if use_wsl:
@@ -379,18 +396,28 @@ def _build_rsync_command(remote_host, remote_dir, local_base_dir, ssh_key_path=N
 
 
 def _run_rsync(cmd, log_file="rsync_download.log"):
-    """运行rsync命令，返回True/False"""
+    """运行rsync命令，带tqdm整体进度条，返回True/False"""
     _log(f"执行rsync命令: {' '.join(cmd)}", log_file=log_file)
     _log("=" * 80, log_file=log_file)
+
+    # 替换 --progress 为 --info=progress2（整体进度而非逐文件）
+    cmd_run = [c for c in cmd if c != '--progress']
     try:
-        if sys.platform == "win32":
-            try:
-                subprocess.run(["rsync", "--version"], capture_output=True, check=True, timeout=5)
-            except Exception:
-                _log("警告: 原生rsync不可用，尝试WSL...", "WARNING", log_file)
-                result = subprocess.run(["wsl"] + cmd, text=True, capture_output=False)
-                return result.returncode == 0
-        result = subprocess.run(cmd, text=True, capture_output=False)
+        rsync_pos = next(i for i, c in enumerate(cmd_run) if c == 'rsync')
+    except StopIteration:
+        rsync_pos = 0
+    cmd_run = (cmd_run[:rsync_pos + 1]
+               + ['--info=progress2']
+               + cmd_run[rsync_pos + 1:])
+
+    _log(f"实际执行命令: {' '.join(cmd_run)}", log_file=log_file)
+
+    try:
+        # stdout 不捕获（输出到终端显示进度）；stderr 单独捕获以记录错误
+        result = subprocess.run(cmd_run, text=True, stderr=subprocess.PIPE)
+        if result.stderr.strip():
+            for line in result.stderr.strip().splitlines():
+                _log(f"rsync stderr: {line}", "WARNING", log_file)
         if result.returncode == 0:
             _log("rsync传输完成！", "SUCCESS", log_file)
             return True
@@ -422,7 +449,7 @@ def transfer_with_tar(remote_host, remote_dir, local_base_dir, ssh_key_path=None
     if not local_tar_path:
         _log("任务终止：下载失败，尝试清理远程tar...", "ERROR", log_file)
         _delete_remote_files(remote_host, remote_dir, remote_tar_path, ssh_key_path,
-                             confirm_delete=False, log_file=log_file)
+                             confirm_delete=True, log_file=log_file)
         return False
 
     _log("=" * 80, log_file=log_file)
@@ -455,13 +482,9 @@ def transfer_with_rsync(remote_host, remote_dir, local_base_dir, ssh_key_path=No
     _log("✓ rsync下载完成", "SUCCESS", log_file)
 
     _log("步骤2: 删除远程目录...", log_file=log_file)
-    if confirm_delete:
-        _log("=" * 80, "WARNING", log_file)
-        _log(f"即将删除远程目录: {remote_host}:{remote_dir}", "WARNING", log_file)
-        _log("=" * 80, "WARNING", log_file)
-        if input("确认删除? (yes/no): ").strip().lower() != "yes":
-            _log("用户取消删除远程目录", log_file=log_file)
-            return False
+    if not confirm_delete:
+        _log("跳过删除远程目录（confirm_delete=False）", log_file=log_file)
+        return True
     try:
         delete_cmd = f"rm -rf '{remote_dir}'"
         ssh_cmd, _ = _build_ssh_command(remote_host, delete_cmd, ssh_key_path, log_file)
@@ -495,7 +518,7 @@ def rsync_and_delete(platform, task_name, local_base_dir="../../output",
                                "lz4"    — 只下载 Data_RES*.lz4 文件（并行 SFTP），不删除远程
         use_tar_mode:        full模式：True=先远程打包再传输，False=rsync直传
         tar_use_compression: full+TAR模式：是否gzip压缩（NetCDF推荐False）
-        confirm_delete:      full模式：删除远程前是否交互确认
+        confirm_delete:      full模式：True=下载完后直接删除远程，False=不删除远程
         debug_mode:          full模式：仅测试SSH连接，不执行实际传输
         test_rsync_command:  debug_mode下额外打印rsync命令
         lz4_n_jobs:          lz4模式：并行下载线程数
@@ -568,7 +591,7 @@ def rsync_and_delete(platform, task_name, local_base_dir="../../output",
     if use_tar_mode:
         _log("✓✓✓ 任务完成：文件已下载并解压，远程文件和tar已删除，本地tar已清理", "SUCCESS", log_file)
     else:
-        _log("✓✓✓ 任务完成：文件已下载，远程目录已删除", "SUCCESS", log_file)
+        _log("✓✓✓ 任务完成", "SUCCESS", log_file)
     _log("=" * 80, log_file=log_file)
 
 
