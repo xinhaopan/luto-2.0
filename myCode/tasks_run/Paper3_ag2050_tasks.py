@@ -2,16 +2,30 @@
 Task runner for AG2050 scenarios (AgS1 – AgS4).
 
 Scenarios:
-  AgS1 – High yield, Maintain historical GHG & Biodiversity
-  AgS2 – Very High yield, Low GHG, Restore 50% biodiversity in top-30% priority areas
-  AgS3 – Medium yield, GHG off, Biodiversity off
-  AgS4 – Low yield,   GHG off, Biodiversity off
+  AgS1 – Regional Ag capitals:   Non-ag OFF, full AG managements, maintain historical GHG & biodiversity
+  AgS2 – Landscape stewardship:  Non-ag ON,  full AG managements, low GHG, restore 50% biodiversity
+  AgS3 – Climate survival:       Non-ag OFF, limited AG managements (Eco Grazing/Savanna/HIR only), GHG off
+  AgS4 – System decline:         Non-ag OFF, limited AG managements (Eco Grazing/Savanna/HIR only), GHG off
+
+AG management availability per scenario:
+  ─────────────────────────────────────────────────────────────────────
+  Management                      AgS1  AgS2  AgS3  AgS4
+  Asparagopsis taxiformis          ✓     ✓     ✗     ✗
+  Precision Agriculture            ✓     ✓     ✗     ✗
+  AgTech EI                        ✓     ✓     ✗     ✗
+  Biochar                          ✓     ✓     ✗     ✗
+  Ecological Grazing               ✓     ✓     ✓     ✓
+  Savanna Burning                  ✓     ✓     ✓     ✓
+  HIR - Beef                       ✓     ✓     ✓     ✓
+  HIR - Sheep                      ✓     ✓     ✓     ✓
+  ─────────────────────────────────────────────────────────────────────
 
 Key differences from Paper2_tasks.py:
   • AG2050_MODE = True   activates all AG2050 overrides in data.py
   • AG2050_SCENARIO      drives PRODUCTIVITY_TREND, GHG_EMISSIONS_LIMITS and
                         BIODIVERSITY_TARGET_GBF_2 automatically via the mapping
                         tables in settings.py
+  • NON_AG_LAND_USES and AG_MANAGEMENTS are set per scenario via conditional_rules
   • Demand is loaded from All_LUTO_demand_scenarios_with_convergences.csv
   • FLC multipliers from FLC_cost_multipliers.xlsx (scenario-specific sheet)
   • AC  multipliers from Area_cost.xlsx            (scenario-specific sheet)
@@ -25,8 +39,65 @@ import pandas as pd
 from tools.helpers import create_grid_search_template, create_task_runs
 
 
+# ---------------------------------------------------------------------------
+# Per-scenario NON_AG_LAND_USES configs
+# ---------------------------------------------------------------------------
+_non_ag_off = {
+    'Environmental Plantings':      False,
+    'Riparian Plantings':           False,
+    'Sheep Agroforestry':           False,
+    'Beef Agroforestry':            False,
+    'Carbon Plantings (Block)':     False,
+    'Sheep Carbon Plantings (Belt)': False,
+    'Beef Carbon Plantings (Belt)': False,
+    'BECCS':                        False,
+    'Destocked - natural land':     False,
+}
+
+_non_ag_on = {
+    'Environmental Plantings':      True,
+    'Riparian Plantings':           True,
+    'Sheep Agroforestry':           True,
+    'Beef Agroforestry':            True,
+    'Carbon Plantings (Block)':     True,
+    'Sheep Carbon Plantings (Belt)': True,
+    'Beef Carbon Plantings (Belt)': True,
+    'BECCS':                        False,
+    'Destocked - natural land':     True,
+}
+
+# ---------------------------------------------------------------------------
+# Per-scenario AG_MANAGEMENTS configs
+# ---------------------------------------------------------------------------
+_ag_man_full = {                         # AgS1 & AgS2
+    'Asparagopsis taxiformis': True,
+    'Precision Agriculture':   True,
+    'Ecological Grazing':      True,
+    'Savanna Burning':         True,
+    'AgTech EI':               True,
+    'Biochar':                 True,
+    'HIR - Beef':              True,
+    'HIR - Sheep':             True,
+    'Utility Solar PV':        False,
+    'Onshore Wind':            False,
+}
+
+_ag_man_limited = {                      # AgS3 & AgS4
+    'Asparagopsis taxiformis': False,
+    'Precision Agriculture':   False,
+    'Ecological Grazing':      True,
+    'Savanna Burning':         True,
+    'AgTech EI':               False,
+    'Biochar':                 False,
+    'HIR - Beef':              True,
+    'HIR - Sheep':             True,
+    'Utility Solar PV':        False,
+    'Onshore Wind':            False,
+}
+
+
 grid_search = {
-    'TASK_NAME': ['20260312_Paper3'],
+    'TASK_NAME': ['20260311_Paper3'],
     'KEEP_OUTPUTS': [True],
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [3],
@@ -101,24 +172,29 @@ grid_search = {
     'DYNAMIC_PRICE': [False],
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
 
-    # ---- Other settings -----------------------------------------------------
+    # ---- Per-scenario land use & management options -------------------------
+    # Two variants each; conditional_rules below select the correct pair.
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],
-    'NON_AG_LAND_USES': [{
-        'Environmental Plantings': True,
-        'Riparian Plantings': True,
-        'Sheep Agroforestry': True,
-        'Beef Agroforestry': True,
-        'Carbon Plantings (Block)': True,
-        'Sheep Carbon Plantings (Belt)': True,
-        'Beef Carbon Plantings (Belt)': True,
-        'BECCS': False,
-        'Destocked - natural land': True,
-    }],
+    'NON_AG_LAND_USES': [_non_ag_off, _non_ag_on],
+    'AG_MANAGEMENTS':   [_ag_man_full, _ag_man_limited],
 }
 
 
-# No conditional rules needed: each scenario is a distinct run.
-conditional_rules = []
+# Conditional rules: for each scenario keep only its matching NON_AG / AG_MAN pair.
+conditional_rules = [
+    # AgS1 – non-ag OFF, full managements
+    {'conditions':    {'AG2050_SCENARIO': ['AgS1']},
+     'restrictions':  {'NON_AG_LAND_USES': [_non_ag_off], 'AG_MANAGEMENTS': [_ag_man_full]}},
+    # AgS2 – non-ag ON, full managements
+    {'conditions':    {'AG2050_SCENARIO': ['AgS2']},
+     'restrictions':  {'NON_AG_LAND_USES': [_non_ag_on],  'AG_MANAGEMENTS': [_ag_man_full]}},
+    # AgS3 – non-ag OFF, limited managements
+    {'conditions':    {'AG2050_SCENARIO': ['AgS3']},
+     'restrictions':  {'NON_AG_LAND_USES': [_non_ag_off], 'AG_MANAGEMENTS': [_ag_man_limited]}},
+    # AgS4 – non-ag OFF, limited managements
+    {'conditions':    {'AG2050_SCENARIO': ['AgS4']},
+     'restrictions':  {'NON_AG_LAND_USES': [_non_ag_off], 'AG_MANAGEMENTS': [_ag_man_limited]}},
+]
 
 settings_name_dict = {
     'AG2050_SCENARIO': 'SCN',

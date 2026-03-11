@@ -472,6 +472,12 @@ class LutoSolver:
             + x_non_ag_vars.sum(axis=0)
         )
         for r, expr, ub in zip(cells, X_sum_r, ag_mask[cells]):
+            # When all AG uses are culled and all non-ag uses are disabled for a cell,
+            # numpy sum returns a Python scalar instead of a Gurobi expression.
+            # Wrap it in LinExpr so Gurobi evaluates the constraint properly
+            # (0 == ub with ub > 0 will correctly trigger infeasibility detection).
+            if isinstance(expr, (int, float, bool, np.integer, np.floating)):
+                expr = gp.LinExpr(float(expr))
             self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(
                 expr == ub,
                 name=f"const_cell_usage_{r}"
@@ -526,15 +532,21 @@ class LutoSolver:
 
                 # Sum of all usage of the AM option must be less than the limit
                 ag_man_vars_sum = (
-                    gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, :]) 
+                    gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, :])
                     + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, :])
                 )
+                # gp.quicksum on an all-zero (no-variable) array may return Python scalar 0;
+                # wrap in LinExpr so Gurobi evaluates the constraint properly.
+                if isinstance(ag_man_vars_sum, (int, float, bool, np.integer, np.floating)):
+                    ag_man_vars_sum = gp.LinExpr(float(ag_man_vars_sum))
 
                 all_vars_sum = (
-                    gp.quicksum(self.X_ag_dry_vars_jr[j, :]) 
+                    gp.quicksum(self.X_ag_dry_vars_jr[j, :])
                     + gp.quicksum(self.X_ag_irr_vars_jr[j, :])
                 )
-                
+                if isinstance(all_vars_sum, (int, float, bool, np.integer, np.floating)):
+                    all_vars_sum = gp.LinExpr(float(all_vars_sum))
+
                 constr = self.gurobi_model.addConstr(
                     ag_man_vars_sum <= adoption_limit * all_vars_sum,
                     name=f"const_ag_mam_adoption_limit_{am}_{j}".replace(" ", "_"),
