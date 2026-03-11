@@ -5,16 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for paper2">
+      <change afterPath="$PROJECT_DIR$/test.ipynb" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/luto/data.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/economics/agricultural/cost.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/economics/agricultural/cost.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/economics/agricultural/ghg.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/economics/agricultural/ghg.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/economics/agricultural/revenue.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/economics/agricultural/revenue.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/economics/agricultural/water.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/economics/agricultural/water.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/solvers/input_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/solvers/input_data.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/luto/tools/write.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/tools/write.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_write_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_write_tasks.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -32,8 +27,8 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Jupyter Notebook" />
         <option value="Python Script" />
+        <option value="Jupyter Notebook" />
       </list>
     </option>
   </component>
@@ -378,7 +373,7 @@
       <workItem from="1772159764072" duration="12677000" />
       <workItem from="1772423235602" duration="6532000" />
       <workItem from="1772717428255" duration="8636000" />
-      <workItem from="1773056348475" duration="10878000" />
+      <workItem from="1773056348475" duration="14323000" />
     </task>
     <task id="LOCAL-00048" summary="update: calculate price">
       <option name="closed" value="true" />
@@ -930,7 +925,7 @@
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py</url>
-          <line>334</line>
+          <line>336</line>
           <option name="timeStamp" value="150" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">

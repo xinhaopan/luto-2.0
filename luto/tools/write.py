@@ -1938,11 +1938,11 @@ def write_ghg_total(data: Data, yr_cal, path):
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get GHG emissions limits used as constraints in model.
-    # 'maintain_historical': GHG_TARGETS is populated lazily; use .get() with 0 fallback.
-    if settings.GHG_EMISSIONS_LIMITS == 'off':
-        ghg_limits = 0
-    else:
-        ghg_limits = data.GHG_TARGETS.get(yr_cal, 0)
+    # Use getattr so that: (a) old lz4 files without GHG_TARGETS attr still work,
+    # (b) joblib worker processes — which re-import settings fresh and may see a
+    # stale GHG_EMISSIONS_LIMITS value — don't crash.  .get() returns 0 when the
+    # dict is empty (GHG off) or not yet populated (maintain_historical lazy init).
+    ghg_limits = getattr(data, 'GHG_TARGETS', {}).get(yr_cal, 0)
 
     # Get GHG emissions from model
     if yr_cal >= data.YR_CAL_BASE + 1:
