@@ -101,6 +101,26 @@ class Data:
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
         for resfactor.
         """
+        # ------------------------------------------------------------------ #
+        # AG2050 MODE: apply scenario → settings mapping at runtime.          #
+        # This must happen here (not only in settings.py) because             #
+        # create_task_runs rewrites settings.py as flat key=value pairs,      #
+        # discarding the auto-configure if-block.  Modifying the settings     #
+        # module object here is safe: Python modules are singletons, so all   #
+        # subsequent imports of luto.settings see the updated values.         #
+        # ------------------------------------------------------------------ #
+        if settings.AG2050_MODE and settings.AG2050_SCENARIO:
+            scen = settings.AG2050_SCENARIO
+            settings.PRODUCTIVITY_TREND        = settings.AG2050_PRODUCTIVITY_MAP[scen]
+            settings.GHG_EMISSIONS_LIMITS      = settings.AG2050_GHG_MAP[scen]
+            settings.BIODIVERSITY_TARGET_GBF_2 = settings.AG2050_BIO_MAP[scen]
+            settings.CARBON_PRICES_FIELD       = 'CONSTANT'
+            settings.CARBON_PRICE_COSTANT      = 0.0
+            print(f"│   [AG2050] Scenario={scen} → "
+                  f"GHG={settings.GHG_EMISSIONS_LIMITS}, "
+                  f"BIO={settings.BIODIVERSITY_TARGET_GBF_2}, "
+                  f"PROD={settings.PRODUCTIVITY_TREND}", flush=True)
+
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
 
@@ -415,6 +435,92 @@ class Data:
         self.BECCS_COST_MULTS = pd.read_excel(cost_mult_excel, "BECCS cost multiplier", index_col="Year")["BECCS_cost_multiplier"].to_dict()
         self.BECCS_REV_MULTS = pd.read_excel(cost_mult_excel, "BECCS revenue multiplier", index_col="Year")["BECCS_revenue_multiplier"].to_dict()
         self.FENCE_COST_MULTS = pd.read_excel(cost_mult_excel, "Fencing cost multiplier", index_col="Year")["Fencing_cost_multiplier"].to_dict()
+
+        # ------------------------------------------------------------------ #
+        # AG2050 MODE: override FLC and AC multipliers with scenario-specific #
+        # data from dedicated Excel files.                                    #
+        # Only active when settings.AG2050_MODE is True.                     #
+        # ------------------------------------------------------------------ #
+        if settings.AG2050_MODE and settings.AG2050_SCENARIO:
+            flc_sheet = settings.AG2050_FLC_MAP[settings.AG2050_SCENARIO]
+            ac_sheet  = settings.AG2050_AC_MAP[settings.AG2050_SCENARIO]
+            print(f"│   ├── [AG2050] Overriding FLC multipliers from FLC_cost_multipliers.xlsx sheet='{flc_sheet}'", flush=True)
+            self.FLC_COST_MULTS = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, 'FLC_cost_multipliers.xlsx'),
+                sheet_name=flc_sheet, index_col="Year"
+            )
+            print(f"│   └── [AG2050] Overriding AC multipliers from Area_cost.xlsx sheet='{ac_sheet}'", flush=True)
+            # Area_cost.xlsx has a two-row header: row 0 = lm (dry/irr), row 1 = LU name.
+            # We read with header=1 (LU names as columns), drop the redundant Year
+            # columns (they appear 4-5 times due to merged cells), then map the
+            # UPPERCASE AG2050 LU names to the simple commodity names expected by
+            # cost.py (e.g. 'BEEF - MODIFIED LAND MEAT' → averaged into 'Beef').
+            _ac_raw = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, 'Area_cost.xlsx'),
+                sheet_name=ac_sheet, header=1, index_col=0
+            )
+            _ac_raw.index.name = 'Year'
+            # Drop unnamed columns (artefacts of merged Year cells in the Excel)
+            _ac_raw = _ac_raw.loc[:, ~_ac_raw.columns.str.startswith('Unnamed')]
+            # Mapping: original AC_COST_MULTS column name → list of AG2050 column names
+            _ac_col_map = {
+                'Apples':               ['APPLES'],
+                'Beef':                 ['BEEF - MODIFIED LAND LEXP', 'BEEF - NATURAL LAND LEXP',
+                                         'BEEF - MODIFIED LAND MEAT', 'BEEF - NATURAL LAND MEAT'],
+                'Citrus':               ['CITRUS'],
+                'Cotton':               ['COTTON'],
+                'Dairy':                ['DAIRY - MODIFIED LAND', 'DAIRY - NATURAL LAND'],
+                'Grapes':               ['GRAPES'],
+                'Hay':                  ['HAY'],
+                'Nuts':                 ['NUTS'],
+                'Other non-cereal crops': ['OTHER NON-CEREAL CROPS'],
+                'Pears':                ['PEARS'],
+                'Plantation fruit':     ['PLANTATION FRUIT'],
+                'Rice':                 ['RICE'],
+                'Sheep':                ['SHEEP - MODIFIED LAND LEXP', 'SHEEP - MODIFIED LAND MEAT',
+                                         'SHEEP - MODIFIED LAND WOOL', 'SHEEP - NATURAL LAND LEXP',
+                                         'SHEEP - NATURAL LAND MEAT', 'SHEEP - NATURAL LAND WOOL'],
+                'Stone fruit':          ['STONE FRUIT'],
+                'Sugar':                ['SUGAR'],
+                'Summer cereals':       ['SUMMER CEREALS'],
+                'Summer legumes':       ['SUMMER LEGUMES'],
+                'Summer oilseeds':      ['SUMMER OILSEEDS'],
+                'Tropical stone fruit': ['TROPICAL STONE FRUIT'],
+                'Vegetables':           ['VEGETABLES'],
+                'Winter cereals':       ['WINTER CEREALS'],
+                'Winter legumes':       ['WINTER LEGUMES'],
+                'Winter oilseeds':      ['WINTER OILSEEDS'],
+            }
+            # Build a flat DataFrame compatible with the original AC_COST_MULTS format.
+            # For livestock sub-types, average across variants (LEXP/MEAT/WOOL × dry/irr).
+            _ac_cols = {}
+            for std_name, ag_cols in _ac_col_map.items():
+                available = [c for c in ag_cols if c in _ac_raw.columns]
+                if available:
+                    _ac_cols[std_name] = _ac_raw[available].mean(axis=1)
+            self.AC_COST_MULTS = pd.DataFrame(_ac_cols, index=_ac_raw.index)
+
+            # -------------------------------------------------------------- #
+            # Load feedlot-specific annual ratio multipliers.                #
+            # Each CSV has columns: Year, AgS1, AgS2, AgS3, AgS4.            #
+            # We select the column matching the active scenario.              #
+            # -------------------------------------------------------------- #
+            def _load_feedlot_ratio(filename):
+                df = pd.read_csv(os.path.join(settings.INPUT_DIR, filename), index_col='Year')
+                return df[settings.AG2050_SCENARIO].to_dict()
+
+            print("│   ├── [AG2050] Loading feedlot ratio multipliers", flush=True)
+            self.FEEDLOT_COST_RATIO    = _load_feedlot_ratio('Feedlots_cost_ratio_from_ag2050.csv')
+            self.FEEDLOT_REVENUE_RATIO = _load_feedlot_ratio('Feedlots_revenue_ratio_from_ag2050.csv')
+            self.FEEDLOT_WATER_RATIO   = _load_feedlot_ratio('Feedlots_water_ratio_from_ag2050.csv')
+            self.FEEDLOT_GHG_RATIO     = _load_feedlot_ratio('Feedlots_ghg_ratio_from_ag2050.csv')
+        else:
+            # Not in AG2050 mode: set ratios to neutral (1.0) so downstream
+            # code can call data.FEEDLOT_*_RATIO[yr_cal] safely.
+            self.FEEDLOT_COST_RATIO    = {}
+            self.FEEDLOT_REVENUE_RATIO = {}
+            self.FEEDLOT_WATER_RATIO   = {}
+            self.FEEDLOT_GHG_RATIO     = {}
 
 
 
@@ -1225,31 +1331,89 @@ class Data:
         # Cache for elasticity multipliers (keyed by yr_cal)
         self.DEMAND_ELASTICITY_MUL = {}
 
-        # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
-        dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'demand_projections.h5'))
+        # ------------------------------------------------------------------ #
+        # AG2050 MODE: load demand from All_LUTO_demand_scenarios_with_     #
+        # convergences.csv, filtered by AG2050_SCENARIO.                    #
+        # ------------------------------------------------------------------ #
+        if settings.AG2050_MODE and settings.AG2050_SCENARIO:
+            print(f"│   └── [AG2050] Loading demand from CSV for scenario '{settings.AG2050_SCENARIO}'", flush=True)
+            demand_csv = pd.read_csv(
+                os.path.join(settings.INPUT_DIR, 'All_LUTO_demand_scenarios_with_convergences.csv')
+            )
+            # Filter to the active scenario AND specific sub-scenario parameters
+            # (matching the same selection used for demand_projections.h5 in non-AG2050 mode).
+            # Without this filter, pivot_table averages over Static vs Trend sub-scenarios,
+            # producing extreme demand values (e.g. 323M tonnes for other non-cereal crops).
+            demand_csv = demand_csv[
+                (demand_csv['Scenario'] == settings.AG2050_SCENARIO) &
+                (demand_csv['Domestic_diet'] == settings.DIET_DOM) &
+                (demand_csv['Global_diet'] == settings.DIET_GLOB) &
+                (demand_csv['Convergence'] == settings.CONVERGENCE) &
+                (demand_csv['Imports'] == settings.IMPORT_TREND) &
+                (demand_csv['Waste'] == settings.WASTE) &
+                (demand_csv['Feed'] == settings.FEED_EFFICIENCY)
+            ]
+            if demand_csv.empty:
+                raise ValueError(
+                    f"[AG2050] No demand rows found for scenario='{settings.AG2050_SCENARIO}', "
+                    f"DIET_DOM='{settings.DIET_DOM}', DIET_GLOB='{settings.DIET_GLOB}', "
+                    f"CONVERGENCE={settings.CONVERGENCE}, IMPORT_TREND='{settings.IMPORT_TREND}', "
+                    f"WASTE={settings.WASTE}, FEED_EFFICIENCY='{settings.FEED_EFFICIENCY}'"
+                )
+            # Pivot: rows = commodity, columns = year, values = All_demand (tonnes).
+            # Row index must be named 'COMMODITY' and column axis named 'YEAR' so
+            # that downstream code (stack/reset_index/merge on 'COMMODITY'/'YEAR')
+            # works identically to the non-AG2050 DEMAND_DATA path.
+            self.DEMAND_C = demand_csv.pivot_table(
+                index='SPREAD_Commodity', columns='Year', values='All_demand'
+            ).rename_axis('COMMODITY').rename_axis('YEAR', axis=1)
+            # Extract off-land commodities BEFORE reindexing to self.COMMODITIES,
+            # because COMMODITIES does not include off-land commodities and reindex
+            # would drop them.
+            self.DEMAND_OFFLAND = self.DEMAND_C.loc[
+                self.DEMAND_C.index.isin(settings.OFF_LAND_COMMODITIES)
+            ].copy()
+            # Convert eggs from count to tonnes — the AG2050 CSV stores eggs as
+            # number-of-eggs (same unit as demand_projections.h5); the GHG
+            # calculation expects tonnes, so apply the same conversion as the
+            # standard LUTO path (line ~1380 below).
+            if 'eggs' in self.DEMAND_OFFLAND.index:
+                self.DEMAND_OFFLAND.loc['eggs'] = (
+                    self.DEMAND_OFFLAND.loc['eggs'] * settings.EGGS_AVG_WEIGHT / 1_000_000
+                )
+            # Align on-land commodity order to self.COMMODITIES (fill missing with NaN)
+            self.DEMAND_C = self.DEMAND_C.loc[
+                ~self.DEMAND_C.index.isin(settings.OFF_LAND_COMMODITIES)
+            ].reindex(self.COMMODITIES)
+            # No DEMAND_DATA needed in AG2050 mode
+            self.DEMAND_DATA = None
+        else:
+            # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
+            dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'demand_projections.h5'))
 
-        # Select the demand data under the running scenariobbryan-January
-        self.DEMAND_DATA = dd.loc[(
-            settings.SCENARIO,
-            settings.DIET_DOM,
-            settings.DIET_GLOB,
-            settings.CONVERGENCE,
-            settings.IMPORT_TREND,
-            settings.WASTE,
-            settings.FEED_EFFICIENCY)
-        ].copy()
+            # Select the demand data under the running scenario
+            self.DEMAND_DATA = dd.loc[(
+                settings.SCENARIO,
+                settings.DIET_DOM,
+                settings.DIET_GLOB,
+                settings.CONVERGENCE,
+                settings.IMPORT_TREND,
+                settings.WASTE,
+                settings.FEED_EFFICIENCY)
+            ].copy()
 
-        # Convert eggs from count to tonnes
-        self.DEMAND_DATA.loc['eggs'] = self.DEMAND_DATA.loc['eggs'] * settings.EGGS_AVG_WEIGHT / 1000 / 1000
+            # Convert eggs from count to tonnes
+            self.DEMAND_DATA.loc['eggs'] = self.DEMAND_DATA.loc['eggs'] * settings.EGGS_AVG_WEIGHT / 1000 / 1000
 
-        # Get the off-land commodities
-        self.DEMAND_OFFLAND = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
+            # Get the off-land commodities
+            self.DEMAND_OFFLAND = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
-        # Remove off-land commodities
-        self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY not in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
+            # Remove off-land commodities
+            self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY not in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
 
-        if settings.APPLY_DEMAND_MULTIPLIERS:
+        # AG2050 mode uses its own demand CSV, so skip AusTIMES demand multipliers.
+        if settings.APPLY_DEMAND_MULTIPLIERS and not (settings.AG2050_MODE and settings.AG2050_SCENARIO):
             # Load demand multiplier data
             AusTIME_multipliers = pd.read_excel(
                 f'{settings.INPUT_DIR}/AusTIMES_demand_multiplier.xlsx',
@@ -1285,7 +1449,7 @@ class Data:
             self.DEMAND_C = (self.DEMAND_C *  demand_multipliers).dropna(axis=1)
             print(f"│   └── Years after applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
         else:
-            self.DEMAND_C = self.DEMAND_C.dropna(axis=1)
+            self.DEMAND_C = self.DEMAND_C.dropna(axis=1)  # Drop years with NaN (covers both normal and AG2050 paths)
 
         # Convert to numpy array of shape (91, 26)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
@@ -1362,7 +1526,13 @@ class Data:
         # GHG targets data.
         ###############################################################
         print("├── Loading GHG targets data", flush=True)
-        if settings.GHG_EMISSIONS_LIMITS != 'off':
+        if settings.GHG_EMISSIONS_LIMITS == 'maintain_historical':
+            # AG2050: keep GHG ≤ 2010 base-year level.
+            # BASE_YR_GHG_t is not available yet at load time; the dict is
+            # populated lazily on the first call to get_limits() in input_data.py.
+            print("│   └── [AG2050] GHG target = maintain 2010 historical level (set lazily at runtime)", flush=True)
+            self.GHG_TARGETS = {}   # Filled in input_data.get_limits() on first solver call
+        elif settings.GHG_EMISSIONS_LIMITS != 'off':
             self.GHG_TARGETS = pd.read_excel(
                 os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
             )
@@ -2152,6 +2322,10 @@ class Data:
         float
             The priority degrade areas conservation target for the given year.
         """
+        # AG2050: maintain 2010 base-year GBF-2 score as a floor (no increase required)
+        if settings.BIODIVERSITY_TARGET_GBF_2 == 'maintain_historical':
+            return self.BIO_GBF2_BASE_YR.sum()
+
         target_config = settings.GBF2_TARGETS_DICT.get(settings.BIODIVERSITY_TARGET_GBF_2)
         if target_config is None:
             # 使用和 'low' 相同的结构，所有目标都是0

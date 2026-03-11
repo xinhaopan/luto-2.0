@@ -740,7 +740,15 @@ def get_limits(data: Data, base_year:int, target_year: int, resale_factors) -> d
         limits['water'] = data.WATER_YIELD_TARGETS
         limits['water_rescale'] = {k: v / resale_factors['Water'] for k, v in limits['water'].items()}
         
-    if settings.GHG_EMISSIONS_LIMITS != 'off':
+    if settings.GHG_EMISSIONS_LIMITS == 'maintain_historical':
+        # AG2050: keep GHG ≤ 2010 base-year level for every year.
+        # Populate data.GHG_TARGETS lazily on the first solver call.
+        if not data.GHG_TARGETS:
+            base_ghg = get_BASE_YR_GHG_t(data)
+            data.GHG_TARGETS = {yr: base_ghg for yr in settings.SIM_YEARS}
+        limits['ghg'] = data.GHG_TARGETS[target_year]
+        limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
+    elif settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[target_year]
         limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
         

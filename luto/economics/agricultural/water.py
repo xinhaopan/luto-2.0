@@ -58,6 +58,13 @@ def get_wreq_matrices(data, yr_idx):
     # Convert to ML per cell via REAL_AREA
     w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
 
+    # AG2050 MODE: apply feedlot water ratio for 'Beef - modified land'.
+    # The ratio is year-specific and loaded from Feedlots_water_ratio_from_ag2050.csv.
+    if settings.AG2050_MODE and data.FEEDLOT_WATER_RATIO:
+        yr_cal = data.YR_CAL_BASE + yr_idx
+        beef_mod_j = data.AGRICULTURAL_LANDUSES.index('Beef - modified land')
+        w_req_mrj[:, :, beef_mod_j] *= data.FEEDLOT_WATER_RATIO.get(yr_cal, 1.0)
+
     return w_req_mrj
 
 

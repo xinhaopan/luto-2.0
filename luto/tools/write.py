@@ -1937,8 +1937,12 @@ def write_ghg_total(data: Data, yr_cal, path):
  
     yr_idx = yr_cal - data.YR_CAL_BASE
 
-    # Get GHG emissions limits used as constraints in model
-    ghg_limits = 0 if settings.GHG_EMISSIONS_LIMITS == 'off' else data.GHG_TARGETS[yr_cal]
+    # Get GHG emissions limits used as constraints in model.
+    # 'maintain_historical': GHG_TARGETS is populated lazily; use .get() with 0 fallback.
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
+        ghg_limits = 0
+    else:
+        ghg_limits = data.GHG_TARGETS.get(yr_cal, 0)
 
     # Get GHG emissions from model
     if yr_cal >= data.YR_CAL_BASE + 1:

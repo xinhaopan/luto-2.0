@@ -238,13 +238,20 @@ def get_ghg_matrices(data:Data, yr_idx, aggregate=True):
         or as a pandas DataFrame if aggregate is False.
     """
     
-    if aggregate == True:  
-        return np.stack(
+    if aggregate == True:
+        g_mrj = np.stack(
             tuple(
                 get_ghg_matrix(data, lm, yr_idx, aggregate)
                 for lm in data.LANDMANS
             )
         )
+        # AG2050 MODE: apply feedlot GHG ratio for 'Beef - modified land'.
+        # The ratio is year-specific and loaded from Feedlots_ghg_ratio_from_ag2050.csv.
+        if settings.AG2050_MODE and data.FEEDLOT_GHG_RATIO:
+            yr_cal = data.YR_CAL_BASE + yr_idx
+            beef_mod_j = data.AGRICULTURAL_LANDUSES.index('Beef - modified land')
+            g_mrj[:, :, beef_mod_j] *= data.FEEDLOT_GHG_RATIO.get(yr_cal, 1.0)
+        return g_mrj
     elif aggregate == False:
         ghg_df = pd.concat([get_ghg_matrix(data, lu, yr_idx, aggregate) for lu in data.LANDMANS], axis=1).replace('CO2E_KG_HA','TCO2E')
         column_rename = [(i[0].replace('CO2E_KG_HA','TCO2E'),i[1],i[2]) for i in ghg_df.columns]
