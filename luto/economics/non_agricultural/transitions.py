@@ -990,7 +990,7 @@ def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.nd
 
     destocked_cells = tools.get_destocked_land_cells(lumap)
     if destocked_cells.size == 0 and separate == False:
-        return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+        return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
     
     # Get transition costs from destocked cells by using transition costs from unallocated land
     unallocated_t_mrj = ag_transitions.get_transition_matrices_ag2ag(
@@ -998,12 +998,15 @@ def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.nd
     )
 
     if separate == False:
-        destocked_t_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+        destocked_t_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
         destocked_t_mrj[:, destocked_cells, :] = unallocated_t_mrj[:, destocked_cells, :]
         return destocked_t_mrj
     
     elif separate == True:
-        sep_destocked_trans = {k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)) for k in unallocated_t_mrj}
+        sep_destocked_trans = {
+            k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+            for k in unallocated_t_mrj
+        }
         if destocked_cells.size == 0:
             return sep_destocked_trans
 
@@ -1043,7 +1046,9 @@ def get_transition_matrix_nonag2ag(data: Data, yr_idx, lumap, lmmap, separate=Fa
 
     """
     
-    non_ag_to_agr_t_matrices = {lu: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32) for lu in settings.NON_AG_LAND_USES}
+    # Do not preallocate placeholder arrays here: each matrix is large and the
+    # placeholders are immediately overwritten by the real transition matrices.
+    non_ag_to_agr_t_matrices = {}
 
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)

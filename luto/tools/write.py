@@ -1869,8 +1869,8 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
     # Record maximum cell magnitude for this transition period for later use in scaling the transition area in the visualization
     return (f"Area transition matrix written from year {data.YR_CAL_BASE} to {yr_cal_end}", {
         'transition_area': {
-            'ag2ag':     (yr_cal_end, xr_ag2ag_filtered_array.max().item()),
-            'ag2non_ag': (yr_cal_end, xr_ag2non_ag_filtered_array.max().item()),
+            'ag2ag':     (yr_cal_end, xr_ag2ag_filtered_array.max().item() if xr_ag2ag_filtered_array.size > 0 else 0),
+            'ag2non_ag': (yr_cal_end, xr_ag2non_ag_filtered_array.max().item() if xr_ag2non_ag_filtered_array.size > 0 else 0),
         }
     })
 

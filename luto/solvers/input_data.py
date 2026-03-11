@@ -430,7 +430,7 @@ def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
         target_index, 
         data.lumaps[base_year], 
         data.lmmaps[base_year],
-    ).astype(np.float32)
+    ).astype(np.float32, copy=False)
     # Transition costs occures if the base year is not the target year
     return non_ag_to_ag_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_to_ag_mrj).astype(np.float32)
 

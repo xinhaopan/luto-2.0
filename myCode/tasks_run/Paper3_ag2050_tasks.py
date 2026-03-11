@@ -97,7 +97,7 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260311_Paper3'],
+    'TASK_NAME': ['20260312_Paper3'],
     'KEEP_OUTPUTS': [True],
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [3],

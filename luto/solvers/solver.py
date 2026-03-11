@@ -1588,23 +1588,25 @@ class LutoSolver:
 
         # Collect optimised decision variables in one X_mrj Numpy array.
         X_dry_sol_rj = np.zeros(
-            (self._input_data.ncells, self._input_data.n_ag_lus)
-        ).astype(np.float32)
+            (self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32
+        )
         X_irr_sol_rj = np.zeros(
-            (self._input_data.ncells, self._input_data.n_ag_lus)
-        ).astype(np.float32)
+            (self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32
+        )
         non_ag_X_sol_rk = np.zeros(
-            (self._input_data.ncells, self._input_data.n_non_ag_lus)
-        ).astype(np.float32)
+            (self._input_data.ncells, self._input_data.n_non_ag_lus), dtype=np.float32
+        )
         am_X_dry_sol_rj = {
-            am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(
-                np.float32
+            am: np.zeros(
+                (self._input_data.ncells, self._input_data.n_ag_lus),
+                dtype=np.float32,
             )
             for am in self._input_data.am2j
         }
         am_X_irr_sol_rj = {
-            am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(
-                np.float32
+            am: np.zeros(
+                (self._input_data.ncells, self._input_data.n_ag_lus),
+                dtype=np.float32,
             )
             for am in self._input_data.am2j
         }
