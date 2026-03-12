@@ -209,7 +209,7 @@ if __name__ == "__main__":
     # 支持检查多个任务
     task_names = [
         '20260312_Paper3_test',
-        # '20260311_Paper3',
+        '20260312_Paper3',
         # 可以在此添加更多任务名称
     ]
     target_year = 2050

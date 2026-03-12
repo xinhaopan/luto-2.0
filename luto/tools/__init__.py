@@ -596,7 +596,8 @@ class _TeeIO:
         if buf.strip() and not self._ts_re.match(buf):
             buf = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {buf}"
         self._file.write(buf)
-        self._orig.write(buf)
+        enc = getattr(self._orig, 'encoding', None) or 'utf-8'
+        self._orig.write(buf.encode(enc, errors='replace').decode(enc))
 
     def flush(self):
         self._file.flush()

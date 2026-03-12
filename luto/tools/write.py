@@ -307,7 +307,12 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
     
     valid_layers_ag = (ag_map_stack.sum('cell') > 0.001).to_dataframe('valid').query('valid == True').index
     valid_layers_non_ag = (non_ag_map_stack.sum('cell') > 0.001).to_dataframe('valid').query('valid == True').index
-    valid_layers_am = (am_map_stack.sum('cell') > 0.001).to_dataframe('valid').query('valid == True').index
+    # For am mosaic layers (am='ALL'), argmax index can be 0 so sum=0 even when active.
+    # Use notnull().any() for mosaic layers to correctly detect activity.
+    am_is_mosaic = am_map_stack['am'] == 'ALL'
+    valid_layers_am = (
+        (am_map_stack.sum('cell') > 0.001) | (am_is_mosaic & am_map_stack.notnull().any('cell'))
+    ).to_dataframe('valid').query('valid == True').index
 
     # Save to netcdf
     _save2nc(ag_map_stack.sel(layer=valid_layers_ag), os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))
