@@ -5,7 +5,6 @@ from matplotlib import gridspec
 from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
 import cartopy.crs as ccrs
 import numpy as np
-import rasterio
 import os
 
 import tools.config as config
@@ -145,31 +144,12 @@ layer_overrides = {
     'transition_cost_ag2non_ag_amortised_diff': {"clip_percent": [1, 100]},
 }
 
-# ==== 预扫描所有 tif，计算全局 vmax ====
+# ==== 全局 vmax（固定值）====
 year_plot = 2050
-global_vmax_list = []
-for env in scenarios:
-    for cost_key in env_keys:
-        tif = f"{arr_path}/{env}/xr_{cost_key}_ha_{env}_{year_plot}.tif"
-        if not os.path.exists(tif):
-            continue
-        clip_cfg = layer_overrides.get(cost_key, {}).get('clip_percent', [0, 100])
-        with rasterio.open(tif) as src:
-            arr = src.read(1).astype(float)
-            nd = src.nodata
-        if nd is not None:
-            arr = np.where(arr == nd, np.nan, arr)
-        arr = np.where(arr < 1, np.nan, arr)   # force_one_start 逻辑
-        valid = arr[~np.isnan(arr)]
-        if len(valid) == 0:
-            continue
-        vmax_loc = np.nanpercentile(valid, clip_cfg[1]) if clip_cfg else np.nanmax(valid)
-        global_vmax_list.append(float(vmax_loc))
+global_vmax = 1500.0
 
-global_vmax = max(global_vmax_list) if global_vmax_list else 1000.0
-
-# 计算共享刻度：以 500 为步长
-seg_step = 500
+# 计算共享刻度：以 150 为步长
+seg_step = 150
 vmin_shared = 0.0
 n_segs = int(np.ceil(global_vmax / seg_step))
 vmax_shared = float(n_segs * seg_step)
