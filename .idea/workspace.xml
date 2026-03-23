@@ -6,13 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for paper2">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/luto/solvers/solver.py" beforeDir="false" afterPath="$PROJECT_DIR$/luto/solvers/solver.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_write_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_write_tasks.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks_NCI.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks_NCI.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks_test copy.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/1_rsync_and_delete.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/1_rsync_and_delete.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -25,7 +19,7 @@
     </persistenceIdMap>
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="1453" />
+    <option name="cachedIndexableFilesCount" value="1488" />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -160,7 +154,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "reference.settingsdialog.project.grazie",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -377,6 +371,7 @@
       <workItem from="1772423235602" duration="6532000" />
       <workItem from="1772717428255" duration="8636000" />
       <workItem from="1773056348475" duration="17287000" />
+      <workItem from="1773925548899" duration="611000" />
     </task>
     <task id="LOCAL-00048" summary="update: calculate price">
       <option name="closed" value="true" />
@@ -888,7 +883,7 @@
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file:////school-les-m.shares.deakin.edu.au/school-les-m/Planet-A/LUF-Modelling/LUTO2_XH/LUTO2/myCode/tasks_run/tools/helpers.py</url>
-          <line>244</line>
+          <line>246</line>
           <option name="timeStamp" value="120" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
@@ -898,12 +893,12 @@
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file:////school-les-m.shares.deakin.edu.au/school-les-m/Planet-A/LUF-Modelling/LUTO2_XH/LUTO2/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>339</line>
+          <line>340</line>
           <option name="timeStamp" value="124" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file:////school-les-m.shares.deakin.edu.au/school-les-m/Planet-A/LUF-Modelling/LUTO2_XH/LUTO2/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>387</line>
+          <line>388</line>
           <option name="timeStamp" value="127" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
@@ -913,7 +908,7 @@
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file:////school-les-m.shares.deakin.edu.au/school-les-m/Planet-A/LUF-Modelling/LUTO2_XH/LUTO2/myCode/carbonprice/code/tools/helper_plot.py</url>
-          <line>430</line>
+          <line>431</line>
           <option name="timeStamp" value="132" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">

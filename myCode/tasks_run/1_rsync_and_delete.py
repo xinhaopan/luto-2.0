@@ -15,7 +15,7 @@ from tools.transfer_helper import rsync_and_delete
 if __name__ == "__main__":
     rsync_and_delete(
         platform       = "NCI",                          # "NCI" 或 "HPC"
-        task_name      = "20260303_Paper2_Results_NCI",   # 远程 output 目录下的文件夹名
+        task_name      = "20260317_paper4_NCI",   # 远程 output 目录下的文件夹名
         local_base_dir = "../../output",                 # 本地下载基础目录
         transfer_mode  = "full",   # "full" | "report" | "lz4"
         # ---- full 模式专用 ----
