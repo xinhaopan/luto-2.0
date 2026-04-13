@@ -1,5 +1,5 @@
 """
-07_Biodiversity.py
+08_Biodiversity.py
 Combined stacked-area figure for biodiversity contribution by land use and
 agricultural management.
 """
@@ -127,7 +127,7 @@ def main():
         if label != 'Other land-use'
     }
     export_long_tables(
-        '07_biodiversity_long_tables.xlsx',
+        '08_biodiversity_long_tables.xlsx',
         overview=overview_df,
         land_use=land_use_df,
         agricultural_management=am_df,
@@ -139,8 +139,8 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        'Biodiversity (Mha)',
-        '07_biodiversity.svg',
+        'Contribution-weighted area (Mha yr\u207b\u00b9)',
+        '08_biodiversity.svg',
         y_label_x=0.030,
     )
 

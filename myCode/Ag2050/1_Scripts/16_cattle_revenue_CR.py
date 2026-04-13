@@ -9,16 +9,12 @@ import os
 #           = (F1×Q1×P1 + F3×Q3×P3) / (F1×Q1×1000)  AUD/kg MEAT
 #           Includes both meat revenue and live export revenue (same as revenue.py)
 #
-# feedlot_cr : grain-fed beef price premium over grass-fed baseline
-#   Source: MLA NLRS market indicators (2019-2020 historical data)
-#   QLD 100-day grainfed vs National OTH heavy yearling (grassfed):
-#   Premium range 2–42¢/kg cwt (avg ~20–30¢/kg); at ~600¢/kg base → ~3–7%
-#   MLA (2020): mla.com.au/prices-markets/market-news/2020/grainfed-cattle-premium-contracts
-#     short-fed (~90 days,  domestic/SE Asia): ~5% premium (MLA 100-day indicator)
-#     mid-fed   (~150 days, Japan/Korea):      ~5% premium (similar to 100-day)
-#     long-fed  (~300+ days, Wagyu-spec):     ~15% premium (niche high-end export)
+# feedlot_cr : absolute grain-fed beef prices (AUD/kg MEAT)
+#   Source: Beef Central market reports + MLA boneless meat yield (74% of cwt)
+#     short-fed (~90 days,  domestic/SE Asia): 13.2–13.3 AUD/kg MEAT  (use 13.2)
+#     mid-fed   (~150 days, Japan/Korea):      ~16.1 AUD/kg MEAT
+#     long-fed  (~300+ days, Wagyu-spec):      ~23.4 AUD/kg MEAT
 #   Feedlot cattle sold as boxed beef (F3≈0, no live export component).
-#   feedlot_cr = land_cr × premium
 # ============================================================
 
 input_dir = '../../../input'
@@ -52,22 +48,31 @@ print(f"LUTO grass-fed revenue: {land_cr:.4f} AUD/kg MEAT")
 print(f"  Mean P1 (meat price): {P1_mean:.2f} AUD/tonne MEAT  (= {P1_mean/1000:.4f} AUD/kg MEAT)")
 
 # ============================================================
-# Feedlot revenue per kg MEAT (grain-fed price premium over grass-fed)
-# Source: MLA NLRS market indicators (2019-2020 historical data)
-#   QLD 100-day grainfed indicator vs National OTH heavy yearling (grassfed):
-#   Historical premium range: 2–42¢/kg cwt; long-run average ~20–30¢/kg
-#   At ~600¢/kg grassfed base → ~3–7% premium for 100-day grain-fed
-#   MLA (Sept 2020): https://www.mla.com.au/prices-markets/market-news/2020/grainfed-cattle-premium-contracts
+# Feedlot revenue per kg MEAT (absolute grain-fed prices)
+# Source: Beef Central market reports + MLA boneless meat yield (68.4% of carcase weight)
+#   MLA boneless meat yield source:
+#     https://www.mla.com.au/contentassets/92b275844c0340a48f98646e2b9b8e6d/b.cch.2072_beef_final_report.pdf
+##  land: 10.3171 AUD/kg MEAT (LUTO grass-fed revenue
+#   short-fed (~90 days,  domestic/SE Asia):
+#     100-day HGP-free export-weight: 900–910 c/kg cwt (Beef Central, 10 Feb 2022)
+#     https://www.beefcentral.com/news/supermarket-grainfed-contract-cattle-break-through-magic-1000c-kg-milestone/
+#     9.00 / 0.684 = 13.16, 9.10 / 0.684 = 13.30 → range: 13.2–13.3 AUD/kg MEAT
 #
-# Feedlot cattle are sold as boxed beef (no live export, F3≈0).
-# feedlot_cr = land_cr × premium  [AUD/kg MEAT]
-#   short-fed (~90 days,  domestic/SE Asia): ~5% premium (MLA 100-day indicator)
-#   mid-fed   (~150 days, Japan/Korea):      ~5% premium (similar to 100-day)
-#   long-fed  (~300+ days, Wagyu-spec):     ~15% premium (niche high-end export)
+#   mid-fed   (~150 days, Japan/Korea):
+#     150-day Angus grainfed program: 1100 c/kg cwt (Beef Central, 16 Nov 2022)
+#     https://www.beefcentral.com/news/killara-feedlot-manager-delivers-sobering-assessment-about-feeder-prices-heading-into-2023/
+#     11.00 / 0.684 = 16.08 → range: ~16.1 AUD/kg MEAT
+#
+#   long-fed  (~300+ days, Wagyu-spec):
+#     Wagyu F1 carcase: A$16/kg cwt (Beef Central, 13 Mar 2025)
+#     https://www.beefcentral.com/news/wagyu-feeder-steer-prices-stable-but-premium-over-angus-under-pressure/
+#     16.00 / 0.684 = 23.39 → range: ~23.4 AUD/kg MEAT
 # ============================================================
-short_cr = land_cr * 1.05   # AUD/kg MEAT  (+5%, MLA 100-day indicator)
-mid_cr   = land_cr * 1.05   # AUD/kg MEAT  (+5%, export 100-day comparable)
-long_cr  = land_cr * 1.15   # AUD/kg MEAT  (+15%, long-fed Wagyu-spec premium)
+MEAT_YIELD = 0.684   # boneless meat yield (% of carcase weight); source: MLA
+
+short_cr = 9.05 / MEAT_YIELD   # AUD/kg MEAT  (90-day,  midpoint 900–910 c/kg cwt; range: 13.2–13.3)
+mid_cr   = 11.00 / MEAT_YIELD  # AUD/kg MEAT  (150-day, 1100 c/kg cwt;             range: ~16.1)
+long_cr  = 16.00 / MEAT_YIELD  # AUD/kg MEAT  (300-day, Wagyu F1 A$16/kg cwt;      range: ~23.4)
 
 cr_map = {
     "land":  land_cr,

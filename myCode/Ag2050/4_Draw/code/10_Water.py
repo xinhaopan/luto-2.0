@@ -1,5 +1,5 @@
 """
-09_Water.py
+10_Water.py
 Combined stacked-area figure for water yield by land use and agricultural
 management.
 """
@@ -133,7 +133,7 @@ def main():
         if label != 'Other land-use'
     }
     export_long_tables(
-        '09_water_long_tables.xlsx',
+        '10_water_long_tables.xlsx',
         overview=overview_df,
         land_use=land_use_df,
         agricultural_management=am_df,
@@ -145,8 +145,8 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        'Water yield (GL)',
-        '09_water.svg',
+        'Water yield (GL yr\u207b\u00b9)',
+        '10_water.svg',
         y_label_x=0.015,
     )
 

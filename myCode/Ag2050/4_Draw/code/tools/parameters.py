@@ -5,7 +5,7 @@
 
 # ── Task root ────────────────────────────────────────────────────────────────
 # Switch between NCI results and local test run as needed
-TASK_ROOT = "20260311_Paper3_NCI"    # NCI run (zip archives, auto-read by data_helper)
+TASK_ROOT = "20260324_Paper3_aquila"    # NCI run (zip archives, auto-read by data_helper)
 # TASK_ROOT = "20260312_Paper3_test" # local test run (RF15, immediately available)
 
 INPUT_DIR  = '../../../input'
@@ -21,10 +21,10 @@ senerios_origin = ['AgS1', 'AgS2', 'AgS3', 'AgS4']
 
 # Display labels for each scenario (used in figure titles / annotation)
 SCENARIO_LABELS = {
-    'Run_1_SCN_AgS1': 'AgS1\n(Ag AM only, no non-ag)',
-    'Run_2_SCN_AgS2': 'AgS2\n(Ag AM + all non-ag)',
-    'Run_3_SCN_AgS3': 'AgS3\n(Min AM, no non-ag)',
-    'Run_4_SCN_AgS4': 'AgS4\n(Min AM, no non-ag v2)',
+    'Run_1_SCN_AgS1': 'Regional Ag Capitals',
+    'Run_2_SCN_AgS2': 'Landscape Stewardship',
+    'Run_3_SCN_AgS3': 'Climate Survival',
+    'Run_4_SCN_AgS4': 'System Decline',
 }
 
 run_number = [num for num in run_number_origin]

@@ -60,7 +60,7 @@ grid_search = {
         'Asparagopsis taxiformis': False,
         'Precision Agriculture': False,
         'Ecological Grazing': False,
-        'Savanna Burning': True,
+        'Savanna Burning': False,
         'AgTech EI': False,
         'Biochar': False,
         'HIR - Beef': True,

@@ -10,13 +10,11 @@ import os
 #           Unit: cost_per_ha / (yield_pot × F1 × Q1 × 1000) = AUD/kg MEAT
 #           No external dressing percentage needed — Q1 is already carcass weight.
 #
-# feedlot_cr: operational cost excl. feeder cattle purchase, expressed per kg MEAT
-#             Source: MLA Agri-benchmark (2019), Australia-27K feedlot
-#               Total long-run cost ~2.80 AUD/kg LW; feeder cattle purchase ~70%
-#               Operational cost (feed+labour+depreciation+water): ~30% = 0.84 AUD/kg LW
-#             Converted to AUD/kg MEAT using feedlot dressing % = 0.56
-#               (grain-fed Australian feedlot; MLA 2022 Feedlot performance monitor)
-#               0.84 / 0.56 = 1.50 AUD/kg MEAT
+# feedlot_cr: total cost incl. feeder cattle purchase, expressed per kg MEAT
+#             Source: Beef Central breakeven / trading budget reports
+#               short (~90 days):       7.03 AUD/kg cwt ÷ 68.4% = ~10.28 AUD/kg MEAT
+#               mid/long (~150/300 days): 6.73 AUD/kg cwt ÷ 68.4% = ~9.84 AUD/kg MEAT
+#             Boneless meat yield 68.4%; source: MLA beef final report
 #
 # Ratio uses production in tonnes LW for weighting; since all stages have similar
 # dressing % (~0.54–0.56), the DP factor cancels in the weighted average ratio.
@@ -75,18 +73,28 @@ print(f"  Natural land:  {np.nanmean(cost_natl):.4f} AUD/kg MEAT")
 print(f"  Modified land: {np.nanmean(cost_modl):.4f} AUD/kg MEAT")
 
 # ============================================================
-# Feedlot operational cost (AUD/kg MEAT), excl. feeder cattle purchase
-# Source: MLA Agri-benchmark (2019)
-#   Total ~2.80 AUD/kg LW; feeder cattle purchase ~70% → operational ~30% = 0.84 AUD/kg LW
-#   Feedlot dressing %: 0.56 (grain-fed, MLA 2022 Feedlot performance monitor)
-#   → 0.84 / 0.56 = 1.50 AUD/kg MEAT
-# Components included: grain feed + labour + operating + depreciation + water
-# Applied uniformly to short/mid/long (no per-type breakdown available)
+# Feedlot total cost per kg MEAT (incl. feeder cattle purchase)
+# Source: Beef Central breakeven / trading budget reports
+#   Boneless meat yield: 68.4% of carcase weight (MLA)
+#     https://www.mla.com.au/contentassets/92b275844c0340a48f98646e2b9b8e6d/b.cch.2072_beef_final_report.pdf
+#
+#   short-fed (~90 days):
+#     Breakeven price: 703 c/kg cwt = 7.03 AUD/kg cwt
+#     Beef Central, "Modest $10 loss in grainfed trading budget, latest breakeven shows", 19 Jun 2025
+#     https://www.beefcentral.com/lotfeeding/modest-profit-on-grainfed-trading-budget-latest-breakeven-shows/
+#     7.03 / 0.684 = 10.28 AUD/kg MEAT
+#
+#   mid-fed (~150 days) and long-fed (~300+ days):
+#     Same breakeven reference; no separate per-type breakdown available
+#     Cost source: Beef Central, "Grainfed margins remain negative, 100-day trading budget shows", 5 Jun 2024
+#     https://www.beefcentral.com/lotfeeding/grainfed-margins-remain-negative-100-day-trading-budget-shows/
+#     6.73 / 0.684 = 9.84 AUD/kg MEAT  (applied to mid and long)
 # ============================================================
-FEEDLOT_DP = 0.56   # grain-fed feedlot dressing % (MLA 2022)
-short_cr = 0.84 / FEEDLOT_DP   # AUD/kg MEAT
-mid_cr   = 0.84 / FEEDLOT_DP
-long_cr  = 0.84 / FEEDLOT_DP
+MEAT_YIELD = 0.684   # boneless meat yield (68.4% of cwt); source: MLA
+
+short_cr = 7.03 / MEAT_YIELD   # AUD/kg MEAT  (90-day;  7.03 AUD/kg cwt ÷ 68.4%; ~10.28)
+mid_cr   = 6.73 / MEAT_YIELD   # AUD/kg MEAT  (150-day; 6.73 AUD/kg cwt ÷ 68.4%; ~9.84)
+long_cr  = 6.73 / MEAT_YIELD   # AUD/kg MEAT  (300-day; same as mid; ~9.84)
 
 cr_map = {
     "land":  land_cr,

@@ -1,5 +1,5 @@
 """
-06_GHG.py
+07_GHG.py
 Combined stacked-area figure for land use and agricultural management GHG.
 """
 import _path_setup  # noqa: F401
@@ -134,7 +134,7 @@ def main():
         if label != 'Other land-use'
     }
     export_long_tables(
-        '06_ghg_long_tables.xlsx',
+        '07_ghg_long_tables.xlsx',
         overview=overview_df,
         land_use=land_use_df,
         agricultural_management=am_df,
@@ -146,8 +146,8 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        'GHG (Mt CO2e)',
-        '06_ghg.svg',
+        'GHG (Mt CO\u2082e yr\u207b\u00b9)',
+        '07_ghg.svg',
         y_label_x=0.030,
     )
 

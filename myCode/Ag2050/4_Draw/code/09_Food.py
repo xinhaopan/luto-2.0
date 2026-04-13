@@ -1,5 +1,5 @@
 """
-08_Food.py
+09_Food.py
 Combined stacked-area figure for food production by land use and agricultural
 management.
 """
@@ -121,7 +121,7 @@ def main():
         if label != 'Other land-use'
     }
     export_long_tables(
-        '08_food_long_tables.xlsx',
+        '09_food_long_tables.xlsx',
         overview=overview_df,
         land_use=land_use_df,
         agricultural_management=am_df,
@@ -133,8 +133,8 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        'Food production (Mt, GL)',
-        '08_food.svg',
+        'Food production (Mt, GL yr\u207b\u00b9)',
+        '09_food.svg',
         y_label_x=0.030,
     )
 

@@ -1,5 +1,5 @@
 """
-04_Area.py
+05_Area.py
 Combined stacked-area figure for land use and agricultural management area.
 Layout: 2 rows x 4 columns (Land-use, AM; AgS1-AgS4).
 """
@@ -245,7 +245,7 @@ def main():
     area_lu = prepare_land_use()
     area_am = prepare_am()
     export_long_tables(
-        '04_area_long_tables.xlsx',
+        '05_area_long_tables.xlsx',
         land_use=area_lu,
         agricultural_management=area_am,
     )
@@ -285,11 +285,11 @@ def main():
     for ax in axes_bot:
         ax.set_xlabel('')
 
-    fig.text(0.43, 0.915, 'Land-use', ha='center', va='bottom',
+    fig.text(0.43, 0.94, 'Land-use', ha='center', va='bottom',
              fontsize=font_size, fontfamily='Arial', fontweight='normal')
     fig.text(0.43, 0.47, 'Agricultural management', ha='center', va='bottom',
              fontsize=font_size, fontfamily='Arial', fontweight='normal')
-    fig.text(0.038, 0.50, 'Area (Mha)', ha='center', va='center', rotation=90,
+    fig.text(0.038, 0.50, 'Area (Mha yr\u207b\u00b9)', ha='center', va='center', rotation=90,
              fontsize=font_size, fontfamily='Arial', fontweight='normal')
 
     ax_leg_lu = fig.add_subplot(gs[0, 4])
@@ -297,7 +297,7 @@ def main():
     add_patch_legend(ax_leg_lu, LU_COLORS, ncol=1)
     add_patch_legend(ax_leg_am, am_colors, ncol=1)
 
-    out = os.path.join(OUTPUT_DIR, '04_area.svg')
+    out = os.path.join(OUTPUT_DIR, '05_area.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight')
     plt.close(fig)
     print(f"Saved: {out}")

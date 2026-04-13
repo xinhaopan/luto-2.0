@@ -82,6 +82,12 @@ def extract_nc_layer_as_tiff(scenario, nc_stem, nc_sel, year, output_dir=None):
     """
     if output_dir is None:
         output_dir = TIFF_DIR
+    sel_tag = "_".join(f"{k}{v}" for k, v in nc_sel.items())
+    out_path = os.path.join(output_dir, f"_extracted_{scenario}_{nc_stem}_{sel_tag}.tiff")
+    os.makedirs(output_dir, exist_ok=True)
+    if os.path.exists(out_path):
+        return out_path
+
     import xarray as xr
     import cf_xarray as cfxr
 
@@ -92,12 +98,6 @@ def extract_nc_layer_as_tiff(scenario, nc_stem, nc_sel, year, output_dir=None):
 
     nc_file    = f"{prefix}/out_{year}/xr_{nc_stem}_{year}.nc"
     tmpl_file  = f"{prefix}/out_{year}/xr_map_template_{year}.nc"
-    sel_tag    = "_".join(f"{k}{v}" for k, v in nc_sel.items())
-    out_path   = os.path.join(output_dir, f"_extracted_{scenario}_{nc_stem}_{sel_tag}.tiff")
-    os.makedirs(output_dir, exist_ok=True)
-
-    if os.path.exists(out_path):
-        return out_path
 
     with zipfile.ZipFile(zip_path) as z:
         if nc_file not in z.namelist():
@@ -133,6 +133,96 @@ def extract_nc_layer_as_tiff(scenario, nc_stem, nc_sel, year, output_dir=None):
     from rasterio.crs import CRS as RioCRS
     with rasterio.open(
         out_path, 'w',
+        driver='GTiff',
+        height=tmpl.shape[0],
+        width=tmpl.shape[1],
+        count=1,
+        dtype='float32',
+        crs=RioCRS.from_wkt(crs_wkt),
+        transform=transform,
+        nodata=-9999,
+    ) as dst:
+        dst.write(tmpl, 1)
+
+    return out_path
+
+
+def extract_nc_layer_as_tiff(scenario, nc_stem, nc_sel, year, output_dir=None):
+    """Read an xr_* NetCDF layer, reconstruct a 2D map, save as GeoTIFF.
+
+    Supports both Run_Archive.zip outputs and unpacked output folders.
+    """
+    if output_dir is None:
+        output_dir = TIFF_DIR
+    sel_tag = "_".join(f"{k}{v}" for k, v in nc_sel.items())
+    out_path = os.path.join(output_dir, f"_extracted_{scenario}_{nc_stem}_{sel_tag}.tiff")
+    os.makedirs(output_dir, exist_ok=True)
+    if os.path.exists(out_path):
+        return out_path
+
+    import xarray as xr
+    import cf_xarray as cfxr
+    from rasterio.crs import CRS as RioCRS
+
+    info = get_zip_info(scenario)
+    if info is not None:
+        zip_path, prefix = info
+        nc_file = f"{prefix}/out_{year}/xr_{nc_stem}_{year}.nc"
+        tmpl_file = f"{prefix}/out_{year}/xr_map_template_{year}.nc"
+
+        with zipfile.ZipFile(zip_path) as z:
+            if nc_file not in z.namelist():
+                print(f"Not found in zip: {nc_file}")
+                return None
+            with z.open(nc_file) as f:
+                ds = xr.open_dataset(io.BytesIO(f.read()))
+            xr_arr = cfxr.decode_compress_to_multi_index(ds, 'layer')['data']
+            valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
+            if nc_sel not in valid_layers:
+                print(f"Layer {nc_sel} not in {nc_file} - skipping (scenario may have no data for this category)")
+                return None
+            arr = xr_arr.sel(**nc_sel).squeeze()
+
+            if tmpl_file not in z.namelist():
+                print(f"Template not found in zip: {tmpl_file}")
+                return None
+            with z.open(tmpl_file) as f:
+                ds_tmpl = xr.open_dataset(io.BytesIO(f.read()))
+    else:
+        try:
+            base = get_path(scenario)
+        except (FileNotFoundError, StopIteration):
+            return None
+
+        nc_file = os.path.join(base, f"out_{year}", f"xr_{nc_stem}_{year}.nc")
+        tmpl_file = os.path.join(base, f"out_{year}", f"xr_map_template_{year}.nc")
+        if not os.path.exists(nc_file):
+            print(f"Not found: {nc_file}")
+            return None
+        if not os.path.exists(tmpl_file):
+            print(f"Template not found: {tmpl_file}")
+            return None
+
+        ds = xr.load_dataset(nc_file)
+        xr_arr = cfxr.decode_compress_to_multi_index(ds, 'layer')['data']
+        valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
+        if nc_sel not in valid_layers:
+            print(f"Layer {nc_sel} not in {nc_file} - skipping (scenario may have no data for this category)")
+            return None
+        arr = xr_arr.sel(**nc_sel).squeeze()
+        ds_tmpl = xr.load_dataset(tmpl_file)
+
+    tmpl = ds_tmpl['layer'].values.astype('float32')
+    valid = tmpl >= 0
+    tmpl[valid] = arr.values
+    tmpl[~valid] = -9999
+
+    crs_wkt = ds_tmpl['spatial_ref'].attrs['crs_wkt']
+    transform = ds_tmpl['layer'].rio.transform()
+
+    with rasterio.open(
+        out_path,
+        'w',
         driver='GTiff',
         height=tmpl.shape[0],
         width=tmpl.shape[1],

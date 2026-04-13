@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -25,14 +27,21 @@ pre_years = pd.DataFrame({'Year': [2010, 2011, 2012, 2013], 'Cost': cost_2014})
 df = pd.concat([pre_years, df], ignore_index=True).drop_duplicates('Year').sort_values('Year').reset_index(drop=True)
 
 # ---------- 预测增长指数并绘图 ----------
-ax, df_result = predict_growth_index(df, var_name='Labour Cost',base_year = 2014)
+# 使用和之前一致的 ETS 设定
+ax, df_result = predict_growth_index(
+    df,
+    var_name='Labour Cost',
+    base_year=2010,
+    draw_base_year=2010,
+    model='ETS',
+    align_scenarios_to_last_actual=False
+)
 handles, labels = ax.get_legend_handles_labels()
 ax.legend(handles, labels, loc='upper left', frameon=True)
 
 fig = ax.get_figure()
 fig.savefig('labour_cost_growth_index.png', dpi=300)
-fig.show()
-excel_path = "../0_original_data/FLC_cost_multipliers.xlsx"   # 把此处改为你的 Excel 文件路径
+excel_path = "../0_original_data/FLC_cost_multipliers.xlsx"
 template_sheet = "FLC_multiplier"            # 模板表所在 sheet（0 表示第一个 sheet）
 
 # ---------- 读取模板 Excel ----------
@@ -49,13 +58,12 @@ if 'Year' not in df_template.columns:
 years = df_template['Year'].astype(int).tolist()
 crop_cols = [c for c in df_template.columns if c != 'Year']
 
-print("读取到年份（行名）：", years)
-print("读取到作物列名：", crop_cols)
+print("Read years:", years)
+print("Read crop columns:", crop_cols)
 
 # 统一索引为整数年份
 df_result = df_result.copy()
 df_result.index = df_result.index.astype(int)
-df_result.loc[df_result.index <= 2014] = 1
 df_result.to_excel('../2_processed_data/labour_cost_forecast.xlsx', index=True)
 
 # 容错查找情景列名（尝试常见变体）
@@ -85,9 +93,9 @@ found_cols = {}
 for sheet, candidates in scenario_map.items():
     col = find_col(df_result, candidates)
     if col is None:
-        print(f"警告：在 df_result 中未找到与 {sheet} 对应的情景列（尝试了 {candidates}）。该 sheet 中的值将全部为 NaN。")
+        print(f"Warning: no scenario column found for {sheet} in df_result (tried {candidates}). This sheet will be NaN.")
     else:
-        print(f"情景 '{sheet}' 对应 df_result 列名为: {col}")
+        print(f"Scenario '{sheet}' maps to df_result column: {col}")
     found_cols[sheet] = col  # 可能为 None
 
 # ---------- 为每个情景构建表格 ----------
@@ -113,4 +121,4 @@ mode = 'a' if p.exists() else 'w'
 with pd.ExcelWriter(excel_path, engine='openpyxl', mode=mode, if_sheet_exists='replace') as writer:
     for sheet_name, df_sheet in sheets_to_write.items():
         df_sheet.to_excel(writer, sheet_name=sheet_name, index=False)
-print(f"已将 {len(sheets_to_write)} 个 sheet 写入到 {excel_path}（同名 sheet 将被替换）。")
+print(f"Wrote {len(sheets_to_write)} sheets to {excel_path} (same-name sheets replaced).")

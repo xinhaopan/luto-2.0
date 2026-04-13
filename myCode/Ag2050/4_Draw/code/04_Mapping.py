@@ -1,5 +1,5 @@
 """
-03_Mapping.py
+04_Mapping.py
 4-row x 2-col figure: land use (col 1) and agricultural management (col 2)
 AM data: xr_dvar_am_2050.nc (values are 0-based am indices; +1 converts to am codes 1-8).
 State boundaries overlaid on every panel.
@@ -93,9 +93,9 @@ def lumap_to_rgba(arr):
 
 
 def ammap_to_rgba(arr, am_info):
-    # xr_dvar_am stores 0-based am index; add 1 to convert to actual am codes (1-8)
     arr = arr.copy()
     valid = ~np.isnan(arr)
+    # xr_dvar_am stores 0-based am index; add 1 to convert to actual am codes (1-8)
     arr[valid] += 1
     cat = np.full(arr.shape, np.nan, dtype='float32')
     for code in am_info:
@@ -284,7 +284,7 @@ def main():
                ncol=1, fontsize=9, frameon=False,
                handlelength=1.2, handleheight=0.9, borderpad=0)
 
-    out = os.path.join(OUTPUT_DIR, '03_land use and ag management map.svg')
+    out = os.path.join(OUTPUT_DIR, '04_land use and ag management map.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     print(f'Saved: {out}')

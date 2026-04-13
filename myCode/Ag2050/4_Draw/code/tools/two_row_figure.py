@@ -244,7 +244,7 @@ def save_two_row_figure(df_top, df_bottom, top_colors, bottom_colors, y_label, o
         ax.set_xlabel('')
 
     fig.text(
-        0.43, 0.915, 'Land-use',
+        0.43, 0.94, 'Land-use',
         ha='center', va='bottom',
         fontsize=font_size, fontfamily='Arial', fontweight='normal',
     )

@@ -1,5 +1,5 @@
 """
-05_Net_Economic_Return.py
+06_Net_Economic_Return.py
 Combined stacked-area figure for net economic return by land use and
 agricultural management.
 """
@@ -206,7 +206,7 @@ def main():
         if label != 'Other land-use'
     }
     export_long_tables(
-        '05_net_economic_return_long_tables.xlsx',
+        '06_net_economic_return_long_tables.xlsx',
         overview=overview_df,
         land_use=land_use_df,
         agricultural_management=am_df,
@@ -218,8 +218,8 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        'Net economic return (Billion AU$)',
-        '05_net_economic_return.svg',
+        'Net economic return (Billion AU$ yr\u207b\u00b9)',
+        '06_net_economic_return.svg',
         total_legend_label='Net economic return',
         y_label_x=0.028,
     )

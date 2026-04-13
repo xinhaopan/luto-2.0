@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 
 from tools import predict_growth_index
 import pandas as pd
@@ -48,7 +50,14 @@ for sheet_name, var_name in sheet_configs:
                        sheet_name=sheet_name, usecols="A,B", skiprows=1)
     df_processed = preprocessed_df(df)
     # df_processed = df_processed.query("Year >= 2000")
-    ax, df_result = predict_growth_index(df_processed, var_name=var_name,base_year=1988,model='ETS')
+    ax, df_result = predict_growth_index(
+        df_processed,
+        var_name=var_name,
+        base_year=2010,
+        draw_base_year=1988,
+        model='ETS',
+        align_scenarios_to_last_actual=False
+    )
 
     all_plots.append((var_name, ax))
     df_result['Variable'] = var_name
@@ -233,7 +242,7 @@ p = Path(output_file)
 mode = 'a' if p.exists() else 'w'
 with pd.ExcelWriter(output_file, engine="openpyxl", mode=mode) as writer:
     for scenario in required_scenarios:
-        print(f"处理场景: {scenario}")
+        print(f"Processing scenario: {scenario}")
 
         df_sheet = pd.DataFrame(index=years, columns=template_cols, dtype=float)
         df_sheet.index.name = 'Year'
@@ -247,7 +256,7 @@ with pd.ExcelWriter(output_file, engine="openpyxl", mode=mode) as writer:
                         if col in df_sheet.columns:
                             df_sheet.loc[y, col] = val
                         else:
-                            print(f"[跳过] 列 {col} 不在模板中")
+                            print(f"[Skip] Column {col} is not in template")
         df_sheet.fillna(1, inplace=True)
         df_out = df_sheet.reset_index()
         df_out.columns.names = [None, None]
@@ -259,7 +268,7 @@ with pd.ExcelWriter(output_file, engine="openpyxl", mode=mode) as writer:
         # 如果该名称的 sheet 已存在，先删除
         if sheet_name in wb.sheetnames:
             del wb[sheet_name]
-            print(f"  已删除旧的 sheet: {sheet_name}")
+            print(f"  Deleted old sheet: {sheet_name}")
 
         ws = wb.create_sheet(title=sheet_name)
         sheets_created.append(sheet_name)
@@ -276,4 +285,4 @@ with pd.ExcelWriter(output_file, engine="openpyxl", mode=mode) as writer:
     if 'Sheet' in writer.book.sheetnames and len(sheets_created) > 0:
         del writer.book['Sheet']
 
-print(f"已保存至 {output_file}")
+print(f"Saved to {output_file}")
