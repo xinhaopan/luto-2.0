@@ -1,6 +1,6 @@
 import math
 
-TASK_NAME = "20260412_paper4_NCI"
+TASK_NAME = "20260413_paper4"
 
 # ---------------------------------------------------------------------------
 # Carbon price levels used in grid search (CARBON_PRICE_COSTANT values)

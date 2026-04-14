@@ -225,12 +225,25 @@ def get_non_ag_c_rk(data: Data, ag_c_mrj: np.ndarray, lumap: np.ndarray, target_
 def get_ag_r_mrj(data: Data, target_index):
     print('Getting agricultural revenue matrices...', flush = True)
     output = ag_revenue.get_rev_matrices(data, target_index)
+    # Add biodiversity price contribution: bio_score (mrj) × bio_price → AUD/cell
+    # Positive scores (high-biodiversity land uses) yield revenue; negative scores (degraded uses) incur a cost.
+    bio_price = data.get_biodiversity_price_by_yr_idx(target_index)
+    if bio_price != 0.0:
+        b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+        output = output + b_mrj * bio_price
     return output.astype(np.float32)
 
 
 def get_non_ag_r_rk(data: Data, ag_r_mrj: np.ndarray, base_year: int, target_year: int):
     print('Getting non-agricultural revenue matrices...', flush = True)
     output = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj, data.lumaps[base_year])
+    # Add biodiversity price contribution: bio_score (rk) × bio_price → AUD/cell
+    # Non-agricultural land uses (plantings, BECCS, etc.) always have positive biodiversity scores.
+    bio_price = data.get_biodiversity_price_by_year(target_year)
+    if bio_price != 0.0:
+        ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+        non_ag_b_rk = non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, data.lumaps[base_year])
+        output = output + non_ag_b_rk * bio_price
     return output.astype(np.float32)
 
 

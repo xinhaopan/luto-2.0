@@ -9,10 +9,10 @@ grid_search = {
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['20GB'],
-    'NCPUS': ['5'],
+    'MEM': ['28GB'],
+    'NCPUS': ['7'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['3:00:00'],
+    'TIME': ['4:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
     'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],

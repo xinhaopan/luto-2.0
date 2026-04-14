@@ -114,8 +114,10 @@ class Data:
             settings.PRODUCTIVITY_TREND        = settings.AG2050_PRODUCTIVITY_MAP[scen]
             settings.GHG_EMISSIONS_LIMITS      = settings.AG2050_GHG_MAP[scen]
             settings.BIODIVERSITY_TARGET_GBF_2 = settings.AG2050_BIO_MAP[scen]
-            settings.CARBON_PRICES_FIELD       = 'CONSTANT'
-            settings.CARBON_PRICE_COSTANT      = 0.0
+            settings.CARBON_PRICES_FIELD         = 'CONSTANT'
+            settings.CARBON_PRICE_COSTANT        = 0.0
+            settings.BIODIVERSITY_PRICES_FIELD   = 'CONSTANT'
+            settings.BIODIVERSITY_PRICE_CONSTANT = 0.0
             print(f"│   [AG2050] Scenario={scen} → "
                   f"GHG={settings.GHG_EMISSIONS_LIMITS}, "
                   f"BIO={settings.BIODIVERSITY_TARGET_GBF_2}, "
@@ -1519,7 +1521,20 @@ class Data:
                 header=carbon_price_sheet_header,
                 index_col=carbon_price_sheet_index_col,
             )["Carbon_price_$_tCO2e"].to_dict()
-            
+
+        # Read the biodiversity price per unit of biodiversity score over the years (indexed by year).
+        # The unit is AUD per (BIO_QUALITY_RAW × ha) — a positive price rewards high-biodiversity land uses.
+        if settings.BIODIVERSITY_PRICES_FIELD == 'CONSTANT':
+            self.BIODIVERSITY_PRICES: dict[int, float] = {yr: settings.BIODIVERSITY_PRICE_CONSTANT for yr in range(2010, 2101)}
+        else:
+            self.BIODIVERSITY_PRICES: dict[int, float] = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, 'biodiversity_prices.xlsx'),
+                sheet_name=settings.BIODIVERSITY_PRICES_FIELD,
+                usecols="A,B",
+                names=["Year", "Biodiversity_price_$_unit"],
+                header=0,
+                index_col="Year",
+            )["Biodiversity_price_$_unit"].to_dict()
 
 
         ###############################################################
@@ -2668,6 +2683,26 @@ class Data:
                 f"Year should be between {self.YR_CAL_BASE} and 2100."
             )
         return self.CARBON_PRICES[yr_cal]
+
+    def get_biodiversity_price_by_yr_idx(self, yr_idx: int) -> float:
+        """
+        Return the biodiversity price (AUD per unit of biodiversity score) for a given year index (since 2010).
+        The resulting year should be between 2010 - 2100.
+        """
+        yr_cal = yr_idx + self.YR_CAL_BASE
+        return self.get_biodiversity_price_by_year(yr_cal)
+
+    def get_biodiversity_price_by_year(self, yr_cal: int) -> float:
+        """
+        Return the biodiversity price (AUD per unit of biodiversity score) for a given year.
+        The resulting year should be between 2010 - 2100.
+        """
+        if yr_cal not in self.BIODIVERSITY_PRICES:
+            raise ValueError(
+                f"Biodiversity price data not given for the given year: {yr_cal}. "
+                f"Year should be between {self.YR_CAL_BASE} and 2100."
+            )
+        return self.BIODIVERSITY_PRICES[yr_cal]
 
     def get_water_nl_yield_for_yr_idx(
         self,

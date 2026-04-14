@@ -562,6 +562,20 @@ Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
 '''
 
 
+# Biodiversity price scenario: 'CONSTANT' or a sheet name from 'biodiversity_prices.xlsx'.
+# When 'CONSTANT', a fixed price ($/unit of biodiversity score) is used for all years.
+# When a sheet name is given, prices are read year-by-year from the corresponding Excel sheet.
+BIODIVERSITY_PRICES_FIELD = 'CONSTANT'
+
+if BIODIVERSITY_PRICES_FIELD == 'CONSTANT':
+    BIODIVERSITY_PRICE_CONSTANT = 0.0  # Price per unit of biodiversity score (AUD/unit). Set to 0 to disable.
+'''
+Only works when BIODIVERSITY_PRICES_FIELD is set to 'CONSTANT'.
+The biodiversity score unit is BIO_QUALITY_RAW * REAL_AREA (dimensionless quality index × ha).
+A positive price rewards high-biodiversity land uses; a negative effective score penalises degradation.
+'''
+
+
 USE_GHG_SCOPE_1 = True  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
 '''
 Basic GHG types are the direct emissions from the land-use and livestock types, excluding
@@ -1203,3 +1217,6 @@ if AG2050_MODE and AG2050_SCENARIO:
     # Force constant (zero) carbon price so the GHG-target-dict lookup is skipped
     CARBON_PRICES_FIELD = 'CONSTANT'
     CARBON_PRICE_COSTANT = 0.0
+    # Force constant (zero) biodiversity price in AG2050 mode
+    BIODIVERSITY_PRICES_FIELD = 'CONSTANT'
+    BIODIVERSITY_PRICE_CONSTANT = 0.0

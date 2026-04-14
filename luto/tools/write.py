@@ -2779,19 +2779,37 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         
     # Fill nan to empty dataframes
     if GBF2_score_ag.empty:
-        GBF2_score_ag.loc[0] = 0
-        GBF2_score_ag = GBF2_score_ag.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_score_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural land-use', 'Apples', yr_cal]
+        GBF2_score_ag = pd.DataFrame({
+            'region': ['AUSTRALIA', 'AUSTRALIA'],
+            'lm': ['dry', 'irr'],
+            'lu': ['Apples', 'Apples'],
+            'Area Weighted Score (ha)': [0.0, 0.0],
+            'Relative_Contribution_Percentage': [0.0, 0.0],
+            'Type': ['Agricultural land-use', 'Agricultural land-use'],
+            'Year': [yr_cal, yr_cal]
+        })
 
     if GBF2_score_non_ag.empty:
-        GBF2_score_non_ag.loc[0] = 0
-        GBF2_score_non_ag = GBF2_score_non_ag.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_score_non_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural Management', 'Apples', yr_cal]
+        GBF2_score_non_ag = pd.DataFrame({
+            'region': ['AUSTRALIA'],
+            'lu': ['Environmental Plantings'],
+            'Area Weighted Score (ha)': [0.0],
+            'Relative_Contribution_Percentage': [0.0],
+            'Type': ['Non-Agricultural Land-use'],
+            'Year': [yr_cal]
+        })
 
     if GBF2_score_am.empty:
-        GBF2_score_am.loc[0] = 0
-        GBF2_score_am = GBF2_score_am.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_score_am.loc[0, ['Type', 'lu' ,'Year']] = ['Non-Agricultural Land-use', 'Environmental Plantings', yr_cal]
+        GBF2_score_am = pd.DataFrame({
+            'region': ['AUSTRALIA', 'AUSTRALIA'],
+            'am': ['Savanna Burning', 'Savanna Burning'],
+            'lm': ['dry', 'dry'],
+            'lu': ['Beef - natural land', 'Sheep - natural land'],
+            'Area Weighted Score (ha)': [0.0, 0.0],
+            'Relative_Contribution_Percentage': [0.0, 0.0],
+            'Type': ['Agricultural Management', 'Agricultural Management'],
+            'Year': [yr_cal, yr_cal]
+        })
         
     # Save to disk  
     df = pd.concat([
