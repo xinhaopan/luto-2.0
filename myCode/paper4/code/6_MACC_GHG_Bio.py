@@ -19,6 +19,7 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -33,15 +34,16 @@ OUT_DIR   = f'../../../output/{TASK_NAME}/paper4/figures'
 os.makedirs(OUT_DIR, exist_ok=True)
 
 YEAR = 2050
+CACHE_PATH = os.path.join(OUT_DIR, f'MACC_raw_data_{YEAR}.xlsx')
 
 GHG_FILES = [
     'xr_GHG_ag', 'xr_GHG_ag_management',
     'xr_GHG_non_ag', 'xr_transition_GHG',
 ]
 BIO_FILES = [
-    'xr_biodiversity_GBF2_priority_ag',
-    'xr_biodiversity_GBF2_priority_ag_management',
-    'xr_biodiversity_GBF2_priority_non_ag',
+    'xr_biodiversity_overall_priority_ag',
+    'xr_biodiversity_overall_priority_ag_management',
+    'xr_biodiversity_overall_priority_non_ag',
 ]
 
 COLOR_GHG = '#1d52a1'
@@ -109,49 +111,61 @@ def read_sum(zip_path, file_stems, year):
 
 
 # ---------------------------------------------------------------------------
-# Baseline: cp=0, bp=0
+# Load from cache or read from zip files, then save cache
 # ---------------------------------------------------------------------------
-base_zp  = RUN_MAP[(0.0, 0.0)]
-base_ghg = read_sum(base_zp, GHG_FILES, YEAR) / 1e6    # Mt CO2e
-base_bio = read_sum(base_zp, BIO_FILES, YEAR)           # keep raw units
+if os.path.isfile(CACHE_PATH):
+    print(f"Loading cached data from {CACHE_PATH}")
+    df_ghg = pd.read_excel(CACHE_PATH, sheet_name='GHG_slice')
+    df_bio = pd.read_excel(CACHE_PATH, sheet_name='Bio_slice')
+    base_ghg = df_ghg.attrs.get('base_ghg', df_ghg['GHG_MtCO2e'].iloc[0] - df_ghg['dGHG_MtCO2e'].iloc[0])
+    base_bio = df_bio.attrs.get('base_bio', df_bio['Bio'].iloc[0] - df_bio['dBio'].iloc[0])
+    # Recover base values stored in first row (cp=0 / bp=0)
+    base_ghg = df_ghg.loc[df_ghg['CarbonPrice'] == 0.0, 'GHG_MtCO2e'].values[0]
+    base_bio = df_bio.loc[df_bio['BioPrice'] == 0.0, 'Bio'].values[0]
+    print(f"Baseline GHG={base_ghg:.1f} Mt CO2e,  Bio={base_bio:.2f}")
+else:
+    # --- Baseline ---
+    base_zp  = RUN_MAP[(0.0, 0.0)]
+    base_ghg = read_sum(base_zp, GHG_FILES, YEAR) / 1e6
+    base_bio = read_sum(base_zp, BIO_FILES, YEAR)
+    print(f"Baseline GHG={base_ghg:.1f} Mt CO2e,  Bio={base_bio:.2f}")
 
-print(f"Baseline GHG={base_ghg:.1f} Mt CO2e,  Bio={base_bio:.2f}")
+    # --- Slice A: BioPrice=0, CarbonPrice varies ---
+    print("\n--- GHG change vs Carbon price (BioPrice=0) ---")
+    rows_ghg = []
+    for cp in CP_VALS:
+        zp = RUN_MAP.get((cp, 0.0))
+        ghg = read_sum(zp, GHG_FILES, YEAR) / 1e6 if zp else np.nan
+        dghg = ghg - base_ghg if not np.isnan(ghg) else np.nan
+        rows_ghg.append({'CarbonPrice': cp, 'GHG_MtCO2e': ghg, 'dGHG_MtCO2e': dghg})
+        print(f"  cp={cp}: GHG={ghg:.1f}, dGHG={dghg:.1f} Mt CO2e")
+    df_ghg = pd.DataFrame(rows_ghg)
+
+    # --- Slice B: CarbonPrice=0, BioPrice varies ---
+    print("\n--- Bio change vs Bio price (CarbonPrice=0) ---")
+    rows_bio = []
+    for bp in BP_VALS:
+        zp = RUN_MAP.get((0.0, bp))
+        bio = read_sum(zp, BIO_FILES, YEAR) if zp else np.nan
+        dbio = bio - base_bio if not np.isnan(bio) else np.nan
+        rows_bio.append({'BioPrice': bp, 'Bio': bio, 'dBio': dbio})
+        print(f"  bp={bp}: Bio={bio:.2f}, dBio={dbio:.2f}")
+    df_bio = pd.DataFrame(rows_bio)
+
+    # --- Save to Excel cache ---
+    with pd.ExcelWriter(CACHE_PATH, engine='openpyxl') as writer:
+        df_ghg.to_excel(writer, sheet_name='GHG_slice', index=False)
+        df_bio.to_excel(writer, sheet_name='Bio_slice', index=False)
+    print(f"\nCache saved: {CACHE_PATH}")
 
 # ---------------------------------------------------------------------------
-# Slice A: BioPrice=0, CarbonPrice varies → GHG change vs carbon price
+# Prepare plot arrays
 # ---------------------------------------------------------------------------
-print("\n--- GHG change vs Carbon price (BioPrice=0) ---")
-ghg_change_cp = []
-for cp in CP_VALS:
-    zp = RUN_MAP.get((cp, 0.0))
-    if zp is None:
-        ghg_change_cp.append(np.nan)
-        continue
-    ghg = read_sum(zp, GHG_FILES, YEAR) / 1e6
-    dghg = ghg - base_ghg
-    ghg_change_cp.append(dghg)
-    print(f"  cp={cp}: GHG={ghg:.1f}, dGHG={dghg:.1f} Mt CO2e")
+x_ghg = -df_ghg['dGHG_MtCO2e'].to_numpy()   # abatement = positive reduction
+y_cp  = df_ghg['CarbonPrice'].to_numpy()
 
-x_ghg = -np.array(ghg_change_cp)   # abatement = positive reduction
-y_cp  = np.array(CP_VALS)
-
-# ---------------------------------------------------------------------------
-# Slice B: CarbonPrice=0, BioPrice varies → Bio change vs bio price
-# ---------------------------------------------------------------------------
-print("\n--- Bio change vs Bio price (CarbonPrice=0) ---")
-bio_change_bp = []
-for bp in BP_VALS:
-    zp = RUN_MAP.get((0.0, bp))
-    if zp is None:
-        bio_change_bp.append(np.nan)
-        continue
-    bio = read_sum(zp, BIO_FILES, YEAR)
-    dbio = bio - base_bio
-    bio_change_bp.append(dbio)
-    print(f"  bp={bp}: Bio={bio:.2f}, dBio={dbio:.2f}")
-
-x_bio = np.array(bio_change_bp)
-y_bp  = np.array(BP_VALS)
+x_bio = df_bio['dBio'].to_numpy()
+y_bp  = df_bio['BioPrice'].to_numpy()
 
 
 # ---------------------------------------------------------------------------

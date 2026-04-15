@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260414_paper4'],
+    'TASK_NAME': ['20260416_paper4'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -27,7 +27,7 @@ grid_search = {
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],
-    'SIM_YEARS': [[i for i in range(2010,2051,5)]],
+    'SIM_YEARS': [[i for i in range(2010,2051,10)]],
 
     # ----------------------------------- GHG settings --------------------------------
     'GHG_CONSTRAINT_TYPE': ['hard'],

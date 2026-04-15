@@ -6,7 +6,36 @@
   <component name="ChangeListManager">
     <list default="true" id="198b6eda-16db-48f9-af55-a06f23cef03d" name="Changes" comment="update for paper2">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/1_rsync_and_delete.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/1_rsync_and_delete.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/0_original_data/FLC_cost_multipliers.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/0_original_data/FLC_cost_multipliers.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/0_original_data/yieldincreases_ABARES.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/0_original_data/yieldincreases_ABARES.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/15_cattle_cost_CR.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/15_cattle_cost_CR.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/16_cattle_revenue_CR.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/16_cattle_revenue_CR.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/1_labour_cost.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/1_labour_cost.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/3_yieldncreass_ABARES.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/3_yieldncreass_ABARES.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/labour_cost_growth_index.png" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/labour_cost_growth_index.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/productivity_plots.png" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/productivity_plots.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/1_Scripts/tools.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/ABARES_productivity_forecast.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/ABARES_productivity_forecast.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/labour_cost_forecast.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/2_processed_data/labour_cost_forecast.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/3_Results/FLC_cost_multipliers.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/3_Results/FLC_cost_multipliers.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/3_Results/Feedlots_cost_ratio_from_ag2050.csv" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/3_Results/Feedlots_cost_ratio_from_ag2050.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/3_Results/Feedlots_revenue_ratio_from_ag2050.csv" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/3_Results/Feedlots_revenue_ratio_from_ag2050.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/3_Results/yieldincreases_ABARES.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/3_Results/yieldincreases_ABARES.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/03_Mapping.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/04_Area.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/05_Net_Economic_Return.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/06_GHG.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/07_Biodiversity.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/08_Food.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/09_Water.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/tools/data_helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/tools/data_helper.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/tools/parameters.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/tools/parameters.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/tools/two_row_figure.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/Ag2050/4_Draw/code/tools/two_row_figure.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/carbonprice/code/0_Preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/carbonprice/code/0_Preprocess.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/0_Check_status.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper2_tasks_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/myCode/tasks_run/Paper3_ag2050_tasks_test.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,81 +112,81 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.0.1_create_GBF2_targets_csv.executor": "Run",
-    "Python.00_am_tif.executor": "Run",
-    "Python.01_Maping all.executor": "Run",
-    "Python.02_Area.executor": "Run",
-    "Python.04_GHG.executor": "Run",
-    "Python.05_Biodiversity.executor": "Run",
-    "Python.06_Transfer Matrix.executor": "Run",
-    "Python.06_Transfer Matrix_all.executor": "Debug",
-    "Python.07_S1_Area ag.executor": "Run",
-    "Python.08_Food demand.executor": "Run",
-    "Python.08_Food demand_dry_irr.executor": "Run",
-    "Python.08_S2_Food demand.executor": "Run",
-    "Python.08_S2_Food demand_table.executor": "Run",
-    "Python.09_S3_Water dry_irr.executor": "Run",
-    "Python.09_S3_Water use.executor": "Run",
-    "Python.09_S3_Water use_tables.executor": "Run",
-    "Python.0_Check_status.executor": "Run",
-    "Python.0_Preprocess.executor": "Run",
-    "Python.0_extract_html.executor": "Run",
-    "Python.0_mem_monitor.executor": "Run",
-    "Python.0_runs_test.executor": "Run",
-    "Python.0_transfer_html.executor": "Run",
-    "Python.0_write_tasks.executor": "Run",
-    "Python.10_Area_table.executor": "Run",
-    "Python.12_ag_moves.executor": "Run",
-    "Python.13_cattle_GHG_CR.executor": "Debug",
-    "Python.1_draw_original_data.executor": "Run",
-    "Python.1_write_test.executor": "Run",
-    "Python.2_draw_processed_data.executor": "Run",
-    "Python.3.0_draw_average_price.executor": "Run",
-    "Python.3.1_draw_sol_average_price.executor": "Run",
-    "Python.4.0_create_tif.executor": "Run",
-    "Python.4.3_make_cost_map.executor": "Run",
-    "Python.4.4_make_GHG_benefits_map.executor": "Run",
-    "Python.4.5_make_BIO_benefits_map.executor": "Run",
-    "Python.4.6_make_price_map.executor": "Run",
-    "Python.4.7_make_agmgt_map.executor": "Run",
-    "Python.4.8_make_non_ag_map.executor": "Run",
-    "Python.5_Rename_figure.executor": "Run",
-    "Python.Paper1_tasks.executor": "Run",
-    "Python.Paper1_tasks_aquila.executor": "Run",
-    "Python.Paper1_tasks_aquila_test.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_10.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_5.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_e6.executor": "Run",
-    "Python.Paper1_tasks_aquila_test_e6_1.executor": "Run",
-    "Python.Paper1_tasks_test.executor": "Run",
-    "Python.Paper1_tasks_test_EP.executor": "Run",
-    "Python.Paper1_tasks_test_hard.executor": "Run",
-    "Python.Paper2_tasks.executor": "Run",
-    "Python.Paper2_tasks_test.executor": "Run",
-    "Python.helper_data.executor": "Debug",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "WebServerToolWindowFactoryState": "true",
-    "ai.playground.ignore.import.keys.banner.in.settings": "true",
-    "database.data.extractors.current.export.id": "Comma-separated (CSV)_id",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "F:/Users/s222552331/Work/LUTO2_XH/luto-2.0/myCode/Ag2050/1_Scripts",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.0.1_create_GBF2_targets_csv.executor&quot;: &quot;Run&quot;,
+    &quot;Python.00_am_tif.executor&quot;: &quot;Run&quot;,
+    &quot;Python.01_Maping all.executor&quot;: &quot;Run&quot;,
+    &quot;Python.02_Area.executor&quot;: &quot;Run&quot;,
+    &quot;Python.04_GHG.executor&quot;: &quot;Run&quot;,
+    &quot;Python.05_Biodiversity.executor&quot;: &quot;Run&quot;,
+    &quot;Python.06_Transfer Matrix.executor&quot;: &quot;Run&quot;,
+    &quot;Python.06_Transfer Matrix_all.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.07_S1_Area ag.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_Food demand.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_Food demand_dry_irr.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_S2_Food demand.executor&quot;: &quot;Run&quot;,
+    &quot;Python.08_S2_Food demand_table.executor&quot;: &quot;Run&quot;,
+    &quot;Python.09_S3_Water dry_irr.executor&quot;: &quot;Run&quot;,
+    &quot;Python.09_S3_Water use.executor&quot;: &quot;Run&quot;,
+    &quot;Python.09_S3_Water use_tables.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_Check_status.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_Preprocess.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_extract_html.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_mem_monitor.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_runs_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_transfer_html.executor&quot;: &quot;Run&quot;,
+    &quot;Python.0_write_tasks.executor&quot;: &quot;Run&quot;,
+    &quot;Python.10_Area_table.executor&quot;: &quot;Run&quot;,
+    &quot;Python.12_ag_moves.executor&quot;: &quot;Run&quot;,
+    &quot;Python.13_cattle_GHG_CR.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.1_draw_original_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.1_write_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.2_draw_processed_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.3.0_draw_average_price.executor&quot;: &quot;Run&quot;,
+    &quot;Python.3.1_draw_sol_average_price.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.0_create_tif.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.3_make_cost_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.4_make_GHG_benefits_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.5_make_BIO_benefits_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.6_make_price_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.7_make_agmgt_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.4.8_make_non_ag_map.executor&quot;: &quot;Run&quot;,
+    &quot;Python.5_Rename_figure.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_10.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_5.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_e6.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_aquila_test_e6_1.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_test_EP.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper1_tasks_test_hard.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper2_tasks.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Paper2_tasks_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.helper_data.executor&quot;: &quot;Debug&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;true&quot;,
+    &quot;ai.playground.ignore.import.keys.banner.in.settings&quot;: &quot;true&quot;,
+    &quot;database.data.extractors.current.export.id&quot;: &quot;Comma-separated (CSV)_id&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;F:/Users/s222552331/Work/LUTO2_XH/luto-2.0/myCode/Ag2050/1_Scripts&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="F:\Users\s222552331\Work\LUTO2_XH\luto-2.0\myCode\Ag2050\1_Scripts" />
@@ -938,17 +967,17 @@
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/Ag2050/1_Scripts/3_yieldncreass_ABARES.py</url>
-          <line>272</line>
+          <line>281</line>
           <option name="timeStamp" value="176" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/Ag2050/1_Scripts/tools.py</url>
-          <line>358</line>
+          <line>372</line>
           <option name="timeStamp" value="200" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/myCode/Ag2050/1_Scripts/3_yieldncreass_ABARES.py</url>
-          <line>60</line>
+          <line>69</line>
           <option name="timeStamp" value="251" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">

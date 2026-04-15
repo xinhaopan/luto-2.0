@@ -234,9 +234,31 @@ def get_ag_r_mrj(data: Data, target_index):
     return output.astype(np.float32)
 
 
+def _strip_biodiversity_price_from_ag_revenue(
+    data: Data,
+    target_index: int,
+    ag_r_mrj: np.ndarray,
+) -> np.ndarray:
+    """
+    Remove the biodiversity-price component from agricultural revenue matrices.
+
+    This lets composite non-agricultural and agricultural-management revenue code
+    reuse the underlying agricultural economics without accidentally monetising the
+    biodiversity term twice.
+    """
+    bio_price = data.get_biodiversity_price_by_yr_idx(target_index)
+    if bio_price == 0.0:
+        return ag_r_mrj
+
+    ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+    return ag_r_mrj - ag_b_mrj * bio_price
+
+
 def get_non_ag_r_rk(data: Data, ag_r_mrj: np.ndarray, base_year: int, target_year: int):
     print('Getting non-agricultural revenue matrices...', flush = True)
-    output = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj, data.lumaps[base_year])
+    target_index = target_year - data.YR_CAL_BASE
+    ag_r_mrj_economic = _strip_biodiversity_price_from_ag_revenue(data, target_index, ag_r_mrj)
+    output = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj_economic, data.lumaps[base_year])
     # Add biodiversity price contribution: bio_score (rk) × bio_price → AUD/cell
     # Non-agricultural land uses (plantings, BECCS, etc.) always have positive biodiversity scores.
     bio_price = data.get_biodiversity_price_by_year(target_year)
@@ -515,7 +537,16 @@ def get_ag_man_q_mrj(data: Data, target_index, ag_q_mrp: np.ndarray):
 
 def get_ag_man_r_mrj(data: Data, target_index, ag_r_mrj: np.ndarray):
     print('Getting agricultural management options\' revenue effects...', flush = True)
-    output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
+    ag_r_mrj_economic = _strip_biodiversity_price_from_ag_revenue(data, target_index, ag_r_mrj)
+    output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj_economic, target_index)
+    bio_price = data.get_biodiversity_price_by_yr_idx(target_index)
+    if bio_price != 0.0:
+        ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+        ag_man_b_mrj = ag_biodiversity.get_ag_mgt_biodiversity_matrices(data, ag_b_mrj, target_index)
+        output = {
+            am: arr + ag_man_b_mrj[am] * bio_price
+            for am, arr in output.items()
+        }
     return output
 
 

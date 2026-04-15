@@ -1,6 +1,6 @@
 import math
 
-TASK_NAME = "20260413_paper4"
+TASK_NAME = "20260414_paper4_NCI"
 
 # ---------------------------------------------------------------------------
 # Carbon price levels used in grid search (CARBON_PRICE_COSTANT values)
@@ -45,9 +45,9 @@ carbon_files = [
     'xr_GHG_ag', 'xr_GHG_ag_management', 'xr_GHG_non_ag', 'xr_transition_GHG',
 ]
 bio_files = [
-    'xr_biodiversity_GBF2_priority_ag',
-    'xr_biodiversity_GBF2_priority_ag_management',
-    'xr_biodiversity_GBF2_priority_non_ag',
+    'xr_biodiversity_overall_priority_ag',
+    'xr_biodiversity_overall_priority_ag_management',
+    'xr_biodiversity_overall_priority_non_ag',
 ]
 
 # ---------------------------------------------------------------------------
@@ -69,9 +69,9 @@ KEY_TO_COLUMN_MAP = {
     "xr_GHG_non_ag":                               "Non-ag GHG",
     "xr_transition_GHG":                           "Transition GHG",
     # Biodiversity
-    "xr_biodiversity_GBF2_priority_ag":            "Ag biodiversity",
-    "xr_biodiversity_GBF2_priority_ag_management": "AgMgt biodiversity",
-    "xr_biodiversity_GBF2_priority_non_ag":        "Non-ag biodiversity",
+    "xr_biodiversity_overall_priority_ag":            "Ag biodiversity",
+    "xr_biodiversity_overall_priority_ag_management": "AgMgt biodiversity",
+    "xr_biodiversity_overall_priority_non_ag":        "Non-ag biodiversity",
 }
 
 # ---------------------------------------------------------------------------
