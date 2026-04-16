@@ -24,9 +24,11 @@ def read_sum(zip_path, file_stems, year):
             if 'layer' in ds.dims and 'compress' in ds['layer'].attrs:
                 ds = cfxr.decode_compress_to_multi_index(ds, 'layer')
             da = list(ds.data_vars.values())[0]
-            for dim in list(da.dims):
-                if dim != 'cell' and 'ALL' in da.coords[dim].values:
-                    da = da.sel({dim: 'ALL'})
+            for coord_name in list(da.coords):
+                if coord_name in {'cell', 'layer'}:
+                    continue
+                if 'ALL' in da.coords[coord_name].values:
+                    da = da.sel({coord_name: 'ALL'})
             val = float(da.sum())
             short = fname.replace('xr_biodiversity_overall_priority_', '')
             print(f'  {short}: {val:.2f}')

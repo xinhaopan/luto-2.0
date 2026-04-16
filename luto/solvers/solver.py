@@ -308,7 +308,9 @@ class LutoSolver:
     def _setup_economy_objective(self):
         print("    ├── setting up objective for economy...")
         
-        # Get economic contributions
+        # `economic_contr_mrj` is the solver-side economy term assembled in
+        # luto/solvers/input_data.py. If biodiversity price is active, that
+        # monetised biodiversity payment is already included in these coefficients.
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
 
         ag_exprs = []

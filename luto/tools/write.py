@@ -868,6 +868,54 @@ def write_quantity_separate_landuse(data: Data, yr_cal, path):
     df.to_csv(os.path.join(path, f'quantity_production_kt_separate_{yr_cal}.csv'), index=False)
 
 
+def _get_biodiversity_price_ag_revenue_xr(data: Data, yr_cal: int):
+    """Return agricultural biodiversity-price revenue as xarray or None when price is zero."""
+    bio_price = data.get_biodiversity_price_by_year(yr_cal)
+    if bio_price == 0.0:
+        return None
+
+    bio_revenue = tools.ag_mrj_to_xr(
+        data,
+        ag_biodiversity.get_bio_quality_score_mrj(data) * bio_price,
+    )
+    return (
+        bio_revenue.transpose('cell', 'lu', 'lm')
+        .expand_dims(source=['Biodiversity price'])
+        .astype(np.float32)
+    )
+
+
+def _get_biodiversity_price_am_revenue_xr(data: Data, yr_cal: int):
+    """Return ag-management biodiversity-price revenue as xarray or None when price is zero."""
+    bio_price = data.get_biodiversity_price_by_year(yr_cal)
+    if bio_price == 0.0:
+        return None
+
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+    return (
+        tools.am_mrj_to_xr(
+            data,
+            ag_biodiversity.get_ag_mgt_biodiversity_matrices(data, ag_b_mrj, yr_idx),
+        ) * bio_price
+    ).astype(np.float32)
+
+
+def _get_biodiversity_price_non_ag_revenue_xr(data: Data, yr_cal: int, lumap: np.ndarray):
+    """Return non-ag biodiversity-price revenue as xarray or None when price is zero."""
+    bio_price = data.get_biodiversity_price_by_year(yr_cal)
+    if bio_price == 0.0:
+        return None
+
+    ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+    return (
+        tools.non_ag_rk_to_xr(
+            data,
+            non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, lumap),
+        ) * bio_price
+    ).astype(np.float32)
+
+
 def write_economics_ag(data: Data, yr_cal, path):
     """Calculate agricultural revenue. Takes a simulation object, a target calendar
        year (e.g., 2030), and an output path as input."""
@@ -947,6 +995,12 @@ def write_economics_ag(data: Data, yr_cal, path):
         dims=['cell', 'layer'],
         coords={'cell': range(data.NCELLS), 'layer': ag_rev_df_rjms.columns}
     ).chunk(chunk).unstack('layer')
+    ag_bio_revenue_rjms = _get_biodiversity_price_ag_revenue_xr(data, yr_cal)
+    if ag_bio_revenue_rjms is not None:
+        ag_rev_rjms = xr.concat(
+            [ag_rev_rjms, ag_bio_revenue_rjms.transpose(*ag_rev_rjms.dims)],
+            dim='source',
+        )
 
     ag_cost_rjms = xr.DataArray(
         ag_cost_df_rjms.values.astype(np.float32),
@@ -1113,6 +1167,9 @@ def write_economics_ag_man(data: Data, yr_cal, path):
     ag_rev_mrj  = ag_revenue.get_rev_matrices(data, yr_idx)
     ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
     am_revenue_mat = tools.am_mrj_to_xr(data, ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx))
+    am_bio_revenue_mat = _get_biodiversity_price_am_revenue_xr(data, yr_cal)
+    if am_bio_revenue_mat is not None:
+        am_revenue_mat = am_revenue_mat + am_bio_revenue_mat
     am_cost_mat    = tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx))
     am_trans_mat   = tools.am_mrj_to_xr(data, ag_transitions.get_agricultural_management_transition_matrices(data, yr_idx))
 
@@ -1232,6 +1289,9 @@ def write_economics_non_ag(data: Data, yr_cal, path):
     ag_rev_mrj  = ag_revenue.get_rev_matrices(data, yr_idx)
     ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
     non_ag_rev_mat       = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_rev_mrj, data.lumaps[yr_cal]))
+    non_ag_bio_revenue_mat = _get_biodiversity_price_non_ag_revenue_xr(data, yr_cal, data.lumaps[yr_cal])
+    if non_ag_bio_revenue_mat is not None:
+        non_ag_rev_mat = non_ag_rev_mat + non_ag_bio_revenue_mat
     non_ag_cost_mat      = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, data.lumaps[yr_cal], yr_cal))
     non_ag_to_non_ag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_non_ag_to_non_ag_transition_matrix(data))
 

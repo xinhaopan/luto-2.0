@@ -24,7 +24,7 @@ grid_search = {
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],
-    'SIM_YEARS': [[i for i in range(2010,2051,10)]],
+    'SIM_YEARS': [[i for i in range(2010,2051,5)]],
 
     # ----------------------------------- GHG settings --------------------------------
     'GHG_CONSTRAINT_TYPE': ['hard'],

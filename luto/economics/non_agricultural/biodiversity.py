@@ -180,29 +180,22 @@ def get_biodiv_beccs(data: Data):
     return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_BECCS
 
 
-def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
+def get_biodiv_destocked_land(data: Data) -> np.ndarray:
     """
+    Destocked - natural land achieves the same biodiversity as Unallocated - natural land.
+    HCLUP[Unallocated - natural land] = 1.0 (the normalisation reference), so the score
+    is BIO_QUALITY_RAW × REAL_AREA — consistent with all other non-ag land uses which use
+    an absolute value, not a delta from the prior land use.
+
     Parameters
     ------
     data: Data object.
-    ag_b_mrj: agricultural biodiversity matrix.
-    lumap: Land use map of the previous year.
 
     Returns
     ------
     Numpy array indexed by r
     """
-    destock_b_contr = np.zeros(data.NCELLS)
-    to_lu = data.DESC2AGLU['Unallocated - natural land']
-
-    for from_lu in data.LU_LVSTK_NATURAL:
-        destock_b_contr[lumap == from_lu] = (
-            data.BIO_QUALITY_RAW[lumap == from_lu] 
-            * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu] - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu])
-            * data.REAL_AREA[lumap == from_lu]
-        )
-        
-    return destock_b_contr
+    return data.BIO_QUALITY_RAW * data.REAL_AREA
 
 
 def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
@@ -230,7 +223,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
         get_biodiv_sheep_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r),
         get_biodiv_beef_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r),
         get_biodiv_beccs(data),                                               
-        get_biodiv_destocked_land(data, lumap)
+        get_biodiv_destocked_land(data)
     ]
 
     return np.concatenate([
