@@ -51,7 +51,6 @@ from tools.price_slice_utils import (
 )
 
 
-BASE_YEAR = 2025
 YEAR = 2050
 BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
@@ -277,62 +276,47 @@ def get_category_order(area_type, categories_seen):
 
 
 def collect_carbon_rows(run_map, cp_max):
+    # Baseline: zero-price run at YEAR; max: highest carbon price run at YEAR
     zero_zip = run_map[(0.0, 0.0)]
     max_zip = run_map[(cp_max, 0.0)]
 
-    zero_profit_2010 = get_profit_summaries(zero_zip, BASE_YEAR)
     zero_profit_2050 = get_profit_summaries(zero_zip, YEAR)
-    max_profit_2010 = get_profit_summaries(max_zip, BASE_YEAR)
     max_profit_2050 = get_profit_summaries(max_zip, YEAR)
 
-    zero_ghg_2010 = get_ghg_summaries(zero_zip, BASE_YEAR)
     zero_ghg_2050 = get_ghg_summaries(zero_zip, YEAR)
-    max_ghg_2010 = get_ghg_summaries(max_zip, BASE_YEAR)
     max_ghg_2050 = get_ghg_summaries(max_zip, YEAR)
 
     rows = []
     for area_type in ("Agricultural land-use", "Ag management", "Non-ag"):
         categories = list(dict.fromkeys(
-            list(zero_profit_2010[area_type]) +
             list(zero_profit_2050[area_type]) +
-            list(max_profit_2010[area_type]) +
             list(max_profit_2050[area_type]) +
-            list(zero_ghg_2010[area_type]) +
             list(zero_ghg_2050[area_type]) +
-            list(max_ghg_2010[area_type]) +
             list(max_ghg_2050[area_type])
         ))
         category_order = get_category_order(area_type, categories)
 
         for category in category_order:
-            zero_profit_change_baud = (
-                zero_profit_2050[area_type].get(category, 0.0)
-                - zero_profit_2010[area_type].get(category, 0.0)
-            ) / 1e9
+            # zero-price run IS the baseline; its "change vs baseline" = 0
+            zero_profit_change_baud = 0.0
             max_profit_change_baud = (
                 max_profit_2050[area_type].get(category, 0.0)
-                - max_profit_2010[area_type].get(category, 0.0)
+                - zero_profit_2050[area_type].get(category, 0.0)
             ) / 1e9
 
-            zero_metric_change_mt = (
-                zero_ghg_2010[area_type].get(category, 0.0)
-                - zero_ghg_2050[area_type].get(category, 0.0)
-            ) / 1e6
+            # GHG abatement vs baseline (positive = less emissions than baseline)
+            zero_metric_change_mt = 0.0
             max_metric_change_mt = (
-                max_ghg_2010[area_type].get(category, 0.0)
+                zero_ghg_2050[area_type].get(category, 0.0)
                 - max_ghg_2050[area_type].get(category, 0.0)
             ) / 1e6
-            contribution_width = max_metric_change_mt - zero_metric_change_mt
+            contribution_width = max_metric_change_mt  # zero_metric = 0
 
             zero_policy_payment_baud = 0.0
             max_policy_payment_baud = cp_max * max_metric_change_mt / 1e3
-            zero_profit_change_excl_policy_baud = zero_profit_change_baud
             max_profit_change_excl_policy_baud = max_profit_change_baud - max_policy_payment_baud
             delta_profit_policy_baud = max_profit_change_baud - zero_profit_change_baud
-            delta_profit_excl_policy_baud = (
-                max_profit_change_excl_policy_baud
-                - zero_profit_change_excl_policy_baud
-            )
+            delta_profit_excl_policy_baud = max_profit_change_excl_policy_baud
 
             avg_cost = np.nan
             include_in_curve = (
@@ -355,7 +339,7 @@ def collect_carbon_rows(run_map, cp_max):
                 "MaxPriceProfitChange_BAUD": max_profit_change_baud,
                 "ZeroPricePolicyPayment_BAUD": zero_policy_payment_baud,
                 "MaxPricePolicyPayment_BAUD": max_policy_payment_baud,
-                "PolicyPaymentMethod": "Approximate: carbon price x abatement since 2010 in the highest-price run",
+                "PolicyPaymentMethod": "Approximate: carbon price x abatement vs 2050 baseline in the highest-price run",
                 "DeltaProfitPolicy_BAUD": delta_profit_policy_baud,
                 "DeltaProfitExclPolicy_BAUD": delta_profit_excl_policy_baud,
                 "AverageNetCost": avg_cost,
@@ -367,58 +351,46 @@ def collect_carbon_rows(run_map, cp_max):
 
 
 def collect_biodiversity_rows(run_map, bp_max):
+    # Baseline: zero-price run at YEAR; max: highest bio price run at YEAR
     zero_zip = run_map[(0.0, 0.0)]
     max_zip = run_map[(0.0, bp_max)]
 
-    zero_profit_2010 = get_profit_summaries(zero_zip, BASE_YEAR)
     zero_profit_2050 = get_profit_summaries(zero_zip, YEAR)
-    max_profit_2010 = get_profit_summaries(max_zip, BASE_YEAR)
     max_profit_2050 = get_profit_summaries(max_zip, YEAR)
 
-    zero_bio_2010 = get_bio_summaries(zero_zip, BASE_YEAR)
     zero_bio_2050 = get_bio_summaries(zero_zip, YEAR)
-    max_bio_2010 = get_bio_summaries(max_zip, BASE_YEAR)
     max_bio_2050 = get_bio_summaries(max_zip, YEAR)
 
     rows = []
     for area_type in ("Agricultural land-use", "Ag management", "Non-ag"):
         categories = list(dict.fromkeys(
-            list(zero_profit_2010[area_type]) +
             list(zero_profit_2050[area_type]) +
-            list(max_profit_2010[area_type]) +
             list(max_profit_2050[area_type]) +
-            list(zero_bio_2010[area_type]) +
             list(zero_bio_2050[area_type]) +
-            list(max_bio_2010[area_type]) +
             list(max_bio_2050[area_type])
         ))
         category_order = get_category_order(area_type, categories)
 
         for category in category_order:
-            zero_profit_change_baud = (
-                zero_profit_2050[area_type].get(category, 0.0)
-                - zero_profit_2010[area_type].get(category, 0.0)
-            ) / 1e9
+            # zero-price run IS the baseline; its "change vs baseline" = 0
+            zero_profit_change_baud = 0.0
             max_profit_change_base_baud = (
                 max_profit_2050[area_type].get(category, 0.0)
-                - max_profit_2010[area_type].get(category, 0.0)
+                - zero_profit_2050[area_type].get(category, 0.0)
             ) / 1e9
 
-            zero_metric_change_mha = (
-                zero_bio_2050[area_type].get(category, 0.0)
-                - zero_bio_2010[area_type].get(category, 0.0)
-            ) / 1e6
+            zero_metric_change_mha = 0.0
             max_metric_change_mha = (
                 max_bio_2050[area_type].get(category, 0.0)
-                - max_bio_2010[area_type].get(category, 0.0)
+                - zero_bio_2050[area_type].get(category, 0.0)
             ) / 1e6
-            contribution_width = max_metric_change_mha - zero_metric_change_mha
+            contribution_width = max_metric_change_mha  # zero_metric = 0
 
             zero_policy_payment_baud = 0.0
             max_policy_payment_baud = bp_max * max_metric_change_mha / 1e3
             max_profit_change_baud = max_profit_change_base_baud + max_policy_payment_baud
             delta_profit_policy_baud = max_profit_change_baud - zero_profit_change_baud
-            delta_profit_excl_policy_baud = max_profit_change_base_baud - zero_profit_change_baud
+            delta_profit_excl_policy_baud = max_profit_change_base_baud
 
             avg_cost = np.nan
             include_in_curve = contribution_width > MIN_WIDTH
@@ -438,7 +410,7 @@ def collect_biodiversity_rows(run_map, bp_max):
                 "MaxPriceProfitChange_BAUD": max_profit_change_baud,
                 "ZeroPricePolicyPayment_BAUD": zero_policy_payment_baud,
                 "MaxPricePolicyPayment_BAUD": max_policy_payment_baud,
-                "PolicyPaymentMethod": "Explicit in paper4 plotting logic: biodiversity price x biodiversity change since 2010 in the highest-price run",
+                "PolicyPaymentMethod": "Explicit in paper4 plotting logic: biodiversity price x biodiversity change vs 2050 baseline in the highest-price run",
                 "DeltaProfitPolicy_BAUD": delta_profit_policy_baud,
                 "DeltaProfitExclPolicy_BAUD": delta_profit_excl_policy_baud,
                 "AverageNetCost": avg_cost,
@@ -496,12 +468,12 @@ def collect_and_cache():
         {
             "Panel": "Carbon",
             "TargetPrice": cp_max,
-            "Note": "Curve width is the additional GHG abatement unlocked beyond cp=0 after both runs are first converted to 2010-to-2050 changes. Carbon transfer is removed approximately using price x abatement since 2010 in the highest-price run.",
+            "Note": f"Curve width is the additional GHG abatement in the max-price run vs the zero-price (baseline) run at {YEAR}. Carbon transfer is removed approximately using price x abatement vs baseline in the highest-price run.",
         },
         {
             "Panel": "Biodiversity",
             "TargetPrice": bp_max,
-            "Note": "Curve width is the additional biodiversity contribution unlocked beyond bp=0 after both runs are first converted to 2010-to-2050 changes. Biodiversity payment is removed using price x biodiversity change since 2010 in the highest-price run.",
+            "Note": f"Curve width is the additional biodiversity contribution in the max-price run vs the zero-price (baseline) run at {YEAR}. Biodiversity payment is removed using price x biodiversity change vs baseline in the highest-price run.",
         },
     ])
 
@@ -709,7 +681,7 @@ handles_carbon = draw_curve(
     outer[0, 0],
     df_carbon,
     "Carbon",
-    f"Carbon average net cost curve\n(max vs 0 after {BASE_YEAR}->{YEAR}; cp = {format_thousands(carbon_price)} AUD per tCO$_2$e)",
+    f"Carbon average net cost curve\n(max vs 0 at {YEAR}; cp = {format_thousands(carbon_price)} AUD per tCO$_2$e)",
     r"Additional abatement beyond cp=0 (Mt CO$_2$e)",
     "Average net cost excluding carbon transfer\n(AUD per tCO$_2$e)",
 )
@@ -719,7 +691,7 @@ handles_bio = draw_curve(
     outer[0, 1],
     df_bio,
     "Biodiversity",
-    f"Biodiversity average net cost curve\n(max vs 0 after {BASE_YEAR}->{YEAR}; bp = {format_thousands(bio_price)} AUD per ha)",
+    f"Biodiversity average net cost curve\n(max vs 0 at {YEAR}; bp = {format_thousands(bio_price)} AUD per ha)",
     r"Additional biodiversity contribution beyond bp=0 (Mha yr$^{-1}$)",
     "Average net cost excluding biodiversity payment\n(AUD per (ha yr$^{-1}$))",
 )

@@ -7,17 +7,20 @@ grid_search = {
     'TASK_NAME': ['20260416_paper4_NCI'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [2],
+    'NUMERIC_FOCUS': [2], 
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['28GB'],
-    'NCPUS': ['7'],
+    'NCPUS': ['7'], 
     'WRITE_THREADS': ['2'],
     'TIME': ['4:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
-    'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50,40,30,20,10],
+    'BIODIVERSITY_TARGET_GBF_2': ['off'],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
+    'CARBON_PRICES_FIELD': ['CONSTANT'],
     'CARBON_PRICE_COSTANT': [0,8.92,17.85,26.77,35.69,44.61,53.54,62.46,75.84,89.23,133.84,178.46,233.07,267.69,312.3,356.92],
+    'BIODIVERSITY_PRICES_FIELD': ['CONSTANT'],
+    'BIODIVERSITY_PRICE_CONSTANT': [i * 500 for i in range(11)],  # 0, 500, 1000, ..., 5000
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
@@ -28,7 +31,6 @@ grid_search = {
 
     # ----------------------------------- GHG settings --------------------------------
     'GHG_CONSTRAINT_TYPE': ['hard'],
-    'CARBON_PRICES_FIELD': ['CONSTANT'],
     'CARBON_EFFECTS_WINDOW': [60],
 
     # ----------------------------- Biodiversity settings -------------------------------
@@ -57,12 +59,12 @@ grid_search = {
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],
 
     "AG_MANAGEMENTS": [{
-        'Asparagopsis taxiformis': False,
-        'Precision Agriculture': False,
-        'Ecological Grazing': False,
-        'Savanna Burning': False,
-        'AgTech EI': False,
-        'Biochar': False,
+        'Asparagopsis taxiformis': True,
+        'Precision Agriculture': True,
+        'Ecological Grazing': True,
+        'Savanna Burning': True,
+        'AgTech EI': True,
+        'Biochar': True,
         'HIR - Beef': True,
         'HIR - Sheep': True,
         'Utility Solar PV':False,
@@ -71,22 +73,26 @@ grid_search = {
 }
 
 conditional_rules = [
-    # 最具体的规则优先
+    # When biodiversity price > 0, carbon price must be 0
     {
-        'conditions': {'BIODIVERSITY_TARGET_GBF_2': ['off']},
-        'restrictions': {'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50]}
-    }
+        'conditions':    {'BIODIVERSITY_PRICE_CONSTANT': [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000]},
+        'restrictions':  {'CARBON_PRICE_COSTANT': [0]},
+    },
+    # When carbon price > 0, biodiversity price must be 0
+    {
+        'conditions':    {'CARBON_PRICE_COSTANT': [8.92, 17.85, 26.77, 35.69, 44.61, 53.54, 62.46, 75.84, 89.23, 133.84, 178.46, 233.07, 267.69, 312.3, 356.92]},
+        'restrictions':  {'BIODIVERSITY_PRICE_CONSTANT': [0]},
+    },
 ]
 
 
 settings_name_dict = {
-    'BIODIVERSITY_TARGET_GBF_2':'GBF2',
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT':'CUT',
-    'CARBON_PRICE_COSTANT':'CarbonPrice',
+    'CARBON_PRICE_COSTANT': 'CarbonPrice',
+    'BIODIVERSITY_PRICE_CONSTANT': 'BioPrice',
 }
 
 task_root_dir = f'../../output/{grid_search['TASK_NAME'][0]}'
 grid_search_settings_df = create_grid_search_template(grid_search,settings_name_dict,conditional_rules=conditional_rules)
 print(grid_search_settings_df.columns)
 # grid_search_settings_df = pd.read_csv(os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0)
-create_task_runs(task_root_dir, grid_search_settings_df, platform="NCI", n_workers=min(len(grid_search_settings_df.columns), 100),use_parallel=True)
+create_task_runs(task_root_dir, grid_search_settings_df, platform="NCI", n_workers=min(len(grid_search_settings_df.columns), 16),use_parallel=True)

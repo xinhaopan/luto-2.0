@@ -2,7 +2,7 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 import tools.config as config
-from tools.helper_plot import set_plot_style, draw_12_price, draw_10_price, draw_22_price,draw_10_price_keep_5_and_10_one_row
+from tools.helper_plot import set_plot_style, draw_combined_carbon_bio_price
 
 def recalculate_carbon_price(df):
     scenario_list = [
@@ -28,24 +28,30 @@ def recalculate_carbon_price(df):
             # 如果二者都存在，则更新
             if not v_counter.empty and not v_base.empty:
                 diff = float(v_counter.values[0]) - float(v_base.values[0])
-                df.loc[(df['scenario'] == sc) & (df['Year'] == year), 'data'] = diff
+                df.loc[(df['scenario'] == sc) & (df['Year'] == year), 'data'] = np.float32(diff)
             else:
                 print(f"Warning: missing data for year {year} in {counter_sc} or {base_sc}.")
     return df
 
 task_name = config.TASK_NAME
 # task_name = '20250922_Paper2_Results_HPC_test'
-input_dir = f'../../../output/{task_name}/carbon_price/1_draw_data'
-output_dir = f"../../../output/{task_name}/carbon_price/3_Paper_figure"
-carbon_price_da = xr.open_dataarray(f"{input_dir}/xr_carbon_sol_price.nc")
-bio_price_da = xr.open_dataarray(f"{input_dir}/xr_bio_sol_price.nc")
+input_dir = f'../../../output/{task_name}/{config.CARBON_PRICE_DIR}/1_draw_data'
+output_dir = f"../../../output/{task_name}/{config.CARBON_PRICE_DIR}/3_Paper_figure"
+carbon_price_da = xr.open_dataarray(f"{input_dir}/xr_carbon_price.nc")
+bio_price_da = xr.open_dataarray(f"{input_dir}/xr_bio_price.nc")
 
 df_carbon_long = carbon_price_da.to_dataframe().reset_index()
 df_carbon_long = recalculate_carbon_price(df_carbon_long )
 df_bio_long = bio_price_da.to_dataframe().reset_index()
+import os
+
+os.makedirs(output_dir, exist_ok=True)
+
 set_plot_style(30)
-draw_22_price(df_carbon_long, config.CP_TITLE_MAP,output_path=f"{output_dir}/05_Carbon_solution_price_all",start_year=config.START_YEAR, desired_ticks=5,  y_label=r"Shadow carbon price (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",ci=95)
-set_plot_style(20)
-draw_10_price(df_bio_long,config.BP_TITLE_MAP,'green',f"{output_dir}/05_biodiversity_solution_price.png",start_year=config.START_YEAR,desired_ticks=5,ylabel="Biodiversity price (AU\$ contribution-weighted area ha$^{-1}$ yr$^{-1}$)",ci=95)
-set_plot_style(15)
-draw_10_price_keep_5_and_10_one_row(df_bio_long,config.BP_TITLE_MAP,'green',f"{output_dir}/05_biodiversity_solution_price_long_5_10.png",start_year=2030,desired_ticks=5,ylabel = r"Biodiversity price(AU\$ " + "\n" + r"contribution-weighted area ha$^{-1}$ yr$^{-1}$)",ci=95)
+draw_combined_carbon_bio_price(
+    df_carbon_long, df_bio_long,
+    config.CP_TITLE_MAP, config.BP_TITLE_MAP,
+    output_path=f"{output_dir}/05_Carbon_bio_price_combined.png",
+    start_year=config.START_YEAR,
+    desired_ticks=5, ci=95,
+)

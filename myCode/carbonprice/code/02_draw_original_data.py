@@ -58,7 +58,7 @@ def add_bio_targets_line(axes, title_names, title_map):
     import pandas as pd
 
     line_kw = dict(color='#0078d4', linestyle='-', linewidth=3, zorder=60)
-    csv_dir = os.path.abspath(os.path.join("../../../output", config.TASK_NAME, "carbon_price", "1_draw_data"))
+    csv_dir = os.path.abspath(os.path.join("../../../output", config.TASK_NAME, config.CARBON_PRICE_DIR, "1_draw_data"))
     csv_path = os.path.join(csv_dir, "gbf2_targets.csv")
 
     if not os.path.exists(csv_path):
@@ -101,8 +101,8 @@ def add_bio_targets_line(axes, title_names, title_map):
 set_plot_style(font_size=20, font_family='Arial')
 
 task_name = config.TASK_NAME
-input_dir = f'../../../output/{task_name }/carbon_price/1_draw_data'
-output_dir = f"../../../output/{task_name }/carbon_price/3_Paper_figure"
+input_dir = f'../../../output/{task_name }/{config.CARBON_PRICE_DIR}/1_draw_data'
+output_dir = f"../../../output/{task_name }/{config.CARBON_PRICE_DIR}/3_Paper_figure"
 PlotSpec = namedtuple("PlotSpec", ["file", "sheet", "ylabel","total_name","bbox_to_anchor","post_process"])
 
 data_dict = xarray_to_dict(f"{input_dir}/xr_cost_for_profit.nc",1e3)

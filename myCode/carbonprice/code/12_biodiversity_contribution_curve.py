@@ -39,8 +39,9 @@ plt.grid(False)
 plt.tight_layout()
 plt.legend(frameon=False, fontsize=10, prop={'family': 'Arial'})
 
-base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
+base_dir = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}"
 out_dir = f"{base_dir}/3_Paper_figure"
+os.makedirs(out_dir, exist_ok=True)
 output_path = os.path.join(out_dir, "06_biodiversity_contribution_curve")
 
 plt.savefig(f"{output_path}.png", dpi=300)

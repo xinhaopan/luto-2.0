@@ -12,7 +12,7 @@ grid_search = {
     'MEM': ['68GB'],
     'NCPUS': ['18'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['24:00:00'],
+    'TIME': ['30:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['high', 'low', 'off'],
     'BIODIVERSITY_TARGET_GBF_2': ['high', 'off'],

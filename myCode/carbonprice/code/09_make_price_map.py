@@ -46,7 +46,7 @@ def plot_tif_grid(tif_title_list, figsize=(10, 11)):
 
 
 # ==== Paths & global params ====
-base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
+base_dir = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}"
 arr_path = f"{base_dir}/4_tif"
 out_dir = f"{base_dir}/3_Paper_figure"
 os.makedirs(out_dir, exist_ok=True)

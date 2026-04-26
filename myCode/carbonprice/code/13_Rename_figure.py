@@ -6,8 +6,7 @@ rename_dict = {
     '04_xr_total_cost': 'Figure 03 Cost',
     '04_xr_total_carbon': 'Figure 04 Change in GHG emissions',
     '04_xr_total_bio': 'Figure 05 Change in Biodiversity',
-    '05_Carbon_price_all_long': 'Figure 06 Shadow carbon price',
-    '05_biodiversity_price_long': 'Figure 07 Shadow biodiversity price',
+    '05_Carbon_bio_price_combined': 'Figure 06 Shadow carbon and biodiversity price',
     '06_cost_maps_line_clip': 'Figure 08 Cost maps',
     '06_Sol_price_maps_line': 'Figure 09 Shadow solution price maps',
 
@@ -37,8 +36,8 @@ rename_dict = {
 }
 
 for old, new in rename_dict.items():
-    old_file = f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/{old}.png"
-    new_file = f"../../../output/{config.TASK_NAME}/carbon_price/3_Paper_figure/{new}.png"
+    old_file = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}/3_Paper_figure/{old}.png"
+    new_file = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}/3_Paper_figure/{new}.png"
     if os.path.exists(old_file):
         os.replace(old_file, new_file)
     else:

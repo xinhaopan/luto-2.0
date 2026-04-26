@@ -49,7 +49,6 @@ from tools.price_slice_utils import (
 )
 
 
-BASE_YEAR = 2025
 YEAR = 2050
 BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
@@ -113,17 +112,17 @@ PANEL_CONFIG = {
     "Agricultural land-use": {
         "order": AG_ORDER,
         "color_map": AG_COLOR_MAP,
-        "ylabel": "Agricultural land-use",
+        "ylabel": "Agricultural land-use\nNet econ. change vs. 2050 baseline (Billion AU$)",
     },
     "Ag management": {
         "order": AM_ORDER,
         "color_map": AM_COLOR_MAP,
-        "ylabel": "Ag management",
+        "ylabel": "Ag management\nNet econ. change vs. 2050 baseline (Billion AU$)",
     },
     "Non-ag": {
         "order": NON_AG_ORDER,
         "color_map": NON_AG_COLOR_MAP,
-        "ylabel": "Non-ag",
+        "ylabel": "Non-ag\nNet econ. change vs. 2050 baseline (Billion AU$)",
     },
 }
 
@@ -252,6 +251,10 @@ def get_category_order(area_type, categories_seen):
 def collect_slice_rows(run_map, price_vals, varying_key):
     rows = []
     price_type = "CarbonPrice" if varying_key == "cp" else "BioPrice"
+    baseline_zip = run_map.get((0.0, 0.0))
+
+    # Baseline: (cp=0, bp=0) run at YEAR — bp=0 so no bio payment add-back needed
+    profit_baseline = get_profit_summaries(baseline_zip, YEAR) if baseline_zip else {at: {} for at in PANEL_CONFIG}
 
     for price in price_vals:
         key = (price, 0.0) if varying_key == "cp" else (0.0, price)
@@ -259,37 +262,33 @@ def collect_slice_rows(run_map, price_vals, varying_key):
         if zip_path is None:
             continue
 
-        profit_2010 = get_profit_summaries(zip_path, BASE_YEAR)
         profit_2050 = get_profit_summaries(zip_path, YEAR)
-        bio_2010 = get_bio_summaries(zip_path, BASE_YEAR) if varying_key == "bp" else {}
         bio_2050 = get_bio_summaries(zip_path, YEAR) if varying_key == "bp" else {}
 
         for area_type in PANEL_CONFIG:
             categories = list(dict.fromkeys(
-                list(profit_2010[area_type]) +
+                list(profit_baseline.get(area_type, {})) +
                 list(profit_2050[area_type]) +
-                list(bio_2010.get(area_type, {})) +
                 list(bio_2050.get(area_type, {}))
             ))
             category_order = get_category_order(area_type, categories)
 
             total_change = 0.0
             for category in category_order:
-                base_net_econ_2010_aud = profit_2010[area_type].get(category, 0.0)
+                base_net_econ_baseline_aud = profit_baseline.get(area_type, {}).get(category, 0.0)
                 base_net_econ_2050_aud = profit_2050[area_type].get(category, 0.0)
-                bio_score_2010_ha_yr = bio_2010.get(area_type, {}).get(category, 0.0)
                 bio_score_2050_ha_yr = bio_2050.get(area_type, {}).get(category, 0.0)
 
                 # Carbon pricing is already embedded in archived profit outputs.
                 # For the biodiversity-price slice, add back bio_price x bio_score
                 # at 2050 so this figure matches solver-side accounting.
                 add_back_bio_payment = varying_key == "bp" and ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS
-                bio_payment_2010_aud = 0.0
                 bio_payment_2050_aud = price * bio_score_2050_ha_yr if add_back_bio_payment else 0.0
 
-                net_econ_2010_aud = base_net_econ_2010_aud + bio_payment_2010_aud
+                # Baseline has bp=0, so no bio payment add-back for baseline
+                net_econ_baseline_aud = base_net_econ_baseline_aud
                 net_econ_2050_aud = base_net_econ_2050_aud + bio_payment_2050_aud
-                net_econ_change_baud = (net_econ_2050_aud - net_econ_2010_aud) / 1e9
+                net_econ_change_baud = (net_econ_2050_aud - net_econ_baseline_aud) / 1e9
                 total_change += net_econ_change_baud
 
                 rows.append({
@@ -297,27 +296,19 @@ def collect_slice_rows(run_map, price_vals, varying_key):
                     "Price": price,
                     "AreaType": area_type,
                     "Category": category,
-                    "BaseNetEcon2010_BAUD": base_net_econ_2010_aud / 1e9,
+                    "BaseNetEcon_Baseline_BAUD": base_net_econ_baseline_aud / 1e9,
                     "BaseNetEcon2050_BAUD": base_net_econ_2050_aud / 1e9,
-                    "BioScore2010_ha_yr": bio_score_2010_ha_yr,
                     "BioScore2050_ha_yr": bio_score_2050_ha_yr,
-                    "BioPayment2010_BAUD": bio_payment_2010_aud / 1e9,
                     "BioPayment2050_BAUD": bio_payment_2050_aud / 1e9,
-                    "NetEcon2010_BAUD": net_econ_2010_aud / 1e9,
+                    "NetEcon_Baseline_BAUD": net_econ_baseline_aud / 1e9,
                     "NetEcon2050_BAUD": net_econ_2050_aud / 1e9,
-                    "NetEconChangeSince2010_BAUD": net_econ_change_baud,
+                    "NetEconChangevs_Baseline_BAUD": net_econ_change_baud,
                 })
 
-            if varying_key == "bp":
-                print(
-                    f"  {varying_key}={format_thousands(price)} | {area_type}: "
-                    f"change={total_change:.2f} B AUD"
-                )
-            else:
-                print(
-                    f"  {varying_key}={format_thousands(price)} | {area_type}: "
-                    f"change={total_change:.2f} B AUD"
-                )
+            print(
+                f"  {varying_key}={format_thousands(price)} | {area_type}: "
+                f"change={total_change:.2f} B AUD"
+            )
 
     return rows
 
@@ -338,15 +329,13 @@ def load_cache():
         "Price",
         "AreaType",
         "Category",
-        "BaseNetEcon2010_BAUD",
+        "BaseNetEcon_Baseline_BAUD",
         "BaseNetEcon2050_BAUD",
-        "BioScore2010_ha_yr",
         "BioScore2050_ha_yr",
-        "BioPayment2010_BAUD",
         "BioPayment2050_BAUD",
-        "NetEcon2010_BAUD",
+        "NetEcon_Baseline_BAUD",
         "NetEcon2050_BAUD",
-        "NetEconChangeSince2010_BAUD",
+        "NetEconChangevs_Baseline_BAUD",
     }
     if not required_columns.issubset(df_long.columns):
         print("Cached net economic data schema is outdated; rebuilding.")
@@ -358,10 +347,10 @@ def load_cache():
 def collect_and_cache():
     run_map, cp_vals, bp_vals = build_run_map()
 
-    print(f"\n--- Slice A: BioPrice=0, carbon price varies ({BASE_YEAR}->{YEAR}) ---")
+    print(f"\n--- Slice A: BioPrice=0, carbon price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
     rows_cp = collect_slice_rows(run_map, cp_vals, "cp")
 
-    print(f"\n--- Slice B: CarbonPrice=0, biodiversity price varies ({BASE_YEAR}->{YEAR}) ---")
+    print(f"\n--- Slice B: CarbonPrice=0, biodiversity price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
     rows_bp = collect_slice_rows(run_map, bp_vals, "bp")
 
     df_long = pd.DataFrame(rows_cp + rows_bp)
@@ -388,7 +377,7 @@ def build_pivot(df_long, price_type, area_type):
     pivot = df_subset.pivot_table(
         index="Price",
         columns="Category",
-        values="NetEconChangeSince2010_BAUD",
+        values="NetEconChangevs_Baseline_BAUD",
         aggfunc="sum",
         fill_value=0.0,
     ).sort_index()

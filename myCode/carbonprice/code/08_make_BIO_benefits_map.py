@@ -86,7 +86,7 @@ def plot_cost_grid(scenarios: dict, year: int = 2050, figsize=None, nrows=4, nco
 
 
 # ==== Paths & global params ====
-base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
+base_dir = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}"
 arr_path = f"{base_dir}/4_tif"
 out_dir = f"{base_dir}/3_Paper_figure"
 os.makedirs(out_dir, exist_ok=True)
@@ -99,7 +99,7 @@ set_plot_style(font_size=15, font_family='Arial')
 # 参照/掩膜对齐（仅一次）
 ref_tif = f"{arr_path}/carbon_high_50/xr_total_cost_ha_carbon_high_50_2050.tif"
 src_tif = f"../Map/public_area.tif"
-aligned_tif = f"../Map/public_area_aligned.tif"
+aligned_tif = f"../Map/public_area_aligned_{os.environ.get('CARBON_RATE', '')}.tif"
 align_raster_to_reference(src_tif, ref_tif, aligned_tif, resampling="nearest")
 
 # 统一色带

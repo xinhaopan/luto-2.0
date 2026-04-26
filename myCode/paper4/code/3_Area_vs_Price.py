@@ -33,7 +33,6 @@ from tools.price_slice_utils import (
 )
 
 
-BASE_YEAR = 2025
 YEAR = 2050
 BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
@@ -90,17 +89,17 @@ AREA_CONFIG = {
     "Agricultural land-use": {
         "order": AG_ORDER,
         "color_map": AG_COLOR_MAP,
-        "ylabel": "Agricultural land-use\nArea change since 2010 (Mha)",
+        "ylabel": "Agricultural land-use\nArea change vs. 2050 baseline (Mha)",
     },
     "Ag management": {
         "order": AM_ORDER,
         "color_map": AM_COLOR_MAP,
-        "ylabel": "Ag management\nArea change since 2010 (Mha)",
+        "ylabel": "Ag management\nArea change vs. 2050 baseline (Mha)",
     },
     "Non-ag": {
         "order": NON_AG_ORDER,
         "color_map": NON_AG_COLOR_MAP,
-        "ylabel": "Non-ag\nArea change since 2010 (Mha)",
+        "ylabel": "Non-ag\nArea change vs. 2050 baseline (Mha)",
     },
 }
 
@@ -210,7 +209,15 @@ def read_non_ag_area(zip_path, year):
 
 def collect_slice_rows(run_map, price_vals, varying_key):
     price_type = "CarbonPrice" if varying_key == "cp" else "BioPrice"
+    baseline_zip = run_map.get((0.0, 0.0))
     rows = []
+
+    # Baseline: (cp=0, bp=0) run at YEAR
+    summaries_baseline = {
+        "Agricultural land-use": read_agricultural_area(baseline_zip, YEAR) if baseline_zip else {},
+        "Ag management": read_ag_management_area(baseline_zip, YEAR) if baseline_zip else {},
+        "Non-ag": read_non_ag_area(baseline_zip, YEAR) if baseline_zip else {},
+    }
 
     for price in price_vals:
         key = (price, 0.0) if varying_key == "cp" else (0.0, price)
@@ -218,11 +225,6 @@ def collect_slice_rows(run_map, price_vals, varying_key):
         if zip_path is None:
             continue
 
-        summaries_2010 = {
-            "Agricultural land-use": read_agricultural_area(zip_path, BASE_YEAR),
-            "Ag management": read_ag_management_area(zip_path, BASE_YEAR),
-            "Non-ag": read_non_ag_area(zip_path, BASE_YEAR),
-        }
         summaries_2050 = {
             "Agricultural land-use": read_agricultural_area(zip_path, YEAR),
             "Ag management": read_ag_management_area(zip_path, YEAR),
@@ -232,31 +234,31 @@ def collect_slice_rows(run_map, price_vals, varying_key):
         print(f"  {varying_key}={format_thousands(price)}:")
 
         for area_type in AREA_CONFIG:
-            summary_2010 = summaries_2010[area_type]
+            summary_baseline = summaries_baseline[area_type]
             summary_2050 = summaries_2050[area_type]
             category_order = get_category_order(
                 area_type,
-                list(dict.fromkeys(list(summary_2010) + list(summary_2050))),
+                list(dict.fromkeys(list(summary_baseline) + list(summary_2050))),
             )
 
-            total_2010 = sum(summary_2010.values())
+            total_baseline = sum(summary_baseline.values())
             total_2050 = sum(summary_2050.values())
             print(
-                f"    {area_type}: 2010={total_2010:.2f} Mha, "
-                f"2050={total_2050:.2f} Mha, change={total_2050 - total_2010:.2f} Mha"
+                f"    {area_type}: baseline={total_baseline:.2f} Mha, "
+                f"2050={total_2050:.2f} Mha, change={total_2050 - total_baseline:.2f} Mha"
             )
 
             for category in category_order:
-                area_2010 = summary_2010.get(category, 0.0)
+                area_baseline = summary_baseline.get(category, 0.0)
                 area_2050 = summary_2050.get(category, 0.0)
                 rows.append({
                     "PriceType": price_type,
                     "Price": price,
                     "AreaType": area_type,
                     "Category": category,
-                    "Area_2010_Mha": area_2010,
+                    "Area_Baseline_Mha": area_baseline,
                     "Area_2050_Mha": area_2050,
-                    "AreaChangeSince2010_Mha": area_2050 - area_2010,
+                    "AreaChangevs_Baseline_Mha": area_2050 - area_baseline,
                 })
 
     return rows
@@ -278,9 +280,9 @@ def load_cache():
         "Price",
         "AreaType",
         "Category",
-        "Area_2010_Mha",
+        "Area_Baseline_Mha",
         "Area_2050_Mha",
-        "AreaChangeSince2010_Mha",
+        "AreaChangevs_Baseline_Mha",
     }
     if not required_columns.issubset(df_long.columns):
         print("Cached area data schema is outdated; rebuilding.")
@@ -292,10 +294,10 @@ def load_cache():
 def collect_and_cache():
     run_map, cp_vals, bp_vals = build_run_map()
 
-    print(f"\n--- Slice A: BioPrice=0, carbon price varies ({BASE_YEAR}->{YEAR}) ---")
+    print(f"\n--- Slice A: BioPrice=0, carbon price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
     rows_cp = collect_slice_rows(run_map, cp_vals, "cp")
 
-    print(f"\n--- Slice B: CarbonPrice=0, biodiversity price varies ({BASE_YEAR}->{YEAR}) ---")
+    print(f"\n--- Slice B: CarbonPrice=0, biodiversity price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
     rows_bp = collect_slice_rows(run_map, bp_vals, "bp")
 
     df_long = pd.DataFrame(rows_cp + rows_bp)
@@ -329,7 +331,7 @@ def build_area_pivot(df_long, price_type, area_type):
     pivot = df_subset.pivot_table(
         index="Price",
         columns="Category",
-        values="AreaChangeSince2010_Mha",
+        values="AreaChangevs_Baseline_Mha",
         aggfunc="sum",
         fill_value=0.0,
     ).sort_index()

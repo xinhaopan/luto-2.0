@@ -130,7 +130,7 @@ def precompute_gbf2_targets_csv(
       - 值：targets / scale（默认除以 1e6）
 
     输出路径默认：
-      ../../../output/{task_name}/carbon_price/1_draw_data/gbf2_targets_{start_year}_{end_year}_scaled1e6.csv
+      ../../../output/{task_name}/{config.CARBON_PRICE_DIR}/1_draw_data/gbf2_targets_{start_year}_{end_year}_scaled1e6.csv
 
     Returns
     -------
@@ -138,7 +138,7 @@ def precompute_gbf2_targets_csv(
         输出 CSV 的路径
     """
     if out_dir is None:
-        out_dir = os.path.abspath(os.path.join("../../../output", task_name, "carbon_price", "1_draw_data"))
+        out_dir = os.path.abspath(os.path.join("../../../output", task_name, config.CARBON_PRICE_DIR, "1_draw_data"))
     os.makedirs(out_dir, exist_ok=True)
 
     filenames = list(dict.fromkeys(filenames))  # 去重且保持原顺序

@@ -46,7 +46,6 @@ from tools.price_slice_utils import (
 )
 
 
-BASE_YEAR = 2025
 YEAR = 2050
 CACHE_PATH = DATA_DIR / f"2_NetEcon_raw_data_{YEAR}.xlsx"
 
@@ -84,21 +83,25 @@ plt.rcParams.update({
 
 def collect_slice(run_map, price_vals, varying_key):
     price_col = "CarbonPrice" if varying_key == "cp" else "BioPrice"
+    baseline_zip = run_map.get((0.0, 0.0))
     rows = []
+
+    # Baseline: (cp=0, bp=0) run at YEAR — no bio payment since bp=0
+    base_net_econ_baseline = (
+        read_sum(baseline_zip, PROFIT_FILES, YEAR) / 1e9
+        if baseline_zip else np.nan
+    )
+    net_econ_baseline = base_net_econ_baseline  # bp=0 for baseline, no add-back needed
 
     for price in price_vals:
         key = (price, 0.0) if varying_key == "cp" else (0.0, price)
         zip_path = run_map.get(key)
 
         if zip_path:
-            base_net_econ_2010 = read_sum(zip_path, PROFIT_FILES, BASE_YEAR) / 1e9
             base_net_econ_2050 = read_sum(zip_path, PROFIT_FILES, YEAR) / 1e9
-            bio_score_2010_ha_yr = read_sum(zip_path, BIO_FILES, BASE_YEAR)
             bio_score_2050_ha_yr = read_sum(zip_path, BIO_FILES, YEAR)
         else:
-            base_net_econ_2010 = np.nan
             base_net_econ_2050 = np.nan
-            bio_score_2010_ha_yr = np.nan
             bio_score_2050_ha_yr = np.nan
 
         # Carbon price is already included in xr_economics_*_profit. Only the
@@ -109,48 +112,40 @@ def collect_slice(run_map, price_vals, varying_key):
             and ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS
             and not np.isnan(bio_score_2050_ha_yr)
         )
-        bio_payment_2010 = 0.0
         bio_payment_2050 = price * bio_score_2050_ha_yr / 1e9 if add_back_bio_payment else 0.0
 
-        net_econ_2010 = (
-            base_net_econ_2010 + bio_payment_2010
-            if not np.isnan(base_net_econ_2010)
-            else np.nan
-        )
         net_econ_2050 = (
             base_net_econ_2050 + bio_payment_2050
             if not np.isnan(base_net_econ_2050)
             else np.nan
         )
         net_econ_change = (
-            net_econ_2050 - net_econ_2010
-            if not np.isnan(net_econ_2010) and not np.isnan(net_econ_2050)
+            net_econ_2050 - net_econ_baseline
+            if not np.isnan(net_econ_2050) and not np.isnan(net_econ_baseline)
             else np.nan
         )
 
         rows.append({
             price_col: price,
-            "BaseNetEcon2010_BAUD": base_net_econ_2010,
+            "BaseNetEcon_Baseline_BAUD": base_net_econ_baseline,
             "BaseNetEcon2050_BAUD": base_net_econ_2050,
-            "BioScore2010_ha_yr": bio_score_2010_ha_yr,
             "BioScore2050_ha_yr": bio_score_2050_ha_yr,
-            "BioPayment2010_BAUD": bio_payment_2010,
             "BioPayment2050_BAUD": bio_payment_2050,
-            "NetEcon2010_BAUD": net_econ_2010,
+            "NetEcon_Baseline_BAUD": net_econ_baseline,
             "NetEcon2050_BAUD": net_econ_2050,
-            "NetEconChangeSince2010_BAUD": net_econ_change,
+            "NetEconChangevs_Baseline_BAUD": net_econ_change,
         })
 
         if varying_key == "bp":
             print(
                 f"  {varying_key}={format_thousands(price)}: "
-                f"2010={net_econ_2010:.2f}, 2050={net_econ_2050:.2f}, "
+                f"baseline={net_econ_baseline:.2f}, 2050={net_econ_2050:.2f}, "
                 f"bio_payment_2050={bio_payment_2050:.2f}, change={net_econ_change:.2f} B AUD"
             )
         else:
             print(
                 f"  {varying_key}={format_thousands(price)}: "
-                f"2010={net_econ_2010:.2f}, 2050={net_econ_2050:.2f}, "
+                f"baseline={net_econ_baseline:.2f}, 2050={net_econ_2050:.2f}, "
                 f"change={net_econ_change:.2f} B AUD"
             )
 
@@ -166,15 +161,13 @@ def load_cache():
     df_bp = pd.read_excel(CACHE_PATH, sheet_name="BioPrice")
 
     required_columns = {
-        "BaseNetEcon2010_BAUD",
+        "BaseNetEcon_Baseline_BAUD",
         "BaseNetEcon2050_BAUD",
-        "BioScore2010_ha_yr",
         "BioScore2050_ha_yr",
-        "BioPayment2010_BAUD",
         "BioPayment2050_BAUD",
-        "NetEcon2010_BAUD",
+        "NetEcon_Baseline_BAUD",
         "NetEcon2050_BAUD",
-        "NetEconChangeSince2010_BAUD",
+        "NetEconChangevs_Baseline_BAUD",
     }
     if not required_columns.issubset(df_cp.columns) or not required_columns.issubset(df_bp.columns):
         print("Cached schema is outdated; rebuilding net economic return cache.")
@@ -188,10 +181,10 @@ df_cp, df_bp = load_cache()
 if df_cp is None or df_bp is None:
     run_map, cp_vals, bp_vals = build_run_map()
 
-    print(f"\n--- Slice A: BioPrice=0, carbon price varies ({BASE_YEAR}->{YEAR}) ---")
+    print(f"\n--- Slice A: BioPrice=0, carbon price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
     df_cp = collect_slice(run_map, cp_vals, "cp")
 
-    print(f"\n--- Slice B: CarbonPrice=0, biodiversity price varies ({BASE_YEAR}->{YEAR}) ---")
+    print(f"\n--- Slice B: CarbonPrice=0, biodiversity price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
     df_bp = collect_slice(run_map, bp_vals, "bp")
 
     with pd.ExcelWriter(CACHE_PATH, engine="openpyxl") as writer:
@@ -202,7 +195,7 @@ if df_cp is None or df_bp is None:
 
 def line_plot(ax, df, price_col):
     x = df[price_col].to_numpy()
-    y = df["NetEconChangeSince2010_BAUD"].to_numpy()
+    y = df["NetEconChangevs_Baseline_BAUD"].to_numpy()
     mask = ~np.isnan(y)
 
     ax.plot(
@@ -215,7 +208,7 @@ def line_plot(ax, df, price_col):
         markersize=5,
     )
     ax.set_xlabel(get_price_axis_label("cp" if price_col == "CarbonPrice" else "bp"))
-    ax.set_ylabel("Change in net economic return since 2010 (Billion AU$)")
+    ax.set_ylabel(r"Change in net economic return vs. 2050 baseline (Billion AU$)")
     ax.set_xlim(left=0)
     if mask.any() and np.nanmin(y[mask]) < 0.0 < np.nanmax(y[mask]):
         ax.axhline(0.0, color="#444444", linewidth=0.8)

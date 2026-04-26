@@ -26,7 +26,6 @@ from tools.price_slice_utils import (
 )
 
 
-BASE_YEAR = 2025
 YEAR = 2050
 CACHE_PATH = DATA_DIR / f"1_MACC_raw_data_{YEAR}.xlsx"
 
@@ -61,42 +60,43 @@ plt.rcParams.update({
 
 def collect_slices():
     run_map, cp_vals, bp_vals = build_run_map()
+    baseline_zip = run_map.get((0.0, 0.0))
 
     rows_ghg = []
-    print(f"\n--- GHG abatement since {BASE_YEAR} vs carbon price (BioPrice=0) ---")
+    print(f"\n--- GHG abatement vs baseline (cp=0, bp=0) at {YEAR} vs carbon price (BioPrice=0) ---")
+    ghg_baseline = read_sum(baseline_zip, GHG_FILES, YEAR) / 1e6 if baseline_zip else np.nan
     for cp in cp_vals:
         zip_path = run_map.get((cp, 0.0))
-        ghg_2010 = read_sum(zip_path, GHG_FILES, BASE_YEAR) / 1e6 if zip_path else np.nan
         ghg_2050 = read_sum(zip_path, GHG_FILES, YEAR) / 1e6 if zip_path else np.nan
-        abatement = ghg_2010 - ghg_2050 if not np.isnan(ghg_2050) else np.nan
+        abatement = ghg_baseline - ghg_2050 if not np.isnan(ghg_2050) else np.nan
         rows_ghg.append({
             "CarbonPrice": cp,
-            "GHG_2025_MtCO2e": ghg_2010,
+            "GHG_Baseline_MtCO2e": ghg_baseline,
             "GHG_2050_MtCO2e": ghg_2050,
-            "GHGAbatementSince2025_MtCO2e": abatement,
+            "GHGAbatement_vs_Baseline_MtCO2e": abatement,
         })
         print(
             f"  cp={format_thousands(cp)}: "
-            f"GHG2010={ghg_2010:.1f}, GHG2050={ghg_2050:.1f}, "
+            f"GHG_baseline={ghg_baseline:.1f}, GHG2050={ghg_2050:.1f}, "
             f"abatement={abatement:.1f} Mt CO2e"
         )
 
     rows_bio = []
-    print(f"\n--- Biodiversity change since {BASE_YEAR} vs bio price (CarbonPrice=0) ---")
+    print(f"\n--- Biodiversity change vs baseline (cp=0, bp=0) at {YEAR} vs bio price (CarbonPrice=0) ---")
+    bio_baseline = read_sum(baseline_zip, BIO_FILES, YEAR) if baseline_zip else np.nan
     for bp in bp_vals:
         zip_path = run_map.get((0.0, bp))
-        bio_2010 = read_sum(zip_path, BIO_FILES, BASE_YEAR) if zip_path else np.nan
         bio_2050 = read_sum(zip_path, BIO_FILES, YEAR) if zip_path else np.nan
-        dbio = bio_2050 - bio_2010 if not np.isnan(bio_2050) else np.nan
+        dbio = bio_2050 - bio_baseline if not np.isnan(bio_2050) else np.nan
         rows_bio.append({
             "BioPrice": bp,
-            "Bio_2025_ha_yr": bio_2010,
+            "Bio_Baseline_ha_yr": bio_baseline,
             "Bio_2050_ha_yr": bio_2050,
-            "BioChangeSince2025_ha_yr": dbio,
+            "BioChange_vs_Baseline_ha_yr": dbio,
         })
         print(
             f"  bp={format_thousands(bp)}: "
-            f"Bio2010={bio_2010:.2f}, Bio2050={bio_2050:.2f}, "
+            f"Bio_baseline={bio_baseline:.2f}, Bio2050={bio_2050:.2f}, "
             f"change={dbio:.2f}"
         )
 
@@ -116,8 +116,8 @@ if CACHE_PATH.is_file():
     df_ghg = pd.read_excel(CACHE_PATH, sheet_name="GHG_slice")
     df_bio = pd.read_excel(CACHE_PATH, sheet_name="Bio_slice")
     if (
-        "GHGAbatementSince2025_MtCO2e" not in df_ghg.columns
-        or "BioChangeSince2025_ha_yr" not in df_bio.columns
+        "GHGAbatement_vs_Baseline_MtCO2e" not in df_ghg.columns
+        or "BioChange_vs_Baseline_ha_yr" not in df_bio.columns
     ):
         print("Cached schema is outdated; rebuilding.")
         df_ghg, df_bio = collect_slices()
@@ -125,10 +125,10 @@ else:
     df_ghg, df_bio = collect_slices()
 
 
-x_ghg = df_ghg["GHGAbatementSince2025_MtCO2e"].to_numpy()
+x_ghg = df_ghg["GHGAbatement_vs_Baseline_MtCO2e"].to_numpy()
 y_cp = df_ghg["CarbonPrice"].to_numpy()
 
-x_bio = df_bio["BioChangeSince2025_ha_yr"].to_numpy() / 1e6
+x_bio = df_bio["BioChange_vs_Baseline_ha_yr"].to_numpy() / 1e6
 y_bp = df_bio["BioPrice"].to_numpy()
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
@@ -143,7 +143,7 @@ ax1.plot(
     linewidth=1.5,
     markersize=5,
 )
-ax1.set_xlabel(r"GHG abatement since 2010 (Mt CO$_2$e)")
+ax1.set_xlabel(r"GHG abatement vs. 2050 baseline (Mt CO$_2$e)")
 ax1.set_ylabel(r"Carbon price (AU\$/tCO$_2$e)")
 ax1.set_xlim(left=0)
 ax1.set_ylim(bottom=0)
@@ -160,7 +160,7 @@ ax2.plot(
     linewidth=1.5,
     markersize=5,
 )
-ax2.set_xlabel("Biodiversity change since 2010 (Mha yr$^{-1}$)")
+ax2.set_xlabel(r"Biodiversity change vs. 2050 baseline (Mha yr$^{-1}$)")
 ax2.set_ylabel(r"Biodiversity price (AU\$/ha)")
 ax2.set_ylim(bottom=0)
 apply_price_formatter(ax2, axis="y")

@@ -5,7 +5,7 @@
 
 # ── Task root ────────────────────────────────────────────────────────────────
 # Switch between NCI results and local test run as needed
-TASK_ROOT = "20260324_Paper3_aquila"    # NCI run (zip archives, auto-read by data_helper)
+TASK_ROOT = "20260414_Paper3_NCI"    # NCI run (zip archives, auto-read by data_helper)
 # TASK_ROOT = "20260312_Paper3_test" # local test run (RF15, immediately available)
 
 INPUT_DIR  = '../../../input'

@@ -35,7 +35,6 @@ from tools.price_slice_utils import (
 )
 
 
-BASE_YEAR = 2025
 YEAR = 2050
 BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
@@ -94,17 +93,17 @@ PANEL_CONFIG = {
     "Agricultural land-use": {
         "order": AG_ORDER + [TRANSITION_LABEL],
         "color_map": {**AG_COLOR_MAP, TRANSITION_LABEL: LU_COLOR_MAP.get(TRANSITION_LABEL, "#D2E0FB")},
-        "ylabel": "Agricultural land-use\nChange since 2010",
+        "ylabel": "Agricultural land-use\nChange vs. 2050 baseline",
     },
     "Ag management": {
         "order": AM_ORDER,
         "color_map": AM_COLOR_MAP,
-        "ylabel": "Ag management\nChange since 2010",
+        "ylabel": "Ag management\nChange vs. 2050 baseline",
     },
     "Non-ag": {
         "order": NON_AG_ORDER,
         "color_map": NON_AG_COLOR_MAP,
-        "ylabel": "Non-ag\nChange since 2010",
+        "ylabel": "Non-ag\nChange vs. 2050 baseline",
     },
 }
 
@@ -250,26 +249,28 @@ def get_category_order(area_type, categories_seen):
 
 def collect_carbon_rows(run_map, cp_vals):
     rows = []
+    baseline_zip = run_map.get((0.0, 0.0))
+    summary_baseline = get_ghg_summaries(baseline_zip, YEAR) if baseline_zip else {}
 
-    print(f"\n--- Slice A: BioPrice=0, carbon price varies ({BASE_YEAR}->{YEAR}) ---")
+    print(f"\n--- Slice A: BioPrice=0, carbon price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
     for cp in cp_vals:
         zip_path = run_map.get((cp, 0.0))
         if zip_path is None:
             continue
 
-        summary_2010 = get_ghg_summaries(zip_path, BASE_YEAR)
         summary_2050 = get_ghg_summaries(zip_path, YEAR)
 
         for area_type in PANEL_CONFIG:
+            baseline_area = summary_baseline.get(area_type, {})
             categories = list(dict.fromkeys(
-                list(summary_2010[area_type]) + list(summary_2050[area_type])
+                list(baseline_area) + list(summary_2050[area_type])
             ))
             category_order = get_category_order(area_type, categories)
 
             total_mt = 0.0
             for category in category_order:
                 contribution_mt = (
-                    summary_2010[area_type].get(category, 0.0)
+                    baseline_area.get(category, 0.0)
                     - summary_2050[area_type].get(category, 0.0)
                 ) / 1e6
                 total_mt += contribution_mt
@@ -278,7 +279,7 @@ def collect_carbon_rows(run_map, cp_vals):
                     "Price": cp,
                     "AreaType": area_type,
                     "Category": category,
-                    "MetricType": "GHGAbatementSince2010_MtCO2e",
+                    "MetricType": "GHGAbatement_vs_Baseline_MtCO2e",
                     "ContributionValue": contribution_mt,
                 })
 
@@ -289,19 +290,21 @@ def collect_carbon_rows(run_map, cp_vals):
 
 def collect_biodiversity_rows(run_map, bp_vals):
     rows = []
+    baseline_zip = run_map.get((0.0, 0.0))
+    summary_baseline = get_bio_summaries(baseline_zip, YEAR) if baseline_zip else {}
 
-    print(f"\n--- Slice B: CarbonPrice=0, biodiversity price varies ({BASE_YEAR}->{YEAR}) ---")
+    print(f"\n--- Slice B: CarbonPrice=0, biodiversity price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
     for bp in bp_vals:
         zip_path = run_map.get((0.0, bp))
         if zip_path is None:
             continue
 
-        summary_2010 = get_bio_summaries(zip_path, BASE_YEAR)
         summary_2050 = get_bio_summaries(zip_path, YEAR)
 
         for area_type in PANEL_CONFIG:
+            baseline_area = summary_baseline.get(area_type, {})
             categories = list(dict.fromkeys(
-                list(summary_2010[area_type]) + list(summary_2050[area_type])
+                list(baseline_area) + list(summary_2050[area_type])
             ))
             category_order = get_category_order(area_type, categories)
 
@@ -309,7 +312,7 @@ def collect_biodiversity_rows(run_map, bp_vals):
             for category in category_order:
                 contribution_mha_yr = (
                     summary_2050[area_type].get(category, 0.0)
-                    - summary_2010[area_type].get(category, 0.0)
+                    - baseline_area.get(category, 0.0)
                 ) / 1e6
                 total_mha_yr += contribution_mha_yr
                 rows.append({
@@ -317,7 +320,7 @@ def collect_biodiversity_rows(run_map, bp_vals):
                     "Price": bp,
                     "AreaType": area_type,
                     "Category": category,
-                    "MetricType": "BiodiversityChangeSince2010_MhaYr",
+                    "MetricType": "BiodiversityChange_vs_Baseline_MhaYr",
                     "ContributionValue": contribution_mha_yr,
                 })
 
@@ -456,9 +459,9 @@ if df_long is None:
 
 fig, axes = plt.subplots(3, 2, figsize=(17, 11), sharex="col")
 
-axes[0, 0].set_title("Carbon price\nGHG abatement since 2010 (Mt CO$_2$e)")
+axes[0, 0].set_title("Carbon price\nGHG abatement vs. 2050 baseline (Mt CO$_2$e)")
 axes[0, 1].set_title(
-    "Biodiversity price\nBiodiversity change since 2010 (Mha yr$^{-1}$)"
+    "Biodiversity price\nBiodiversity change vs. 2050 baseline (Mha yr$^{-1}$)"
 )
 
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]

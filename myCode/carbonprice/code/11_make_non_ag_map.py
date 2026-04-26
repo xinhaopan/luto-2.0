@@ -39,13 +39,13 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
 
             if tif == "Total":
                 tif_path = (
-                    f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/"
+                    f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}/4_tif/{scenario}/"
                     f"xr_total_area_non_agricultural_landuse_{scenario}_2050.tif"
                 )
                 title_name = title_names[col]
             else:
                 tif_path = (
-                    f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/"
+                    f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}/4_tif/{scenario}/"
                     f"xr_area_non_agricultural_landuse_{scenario}_{tif}_2050.tif"
                 )
 
@@ -82,7 +82,7 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
 
 
 # --- Configuration ---
-base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
+base_dir = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}"
 out_dir = f"{base_dir}/3_Paper_figure"
 os.makedirs(out_dir, exist_ok=True)
 

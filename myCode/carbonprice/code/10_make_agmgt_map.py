@@ -32,9 +32,9 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
         for col, scenario in enumerate(scenarios):
             title_name = title_names[col] if row == 0 else ""
             if tif == "Total":
-                tif_path = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/xr_total_area_agricultural_management_{scenario}_2050.tif"
+                tif_path = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}/4_tif/{scenario}/xr_total_area_agricultural_management_{scenario}_2050.tif"
             else:
-                tif_path = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/xr_area_agricultural_management_{scenario}_{tif}_2050.tif"
+                tif_path = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}/4_tif/{scenario}/xr_area_agricultural_management_{scenario}_{tif}_2050.tif"
 
             tif_paths.append(tif_path)
             cell_jobs.append((row, col, tif_path, title_name))
@@ -55,9 +55,9 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
             if row == 0:
                 title_name = title_names[col]
             if tif == "Total":
-                tif_path = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/xr_total_area_agricultural_management_{scenario}_2050.tif"
+                tif_path = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}/4_tif/{scenario}/xr_total_area_agricultural_management_{scenario}_2050.tif"
             else:
-                tif_path = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif/{scenario}/xr_area_agricultural_management_{scenario}_{tif}_2050.tif"
+                tif_path = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}/4_tif/{scenario}/xr_area_agricultural_management_{scenario}_{tif}_2050.tif"
             ax = fig.add_subplot(gs[row, col], projection=ccrs.PlateCarree())
             safe_plot(
                 tif_path=tif_path,
@@ -73,7 +73,7 @@ def plot_tif_grid(scenarios, tif_title_list, title_names):
             axes.append(ax)
     return fig, axes
 
-base_dir = f"../../../output/{config.TASK_NAME}/carbon_price"
+base_dir = f"../../../output/{config.TASK_NAME}/{config.CARBON_PRICE_DIR}"
 arr_path = f"{base_dir}/4_tif"
 out_dir = f"{base_dir}/3_Paper_figure"
 os.makedirs(out_dir, exist_ok=True)
