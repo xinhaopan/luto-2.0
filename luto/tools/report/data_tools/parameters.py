@@ -306,6 +306,8 @@ COLORS_PLOT = {
     'Transition cost (Ag2Non-Ag)':              "#FF9F43",
     'Transition cost (Non-Ag2Ag)':              "#FFC3A0",
     'Profit':                                   "#232424",
+    'Biodiversity price':                       "#4DA6FF",
+    'Carbon price':                             "#66CC99",
 
     # --- Cost breakdown ---
     'Area cost':                                '#f45b5b',

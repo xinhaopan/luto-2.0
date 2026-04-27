@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260416_paper4'],
+    'TASK_NAME': ['20260427_paper4'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -20,7 +20,7 @@ grid_search = {
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'CARBON_PRICE_COSTANT': [0,8.92,17.85,26.77,35.69,44.61,53.54,62.46,75.84,89.23,133.84,178.46,233.07,267.69,312.3,356.92],
     'BIODIVERSITY_PRICES_FIELD': ['CONSTANT'],
-    'BIODIVERSITY_PRICE_CONSTANT': [i * 500 for i in range(11)],  # 0, 500, 1000, ..., 5000
+    'BIODIVERSITY_PRICE_CONSTANT':[0, 3850, 11000, 12925, 16379, 22000, 27297, 35431, 81950],
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
