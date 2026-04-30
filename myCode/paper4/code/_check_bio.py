@@ -1,6 +1,15 @@
 import io, zipfile
+import importlib.util
+from pathlib import Path
+
 import cf_xarray as cfxr
 import xarray as xr
+
+
+CONFIG_PATH = Path(__file__).resolve().parent / 'tools' / 'config.py'
+CONFIG_SPEC = importlib.util.spec_from_file_location('paper4_config', CONFIG_PATH)
+config = importlib.util.module_from_spec(CONFIG_SPEC)
+CONFIG_SPEC.loader.exec_module(config)
 
 BIO_FILES = [
     'xr_biodiversity_overall_priority_ag',
@@ -35,13 +44,14 @@ def read_sum(zip_path, file_stems, year):
             total += val
     return total
 
-root = 'F:/Users/s222552331/Work/LUTO2_XH/luto-2.0/output/20260414_paper4_NCI'
+root = str(config.TASK_ROOT)
 runs = [
-    ('Run_01_CarbonPrice_0_BioPrice_0',    0,    0),
-    ('Run_02_CarbonPrice_0_BioPrice_500',  0,  500),
-    ('Run_03_CarbonPrice_0_BioPrice_1000', 0, 1000),
-    ('Run_05_CarbonPrice_0_BioPrice_2000', 0, 2000),
-    ('Run_11_CarbonPrice_0_BioPrice_5000', 0, 5000),
+    (
+        run_name,
+        config.SCENARIO_PRICE_LOOKUP[run_name]['CarbonPrice'],
+        config.SCENARIO_PRICE_LOOKUP[run_name]['BioPrice'],
+    )
+    for run_name in config.biodiversity_price_scenarios
 ]
 base = None
 for run, cp, bp in runs:

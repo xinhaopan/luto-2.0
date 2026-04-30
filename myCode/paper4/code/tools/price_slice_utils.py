@@ -17,12 +17,53 @@ TASK_ROOT = (CODE_DIR / ".." / ".." / ".." / "output" / config.TASK_NAME).resolv
 OUT_DIR = TASK_ROOT / "paper4" / "figures"
 DATA_DIR = TASK_ROOT / "paper4" / "data"
 
+PAPER4_COLOR_OVERRIDES = {
+    "crops": "#7a3f91",
+    "livestock": "#f4d801",
+    "unallocatedmodifiedland": "#a3ff73",
+    "unallocatednaturalland": "#4eae32",
+}
+
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_paper4_paths():
     return TASK_ROOT, OUT_DIR, DATA_DIR
+
+
+def normalize_style_key(value):
+    return re.sub(r"[\s\-]+", "", str(value).strip().lower())
+
+
+def apply_paper4_color_overrides(color_map):
+    updated = dict(color_map)
+    for label in list(updated):
+        override = PAPER4_COLOR_OVERRIDES.get(normalize_style_key(label))
+        if override is not None:
+            updated[label] = override
+    return updated
+
+
+def apply_paper4_color_overrides_to_style_df(df):
+    df = df.copy()
+    label_columns = [column for column in ("desc_new", "desc") if column in df.columns]
+    if "color" not in df.columns or not label_columns:
+        return df
+
+    for idx, row in df.iterrows():
+        override = None
+        for column in label_columns:
+            value = row.get(column)
+            if pd.notna(value):
+                override = PAPER4_COLOR_OVERRIDES.get(normalize_style_key(value))
+            if override is not None:
+                break
+
+        if override is not None:
+            df.at[idx, "color"] = override
+
+    return df
 
 
 def parse_prices(run_name):
@@ -73,9 +114,9 @@ def get_price_column(varying_key):
 
 def get_price_axis_label(varying_key):
     if varying_key == "cp":
-        return r"Carbon price (AU\$/tCO$_2$e)"
+        return r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)"
     if varying_key == "bp":
-        return r"Biodiversity price (AU\$/ha)"
+        return r"Biodiversity price (AU\$/ha yr$^{-1}$)"
     raise ValueError(f"Unsupported varying_key: {varying_key}")
 
 

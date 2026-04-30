@@ -137,15 +137,7 @@ def create_zip(data):
     """Zip results into two archives: full archive + report-only archive, then clean up."""
     import os, pathlib, shutil, zipfile
 
-    output_dir = pathlib.Path(data.path).absolute()
-    simulation_root = output_dir.parent.parent  # .../Run_XXXX/
-
-    run_idx = simulation_root.name
-    report_data_dir = simulation_root.parent / 'Report_Data'
-    report_data_dir.mkdir(parents=True, exist_ok=True)
-
-    report_zip_path = report_data_dir / f'{run_idx}.zip'
-    archive_path = simulation_root / 'Run_Archive.zip'
+    output_dir, simulation_root, report_zip_path, archive_path = get_archive_paths(data)
 
     with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as run_zip, \
          zipfile.ZipFile(report_zip_path, 'w', zipfile.ZIP_DEFLATED) as report_zip:
@@ -171,10 +163,24 @@ def create_zip(data):
 
     return report_zip_path
 
+def get_archive_paths(data):
+    output_dir = pathlib.Path(data.path).absolute()
+    simulation_root = output_dir.parent.parent  # .../Run_XXXX/
+
+    run_idx = simulation_root.name
+    report_data_dir = simulation_root.parent / 'Report_Data'
+    report_data_dir.mkdir(parents=True, exist_ok=True)
+
+    report_zip_path = report_data_dir / f'{run_idx}.zip'
+    archive_path = simulation_root / 'Run_Archive.zip'
+
+    return output_dir, simulation_root, report_zip_path, archive_path
+
 def main():
     import luto.simulation as sim
     import luto.settings as settings
 
+    data = None
     try:
         # 确保日志目录存在
         os.makedirs('output', exist_ok=True)
@@ -223,18 +229,24 @@ def main():
             pass
 
         else:
+            _, _, report_zip_path, _ = get_archive_paths(data)
             write_log("Archiving results...")
-            report_zip_path = create_zip(data)
-            write_log(f"Archiving complete. Report zip: {report_zip_path}")
-            write_log("Cleanup complete.")
+            write_log(f"Report zip target: {report_zip_path}")
+            write_log("Starting final archive and cleanup step.")
+            create_zip(data)
+            print(f"Archiving complete. Report zip: {report_zip_path}")
+            print("Cleanup complete.")
 
     except Exception as e:
         # 记录错误到日志文件
-        write_log(f"Run failed.", file=log_file)
-        write_log(f"Model finished in {data.last_year}", file=log_file)
-
         error_message = f"An error occurred during simulation:\n{str(e)}\n{traceback.format_exc()}"
-        write_log(error_message, file=error_log_file)
+        try:
+            write_log("Run failed.", file=log_file)
+            if data is not None and hasattr(data, 'last_year'):
+                write_log(f"Model finished in {data.last_year}", file=log_file)
+            write_log(error_message, file=error_log_file)
+        except Exception as log_error:
+            print(f"Failed to write error logs: {log_error}")
 
         # 打印错误信息，便于调试
         print(f"Error in simulation: {e}")

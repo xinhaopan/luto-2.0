@@ -25,6 +25,7 @@ import xarray as xr
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from tools.price_slice_utils import (
+    apply_paper4_color_overrides_to_style_df,
     build_run_map,
     DATA_DIR,
     format_thousands,
@@ -68,6 +69,7 @@ def normalize_name(value):
 
 def load_style_table(sheet_name):
     df = pd.read_excel(COLOR_FILE, sheet_name=sheet_name)
+    df = apply_paper4_color_overrides_to_style_df(df)
     label_col = "desc_new" if "desc_new" in df.columns else "desc"
 
     order = []
@@ -103,13 +105,20 @@ LU_TO_AG_GROUP = {
     if pd.notna(row.get("desc")) and pd.notna(row.get("ag_group"))
 }
 
+LONG_BG_LABEL = (
+    "Public and indigenous land, urban land, "
+    "plantation forestry, and water bodies"
+)
+
+NON_AG_LAND_COLOR = AM_COLOR_MAP["No agricultural management"]
+
 MAP_CONFIG = {
     "Agricultural land-use": {
         "active_order": AG_ACTIVE_ORDER,
         "color_map": AG_COLOR_MAP,
-        "zero_label": "Other land",
-        "zero_color": AG_COLOR_MAP["Other land"],
-        "background_label": "Other land",
+        "zero_label": "Non-agricultural land-use",
+        "zero_color": NON_AG_LAND_COLOR,
+        "background_label": LONG_BG_LABEL,
         "background_color": AG_COLOR_MAP["Other land"],
     },
     "Ag management": {
@@ -117,7 +126,7 @@ MAP_CONFIG = {
         "color_map": AM_COLOR_MAP,
         "zero_label": "No agricultural management",
         "zero_color": AM_COLOR_MAP["No agricultural management"],
-        "background_label": "Other land-use",
+        "background_label": LONG_BG_LABEL,
         "background_color": AM_COLOR_MAP["Other land-use"],
     },
     "Non-ag": {
@@ -125,7 +134,7 @@ MAP_CONFIG = {
         "color_map": NON_AG_COLOR_MAP,
         "zero_label": "Agricultural land-use",
         "zero_color": NON_AG_COLOR_MAP["Agricultural land-use"],
-        "background_label": "Other land-use",
+        "background_label": LONG_BG_LABEL,
         "background_color": NON_AG_COLOR_MAP["Other land-use"],
     },
 }
@@ -472,25 +481,26 @@ else:
 
 gdf_states = load_states()
 
-fig, axes = plt.subplots(3, 2, figsize=(16, 15), facecolor="white")
+fig, axes = plt.subplots(3, 2, figsize=(10, 13), facecolor="white")
 
 axes[0, 0].set_title(
-    rf"Carbon price = {format_thousands(MAX_CP)} AUD/tCO$_2$e",
+    rf"Carbon price: {format_thousands(MAX_CP)} AU\$/tCO$_2$e yr$^{{-1}}$",
     pad=4,
 )
 axes[0, 1].set_title(
-    f"Biodiversity price = {format_thousands(MAX_BP)} AUD/ha",
+    rf"Biodiversity price: {format_thousands(MAX_BP)} AU\$/ha yr$^{{-1}}$",
     pad=4,
 )
 
 row_specs = [
-    ("Agricultural land-use", "ag_cp", "ag_bp"),
-    ("Ag management", "am_cp", "am_bp"),
-    ("Non-ag", "non_ag_cp", "non_ag_bp"),
+    ("Agricultural land-use", "Agricultural land-use", "ag_cp", "ag_bp"),
+    ("Ag management", "Agricultural management", "am_cp", "am_bp"),
+    ("Non-ag", "Non-agricultural land-use", "non_ag_cp", "non_ag_bp"),
 ]
 
-for row_idx, (area_type, key_cp, key_bp) in enumerate(row_specs):
-    config = MAP_CONFIG[area_type]
+row_legend_handles = {}
+for row_idx, (area_key, area_label, key_cp, key_bp) in enumerate(row_specs):
+    config = MAP_CONFIG[area_key]
     cat_cp = MAPS[key_cp]
     cat_bp = MAPS[key_bp]
 
@@ -509,21 +519,97 @@ for row_idx, (area_type, key_cp, key_bp) in enumerate(row_specs):
             gdf_states.plot(ax=ax, edgecolor="#555555", linewidth=0.4, facecolor="none", zorder=3)
         style_map_ax(ax)
 
-    axes[row_idx, 0].set_ylabel(area_type, rotation=90, labelpad=18)
+    axes[row_idx, 0].set_ylabel(area_label, rotation=90, labelpad=18)
+    row_legend_handles[row_idx] = get_row_legend_handles(cat_cp, cat_bp, config)
 
-    legend_handles = get_row_legend_handles(cat_cp, cat_bp, config)
-    axes[row_idx, 1].legend(
-        handles=legend_handles,
-        loc="upper left",
-        bbox_to_anchor=(1.02, 1.0),
+ROW_KEYS = ["Agricultural land-use", "Ag management", "Non-ag"]
+LEGEND_NCOL = {
+    "Ag management": 2,
+    "Non-ag": 2,
+}
+LEGEND_FS = {
+    "Agricultural land-use": FS,
+    "Ag management": FS - 1,
+    "Non-ag": FS - 1,
+}
+
+plt.tight_layout()
+plt.subplots_adjust(hspace=0.25, wspace=0.03)
+fig.canvas.draw()
+renderer = fig.canvas.get_renderer()
+fig_w_px = fig.get_figwidth() * fig.dpi
+fig_h_px = fig.get_figheight() * fig.dpi
+
+_SPACER = mpatches.Patch(facecolor="none", edgecolor="none", label="")
+
+for row_idx, legend_handles in row_legend_handles.items():
+    if not legend_handles:
+        continue
+
+    ax_l, ax_r = axes[row_idx, 0], axes[row_idx, 1]
+    bb_l = ax_l.get_tightbbox(renderer)
+    bb_r = ax_r.get_tightbbox(renderer)
+    x_center = (bb_l.x0 + bb_r.x1) / 2 / fig_w_px
+    y_anchor = min(bb_l.y0, bb_r.y0) / fig_h_px - 0.01
+
+    row_key = ROW_KEYS[row_idx] if row_idx < len(ROW_KEYS) else "Non-ag"
+    handles = list(legend_handles)
+
+    if row_key == "Agricultural land-use":
+        active_handles = handles[:-2]
+        special_handles = handles[-2:]
+        row2_offset = 0.018
+        fig.legend(
+            handles=active_handles,
+            loc="upper center",
+            bbox_to_anchor=(x_center, y_anchor),
+            bbox_transform=fig.transFigure,
+            ncol=max(1, len(active_handles)),
+            frameon=False,
+            borderaxespad=0.0,
+            handlelength=1.0,
+            handleheight=1.0,
+            columnspacing=1.0,
+            fontsize=LEGEND_FS.get(row_key, FS - 1),
+        )
+        fig.legend(
+            handles=special_handles,
+            loc="upper center",
+            bbox_to_anchor=(x_center, y_anchor - row2_offset),
+            bbox_transform=fig.transFigure,
+            ncol=2,
+            frameon=False,
+            borderaxespad=0.0,
+            handlelength=1.0,
+            handleheight=1.0,
+            columnspacing=1.0,
+            fontsize=LEGEND_FS.get(row_key, FS - 1),
+        )
+        continue
+    else:
+        # Ag management & Non-ag: ncol=2, last 2 (zero + background) on the same row
+        ncol = LEGEND_NCOL.get(row_key, 2)
+        if len(handles) >= 2:
+            special = handles[-2:]
+            active = handles[:-2]
+            rem = len(active) % ncol
+            if rem != 0:
+                active = active + [_SPACER] * (ncol - rem)
+            handles = active + special
+
+    fig.legend(
+        handles=handles,
+        loc="upper center",
+        bbox_to_anchor=(x_center, y_anchor),
+        bbox_transform=fig.transFigure,
+        ncol=ncol,
         frameon=False,
         borderaxespad=0.0,
         handlelength=1.0,
         handleheight=1.0,
+        columnspacing=1.0,
+        fontsize=LEGEND_FS.get(row_key, FS - 1),
     )
-
-plt.tight_layout()
-plt.subplots_adjust(right=0.77, hspace=0.08, wspace=0.06)
 
 out_path = OUT_DIR / f"5_Area_Map_vs_Price_{YEAR}.png"
 fig.savefig(out_path, dpi=200, bbox_inches="tight", facecolor="white")

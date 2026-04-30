@@ -17,6 +17,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -26,6 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tools.price_slice_utils import (
     DATA_DIR,
     OUT_DIR,
+    apply_paper4_color_overrides_to_style_df,
     build_run_map,
     format_thousands,
     get_price_axis_label,
@@ -41,6 +43,8 @@ GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 CACHE_PATH = DATA_DIR / f"3_Area_raw_data_{YEAR}.xlsx"
 
 FS = 11
+SUM_LINE_LABEL = "Sum"
+
 plt.rcParams.update({
     "font.family": "sans-serif",
     "font.sans-serif": ["Arial"],
@@ -49,7 +53,7 @@ plt.rcParams.update({
     "axes.labelsize": FS,
     "xtick.labelsize": FS,
     "ytick.labelsize": FS,
-    "legend.fontsize": FS - 1,
+    "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
 })
 
@@ -60,6 +64,7 @@ def normalize_name(value):
 
 def load_style_table(sheet_name):
     df = pd.read_excel(COLOR_FILE, sheet_name=sheet_name)
+    df = apply_paper4_color_overrides_to_style_df(df)
     label_col = "desc_new" if "desc_new" in df.columns else "desc"
 
     order = []
@@ -77,6 +82,7 @@ def load_style_table(sheet_name):
 AG_ORDER, AG_COLOR_MAP, _ = load_style_table("ag_group")
 AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = load_style_table("am")
 NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = load_style_table("non_ag")
+LU_ORDER, LU_COLOR_MAP, LU_LABEL_MAP = load_style_table("lu")
 
 group_df = pd.read_excel(GROUP_FILE)
 LU_TO_AG_GROUP = {
@@ -89,18 +95,42 @@ AREA_CONFIG = {
     "Agricultural land-use": {
         "order": AG_ORDER,
         "color_map": AG_COLOR_MAP,
-        "ylabel": "Agricultural land-use\nArea change vs. 2050 baseline (Mha)",
+        "ylabel": "Agricultural land-use",
     },
     "Ag management": {
         "order": AM_ORDER,
         "color_map": AM_COLOR_MAP,
-        "ylabel": "Ag management\nArea change vs. 2050 baseline (Mha)",
+        "ylabel": "Agricultural management",
     },
     "Non-ag": {
         "order": NON_AG_ORDER,
         "color_map": NON_AG_COLOR_MAP,
-        "ylabel": "Non-ag\nArea change vs. 2050 baseline (Mha)",
+        "ylabel": "Non-agricultural land-use",
     },
+}
+
+TOTAL_CATEGORY_MAP = {
+    "Agricultural land-use": LU_LABEL_MAP.get(
+        normalize_name("Agricultural land-use"),
+        "Agricultural land-use",
+    ),
+    "Ag management": LU_LABEL_MAP.get(
+        normalize_name("Agricultural management"),
+        "Agricultural management",
+    ),
+    "Non-ag": LU_LABEL_MAP.get(
+        normalize_name("Non-agricultural land-use"),
+        "Non-agricultural land-use",
+    ),
+}
+TOTAL_ORDER = [
+    TOTAL_CATEGORY_MAP["Agricultural land-use"],
+    TOTAL_CATEGORY_MAP["Ag management"],
+    TOTAL_CATEGORY_MAP["Non-ag"],
+]
+TOTAL_COLOR_MAP = {
+    category: LU_COLOR_MAP.get(category, "#888888")
+    for category in TOTAL_ORDER
 }
 
 NON_AG_EXCLUDE = {
@@ -340,13 +370,81 @@ def build_area_pivot(df_long, price_type, area_type):
     return pivot.reindex(columns=category_order, fill_value=0.0)
 
 
-def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel):
+def build_total_area_pivot(df_long, price_type):
+    df_subset = df_long[df_long["PriceType"] == price_type].copy()
+    if df_subset.empty:
+        return pd.DataFrame()
+
+    df_subset["Category"] = df_subset["AreaType"].map(TOTAL_CATEGORY_MAP)
+    df_subset = df_subset.dropna(subset=["Category"])
+
+    pivot = df_subset.pivot_table(
+        index="Price",
+        columns="Category",
+        values="AreaChangevs_Baseline_Mha",
+        aggfunc="sum",
+        fill_value=0.0,
+    ).sort_index()
+
+    category_order = [category for category in TOTAL_ORDER if category in pivot.columns]
+    category_order += [category for category in pivot.columns if category not in category_order]
+    return pivot.reindex(columns=category_order, fill_value=0.0)
+
+
+def build_patch_handles(categories, color_map):
+    return [
+        mpatches.Patch(
+            facecolor=color_map.get(category, "#888888"),
+            edgecolor="none",
+            label=category,
+        )
+        for category in categories
+    ]
+
+
+def build_total_line_handle():
+    return Line2D(
+        [0],
+        [0],
+        color="black",
+        linestyle="-",
+        marker="o",
+        linewidth=1.8,
+        markersize=4.5,
+        solid_capstyle="round",
+        label=SUM_LINE_LABEL,
+    )
+
+
+def plot_sum_markers(ax, x, y):
+    ax.plot(
+        x,
+        y,
+        color="black",
+        linestyle="None",
+        marker="_",
+        markersize=16,
+        markeredgewidth=2.0,
+        zorder=30,
+    )
+    ax.plot(
+        x,
+        y,
+        color="black",
+        linestyle="None",
+        marker="o",
+        markersize=4.5,
+        zorder=31,
+    )
+
+
+def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=None, show_sum_line=False):
     if pivot_df.empty:
         ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
         style_box_axis(ax, linewidth=0.8)
         return []
 
-    color_map = AREA_CONFIG[area_type]["color_map"]
+    color_map = AREA_CONFIG[area_type]["color_map"] if color_map is None else color_map
     price_vals = pivot_df.index.to_list()
     x = np.arange(len(price_vals))
     positive_bottoms = np.zeros(len(price_vals))
@@ -388,6 +486,10 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel):
     if np.any(pivot_df.to_numpy() < 0.0):
         ax.axhline(0.0, color="#444444", linewidth=0.8)
 
+    if show_sum_line:
+        totals = pivot_df.sum(axis=1).to_numpy()
+        plot_sum_markers(ax, x, totals)
+
     ax.set_xticks(x)
     if show_xlabel:
         ax.set_xticklabels([format_thousands(value) for value in price_vals], rotation=90, ha="center")
@@ -407,12 +509,9 @@ if df_long is None:
 fig, axes = plt.subplots(
     3,
     2,
-    figsize=(16, 11),
+    figsize=(10, 13),
     sharex="col",
 )
-
-axes[0, 0].set_title("Carbon price")
-axes[0, 1].set_title("Biodiversity price")
 
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
@@ -430,32 +529,54 @@ for row_idx, area_type in enumerate(row_area_types):
     ax_left.set_ylabel(AREA_CONFIG[area_type]["ylabel"])
 
     legend_categories = get_category_order(area_type, list(dict.fromkeys(cats_left + cats_right)))
-    row_legends[area_type] = [
-        mpatches.Patch(
-            facecolor=AREA_CONFIG[area_type]["color_map"].get(category, "#888888"),
-            edgecolor="none",
-            label=category,
-        )
-        for category in legend_categories
-    ]
+    row_legends[area_type] = build_patch_handles(
+        legend_categories,
+        AREA_CONFIG[area_type]["color_map"],
+    )
+
+LEGEND_NCOL = {
+    "Agricultural land-use": 5,
+    "Ag management": 3,
+    "Non-ag": 2,
+}
+LEGEND_FS = {
+    "Agricultural land-use": FS,
+    "Ag management": FS,
+    "Non-ag": FS - 1,
+}
+
+fig.supylabel(r"Area (Mha yr$^{-1}$)", fontsize=FS)
+plt.tight_layout()
+plt.subplots_adjust(hspace=0.35, wspace=0.12)
+fig.canvas.draw()
+renderer = fig.canvas.get_renderer()
+fig_w_px = fig.get_figwidth() * fig.dpi
+fig_h_px = fig.get_figheight() * fig.dpi
 
 for row_idx, area_type in enumerate(row_area_types):
     handles = row_legends[area_type]
     if not handles:
         continue
 
-    axes[row_idx, 1].legend(
+    ax_l, ax_r = axes[row_idx, 0], axes[row_idx, 1]
+    bb_l = ax_l.get_tightbbox(renderer)
+    bb_r = ax_r.get_tightbbox(renderer)
+    x_center = (bb_l.x0 + bb_r.x1) / 2 / fig_w_px
+    y_anchor = min(bb_l.y0, bb_r.y0) / fig_h_px - 0.01
+
+    fig.legend(
         handles=handles,
-        loc="upper left",
-        bbox_to_anchor=(1.02, 1.0),
+        loc="upper center",
+        bbox_to_anchor=(x_center, y_anchor),
+        bbox_transform=fig.transFigure,
+        ncol=LEGEND_NCOL.get(area_type, 3),
         frameon=False,
         borderaxespad=0.0,
         handlelength=1.0,
         handleheight=1.0,
+        columnspacing=1.0,
+        fontsize=LEGEND_FS.get(area_type, FS - 1),
     )
-
-plt.tight_layout()
-plt.subplots_adjust(right=0.77, hspace=0.22, wspace=0.12)
 
 out_path = OUT_DIR / f"3_Area_vs_Price_{YEAR}.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")

@@ -21,6 +21,7 @@ import re
 from typing import List, Optional, Dict
 
 import tools.config as config
+from tools.price_slice_utils import apply_paper4_color_overrides_to_style_df
 
 def xarray_to_dict(file_path: str, scale: float = None, total_name: str =None,negative=False, year_threshold: int = 2020) -> dict:
     """
@@ -654,6 +655,8 @@ def get_colors(merged_dict, mapping_file, sheet_name=None, total_name='Total'):
         mapping_df = pd.read_excel(mapping_file, sheet_name=sheet_name)
     else:
         mapping_df = pd.read_csv(mapping_file)
+
+    mapping_df = apply_paper4_color_overrides_to_style_df(mapping_df)
 
     # 处理 merged_dict 中的每个 DataFrame，获取处理后的 DataFrame 字典和 legend_colors
     data_dict = {}

@@ -45,6 +45,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tools.price_slice_utils import (
     DATA_DIR,
     OUT_DIR,
+    apply_paper4_color_overrides_to_style_df,
     build_run_map,
     format_thousands,
     style_box_axis,
@@ -67,7 +68,7 @@ plt.rcParams.update({
     "axes.labelsize": FS,
     "xtick.labelsize": FS,
     "ytick.labelsize": FS,
-    "legend.fontsize": FS - 1,
+    "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
 })
 
@@ -84,6 +85,7 @@ def normalize_name(value):
 
 def load_style_table(sheet_name):
     df = pd.read_excel(COLOR_FILE, sheet_name=sheet_name)
+    df = apply_paper4_color_overrides_to_style_df(df)
     label_col = "desc_new" if "desc_new" in df.columns else "desc"
 
     order = []
@@ -587,11 +589,11 @@ def draw_thin_bar_zoom(zoom_ax, df_panel, panel_name):
 
     zoom_ax.set_title(
         f"Thin bars zoom ({len(df_thin)})\n(width < {format_thousands(threshold)} {THIN_BAR_UNITS[panel_name]})",
-        fontsize=FS - 3,
+        fontsize=FS,
         pad=2,
     )
     zoom_ax.xaxis.set_major_formatter(VALUE_FORMATTERS[panel_name])
-    zoom_ax.tick_params(axis="both", labelsize=FS - 4, length=2)
+    zoom_ax.tick_params(axis="both", labelsize=FS, length=2)
     style_box_axis(zoom_ax, linewidth=0.6)
 
 
@@ -681,9 +683,9 @@ handles_carbon = draw_curve(
     outer[0, 0],
     df_carbon,
     "Carbon",
-    f"Carbon average net cost curve\n(max vs 0 at {YEAR}; cp = {format_thousands(carbon_price)} AUD per tCO$_2$e)",
-    r"Additional abatement beyond cp=0 (Mt CO$_2$e)",
-    "Average net cost excluding carbon transfer\n(AUD per tCO$_2$e)",
+    rf"Carbon average net cost curve (cp = {format_thousands(carbon_price)} AU\$/tCO$_2$e yr$^{{-1}}$)",
+    r"GHG emission reduction beyond cp=0 (Mt CO$_2$e yr$^{-1}$)",
+    r"Avg. net cost excl. carbon transfer (AU\$/tCO$_2$e yr$^{-1}$)",
 )
 
 handles_bio = draw_curve(
@@ -691,9 +693,9 @@ handles_bio = draw_curve(
     outer[0, 1],
     df_bio,
     "Biodiversity",
-    f"Biodiversity average net cost curve\n(max vs 0 at {YEAR}; bp = {format_thousands(bio_price)} AUD per ha)",
+    rf"Biodiversity average net cost curve (bp = {format_thousands(bio_price)} AU\$/ha yr$^{{-1}}$)",
     r"Additional biodiversity contribution beyond bp=0 (Mha yr$^{-1}$)",
-    "Average net cost excluding biodiversity payment\n(AUD per (ha yr$^{-1}$))",
+    r"Avg. net cost excl. biodiversity payment (AU\$/ha yr$^{-1}$)",
 )
 
 all_handles = []

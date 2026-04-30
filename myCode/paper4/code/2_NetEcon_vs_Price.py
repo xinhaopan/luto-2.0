@@ -18,9 +18,8 @@
 #     be assumed to be present in `xr_economics_*_profit`, even though the solver
 #     objective did include it. To match solver-side accounting, this script adds
 #     back biodiversity payment for the biodiversity-price slice.
-#   - This figure now shows the 2050 minus 2010 change within each run. The 2010
-#     slice is treated as the historical no-policy anchor for these paper4 scans,
-#     so the explicit biodiversity-payment add-back is only applied to 2050.
+#   - For the biodiversity-price slice, the explicit add-back is based on
+#     biodiversity change vs the zero-price baseline run at the same year.
 # ==============================================================================
 
 import os
@@ -81,6 +80,12 @@ plt.rcParams.update({
 })
 
 
+def read_biodiversity_contribution(zip_path, year):
+    if not zip_path:
+        return np.nan
+    return read_sum(zip_path, BIO_FILES, year)
+
+
 def collect_slice(run_map, price_vals, varying_key):
     price_col = "CarbonPrice" if varying_key == "cp" else "BioPrice"
     baseline_zip = run_map.get((0.0, 0.0))
@@ -91,7 +96,8 @@ def collect_slice(run_map, price_vals, varying_key):
         read_sum(baseline_zip, PROFIT_FILES, YEAR) / 1e9
         if baseline_zip else np.nan
     )
-    net_econ_baseline = base_net_econ_baseline  # bp=0 for baseline, no add-back needed
+    bio_contribution_baseline_ha_yr = read_biodiversity_contribution(baseline_zip, YEAR)
+    net_econ_baseline = base_net_econ_baseline
 
     for price in price_vals:
         key = (price, 0.0) if varying_key == "cp" else (0.0, price)
@@ -99,20 +105,32 @@ def collect_slice(run_map, price_vals, varying_key):
 
         if zip_path:
             base_net_econ_2050 = read_sum(zip_path, PROFIT_FILES, YEAR) / 1e9
-            bio_score_2050_ha_yr = read_sum(zip_path, BIO_FILES, YEAR)
+            bio_contribution_2050_ha_yr = read_biodiversity_contribution(zip_path, YEAR)
         else:
             base_net_econ_2050 = np.nan
-            bio_score_2050_ha_yr = np.nan
+            bio_contribution_2050_ha_yr = np.nan
+
+        # Explicitly use biodiversity contribution change vs the zero-price run,
+        # then monetise that change with the biodiversity price.
+        bio_contribution_change_ha_yr = (
+            bio_contribution_2050_ha_yr - bio_contribution_baseline_ha_yr
+            if not np.isnan(bio_contribution_2050_ha_yr) and not np.isnan(bio_contribution_baseline_ha_yr)
+            else np.nan
+        )
 
         # Carbon price is already included in xr_economics_*_profit. Only the
-        # biodiversity-price slice needs an explicit bio_price x bio_score add-back
-        # so the plotted value matches the solver objective accounting.
+        # biodiversity-price slice needs an explicit
+        # bio_price x biodiversity_contribution_change add-back so the plotted
+        # value matches the solver objective accounting.
         add_back_bio_payment = (
             varying_key == "bp"
             and ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS
-            and not np.isnan(bio_score_2050_ha_yr)
+            and not np.isnan(bio_contribution_change_ha_yr)
         )
-        bio_payment_2050 = price * bio_score_2050_ha_yr / 1e9 if add_back_bio_payment else 0.0
+        bio_payment_2050 = (
+            price * bio_contribution_change_ha_yr / 1e9
+            if add_back_bio_payment else 0.0
+        )
 
         net_econ_2050 = (
             base_net_econ_2050 + bio_payment_2050
@@ -129,7 +147,12 @@ def collect_slice(run_map, price_vals, varying_key):
             price_col: price,
             "BaseNetEcon_Baseline_BAUD": base_net_econ_baseline,
             "BaseNetEcon2050_BAUD": base_net_econ_2050,
-            "BioScore2050_ha_yr": bio_score_2050_ha_yr,
+            "BioContribution_Baseline_ha_yr": bio_contribution_baseline_ha_yr,
+            "BioContribution2050_ha_yr": bio_contribution_2050_ha_yr,
+            "BioContributionChange_vs_Baseline_ha_yr": bio_contribution_change_ha_yr,
+            "Bio_Baseline_ha_yr": bio_contribution_baseline_ha_yr,
+            "Bio2050_ha_yr": bio_contribution_2050_ha_yr,
+            "BioChange_vs_Baseline_ha_yr": bio_contribution_change_ha_yr,
             "BioPayment2050_BAUD": bio_payment_2050,
             "NetEcon_Baseline_BAUD": net_econ_baseline,
             "NetEcon2050_BAUD": net_econ_2050,
@@ -140,6 +163,7 @@ def collect_slice(run_map, price_vals, varying_key):
             print(
                 f"  {varying_key}={format_thousands(price)}: "
                 f"baseline={net_econ_baseline:.2f}, 2050={net_econ_2050:.2f}, "
+                f"bio_contribution_change_2050={bio_contribution_change_ha_yr:,.2f}, "
                 f"bio_payment_2050={bio_payment_2050:.2f}, change={net_econ_change:.2f} B AUD"
             )
         else:
@@ -163,7 +187,12 @@ def load_cache():
     required_columns = {
         "BaseNetEcon_Baseline_BAUD",
         "BaseNetEcon2050_BAUD",
-        "BioScore2050_ha_yr",
+        "BioContribution_Baseline_ha_yr",
+        "BioContribution2050_ha_yr",
+        "BioContributionChange_vs_Baseline_ha_yr",
+        "Bio_Baseline_ha_yr",
+        "Bio2050_ha_yr",
+        "BioChange_vs_Baseline_ha_yr",
         "BioPayment2050_BAUD",
         "NetEcon_Baseline_BAUD",
         "NetEcon2050_BAUD",
@@ -193,7 +222,7 @@ if df_cp is None or df_bp is None:
     print(f"\nCache saved: {CACHE_PATH}")
 
 
-def line_plot(ax, df, price_col):
+def line_plot(ax, df, price_col, show_ylabel=True):
     x = df[price_col].to_numpy()
     y = df["NetEconChangevs_Baseline_BAUD"].to_numpy()
     mask = ~np.isnan(y)
@@ -208,17 +237,19 @@ def line_plot(ax, df, price_col):
         markersize=5,
     )
     ax.set_xlabel(get_price_axis_label("cp" if price_col == "CarbonPrice" else "bp"))
-    ax.set_ylabel(r"Change in net economic return vs. 2050 baseline (Billion AU$)")
+    if show_ylabel:
+        ax.set_ylabel(r"Net economic return (Billion AU\$ yr$^{-1}$)")
     ax.set_xlim(left=0)
     if mask.any() and np.nanmin(y[mask]) < 0.0 < np.nanmax(y[mask]):
         ax.axhline(0.0, color="#444444", linewidth=0.8)
     apply_price_formatter(ax, axis="x")
+    apply_price_formatter(ax, axis="y")
     style_box_axis(ax)
 
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 line_plot(ax1, df_cp, "CarbonPrice")
-line_plot(ax2, df_bp, "BioPrice")
+line_plot(ax2, df_bp, "BioPrice", show_ylabel=False)
 
 plt.tight_layout()
 out_path = OUT_DIR / f"2_NetEcon_vs_Price_{YEAR}.png"

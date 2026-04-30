@@ -9,10 +9,10 @@ grid_search = {
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['28GB'],
-    'NCPUS': ['7'],
+    'MEM': ['36GB'],
+    'NCPUS': ['9'],
     'WRITE_THREADS': ['2'],
-    'TIME': ['4:00:00'],
+    'TIME': ['6:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
     'BIODIVERSITY_TARGET_GBF_2': ['off'],
@@ -72,15 +72,18 @@ grid_search = {
     }],
 }
 
+carbon_prices = grid_search['CARBON_PRICE_COSTANT']
+bio_prices = grid_search['BIODIVERSITY_PRICE_CONSTANT']
+
 conditional_rules = [
     # When biodiversity price > 0, carbon price must be 0
     {
-        'conditions':    {'BIODIVERSITY_PRICE_CONSTANT': [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000]},
+        'conditions':    {'BIODIVERSITY_PRICE_CONSTANT': [price for price in bio_prices if price > 0]},
         'restrictions':  {'CARBON_PRICE_COSTANT': [0]},
     },
     # When carbon price > 0, biodiversity price must be 0
     {
-        'conditions':    {'CARBON_PRICE_COSTANT': [8.92, 17.85, 26.77, 35.69, 44.61, 53.54, 62.46, 75.84, 89.23, 133.84, 178.46, 233.07, 267.69, 312.3, 356.92]},
+        'conditions':    {'CARBON_PRICE_COSTANT': [price for price in carbon_prices if price > 0]},
         'restrictions':  {'BIODIVERSITY_PRICE_CONSTANT': [0]},
     },
 ]
