@@ -1,7 +1,11 @@
 # ==============================================================================
-# Figure 1: MACC-style figure with two panels
-#   Panel A: GHG abatement since 2010 vs carbon price      (BioPrice=0)
-#   Panel B: Biodiversity change since 2010 vs bio price   (CarbonPrice=0)
+# Figure 01: 2025 price response curves
+#   Panel A: GHG emissions vs carbon price                 (BioPrice=0)
+#   Panel B: Biodiversity contribution vs biodiversity price (CarbonPrice=0)
+#
+#   Values are absolute 2025 quantities:
+#     GHG emissions = net GHG emissions
+#     biodiversity contribution = total biodiversity contribution
 # ==============================================================================
 
 import os
@@ -27,7 +31,7 @@ from tools.price_slice_utils import (
 
 
 YEAR = 2025
-CACHE_PATH = DATA_DIR / f"1_MACC_raw_data_{YEAR}.xlsx"
+CACHE_PATH = DATA_DIR / f"01_Price_Response_raw_data_{YEAR}.xlsx"
 
 GHG_FILES = [
     "xr_GHG_ag",
@@ -60,44 +64,34 @@ plt.rcParams.update({
 
 def collect_slices():
     run_map, cp_vals, bp_vals = build_run_map()
-    baseline_zip = run_map.get((0.0, 0.0))
 
     rows_ghg = []
-    print(f"\n--- GHG emission change vs baseline (cp=0, bp=0) at {YEAR} vs carbon price (BioPrice=0) ---")
-    ghg_baseline = read_sum(baseline_zip, GHG_FILES, YEAR) / 1e6 if baseline_zip else np.nan
+    print(f"\n--- Absolute GHG emissions at {YEAR} vs carbon price (BioPrice=0) ---")
     for cp in cp_vals:
         zip_path = run_map.get((cp, 0.0))
-        ghg_2050 = read_sum(zip_path, GHG_FILES, YEAR) / 1e6 if zip_path else np.nan
-        emission_change = ghg_2050 - ghg_baseline if not np.isnan(ghg_2050) else np.nan
+        ghg_2025 = read_sum(zip_path, GHG_FILES, YEAR) / 1e6 if zip_path else np.nan
         rows_ghg.append({
             "CarbonPrice": cp,
-            "GHG_Baseline_MtCO2e": ghg_baseline,
-            "GHG_2050_MtCO2e": ghg_2050,
-            "GHGEmissionChange_MtCO2e": emission_change,
+            "GHGEmissions_2025_MtCO2e": ghg_2025,
         })
         print(
             f"  cp={format_thousands(cp)}: "
-            f"GHG_baseline={ghg_baseline:.1f}, GHG2050={ghg_2050:.1f}, "
-            f"emission_change={emission_change:.1f} Mt CO2e"
+            f"GHG emissions={ghg_2025:.1f} Mt CO2e"
         )
 
     rows_bio = []
-    print(f"\n--- Biodiversity change vs baseline (cp=0, bp=0) at {YEAR} vs bio price (CarbonPrice=0) ---")
-    bio_baseline = read_sum(baseline_zip, BIO_FILES, YEAR) if baseline_zip else np.nan
+    print(f"\n--- Absolute biodiversity contribution at {YEAR} vs bio price (CarbonPrice=0) ---")
     for bp in bp_vals:
         zip_path = run_map.get((0.0, bp))
-        bio_2050 = read_sum(zip_path, BIO_FILES, YEAR) if zip_path else np.nan
-        dbio = bio_2050 - bio_baseline if not np.isnan(bio_2050) else np.nan
+        bio_2025 = read_sum(zip_path, BIO_FILES, YEAR) if zip_path else np.nan
         rows_bio.append({
             "BioPrice": bp,
-            "Bio_Baseline_ha_yr": bio_baseline,
-            "Bio_2050_ha_yr": bio_2050,
-            "BioChange_vs_Baseline_ha_yr": dbio,
+            "Bio_2025_ha_yr": bio_2025,
+            "BioContribution_2025_ha_yr": bio_2025,
         })
         print(
             f"  bp={format_thousands(bp)}: "
-            f"Bio_baseline={bio_baseline:.2f}, Bio2050={bio_2050:.2f}, "
-            f"change={dbio:.2f}"
+            f"Bio2025={bio_2025:.2f}"
         )
 
     df_ghg = pd.DataFrame(rows_ghg)
@@ -116,8 +110,8 @@ if CACHE_PATH.is_file():
     df_ghg = pd.read_excel(CACHE_PATH, sheet_name="GHG_slice")
     df_bio = pd.read_excel(CACHE_PATH, sheet_name="Bio_slice")
     if (
-        "GHGEmissionChange_MtCO2e" not in df_ghg.columns
-        or "BioChange_vs_Baseline_ha_yr" not in df_bio.columns
+        "GHGEmissions_2025_MtCO2e" not in df_ghg.columns
+        or "BioContribution_2025_ha_yr" not in df_bio.columns
     ):
         print("Cached schema is outdated; rebuilding.")
         df_ghg, df_bio = collect_slices()
@@ -125,10 +119,10 @@ else:
     df_ghg, df_bio = collect_slices()
 
 
-x_ghg = df_ghg["GHGEmissionChange_MtCO2e"].to_numpy()
+x_ghg = df_ghg["GHGEmissions_2025_MtCO2e"].to_numpy()
 y_cp = df_ghg["CarbonPrice"].to_numpy()
 
-x_bio = df_bio["BioChange_vs_Baseline_ha_yr"].to_numpy() / 1e6
+x_bio = df_bio["BioContribution_2025_ha_yr"].to_numpy() / 1e6
 y_bp = df_bio["BioPrice"].to_numpy()
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
@@ -145,8 +139,9 @@ ax1.plot(
 )
 ax1.set_xlabel(r"GHG emissions (Mt CO$_2$e yr$^{-1}$)")
 ax1.set_ylabel(r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)")
-ax1.set_xlim(right=0)
 ax1.set_ylim(bottom=0)
+if mask_ghg.any() and np.nanmin(x_ghg[mask_ghg]) < 0.0 < np.nanmax(x_ghg[mask_ghg]):
+    ax1.axvline(0.0, color="#444444", linewidth=0.8)
 apply_price_formatter(ax1, axis="y")
 style_box_axis(ax1)
 
@@ -167,7 +162,7 @@ apply_price_formatter(ax2, axis="y")
 style_box_axis(ax2)
 
 plt.tight_layout()
-out_path = OUT_DIR / f"1_MACC_GHG_Bio_{YEAR}.png"
+out_path = OUT_DIR / f"01_Price_Response_Curves_{YEAR}.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")

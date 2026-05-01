@@ -48,7 +48,7 @@ from tools.price_slice_utils import (
 )
 
 
-YEAR = 2050
+YEAR = 2025
 BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"

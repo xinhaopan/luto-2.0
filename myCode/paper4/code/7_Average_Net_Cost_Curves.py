@@ -1,26 +1,11 @@
 # ==============================================================================
-# Figure 7: Average net cost curves under equilibrium outcomes
-#   Panel A: Carbon price, comparing cp=0 vs cp=max (BioPrice=0)
-#   Panel B: Biodiversity price, comparing bp=0 vs bp=max (CarbonPrice=0)
+# Figure 7: Average net cost curves — broken-axis 3×3 equal-grid layout
+#   Panel A (top):    Carbon price
+#   Panel B (bottom): Biodiversity price
 #
-# Curve interpretation:
-#   - First calculate the within-run change from 2010 to 2050 for the zero-price
-#     scenario and for the highest-price scenario.
-#   - Then calculate the additional contribution and additional net return as:
-#         (highest-price run change since 2010) - (zero-price run change since 2010)
-#   - Width  = additional contribution unlocked beyond the zero-price path.
-#   - Height = average net cost excluding policy payment.
-#
-# Carbon note:
-#   Archived economics outputs do not expose a clean, category-level carbon
-#   transfer term. For this figure we therefore remove an approximate carbon
-#   transfer from the highest-price scenario change using:
-#       carbon transfer ~= carbon price x abatement since 2010
-#
-# Biodiversity note:
-#   In paper4 we add biodiversity payment explicitly as bio_price x bio_score.
-#   That term can be removed from the highest-price scenario change using:
-#       biodiversity payment = bio price x biodiversity change since 2010
+#   Uses absolute values from the max-price run (not deltas vs zero-price run).
+#   Policy payment is removed to obtain true underlying net cost.
+#   Both panels use a 3×3 equal-size grid of subplots with broken x and y axes.
 # ==============================================================================
 
 import io
@@ -51,59 +36,72 @@ from tools.price_slice_utils import (
     style_box_axis,
 )
 
-
-YEAR = 2050
+YEAR     = 2025
+N_SEGS   = 3   # Equal 3×3 grid of subplots per panel
 BASE_DIR = Path(__file__).resolve().parent
-DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
-COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
-GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
-CACHE_PATH = DATA_DIR / f"7_Average_Net_Cost_raw_data_{YEAR}.xlsx"
 
-FS = 11
+# ---------------------------------------------------------------------------
+# Manual axis segment ranges  (set to None to use auto-detection)
+#
+# X ranges: list of (xmin, xmax) tuples, left → right, units on x-axis label
+# Y ranges: list of (ymin, ymax) tuples, bottom → top (smallest y first)
+# Number of tuples must equal N_SEGS (3) when not None.
+# ---------------------------------------------------------------------------
+
+# Carbon panel  (x unit: Mt CO₂e yr⁻¹,  y unit: AUD/tCO₂e yr⁻¹)
+CARBON_X_RANGES = [(0,1),(1,150),(150,165)]   # e.g. [(0, 20), (20, 110), (145, 165)]
+CARBON_Y_RANGES = [(-600,0),(0,500),(500,2100)]   # e.g. [(800, 2100), (-50, 700), (-420, -250)]
+
+# Biodiversity panel  (x unit: Mha yr⁻¹,  y unit: AUD/ha yr⁻¹)
+BIO_X_RANGES    = None   # e.g. [(0, 20), (20, 80), (80, 115)]
+BIO_Y_RANGES    = None   # e.g. [(700, 1100), (-100, 430), (-420, -250)]
+DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
+COLOR_FILE  = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
+GROUP_FILE  = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
+CACHE_PATH  = DATA_DIR / f"7_Average_Net_Cost_raw_data_{YEAR}_abs.xlsx"
+
+FS = 10
 plt.rcParams.update({
     "font.family": "sans-serif",
     "font.sans-serif": ["Arial"],
     "font.size": FS,
     "axes.titlesize": FS,
     "axes.labelsize": FS,
-    "xtick.labelsize": FS,
-    "ytick.labelsize": FS,
-    "legend.fontsize": FS,
+    "xtick.labelsize": FS - 1,
+    "ytick.labelsize": FS - 1,
+    "legend.fontsize": FS - 1,
     "mathtext.fontset": "stixsans",
 })
 
-NON_AG_EXCLUDE = {
-    "agriculturallanduse",
-    "otherlanduse",
-}
+NON_AG_EXCLUDE = {"agriculturallanduse", "otherlanduse"}
 MIN_WIDTH = 1e-3
 
 
-def normalize_name(value):
-    return re.sub(r"[\s\-]+", "", str(value).strip().lower())
+# ---------------------------------------------------------------------------
+# Style helpers
+# ---------------------------------------------------------------------------
+
+def normalize_name(v):
+    return re.sub(r"[\s\-]+", "", str(v).strip().lower())
 
 
 def load_style_table(sheet_name):
     df = pd.read_excel(COLOR_FILE, sheet_name=sheet_name)
     df = apply_paper4_color_overrides_to_style_df(df)
     label_col = "desc_new" if "desc_new" in df.columns else "desc"
-
-    order = []
-    color_map = {}
-    label_map = {}
+    order, color_map, label_map = [], {}, {}
     for _, row in df.iterrows():
-        label = row[label_col]
-        order.append(label)
-        color_map[label] = row["color"]
-        label_map[normalize_name(row["desc"])] = label
-
+        lbl = row[label_col]
+        order.append(lbl)
+        color_map[lbl] = row["color"]
+        label_map[normalize_name(row["desc"])] = lbl
     return order, color_map, label_map
 
 
-AG_ORDER, AG_COLOR_MAP, _ = load_style_table("ag_group")
-AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = load_style_table("am")
+AG_ORDER, AG_COLOR_MAP, _                        = load_style_table("ag_group")
+AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP             = load_style_table("am")
 NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = load_style_table("non_ag")
-LU_ORDER, LU_COLOR_MAP, LU_LABEL_MAP = load_style_table("lu")
+LU_ORDER, LU_COLOR_MAP, LU_LABEL_MAP             = load_style_table("lu")
 TRANSITION_LABEL = LU_LABEL_MAP.get(normalize_name("Transition"), "Transition")
 
 group_df = pd.read_excel(GROUP_FILE)
@@ -114,41 +112,30 @@ LU_TO_AG_GROUP = {
 }
 
 PANEL_CONFIG = {
-    "Agricultural land-use": {
-        "order": AG_ORDER,
-        "color_map": AG_COLOR_MAP,
-    },
-    "Ag management": {
-        "order": AM_ORDER,
-        "color_map": AM_COLOR_MAP,
-    },
-    "Non-ag": {
-        "order": NON_AG_ORDER,
-        "color_map": NON_AG_COLOR_MAP,
-    },
+    "Agricultural land-use": {"order": AG_ORDER,     "color_map": AG_COLOR_MAP},
+    "Ag management":          {"order": AM_ORDER,     "color_map": AM_COLOR_MAP},
+    "Non-ag":                 {"order": NON_AG_ORDER, "color_map": NON_AG_COLOR_MAP},
 }
-
 CURVE_COLOR_MAP = {
-    **AG_COLOR_MAP,
-    **AM_COLOR_MAP,
-    **NON_AG_COLOR_MAP,
+    **AG_COLOR_MAP, **AM_COLOR_MAP, **NON_AG_COLOR_MAP,
     TRANSITION_LABEL: LU_COLOR_MAP.get(TRANSITION_LABEL, "#D2E0FB"),
 }
 
 
+# ---------------------------------------------------------------------------
+# NetCDF / zip helpers
+# ---------------------------------------------------------------------------
+
 def open_metric_da(zip_path, file_name):
     with zipfile.ZipFile(zip_path) as archive:
-        matches = [name for name in archive.namelist() if name.endswith(file_name)]
+        matches = [n for n in archive.namelist() if n.endswith(file_name)]
         if not matches:
             return None
-
-        with archive.open(matches[0]) as file_obj:
-            ds = xr.open_dataset(io.BytesIO(file_obj.read()), engine="h5netcdf")
-
+        with archive.open(matches[0]) as f:
+            ds = xr.open_dataset(io.BytesIO(f.read()), engine="h5netcdf")
     try:
         if "layer" in ds.dims and "compress" in ds["layer"].attrs:
             ds = cfxr.decode_compress_to_multi_index(ds, "layer")
-
         da = next(iter(ds.data_vars.values()))
         return da.load()
     finally:
@@ -157,565 +144,459 @@ def open_metric_da(zip_path, file_name):
 
 def sum_with_total_coords(da, **selectors):
     sub = da.sel(selectors)
-
-    for coord_name in list(sub.coords):
-        if coord_name in {"cell", "layer"} or coord_name in selectors:
+    for cname in list(sub.coords):
+        if cname in {"cell", "layer"} or cname in selectors:
             continue
-
-        coord_values = sub.coords[coord_name].values
         try:
-            has_all = "ALL" in coord_values
+            if "ALL" in sub.coords[cname].values:
+                sub = sub.sel({cname: "ALL"})
         except TypeError:
-            has_all = False
-
-        if has_all:
-            sub = sub.sel({coord_name: "ALL"})
-
+            pass
     return float(sub.sum())
 
 
-def read_ag_group_summary(zip_path, file_name):
-    da = open_metric_da(zip_path, file_name)
+def read_ag_group_summary(zip_path, fname):
+    da = open_metric_da(zip_path, fname)
     if da is None:
         return {}
-
     result = {}
     for lu in pd.unique(da.coords["lu"].values):
         if lu == "ALL":
             continue
-
-        value = sum_with_total_coords(da, lu=lu)
-        if np.isclose(value, 0.0):
+        v = sum_with_total_coords(da, lu=lu)
+        if np.isclose(v, 0.0):
             continue
-
-        group = LU_TO_AG_GROUP.get(normalize_name(lu), "Other land")
-        result[group] = result.get(group, 0.0) + value
-
+        g = LU_TO_AG_GROUP.get(normalize_name(lu), "Other land")
+        result[g] = result.get(g, 0.0) + v
     return result
 
 
-def read_ag_management_summary(zip_path, file_name):
-    da = open_metric_da(zip_path, file_name)
+def read_am_summary(zip_path, fname):
+    da = open_metric_da(zip_path, fname)
     if da is None:
         return {}
-
+    if "am" not in da.coords:
+        return {}
     result = {}
     for am in pd.unique(da.coords["am"].values):
         if am == "ALL":
             continue
-
-        value = sum_with_total_coords(da, am=am)
-        if np.isclose(value, 0.0):
+        v = sum_with_total_coords(da, am=am)
+        if np.isclose(v, 0.0):
             continue
-
         label = AM_LABEL_MAP.get(normalize_name(am), am)
-        result[label] = result.get(label, 0.0) + value
-
+        result[label] = result.get(label, 0.0) + v
     return result
 
 
-def read_non_ag_summary(zip_path, file_name):
-    da = open_metric_da(zip_path, file_name)
+def read_non_ag_summary(zip_path, fname):
+    da = open_metric_da(zip_path, fname)
     if da is None:
         return {}
-
     result = {}
     for lu in pd.unique(da.coords["lu"].values):
         if lu == "ALL" or normalize_name(lu) in NON_AG_EXCLUDE:
             continue
-
-        value = sum_with_total_coords(da, lu=lu)
-        if np.isclose(value, 0.0):
+        v = sum_with_total_coords(da, lu=lu)
+        if np.isclose(v, 0.0):
             continue
-
         label = NON_AG_LABEL_MAP.get(normalize_name(lu), lu)
-        result[label] = result.get(label, 0.0) + value
-
+        result[label] = result.get(label, 0.0) + v
     return result
 
 
-def read_transition_ghg_total(zip_path, year):
+def read_transition_ghg(zip_path, year):
     da = open_metric_da(zip_path, f"xr_transition_GHG_{year}.nc")
-    if da is None:
-        return 0.0
-    return sum_with_total_coords(da)
+    return 0.0 if da is None else sum_with_total_coords(da)
 
 
-def get_profit_summaries(zip_path, year):
+def get_profit(zip_path, year):
     return {
         "Agricultural land-use": read_ag_group_summary(zip_path, f"xr_economics_ag_profit_{year}.nc"),
-        "Ag management": read_ag_management_summary(zip_path, f"xr_economics_am_profit_{year}.nc"),
-        "Non-ag": read_non_ag_summary(zip_path, f"xr_economics_non_ag_profit_{year}.nc"),
+        "Ag management":          read_am_summary(zip_path,        f"xr_economics_am_profit_{year}.nc"),
+        "Non-ag":                 read_non_ag_summary(zip_path,    f"xr_economics_non_ag_profit_{year}.nc"),
     }
 
 
-def get_ghg_summaries(zip_path, year):
-    ag_summary = read_ag_group_summary(zip_path, f"xr_GHG_ag_{year}.nc")
-    transition_total = read_transition_ghg_total(zip_path, year)
-    if not np.isclose(transition_total, 0.0):
-        ag_summary[TRANSITION_LABEL] = ag_summary.get(TRANSITION_LABEL, 0.0) + transition_total
-
+def get_ghg(zip_path, year):
+    ag = read_ag_group_summary(zip_path, f"xr_GHG_ag_{year}.nc")
+    t  = read_transition_ghg(zip_path, year)
+    if not np.isclose(t, 0.0):
+        ag[TRANSITION_LABEL] = ag.get(TRANSITION_LABEL, 0.0) + t
     return {
-        "Agricultural land-use": ag_summary,
-        "Ag management": read_ag_management_summary(zip_path, f"xr_GHG_ag_management_{year}.nc"),
-        "Non-ag": read_non_ag_summary(zip_path, f"xr_GHG_non_ag_{year}.nc"),
+        "Agricultural land-use": ag,
+        "Ag management":          read_am_summary(zip_path,     f"xr_GHG_ag_management_{year}.nc"),
+        "Non-ag":                 read_non_ag_summary(zip_path, f"xr_GHG_non_ag_{year}.nc"),
     }
 
 
-def get_bio_summaries(zip_path, year):
+def get_bio(zip_path, year):
     return {
         "Agricultural land-use": read_ag_group_summary(zip_path, f"xr_biodiversity_overall_priority_ag_{year}.nc"),
-        "Ag management": read_ag_management_summary(zip_path, f"xr_biodiversity_overall_priority_ag_management_{year}.nc"),
-        "Non-ag": read_non_ag_summary(zip_path, f"xr_biodiversity_overall_priority_non_ag_{year}.nc"),
+        "Ag management":          read_am_summary(zip_path,        f"xr_biodiversity_overall_priority_ag_management_{year}.nc"),
+        "Non-ag":                 read_non_ag_summary(zip_path,    f"xr_biodiversity_overall_priority_non_ag_{year}.nc"),
     }
 
 
-def get_category_order(area_type, categories_seen):
-    base_order = PANEL_CONFIG[area_type]["order"]
-    ordered = [category for category in base_order if category in categories_seen]
-    ordered += [category for category in categories_seen if category not in base_order]
-    return ordered
+def get_category_order(area_type, cats):
+    base = PANEL_CONFIG[area_type]["order"]
+    return [c for c in base if c in cats] + [c for c in cats if c not in base]
 
+
+# ---------------------------------------------------------------------------
+# Data collection — absolute values from max-price run only
+# ---------------------------------------------------------------------------
 
 def collect_carbon_rows(run_map, cp_max):
-    # Baseline: zero-price run at YEAR; max: highest carbon price run at YEAR
-    zero_zip = run_map[(0.0, 0.0)]
-    max_zip = run_map[(cp_max, 0.0)]
-
-    zero_profit_2050 = get_profit_summaries(zero_zip, YEAR)
-    max_profit_2050 = get_profit_summaries(max_zip, YEAR)
-
-    zero_ghg_2050 = get_ghg_summaries(zero_zip, YEAR)
-    max_ghg_2050 = get_ghg_summaries(max_zip, YEAR)
-
+    """
+    Use absolute values from the max-price carbon run.
+    Subtract the carbon policy payment to obtain underlying net cost.
+    Only include categories with positive GHG abatement (sequestration).
+    """
+    m   = run_map[(cp_max, 0.0)]
+    mp  = get_profit(m, YEAR)
+    mg  = get_ghg(m, YEAR)
     rows = []
-    for area_type in ("Agricultural land-use", "Ag management", "Non-ag"):
-        categories = list(dict.fromkeys(
-            list(zero_profit_2050[area_type]) +
-            list(max_profit_2050[area_type]) +
-            list(zero_ghg_2050[area_type]) +
-            list(max_ghg_2050[area_type])
-        ))
-        category_order = get_category_order(area_type, categories)
-
-        for category in category_order:
-            # zero-price run IS the baseline; its "change vs baseline" = 0
-            zero_profit_change_baud = 0.0
-            max_profit_change_baud = (
-                max_profit_2050[area_type].get(category, 0.0)
-                - zero_profit_2050[area_type].get(category, 0.0)
-            ) / 1e9
-
-            # GHG abatement vs baseline (positive = less emissions than baseline)
-            zero_metric_change_mt = 0.0
-            max_metric_change_mt = (
-                zero_ghg_2050[area_type].get(category, 0.0)
-                - max_ghg_2050[area_type].get(category, 0.0)
-            ) / 1e6
-            contribution_width = max_metric_change_mt  # zero_metric = 0
-
-            zero_policy_payment_baud = 0.0
-            max_policy_payment_baud = cp_max * max_metric_change_mt / 1e3
-            max_profit_change_excl_policy_baud = max_profit_change_baud - max_policy_payment_baud
-            delta_profit_policy_baud = max_profit_change_baud - zero_profit_change_baud
-            delta_profit_excl_policy_baud = max_profit_change_excl_policy_baud
-
-            avg_cost = np.nan
-            include_in_curve = (
-                contribution_width > MIN_WIDTH
-                and category != TRANSITION_LABEL
-            )
-            if include_in_curve:
-                avg_cost = -(delta_profit_excl_policy_baud * 1e3) / contribution_width
-
+    for at in ("Agricultural land-use", "Ag management", "Non-ag"):
+        cats = list(dict.fromkeys(list(mp[at]) + list(mg[at])))
+        for cat in get_category_order(at, cats):
+            p    = mp[at].get(cat, 0.0) / 1e9    # absolute profit [BAUD]
+            g    = -mg[at].get(cat, 0.0) / 1e6   # abatement [Mt CO2e] (+ = seq)
+            excl = p - cp_max * g / 1e3           # profit excl. carbon payment [BAUD]
+            inc  = g > MIN_WIDTH and cat != TRANSITION_LABEL
             rows.append({
                 "Panel": "Carbon",
                 "TargetPrice": cp_max,
-                "AreaType": area_type,
-                "Category": category,
-                "ZeroPriceMetricChange": zero_metric_change_mt,
-                "MaxPriceMetricChange": max_metric_change_mt,
-                "ContributionWidth": contribution_width,
-                "ContributionUnit": "Mt CO2e",
-                "ZeroPriceProfitChange_BAUD": zero_profit_change_baud,
-                "MaxPriceProfitChange_BAUD": max_profit_change_baud,
-                "ZeroPricePolicyPayment_BAUD": zero_policy_payment_baud,
-                "MaxPricePolicyPayment_BAUD": max_policy_payment_baud,
-                "PolicyPaymentMethod": "Approximate: carbon price x abatement vs 2050 baseline in the highest-price run",
-                "DeltaProfitPolicy_BAUD": delta_profit_policy_baud,
-                "DeltaProfitExclPolicy_BAUD": delta_profit_excl_policy_baud,
-                "AverageNetCost": avg_cost,
-                "AverageNetCostUnit": "AUD per tCO2e",
-                "IncludeInCurve": include_in_curve,
+                "AreaType": at,
+                "Category": cat,
+                "ContributionWidth": g,
+                "ProfitExclPolicy_BAUD": excl,
+                "AverageNetCost": -(excl * 1e3) / g if inc else np.nan,
+                "IncludeInCurve": inc,
             })
-
     return rows
 
 
-def collect_biodiversity_rows(run_map, bp_max):
-    # Baseline: zero-price run at YEAR; max: highest bio price run at YEAR
-    zero_zip = run_map[(0.0, 0.0)]
-    max_zip = run_map[(0.0, bp_max)]
-
-    zero_profit_2050 = get_profit_summaries(zero_zip, YEAR)
-    max_profit_2050 = get_profit_summaries(max_zip, YEAR)
-
-    zero_bio_2050 = get_bio_summaries(zero_zip, YEAR)
-    max_bio_2050 = get_bio_summaries(max_zip, YEAR)
-
+def collect_bio_rows(run_map, bp_max):
+    """
+    Use absolute values from the max-price biodiversity run.
+    Subtract the biodiversity policy payment to obtain underlying net cost.
+    Only include categories with positive biodiversity contribution.
+    """
+    m   = run_map[(0.0, bp_max)]
+    mp  = get_profit(m, YEAR)
+    mb  = get_bio(m, YEAR)
     rows = []
-    for area_type in ("Agricultural land-use", "Ag management", "Non-ag"):
-        categories = list(dict.fromkeys(
-            list(zero_profit_2050[area_type]) +
-            list(max_profit_2050[area_type]) +
-            list(zero_bio_2050[area_type]) +
-            list(max_bio_2050[area_type])
-        ))
-        category_order = get_category_order(area_type, categories)
-
-        for category in category_order:
-            # zero-price run IS the baseline; its "change vs baseline" = 0
-            zero_profit_change_baud = 0.0
-            max_profit_change_base_baud = (
-                max_profit_2050[area_type].get(category, 0.0)
-                - zero_profit_2050[area_type].get(category, 0.0)
-            ) / 1e9
-
-            zero_metric_change_mha = 0.0
-            max_metric_change_mha = (
-                max_bio_2050[area_type].get(category, 0.0)
-                - zero_bio_2050[area_type].get(category, 0.0)
-            ) / 1e6
-            contribution_width = max_metric_change_mha  # zero_metric = 0
-
-            zero_policy_payment_baud = 0.0
-            max_policy_payment_baud = bp_max * max_metric_change_mha / 1e3
-            max_profit_change_baud = max_profit_change_base_baud + max_policy_payment_baud
-            delta_profit_policy_baud = max_profit_change_baud - zero_profit_change_baud
-            delta_profit_excl_policy_baud = max_profit_change_base_baud
-
-            avg_cost = np.nan
-            include_in_curve = contribution_width > MIN_WIDTH
-            if include_in_curve:
-                avg_cost = -(delta_profit_excl_policy_baud * 1e3) / contribution_width
-
+    for at in ("Agricultural land-use", "Ag management", "Non-ag"):
+        cats = list(dict.fromkeys(list(mp[at]) + list(mb[at])))
+        for cat in get_category_order(at, cats):
+            p    = mp[at].get(cat, 0.0) / 1e9    # absolute profit [BAUD]
+            b    = mb[at].get(cat, 0.0) / 1e6    # biodiversity score [Mha yr]
+            excl = p - bp_max * b / 1e3           # profit excl. bio payment [BAUD]
+            inc  = b > MIN_WIDTH
             rows.append({
                 "Panel": "Biodiversity",
                 "TargetPrice": bp_max,
-                "AreaType": area_type,
-                "Category": category,
-                "ZeroPriceMetricChange": zero_metric_change_mha,
-                "MaxPriceMetricChange": max_metric_change_mha,
-                "ContributionWidth": contribution_width,
-                "ContributionUnit": "Mha yr^-1",
-                "ZeroPriceProfitChange_BAUD": zero_profit_change_baud,
-                "MaxPriceProfitChange_BAUD": max_profit_change_baud,
-                "ZeroPricePolicyPayment_BAUD": zero_policy_payment_baud,
-                "MaxPricePolicyPayment_BAUD": max_policy_payment_baud,
-                "PolicyPaymentMethod": "Explicit in paper4 plotting logic: biodiversity price x biodiversity change vs 2050 baseline in the highest-price run",
-                "DeltaProfitPolicy_BAUD": delta_profit_policy_baud,
-                "DeltaProfitExclPolicy_BAUD": delta_profit_excl_policy_baud,
-                "AverageNetCost": avg_cost,
-                "AverageNetCostUnit": "AUD per (ha yr^-1)",
-                "IncludeInCurve": include_in_curve,
+                "AreaType": at,
+                "Category": cat,
+                "ContributionWidth": b,
+                "ProfitExclPolicy_BAUD": excl,
+                "AverageNetCost": -(excl * 1e3) / b if inc else np.nan,
+                "IncludeInCurve": inc,
             })
-
     return rows
 
+
+# ---------------------------------------------------------------------------
+# Cache
+# ---------------------------------------------------------------------------
 
 def load_cache():
     if not CACHE_PATH.is_file():
         return None, None
-
     try:
         print(f"Loading cached data from {CACHE_PATH}")
-        df_curve = pd.read_excel(CACHE_PATH, sheet_name="CurveData")
-        df_metadata = pd.read_excel(CACHE_PATH, sheet_name="Metadata")
+        dfc = pd.read_excel(CACHE_PATH, sheet_name="CurveData")
+        dfm = pd.read_excel(CACHE_PATH, sheet_name="Metadata")
     except ValueError:
-        print("Cached average-cost workbook uses an older layout; rebuilding.")
+        print("Cache schema outdated; rebuilding.")
         return None, None
-
-    required_columns = {
-        "Panel",
-        "AreaType",
-        "Category",
-        "ZeroPriceMetricChange",
-        "MaxPriceMetricChange",
-        "ContributionWidth",
-        "ZeroPriceProfitChange_BAUD",
-        "MaxPriceProfitChange_BAUD",
-        "MaxPricePolicyPayment_BAUD",
-        "DeltaProfitExclPolicy_BAUD",
-        "AverageNetCost",
-        "IncludeInCurve",
-    }
-    if not required_columns.issubset(df_curve.columns):
-        print("Cached average-cost data schema is outdated; rebuilding.")
+    required = {"Panel", "AreaType", "Category", "ContributionWidth",
+                 "ProfitExclPolicy_BAUD", "AverageNetCost", "IncludeInCurve"}
+    if not required.issubset(dfc.columns):
+        print("Cache schema outdated; rebuilding.")
         return None, None
-
-    return df_curve, df_metadata
+    return dfc, dfm
 
 
 def collect_and_cache():
     run_map, cp_vals, bp_vals = build_run_map()
-    cp_max = max(cp_vals)
-    bp_max = max(bp_vals)
-
-    carbon_rows = collect_carbon_rows(run_map, cp_max)
-    bio_rows = collect_biodiversity_rows(run_map, bp_max)
-
-    df_curve = pd.DataFrame(carbon_rows + bio_rows)
-    df_curve = df_curve.sort_values(["Panel", "AreaType", "Category"]).reset_index(drop=True)
-    df_metadata = pd.DataFrame([
-        {
-            "Panel": "Carbon",
-            "TargetPrice": cp_max,
-            "Note": f"Curve width is the additional GHG abatement in the max-price run vs the zero-price (baseline) run at {YEAR}. Carbon transfer is removed approximately using price x abatement vs baseline in the highest-price run.",
-        },
-        {
-            "Panel": "Biodiversity",
-            "TargetPrice": bp_max,
-            "Note": f"Curve width is the additional biodiversity contribution in the max-price run vs the zero-price (baseline) run at {YEAR}. Biodiversity payment is removed using price x biodiversity change vs baseline in the highest-price run.",
-        },
-    ])
-
-    with pd.ExcelWriter(CACHE_PATH, engine="openpyxl") as writer:
-        df_curve.to_excel(writer, sheet_name="CurveData", index=False)
-        df_curve[df_curve["Panel"] == "Carbon"].to_excel(writer, sheet_name="Carbon", index=False)
-        df_curve[df_curve["Panel"] == "Biodiversity"].to_excel(writer, sheet_name="Biodiversity", index=False)
-        df_metadata.to_excel(writer, sheet_name="Metadata", index=False)
-
+    cp_max, bp_max = max(cp_vals), max(bp_vals)
+    dfc = pd.DataFrame(
+        collect_carbon_rows(run_map, cp_max) + collect_bio_rows(run_map, bp_max)
+    ).sort_values(["Panel", "AreaType", "Category"]).reset_index(drop=True)
+    dfm = pd.DataFrame([{"Panel": "Carbon", "TargetPrice": cp_max},
+                         {"Panel": "Biodiversity", "TargetPrice": bp_max}])
+    with pd.ExcelWriter(CACHE_PATH, engine="openpyxl") as w:
+        dfc.to_excel(w, sheet_name="CurveData", index=False)
+        dfc[dfc["Panel"] == "Carbon"].to_excel(w,       sheet_name="Carbon",       index=False)
+        dfc[dfc["Panel"] == "Biodiversity"].to_excel(w, sheet_name="Biodiversity", index=False)
+        dfm.to_excel(w, sheet_name="Metadata", index=False)
     print(f"Cache saved: {CACHE_PATH}")
-    return df_curve, df_metadata
+    return dfc, dfm
 
 
-def prepare_curve(df_curve, panel_name):
-    df_panel = df_curve[(df_curve["Panel"] == panel_name) & (df_curve["IncludeInCurve"])].copy()
-    if df_panel.empty:
-        return df_panel
+# ---------------------------------------------------------------------------
+# Curve preparation
+# ---------------------------------------------------------------------------
 
-    df_panel = df_panel.sort_values(
-        ["AverageNetCost", "ContributionWidth", "Category"],
-        ascending=[True, False, True],
-    ).reset_index(drop=True)
-    df_panel["x_left"] = df_panel["ContributionWidth"].cumsum().shift(fill_value=0.0)
-    df_panel["x_right"] = df_panel["x_left"] + df_panel["ContributionWidth"]
-    return df_panel
+def prepare_curve(dfc, panel_name, min_contrib_frac=0.005):
+    df = dfc[(dfc["Panel"] == panel_name) & (dfc["IncludeInCurve"])].copy()
+    if df.empty:
+        return df
+    total = df["ContributionWidth"].sum()
+    if total > 0:
+        df = df[df["ContributionWidth"] >= total * min_contrib_frac].copy()
+    df = df.sort_values(["AverageNetCost", "ContributionWidth", "Category"],
+                        ascending=[True, False, True]).reset_index(drop=True)
+    df["x_left"]  = df["ContributionWidth"].cumsum().shift(fill_value=0.0)
+    df["x_right"] = df["x_left"] + df["ContributionWidth"]
+    return df
 
 
-VALUE_FORMATTERS = {
-    "Carbon": ticker.FuncFormatter(lambda value, _: format_thousands(value)),
-    "Biodiversity": ticker.FuncFormatter(lambda value, _: format_thousands(value)),
-}
-
-PANEL_SEGMENTS = {
-    "Carbon": [(600, 1100), (-650, 350)],
-    "Biodiversity": [(2200, 2800), (-100, 900), (-8000, -6000)],
-}
-
-THIN_BAR_ABS_THRESHOLDS = {
-    "Carbon": 0.5,
-    "Biodiversity": 0.1,
-}
-THIN_BAR_SHARE_THRESHOLD = 0.02
-
-THIN_BAR_UNITS = {
-    "Carbon": "Mt CO$_2$e",
-    "Biodiversity": "Mha yr$^{-1}$",
+VALUE_FMT = {
+    "Carbon":       ticker.FuncFormatter(lambda v, _: format_thousands(v)),
+    "Biodiversity": ticker.FuncFormatter(lambda v, _: format_thousands(v)),
 }
 
 
-def get_legend_handles(df_panel):
-    handles = []
-    seen_categories = set()
-    for category in df_panel["Category"]:
-        if category in seen_categories:
+# ---------------------------------------------------------------------------
+# Axis-segment detection — always returns exactly N_SEGS segments
+# ---------------------------------------------------------------------------
+
+def _gap_segs(values, n, pad_frac=0.06):
+    """
+    Split `values` into `n` segments by finding the n-1 largest gaps.
+    Returns segments in ascending order (bottom to top for y, left to right for x).
+    """
+    vals = np.sort(values[~np.isnan(values)])
+    if len(vals) == 0:
+        return [(-1.0, 1.0)] * n
+    total_rng = float(vals[-1] - vals[0])
+    pad = max(total_rng * pad_frac, abs(vals[0]) * 0.01 + 1.0)
+
+    if total_rng < 1e-10 or len(vals) < n:
+        lo, hi = vals[0] - pad, vals[-1] + pad
+        step = (hi - lo) / n
+        return [(lo + i * step, lo + (i + 1) * step) for i in range(n)]
+
+    gaps = np.diff(vals)
+    n_breaks = n - 1
+    top_idx = sorted(np.argsort(gaps)[::-1][:n_breaks].tolist())
+
+    # Boundaries between segments (midpoints of the largest gaps)
+    bounds = [vals[i] + gaps[i] / 2.0 for i in top_idx]
+    edges = [-np.inf] + bounds + [np.inf]
+
+    segs = []
+    for i in range(n):
+        mask = (vals >= edges[i]) & (vals < edges[i + 1])
+        seg_vals = vals[mask]
+        if len(seg_vals) == 0:
+            # Edge case: no data in this segment — use boundary midpoints
+            lo_b = bounds[i - 1] if i > 0 else vals[0] - pad
+            hi_b = bounds[i]     if i < n - 1 else vals[-1] + pad
+            segs.append((lo_b, hi_b))
+        else:
+            segs.append((float(seg_vals[0]) - pad, float(seg_vals[-1]) + pad))
+    return segs
+
+
+def y_segs(df, n=N_SEGS):
+    """N y-segments, top (high y) first."""
+    heights = df["AverageNetCost"].dropna().values
+    segs = _gap_segs(heights, n)
+    return list(reversed(segs))   # highest y at index 0
+
+
+def x_segs(df, n=N_SEGS, pad_frac=0.02):
+    """N x-segments, left (low x) first. Equal division over cumulative x range."""
+    x_max = float(df["x_right"].max()) * (1.0 + pad_frac)
+    step  = x_max / n
+    return [(i * step, (i + 1) * step) for i in range(n)]
+
+
+# ---------------------------------------------------------------------------
+# Break marks
+# ---------------------------------------------------------------------------
+
+def add_y_break_marks(ax_u, ax_l, d=0.010):
+    kw = dict(color="black", clip_on=False, linewidth=0.9)
+    for ax, ys in [(ax_u, (-d, +d)), (ax_l, (1 - d, 1 + d))]:
+        ax.plot((-d, +d),   ys, transform=ax.transAxes, **kw)
+        ax.plot((1 - d, 1 + d), ys, transform=ax.transAxes, **kw)
+
+
+def add_x_break_marks(ax_l, ax_r, d=0.010):
+    kw = dict(color="black", clip_on=False, linewidth=0.9)
+    for ax, xs in [(ax_l, (1 - d, 1 + d)), (ax_r, (-d, +d))]:
+        ax.plot(xs, (-d, +d),   transform=ax.transAxes, **kw)
+        ax.plot(xs, (1 - d, 1 + d), transform=ax.transAxes, **kw)
+
+
+# ---------------------------------------------------------------------------
+# Legend
+# ---------------------------------------------------------------------------
+
+def get_legend_handles(df):
+    handles, seen = [], set()
+    for cat in df["Category"]:
+        if cat in seen:
             continue
-        handles.append(
-            mpatches.Patch(
-                facecolor=CURVE_COLOR_MAP.get(category, "#888888"),
-                edgecolor="none",
-                label=category,
-            )
-        )
-        seen_categories.add(category)
+        handles.append(mpatches.Patch(
+            facecolor=CURVE_COLOR_MAP.get(cat, "#888888"),
+            edgecolor="none", label=cat))
+        seen.add(cat)
     return handles
 
 
-def add_break_marks(ax_upper, ax_lower, d=0.008):
-    kwargs_upper = dict(transform=ax_upper.transAxes, color="black", clip_on=False, linewidth=0.8)
-    ax_upper.plot((-d, +d), (-d, +d), **kwargs_upper)
-    ax_upper.plot((1 - d, 1 + d), (-d, +d), **kwargs_upper)
+# ---------------------------------------------------------------------------
+# Main draw function — 3×3 equal-size grid with broken axes
+# ---------------------------------------------------------------------------
 
-    kwargs_lower = dict(transform=ax_lower.transAxes, color="black", clip_on=False, linewidth=0.8)
-    ax_lower.plot((-d, +d), (1 - d, 1 + d), **kwargs_lower)
-    ax_lower.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs_lower)
-
-
-def get_thin_bar_subset(df_panel, panel_name):
-    total_width = float(df_panel["ContributionWidth"].sum())
-    threshold = max(
-        THIN_BAR_ABS_THRESHOLDS[panel_name],
-        total_width * THIN_BAR_SHARE_THRESHOLD,
-    )
-    df_thin = df_panel[df_panel["ContributionWidth"] < threshold].copy()
-    return df_thin, threshold
-
-
-def draw_thin_bar_zoom(zoom_ax, df_panel, panel_name):
-    df_thin, threshold = get_thin_bar_subset(df_panel, panel_name)
-    if df_thin.empty:
-        zoom_ax.set_visible(False)
-        return
-
-    df_thin["zoom_left"] = df_thin["ContributionWidth"].cumsum().shift(fill_value=0.0)
-    df_thin["zoom_right"] = df_thin["zoom_left"] + df_thin["ContributionWidth"]
-
-    for _, row in df_thin.iterrows():
-        zoom_ax.bar(
-            row["zoom_left"],
-            row["AverageNetCost"],
-            width=row["ContributionWidth"],
-            align="edge",
-            color=CURVE_COLOR_MAP.get(row["Category"], "#888888"),
-            edgecolor="white",
-            linewidth=0.4,
-        )
-
-    zoom_ax.set_xlim(0.0, float(df_thin["zoom_right"].max()))
-    zoom_ax.set_yscale("symlog", linthresh=100.0)
-    if df_thin["AverageNetCost"].min() < 0.0 < df_thin["AverageNetCost"].max():
-        zoom_ax.axhline(0.0, color="#444444", linewidth=0.6)
-
-    zoom_ax.set_title(
-        f"Thin bars zoom ({len(df_thin)})\n(width < {format_thousands(threshold)} {THIN_BAR_UNITS[panel_name]})",
-        fontsize=FS,
-        pad=2,
-    )
-    zoom_ax.xaxis.set_major_formatter(VALUE_FORMATTERS[panel_name])
-    zoom_ax.tick_params(axis="both", labelsize=FS, length=2)
-    style_box_axis(zoom_ax, linewidth=0.6)
-
-
-def draw_curve(fig, outer_spec, df_panel, panel_name, title, xlabel, ylabel):
-    if df_panel.empty:
+def draw_curve(fig, outer_spec, df, panel_name, title, xlabel, ylabel,
+               x_ranges=None, y_ranges=None):
+    """
+    x_ranges : list of (xmin, xmax), left → right.  None = auto-detect.
+    y_ranges : list of (ymin, ymax), top → bottom (highest y first).  None = auto-detect.
+    """
+    if df.empty:
         ax = fig.add_subplot(outer_spec)
-        ax.text(0.5, 0.5, "No positive contribution categories", ha="center", va="center", transform=ax.transAxes)
+        ax.text(0.5, 0.5, "No data", ha="center", va="center",
+                transform=ax.transAxes)
         style_box_axis(ax, linewidth=0.8)
         return []
 
-    segments = PANEL_SEGMENTS[panel_name]
-    df_thin, _ = get_thin_bar_subset(df_panel, panel_name)
-    has_zoom = not df_thin.empty
+    y_segs_ = list(reversed(y_ranges)) if y_ranges is not None else y_segs(df)
+    x_segs_ = x_ranges if x_ranges is not None else x_segs(df)
 
-    inner = outer_spec.subgridspec(
-        len(segments),
-        1,
-        hspace=0.05,
-    )
+    n_y, n_x = len(y_segs_), len(x_segs_)
 
-    axes = []
-    shared_ax = None
-    for idx in range(len(segments)):
-        ax = fig.add_subplot(inner[idx, 0], sharex=shared_ax)
-        if shared_ax is None:
-            shared_ax = ax
-        axes.append(ax)
+    # Equal-size subplots — NO height_ratios or width_ratios
+    inner = outer_spec.subgridspec(n_y, n_x, hspace=0.08, wspace=0.08)
+    axes  = [[fig.add_subplot(inner[iy, ix])
+              for ix in range(n_x)] for iy in range(n_y)]
 
-    for ax, (ymin, ymax) in zip(axes, segments):
-        for _, row in df_panel.iterrows():
-            ax.bar(
-                row["x_left"],
-                row["AverageNetCost"],
-                width=row["ContributionWidth"],
-                align="edge",
-                color=CURVE_COLOR_MAP.get(row["Category"], "#888888"),
-                edgecolor="white",
-                linewidth=0.5,
-            )
+    # Draw every bar in every cell; matplotlib clips to the cell's xlim/ylim
+    for iy in range(n_y):
+        for ix in range(n_x):
+            ax = axes[iy][ix]
+            for _, row in df.iterrows():
+                ax.bar(
+                    row["x_left"], row["AverageNetCost"],
+                    width=row["ContributionWidth"],
+                    align="edge",
+                    color=CURVE_COLOR_MAP.get(row["Category"], "#888888"),
+                    edgecolor="white", linewidth=0.5,
+                )
+            ax.set_xlim(*x_segs_[ix])
+            ax.set_ylim(*y_segs_[iy])
+            if y_segs_[iy][0] < 0.0 < y_segs_[iy][1]:
+                ax.axhline(0.0, color="#444444", linewidth=0.8)
+            ax.xaxis.set_major_formatter(VALUE_FMT[panel_name])
+            ax.xaxis.set_major_locator(ticker.MaxNLocator(3, integer=False))
+            ax.yaxis.set_major_locator(ticker.MaxNLocator(3, integer=False))
+            style_box_axis(ax, linewidth=0.8)
 
-        ax.set_ylim(ymin, ymax)
-        if ymin < 0.0 < ymax:
-            ax.axhline(0.0, color="#444444", linewidth=0.8)
-        style_box_axis(ax, linewidth=0.8)
+    # ── Broken y-axis: hide inner horizontal spines + x-tick labels ──
+    for iy in range(n_y - 1):
+        for ix in range(n_x):
+            axes[iy][ix].spines["bottom"].set_visible(False)
+            axes[iy][ix].tick_params(axis="x", labelbottom=False, bottom=False)
+    for iy in range(1, n_y):
+        for ix in range(n_x):
+            axes[iy][ix].spines["top"].set_visible(False)
 
-    axes[0].set_title(title)
-    axes[-1].set_xlabel(xlabel)
-    axes[len(axes) // 2].set_ylabel(ylabel)
+    # ── Broken x-axis: hide inner vertical spines + y-tick labels ──
+    for ix in range(n_x - 1):
+        for iy in range(n_y):
+            axes[iy][ix].spines["right"].set_visible(False)
+            axes[iy][ix].tick_params(axis="y", right=False)
+    for ix in range(1, n_x):
+        for iy in range(n_y):
+            axes[iy][ix].spines["left"].set_visible(False)
+            axes[iy][ix].tick_params(axis="y", labelleft=False, left=False)
 
-    x_max = float(df_panel["x_right"].max())
-    for ax in axes:
-        ax.set_xlim(0.0, x_max)
-        ax.xaxis.set_major_formatter(VALUE_FORMATTERS[panel_name])
+    # ── Break marks ──
+    for iy in range(n_y - 1):
+        for ix in range(n_x):
+            add_y_break_marks(axes[iy][ix], axes[iy + 1][ix])
+    for ix in range(n_x - 1):
+        for iy in range(n_y):
+            add_x_break_marks(axes[iy][ix], axes[iy][ix + 1])
 
-    for ax in axes[:-1]:
-        ax.tick_params(axis="x", labelbottom=False, bottom=False)
-        ax.spines["bottom"].set_visible(False)
+    # ── Labels: title top-centre, x-label bottom-centre, y-label mid-left ──
+    axes[0][n_x // 2].set_title(title, pad=6)
+    axes[-1][n_x // 2].set_xlabel(xlabel)
+    axes[n_y // 2][0].set_ylabel(ylabel)
 
-    for ax in axes[1:]:
-        ax.spines["top"].set_visible(False)
-
-    for ax_upper, ax_lower in zip(axes[:-1], axes[1:]):
-        add_break_marks(ax_upper, ax_lower)
-
-    if has_zoom:
-        zoom_ax = axes[0].inset_axes([0.08, 0.08, 0.40, 0.52])
-        draw_thin_bar_zoom(zoom_ax, df_panel, panel_name)
-
-    return get_legend_handles(df_panel)
+    return get_legend_handles(df)
 
 
-df_curve, df_metadata = load_cache()
-if df_curve is None or df_metadata is None:
-    df_curve, df_metadata = collect_and_cache()
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
-df_carbon = prepare_curve(df_curve, "Carbon")
-df_bio = prepare_curve(df_curve, "Biodiversity")
+dfc, dfm = load_cache()
+if dfc is None or dfm is None:
+    dfc, dfm = collect_and_cache()
 
-carbon_price = float(df_curve.loc[df_curve["Panel"] == "Carbon", "TargetPrice"].iloc[0])
-bio_price = float(df_curve.loc[df_curve["Panel"] == "Biodiversity", "TargetPrice"].iloc[0])
+df_carbon = prepare_curve(dfc, "Carbon")
+df_bio    = prepare_curve(dfc, "Biodiversity")
 
-fig = plt.figure(figsize=(18, 8))
-outer = fig.add_gridspec(1, 2, wspace=0.22)
+cp = float(dfc.loc[dfc["Panel"] == "Carbon",       "TargetPrice"].iloc[0])
+bp = float(dfc.loc[dfc["Panel"] == "Biodiversity", "TargetPrice"].iloc[0])
 
-handles_carbon = draw_curve(
-    fig,
-    outer[0, 0],
-    df_carbon,
-    "Carbon",
-    rf"Carbon average net cost curve (cp = {format_thousands(carbon_price)} AU\$/tCO$_2$e yr$^{{-1}}$)",
-    r"GHG emission reduction beyond cp=0 (Mt CO$_2$e yr$^{-1}$)",
-    r"Avg. net cost excl. carbon transfer (AU\$/tCO$_2$e yr$^{-1}$)",
+fig   = plt.figure(figsize=(14, 16))
+outer = fig.add_gridspec(3, 1, hspace=0.45, height_ratios=[10, 10, 1.2])
+
+handles_c = draw_curve(
+    fig, outer[0, 0], df_carbon, "Carbon",
+    rf"Carbon average net cost curve  (cp = {format_thousands(cp)} AU\$/tCO$_2$e yr$^{{-1}}$)",
+    r"GHG abatement at max price (Mt CO$_2$e yr$^{-1}$)",
+    r"Emission reduction cost (AU\$/tCO$_2$e yr$^{-1}$)",
+    x_ranges=CARBON_X_RANGES,
+    y_ranges=CARBON_Y_RANGES,
 )
 
-handles_bio = draw_curve(
-    fig,
-    outer[0, 1],
-    df_bio,
-    "Biodiversity",
-    rf"Biodiversity average net cost curve (bp = {format_thousands(bio_price)} AU\$/ha yr$^{{-1}}$)",
-    r"Additional biodiversity contribution beyond bp=0 (Mha yr$^{-1}$)",
-    r"Avg. net cost excl. biodiversity payment (AU\$/ha yr$^{-1}$)",
+handles_b = draw_curve(
+    fig, outer[1, 0], df_bio, "Biodiversity",
+    rf"Biodiversity average net cost curve  (bp = {format_thousands(bp)} AU\$/ha yr$^{{-1}}$)",
+    r"Biodiversity contribution at max price (Mha yr$^{-1}$)",
+    r"Biodiversity restoration cost (AU\$/ha yr$^{-1}$)",
+    x_ranges=BIO_X_RANGES,
+    y_ranges=BIO_Y_RANGES,
 )
 
-all_handles = []
-seen_labels = set()
-for handle in handles_carbon + handles_bio:
-    if handle.get_label() in seen_labels:
-        continue
-    all_handles.append(handle)
-    seen_labels.add(handle.get_label())
+all_handles, seen = [], set()
+for h in handles_c + handles_b:
+    if h.get_label() not in seen:
+        all_handles.append(h)
+        seen.add(h.get_label())
 
 if all_handles:
-    fig.legend(
+    leg_ax = fig.add_subplot(outer[2, 0])
+    leg_ax.set_axis_off()
+    leg_ax.legend(
         handles=all_handles,
-        loc="lower center",
-        bbox_to_anchor=(0.5, -0.02),
-        ncol=4,
+        loc="center",
+        ncol=min(len(all_handles), 5),
         frameon=False,
+        fontsize=FS - 1,
+        handlelength=1.2,
+        handleheight=1.0,
+        columnspacing=1.0,
     )
-
-fig.subplots_adjust(bottom=0.2, top=0.95)
 
 out_path = OUT_DIR / f"7_Average_Net_Cost_Curves_{YEAR}.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")

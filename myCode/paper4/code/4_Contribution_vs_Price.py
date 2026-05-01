@@ -37,7 +37,7 @@ from tools.price_slice_utils import (
 )
 
 
-YEAR = 2050
+YEAR = 2025
 BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
@@ -96,8 +96,8 @@ LU_TO_AG_GROUP = {
 
 PANEL_CONFIG = {
     "Agricultural land-use": {
-        "order": AG_ORDER + [TRANSITION_LABEL],
-        "color_map": {**AG_COLOR_MAP, TRANSITION_LABEL: LU_COLOR_MAP.get(TRANSITION_LABEL, "#D2E0FB")},
+        "order": AG_ORDER,
+        "color_map": AG_COLOR_MAP,
         "ylabel": "Agricultural land-use",
     },
     "Ag management": {
@@ -409,6 +409,8 @@ def build_pivot(df_long, price_type, area_type):
         (df_long["PriceType"] == price_type) &
         (df_long["AreaType"] == area_type)
     ]
+    if area_type == "Agricultural land-use":
+        df_subset = df_subset[df_subset["Category"] != TRANSITION_LABEL]
 
     if df_subset.empty:
         return pd.DataFrame()
@@ -620,14 +622,25 @@ LEGEND_FS = {
     "Non-ag": FS - 1,
 }
 
-axes[0, 0].set_title(r"GHG emissions (Mt CO$_2$e yr$^{-1}$)", fontsize=FS)
-axes[0, 1].set_title(r"Biodiversity contribution score (Mha yr$^{-1}$)", fontsize=FS)
+for r in range(4):
+    axes[r, 1].yaxis.tick_right()
 plt.tight_layout()
 plt.subplots_adjust(hspace=0.35, wspace=0.28)
 fig.canvas.draw()
 renderer = fig.canvas.get_renderer()
 fig_w_px = fig.get_figwidth() * fig.dpi
 fig_h_px = fig.get_figheight() * fig.dpi
+
+bb_left = [axes[r, 0].get_tightbbox(renderer) for r in range(4)]
+bb_right = [axes[r, 1].get_tightbbox(renderer) for r in range(4)]
+y_mid_l = (max(b.y1 for b in bb_left) + min(b.y0 for b in bb_left)) / 2 / fig_h_px
+y_mid_r = (max(b.y1 for b in bb_right) + min(b.y0 for b in bb_right)) / 2 / fig_h_px
+x_l = min(b.x0 for b in bb_left) / fig_w_px - 0.02
+x_r = max(b.x1 for b in bb_right) / fig_w_px + 0.02
+fig.text(x_l, y_mid_l, r"GHG emissions (Mt CO$_2$e yr$^{-1}$)",
+         rotation=90, va='center', ha='center', fontsize=FS)
+fig.text(x_r, y_mid_r, r"Biodiversity contribution score (Mha yr$^{-1}$)",
+         rotation=270, va='center', ha='center', fontsize=FS)
 
 all_rows = [("_total", 0)] + [(area_type, i + 1) for i, area_type in enumerate(row_area_types)]
 for key, row_idx in all_rows:

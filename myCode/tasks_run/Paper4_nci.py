@@ -4,13 +4,13 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260427_paper4_NCI'],
+    'TASK_NAME': ['20260502_paper4_NCI'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2], 
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['36GB'],
-    'NCPUS': ['9'], 
+    'MEM': ['40GB'],
+    'NCPUS': ['10'], 
     'WRITE_THREADS': ['2'],
     'TIME': ['6:00:00'],
 
@@ -18,9 +18,9 @@ grid_search = {
     'BIODIVERSITY_TARGET_GBF_2': ['off'],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
-    'CARBON_PRICE_COSTANT': [0,8.92,17.85,26.77,35.69,44.61,53.54,62.46,75.84,89.23,133.84,178.46,233.07,267.69,312.3,356.92],
+    'CARBON_PRICE_COSTANT': [i for i in range(0,361,20)], # [0,8.92,17.85,26.77,35.69,44.61,53.54,62.46,75.84,89.23,133.84,178.46,233.07,267.69,312.3,356.92],
     'BIODIVERSITY_PRICES_FIELD': ['CONSTANT'],
-    'BIODIVERSITY_PRICE_CONSTANT': [0, 3850, 11000, 12925, 16379, 22000, 27297, 35431, 81950],
+    'BIODIVERSITY_PRICE_CONSTANT': [i for i in range(0,90001,5000)], # [0, 5500, 11000, 16500, 22000, 27500, 33000, 38500,44000, 49500, 55000, 60500, 66000, 71500, 77000, 82500],
     # ---------------------------------- Model settings ------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],

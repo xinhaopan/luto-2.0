@@ -45,7 +45,7 @@ from tools.price_slice_utils import (
 )
 
 
-YEAR = 2050
+YEAR = 2025
 CACHE_PATH = DATA_DIR / f"2_NetEcon_raw_data_{YEAR}.xlsx"
 
 PROFIT_FILES = [

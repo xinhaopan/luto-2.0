@@ -1,5 +1,5 @@
 # ==============================================================================
-# Figure 3: Area composition change since 2010 vs carbon price / biodiversity price
+# Figure 02: 2025 area composition across all price scenarios
 #   Left column:  BioPrice = 0, carbon price varies
 #   Right column: CarbonPrice = 0, biodiversity price varies
 #   Rows: Agricultural land-use / Ag management / Non-ag
@@ -40,10 +40,14 @@ BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
-CACHE_PATH = DATA_DIR / f"3_Area_raw_data_{YEAR}.xlsx"
+CACHE_PATH = DATA_DIR / f"02_Area_2025_All_Scenarios_raw_data_{YEAR}.xlsx"
 
 FS = 11
 SUM_LINE_LABEL = "Sum"
+OLD_LIVESTOCK_LABEL = "Livestock"
+MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
+NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
+MODIFIED_LIVESTOCK_COLOR = "#F77B00"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -79,14 +83,45 @@ def load_style_table(sheet_name):
     return order, color_map, label_map
 
 
+def split_livestock_style(order, color_map):
+    previous_livestock_color = color_map.get(OLD_LIVESTOCK_LABEL, "#FFC87C")
+    new_order = []
+    for label in order:
+        if label == OLD_LIVESTOCK_LABEL:
+            new_order.extend([MODIFIED_LIVESTOCK_LABEL, NATURAL_LIVESTOCK_LABEL])
+        else:
+            new_order.append(label)
+
+    new_color_map = {
+        label: color
+        for label, color in color_map.items()
+        if label != OLD_LIVESTOCK_LABEL
+    }
+    new_color_map[MODIFIED_LIVESTOCK_LABEL] = MODIFIED_LIVESTOCK_COLOR
+    new_color_map[NATURAL_LIVESTOCK_LABEL] = previous_livestock_color
+    return new_order, new_color_map
+
+
+def map_ag_group(row):
+    group = row["ag_group"]
+    if group == OLD_LIVESTOCK_LABEL:
+        desc_key = normalize_name(row["desc"])
+        if "modifiedland" in desc_key:
+            return MODIFIED_LIVESTOCK_LABEL
+        if "naturalland" in desc_key:
+            return NATURAL_LIVESTOCK_LABEL
+    return group
+
+
 AG_ORDER, AG_COLOR_MAP, _ = load_style_table("ag_group")
+AG_ORDER, AG_COLOR_MAP = split_livestock_style(AG_ORDER, AG_COLOR_MAP)
 AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = load_style_table("am")
 NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = load_style_table("non_ag")
 LU_ORDER, LU_COLOR_MAP, LU_LABEL_MAP = load_style_table("lu")
 
 group_df = pd.read_excel(GROUP_FILE)
 LU_TO_AG_GROUP = {
-    normalize_name(row["desc"]): row["ag_group"]
+    normalize_name(row["desc"]): map_ag_group(row)
     for _, row in group_df.iterrows()
     if pd.notna(row.get("desc")) and pd.notna(row.get("ag_group"))
 }
@@ -239,15 +274,7 @@ def read_non_ag_area(zip_path, year):
 
 def collect_slice_rows(run_map, price_vals, varying_key):
     price_type = "CarbonPrice" if varying_key == "cp" else "BioPrice"
-    baseline_zip = run_map.get((0.0, 0.0))
     rows = []
-
-    # Baseline: (cp=0, bp=0) run at YEAR
-    summaries_baseline = {
-        "Agricultural land-use": read_agricultural_area(baseline_zip, YEAR) if baseline_zip else {},
-        "Ag management": read_ag_management_area(baseline_zip, YEAR) if baseline_zip else {},
-        "Non-ag": read_non_ag_area(baseline_zip, YEAR) if baseline_zip else {},
-    }
 
     for price in price_vals:
         key = (price, 0.0) if varying_key == "cp" else (0.0, price)
@@ -255,7 +282,7 @@ def collect_slice_rows(run_map, price_vals, varying_key):
         if zip_path is None:
             continue
 
-        summaries_2050 = {
+        summaries_2025 = {
             "Agricultural land-use": read_agricultural_area(zip_path, YEAR),
             "Ag management": read_ag_management_area(zip_path, YEAR),
             "Non-ag": read_non_ag_area(zip_path, YEAR),
@@ -264,31 +291,23 @@ def collect_slice_rows(run_map, price_vals, varying_key):
         print(f"  {varying_key}={format_thousands(price)}:")
 
         for area_type in AREA_CONFIG:
-            summary_baseline = summaries_baseline[area_type]
-            summary_2050 = summaries_2050[area_type]
+            summary_2025 = summaries_2025[area_type]
             category_order = get_category_order(
                 area_type,
-                list(dict.fromkeys(list(summary_baseline) + list(summary_2050))),
+                list(dict.fromkeys(list(summary_2025))),
             )
 
-            total_baseline = sum(summary_baseline.values())
-            total_2050 = sum(summary_2050.values())
-            print(
-                f"    {area_type}: baseline={total_baseline:.2f} Mha, "
-                f"2050={total_2050:.2f} Mha, change={total_2050 - total_baseline:.2f} Mha"
-            )
+            total_2025 = sum(summary_2025.values())
+            print(f"    {area_type}: 2025={total_2025:.2f} Mha")
 
             for category in category_order:
-                area_baseline = summary_baseline.get(category, 0.0)
-                area_2050 = summary_2050.get(category, 0.0)
+                area_2025 = summary_2025.get(category, 0.0)
                 rows.append({
                     "PriceType": price_type,
                     "Price": price,
                     "AreaType": area_type,
                     "Category": category,
-                    "Area_Baseline_Mha": area_baseline,
-                    "Area_2050_Mha": area_2050,
-                    "AreaChangevs_Baseline_Mha": area_2050 - area_baseline,
+                    "Area_2025_Mha": area_2025,
                 })
 
     return rows
@@ -310,12 +329,17 @@ def load_cache():
         "Price",
         "AreaType",
         "Category",
-        "Area_Baseline_Mha",
-        "Area_2050_Mha",
-        "AreaChangevs_Baseline_Mha",
+        "Area_2025_Mha",
     }
     if not required_columns.issubset(df_long.columns):
         print("Cached area data schema is outdated; rebuilding.")
+        return None
+    old_relative_columns = {"Area_ZeroPrice_Mha", "AreaChange_vs_ZeroPrice_Mha"}
+    if old_relative_columns.intersection(df_long.columns):
+        print("Cached area data includes relative columns; rebuilding.")
+        return None
+    if OLD_LIVESTOCK_LABEL in set(df_long["Category"]):
+        print("Cached area data uses unsplit livestock categories; rebuilding.")
         return None
 
     return df_long
@@ -324,10 +348,10 @@ def load_cache():
 def collect_and_cache():
     run_map, cp_vals, bp_vals = build_run_map()
 
-    print(f"\n--- Slice A: BioPrice=0, carbon price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
+    print(f"\n--- Slice A: 2025 area, BioPrice=0 and carbon price varies ---")
     rows_cp = collect_slice_rows(run_map, cp_vals, "cp")
 
-    print(f"\n--- Slice B: CarbonPrice=0, biodiversity price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
+    print(f"\n--- Slice B: 2025 area, CarbonPrice=0 and biodiversity price varies ---")
     rows_bp = collect_slice_rows(run_map, bp_vals, "bp")
 
     df_long = pd.DataFrame(rows_cp + rows_bp)
@@ -361,7 +385,7 @@ def build_area_pivot(df_long, price_type, area_type):
     pivot = df_subset.pivot_table(
         index="Price",
         columns="Category",
-        values="AreaChangevs_Baseline_Mha",
+        values="Area_2025_Mha",
         aggfunc="sum",
         fill_value=0.0,
     ).sort_index()
@@ -381,7 +405,7 @@ def build_total_area_pivot(df_long, price_type):
     pivot = df_subset.pivot_table(
         index="Price",
         columns="Category",
-        values="AreaChangevs_Baseline_Mha",
+        values="Area_2025_Mha",
         aggfunc="sum",
         fill_value=0.0,
     ).sort_index()
@@ -545,7 +569,7 @@ LEGEND_FS = {
     "Non-ag": FS - 1,
 }
 
-fig.supylabel(r"Area (Mha yr$^{-1}$)", fontsize=FS)
+fig.supylabel(r"Area in 2025 (Mha)", fontsize=FS)
 plt.tight_layout()
 plt.subplots_adjust(hspace=0.35, wspace=0.12)
 fig.canvas.draw()
@@ -578,7 +602,7 @@ for row_idx, area_type in enumerate(row_area_types):
         fontsize=LEGEND_FS.get(area_type, FS - 1),
     )
 
-out_path = OUT_DIR / f"3_Area_vs_Price_{YEAR}.png"
+out_path = OUT_DIR / f"02_Area_All_Scenarios_{YEAR}.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")
