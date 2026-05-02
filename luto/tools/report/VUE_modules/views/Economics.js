@@ -74,7 +74,8 @@ window.EconomicsView = {
           return mapData?.[selectWater.value]?.[selectLanduse.value]?.[yr] || {};
         }
       } else if (cat === "Ag Mgt") {
-        return mapData?.[selectAgMgt.value]?.[selectWater.value]?.[selectLanduse.value]?.[yr] || {};
+        // Am map data has only "ALL" at lm/lu levels; ignore selectWater/selectLanduse for map
+        return mapData?.[selectAgMgt.value]?.["ALL"]?.["ALL"]?.[yr] || {};
       } else if (cat === "Non-Ag") {
         return mapData?.[selectLanduse.value]?.[yr] || {};
       }
@@ -86,8 +87,13 @@ window.EconomicsView = {
       const cat = selectCategory.value;
       const chartData = window[chartRegister[cat]?.name]?.[selectRegion.value];
       let seriesData;
-      if (cat === "Ag" || cat === "Ag Mgt") {
+      if (cat === "Ag") {
         seriesData = chartData?.["ALL"]?.["ALL"];
+      } else if (cat === "Ag Mgt") {
+        // Economics_Am: region → lm → lu → { Cost/Revenue: [series] }
+        // Chart data has no "Profit" key; map "Profit" mapType to "Revenue" for chart
+        const chartMetric = (selectMapType.value === 'Profit') ? 'Revenue' : selectMapType.value;
+        seriesData = chartData?.[selectWater.value]?.[selectLanduse.value]?.[chartMetric];
       } else if (cat === "Non-Ag") {
         seriesData = chartData;
       }
@@ -161,16 +167,18 @@ window.EconomicsView = {
         }
 
       } else if (cat === "Ag Mgt") {
+        // AgMgt selector: from map data (controls which am is shown in the map)
         availableAgMgt.value = Object.keys(mapData);
         const prevAm = previousSelections.value["Ag Mgt"].agMgt;
         selectAgMgt.value = (prevAm && availableAgMgt.value.includes(prevAm)) ? prevAm : (availableAgMgt.value[0] || '');
 
-        const agMgtData = mapData[selectAgMgt.value] || {};
-        availableWater.value = Object.keys(agMgtData);
+        // Water/Landuse: from chart data (lm → lu), since map data only has "ALL" at these levels
+        const chartForRegion = window[chartRegister["Ag Mgt"]?.name]?.[selectRegion.value] || {};
+        availableWater.value = Object.keys(chartForRegion);
         const prevW = previousSelections.value["Ag Mgt"].water;
         selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
 
-        availableLanduse.value = Object.keys(agMgtData[selectWater.value] || {});
+        availableLanduse.value = Object.keys(chartForRegion[selectWater.value] || {});
         const prevL = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
 
@@ -238,18 +246,11 @@ window.EconomicsView = {
       cascadeAll(newCat, newMapType);
     }, { immediate: true });
 
-    // AgMgt → Water → Landuse (Ag Mgt only)
+    // AgMgt selector change — map updates automatically via selectMapData computed;
+    // water/landuse come from chart data (independent of am selection)
     watch(selectAgMgt, (newAgMgt) => {
       if (selectCategory.value !== "Ag Mgt") return;
       previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-      const mapData = window[mapRegister["Ag Mgt"][selectMapType.value]?.name];
-      const agMgtData = mapData?.[newAgMgt] || {};
-      availableWater.value = Object.keys(agMgtData);
-      const prevW = previousSelections.value["Ag Mgt"].water;
-      selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
-      availableLanduse.value = Object.keys(agMgtData[selectWater.value] || {});
-      const prevL = previousSelections.value["Ag Mgt"].landuse;
-      selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
     });
 
     // Water → Source → Landuse
@@ -262,8 +263,9 @@ window.EconomicsView = {
         cascadeAgFromWater(mapData, newWater, selectMapType.value !== "Profit");
       } else if (cat === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].water = newWater;
-        const mapData = window[mapRegister["Ag Mgt"][selectMapType.value]?.name];
-        availableLanduse.value = Object.keys(mapData?.[selectAgMgt.value]?.[newWater] || {});
+        // Use chart data (lm → lu) for landuse cascade
+        const chartForRegion = window[chartRegister["Ag Mgt"]?.name]?.[selectRegion.value] || {};
+        availableLanduse.value = Object.keys(chartForRegion[newWater] || {});
         const prev = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
       }
