@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260503_paper4_HPC'],
+    'TASK_NAME': ['20260503_paper4_HPC_1'],
     'KEEP_OUTPUTS': [True],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2], 
@@ -50,7 +50,7 @@ grid_search = {
     'WATER_STRESS': [0.6],
     'WATER_LIMITS': ['on'],
     'WATER_CONSTRAINT_TYPE': ['hard'],
-    'INCLUDE_WATER_LICENSE_COSTS': [1],
+    'INCLUDE_WATER_LICENSE_COSTS': [0],
     'WATER_REGION_DEF': ['Drainage Division'],
     'WATER_CLIMATE_CHANGE_IMPACT': ['on'],
     # ----------------------------------- Demand settings --------------------------------

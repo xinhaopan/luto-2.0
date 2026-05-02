@@ -150,16 +150,24 @@ def create_zip(data):
                 else:
                     run_zip.write(abs_path, arcname=abs_path.relative_to(simulation_root))
 
+    # Remove the generated output tree first so the run folder only keeps the archive.
+    if output_dir.exists():
+        try:
+            shutil.rmtree(output_dir)
+        except Exception as e:
+            print(f"Failed to delete output directory {output_dir}. Reason: {e}")
+
     for item in os.listdir(simulation_root):
-        if item != 'Run_Archive.zip':
-            item_path = simulation_root / item
-            try:
-                if item_path.is_file() or item_path.is_symlink():
-                    item_path.unlink()
-                elif item_path.is_dir():
-                    shutil.rmtree(item_path)
-            except Exception as e:
-                print(f"Failed to delete {item}. Reason: {e}")
+        if item == 'Run_Archive.zip':
+            continue
+        item_path = simulation_root / item
+        try:
+            if item_path.is_file() or item_path.is_symlink():
+                item_path.unlink()
+            elif item_path.is_dir():
+                shutil.rmtree(item_path)
+        except Exception as e:
+            print(f"Failed to delete {item}. Reason: {e}")
 
     return report_zip_path
 
