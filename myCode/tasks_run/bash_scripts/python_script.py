@@ -47,6 +47,33 @@ def is_zip_valid(path):
         return False
     return True
 
+
+def extract_output_from_archive(archive_path, output_path="output"):
+    """Extract only archived model outputs, keeping current code/settings intact."""
+    target_root = pathlib.Path(".").resolve()
+    output_root = pathlib.Path(output_path)
+
+    with zipfile.ZipFile(archive_path, 'r') as zf:
+        members = []
+        for member in zf.infolist():
+            member_name = member.filename.replace("\\", "/")
+            parts = pathlib.PurePosixPath(member_name).parts
+            if not parts or parts[0] != output_path or ".." in parts:
+                continue
+            members.append(member)
+
+        if not members:
+            raise FileNotFoundError(f"No '{output_path}/' entries found in {archive_path}")
+
+        if output_root.exists():
+            shutil.rmtree(output_root)
+
+        for member in members:
+            dest = (target_root / member.filename).resolve()
+            dest.relative_to(target_root)
+            zf.extract(member, target_root)
+
+
 def zip_only():
     """Load data from .lz4 and run create_zip (no simulation)."""
     import joblib
@@ -99,6 +126,44 @@ def write_only():
     else:
         report_zip_path = create_zip(data)
         print(f"Archiving complete. Report zip: {report_zip_path}")
+
+
+def rewrite_only():
+    """Extract archived outputs, re-run write_outputs, then re-zip.
+
+    Use this when results are already archived but new write functions have
+    been added and need to be run against existing simulation data.
+    Falls back to write_only() if no archive is found.
+    """
+    import joblib
+
+    archive_path = 'Run_Archive.zip'
+
+    if not is_zip_valid(archive_path):
+        print(f"'{archive_path}' not found or invalid - falling back to write_only().")
+        write_only()
+        return
+
+    print(f"Extracting outputs from '{archive_path}'...")
+    extract_output_from_archive(archive_path)
+    print("Output extraction complete; current code and settings were preserved.")
+
+    from luto.tools.write import write_outputs
+    import luto.settings as settings
+
+    lz4_path, _ = _find_lz4()
+    print(f"Loading data from: {lz4_path}")
+    data = joblib.load(lz4_path)
+
+    print("Writing outputs...")
+    write_outputs(data)
+    print("Write complete.")
+
+    if settings.KEEP_OUTPUTS:
+        print("KEEP_OUTPUTS is True. Skipping re-archiving.")
+    else:
+        report_zip_path = create_zip(data)
+        print(f"Re-archiving complete. Report zip: {report_zip_path}")
 
 def report_only():
     """Load .lz4 and run create_report (no simulation, no archiving)."""
@@ -267,6 +332,8 @@ if __name__ == "__main__":
         zip_only()
     elif os.path.exists('write_mode.flag'):
         write_only()
+    elif os.path.exists('rewrite_mode.flag'):
+        rewrite_only()
     elif os.path.exists('report_mode.flag'):
         report_only()
     else:

@@ -1,14 +1,14 @@
 # ==============================================================================
-# Figure 04: 2025 contribution response vs carbon price / biodiversity price
+# Figure 04: contribution response vs carbon price / biodiversity price
 #   Left column:  BioPrice = 0, carbon price varies
 #   Right column: CarbonPrice = 0, biodiversity price varies
 #   Rows: Agricultural land-use / Ag management / Non-ag
 #   Note: transition GHG is folded into the first row (Agricultural land-use)
 #         as a separate stacked segment labelled "Transition".
 #
-#   Values are absolute 2025 quantities.
+#   Values are differences from the zero-price run for YEAR.
 #   Carbon uses net GHG emissions:
-#       GHG emissions = GHG(price run)
+#       GHG emissions change = GHG(price run) - GHG(zero-price run)
 # ==============================================================================
 
 import io
@@ -46,7 +46,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
-CACHE_PATH = DATA_DIR / f"04_Contribution_vs_Price_raw_data_{YEAR}.xlsx"
+CACHE_PATH = DATA_DIR / f"04_Contribution_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
 
 FS = 11
 SUM_LINE_LABEL = "Sum"
@@ -318,8 +318,12 @@ def get_category_order(area_type, categories_seen):
 
 def collect_carbon_rows(run_map, cp_vals):
     rows = []
+    zero_zip_path = run_map.get((0.0, 0.0))
+    if zero_zip_path is None:
+        raise FileNotFoundError("Could not find zero-price run (CarbonPrice=0, BioPrice=0).")
+    baseline_2025 = get_ghg_summaries(zero_zip_path, YEAR)
 
-    print(f"\n--- Slice A: absolute GHG emissions at {YEAR}; BioPrice=0 and carbon price varies ---")
+    print(f"\n--- Slice A: GHG emissions change at {YEAR}; BioPrice=0 and carbon price varies ---")
     for cp in cp_vals:
         zip_path = run_map.get((cp, 0.0))
         if zip_path is None:
@@ -328,31 +332,41 @@ def collect_carbon_rows(run_map, cp_vals):
         summary_2025 = get_ghg_summaries(zip_path, YEAR)
 
         for area_type in PANEL_CONFIG:
-            categories = list(dict.fromkeys(list(summary_2025[area_type])))
+            categories = list(dict.fromkeys(
+                list(summary_2025[area_type]) +
+                list(baseline_2025[area_type])
+            ))
             category_order = get_category_order(area_type, categories)
 
             total_mt = 0.0
             for category in category_order:
-                contribution_mt = summary_2025[area_type].get(category, 0.0) / 1e6
+                contribution_mt = (
+                    summary_2025[area_type].get(category, 0.0) -
+                    baseline_2025[area_type].get(category, 0.0)
+                ) / 1e6
                 total_mt += contribution_mt
                 rows.append({
                     "PriceType": "CarbonPrice",
                     "Price": cp,
                     "AreaType": area_type,
                     "Category": category,
-                    "MetricType": "GHGEmissions_2025_MtCO2e",
+                    "MetricType": "GHGEmissionsChange_vs_ZeroPrice_MtCO2e",
                     "ContributionValue": contribution_mt,
                 })
 
-            print(f"  cp={format_thousands(cp)} | {area_type}: {total_mt:.2f} Mt CO2e")
+            print(f"  cp={format_thousands(cp)} | {area_type}: change={total_mt:.2f} Mt CO2e")
 
     return rows
 
 
 def collect_biodiversity_rows(run_map, bp_vals):
     rows = []
+    zero_zip_path = run_map.get((0.0, 0.0))
+    if zero_zip_path is None:
+        raise FileNotFoundError("Could not find zero-price run (CarbonPrice=0, BioPrice=0).")
+    baseline_2025 = get_bio_summaries(zero_zip_path, YEAR)
 
-    print(f"\n--- Slice B: absolute biodiversity contribution at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
+    print(f"\n--- Slice B: biodiversity contribution change at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
     for bp in bp_vals:
         zip_path = run_map.get((0.0, bp))
         if zip_path is None:
@@ -361,25 +375,31 @@ def collect_biodiversity_rows(run_map, bp_vals):
         summary_2025 = get_bio_summaries(zip_path, YEAR)
 
         for area_type in PANEL_CONFIG:
-            categories = list(dict.fromkeys(list(summary_2025[area_type])))
+            categories = list(dict.fromkeys(
+                list(summary_2025[area_type]) +
+                list(baseline_2025[area_type])
+            ))
             category_order = get_category_order(area_type, categories)
 
             total_mha_yr = 0.0
             for category in category_order:
-                contribution_mha_yr = summary_2025[area_type].get(category, 0.0) / 1e6
+                contribution_mha_yr = (
+                    summary_2025[area_type].get(category, 0.0) -
+                    baseline_2025[area_type].get(category, 0.0)
+                ) / 1e6
                 total_mha_yr += contribution_mha_yr
                 rows.append({
                     "PriceType": "BioPrice",
                     "Price": bp,
                     "AreaType": area_type,
                     "Category": category,
-                    "MetricType": "BiodiversityContribution_2025_MhaYr",
+                    "MetricType": "BiodiversityContributionChange_vs_ZeroPrice_MhaYr",
                     "ContributionValue": contribution_mha_yr,
                 })
 
             print(
                 f"  bp={format_thousands(bp)} | {area_type}: "
-                f"{total_mha_yr:.2f} Mha yr^-1"
+                f"change={total_mha_yr:.2f} Mha yr^-1"
             )
 
     return rows
@@ -408,8 +428,8 @@ def load_cache():
         print("Cached contribution data schema is outdated; rebuilding.")
         return None
     expected_metric_types = {
-        "GHGEmissions_2025_MtCO2e",
-        "BiodiversityContribution_2025_MhaYr",
+        "GHGEmissionsChange_vs_ZeroPrice_MtCO2e",
+        "BiodiversityContributionChange_vs_ZeroPrice_MhaYr",
     }
     if not set(df_long["MetricType"]).issubset(expected_metric_types):
         print("Cached contribution data uses relative metrics; rebuilding.")
@@ -580,9 +600,6 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
 
         visible_categories.append(category)
 
-    if np.any(pivot_df.to_numpy() < 0.0):
-        ax.axhline(0.0, color="#444444", linewidth=0.8)
-
     if show_sum_line:
         totals = pivot_df.sum(axis=1).to_numpy()
         plot_sum_markers(ax, x, totals)
@@ -666,9 +683,9 @@ y_mid_l = (max(b.y1 for b in bb_left) + min(b.y0 for b in bb_left)) / 2 / fig_h_
 y_mid_r = (max(b.y1 for b in bb_right) + min(b.y0 for b in bb_right)) / 2 / fig_h_px
 x_l = min(b.x0 for b in bb_left) / fig_w_px - 0.02
 x_r = max(b.x1 for b in bb_right) / fig_w_px + 0.02
-fig.text(x_l, y_mid_l, r"GHG emissions (Mt CO$_2$e yr$^{-1}$)",
+fig.text(x_l, y_mid_l, r"Change in GHG emissions vs zero price (Mt CO$_2$e yr$^{-1}$)",
          rotation=90, va='center', ha='center', fontsize=FS)
-fig.text(x_r, y_mid_r, r"Biodiversity contribution score (Mha yr$^{-1}$)",
+fig.text(x_r, y_mid_r, r"Change in biodiversity contribution score vs zero price (Mha yr$^{-1}$)",
          rotation=270, va='center', ha='center', fontsize=FS)
 
 all_rows = [("_total", 0)] + [(area_type, i + 1) for i, area_type in enumerate(row_area_types)]
@@ -697,7 +714,7 @@ for key, row_idx in all_rows:
         fontsize=LEGEND_FS.get(key, FS - 1),
     )
 
-out_path = OUT_DIR / f"04_Contribution_vs_Price_{YEAR}.png"
+out_path = OUT_DIR / "04_Contribution_Delta_vs_Zero.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")

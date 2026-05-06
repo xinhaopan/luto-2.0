@@ -1,7 +1,7 @@
 """
 08_Biodiversity.py
-Combined stacked-area figure for biodiversity contribution by land use and
-agricultural management.
+Combined stacked-area figure for all-cell GBF2-style biodiversity contribution
+by land use and agricultural management.
 """
 import _path_setup  # noqa: F401
 
@@ -20,6 +20,7 @@ from tools.two_row_figure import (
 )
 
 VALUE_COL = 'Area Weighted Score (ha)'
+SOURCE_CSV = 'biodiversity_GBF2_all_scores'
 OVERVIEW_COLORS = {
     'Agricultural land-use': '#f39b8b',
     'Agricultural management': '#9A8AB3',
@@ -31,7 +32,7 @@ def prepare_overview():
     rows = []
 
     for scenario in input_files:
-        bio = load_report_source_csv(scenario, 'biodiversity_GBF2_priority_scores')
+        bio = load_report_source_csv(scenario, SOURCE_CSV)
         if bio.empty:
             continue
         bio = bio.replace(RENAME_AM_NON_AG).query(
@@ -62,7 +63,7 @@ def prepare_land_use():
     rows = []
 
     for scenario in input_files:
-        bio = load_report_source_csv(scenario, 'biodiversity_GBF2_priority_scores')
+        bio = load_report_source_csv(scenario, SOURCE_CSV)
         if bio.empty:
             continue
         bio = bio.replace(RENAME_AM_NON_AG).query(
@@ -99,7 +100,7 @@ def prepare_am():
     rows = []
 
     for scenario in input_files:
-        bio = load_report_source_csv(scenario, 'biodiversity_GBF2_priority_scores')
+        bio = load_report_source_csv(scenario, SOURCE_CSV)
         if bio.empty:
             continue
         bio = bio.replace(RENAME_AM_NON_AG).query(

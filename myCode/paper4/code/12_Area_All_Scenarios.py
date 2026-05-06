@@ -1,5 +1,5 @@
 # ==============================================================================
-# Figure 02: 2025 area composition across all price scenarios
+# Figure 12: area composition across all price scenarios
 #   Left column:  BioPrice = 0, carbon price varies
 #   Right column: CarbonPrice = 0, biodiversity price varies
 #   Rows: Agricultural land-use / Ag management / Non-ag
@@ -40,7 +40,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
-CACHE_PATH = DATA_DIR / f"02_Area_2025_All_Scenarios_raw_data_{YEAR}.xlsx"
+CACHE_PATH = DATA_DIR / f"02_Area_All_Scenarios_raw_data_{YEAR}.xlsx"
 
 FS = 11
 SUM_LINE_LABEL = "Sum"
@@ -348,10 +348,10 @@ def load_cache():
 def collect_and_cache():
     run_map, cp_vals, bp_vals = build_run_map()
 
-    print(f"\n--- Slice A: 2025 area, BioPrice=0 and carbon price varies ---")
+    print(f"\n--- Slice A: area at {YEAR}, BioPrice=0 and carbon price varies ---")
     rows_cp = collect_slice_rows(run_map, cp_vals, "cp")
 
-    print(f"\n--- Slice B: 2025 area, CarbonPrice=0 and biodiversity price varies ---")
+    print(f"\n--- Slice B: area at {YEAR}, CarbonPrice=0 and biodiversity price varies ---")
     rows_bp = collect_slice_rows(run_map, bp_vals, "bp")
 
     df_long = pd.DataFrame(rows_cp + rows_bp)
@@ -507,9 +507,6 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
 
         visible_categories.append(category)
 
-    if np.any(pivot_df.to_numpy() < 0.0):
-        ax.axhline(0.0, color="#444444", linewidth=0.8)
-
     if show_sum_line:
         totals = pivot_df.sum(axis=1).to_numpy()
         plot_sum_markers(ax, x, totals)
@@ -569,7 +566,7 @@ LEGEND_FS = {
     "Non-ag": FS - 1,
 }
 
-fig.supylabel(r"Area in 2025 (Mha)", fontsize=FS)
+fig.supylabel(r"Area (Mha)", fontsize=FS)
 plt.tight_layout()
 plt.subplots_adjust(hspace=0.35, wspace=0.12)
 fig.canvas.draw()
@@ -602,7 +599,7 @@ for row_idx, area_type in enumerate(row_area_types):
         fontsize=LEGEND_FS.get(area_type, FS - 1),
     )
 
-out_path = OUT_DIR / f"02_Area_All_Scenarios_{YEAR}.png"
+out_path = OUT_DIR / "12_Area_All_Scenarios.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")

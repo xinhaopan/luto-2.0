@@ -1,23 +1,14 @@
 # ==============================================================================
-# Figure 05: 2025 net economic return response vs carbon price /
-#            biodiversity price
+# Figure 14: contribution response vs carbon price / biodiversity price
 #   Left column:  BioPrice = 0, carbon price varies
 #   Right column: CarbonPrice = 0, biodiversity price varies
 #   Rows: Agricultural land-use / Ag management / Non-ag
+#   Note: transition GHG is folded into the first row (Agricultural land-use)
+#         as a separate stacked segment labelled "Transition".
 #
-#   Values are absolute 2025 net economic returns.
-#
-# Notes on accounting:
-#   - Solver-side economic optimisation uses `economic_contr_mrj`, assembled in
-#     `luto/solvers/input_data.py`.
-#   - In that solver pathway, biodiversity payment is monetised as
-#     `bio_score x bio_price` before the economic objective is formed.
-#   - Archived `xr_economics_*_profit` outputs can be used directly for the
-#     carbon-price slice because carbon pricing is already embedded there.
-#   - For the biodiversity-price slice in these archived paper4 runs, we do not
-#     assume biodiversity payment is already included in `xr_economics_*_profit`.
-#     To match solver-side accounting, this script adds it back explicitly at the
-#     category level using absolute 2025 biodiversity contribution.
+#   Values are absolute quantities for YEAR.
+#   Carbon uses net GHG emissions:
+#       GHG emissions = GHG(price run)
 # ==============================================================================
 
 import io
@@ -55,7 +46,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
-CACHE_PATH = DATA_DIR / f"05_NetEcon_Composition_raw_data_{YEAR}.xlsx"
+CACHE_PATH = DATA_DIR / f"04_Contribution_vs_Price_raw_data_{YEAR}.xlsx"
 
 FS = 11
 SUM_LINE_LABEL = "Sum"
@@ -75,13 +66,6 @@ plt.rcParams.update({
     "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
 })
-
-ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS = True
-
-NON_AG_EXCLUDE = {
-    "agriculturallanduse",
-    "otherlanduse",
-}
 
 
 def normalize_name(value):
@@ -140,6 +124,7 @@ AG_ORDER, AG_COLOR_MAP = split_livestock_style(AG_ORDER, AG_COLOR_MAP)
 AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = load_style_table("am")
 NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = load_style_table("non_ag")
 LU_ORDER, LU_COLOR_MAP, LU_LABEL_MAP = load_style_table("lu")
+TRANSITION_LABEL = LU_LABEL_MAP.get(normalize_name("Transition"), "Transition")
 
 group_df = pd.read_excel(GROUP_FILE)
 LU_TO_AG_GROUP = {
@@ -184,10 +169,16 @@ TOTAL_ORDER = [
     TOTAL_CATEGORY_MAP["Agricultural land-use"],
     TOTAL_CATEGORY_MAP["Ag management"],
     TOTAL_CATEGORY_MAP["Non-ag"],
+    TRANSITION_LABEL,
 ]
 TOTAL_COLOR_MAP = {
     category: LU_COLOR_MAP.get(category, "#888888")
     for category in TOTAL_ORDER
+}
+
+NON_AG_EXCLUDE = {
+    normalize_name("Agricultural land-use"),
+    normalize_name("Other land-use"),
 }
 
 
@@ -289,11 +280,24 @@ def read_non_ag_summary(zip_path, file_name):
     return result
 
 
-def get_profit_summaries(zip_path, year):
+def read_transition_ghg_total(zip_path, year):
+    da = open_metric_da(zip_path, f"xr_transition_GHG_{year}.nc")
+    if da is None:
+        return 0.0
+
+    return sum_with_total_coords(da)
+
+
+def get_ghg_summaries(zip_path, year):
+    ag_summary = read_ag_group_summary(zip_path, f"xr_GHG_ag_{year}.nc")
+    transition_total = read_transition_ghg_total(zip_path, year)
+    if not np.isclose(transition_total, 0.0):
+        ag_summary[TRANSITION_LABEL] = ag_summary.get(TRANSITION_LABEL, 0.0) + transition_total
+
     return {
-        "Agricultural land-use": read_ag_group_summary(zip_path, f"xr_economics_ag_profit_{year}.nc"),
-        "Ag management": read_ag_management_summary(zip_path, f"xr_economics_am_profit_{year}.nc"),
-        "Non-ag": read_non_ag_summary(zip_path, f"xr_economics_non_ag_profit_{year}.nc"),
+        "Agricultural land-use": ag_summary,
+        "Ag management": read_ag_management_summary(zip_path, f"xr_GHG_ag_management_{year}.nc"),
+        "Non-ag": read_non_ag_summary(zip_path, f"xr_GHG_non_ag_{year}.nc"),
     }
 
 
@@ -312,57 +316,70 @@ def get_category_order(area_type, categories_seen):
     return ordered
 
 
-def collect_slice_rows(run_map, price_vals, varying_key):
+def collect_carbon_rows(run_map, cp_vals):
     rows = []
-    price_type = "CarbonPrice" if varying_key == "cp" else "BioPrice"
 
-    for price in price_vals:
-        key = (price, 0.0) if varying_key == "cp" else (0.0, price)
-        zip_path = run_map.get(key)
+    print(f"\n--- Slice A: absolute GHG emissions at {YEAR}; BioPrice=0 and carbon price varies ---")
+    for cp in cp_vals:
+        zip_path = run_map.get((cp, 0.0))
         if zip_path is None:
             continue
 
-        profit_2025 = get_profit_summaries(zip_path, YEAR)
-        bio_2025 = get_bio_summaries(zip_path, YEAR) if varying_key == "bp" else {}
+        summary_2025 = get_ghg_summaries(zip_path, YEAR)
 
         for area_type in PANEL_CONFIG:
-            categories = list(dict.fromkeys(
-                list(profit_2025[area_type]) +
-                list(bio_2025.get(area_type, {}))
-            ))
+            categories = list(dict.fromkeys(list(summary_2025[area_type])))
             category_order = get_category_order(area_type, categories)
 
-            total_net_econ = 0.0
+            total_mt = 0.0
             for category in category_order:
-                base_net_econ_2025_aud = profit_2025[area_type].get(category, 0.0)
-                bio_2025_ha_yr = bio_2025.get(area_type, {}).get(category, 0.0)
-
-                # Carbon pricing is already embedded in archived profit outputs.
-                # For the biodiversity-price slice, add back bio_price x absolute
-                # biodiversity contribution at YEAR so this figure matches
-                # solver-side accounting.
-                add_back_bio_payment = varying_key == "bp" and ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS
-                bio_payment_2025_aud = price * bio_2025_ha_yr if add_back_bio_payment else 0.0
-
-                net_econ_2025_aud = base_net_econ_2025_aud + bio_payment_2025_aud
-                net_econ_2025_baud = net_econ_2025_aud / 1e9
-                total_net_econ += net_econ_2025_baud
-
+                contribution_mt = summary_2025[area_type].get(category, 0.0) / 1e6
+                total_mt += contribution_mt
                 rows.append({
-                    "AccountingMode": "Absolute2025",
-                    "PriceType": price_type,
-                    "Price": price,
+                    "PriceType": "CarbonPrice",
+                    "Price": cp,
                     "AreaType": area_type,
                     "Category": category,
-                    "BaseNetEcon_2025_BAUD": base_net_econ_2025_aud / 1e9,
-                    "Bio_2025_ha_yr": bio_2025_ha_yr,
-                    "BioPayment_2025_BAUD": bio_payment_2025_aud / 1e9,
-                    "NetEcon_2025_BAUD": net_econ_2025_baud,
+                    "MetricType": "GHGEmissions_2025_MtCO2e",
+                    "ContributionValue": contribution_mt,
+                })
+
+            print(f"  cp={format_thousands(cp)} | {area_type}: {total_mt:.2f} Mt CO2e")
+
+    return rows
+
+
+def collect_biodiversity_rows(run_map, bp_vals):
+    rows = []
+
+    print(f"\n--- Slice B: absolute biodiversity contribution at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
+    for bp in bp_vals:
+        zip_path = run_map.get((0.0, bp))
+        if zip_path is None:
+            continue
+
+        summary_2025 = get_bio_summaries(zip_path, YEAR)
+
+        for area_type in PANEL_CONFIG:
+            categories = list(dict.fromkeys(list(summary_2025[area_type])))
+            category_order = get_category_order(area_type, categories)
+
+            total_mha_yr = 0.0
+            for category in category_order:
+                contribution_mha_yr = summary_2025[area_type].get(category, 0.0) / 1e6
+                total_mha_yr += contribution_mha_yr
+                rows.append({
+                    "PriceType": "BioPrice",
+                    "Price": bp,
+                    "AreaType": area_type,
+                    "Category": category,
+                    "MetricType": "BiodiversityContribution_2025_MhaYr",
+                    "ContributionValue": contribution_mha_yr,
                 })
 
             print(
-                f"  {varying_key}={format_thousands(price)} | {area_type}: "
-                f"net_econ={total_net_econ:.2f} B AUD"
+                f"  bp={format_thousands(bp)} | {area_type}: "
+                f"{total_mha_yr:.2f} Mha yr^-1"
             )
 
     return rows
@@ -374,30 +391,31 @@ def load_cache():
 
     try:
         print(f"Loading cached data from {CACHE_PATH}")
-        df_long = pd.read_excel(CACHE_PATH, sheet_name="NetEconLong")
+        df_long = pd.read_excel(CACHE_PATH, sheet_name="ContributionLong")
     except ValueError:
-        print("Cached net economic workbook uses an older layout; rebuilding.")
+        print("Cached contribution workbook uses an older layout; rebuilding.")
         return None
 
     required_columns = {
-        "AccountingMode",
         "PriceType",
         "Price",
         "AreaType",
         "Category",
-        "BaseNetEcon_2025_BAUD",
-        "Bio_2025_ha_yr",
-        "BioPayment_2025_BAUD",
-        "NetEcon_2025_BAUD",
+        "MetricType",
+        "ContributionValue",
     }
     if not required_columns.issubset(df_long.columns):
-        print("Cached net economic data schema is outdated; rebuilding.")
+        print("Cached contribution data schema is outdated; rebuilding.")
         return None
-    if set(df_long["AccountingMode"]) != {"Absolute2025"}:
-        print("Cached net economic data uses relative accounting; rebuilding.")
+    expected_metric_types = {
+        "GHGEmissions_2025_MtCO2e",
+        "BiodiversityContribution_2025_MhaYr",
+    }
+    if not set(df_long["MetricType"]).issubset(expected_metric_types):
+        print("Cached contribution data uses relative metrics; rebuilding.")
         return None
     if OLD_LIVESTOCK_LABEL in set(df_long["Category"]):
-        print("Cached net economic data uses unsplit livestock categories; rebuilding.")
+        print("Cached contribution data uses unsplit livestock categories; rebuilding.")
         return None
 
     return df_long
@@ -405,18 +423,13 @@ def load_cache():
 
 def collect_and_cache():
     run_map, cp_vals, bp_vals = build_run_map()
+    rows = collect_carbon_rows(run_map, cp_vals) + collect_biodiversity_rows(run_map, bp_vals)
 
-    print(f"\n--- Slice A: absolute net economic return at {YEAR}; BioPrice=0 and carbon price varies ---")
-    rows_cp = collect_slice_rows(run_map, cp_vals, "cp")
-
-    print(f"\n--- Slice B: absolute net economic return at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
-    rows_bp = collect_slice_rows(run_map, bp_vals, "bp")
-
-    df_long = pd.DataFrame(rows_cp + rows_bp)
+    df_long = pd.DataFrame(rows)
     df_long = df_long.sort_values(["PriceType", "AreaType", "Price", "Category"]).reset_index(drop=True)
 
     with pd.ExcelWriter(CACHE_PATH, engine="openpyxl") as writer:
-        df_long.to_excel(writer, sheet_name="NetEconLong", index=False)
+        df_long.to_excel(writer, sheet_name="ContributionLong", index=False)
         df_long[df_long["PriceType"] == "CarbonPrice"].to_excel(writer, sheet_name="CarbonPrice", index=False)
         df_long[df_long["PriceType"] == "BioPrice"].to_excel(writer, sheet_name="BioPrice", index=False)
 
@@ -429,6 +442,8 @@ def build_pivot(df_long, price_type, area_type):
         (df_long["PriceType"] == price_type) &
         (df_long["AreaType"] == area_type)
     ]
+    if area_type == "Agricultural land-use":
+        df_subset = df_subset[df_subset["Category"] != TRANSITION_LABEL]
 
     if df_subset.empty:
         return pd.DataFrame()
@@ -436,7 +451,7 @@ def build_pivot(df_long, price_type, area_type):
     pivot = df_subset.pivot_table(
         index="Price",
         columns="Category",
-        values="NetEcon_2025_BAUD",
+        values="ContributionValue",
         aggfunc="sum",
         fill_value=0.0,
     ).sort_index()
@@ -445,18 +460,27 @@ def build_pivot(df_long, price_type, area_type):
     return pivot.reindex(columns=category_order, fill_value=0.0)
 
 
+def map_total_category(area_type, category):
+    if area_type == "Agricultural land-use" and category == TRANSITION_LABEL:
+        return TRANSITION_LABEL
+    return TOTAL_CATEGORY_MAP.get(area_type)
+
+
 def build_total_pivot(df_long, price_type):
     df_subset = df_long[df_long["PriceType"] == price_type].copy()
     if df_subset.empty:
         return pd.DataFrame()
 
-    df_subset["Category"] = df_subset["AreaType"].map(TOTAL_CATEGORY_MAP)
+    df_subset["Category"] = [
+        map_total_category(area_type, category)
+        for area_type, category in zip(df_subset["AreaType"], df_subset["Category"])
+    ]
     df_subset = df_subset.dropna(subset=["Category"])
 
     pivot = df_subset.pivot_table(
         index="Price",
         columns="Category",
-        values="NetEcon_2025_BAUD",
+        values="ContributionValue",
         aggfunc="sum",
         fill_value=0.0,
     ).sort_index()
@@ -556,9 +580,6 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
 
         visible_categories.append(category)
 
-    if np.any(pivot_df.to_numpy() < 0.0):
-        ax.axhline(0.0, color="#444444", linewidth=0.8)
-
     if show_sum_line:
         totals = pivot_df.sum(axis=1).to_numpy()
         plot_sum_markers(ax, x, totals)
@@ -579,12 +600,13 @@ if df_long is None:
     df_long = collect_and_cache()
 
 
-fig, axes = plt.subplots(4, 2, figsize=(10, 17), sharex="col")
+fig, axes = plt.subplots(4, 2, figsize=(10, 16), sharex="col")
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
 
 total_pivot_cp = build_total_pivot(df_long, "CarbonPrice")
 total_pivot_bp = build_total_pivot(df_long, "BioPrice")
+
 total_cats_left = stacked_bar(axes[0, 0], total_pivot_cp, "Total", "cp", show_xlabel=False, color_map=TOTAL_COLOR_MAP, show_sum_line=True)
 total_cats_right = stacked_bar(axes[0, 1], total_pivot_bp, "Total", "bp", show_xlabel=False, color_map=TOTAL_COLOR_MAP, show_sum_line=True)
 axes[0, 0].set_ylabel("Total")
@@ -626,13 +648,25 @@ LEGEND_FS = {
     "Non-ag": FS - 1,
 }
 
-fig.supylabel(r"Net economic returns (Billion AU\$ yr$^{-1}$)", fontsize=FS)
+for r in range(4):
+    axes[r, 1].yaxis.tick_right()
 plt.tight_layout()
-plt.subplots_adjust(hspace=0.35, wspace=0.12)
+plt.subplots_adjust(hspace=0.35, wspace=0.28)
 fig.canvas.draw()
 renderer = fig.canvas.get_renderer()
 fig_w_px = fig.get_figwidth() * fig.dpi
 fig_h_px = fig.get_figheight() * fig.dpi
+
+bb_left = [axes[r, 0].get_tightbbox(renderer) for r in range(4)]
+bb_right = [axes[r, 1].get_tightbbox(renderer) for r in range(4)]
+y_mid_l = (max(b.y1 for b in bb_left) + min(b.y0 for b in bb_left)) / 2 / fig_h_px
+y_mid_r = (max(b.y1 for b in bb_right) + min(b.y0 for b in bb_right)) / 2 / fig_h_px
+x_l = min(b.x0 for b in bb_left) / fig_w_px - 0.02
+x_r = max(b.x1 for b in bb_right) / fig_w_px + 0.02
+fig.text(x_l, y_mid_l, r"GHG emissions (Mt CO$_2$e yr$^{-1}$)",
+         rotation=90, va='center', ha='center', fontsize=FS)
+fig.text(x_r, y_mid_r, r"Biodiversity contribution score (Mha yr$^{-1}$)",
+         rotation=270, va='center', ha='center', fontsize=FS)
 
 all_rows = [("_total", 0)] + [(area_type, i + 1) for i, area_type in enumerate(row_area_types)]
 for key, row_idx in all_rows:
@@ -660,7 +694,7 @@ for key, row_idx in all_rows:
         fontsize=LEGEND_FS.get(key, FS - 1),
     )
 
-out_path = OUT_DIR / f"05_NetEcon_Composition_{YEAR}.png"
+out_path = OUT_DIR / "14_Contribution_vs_Price.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")

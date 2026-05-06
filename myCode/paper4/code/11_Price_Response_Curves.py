@@ -1,9 +1,9 @@
 # ==============================================================================
-# Figure 01: 2025 price response curves
+# Figure 11: price response curves
 #   Panel A: GHG emissions vs carbon price                 (BioPrice=0)
 #   Panel B: Biodiversity contribution vs biodiversity price (CarbonPrice=0)
 #
-#   Values are absolute 2025 quantities:
+#   Values are absolute quantities for YEAR:
 #     GHG emissions = net GHG emissions
 #     biodiversity contribution = total biodiversity contribution
 # ==============================================================================
@@ -140,8 +140,6 @@ ax1.plot(
 ax1.set_xlabel(r"GHG emissions (Mt CO$_2$e yr$^{-1}$)")
 ax1.set_ylabel(r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)")
 ax1.set_ylim(bottom=0)
-if mask_ghg.any() and np.nanmin(x_ghg[mask_ghg]) < 0.0 < np.nanmax(x_ghg[mask_ghg]):
-    ax1.axvline(0.0, color="#444444", linewidth=0.8)
 apply_price_formatter(ax1, axis="y")
 style_box_axis(ax1)
 
@@ -162,7 +160,7 @@ apply_price_formatter(ax2, axis="y")
 style_box_axis(ax2)
 
 plt.tight_layout()
-out_path = OUT_DIR / f"01_Price_Response_Curves_{YEAR}.png"
+out_path = OUT_DIR / "11_Price_Response_Curves.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")

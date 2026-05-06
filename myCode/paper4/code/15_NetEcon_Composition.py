@@ -1,9 +1,11 @@
 # ==============================================================================
-# Figure 6: Change in net economic return since 2010 vs carbon price /
-#           biodiversity price
+# Figure 15: net economic return response vs carbon price /
+#            biodiversity price
 #   Left column:  BioPrice = 0, carbon price varies
 #   Right column: CarbonPrice = 0, biodiversity price varies
 #   Rows: Agricultural land-use / Ag management / Non-ag
+#
+#   Values are absolute net economic returns for YEAR.
 #
 # Notes on accounting:
 #   - Solver-side economic optimisation uses `economic_contr_mrj`, assembled in
@@ -15,7 +17,7 @@
 #   - For the biodiversity-price slice in these archived paper4 runs, we do not
 #     assume biodiversity payment is already included in `xr_economics_*_profit`.
 #     To match solver-side accounting, this script adds it back explicitly at the
-#     category level using biodiversity change vs the zero-price baseline run.
+#     category level using absolute 2025 biodiversity contribution.
 # ==============================================================================
 
 import io
@@ -53,10 +55,14 @@ BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
-CACHE_PATH = DATA_DIR / f"6_NetEcon_Composition_raw_data_{YEAR}.xlsx"
+CACHE_PATH = DATA_DIR / f"05_NetEcon_Composition_raw_data_{YEAR}.xlsx"
 
 FS = 11
 SUM_LINE_LABEL = "Sum"
+OLD_LIVESTOCK_LABEL = "Livestock"
+MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
+NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
+MODIFIED_LIVESTOCK_COLOR = "#F77B00"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -99,14 +105,45 @@ def load_style_table(sheet_name):
     return order, color_map, label_map
 
 
+def split_livestock_style(order, color_map):
+    previous_livestock_color = color_map.get(OLD_LIVESTOCK_LABEL, "#FFC87C")
+    new_order = []
+    for label in order:
+        if label == OLD_LIVESTOCK_LABEL:
+            new_order.extend([MODIFIED_LIVESTOCK_LABEL, NATURAL_LIVESTOCK_LABEL])
+        else:
+            new_order.append(label)
+
+    new_color_map = {
+        label: color
+        for label, color in color_map.items()
+        if label != OLD_LIVESTOCK_LABEL
+    }
+    new_color_map[MODIFIED_LIVESTOCK_LABEL] = MODIFIED_LIVESTOCK_COLOR
+    new_color_map[NATURAL_LIVESTOCK_LABEL] = previous_livestock_color
+    return new_order, new_color_map
+
+
+def map_ag_group(row):
+    group = row["ag_group"]
+    if group == OLD_LIVESTOCK_LABEL:
+        desc_key = normalize_name(row["desc"])
+        if "modifiedland" in desc_key:
+            return MODIFIED_LIVESTOCK_LABEL
+        if "naturalland" in desc_key:
+            return NATURAL_LIVESTOCK_LABEL
+    return group
+
+
 AG_ORDER, AG_COLOR_MAP, _ = load_style_table("ag_group")
+AG_ORDER, AG_COLOR_MAP = split_livestock_style(AG_ORDER, AG_COLOR_MAP)
 AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = load_style_table("am")
 NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = load_style_table("non_ag")
 LU_ORDER, LU_COLOR_MAP, LU_LABEL_MAP = load_style_table("lu")
 
 group_df = pd.read_excel(GROUP_FILE)
 LU_TO_AG_GROUP = {
-    normalize_name(row["desc"]): row["ag_group"]
+    normalize_name(row["desc"]): map_ag_group(row)
     for _, row in group_df.iterrows()
     if pd.notna(row.get("desc")) and pd.notna(row.get("ag_group"))
 }
@@ -278,11 +315,6 @@ def get_category_order(area_type, categories_seen):
 def collect_slice_rows(run_map, price_vals, varying_key):
     rows = []
     price_type = "CarbonPrice" if varying_key == "cp" else "BioPrice"
-    baseline_zip = run_map.get((0.0, 0.0))
-
-    # Baseline: (cp=0, bp=0) run at YEAR — bp=0 so no bio payment add-back needed
-    profit_baseline = get_profit_summaries(baseline_zip, YEAR) if baseline_zip else {at: {} for at in PANEL_CONFIG}
-    bio_baseline = get_bio_summaries(baseline_zip, YEAR) if baseline_zip else {at: {} for at in PANEL_CONFIG}
 
     for price in price_vals:
         key = (price, 0.0) if varying_key == "cp" else (0.0, price)
@@ -290,57 +322,47 @@ def collect_slice_rows(run_map, price_vals, varying_key):
         if zip_path is None:
             continue
 
-        profit_2050 = get_profit_summaries(zip_path, YEAR)
-        bio_2050 = get_bio_summaries(zip_path, YEAR) if varying_key == "bp" else {}
+        profit_2025 = get_profit_summaries(zip_path, YEAR)
+        bio_2025 = get_bio_summaries(zip_path, YEAR) if varying_key == "bp" else {}
 
         for area_type in PANEL_CONFIG:
             categories = list(dict.fromkeys(
-                list(profit_baseline.get(area_type, {})) +
-                list(profit_2050[area_type]) +
-                list(bio_baseline.get(area_type, {})) +
-                list(bio_2050.get(area_type, {}))
+                list(profit_2025[area_type]) +
+                list(bio_2025.get(area_type, {}))
             ))
             category_order = get_category_order(area_type, categories)
 
-            total_change = 0.0
+            total_net_econ = 0.0
             for category in category_order:
-                base_net_econ_baseline_aud = profit_baseline.get(area_type, {}).get(category, 0.0)
-                base_net_econ_2050_aud = profit_2050[area_type].get(category, 0.0)
-                bio_baseline_ha_yr = bio_baseline.get(area_type, {}).get(category, 0.0)
-                bio_2050_ha_yr = bio_2050.get(area_type, {}).get(category, 0.0)
-                bio_change_ha_yr = bio_2050_ha_yr - bio_baseline_ha_yr
+                base_net_econ_2025_aud = profit_2025[area_type].get(category, 0.0)
+                bio_2025_ha_yr = bio_2025.get(area_type, {}).get(category, 0.0)
 
                 # Carbon pricing is already embedded in archived profit outputs.
-                # For the biodiversity-price slice, add back bio_price x biodiversity_change
-                # at 2050 so this figure matches solver-side accounting.
+                # For the biodiversity-price slice, add back bio_price x absolute
+                # biodiversity contribution at YEAR so this figure matches
+                # solver-side accounting.
                 add_back_bio_payment = varying_key == "bp" and ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS
-                bio_payment_2050_aud = price * bio_change_ha_yr if add_back_bio_payment else 0.0
+                bio_payment_2025_aud = price * bio_2025_ha_yr if add_back_bio_payment else 0.0
 
-                # Baseline has bp=0, so no bio payment add-back for baseline
-                net_econ_baseline_aud = base_net_econ_baseline_aud
-                net_econ_2050_aud = base_net_econ_2050_aud + bio_payment_2050_aud
-                net_econ_change_baud = (net_econ_2050_aud - net_econ_baseline_aud) / 1e9
-                total_change += net_econ_change_baud
+                net_econ_2025_aud = base_net_econ_2025_aud + bio_payment_2025_aud
+                net_econ_2025_baud = net_econ_2025_aud / 1e9
+                total_net_econ += net_econ_2025_baud
 
                 rows.append({
+                    "AccountingMode": "Absolute2025",
                     "PriceType": price_type,
                     "Price": price,
                     "AreaType": area_type,
                     "Category": category,
-                    "BaseNetEcon_Baseline_BAUD": base_net_econ_baseline_aud / 1e9,
-                    "BaseNetEcon2050_BAUD": base_net_econ_2050_aud / 1e9,
-                    "Bio_Baseline_ha_yr": bio_baseline_ha_yr,
-                    "Bio2050_ha_yr": bio_2050_ha_yr,
-                    "BioChange_vs_Baseline_ha_yr": bio_change_ha_yr,
-                    "BioPayment2050_BAUD": bio_payment_2050_aud / 1e9,
-                    "NetEcon_Baseline_BAUD": net_econ_baseline_aud / 1e9,
-                    "NetEcon2050_BAUD": net_econ_2050_aud / 1e9,
-                    "NetEconChangevs_Baseline_BAUD": net_econ_change_baud,
+                    "BaseNetEcon_2025_BAUD": base_net_econ_2025_aud / 1e9,
+                    "Bio_2025_ha_yr": bio_2025_ha_yr,
+                    "BioPayment_2025_BAUD": bio_payment_2025_aud / 1e9,
+                    "NetEcon_2025_BAUD": net_econ_2025_baud,
                 })
 
             print(
                 f"  {varying_key}={format_thousands(price)} | {area_type}: "
-                f"change={total_change:.2f} B AUD"
+                f"net_econ={total_net_econ:.2f} B AUD"
             )
 
     return rows
@@ -358,22 +380,24 @@ def load_cache():
         return None
 
     required_columns = {
+        "AccountingMode",
         "PriceType",
         "Price",
         "AreaType",
         "Category",
-        "BaseNetEcon_Baseline_BAUD",
-        "BaseNetEcon2050_BAUD",
-        "Bio_Baseline_ha_yr",
-        "Bio2050_ha_yr",
-        "BioChange_vs_Baseline_ha_yr",
-        "BioPayment2050_BAUD",
-        "NetEcon_Baseline_BAUD",
-        "NetEcon2050_BAUD",
-        "NetEconChangevs_Baseline_BAUD",
+        "BaseNetEcon_2025_BAUD",
+        "Bio_2025_ha_yr",
+        "BioPayment_2025_BAUD",
+        "NetEcon_2025_BAUD",
     }
     if not required_columns.issubset(df_long.columns):
         print("Cached net economic data schema is outdated; rebuilding.")
+        return None
+    if set(df_long["AccountingMode"]) != {"Absolute2025"}:
+        print("Cached net economic data uses relative accounting; rebuilding.")
+        return None
+    if OLD_LIVESTOCK_LABEL in set(df_long["Category"]):
+        print("Cached net economic data uses unsplit livestock categories; rebuilding.")
         return None
 
     return df_long
@@ -382,10 +406,10 @@ def load_cache():
 def collect_and_cache():
     run_map, cp_vals, bp_vals = build_run_map()
 
-    print(f"\n--- Slice A: BioPrice=0, carbon price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
+    print(f"\n--- Slice A: absolute net economic return at {YEAR}; BioPrice=0 and carbon price varies ---")
     rows_cp = collect_slice_rows(run_map, cp_vals, "cp")
 
-    print(f"\n--- Slice B: CarbonPrice=0, biodiversity price varies (baseline=cp=0,bp=0 at {YEAR}) ---")
+    print(f"\n--- Slice B: absolute net economic return at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
     rows_bp = collect_slice_rows(run_map, bp_vals, "bp")
 
     df_long = pd.DataFrame(rows_cp + rows_bp)
@@ -412,7 +436,7 @@ def build_pivot(df_long, price_type, area_type):
     pivot = df_subset.pivot_table(
         index="Price",
         columns="Category",
-        values="NetEconChangevs_Baseline_BAUD",
+        values="NetEcon_2025_BAUD",
         aggfunc="sum",
         fill_value=0.0,
     ).sort_index()
@@ -432,7 +456,7 @@ def build_total_pivot(df_long, price_type):
     pivot = df_subset.pivot_table(
         index="Price",
         columns="Category",
-        values="NetEconChangevs_Baseline_BAUD",
+        values="NetEcon_2025_BAUD",
         aggfunc="sum",
         fill_value=0.0,
     ).sort_index()
@@ -531,9 +555,6 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
             negative_bottoms += negative
 
         visible_categories.append(category)
-
-    if np.any(pivot_df.to_numpy() < 0.0):
-        ax.axhline(0.0, color="#444444", linewidth=0.8)
 
     if show_sum_line:
         totals = pivot_df.sum(axis=1).to_numpy()
@@ -636,7 +657,7 @@ for key, row_idx in all_rows:
         fontsize=LEGEND_FS.get(key, FS - 1),
     )
 
-out_path = OUT_DIR / f"6_NetEcon_Composition_vs_Price_{YEAR}.png"
+out_path = OUT_DIR / "15_NetEcon_Composition.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")

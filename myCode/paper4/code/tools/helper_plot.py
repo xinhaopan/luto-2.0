@@ -1,3 +1,15 @@
+EXTRA_COLORS = {
+    "Color1": "#004301",
+    "Color2": "#3C865A",
+    "Color3": "#522A19",
+    "Color4": "#1E0B15",
+    "Color5": "#4A3C0D",
+    "Color6": "#808C12",
+    "Color7": "#C08282",
+    "Color8": "#00B2DF",
+}
+
+
 import os
 import pandas as pd
 import seaborn as sns

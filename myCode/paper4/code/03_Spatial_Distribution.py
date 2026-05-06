@@ -1,5 +1,5 @@
 # ==============================================================================
-# Figure 03: Spatial distribution of 2025 area composition
+# Figure 03: Spatial distribution of area composition
 #   Columns: zero price / carbon max / biodiversity max
 #   Rows: Agricultural land-use / Ag management / Non-ag
 # ==============================================================================
@@ -464,7 +464,7 @@ def build_and_cache():
     max_cp = max(cp_vals)
     max_bp = max(bp_vals)
     print(
-        "Building 2025 maps for zero price, "
+        f"Building maps for {YEAR}: zero price, "
         f"CP={format_thousands(max_cp)} (BioPrice=0), and "
         f"BP={format_thousands(max_bp)} (CarbonPrice=0)"
     )
@@ -635,7 +635,7 @@ for row_idx, legend_handles in row_legend_handles.items():
     add_row_legend(active_handles[split_idx:], x_center, y_anchor - 0.018, row_key)
     add_row_legend(special_handles, x_center, y_anchor - 0.036, row_key)
 
-out_path = OUT_DIR / f"03_Spatial_Distribution_{YEAR}.png"
+out_path = OUT_DIR / "03_Spatial_Distribution.png"
 fig.savefig(out_path, dpi=200, bbox_inches="tight", facecolor="white")
 plt.close()
 print(f"Saved: {out_path}")

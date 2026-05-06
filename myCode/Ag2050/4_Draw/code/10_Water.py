@@ -1,7 +1,7 @@
 """
 10_Water.py
-Combined stacked-area figure for water yield by land use and agricultural
-management.
+Combined stacked-area figure for water use (requirements) by land use and
+agricultural management.
 """
 import _path_setup  # noqa: F401
 
@@ -18,7 +18,8 @@ from tools.two_row_figure import (
     save_three_row_figure,
 )
 
-VALUE_COL = 'Water Net Yield (ML)'
+VALUE_COL = 'Water Use (ML)'
+SOURCE_CSV = 'water_use_separate_watershed'
 OVERVIEW_COLORS = {
     'Agricultural land-use': '#f39b8b',
     'Agricultural management': '#9A8AB3',
@@ -27,7 +28,7 @@ OVERVIEW_COLORS = {
 
 
 def load_water_australia(scenario):
-    water = load_report_source_csv(scenario, 'water_yield_separate_watershed')
+    water = load_report_source_csv(scenario, SOURCE_CSV)
     if water.empty:
         return water
     water = (
@@ -145,7 +146,7 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        'Water yield (GL yr\u207b\u00b9)',
+        'Water use (GL yr\u207b\u00b9)',
         '10_water.svg',
         y_label_x=0.015,
     )
