@@ -146,7 +146,7 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        'GHG (Mt CO\u2082e yr\u207b\u00b9)',
+        "GHG emissions (MtCO₂e yr⁻¹)",
         '07_ghg.svg',
         y_label_x=0.030,
     )

@@ -18,10 +18,12 @@ OUT_DIR = TASK_ROOT / "paper4" / "figures"
 DATA_DIR = TASK_ROOT / "paper4" / "data"
 
 PAPER4_COLOR_OVERRIDES = {
-    "crops": "#7a3f91",
-    "livestock": "#f4d801",
-    "unallocatedmodifiedland": "#a3ff73",
-    "unallocatednaturalland": "#4eae32",
+    "crops": "#5d1b41",
+    "livestock": "#cac559",
+    "modifiedlivestock": "#cac559",
+    "naturallivestock": "#cac559",
+    "unallocatedmodifiedland": "#f5ec7e",
+    "unallocatednaturalland": "#669b25",
 }
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -143,12 +145,78 @@ def apply_price_formatter(ax, axis="x"):
 
 
 def style_box_axis(ax, linewidth=1.0):
-    ax.set_facecolor("white")
-    ax.grid(False)
+    ax.set_facecolor("#EAEAF2")
+    ax.set_axisbelow(True)
+    ax.grid(True, color="white", linewidth=1.0)
     for spine in ax.spines.values():
         spine.set_visible(True)
         spine.set_linewidth(linewidth)
         spine.set_color("black")
+    ax.tick_params(direction="out", length=4, width=linewidth, top=False, right=False)
+
+
+def add_zero_line(ax):
+    ax.axhline(0, color="#404040", linewidth=0.9, zorder=8)
+
+
+def apply_compact_ticks(ax, x_nbins=8, y_nbins=5):
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=x_nbins))
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=y_nbins))
+
+
+def stacked_area_pos_neg(ax, pivot_df, color_map, alpha=0.88):
+    if pivot_df.empty:
+        return []
+
+    x = pivot_df.index.to_numpy(dtype=float)
+    positive_bottoms = np.zeros(len(x))
+    negative_bottoms = np.zeros(len(x))
+    visible_categories = []
+
+    for category in pivot_df.columns:
+        heights = pivot_df[category].to_numpy(dtype=float)
+        if np.isclose(np.abs(heights).sum(), 0.0):
+            continue
+
+        color = color_map.get(category, "#888888")
+        positive = np.clip(heights, 0.0, None)
+        negative = np.clip(heights, None, 0.0)
+
+        if not np.isclose(positive.sum(), 0.0):
+            next_positive = positive_bottoms + positive
+            ax.fill_between(
+                x,
+                positive_bottoms,
+                next_positive,
+                facecolor=color,
+                edgecolor="white",
+                linewidth=0.55,
+                alpha=alpha,
+                zorder=3,
+            )
+            positive_bottoms = next_positive
+
+        if not np.isclose(np.abs(negative).sum(), 0.0):
+            next_negative = negative_bottoms + negative
+            ax.fill_between(
+                x,
+                negative_bottoms,
+                next_negative,
+                facecolor=color,
+                edgecolor="white",
+                linewidth=0.55,
+                alpha=alpha,
+                zorder=3,
+            )
+            negative_bottoms = next_negative
+
+        visible_categories.append(category)
+
+    if len(x) > 1:
+        pad = (float(np.nanmax(x)) - float(np.nanmin(x))) * 0.02
+        ax.set_xlim(float(np.nanmin(x)) - pad, float(np.nanmax(x)) + pad)
+
+    return visible_categories
 
 
 def _select_all_coords(da):

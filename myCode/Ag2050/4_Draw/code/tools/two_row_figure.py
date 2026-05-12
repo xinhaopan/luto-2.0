@@ -69,6 +69,70 @@ NATIVE_PASTURE_LUS = {
 }
 
 COLORS_FILE = 'tools/land use colors.xlsx'
+UNIT_DEJAVU_CHARS = {'₂', '⁻', '¹'}
+
+
+def _split_unit_font_runs(text):
+    runs = []
+    current_text = []
+    current_family = None
+    for char in text:
+        family = 'DejaVu Sans' if char in UNIT_DEJAVU_CHARS else 'Arial'
+        if family != current_family and current_text:
+            runs.append((''.join(current_text), current_family))
+            current_text = []
+        current_text.append(char)
+        current_family = family
+    if current_text:
+        runs.append((''.join(current_text), current_family))
+    return runs
+
+
+def _measure_text_runs(fig, runs, fontsize, fontweight):
+    temp_artists = [
+        fig.text(
+            0, 0, text,
+            fontsize=fontsize,
+            fontfamily=family,
+            fontweight=fontweight,
+            alpha=0,
+        )
+        for text, family in runs
+    ]
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    widths = [
+        artist.get_window_extent(renderer=renderer).width
+        for artist in temp_artists
+    ]
+    for artist in temp_artists:
+        artist.remove()
+    return widths
+
+
+def _add_vertical_unit_label(fig, x, y, text, fontsize, fontweight='normal'):
+    runs = _split_unit_font_runs(text)
+    if len(runs) == 1:
+        text_run, family = runs[0]
+        fig.text(
+            x, y, text_run,
+            ha='center', va='center', rotation=90,
+            fontsize=fontsize, fontfamily=family, fontweight=fontweight,
+        )
+        return
+
+    widths = _measure_text_runs(fig, runs, fontsize, fontweight)
+    total_width = sum(widths)
+    cursor = -total_width / 2
+    fig_height_px = fig.bbox.height
+    for (text_run, family), width in zip(runs, widths):
+        offset_px = cursor + width / 2
+        fig.text(
+            x, y + offset_px / fig_height_px, text_run,
+            ha='center', va='center', rotation=90,
+            fontsize=fontsize, fontfamily=family, fontweight=fontweight,
+        )
+        cursor += width
 
 
 def classify_land_use(name):
@@ -121,7 +185,7 @@ def get_am_colors():
 
 
 def _draw_row(fig, gs, row_idx, df_long, colors, y_range, show_titles):
-    years = list(range(2025, 2051))
+    years = list(range(2010, 2051))
     cats = list(colors.keys())
     axes = []
 
@@ -159,7 +223,7 @@ def _draw_row(fig, gs, row_idx, df_long, colors, y_range, show_titles):
             clip_on=False,
         )
 
-        ax.set_xticks([year for year in range(2025, 2051, 5)])
+        ax.set_xticks([year for year in range(2010, 2051, 10)])
         ax.tick_params(axis='x', labelrotation=45, labelbottom=True)
         if row_idx == 0:
             ax.tick_params(axis='x', labelbottom=False)
@@ -221,8 +285,6 @@ def _add_mixed_legend(ax, patch_colors, line_label=None, line_color='black'):
 def save_two_row_figure(df_top, df_bottom, top_colors, bottom_colors, y_label, output_name):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     set_plot_style(font_size=font_size)
-    plt.rcParams['font.family'] = 'Arial'
-    plt.rcParams['font.sans-serif'] = ['Arial']
 
     df_top = df_top[df_top['category'].isin(top_colors)].copy()
     df_bottom = df_bottom[df_bottom['category'].isin(bottom_colors)].copy()
@@ -237,27 +299,35 @@ def save_two_row_figure(df_top, df_bottom, top_colors, bottom_colors, y_label, o
     )
     fig.subplots_adjust(left=0.08, right=0.95, top=0.90, bottom=0.12)
 
-    axes_top = _draw_row(fig, gs, 0, df_top, top_colors, y_range_top, show_titles=True)
+    axes_top = _draw_row(fig, gs, 0, df_top, top_colors, y_range_top, show_titles=False)
     axes_bottom = _draw_row(fig, gs, 1, df_bottom, bottom_colors, y_range_bottom, show_titles=False)
 
     for ax in axes_top + axes_bottom:
         ax.set_xlabel('')
 
+    # top=0.90, bottom=0.12, hspace=0.26, 2 rows:
+    #   row_h = 0.78/2.26 ≈ 0.345,  gap_h = 0.090
+    #   Row 0: 0.555–0.900,  gap: 0.465–0.555,  Row 1: 0.120–0.465
     fig.text(
-        0.43, 0.94, 'Land-use',
+        0.43, 0.935, 'Land-use',
         ha='center', va='bottom',
         fontsize=font_size, fontfamily='Arial', fontweight='normal',
     )
     fig.text(
-        0.43, 0.47, 'Agricultural management',
+        0.43, 0.503, 'Agricultural management',
         ha='center', va='bottom',
         fontsize=font_size, fontfamily='Arial', fontweight='normal',
     )
-    fig.text(
-        0.038, 0.50, y_label,
-        ha='center', va='center', rotation=90,
-        fontsize=font_size, fontfamily='Arial', fontweight='normal',
-    )
+    _add_vertical_unit_label(fig, 0.038, 0.50, y_label, font_size)
+
+    # Bold scenario column headers — placed just above the section label
+    fig.canvas.draw()
+    for ax, scenario in zip(axes_top, input_files):
+        pos = ax.get_position()
+        cx = (pos.x0 + pos.x1) / 2
+        fig.text(cx, 0.968, SCENARIO_LABELS.get(scenario, scenario),
+                 ha='center', va='bottom',
+                 fontsize=font_size, fontweight='bold', fontfamily='Arial')
 
     _add_patch_legend(fig.add_subplot(gs[0, 4]), top_colors)
     _add_patch_legend(fig.add_subplot(gs[1, 4]), bottom_colors)
@@ -282,8 +352,6 @@ def save_three_row_figure(
 ):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     set_plot_style(font_size=font_size)
-    plt.rcParams['font.family'] = 'Arial'
-    plt.rcParams['font.sans-serif'] = ['Arial']
 
     df_overview = df_overview[df_overview['category'].isin(overview_colors)].copy()
     df_top = df_top[df_top['category'].isin(top_colors)].copy()
@@ -299,13 +367,13 @@ def save_three_row_figure(
         width_ratios=[1, 1, 1, 1, 0.82],
         hspace=0.24, wspace=0.10,
     )
-    fig.subplots_adjust(left=0.08, right=0.95, top=0.90, bottom=0.10)
+    fig.subplots_adjust(left=0.08, right=0.95, top=0.84, bottom=0.10)
 
-    axes_overview = _draw_row(fig, gs, 0, df_overview, overview_colors, y_range_overview, show_titles=True)
+    axes_overview = _draw_row(fig, gs, 0, df_overview, overview_colors, y_range_overview, show_titles=False)
     axes_top = _draw_row(fig, gs, 1, df_top, top_colors, y_range_top, show_titles=False)
     axes_bottom = _draw_row(fig, gs, 2, df_bottom, bottom_colors, y_range_bottom, show_titles=False)
 
-    years = list(range(2025, 2051))
+    years = list(range(2010, 2051))
     for ax, scenario in zip(axes_overview, input_files):
         df_s = df_overview[df_overview['scenario'] == scenario]
         total = (
@@ -323,26 +391,40 @@ def save_three_row_figure(
     for ax in axes_overview + axes_top + axes_bottom:
         ax.set_xlabel('')
 
+    # Use actual axes positions so labels sit just above each row without overlap
+    fig.canvas.draw()
+    pos_ov = axes_overview[0].get_position()
+    pos_tp = axes_top[0].get_position()
+    pos_bt = axes_bottom[0].get_position()
+
+    _section_gap = 0.008   # gap between row top edge and section-label bottom
+    _header_gap  = 0.038   # additional gap from section label to column-header bottom
+
     fig.text(
-        0.43, 0.948, 'Total',
+        0.43, pos_ov.y1 + _section_gap, 'Total',
         ha='center', va='bottom',
         fontsize=font_size, fontfamily='Arial', fontweight='normal',
     )
     fig.text(
-        0.43, 0.620, 'Land-use',
+        0.43, pos_tp.y1 + _section_gap, 'Land-use',
         ha='center', va='bottom',
         fontsize=font_size, fontfamily='Arial', fontweight='normal',
     )
     fig.text(
-        0.43, 0.332, 'Agricultural management',
+        0.43, pos_bt.y1 + _section_gap, 'Agricultural management',
         ha='center', va='bottom',
         fontsize=font_size, fontfamily='Arial', fontweight='normal',
     )
-    fig.text(
-        y_label_x, 0.50, y_label,
-        ha='center', va='center', rotation=90,
-        fontsize=font_size, fontfamily='Arial', fontweight='normal',
-    )
+    _add_vertical_unit_label(fig, y_label_x, (pos_bt.y0 + pos_ov.y1) / 2, y_label, font_size)
+
+    # Bold scenario column headers just above the Total section label
+    header_y = pos_ov.y1 + _section_gap + _header_gap
+    for ax, scenario in zip(axes_overview, input_files):
+        pos = ax.get_position()
+        cx = (pos.x0 + pos.x1) / 2
+        fig.text(cx, header_y, SCENARIO_LABELS.get(scenario, scenario),
+                 ha='center', va='bottom',
+                 fontsize=font_size, fontweight='bold', fontfamily='Arial')
 
     _add_mixed_legend(fig.add_subplot(gs[0, 4]), overview_colors, line_label=total_legend_label)
     _add_patch_legend(fig.add_subplot(gs[1, 4]), top_colors)

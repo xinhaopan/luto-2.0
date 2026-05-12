@@ -27,7 +27,7 @@ from tools.plot_helper import (
     stacked_area_pos_neg,
 )
 from tools.parameters import input_files, font_size, OUTPUT_DIR, SCENARIO_LABELS
-from tools.two_row_figure import export_long_tables
+from tools.two_row_figure import export_long_tables, _add_vertical_unit_label
 
 RENAME_AM = {
     "Asparagopsis taxiformis": "Methane reduction (livestock)",
@@ -166,7 +166,7 @@ def prepare_am():
 
 
 def draw_row(fig, gs, row_idx, df_long, colors, y_range, row_label, show_titles):
-    years = list(range(2025, 2051))
+    years = list(range(2010, 2051))
     cats = list(colors.keys())
     clrs = list(colors.values())
     axes = []
@@ -200,7 +200,7 @@ def draw_row(fig, gs, row_idx, df_long, colors, y_range, row_label, show_titles)
         ax.plot([0, 1], [0, 0], transform=ax.transAxes,
                 color='black', linewidth=1.2, zorder=50, clip_on=False)
 
-        tick_pos = [y for y in range(2025, 2051, 5)]
+        tick_pos = [y for y in range(2010, 2051, 10)]
         ax.set_xticks(tick_pos)
         ax.tick_params(axis='x', labelrotation=45, labelbottom=True)
         if row_idx == 0:
@@ -275,9 +275,9 @@ def main():
         width_ratios=[1, 1, 1, 1, 0.78],
         hspace=0.26, wspace=0.10
     )
-    fig.subplots_adjust(left=0.08, right=0.95, top=0.90, bottom=0.12)
+    fig.subplots_adjust(left=0.08, right=0.95, top=0.84, bottom=0.12)
 
-    axes_top = draw_row(fig, gs, 0, area_lu, LU_COLORS, y_range_lu, 'Land-use', show_titles=True)
+    axes_top = draw_row(fig, gs, 0, area_lu, LU_COLORS, y_range_lu, 'Land-use', show_titles=False)
     axes_bot = draw_row(fig, gs, 1, area_am, am_colors, y_range_am, 'Agricultural management', show_titles=False)
 
     for ax in axes_top:
@@ -285,12 +285,21 @@ def main():
     for ax in axes_bot:
         ax.set_xlabel('')
 
-    fig.text(0.43, 0.94, 'Land-use', ha='center', va='bottom',
+    # Section labels (below the scenario-name header line)
+    fig.text(0.43, 0.87, 'Land-use', ha='center', va='bottom',
              fontsize=font_size, fontfamily='Arial', fontweight='normal')
-    fig.text(0.43, 0.47, 'Agricultural management', ha='center', va='bottom',
+    fig.text(0.43, 0.44, 'Agricultural management', ha='center', va='bottom',
              fontsize=font_size, fontfamily='Arial', fontweight='normal')
-    fig.text(0.038, 0.50, 'Area (Mha yr\u207b\u00b9)', ha='center', va='center', rotation=90,
-             fontsize=font_size, fontfamily='Arial', fontweight='normal')
+    _add_vertical_unit_label(fig, 0.038, 0.50, 'Area (Mha yr⁻¹)', font_size)
+
+    # Bold scenario column headers at the very top
+    fig.canvas.draw()
+    for ax, scenario in zip(axes_top, input_files):
+        pos = ax.get_position()
+        cx = (pos.x0 + pos.x1) / 2
+        fig.text(cx, 0.97, SCENARIO_LABELS.get(scenario, scenario),
+                 ha='center', va='bottom',
+                 fontsize=font_size, fontweight='bold', fontfamily='Arial')
 
     ax_leg_lu = fig.add_subplot(gs[0, 4])
     ax_leg_am = fig.add_subplot(gs[1, 4])

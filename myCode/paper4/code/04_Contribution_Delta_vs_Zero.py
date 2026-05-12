@@ -33,10 +33,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tools.price_slice_utils import (
     DATA_DIR,
     OUT_DIR,
+    add_zero_line,
+    apply_compact_ticks,
     apply_paper4_color_overrides_to_style_df,
+    apply_price_formatter,
     build_run_map,
     format_thousands,
     get_price_axis_label,
+    stacked_area_pos_neg,
     style_box_axis,
 )
 
@@ -53,7 +57,7 @@ SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
 NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
-MODIFIED_LIVESTOCK_COLOR = "#F77B00"
+MODIFIED_LIVESTOCK_COLOR = "#cac559"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -65,6 +69,9 @@ plt.rcParams.update({
     "ytick.labelsize": FS,
     "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
+    "axes.facecolor": "#EAEAF2",
+    "grid.color": "white",
+    "grid.linewidth": 1.0,
 })
 
 
@@ -540,20 +547,12 @@ def plot_sum_markers(ax, x, y):
         x,
         y,
         color="black",
-        linestyle="None",
-        marker="_",
-        markersize=16,
-        markeredgewidth=2.0,
-        zorder=30,
-    )
-    ax.plot(
-        x,
-        y,
-        color="black",
-        linestyle="None",
+        linestyle="-",
         marker="o",
+        linewidth=1.8,
         markersize=4.5,
-        zorder=31,
+        markeredgewidth=0,
+        zorder=30,
     )
 
 
@@ -564,53 +563,24 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
         return []
 
     color_map = PANEL_CONFIG[area_type]["color_map"] if color_map is None else color_map
-    price_vals = pivot_df.index.to_list()
-    x = np.arange(len(price_vals))
-    positive_bottoms = np.zeros(len(price_vals))
-    negative_bottoms = np.zeros(len(price_vals))
-
-    visible_categories = []
-    for category in pivot_df.columns:
-        heights = pivot_df[category].to_numpy()
-        if np.isclose(np.abs(heights).sum(), 0.0):
-            continue
-
-        positive = np.clip(heights, 0.0, None)
-        negative = np.clip(heights, None, 0.0)
-
-        if not np.isclose(positive.sum(), 0.0):
-            ax.bar(
-                x,
-                positive,
-                0.75,
-                bottom=positive_bottoms,
-                color=color_map.get(category, "#888888"),
-            )
-            positive_bottoms += positive
-
-        if not np.isclose(np.abs(negative).sum(), 0.0):
-            ax.bar(
-                x,
-                negative,
-                0.75,
-                bottom=negative_bottoms,
-                color=color_map.get(category, "#888888"),
-            )
-            negative_bottoms += negative
-
-        visible_categories.append(category)
+    visible_categories = stacked_area_pos_neg(ax, pivot_df, color_map)
 
     if show_sum_line:
         totals = pivot_df.sum(axis=1).to_numpy()
-        plot_sum_markers(ax, x, totals)
+        plot_sum_markers(ax, pivot_df.index.to_numpy(dtype=float), totals)
 
-    ax.set_xticks(x)
+    add_zero_line(ax)
     if show_xlabel:
-        ax.set_xticklabels([format_thousands(value) for value in price_vals], rotation=90, ha="center")
         ax.set_xlabel(get_price_axis_label(varying_key))
     else:
         ax.tick_params(axis="x", labelbottom=False)
 
+    apply_price_formatter(ax, axis="x")
+    apply_compact_ticks(ax, x_nbins=8, y_nbins=5)
+    if show_xlabel:
+        for label in ax.get_xticklabels():
+            label.set_rotation(45)
+            label.set_ha("right")
     style_box_axis(ax, linewidth=0.8)
     return visible_categories
 
@@ -623,6 +593,8 @@ if df_long is None:
 fig, axes = plt.subplots(4, 2, figsize=(10, 16), sharex="col")
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
+axes[0, 0].set_title("Carbon price varies\n(BioPrice=0)", pad=8)
+axes[0, 1].set_title("Biodiversity price varies\n(CarbonPrice=0)", pad=8)
 
 total_pivot_cp = build_total_pivot(df_long, "CarbonPrice")
 total_pivot_bp = build_total_pivot(df_long, "BioPrice")

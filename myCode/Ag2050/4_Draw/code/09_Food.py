@@ -133,7 +133,7 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        'Food production (Mt, GL yr\u207b\u00b9)',
+        'Food production (Mt yr⁻¹)',
         '09_food.svg',
         y_label_x=0.030,
     )

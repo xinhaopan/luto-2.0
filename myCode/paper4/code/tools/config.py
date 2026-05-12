@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 
-TASK_NAME = "20260429_paper4_NCI"
+TASK_NAME = "20260505_paper4_HPC"
 
 CODE_DIR = Path(__file__).resolve().parent
 TASK_ROOT = (CODE_DIR / ".." / ".." / ".." / ".." / "output" / TASK_NAME).resolve()

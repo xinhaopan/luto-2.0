@@ -50,7 +50,7 @@ FS = 10
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
 NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
-MODIFIED_LIVESTOCK_COLOR = "#F77B00"
+MODIFIED_LIVESTOCK_COLOR = "#cac559"
 plt.rcParams.update({
     "font.family": "sans-serif",
     "font.sans-serif": ["Arial"],
@@ -417,10 +417,9 @@ def style_map_ax(ax):
     ax.set_xlim(*XLIM)
     ax.set_ylim(*YLIM)
     ax.set_aspect("equal", adjustable="box")
+    ax.set_frame_on(False)
     for spine in ax.spines.values():
-        spine.set_visible(True)
-        spine.set_linewidth(0.6)
-        spine.set_edgecolor("#444444")
+        spine.set_visible(False)
 
 
 def load_cache():

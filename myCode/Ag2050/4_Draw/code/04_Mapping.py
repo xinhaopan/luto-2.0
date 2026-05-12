@@ -12,7 +12,9 @@ import matplotlib
 matplotlib.use('Agg')
 matplotlib.rcParams.update({
     'font.family': 'Arial',
+    'font.sans-serif': ['Arial'],
     'font.size':   9,
+    'svg.fonttype': 'none',
 })
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -198,6 +200,7 @@ def main():
                     ha='center', va='center',
                     transform=ax_lbl.transAxes,
                     fontsize=9, rotation=90,
+                    fontweight='bold',
                     clip_on=False)
 
         def _style(ax):
@@ -206,9 +209,7 @@ def main():
             ax.set_ylim(TIFF_BOTTOM, TIFF_TOP)
             ax.set_aspect('equal', adjustable='box')
             for sp in ax.spines.values():
-                sp.set_visible(True)
-                sp.set_linewidth(0.7)
-                sp.set_edgecolor('#444444')
+                sp.set_visible(False)
 
         # ── Land-use column ──────────────────────────────────────────────────
         ax_lu = fig.add_subplot(gs[row, 1])
@@ -277,12 +278,12 @@ def main():
                loc='upper center',
                bbox_to_anchor=(x_lu, leg_y), bbox_transform=fig.transFigure,
                ncol=1, fontsize=9, frameon=False,
-               handlelength=1.2, handleheight=0.9, borderpad=0)
+               handlelength=1.0, handleheight=1.0, borderpad=0)
     fig.legend(am_handles, [h.get_label() for h in am_handles],
                loc='upper center',
                bbox_to_anchor=(x_am, leg_y), bbox_transform=fig.transFigure,
                ncol=1, fontsize=9, frameon=False,
-               handlelength=1.2, handleheight=0.9, borderpad=0)
+               handlelength=1.0, handleheight=1.0, borderpad=0)
 
     out = os.path.join(OUTPUT_DIR, '04_land use and ag management map.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')

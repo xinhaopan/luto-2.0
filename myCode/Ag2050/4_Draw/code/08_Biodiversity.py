@@ -140,7 +140,7 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        'Contribution-weighted area (Mha yr\u207b\u00b9)',
+        "Biodiversity contribution-weighted area (Mha yr⁻¹)",
         '08_biodiversity.svg',
         y_label_x=0.030,
     )

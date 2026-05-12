@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tools.price_slice_utils import (
     apply_price_formatter,
     build_run_map,
+    apply_compact_ticks,
     DATA_DIR,
     format_thousands,
     OUT_DIR,
@@ -59,6 +60,9 @@ plt.rcParams.update({
     "ytick.labelsize": FS,
     "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
+    "axes.facecolor": "#EAEAF2",
+    "grid.color": "white",
+    "grid.linewidth": 1.0,
 })
 
 
@@ -146,13 +150,16 @@ ax1.plot(
     color=COLOR_GHG,
     marker="o",
     linestyle="-",
-    linewidth=1.5,
-    markersize=5,
+    linewidth=2.2,
+    markersize=7,
+    markeredgewidth=0,
 )
+ax1.set_title("Carbon price response", pad=8)
 ax1.set_xlabel(r"Change in GHG emissions vs zero price (Mt CO$_2$e yr$^{-1}$)")
 ax1.set_ylabel(r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)")
 ax1.set_ylim(bottom=0)
 apply_price_formatter(ax1, axis="y")
+apply_compact_ticks(ax1, x_nbins=7, y_nbins=6)
 style_box_axis(ax1)
 
 mask_bio = ~np.isnan(x_bio)
@@ -162,13 +169,16 @@ ax2.plot(
     color=COLOR_BIO,
     marker="o",
     linestyle="-",
-    linewidth=1.5,
-    markersize=5,
+    linewidth=2.2,
+    markersize=7,
+    markeredgewidth=0,
 )
+ax2.set_title("Biodiversity price response", pad=8)
 ax2.set_xlabel(r"Change in biodiversity contribution score vs zero price (Mha yr$^{-1}$)")
 ax2.set_ylabel(r"Biodiversity price (AU\$/ha yr$^{-1}$)")
 ax2.set_ylim(bottom=0)
 apply_price_formatter(ax2, axis="y")
+apply_compact_ticks(ax2, x_nbins=7, y_nbins=6)
 style_box_axis(ax2)
 
 plt.tight_layout()

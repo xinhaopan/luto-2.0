@@ -1,4 +1,6 @@
 import os
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend for running in terminal
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -139,6 +141,46 @@ def draw_stacked_area(data, legend_colors, output_file, fontsize=22, y_range=(0,
     handles, labels = ax.get_legend_handles_labels()
     legend_file = f"{output_file}_legend.svg"
     save_legend_as_image(handles, labels, legend_file, ncol=2, font_size=10)
+
+    # Direct labeling — evenly distributed labels + two staggered columns
+    label_fontsize = 9
+    y_total = y_range[1] - y_range[0]
+    margin = y_total * 0.02
+
+    # Anchor points: band midpoints at 2050, bottom→top order
+    anchors = []
+    bottom = 0.0
+    for i, cat in enumerate(categories):
+        band_height = data_to_plot[i][-1]
+        mid_y = bottom + band_height / 2
+        bottom += band_height
+        anchors.append((mid_y, cat, colors[i]))
+
+    n = len(anchors)
+    # Evenly space label y positions across the full y range — guaranteed no overlap
+    label_ys = np.linspace(y_range[0] + margin, y_range[1] - margin, n)
+
+    # Two staggered x columns: even index → near, odd index → far
+    col_x = [2051.5, 2057.5]
+
+    for idx, ((anchor_y, cat, color), ly) in enumerate(zip(anchors, label_ys)):
+        x_lbl = col_x[idx % 2]
+        ax.annotate(
+            f' {cat}',
+            xy=(2050, anchor_y),
+            xytext=(x_lbl, ly),
+            fontsize=label_fontsize,
+            va='center', ha='left',
+            color='black',
+            clip_on=False,
+            annotation_clip=False,
+            arrowprops=dict(
+                arrowstyle='-',
+                color=color,
+                lw=0.8,
+                connectionstyle='arc3,rad=0',
+            ),
+        )
 
     # 保存图像
     plt.tight_layout()

@@ -35,6 +35,7 @@ from tools.parameters import EXCEL_DIR, OUTPUT_DIR, input_files
 from tools.two_row_figure import RENAME_NON_AG, load_report_source_csv
 
 
+UNIT_DEJAVU_CHARS = {'₂', '⁻', '¹'}
 YEAR = 2050
 BASELINE_YEAR = 2010
 SCENARIO_LABELS = {
@@ -67,10 +68,10 @@ class IndicatorSpec:
 INDICATORS = [
     IndicatorSpec(
         key="food_production",
-        label="Agri-food production \u2191\n(Mt, GL)",
+        label="Agri-food production \u2191\n(Mt yr⁻¹)",
         sector_label="Agri-food production",
         value_label="Food",
-        unit_label="Mt, GL",
+        unit_label="Mt yr⁻¹",
         higher_is_better=True,
         decimals=1,
         filename="09_Food.py",
@@ -87,40 +88,40 @@ INDICATORS = [
     ),
     IndicatorSpec(
         key="net_ghg_emissions",
-        label="Net GHG emissions \u2193\n(Mt CO2e)",
+        label="Net GHG emissions \u2193\n(Mt CO₂e yr⁻¹)",
         sector_label="Net GHG\nemissions",
         value_label="GHG",
-        unit_label="Mt CO2e",
+        unit_label="Mt CO₂e yr⁻¹",
         higher_is_better=False,
         decimals=1,
         filename="07_GHG.py",
     ),
     IndicatorSpec(
         key="biodiversity",
-        label="Biodiversity \u2191\n(Mha)",
+        label="Biodiversity contribution-weighted area \u2191\n(Mha yr⁻¹)",
         sector_label="Biodiversity",
         value_label="Bio",
-        unit_label="Mha",
+        unit_label="Mha yr⁻¹",
         higher_is_better=True,
         decimals=1,
         filename="08_Biodiversity.py",
     ),
     IndicatorSpec(
         key="water_yield",
-        label="Water yield \u2191\n(GL)",
-        sector_label="Water yield",
+        label="Water yield decrease \u2193\n(GL yr⁻¹)",
+        sector_label="Water yield\ndecrease",
         value_label="Water",
-        unit_label="GL",
-        higher_is_better=True,
+        unit_label="GL yr⁻¹",
+        higher_is_better=False,
         decimals=0,
         filename="10_Water.py",
     ),
     IndicatorSpec(
         key="land_use_change_extent",
-        label="Land-use change extent \u2193\n(Mha changed)",
+        label="Land-use change extent \u2193\n(Mha yr⁻¹)",
         sector_label="Land-use\nchange",
         value_label="Land change",
-        unit_label="Mha",
+        unit_label="Mha yr⁻¹",
         higher_is_better=False,
         decimals=1,
         filename=None,
@@ -243,6 +244,81 @@ def _format_value_with_unit(value: float, unit_label: str) -> str:
     return f"{_format_value(value, 2)} {unit_label}"
 
 
+def _split_unit_font_runs(text: str) -> list[tuple[str, str]]:
+    runs: list[tuple[str, str]] = []
+    current_text: list[str] = []
+    current_family: str | None = None
+    for char in text:
+        family = "DejaVu Sans" if char in UNIT_DEJAVU_CHARS else "Arial"
+        if family != current_family and current_text:
+            runs.append(("".join(current_text), current_family or "Arial"))
+            current_text = []
+        current_text.append(char)
+        current_family = family
+    if current_text:
+        runs.append(("".join(current_text), current_family or "Arial"))
+    return runs
+
+
+def _measure_text_runs(fig, runs, fontsize, fontweight):
+    temp_artists = [
+        fig.text(
+            0, 0, text,
+            fontsize=fontsize,
+            fontfamily=family,
+            fontweight=fontweight,
+            alpha=0,
+        )
+        for text, family in runs
+    ]
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    widths = [
+        artist.get_window_extent(renderer=renderer).width
+        for artist in temp_artists
+    ]
+    for artist in temp_artists:
+        artist.remove()
+    return widths
+
+
+def _draw_mixed_unit_text(ax, theta, radius, text, rotation, fontsize, color, fontweight, zorder):
+    runs = _split_unit_font_runs(text)
+    if len(runs) == 1:
+        text_run, family = runs[0]
+        return [
+            ax.text(
+                theta, radius, text_run,
+                ha="center", va="center",
+                rotation=rotation, rotation_mode="anchor",
+                fontsize=fontsize, color=color, fontweight=fontweight,
+                family=family, zorder=zorder,
+            )
+        ]
+
+    widths = _measure_text_runs(ax.figure, runs, fontsize, fontweight)
+    total_width = sum(widths)
+    cursor = -total_width / 2
+    base_display = ax.transData.transform((theta, radius))
+    direction = np.array([np.cos(np.deg2rad(rotation)), np.sin(np.deg2rad(rotation))])
+    artists = []
+    for (text_run, family), width in zip(runs, widths):
+        offset_px = cursor + width / 2
+        display_pos = base_display + offset_px * direction
+        data_pos = ax.transData.inverted().transform(display_pos)
+        artists.append(
+            ax.text(
+                data_pos[0], data_pos[1], text_run,
+                ha="center", va="center",
+                rotation=rotation, rotation_mode="anchor",
+                fontsize=fontsize, color=color, fontweight=fontweight,
+                family=family, zorder=zorder,
+            )
+        )
+        cursor += width
+    return artists
+
+
 def build_summary_tables() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     raw_values = pd.DataFrame(index=[spec.key for spec in INDICATORS], columns=input_files, dtype=float)
 
@@ -251,6 +327,9 @@ def build_summary_tables() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
             raw_values.loc[spec.key] = _land_use_change_extent().values
         else:
             raw_values.loc[spec.key] = _prepare_overview_totals(spec.filename).values
+
+    # Water yield is a decrease: negate so the displayed value is the absolute drop (positive)
+    raw_values.loc['water_yield'] = -raw_values.loc['water_yield']
 
     score_values = pd.DataFrame(index=raw_values.index, columns=raw_values.columns, dtype=float)
     for spec in INDICATORS:
@@ -308,12 +387,12 @@ def _place_text_pair_outward(
     value_start_r, label_start_r,
     value_text, label_text, rotation, fontsize,
 ):
-    value_artist = ax.text(
+    value_probe = ax.text(
         theta, value_start_r, value_text,
         ha="center", va="center",
         rotation=rotation, rotation_mode="anchor",
         fontsize=fontsize - 1, color="black", fontweight="normal",
-        family="Arial", zorder=10,
+        family="DejaVu Sans", alpha=0, zorder=10,
     )
     label_artist = ax.text(
         theta, label_start_r, label_text,
@@ -328,9 +407,9 @@ def _place_text_pair_outward(
     for offset in np.arange(0.0, 0.60, 0.01):
         vr = value_start_r + offset
         lr = label_start_r + offset
-        value_artist.set_position((theta, vr))
+        value_probe.set_position((theta, vr))
         label_artist.set_position((theta, lr))
-        vbox = value_artist.get_window_extent(renderer=renderer)
+        vbox = value_probe.get_window_extent(renderer=renderer)
         lbox = label_artist.get_window_extent(renderer=renderer)
         group = Bbox.union([vbox, lbox])
         padded = group.expanded(1.05, 1.08).padded(2.0)
@@ -340,10 +419,14 @@ def _place_text_pair_outward(
         best_label_r = lr
         break
 
-    value_artist.set_position((theta, best_value_r))
+    value_probe.remove()
+    value_artists = _draw_mixed_unit_text(
+        ax, theta, best_value_r, value_text,
+        rotation, fontsize - 1, "black", "normal", 10,
+    )
     label_artist.set_position((theta, best_label_r))
     final_box = Bbox.union([
-        value_artist.get_window_extent(renderer=renderer),
+        *[artist.get_window_extent(renderer=renderer) for artist in value_artists],
         label_artist.get_window_extent(renderer=renderer),
     ])
     occupied_bboxes.append(final_box.expanded(1.05, 1.08).padded(2.0))
@@ -443,6 +526,7 @@ def plot_circular_synthesis(raw_values: pd.DataFrame, score_values: pd.DataFrame
 
     plt.rcParams["font.family"] = "Arial"
     plt.rcParams["font.sans-serif"] = ["Arial"]
+    plt.rcParams["svg.fonttype"] = "none"
 
     text_size = 10
     fig, axes = plt.subplots(2, 2, figsize=(13.8, 10.8), subplot_kw={"projection": "polar"})
@@ -473,7 +557,7 @@ def plot_circular_synthesis(raw_values: pd.DataFrame, score_values: pd.DataFrame
             indicator_value = float(scenario_raw.loc[spec.key])
             if spec.key == "net_ghg_emissions":
                 sector_cmap = green_cmap if indicator_value < 0 else red_cmap
-            elif spec.key == "land_use_change_extent":
+            elif spec.key in ("land_use_change_extent", "water_yield"):
                 sector_cmap = red_cmap
             else:
                 sector_cmap = green_cmap
