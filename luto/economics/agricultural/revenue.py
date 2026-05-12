@@ -164,6 +164,11 @@ def get_rev_lvstk( data:Data   # Data object.
     # Revenue so far in AUD/ha. Now convert to AUD/cell including resfactor.
     rev_seperate = rev_seperate * data.REAL_AREA.reshape(-1, 1) # Convert to AUD/cell
 
+    # AG2050 MODE: apply feedlot revenue ratio for 'Beef - modified land'.
+    # The ratio is year-specific and loaded from Feedlots_revenue_ratio_from_ag2050.csv.
+    if settings.AG2050_MODE and lu == 'Beef - modified land' and data.FEEDLOT_REVENUE_RATIO:
+        rev_seperate = rev_seperate * data.FEEDLOT_REVENUE_RATIO.get(yr_cal, 1.0)
+
     # Return revenue as numpy array.
     return rev_seperate
 

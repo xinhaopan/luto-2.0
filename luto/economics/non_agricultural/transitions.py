@@ -990,7 +990,7 @@ def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.nd
 
     destocked_cells = tools.get_destocked_land_cells(lumap)
     if destocked_cells.size == 0 and separate == False:
-        return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+        return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
     
     # Get transition costs from destocked cells by using transition costs from unallocated land
     unallocated_t_mrj = ag_transitions.get_transition_matrices_ag2ag(
@@ -998,12 +998,15 @@ def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.nd
     )
 
     if separate == False:
-        destocked_t_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+        destocked_t_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
         destocked_t_mrj[:, destocked_cells, :] = unallocated_t_mrj[:, destocked_cells, :]
         return destocked_t_mrj
     
     elif separate == True:
-        sep_destocked_trans = {k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)) for k in unallocated_t_mrj}
+        sep_destocked_trans = {
+            k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+            for k in unallocated_t_mrj
+        }
         if destocked_cells.size == 0:
             return sep_destocked_trans
 
@@ -1043,7 +1046,9 @@ def get_transition_matrix_nonag2ag(data: Data, yr_idx, lumap, lmmap, separate=Fa
 
     """
     
-    non_ag_to_agr_t_matrices = {lu: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32) for lu in settings.NON_AG_LAND_USES}
+    # Do not preallocate placeholder arrays here: each matrix is large and the
+    # placeholders are immediately overwritten by the real transition matrices.
+    non_ag_to_agr_t_matrices = {}
 
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
@@ -1144,10 +1149,27 @@ def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarr
 
     if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
         return np.zeros((data.NCELLS, len(settings.NON_AG_LAND_USES))).astype(np.float32)
-        
-    # return np.divide(
-    #     np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECMIALS),
-    #     10 ** settings.ROUND_DECMIALS,
-    # )
-    
-    return data.non_ag_dvars[base_year].astype(np.float32)
+
+    # Floor-truncate to ROUND_DECMIALS precision (prevents float32 upward rounding
+    # from inflating the lb above the stored dvar value).
+    lb_rk = np.divide(
+        np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECMIALS),
+        10 ** settings.ROUND_DECMIALS,
+    )
+
+    # Cap each lb against the cell capacity (AG_MASK_PROPORTION_R) — the same float32
+    # value used as the const_cell_usage RHS.  This prevents a float32 rounding
+    # artefact (e.g. float32(0.92) = 0.9200000169) from exceeding a cell capacity
+    # stored as a slightly different float32 value (e.g. 0.9199999571), which would
+    # make the cell-usage equality constraint structurally infeasible.
+    lb_capped = np.minimum(lb_rk, data.AG_MASK_PROPORTION_R[:, np.newaxis]).astype(np.float32)
+
+    lb_update = lb_capped < lb_rk
+    if lb_update.any():
+        gap = lb_rk[lb_update] - lb_capped[lb_update]
+        print(
+            f"  └── NonAg lb capped: {lb_update.sum()} cells updated,"
+            f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
+        )
+
+    return lb_capped

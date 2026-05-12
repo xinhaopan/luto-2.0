@@ -225,12 +225,47 @@ def get_non_ag_c_rk(data: Data, ag_c_mrj: np.ndarray, lumap: np.ndarray, target_
 def get_ag_r_mrj(data: Data, target_index):
     print('Getting agricultural revenue matrices...', flush = True)
     output = ag_revenue.get_rev_matrices(data, target_index)
+    # Add biodiversity price contribution: bio_score (mrj) × bio_price → AUD/cell
+    # Positive scores (high-biodiversity land uses) yield revenue; negative scores (degraded uses) incur a cost.
+    bio_price = data.get_biodiversity_price_by_yr_idx(target_index)
+    if bio_price != 0.0:
+        b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+        output = output + b_mrj * bio_price
     return output.astype(np.float32)
+
+
+def _strip_biodiversity_price_from_ag_revenue(
+    data: Data,
+    target_index: int,
+    ag_r_mrj: np.ndarray,
+) -> np.ndarray:
+    """
+    Remove the biodiversity-price component from agricultural revenue matrices.
+
+    This lets composite non-agricultural and agricultural-management revenue code
+    reuse the underlying agricultural economics without accidentally monetising the
+    biodiversity term twice.
+    """
+    bio_price = data.get_biodiversity_price_by_yr_idx(target_index)
+    if bio_price == 0.0:
+        return ag_r_mrj
+
+    ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+    return ag_r_mrj - ag_b_mrj * bio_price
 
 
 def get_non_ag_r_rk(data: Data, ag_r_mrj: np.ndarray, base_year: int, target_year: int):
     print('Getting non-agricultural revenue matrices...', flush = True)
-    output = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj, data.lumaps[base_year])
+    target_index = target_year - data.YR_CAL_BASE
+    ag_r_mrj_economic = _strip_biodiversity_price_from_ag_revenue(data, target_index, ag_r_mrj)
+    output = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj_economic, data.lumaps[base_year])
+    # Add biodiversity price contribution: bio_score (rk) × bio_price → AUD/cell
+    # Non-agricultural land uses (plantings, BECCS, etc.) always have positive biodiversity scores.
+    bio_price = data.get_biodiversity_price_by_year(target_year)
+    if bio_price != 0.0:
+        ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+        non_ag_b_rk = non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, data.lumaps[base_year])
+        output = output + non_ag_b_rk * bio_price
     return output.astype(np.float32)
 
 
@@ -430,7 +465,7 @@ def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
         target_index, 
         data.lumaps[base_year], 
         data.lmmaps[base_year],
-    ).astype(np.float32)
+    ).astype(np.float32, copy=False)
     # Transition costs occures if the base year is not the target year
     return non_ag_to_ag_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_to_ag_mrj).astype(np.float32)
 
@@ -502,7 +537,16 @@ def get_ag_man_q_mrj(data: Data, target_index, ag_q_mrp: np.ndarray):
 
 def get_ag_man_r_mrj(data: Data, target_index, ag_r_mrj: np.ndarray):
     print('Getting agricultural management options\' revenue effects...', flush = True)
-    output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
+    ag_r_mrj_economic = _strip_biodiversity_price_from_ag_revenue(data, target_index, ag_r_mrj)
+    output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj_economic, target_index)
+    bio_price = data.get_biodiversity_price_by_yr_idx(target_index)
+    if bio_price != 0.0:
+        ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+        ag_man_b_mrj = ag_biodiversity.get_ag_mgt_biodiversity_matrices(data, ag_b_mrj, target_index)
+        output = {
+            am: arr + ag_man_b_mrj[am] * bio_price
+            for am, arr in output.items()
+        }
     return output
 
 
@@ -740,7 +784,15 @@ def get_limits(data: Data, base_year:int, target_year: int, resale_factors) -> d
         limits['water'] = data.WATER_YIELD_TARGETS
         limits['water_rescale'] = {k: v / resale_factors['Water'] for k, v in limits['water'].items()}
         
-    if settings.GHG_EMISSIONS_LIMITS != 'off':
+    if settings.GHG_EMISSIONS_LIMITS == 'maintain_historical':
+        # AG2050: keep GHG ≤ 2010 base-year level for every year.
+        # Populate data.GHG_TARGETS lazily on the first solver call.
+        if not data.GHG_TARGETS:
+            base_ghg = get_BASE_YR_GHG_t(data)
+            data.GHG_TARGETS = {yr: base_ghg for yr in settings.SIM_YEARS}
+        limits['ghg'] = data.GHG_TARGETS[target_year]
+        limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
+    elif settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[target_year]
         limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
         

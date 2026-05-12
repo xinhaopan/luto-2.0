@@ -540,6 +540,8 @@ def align_raster_to_reference(src_path, ref_path, dst_path,
     - 适合掩膜层(0/1)：resampling='nearest'
     - 适合连续值：resampling='bilinear' 或 'cubic'
     """
+    if os.path.exists(dst_path):
+        return
     # 选择重采样算法
     resampling_map = {
         "nearest": Resampling.nearest,
@@ -876,7 +878,7 @@ def plot_tif_layer(
         vmin_override=vmin_override,
         vmax_override=vmax_override,
     )
-    aligned_tif = f"../Map/public_area_aligned.tif"
+    aligned_tif = f"../Map/public_area_aligned_{os.environ.get('CARBON_RATE', '')}.tif"
     add_binary_gray_layer(ax, aligned_tif, gray_hex="#808080", alpha=1, zorder=15)
 
     # 只有单图模式才保存和显示

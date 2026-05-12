@@ -4,9 +4,9 @@ import pandas as pd
 from tools.helpers import create_task_runs
 import time
 # time.sleep(60*60*5)
-platform = "NCI"  # 可选值: 'HPC', 'Denethor', 'NCI',"aquila"
-tasks = ['20260303_Paper2_Results_test']
-model_name = 'Zip'
+platform = "aquila"  # 可选值: 'HPC', 'Denethor', 'NCI',"aquila"
+tasks = ['20260414_Paper3_NCI'] # 任务名称列表,可以包含一个或多个任务
+model_name = 'Rewrite' # 'Run','Write','Rewrite','Report','Zip'
 
 input_path_dict = {"HPC": "/home/remote/s222552331/LUTO2_XH/LUTO2/input",
                     "Denethor": "N:/LUF-Modelling/LUTO2_XH/LUTO2/input",
@@ -34,4 +34,12 @@ for task in tasks:
         for col in grid_search_settings_df.columns:
             grid_search_settings_df.at[name, col] = new_value
 
-    create_task_runs(task_root_dir, grid_search_settings_df, platform, n_workers=min(len(grid_search_settings_df.columns), 100),use_parallel=True,model_name=model_name)
+    # local_rewrite_like_mode = platform in {"aquila", "Denethor"} and model_name in {"Write", "Rewrite"}
+    create_task_runs(
+        task_root_dir,
+        grid_search_settings_df,
+        platform,
+        n_workers=min(len(grid_search_settings_df.columns), 100),
+        use_parallel=True,
+        model_name=model_name,
+    )

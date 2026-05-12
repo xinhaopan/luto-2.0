@@ -176,13 +176,18 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
 
     costs = np.stack([costs_a, costs_flc, costs_foc, costs_fdc, costs_w, costs_q]).T
 
-    # Return costs 
+    # AG2050 MODE: apply feedlot cost ratio for 'Beef - modified land'.
+    # The ratio is year-specific and loaded from Feedlots_cost_ratio_from_ag2050.csv.
+    if settings.AG2050_MODE and lu == 'Beef - modified land' and data.FEEDLOT_COST_RATIO:
+        costs = costs * data.FEEDLOT_COST_RATIO.get(yr_cal, 1.0)
+
+    # Return costs
     return pd.DataFrame(
         costs,
         columns=pd.MultiIndex.from_product(
             [
-                [lu], 
-                [lm], 
+                [lu],
+                [lm],
                 ['Area cost', 'Fixed labour cost', 'Fixed operating cost', 'Fixed depreciation cost', 'Water cost', 'Quantity cost']
             ]
         )

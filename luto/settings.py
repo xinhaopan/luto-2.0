@@ -562,6 +562,20 @@ Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
 '''
 
 
+# Biodiversity price scenario: 'CONSTANT' or a sheet name from 'biodiversity_prices.xlsx'.
+# When 'CONSTANT', a fixed price ($/unit of biodiversity score) is used for all years.
+# When a sheet name is given, prices are read year-by-year from the corresponding Excel sheet.
+BIODIVERSITY_PRICES_FIELD = 'CONSTANT'
+
+if BIODIVERSITY_PRICES_FIELD == 'CONSTANT':
+    BIODIVERSITY_PRICE_CONSTANT = 0.0  # Price per unit of biodiversity score (AUD/unit). Set to 0 to disable.
+'''
+Only works when BIODIVERSITY_PRICES_FIELD is set to 'CONSTANT'.
+The biodiversity score unit is BIO_QUALITY_RAW * REAL_AREA (dimensionless quality index × ha).
+A positive price rewards high-biodiversity land uses; a negative effective score penalises degradation.
+'''
+
+
 USE_GHG_SCOPE_1 = True  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
 '''
 Basic GHG types are the direct emissions from the land-use and livestock types, excluding
@@ -1133,3 +1147,76 @@ RIVER REGIONS
  217: 'YANNARIE RIVER',
  218: 'YARRA RIVER'}
 """
+
+
+# ============================================================================ #
+# AG2050 Scenario Settings                                                      #
+# ============================================================================ #
+# Switch: set to True to enable AG2050 scenario mode.
+# When enabled, AG2050_SCENARIO drives PRODUCTIVITY_TREND, GHG_EMISSIONS_LIMITS,
+# and BIODIVERSITY_TARGET_GBF_2 automatically via the mapping tables below.
+AG2050_MODE = False
+
+# Active scenario: one of 'AgS1', 'AgS2', 'AgS3', 'AgS4', or '' (disabled).
+# Must be a string (not None) so create_task_runs does not eval() the value.
+AG2050_SCENARIO = ''
+
+# ---------- Scenario → model-setting mappings --------------------------------
+
+# Yield / productivity: maps to sheet name in yieldincreases_ag_2050.xlsx
+AG2050_PRODUCTIVITY_MAP = {
+    'AgS1': 'HIGH',
+    'AgS2': 'VERY_HIGH',
+    'AgS3': 'MEDIUM',
+    'AgS4': 'LOW',
+}
+
+# Fixed-labour-cost multiplier: maps to sheet name in FLC_cost_multipliers.xlsx
+AG2050_FLC_MAP = {
+    'AgS1': 'FLC_multiplier_high',
+    'AgS2': 'FLC_multiplier_high',   # Same sheet as AgS1
+    'AgS3': 'FLC_multiplier_medium',
+    'AgS4': 'FLC_multiplier_low',
+}
+
+# Area-cost multiplier: maps to sheet name in Area_cost.xlsx
+AG2050_AC_MAP = {
+    'AgS1': 'high',
+    'AgS2': 'very_high',
+    'AgS3': 'medium',
+    'AgS4': 'low',
+}
+
+# GHG target per scenario.
+# 'maintain_historical' keeps GHG ≤ 2010 base-year level for every future year.
+AG2050_GHG_MAP = {
+    'AgS1': 'maintain_historical',
+    'AgS2': 'low',
+    'AgS3': 'off',
+    'AgS4': 'off',
+}
+
+# Biodiversity (GBF-2) target per scenario.
+# 'maintain_historical' keeps the 2010 base-year GBF-2 score as the floor target.
+# 'high' = restore 50 % in top-30 % priority areas (standard 'high' setting).
+AG2050_BIO_MAP = {
+    'AgS1': 'maintain_historical',
+    'AgS2': 'high',
+    'AgS3': 'off',
+    'AgS4': 'off',
+}
+
+# ---------- Auto-configure: override dependent settings ----------------------
+# When AG2050_MODE is True and a scenario is selected, the three settings below
+# are overridden automatically.  The carbon-price field is forced to 'CONSTANT'
+# (zero carbon price) so that the AS_GHG lookup never runs on 'maintain_historical'.
+if AG2050_MODE and AG2050_SCENARIO:
+    PRODUCTIVITY_TREND        = AG2050_PRODUCTIVITY_MAP[AG2050_SCENARIO]
+    GHG_EMISSIONS_LIMITS      = AG2050_GHG_MAP[AG2050_SCENARIO]
+    BIODIVERSITY_TARGET_GBF_2 = AG2050_BIO_MAP[AG2050_SCENARIO]
+    # Force constant (zero) carbon price so the GHG-target-dict lookup is skipped
+    CARBON_PRICES_FIELD = 'CONSTANT'
+    CARBON_PRICE_COSTANT = 0.0
+    # Force constant (zero) biodiversity price in AG2050 mode
+    BIODIVERSITY_PRICES_FIELD = 'CONSTANT'
+    BIODIVERSITY_PRICE_CONSTANT = 0.0

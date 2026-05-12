@@ -210,8 +210,8 @@ def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
 
     for idx, lu_code in enumerate(lu_codes):
         b_mrj_effect[:, :, idx] = (
-            unallocated_b_mr * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu_code])     # The proportional gap of biodiversity between beef-natural to full-natural
-            - (1 - settings.HIR_CEILING_PERCENTAGE)                                     # HIR achienves HIR_CEILING_PERCENTAGE% of full-natural biodiversity
+            unallocated_b_mr * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu_code])     # The proportional gap between beef-natural and full-natural
+            * settings.HIR_CEILING_PERCENTAGE                                            # HIR achieves CEILING% of that gap
         )
 
     return b_mrj_effect
@@ -241,10 +241,10 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
 
     for idx, lu_code in enumerate(lu_codes):
         b_mrj_effect[:, :, idx] = (
-            unallocated_b_mr * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu_code])     # The proportional gap of biodiversity between beef-natural to full-natural
-            - (1 - settings.HIR_CEILING_PERCENTAGE)                                     # HIR achienves HIR_CEILING_PERCENTAGE% of full-natural biodiversity
+            unallocated_b_mr * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu_code])     # The proportional gap between sheep-natural and full-natural
+            * settings.HIR_CEILING_PERCENTAGE                                            # HIR achieves CEILING% of that gap
         )
-        
+
     return b_mrj_effect
 
 def get_utility_solar_pv_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):

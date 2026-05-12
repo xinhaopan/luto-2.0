@@ -1,7 +1,11 @@
 import math
+import os
 
 N_JOBS = math.ceil(41 / 1)
-TASK_NAME = "20260303_Paper2_Results_NCI" # "20250922_Paper2_Results_NCI"  #
+TASK_NAME = "20260414_Paper2_NCI" # "20250922_Paper2_Results_NCI"  #
+
+_rate = os.environ.get("CARBON_RATE", "")
+CARBON_PRICE_DIR = f"carbon_price_{_rate}" if _rate else "carbon_price"
 
 COST_DICT = {
     'cost_am': [

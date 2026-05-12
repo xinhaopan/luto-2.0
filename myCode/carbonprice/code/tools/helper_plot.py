@@ -1497,6 +1497,8 @@ def draw_22_price(
         ncol=1,
         bbox_to_anchor=(0.44, 0.95),
         column_spacing=1,
+        fig=None,
+        save=True,
 ):
     """
     绘制22个价格趋势图（5行5列布局，前3个空位）
@@ -1521,7 +1523,8 @@ def draw_22_price(
     df_pivot = df_filtered.pivot(index='Year', columns='scenario', values='data')
     df = df_pivot[scenario_list]  # 按照title_map顺序重新排列列
 
-    fig = plt.figure(figsize=figsize)
+    if fig is None:
+        fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(5, 5, figure=fig, hspace=0.15, wspace=0.15)
     fig.subplots_adjust(left=0.06, right=0.91, top=0.95, bottom=0.05)
 
@@ -1652,11 +1655,13 @@ def draw_22_price(
         )
 
     # 保存图形
-    if not os.path.exists(os.path.dirname(output_path)):
-        os.makedirs(os.path.dirname(output_path))
-    fig.savefig(output_path, dpi=300)
-    fig.show()
-    print(f"✅ Saved to {output_path}")
+    if save and output_path:
+        if not os.path.exists(os.path.dirname(output_path)):
+            os.makedirs(os.path.dirname(output_path))
+        fig.savefig(output_path, dpi=300)
+        fig.show()
+        print(f"✅ Saved to {output_path}")
+    return fig
 
 # def draw_22_price(
 #     df,
@@ -1788,6 +1793,8 @@ def draw_10_price(
         ylabel_pos=(-0.3, -0.2),  # (x, y) in axes coords
         top_space_ratio=0.20,  # y 轴顶部额外空间比例
         ci=95,
+        fig=None,
+        save=True,
 ):
     """
     画两行共 10 张子图，每张做拟合并统一坐标与格式。
@@ -1820,7 +1827,8 @@ def draw_10_price(
     df_pivot = df_filtered.pivot(index='Year', columns='scenario', values='data')
     df2 = df_pivot[scenario_list]  # 按照title_map顺序重新排列列
 
-    fig = plt.figure(figsize=figsize)
+    if fig is None:
+        fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(2, 5, figure=fig, hspace=0.15, wspace=0.15)
     fig.subplots_adjust(left=0.06, right=0.97, top=0.95, bottom=0.05)
 
@@ -1889,13 +1897,178 @@ def draw_10_price(
             axes[legend_ax_index].legend(handles=[line_handle], loc=legend_loc, frameon=False)
 
     # 保存图形
-    if not os.path.exists(os.path.dirname(output_path)):
-        os.makedirs(os.path.dirname(output_path))
-    plt.savefig(output_path, dpi=300)
-    plt.show()
-    print(f"✅ Saved to {output_path}")
+    if save and output_path:
+        if not os.path.exists(os.path.dirname(output_path)):
+            os.makedirs(os.path.dirname(output_path))
+        plt.savefig(output_path, dpi=300)
+        plt.show()
+        print(f"✅ Saved to {output_path}")
 
     return fig, axes
+
+
+def draw_combined_carbon_bio_price(
+        df_carbon_long,
+        df_bio_long,
+        title_map_carbon,
+        title_map_bio,
+        output_path,
+        start_year,
+        desired_ticks=5,
+        ylabel_carbon=r"Shadow carbon price (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)",
+        ylabel_bio=r"Shadow biodiversity price (AU\$ contribution-weighted area ha$^{-1}$ yr$^{-1}$)",
+        figsize=(36, 52),
+        ci=95,
+        color_bio='green',
+        top_space_ratio_bio=0.20,
+):
+    """
+    Draw 22 carbon price subplots (rows 0-4) and 10 bio price subplots (rows 5-6)
+    in a single 7×5 GridSpec so all subplots are the same size.
+    No x-axis year labels on row 4 (last carbon row).
+    Right-side group labels for all sections.
+    Y-axis labels centered over their respective row groups.
+    """
+    # ---- Prepare data ----
+    def _pivot(df_long, title_map):
+        df = df_long[df_long['Year'] >= start_year].copy()
+        df = df.pivot(index='Year', columns='scenario', values='data')
+        return df[list(title_map.keys())]
+
+    df_c = _pivot(df_carbon_long, title_map_carbon)   # 22 cols
+    df_b = _pivot(df_bio_long,    title_map_bio)       # 10 cols
+
+    x_data = df_c.index
+    tick_positions = [y for y in range(int(x_data.min()), int(x_data.max()) + 1, 5)
+                      if y in x_data]
+
+    # ---- Y-axis ranges ----
+    carbon_y_all = np.concatenate([df_c.iloc[:, i].values for i in range(22)])
+    y_carbon = get_y_axis_ticks(0, np.nanmax(carbon_y_all), desired_ticks=desired_ticks)
+
+    bio_c_y = np.concatenate([
+        np.concatenate([df_c.iloc[:, i + 2].values for i in range(10)]),
+        np.concatenate([df_c.iloc[:, i + 7].values for i in range(10)]),
+    ])
+    y_bio_c = get_y_axis_ticks(0, np.nanmax(bio_c_y), desired_ticks=desired_ticks)
+
+    bio_b_y = np.concatenate([df_b.iloc[:, i].values for i in range(10)])
+    y0_b = 0.0
+    y1_b = float(np.nanmax(bio_b_y)) * (1.0 + top_space_ratio_bio)
+
+    def _int_fmt(x, pos): return f"{int(x)}"
+    int_fmt = FuncFormatter(_int_fmt)
+
+    # ---- Figure: 7 rows × 5 cols ----
+    fig = plt.figure(figsize=figsize)
+    gs  = gridspec.GridSpec(7, 5, figure=fig, hspace=0.15, wspace=0.15)
+    fig.subplots_adjust(left=0.06, right=0.91, top=0.95, bottom=0.05)
+    fs = plt.rcParams['font.size']
+
+    # ---- Rows 0-4: carbon price ----
+    ax_c = []
+
+    # Row 0: 2 subplots (black, NZ only)
+    for i in range(2):
+        ax = fig.add_subplot(gs[0, i])
+        draw_fit_line_ax(ax, df_c.iloc[:, i].to_frame(), color='black',
+                         title_name=title_map_carbon.get(df_c.columns[i], df_c.columns[i]), ci=ci)
+        ax.set_ylim(y_carbon[0], y_carbon[1])
+        ax.set_yticks(y_carbon[2])
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x', labelbottom=False)
+        if i != 0:
+            ax.tick_params(axis='y', labelleft=False)
+        ax_c.append(ax)
+
+    # Rows 1-2: orange (NP targets)
+    for i in range(2, 12):
+        row, col = (i - 2) // 5 + 1, (i - 2) % 5
+        ax = fig.add_subplot(gs[row, col])
+        draw_fit_line_ax(ax, df_c.iloc[:, i].to_frame(), color='orange',
+                         title_name=title_map_carbon.get(df_c.columns[i], df_c.columns[i]), ci=ci)
+        ax.set_ylim(y_bio_c[0], y_bio_c[1])
+        ax.set_yticks(y_bio_c[2])
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x', labelbottom=False)
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+        ax_c.append(ax)
+
+    # Rows 3-4: purple (NZ + NP), NO year labels on row 4
+    for i in range(12, 22):
+        row, col = (i - 2) // 5 + 1, (i - 2) % 5
+        ax = fig.add_subplot(gs[row, col])
+        draw_fit_line_ax(ax, df_c.iloc[:, i].to_frame(), color='purple',
+                         title_name=title_map_carbon.get(df_c.columns[i], df_c.columns[i]), ci=ci)
+        ax.set_ylim(y_bio_c[0], y_bio_c[1])
+        ax.set_yticks(y_bio_c[2])
+        ax.set_xticks(tick_positions)
+        ax.tick_params(axis='x', labelbottom=False)   # no year labels on row 4
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+        ax_c.append(ax)
+
+    # ---- Rows 5-6: bio price (green) ----
+    ax_b = []
+    for i in range(10):
+        row, col = i // 5 + 5, i % 5
+        ax = fig.add_subplot(gs[row, col])
+        draw_fit_line_ax(ax, df_b.iloc[:, i].to_frame(), color=color_bio,
+                         title_name=title_map_bio.get(df_b.columns[i], df_b.columns[i]), ci=ci)
+        ax.set_ylim(y0_b, y1_b)
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=desired_ticks, integer=True))
+        ax.yaxis.set_major_formatter(int_fmt)
+        ax.set_xticks(tick_positions)
+        if col != 0:
+            ax.tick_params(axis='y', labelleft=False)
+        if row == 6:
+            ax.tick_params(axis='x', labelbottom=True)
+        else:
+            ax.tick_params(axis='x', labelbottom=False)
+        ax_b.append(ax)
+
+    # Legend on bio second row, first subplot
+    line_h  = mlines.Line2D([], [], color=color_bio, linewidth=2, label="Nature-positive targets")
+    shade_h = Patch(color=color_bio, alpha=0.25, label="95% CI")
+    ax_b[5].legend(handles=[line_h, shade_h], loc="upper left", frameon=False)
+
+    # ---- Right-side group labels ----
+    off = 0.015
+    b = gs[0, 1].get_position(fig)
+    fig.text(b.x1 + off, (b.y0 + b.y1) / 2, "Under NZ targets",
+             rotation=270, va='center', ha='center', fontsize=fs)
+
+    b1, b2 = gs[1, 4].get_position(fig), gs[2, 4].get_position(fig)
+    fig.text(b1.x1 + off, (b2.y0 + b1.y1) / 2, "Under NP targets",
+             rotation=270, va='center', ha='center', fontsize=fs)
+
+    b3, b4 = gs[3, 4].get_position(fig), gs[4, 4].get_position(fig)
+    fig.text(b3.x1 + off, (b4.y0 + b3.y1) / 2, "Under NZ and NP targets",
+             rotation=270, va='center', ha='center', fontsize=fs)
+
+    b5, b6 = gs[5, 4].get_position(fig), gs[6, 4].get_position(fig)
+    fig.text(b5.x1 + off, (b6.y0 + b5.y1) / 2, "Under NP targets",
+             rotation=270, va='center', ha='center', fontsize=fs)
+
+    # ---- Y-axis labels centered over their row groups ----
+    x_label = 0.005
+    bt = gs[0, 0].get_position(fig)
+    bb = gs[4, 0].get_position(fig)
+    fig.text(x_label, (bt.y1 + bb.y0) / 2, ylabel_carbon,
+             rotation=90, va='center', ha='center', fontsize=fs)
+
+    bt2 = gs[5, 0].get_position(fig)
+    bb2 = gs[6, 0].get_position(fig)
+    fig.text(x_label, (bt2.y1 + bb2.y0) / 2, ylabel_bio,
+             rotation=90, va='center', ha='center', fontsize=fs)
+
+    # ---- Save ----
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, dpi=300)
+    print(f"✅ Saved to {output_path}")
+    return fig
+
 
 def draw_10_price_skip_0_5(
         df_long,

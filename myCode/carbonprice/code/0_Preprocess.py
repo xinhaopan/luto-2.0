@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import threading
 import time
+import zipfile
 from datetime import datetime
 from typing import Dict, Iterable, Optional, Sequence, Tuple, Union
 
@@ -489,7 +490,7 @@ def copy_single_file(
 # Cost Computation
 # ==============================================================================
 
-def amortize_costs(data_path_name, amortize_file, years, njobs=0, rate=0.07, horizon=60):
+def amortize_costs(data_path_name, amortize_file, years, njobs=0, rate=0.03, horizon=60):
     """Compute amortized costs and write one output file per year.
 
     Loads upfront costs for all years, converts each to an annual payment
@@ -1216,200 +1217,200 @@ def main(task_dir, njobs):
     # # ==========================================================================
     # # Stage 1: File copy and amortisation
     # # ==========================================================================
-    # tprint("\n--- Stage 1: File copy ---")
-    # for input_file in unique_input_files:
-    #     _run_dir = f"../../../output/{config.TASK_NAME}/{input_file}"
-    #     _zip_file = os.path.join(_run_dir, 'Run_Archive.zip')
-    #     if os.path.isfile(_zip_file):
-    #         origin_path_name = _zip_file
-    #     else:
-    #         origin_path_name = get_path(config.TASK_NAME, input_file)
-    #     target_path_name = os.path.join(output_path, input_file)
-    #     tprint(f"  -> Copying: {origin_path_name}")
+    tprint("\n--- Stage 1: File copy ---")
+    for input_file in unique_input_files:
+        _run_dir = f"../../../output/{config.TASK_NAME}/{input_file}"
+        _zip_file = os.path.join(_run_dir, 'Run_Archive.zip')
+        if os.path.isfile(_zip_file):
+            origin_path_name = _zip_file
+        else:
+            origin_path_name = get_path(config.TASK_NAME, input_file)
+        target_path_name = os.path.join(output_path, input_file)
+        tprint(f"  -> Copying: {origin_path_name}")
 
-    #     files_in_memory = extract_files_from_zip(
-    #         origin_path_name, copy_files, years, allow_missing_2010=True
-    #     )
-    #     _run_or_parallel(
-    #         njobs, process_single_file_from_memory,
-    #         [(fb, vp, y, target_path_name, ('source',))
-    #          for (vp, y), fb in files_in_memory.items()],
-    #     )
-    # tprint("File copy complete.")
+        files_in_memory = extract_files_from_zip(
+            origin_path_name, copy_files, years, allow_missing_2010=True
+        )
+        _run_or_parallel(
+            njobs, process_single_file_from_memory,
+            [(fb, vp, y, target_path_name, ('source',))
+             for (vp, y), fb in files_in_memory.items()],
+        )
+    tprint("File copy complete.")
 
-    # tprint("\n--- Stage 1b: Amortise transition costs ---")
-    # if njobs == 0:
-    #     for run_name in unique_input_files:
-    #         amortize_costs(os.path.join(output_path, run_name), amortize_files[0], years, njobs=0)
-    # else:
-    #     Parallel(n_jobs=5, backend="loky")(
-    #         delayed(amortize_costs)(
-    #             os.path.join(output_path, run_name), amortize_files[0], years, njobs=1
-    #         )
-    #         for run_name in unique_input_files
-    #     )
-    # tprint("Amortisation complete.")
+    tprint("\n--- Stage 1b: Amortise transition costs ---")
+    if njobs == 0:
+        for run_name in unique_input_files:
+            amortize_costs(os.path.join(output_path, run_name), amortize_files[0], years, njobs=0)
+    else:
+        Parallel(n_jobs=5, backend="loky")(
+            delayed(amortize_costs)(
+                os.path.join(output_path, run_name), amortize_files[0], years, njobs=1
+            )
+            for run_name in unique_input_files
+        )
+    tprint("Amortisation complete.")
 
-    # # ==========================================================================
-    # # Stage 2: Environment (carbon & bio) diff and summary
-    # # ==========================================================================
-    # tprint("\n--- Stage 2a: Carbon & bio diff calculation ---")
-    # for env_file in env_files:
-    #     _run_or_parallel(
-    #         njobs, calculate_env_diff,
-    #         [(y, output_path, input_all_names, env_file, output_all_names) for y in years[1:]],
-    #     )
+    # ==========================================================================
+    # Stage 2: Environment (carbon & bio) diff and summary
+    # ==========================================================================
+    tprint("\n--- Stage 2a: Carbon & bio diff calculation ---")
+    for env_file in env_files:
+        _run_or_parallel(
+            njobs, calculate_env_diff,
+            [(y, output_path, input_all_names, env_file, output_all_names) for y in years[1:]],
+        )
 
-    # tprint("\n--- Stage 2b: Aggregate carbon & bio summaries ---")
-    # for summary_type, file_list in [('carbon', carbon_files), ('bio', bio_files),
-    #                                 ('sol_carbon', carbon_sol_files), ('sol_bio', bio_sol_files)]:
-    #     _run_or_parallel(
-    #         njobs, aggregate_and_save_summary,
-    #         [(y, output_path, file_list, output_all_names, summary_type) for y in years[1:]],
-    #     )
-    # tprint("Stage 2 complete.")
+    tprint("\n--- Stage 2b: Aggregate carbon & bio summaries ---")
+    for summary_type, file_list in [('carbon', carbon_files), ('bio', bio_files),
+                                    ('sol_carbon', carbon_sol_files), ('sol_bio', bio_sol_files)]:
+        _run_or_parallel(
+            njobs, aggregate_and_save_summary,
+            [(y, output_path, file_list, output_all_names, summary_type) for y in years[1:]],
+        )
+    tprint("Stage 2 complete.")
 
-    # # ==========================================================================
-    # # Stage 3: Profit calculation
-    # # ==========================================================================
-    # tprint("\n--- Stage 3: Profit calculation ---")
-    # all_run_names = [r for run_names in input_all_names for r in run_names]
-    # # Explicit (cost_file, revenue_file, profit_category) triples so the
-    # # profit file names stay as xr_profit_{ag|agricultural_management|non_ag}_YEAR.nc
-    # # even though the source files were renamed.
-    # profit_triples = [
-    #     ('xr_economics_ag_cost',      'xr_economics_ag_revenue',      'ag'),
-    #     ('xr_economics_am_cost',      'xr_economics_am_revenue',      'agricultural_management'),
-    #     ('xr_economics_non_ag_cost',  'xr_economics_non_ag_revenue',  'non_ag'),
-    # ]
-    # for cost_base, rev_base, profit_cat in profit_triples:
-    #     for run_name in all_run_names:
-    #         _run_or_parallel(
-    #             njobs, calculate_profit_for_run,
-    #             [(y, output_path, run_name, cost_base, rev_base, profit_cat) for y in years],
-    #         )
-    # tprint("Stage 3 complete.")
+    # ==========================================================================
+    # Stage 3: Profit calculation
+    # ==========================================================================
+    tprint("\n--- Stage 3: Profit calculation ---")
+    all_run_names = [r for run_names in input_all_names for r in run_names]
+    # Explicit (cost_file, revenue_file, profit_category) triples so the
+    # profit file names stay as xr_profit_{ag|agricultural_management|non_ag}_YEAR.nc
+    # even though the source files were renamed.
+    profit_triples = [
+        ('xr_economics_ag_cost',      'xr_economics_ag_revenue',      'ag'),
+        ('xr_economics_am_cost',      'xr_economics_am_revenue',      'agricultural_management'),
+        ('xr_economics_non_ag_cost',  'xr_economics_non_ag_revenue',  'non_ag'),
+    ]
+    for cost_base, rev_base, profit_cat in profit_triples:
+        for run_name in all_run_names:
+            _run_or_parallel(
+                njobs, calculate_profit_for_run,
+                [(y, output_path, run_name, cost_base, rev_base, profit_cat) for y in years],
+            )
+    tprint("Stage 3 complete.")
 
-    # # ==========================================================================
-    # # Stage 4: Policy cost calculation
-    # # ==========================================================================
-    # tprint("\n--- Stage 4: Policy cost calculation ---")
-    # for category in ['agricultural_management', 'ag', 'non_ag']:
-    #     for policy_type, cost_names in policy_config:
-    #         _run_or_parallel(
-    #             njobs, calculate_policy_cost,
-    #             [(y, output_path, input_all_names, category, policy_type, cost_names)
-    #              for y in years[1:]],
-    #         )
-    # tprint("Stage 4 complete.")
+    # ==========================================================================
+    # Stage 4: Policy cost calculation
+    # ==========================================================================
+    tprint("\n--- Stage 4: Policy cost calculation ---")
+    for category in ['agricultural_management', 'ag', 'non_ag']:
+        for policy_type, cost_names in policy_config:
+            _run_or_parallel(
+                njobs, calculate_policy_cost,
+                [(y, output_path, input_all_names, category, policy_type, cost_names)
+                 for y in years[1:]],
+            )
+    tprint("Stage 4 complete.")
 
-    # # ==========================================================================
-    # # Stage 5: Transition cost diff calculation
-    # # ==========================================================================
-    # tprint("\n--- Stage 5: Transition cost diff calculation ---")
-    # independent_tran_files = [
-    #     'xr_transition_cost_ag2ag',
-    #     'xr_transition_cost_ag2non_ag',
-    #     'xr_transition_cost_ag2non_ag_amortised',
-    # ]
-    # tran_njobs = math.ceil(njobs / 2)
-    # for tran_file in independent_tran_files:
-    #     tprint(f"  Processing: {tran_file}")
-    #     for policy_type, cost_names in policy_config:
-    #         _run_or_parallel(
-    #             tran_njobs, calculate_transition_cost_diff,
-    #             [(y, output_path, input_all_names, tran_file, policy_type, cost_names)
-    #              for y in years[1:]],
-    #         )
-    # tprint("Stage 5 complete.")
+    # ==========================================================================
+    # Stage 5: Transition cost diff calculation
+    # ==========================================================================
+    tprint("\n--- Stage 5: Transition cost diff calculation ---")
+    independent_tran_files = [
+        'xr_transition_cost_ag2ag',
+        'xr_transition_cost_ag2non_ag',
+        'xr_transition_cost_ag2non_ag_amortised',
+    ]
+    tran_njobs = math.ceil(njobs / 2)
+    for tran_file in independent_tran_files:
+        tprint(f"  Processing: {tran_file}")
+        for policy_type, cost_names in policy_config:
+            _run_or_parallel(
+                tran_njobs, calculate_transition_cost_diff,
+                [(y, output_path, input_all_names, tran_file, policy_type, cost_names)
+                 for y in years[1:]],
+            )
+    tprint("Stage 5 complete.")
 
-    # # ==========================================================================
-    # # Stage 6: Cost aggregation
-    # # ==========================================================================
-    # tprint("\n--- Stage 6: Cost aggregation ---")
-    # output_name_groups = [carbon_names, carbon_bio_names, counter_carbon_bio_names]
-    # for fn in [aggregate_and_save_cost, aggregate_and_save_cost_sol]:
-    #     for grp in output_name_groups:
-    #         _run_or_parallel(njobs, fn, [(y, output_path, grp) for y in years[1:]])
-    # tprint("Stage 6 complete.")
+    # ==========================================================================
+    # Stage 6: Cost aggregation
+    # ==========================================================================
+    tprint("\n--- Stage 6: Cost aggregation ---")
+    output_name_groups = [carbon_names, carbon_bio_names, counter_carbon_bio_names]
+    for fn in [aggregate_and_save_cost, aggregate_and_save_cost_sol]:
+        for grp in output_name_groups:
+            _run_or_parallel(njobs, fn, [(y, output_path, grp) for y in years[1:]])
+    tprint("Stage 6 complete.")
 
-    # # ==========================================================================
-    # # Stage 7: Price calculation
-    # # ==========================================================================
-    # tprint("\n--- Stage 7: Price calculation ---")
-    # for fn in [calculate_cell_price, calculate_cell_price_sol]:
-    #     for ptype in ['carbon', 'bio']:
-    #         _run_or_parallel(
-    #             njobs, fn,
-    #             [(f, y, output_path, ptype) for f in output_all_names for y in years[1:]],
-    #         )
-    # tprint("Stage 7 complete.")
+    # ==========================================================================
+    # Stage 7: Price calculation
+    # ==========================================================================
+    tprint("\n--- Stage 7: Price calculation ---")
+    for fn in [calculate_cell_price, calculate_cell_price_sol]:
+        for ptype in ['carbon', 'bio']:
+            _run_or_parallel(
+                njobs, fn,
+                [(f, y, output_path, ptype) for f in output_all_names for y in years[1:]],
+            )
+    tprint("Stage 7 complete.")
 
-    # # ==========================================================================
-    # # Excel summaries
-    # # ==========================================================================
-    # excel_path = f"../../../output/{config.TASK_NAME}/carbon_price/1_excel"
-    # os.makedirs(excel_path, exist_ok=True)
+    # ==========================================================================
+    # Excel summaries
+    # ==========================================================================
+    excel_path = f"../../../output/{config.TASK_NAME}/carbon_price/1_excel"
+    os.makedirs(excel_path, exist_ok=True)
 
-    # tprint("\n--- Excel: carbon summaries ---")
-    # for input_file in unique_input_files:
-    #     tprint(f"  {input_file}")
-    #     summarize_netcdf_to_excel(input_file, years[1:], carbon_files, njobs, 'carbon')
-    # tprint("\n--- Excel: biodiversity summaries ---")
-    # for input_file in unique_input_files:
-    #     tprint(f"  {input_file}")
-    #     summarize_netcdf_to_excel(input_file, years[1:], bio_files, njobs, 'biodiversity')
-    # tprint("\n--- Excel: economic summaries ---")
-    # for input_file in unique_input_files:
-    #     tprint(f"  {input_file}")
-    #     summarize_netcdf_to_excel(input_file, years[1:], economic_files,
-    #                               math.ceil(njobs / 2), 'economic')
+    tprint("\n--- Excel: carbon summaries ---")
+    for input_file in unique_input_files:
+        tprint(f"  {input_file}")
+        summarize_netcdf_to_excel(input_file, years[1:], carbon_files, njobs, 'carbon')
+    tprint("\n--- Excel: biodiversity summaries ---")
+    for input_file in unique_input_files:
+        tprint(f"  {input_file}")
+        summarize_netcdf_to_excel(input_file, years[1:], bio_files, njobs, 'biodiversity')
+    tprint("\n--- Excel: economic summaries ---")
+    for input_file in unique_input_files:
+        tprint(f"  {input_file}")
+        summarize_netcdf_to_excel(input_file, years[1:], economic_files,
+                                  math.ceil(njobs / 2), 'economic')
 
-    # # --- Excel: profit-based costs per scenario pair ---
-    # profit_lists = [
-    #     [create_profit_for_cost(excel_path, f) for f in files]
-    #     for files in [input_files_0, input_files_1, input_files_2]
-    # ]
-    # profit_0_list, profit_1_list, profit_2_list = profit_lists
+    # --- Excel: profit-based costs per scenario pair ---
+    profit_lists = [
+        [create_profit_for_cost(excel_path, f) for f in files]
+        for files in [input_files_0, input_files_1, input_files_2]
+    ]
+    profit_0_list, profit_1_list, profit_2_list = profit_lists
 
-    # for i in range(len(input_files_1)):
-    #     for diff, name in [
-    #         (profit_0_list[i] - profit_1_list[i], carbon_names[i]),
-    #         (profit_1_list[i] - profit_2_list[i], carbon_bio_names[i]),
-    #         (profit_0_list[i] - profit_2_list[i], counter_carbon_bio_names[i]),
-    #     ]:
-    #         diff.columns = diff.columns.str.replace('profit', '')
-    #         diff['Total'] = diff.sum(axis=1)
-    #         diff.to_excel(os.path.join(excel_path, f'1_Cost_{name}.xlsx'))
+    for i in range(len(input_files_1)):
+        for diff, name in [
+            (profit_0_list[i] - profit_1_list[i], carbon_names[i]),
+            (profit_1_list[i] - profit_2_list[i], carbon_bio_names[i]),
+            (profit_0_list[i] - profit_2_list[i], counter_carbon_bio_names[i]),
+        ]:
+            diff.columns = diff.columns.str.replace('profit', '')
+            diff['Total'] = diff.sum(axis=1)
+            diff.to_excel(os.path.join(excel_path, f'1_Cost_{name}.xlsx'))
 
-    # # --- Excel: processed carbon and bio time-series ---
-    # for input_file in dict.fromkeys(input_files):
-    #     df = pd.read_excel(
-    #         os.path.join(excel_path, f'0_Origin_carbon_{input_file}.xlsx'), index_col=0
-    #     )
-    #     df.columns = df.columns.str.replace(' GHG', '')
-    #     new_rows_list = []
-    #     for i in range(1, len(df)):
-    #         new_row = df.iloc[i].copy() * -1
-    #         new_row.iloc[0] = -df.iloc[i, 0] + df.iloc[i - 1, 0]
-    #         new_rows_list.append(new_row)
-    #     new_df = pd.DataFrame(new_rows_list, index=df.index[1:])
-    #     new_df['Total'] = new_df.sum(axis=1)
-    #     new_df.to_excel(os.path.join(excel_path, f'1_Processed_carbon_{input_file}.xlsx'))
+    # --- Excel: processed carbon and bio time-series ---
+    for input_file in dict.fromkeys(input_files):
+        df = pd.read_excel(
+            os.path.join(excel_path, f'0_Origin_carbon_{input_file}.xlsx'), index_col=0
+        )
+        df.columns = df.columns.str.replace(' GHG', '')
+        new_rows_list = []
+        for i in range(1, len(df)):
+            new_row = df.iloc[i].copy() * -1
+            new_row.iloc[0] = -df.iloc[i, 0] + df.iloc[i - 1, 0]
+            new_rows_list.append(new_row)
+        new_df = pd.DataFrame(new_rows_list, index=df.index[1:])
+        new_df['Total'] = new_df.sum(axis=1)
+        new_df.to_excel(os.path.join(excel_path, f'1_Processed_carbon_{input_file}.xlsx'))
 
-    # for input_file in dict.fromkeys(input_files):
-    #     df = pd.read_excel(
-    #         os.path.join(excel_path, f'0_Origin_biodiversity_{input_file}.xlsx'), index_col=0
-    #     )
-    #     df.columns = df.columns.str.replace(' biodiversity', '')
-    #     new_rows_list = []
-    #     for i in range(1, len(df)):
-    #         new_row = df.iloc[i].copy()
-    #         new_row.iloc[0] = df.iloc[i, 0] - df.iloc[i - 1, 0]
-    #         new_rows_list.append(new_row)
-    #     new_df = pd.DataFrame(new_rows_list, index=df.index[1:])
-    #     new_df['Total'] = new_df.sum(axis=1)
-    #     new_df.to_excel(os.path.join(excel_path, f'1_Processed_bio_{input_file}.xlsx'))
+    for input_file in dict.fromkeys(input_files):
+        df = pd.read_excel(
+            os.path.join(excel_path, f'0_Origin_biodiversity_{input_file}.xlsx'), index_col=0
+        )
+        df.columns = df.columns.str.replace(' biodiversity', '')
+        new_rows_list = []
+        for i in range(1, len(df)):
+            new_row = df.iloc[i].copy()
+            new_row.iloc[0] = df.iloc[i, 0] - df.iloc[i - 1, 0]
+            new_rows_list.append(new_row)
+        new_df = pd.DataFrame(new_rows_list, index=df.index[1:])
+        new_df['Total'] = new_df.sum(axis=1)
+        new_df.to_excel(os.path.join(excel_path, f'1_Processed_bio_{input_file}.xlsx'))
 
     # --- Excel: cost/carbon/bio summary tables ---
     colnames = ["GHG benefits (Mt CO2e)", "Carbon cost (M AUD$)", "Average Carbon price (AUD$/t CO2e)"]
@@ -1426,164 +1427,164 @@ def main(task_dir, njobs):
     )
 
     # # --- NetCDF summaries ---
-    # summarize_to_category(output_all_names, years[1:], carbon_files, 'xr_total_carbon', n_jobs=41)
-    # summarize_to_category(output_all_names, years[1:], bio_files, 'xr_total_bio', n_jobs=41)
-    # summarize_to_category(unique_input_files, years[1:], carbon_files,
-    #                       'xr_total_carbon_original', n_jobs=41, scenario_name=False)
-    # summarize_to_category(unique_input_files, years[1:], bio_files,
-    #                       'xr_total_bio_original', n_jobs=41, scenario_name=False)
+    summarize_to_category(output_all_names, years[1:], carbon_files, 'xr_total_carbon', n_jobs=41)
+    summarize_to_category(output_all_names, years[1:], bio_files, 'xr_total_bio', n_jobs=41)
+    summarize_to_category(unique_input_files, years[1:], carbon_files,
+                          'xr_total_carbon_original', n_jobs=41, scenario_name=False)
+    summarize_to_category(unique_input_files, years[1:], bio_files,
+                          'xr_total_bio_original', n_jobs=41, scenario_name=False)
 
-    # profit_da = summarize_to_category(unique_input_files, years[1:], economic_files,
-    #                                    'xr_cost_for_profit', n_jobs=41, scenario_name=False)
-    # build_profit_and_cost_nc(
-    #     profit_da, list(dict.fromkeys(input_files_0)), input_files_1, input_files_2,
-    #     carbon_names, carbon_bio_names, counter_carbon_bio_names,
-    # )
-    # make_prices_nc(output_all_names)
+    profit_da = summarize_to_category(unique_input_files, years[1:], economic_files,
+                                       'xr_cost_for_profit', n_jobs=41, scenario_name=False)
+    build_profit_and_cost_nc(
+        profit_da, list(dict.fromkeys(input_files_0)), input_files_1, input_files_2,
+        carbon_names, carbon_bio_names, counter_carbon_bio_names,
+    )
+    make_prices_nc(output_all_names)
 
-    # summarize_to_category(output_all_names, years[1:], carbon_sol_files,
-    #                       'xr_total_sol_carbon', n_jobs=41)
-    # summarize_to_category(output_all_names, years[1:], bio_sol_files,
-    #                       'xr_total_sol_bio', n_jobs=41)
+    summarize_to_category(output_all_names, years[1:], carbon_sol_files,
+                          'xr_total_sol_carbon', n_jobs=41)
+    summarize_to_category(output_all_names, years[1:], bio_sol_files,
+                          'xr_total_sol_bio', n_jobs=41)
 
-    # profit_sol_da = summarize_to_category(unique_input_files, years[1:], economic_sol_files,
-    #                                        'xr_sol_cost_for_profit', n_jobs=41, scenario_name=False)
-    # build_sol_profit_and_cost_nc(
-    #     profit_sol_da, list(dict.fromkeys(input_files_0)), input_files_1, input_files_2,
-    #     carbon_names, carbon_bio_names, counter_carbon_bio_names,
-    # )
-    # make_sol_prices_nc(output_all_names)
+    profit_sol_da = summarize_to_category(unique_input_files, years[1:], economic_sol_files,
+                                           'xr_sol_cost_for_profit', n_jobs=41, scenario_name=False)
+    build_sol_profit_and_cost_nc(
+        profit_sol_da, list(dict.fromkeys(input_files_0)), input_files_1, input_files_2,
+        carbon_names, carbon_bio_names, counter_carbon_bio_names,
+    )
+    make_sol_prices_nc(output_all_names)
 
-    # # --- Dimension-level summaries ---
-    # diff_files    = ['xr_cost_agricultural_management', 'xr_cost_non_ag',
-    #                  'xr_transition_cost_ag2non_ag_amortised_diff',
-    #                  'xr_GHG_ag_management', 'xr_GHG_non_ag',
-    #                  'xr_biodiversity_GBF2_priority_ag_management',
-    #                  'xr_biodiversity_GBF2_priority_non_ag']
-    # diff_dim_names = ['am', 'lu', 'To-land-use', 'am', 'lu', 'am', 'lu']
-    # for file, dim_name in zip(diff_files, diff_dim_names):
-    #     summarize_to_type(
-    #         scenarios=output_all_names, years=years[1:], file=file, keep_dim=dim_name,
-    #         output_file=file, var_name='data', scale=1e6, n_jobs=njobs, dtype='float32',
-    #     )
+    # --- Dimension-level summaries ---
+    diff_files    = ['xr_cost_agricultural_management', 'xr_cost_non_ag',
+                     'xr_transition_cost_ag2non_ag_amortised_diff',
+                     'xr_GHG_ag_management', 'xr_GHG_non_ag',
+                     'xr_biodiversity_GBF2_priority_ag_management',
+                     'xr_biodiversity_GBF2_priority_non_ag']
+    diff_dim_names = ['am', 'lu', 'To-land-use', 'am', 'lu', 'am', 'lu']
+    for file, dim_name in zip(diff_files, diff_dim_names):
+        summarize_to_type(
+            scenarios=output_all_names, years=years[1:], file=file, keep_dim=dim_name,
+            output_file=file, var_name='data', scale=1e6, n_jobs=njobs, dtype='float32',
+        )
 
-    # orig_files    = ['xr_area_agricultural_management', 'xr_area_non_agricultural_landuse',
-    #                  'xr_biodiversity_GBF2_priority_ag_management',
-    #                  'xr_biodiversity_GBF2_priority_non_ag',
-    #                  'xr_GHG_ag_management', 'xr_GHG_non_ag',
-    #                  'xr_economics_am_cost', 'xr_economics_non_ag_cost',
-    #                  'xr_transition_cost_ag2non_ag_amortised']
-    # orig_dim_names = ['am', 'lu', 'am', 'lu', 'am', 'lu', 'am', 'lu', 'To-land-use']
-    # for file, dim_name in zip(orig_files, orig_dim_names):
-    #     summarize_to_type(
-    #         scenarios=unique_input_files, years=years[1:], file=file, keep_dim=dim_name,
-    #         output_file=file, var_name='data', scale=1e6, n_jobs=njobs, dtype='float32',
-    #         scenario_name=False,
-    #     )
+    orig_files    = ['xr_area_agricultural_management', 'xr_area_non_agricultural_landuse',
+                     'xr_biodiversity_GBF2_priority_ag_management',
+                     'xr_biodiversity_GBF2_priority_non_ag',
+                     'xr_GHG_ag_management', 'xr_GHG_non_ag',
+                     'xr_economics_am_cost', 'xr_economics_non_ag_cost',
+                     'xr_transition_cost_ag2non_ag_amortised']
+    orig_dim_names = ['am', 'lu', 'am', 'lu', 'am', 'lu', 'am', 'lu', 'To-land-use']
+    for file, dim_name in zip(orig_files, orig_dim_names):
+        summarize_to_type(
+            scenarios=unique_input_files, years=years[1:], file=file, keep_dim=dim_name,
+            output_file=file, var_name='data', scale=1e6, n_jobs=njobs, dtype='float32',
+            scenario_name=False,
+        )
 
-    # # ==========================================================================
-    # # Stage 8: TIF export
-    # # ==========================================================================
-    # tif_dir = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif"
-    # _run_dir_0 = f"../../../output/{config.TASK_NAME}/{input_files_0[0]}"
-    # _use_zip_0 = os.path.isfile(os.path.join(_run_dir_0, 'Run_Archive.zip'))
-    # data = get_data_RES(config.TASK_NAME, input_files_0[0], use_zip=_use_zip_0)
+    # ==========================================================================
+    # Stage 8: TIF export
+    # ==========================================================================
+    tif_dir = f"../../../output/{config.TASK_NAME}/carbon_price/4_tif"
+    _run_dir_0 = f"../../../output/{config.TASK_NAME}/{input_files_0[0]}"
+    _use_zip_0 = os.path.isfile(os.path.join(_run_dir_0, 'Run_Archive.zip'))
+    data = get_data_RES(config.TASK_NAME, input_files_0[0], use_zip=_use_zip_0)
 
-    # cost_file_parts    = ['total_cost', 'cost_agricultural_management', 'cost_non_ag',
-    #                       'transition_cost_ag2non_ag_amortised_diff']
-    # GHG_file_parts     = ['total_carbon', 'GHG_ag_management', 'GHG_non_ag']
-    # bio_file_parts     = ['total_bio', 'biodiversity_GBF2_priority_ag_management',
-    #                       'biodiversity_GBF2_priority_non_ag']
-    # agmgt_file_parts   = ['area_agricultural_management']
-    # nonag_file_parts   = ['area_non_agricultural_landuse']
+    cost_file_parts    = ['total_cost', 'cost_agricultural_management', 'cost_non_ag',
+                          'transition_cost_ag2non_ag_amortised_diff']
+    GHG_file_parts     = ['total_carbon', 'GHG_ag_management', 'GHG_non_ag']
+    bio_file_parts     = ['total_bio', 'biodiversity_GBF2_priority_ag_management',
+                          'biodiversity_GBF2_priority_non_ag']
+    agmgt_file_parts   = ['area_agricultural_management']
+    nonag_file_parts   = ['area_non_agricultural_landuse']
 
-    # cost_tasks  = [(c, fp) for c in output_all_names for fp in cost_file_parts]
-    # GHG_tasks   = [(c, fp) for c in output_all_names for fp in GHG_file_parts]
-    # bio_tasks   = [(c, fp) for c in output_all_names for fp in bio_file_parts]
-    # agmgt_tasks = [(c, fp) for c in input_files for fp in agmgt_file_parts]
-    # nonag_tasks = [(c, fp) for c in input_files for fp in nonag_file_parts]
+    cost_tasks  = [(c, fp) for c in output_all_names for fp in cost_file_parts]
+    GHG_tasks   = [(c, fp) for c in output_all_names for fp in GHG_file_parts]
+    bio_tasks   = [(c, fp) for c in output_all_names for fp in bio_file_parts]
+    agmgt_tasks = [(c, fp) for c in input_files for fp in agmgt_file_parts]
+    nonag_tasks = [(c, fp) for c in input_files for fp in nonag_file_parts]
 
-    # Parallel(n_jobs=njobs)(
-    #     delayed(xarrays_to_tifs)(c, fp, output_path, tif_dir, data)
-    #     for c, fp in cost_tasks
-    # )
-    # Parallel(n_jobs=njobs)(
-    #     delayed(xarrays_to_tifs)(c, fp, output_path, tif_dir, data, remove_negative=False)
-    #     for c, fp in GHG_tasks + bio_tasks
-    # )
-    # Parallel(n_jobs=njobs)(
-    #     delayed(xarrays_to_tifs)(c, fp, output_path, tif_dir, data, per_ha=False)
-    #     for c, fp in cost_tasks
-    # )
-    # Parallel(n_jobs=njobs)(
-    #     delayed(xarrays_to_tifs)(c, fp, output_path, tif_dir, data,
-    #                              remove_negative=False, per_ha=False)
-    #     for c, fp in GHG_tasks + bio_tasks
-    # )
-    # Parallel(n_jobs=njobs)(
-    #     delayed(xarrays_to_tifs_by_type)(c, fp, output_path, tif_dir, data, sum_dim='am')
-    #     for c, fp in agmgt_tasks
-    # )
-    # Parallel(n_jobs=njobs)(
-    #     delayed(xarrays_to_tifs_by_type)(c, fp, output_path, tif_dir, data, sum_dim='lu')
-    #     for c, fp in nonag_tasks
-    # )
+    Parallel(n_jobs=njobs)(
+        delayed(xarrays_to_tifs)(c, fp, output_path, tif_dir, data)
+        for c, fp in cost_tasks
+    )
+    Parallel(n_jobs=njobs)(
+        delayed(xarrays_to_tifs)(c, fp, output_path, tif_dir, data, remove_negative=False)
+        for c, fp in GHG_tasks + bio_tasks
+    )
+    Parallel(n_jobs=njobs)(
+        delayed(xarrays_to_tifs)(c, fp, output_path, tif_dir, data, per_ha=False)
+        for c, fp in cost_tasks
+    )
+    Parallel(n_jobs=njobs)(
+        delayed(xarrays_to_tifs)(c, fp, output_path, tif_dir, data,
+                                 remove_negative=False, per_ha=False)
+        for c, fp in GHG_tasks + bio_tasks
+    )
+    Parallel(n_jobs=njobs)(
+        delayed(xarrays_to_tifs_by_type)(c, fp, output_path, tif_dir, data, sum_dim='am')
+        for c, fp in agmgt_tasks
+    )
+    Parallel(n_jobs=njobs)(
+        delayed(xarrays_to_tifs_by_type)(c, fp, output_path, tif_dir, data, sum_dim='lu')
+        for c, fp in nonag_tasks
+    )
 
-    # # --- Solution cost/benefit TIFs ---
-    # solution_cost_parts        = ['cost_non_ag', 'transition_cost_ag2non_ag_amortised_diff']
-    # solution_ghg_benefit_parts = ['GHG_non_ag']
-    # solution_bio_benefit_parts = ['biodiversity_GBF2_priority_non_ag']
+    # --- Solution cost/benefit TIFs ---
+    solution_cost_parts        = ['cost_non_ag', 'transition_cost_ag2non_ag_amortised_diff']
+    solution_ghg_benefit_parts = ['GHG_non_ag']
+    solution_bio_benefit_parts = ['biodiversity_GBF2_priority_non_ag']
 
-    # Parallel(n_jobs=njobs)(
-    #     delayed(plus_tifs)(tif_dir, c, solution_cost_parts, "total_sol_cost")
-    #     for c in output_all_names
-    # )
-    # Parallel(n_jobs=njobs)(
-    #     delayed(plus_tifs)(tif_dir, c, solution_ghg_benefit_parts,
-    #                        "total_sol_ghg_benefit", remove_negative=False)
-    #     for c in output_all_names
-    # )
-    # Parallel(n_jobs=njobs)(
-    #     delayed(divide_tifs)(tif_dir, c, 'total_sol_cost', 'total_sol_ghg_benefit',
-    #                          "carbon_sol_price")
-    #     for c in output_all_names
-    # )
-    # Parallel(n_jobs=njobs)(
-    #     delayed(plus_tifs)(tif_dir, c, solution_bio_benefit_parts,
-    #                        "total_sol_bio_benefit", remove_negative=False)
-    #     for c in output_all_names
-    # )
-    # Parallel(n_jobs=njobs)(
-    #     delayed(divide_tifs)(tif_dir, c, 'total_sol_cost', 'total_sol_bio_benefit',
-    #                          "bio_sol_price")
-    #     for c in output_all_names
-    # )
+    Parallel(n_jobs=njobs)(
+        delayed(plus_tifs)(tif_dir, c, solution_cost_parts, "total_sol_cost")
+        for c in output_all_names
+    )
+    Parallel(n_jobs=njobs)(
+        delayed(plus_tifs)(tif_dir, c, solution_ghg_benefit_parts,
+                           "total_sol_ghg_benefit", remove_negative=False)
+        for c in output_all_names
+    )
+    Parallel(n_jobs=njobs)(
+        delayed(divide_tifs)(tif_dir, c, 'total_sol_cost', 'total_sol_ghg_benefit',
+                             "carbon_sol_price")
+        for c in output_all_names
+    )
+    Parallel(n_jobs=njobs)(
+        delayed(plus_tifs)(tif_dir, c, solution_bio_benefit_parts,
+                           "total_sol_bio_benefit", remove_negative=False)
+        for c in output_all_names
+    )
+    Parallel(n_jobs=njobs)(
+        delayed(divide_tifs)(tif_dir, c, 'total_sol_cost', 'total_sol_bio_benefit',
+                             "bio_sol_price")
+        for c in output_all_names
+    )
 
-    # # --- Diff: bio price = counterfactual − carbon-only ---
-    # tif_path_1 = os.path.join(tif_dir, 'carbon_high_50',
-    #                            "xr_carbon_sol_price_carbon_high_50_2050.tif")
-    # tif_path_2 = os.path.join(tif_dir, 'Counterfactual_carbon_high_bio_50',
-    #                            "xr_carbon_sol_price_Counterfactual_carbon_high_bio_50_2050.tif")
-    # tif_output = os.path.join(tif_dir, 'carbon_high_bio_50',
-    #                            "xr_carbon_sol_price_carbon_high_bio_50_2050.tif")
-    # subtract_tifs(tif_path_2, tif_path_1, tif_output)
+    # --- Diff: bio price = counterfactual − carbon-only ---
+    tif_path_1 = os.path.join(tif_dir, 'carbon_high_50',
+                               "xr_carbon_sol_price_carbon_high_50_2050.tif")
+    tif_path_2 = os.path.join(tif_dir, 'Counterfactual_carbon_high_bio_50',
+                               "xr_carbon_sol_price_Counterfactual_carbon_high_bio_50_2050.tif")
+    tif_output = os.path.join(tif_dir, 'carbon_high_bio_50',
+                               "xr_carbon_sol_price_carbon_high_bio_50_2050.tif")
+    subtract_tifs(tif_path_2, tif_path_1, tif_output)
 
-    # # --- Summary ---
-    # total_time = time.time() - start_time
-    # tprint("\n" + "=" * 80)
-    # tprint("All tasks complete.")
-    # tprint(f"Total elapsed time: {total_time / 3600:.2f} hours")
-    # tprint("=" * 80)
+    # --- Summary ---
+    total_time = time.time() - start_time
+    tprint("\n" + "=" * 80)
+    tprint("All tasks complete.")
+    tprint(f"Total elapsed time: {total_time / 3600:.2f} hours")
+    tprint("=" * 80)
 
-    # # Pack 0_base_data into a tar archive (no compression, fast) and remove the folder
-    # tar_path = output_path + '.tar'
-    # tprint(f"\nPacking {output_path} -> {tar_path}")
-    # subprocess.run(
-    #     ['tar', '-cf', tar_path, '-C', os.path.dirname(output_path), os.path.basename(output_path)],
-    #     check=True
-    # )
-    # shutil.rmtree(output_path)
-    # tprint(f"Packed and removed original folder. Archive: {tar_path}")
+    # Pack 0_base_data into a tar archive (no compression, fast) and remove the folder
+    tar_path = output_path + '.tar'
+    tprint(f"\nPacking {output_path} -> {tar_path}")
+    subprocess.run(
+        ['tar', '-cf', tar_path, '-C', os.path.dirname(output_path), os.path.basename(output_path)],
+        check=True
+    )
+    shutil.rmtree(output_path)
+    tprint(f"Packed and removed original folder. Archive: {tar_path}")
 
 
 def run(task_dir, njobs):

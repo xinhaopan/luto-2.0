@@ -73,15 +73,20 @@ def submit_task(task_root_dir: str, col: str, platform: Literal['aquila', 'Denet
     # 复制bash和python脚本到对应目录
     # All modes share python_script.py; flag files control which branch runs
     _FLAG_MAP = {
-        'Run':    None,
-        'Write':  'write_mode.flag',
-        'Report': 'report_mode.flag',
-        'Zip':    'zip_mode.flag',
+        'Run':     None,
+        'Write':   'write_mode.flag',
+        'Rewrite': 'rewrite_mode.flag',
+        'Report':  'report_mode.flag',
+        'Zip':     'zip_mode.flag',
     }
     if model_name not in _FLAG_MAP:
-        raise ValueError('model_name must be either "Run", "Write", "Report", or "Zip"!')
+        raise ValueError('model_name must be either "Run", "Write", "Rewrite", "Report", or "Zip"!')
     script_name = 'python_script.py'
     shutil.copyfile(f'bash_scripts/{script_name}', f'{task_root_dir}/{col}/{script_name}')
+    for flag_name in [flag for flag in _FLAG_MAP.values() if flag]:
+        flag_path = f'{task_root_dir}/{col}/{flag_name}'
+        if os.path.exists(flag_path):
+            os.remove(flag_path)
     if _FLAG_MAP[model_name]:
         open(f'{task_root_dir}/{col}/{_FLAG_MAP[model_name]}', 'w').close()
     if platform == 'NCI':
@@ -259,7 +264,7 @@ def create_task_runs(
     n_workers:int=4,
     max_concurrent_tasks:int=300,
     use_parallel:bool=True,
-    model_name:Literal['Run','Write','Report','Zip']='Run'
+    model_name:Literal['Run','Write','Rewrite','Report','Zip']='Run'
 ) -> None:
     check_platform_system(platform)
     if platform == 'NCI':
@@ -344,6 +349,11 @@ def create_run_folders(task_root_dir:str, col:str, n_workers:int):
         delayed(lambda s, d: (shutil.copy2(s, d), os.utime(d, (time.time(), time.time()))))(s, d)
         for s, d in from_to_files
     )
+    for root, dirs, _ in os.walk(dst_dir):
+        if '__pycache__' in dirs:
+            shutil.rmtree(os.path.join(root, '__pycache__'))
+            dirs.remove('__pycache__')
+        dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
     # Create an output folder for the task
     os.makedirs(f'{dst_dir}/output', exist_ok=True)
 

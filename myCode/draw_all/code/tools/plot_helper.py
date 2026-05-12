@@ -3,7 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import re
-import cairosvg
+try:
+    import cairosvg
+except OSError:
+    cairosvg = None
 from lxml import etree
 from joblib import Parallel, delayed
 from plotnine import ggplot, aes, geom_area, theme, element_text, scale_fill_manual, labs, xlim, ylim
@@ -235,7 +238,10 @@ def save_figure(fig, output_prefix):
 
     # 直接转换无文字的 SVG 数据为 PDF
     svg_no_text = etree.tostring(tree_no_text, encoding="utf-8")
-    cairosvg.svg2pdf(bytestring=svg_no_text, write_to=pdf_path, dpi=300)
+    if cairosvg is not None:
+        cairosvg.svg2pdf(bytestring=svg_no_text, write_to=pdf_path, dpi=300)
+    else:
+        print(f"[Warning] cairosvg not available, skipping PDF export: {pdf_path}")
 
     # Step 4: 生成仅保留坐标轴、边框、文字的 SVG（去掉折线、散点、柱状图）
     tree_no_plot = etree.fromstring(svg_content.encode("utf-8"), parser)

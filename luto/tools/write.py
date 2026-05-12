@@ -226,6 +226,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_transition_cost_ag2nonag)(data, yr_cal, path_yr),
         delayed(write_transition_cost_nonag2ag)(data, yr_cal, path_yr),
         delayed(write_water)(data, yr_cal, path_yr),
+        delayed(write_water_use)(data, yr_cal, path_yr),
         delayed(write_ghg_total)(data, yr_cal, path_yr),
         delayed(write_ghg_agricultural)(data, yr_cal, path_yr),
         delayed(write_ghg_non_agricultural)(data, yr_cal, path_yr),
@@ -234,6 +235,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_ghg_offland_commodity)(data, yr_cal, path_yr),
         delayed(write_biodiversity_quality_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),
+        delayed(write_biodiversity_GBF2_all_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF3_NVIS_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF3_IBRA_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF4_SNES_scores)(data, yr_cal, path_yr),
@@ -307,7 +309,12 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
     
     valid_layers_ag = (ag_map_stack.sum('cell') > 0.001).to_dataframe('valid').query('valid == True').index
     valid_layers_non_ag = (non_ag_map_stack.sum('cell') > 0.001).to_dataframe('valid').query('valid == True').index
-    valid_layers_am = (am_map_stack.sum('cell') > 0.001).to_dataframe('valid').query('valid == True').index
+    # For am mosaic layers (am='ALL'), argmax index can be 0 so sum=0 even when active.
+    # Use notnull().any() for mosaic layers to correctly detect activity.
+    am_is_mosaic = am_map_stack['am'] == 'ALL'
+    valid_layers_am = (
+        (am_map_stack.sum('cell') > 0.001) | (am_is_mosaic & am_map_stack.notnull().any('cell'))
+    ).to_dataframe('valid').query('valid == True').index
 
     # Save to netcdf
     _save2nc(ag_map_stack.sel(layer=valid_layers_ag), os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))
@@ -863,6 +870,54 @@ def write_quantity_separate_landuse(data: Data, yr_cal, path):
     df.to_csv(os.path.join(path, f'quantity_production_kt_separate_{yr_cal}.csv'), index=False)
 
 
+def _get_biodiversity_price_ag_revenue_xr(data: Data, yr_cal: int):
+    """Return agricultural biodiversity-price revenue as xarray or None when price is zero."""
+    bio_price = data.get_biodiversity_price_by_year(yr_cal)
+    if bio_price == 0.0:
+        return None
+
+    bio_revenue = tools.ag_mrj_to_xr(
+        data,
+        ag_biodiversity.get_bio_quality_score_mrj(data) * bio_price,
+    )
+    return (
+        bio_revenue.transpose('cell', 'lu', 'lm')
+        .expand_dims(source=['Biodiversity price'])
+        .astype(np.float32)
+    )
+
+
+def _get_biodiversity_price_am_revenue_xr(data: Data, yr_cal: int):
+    """Return ag-management biodiversity-price revenue as xarray or None when price is zero."""
+    bio_price = data.get_biodiversity_price_by_year(yr_cal)
+    if bio_price == 0.0:
+        return None
+
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+    return (
+        tools.am_mrj_to_xr(
+            data,
+            ag_biodiversity.get_ag_mgt_biodiversity_matrices(data, ag_b_mrj, yr_idx),
+        ) * bio_price
+    ).astype(np.float32)
+
+
+def _get_biodiversity_price_non_ag_revenue_xr(data: Data, yr_cal: int, lumap: np.ndarray):
+    """Return non-ag biodiversity-price revenue as xarray or None when price is zero."""
+    bio_price = data.get_biodiversity_price_by_year(yr_cal)
+    if bio_price == 0.0:
+        return None
+
+    ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
+    return (
+        tools.non_ag_rk_to_xr(
+            data,
+            non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, lumap),
+        ) * bio_price
+    ).astype(np.float32)
+
+
 def write_economics_ag(data: Data, yr_cal, path):
     """Calculate agricultural revenue. Takes a simulation object, a target calendar
        year (e.g., 2030), and an output path as input."""
@@ -942,6 +997,12 @@ def write_economics_ag(data: Data, yr_cal, path):
         dims=['cell', 'layer'],
         coords={'cell': range(data.NCELLS), 'layer': ag_rev_df_rjms.columns}
     ).chunk(chunk).unstack('layer')
+    ag_bio_revenue_rjms = _get_biodiversity_price_ag_revenue_xr(data, yr_cal)
+    if ag_bio_revenue_rjms is not None:
+        ag_rev_rjms = xr.concat(
+            [ag_rev_rjms, ag_bio_revenue_rjms.transpose(*ag_rev_rjms.dims)],
+            dim='source',
+        )
 
     ag_cost_rjms = xr.DataArray(
         ag_cost_df_rjms.values.astype(np.float32),
@@ -1108,6 +1169,9 @@ def write_economics_ag_man(data: Data, yr_cal, path):
     ag_rev_mrj  = ag_revenue.get_rev_matrices(data, yr_idx)
     ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
     am_revenue_mat = tools.am_mrj_to_xr(data, ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx))
+    am_bio_revenue_mat = _get_biodiversity_price_am_revenue_xr(data, yr_cal)
+    if am_bio_revenue_mat is not None:
+        am_revenue_mat = am_revenue_mat + am_bio_revenue_mat
     am_cost_mat    = tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx))
     am_trans_mat   = tools.am_mrj_to_xr(data, ag_transitions.get_agricultural_management_transition_matrices(data, yr_idx))
 
@@ -1227,6 +1291,9 @@ def write_economics_non_ag(data: Data, yr_cal, path):
     ag_rev_mrj  = ag_revenue.get_rev_matrices(data, yr_idx)
     ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
     non_ag_rev_mat       = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_rev_mrj, data.lumaps[yr_cal]))
+    non_ag_bio_revenue_mat = _get_biodiversity_price_non_ag_revenue_xr(data, yr_cal, data.lumaps[yr_cal])
+    if non_ag_bio_revenue_mat is not None:
+        non_ag_rev_mat = non_ag_rev_mat + non_ag_bio_revenue_mat
     non_ag_cost_mat      = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, data.lumaps[yr_cal], yr_cal))
     non_ag_to_non_ag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_non_ag_to_non_ag_transition_matrix(data))
 
@@ -1869,8 +1936,8 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
     # Record maximum cell magnitude for this transition period for later use in scaling the transition area in the visualization
     return (f"Area transition matrix written from year {data.YR_CAL_BASE} to {yr_cal_end}", {
         'transition_area': {
-            'ag2ag':     (yr_cal_end, xr_ag2ag_filtered_array.max().item()),
-            'ag2non_ag': (yr_cal_end, xr_ag2non_ag_filtered_array.max().item()),
+            'ag2ag':     (yr_cal_end, xr_ag2ag_filtered_array.max().item() if xr_ag2ag_filtered_array.size > 0 else 0),
+            'ag2non_ag': (yr_cal_end, xr_ag2non_ag_filtered_array.max().item() if xr_ag2non_ag_filtered_array.size > 0 else 0),
         }
     })
 
@@ -1937,8 +2004,12 @@ def write_ghg_total(data: Data, yr_cal, path):
  
     yr_idx = yr_cal - data.YR_CAL_BASE
 
-    # Get GHG emissions limits used as constraints in model
-    ghg_limits = 0 if settings.GHG_EMISSIONS_LIMITS == 'off' else data.GHG_TARGETS[yr_cal]
+    # Get GHG emissions limits used as constraints in model.
+    # Use getattr so that: (a) old lz4 files without GHG_TARGETS attr still work,
+    # (b) joblib worker processes — which re-import settings fresh and may see a
+    # stale GHG_EMISSIONS_LIMITS value — don't crash.  .get() returns 0 when the
+    # dict is empty (GHG off) or not yet populated (maintain_historical lazy init).
+    ghg_limits = getattr(data, 'GHG_TARGETS', {}).get(yr_cal, 0)
 
     # Get GHG emissions from model
     if yr_cal >= data.YR_CAL_BASE + 1:
@@ -2510,6 +2581,109 @@ def write_water(data: Data, yr_cal, path):
     return f"Water yield data written for year {yr_cal}"
 
 
+def write_water_use(data: Data, yr_cal, path):
+    """Write water use to disk.
+
+    - Ag:     irrigation + livestock drinking water (always positive)
+    - Non-Ag: negated water yield (trees reduce runoff = positive use;
+              restored vegetation that raises runoff = negative use)
+    - AM:     negated AM water yield effect (water savings show as negative)
+    """
+
+    yr_idx = yr_cal - data.YR_CAL_BASE
+
+    # Get the decision variables
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
+        ).assign_coords(region_water=('cell', data.WATER_REGION_ID)
+        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    non_ag_dvar_rj = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
+        ).assign_coords(region_water=('cell', data.WATER_REGION_ID)
+        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
+        ).assign_coords(region_water=('cell', data.WATER_REGION_ID)
+        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+
+    # Agricultural water requirements (irrigation + livestock, CCI-independent)
+    ag_wreq_mrj = tools.ag_mrj_to_xr(data, ag_water.get_wreq_matrices(data, yr_idx))
+    xr_ag_wreq = ag_dvar_mrj * ag_wreq_mrj
+
+    # Non-ag water yield (CCI-dependent; requires ag_w_mrj for agroforestry/belt calculations)
+    if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on':
+        ag_w_mrj = tools.ag_mrj_to_xr(data, ag_water.get_water_net_yield_matrices(data, yr_idx))
+        non_ag_w_rk = tools.non_ag_rk_to_xr(
+            data,
+            non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, data.lumaps[yr_cal], yr_idx)
+        )
+    elif settings.WATER_CLIMATE_CHANGE_IMPACT == 'off':
+        ag_w_mrj = tools.ag_mrj_to_xr(
+            data, ag_water.get_water_net_yield_matrices(data, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+        )
+        non_ag_w_rk = tools.non_ag_rk_to_xr(
+            data,
+            non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, data.lumaps[yr_cal], yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+        )
+    else:
+        raise ValueError("Invalid setting for WATER_CLIMATE_CHANGE_IMPACT, only 'on' or 'off' allowed.")
+
+    # Non-ag water use = negated yield (positive yield → negative use; negative yield → positive use)
+    xr_non_ag_wreq = -non_ag_w_rk * non_ag_dvar_rj
+
+    # AM water use change: negate the AM water yield effect
+    ag_man_w_mrj = tools.am_mrj_to_xr(
+        data, ag_water.get_agricultural_management_water_matrices(data, yr_idx)
+    )
+    xr_am_wreq = -ag_man_w_mrj * am_dvar_mrj
+
+    # Expand dimension (has to be after calculation to avoid double counting)
+    xr_ag_wreq   = xr.concat([xr_ag_wreq.sum(dim='lm',   keepdims=True).assign_coords(lm=['ALL']),   xr_ag_wreq],   dim='lm')
+    xr_ag_wreq   = xr.concat([xr_ag_wreq.sum(dim='lu',   keepdims=True).assign_coords(lu=['ALL']),   xr_ag_wreq],   dim='lu')
+    xr_non_ag_wreq = xr.concat([xr_non_ag_wreq.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_non_ag_wreq], dim='lu')
+    xr_am_wreq   = xr.concat([xr_am_wreq.sum(dim='lm',   keepdims=True).assign_coords(lm=['ALL']),   xr_am_wreq],   dim='lm')
+    xr_am_wreq   = xr.concat([xr_am_wreq.sum(dim='lu',   keepdims=True).assign_coords(lu=['ALL']),   xr_am_wreq],   dim='lu')
+    xr_am_wreq   = xr.concat([xr_am_wreq.sum(dim='am',   keepdims=True).assign_coords(am=['ALL']),   xr_am_wreq],   dim='am')
+
+    ag_wu = xr_ag_wreq.groupby('region_water'
+        ).sum(['cell']
+        ).to_dataframe('Water Use (ML)'
+        ).reset_index(
+        ).assign(Type='Agricultural land-use'
+        ).infer_objects(copy=False
+        ).replace({'region_water': data.WATER_REGION_NAMES})
+    non_ag_wu = xr_non_ag_wreq.groupby('region_water'
+        ).sum(['cell']
+        ).to_dataframe('Water Use (ML)'
+        ).reset_index(
+        ).assign(Type='Non-Agricultural Land-use'
+        ).infer_objects(copy=False
+        ).replace({'region_water': data.WATER_REGION_NAMES})
+    am_wu = xr_am_wreq.groupby('region_water'
+        ).sum(['cell']
+        ).to_dataframe('Water Use (ML)'
+        ).reset_index(
+        ).assign(Type='Agricultural Management'
+        ).infer_objects(copy=False
+        ).replace({'region_water': data.WATER_REGION_NAMES})
+
+    wu_inside_luto = pd.concat([ag_wu, non_ag_wu, am_wu], ignore_index=True
+        ).assign(Year=yr_cal
+        ).rename(columns={
+            'region_water': 'Region',
+            'lu': 'Landuse',
+            'am': 'Agricultural Management',
+            'lm': 'Water Supply'}
+        ).infer_objects(copy=False
+        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+        ).dropna(axis=0, how='all')
+
+    wu_inside_luto.to_csv(os.path.join(path, f'water_use_separate_watershed_{yr_cal}.csv'), index=False)
+
+    # NetCDF outputs (same stacking pattern as write_water)
+    _save2nc(xr_ag_wreq.stack(layer=['lm', 'lu']),           os.path.join(path, f'xr_water_use_ag_{yr_cal}.nc'))
+    _save2nc(xr_non_ag_wreq.stack(layer=['lu']),              os.path.join(path, f'xr_water_use_non_ag_{yr_cal}.nc'))
+    _save2nc(xr_am_wreq.stack(layer=['am', 'lm', 'lu']),     os.path.join(path, f'xr_water_use_ag_management_{yr_cal}.nc'))
+
+    return f"Water use data written for year {yr_cal}"
+
 
 def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     ''' Biodiversity overall quality scores are always written to disk. '''
@@ -2770,19 +2944,37 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         
     # Fill nan to empty dataframes
     if GBF2_score_ag.empty:
-        GBF2_score_ag.loc[0] = 0
-        GBF2_score_ag = GBF2_score_ag.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_score_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural land-use', 'Apples', yr_cal]
+        GBF2_score_ag = pd.DataFrame({
+            'region': ['AUSTRALIA', 'AUSTRALIA'],
+            'lm': ['dry', 'irr'],
+            'lu': ['Apples', 'Apples'],
+            'Area Weighted Score (ha)': [0.0, 0.0],
+            'Relative_Contribution_Percentage': [0.0, 0.0],
+            'Type': ['Agricultural land-use', 'Agricultural land-use'],
+            'Year': [yr_cal, yr_cal]
+        })
 
     if GBF2_score_non_ag.empty:
-        GBF2_score_non_ag.loc[0] = 0
-        GBF2_score_non_ag = GBF2_score_non_ag.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_score_non_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural Management', 'Apples', yr_cal]
+        GBF2_score_non_ag = pd.DataFrame({
+            'region': ['AUSTRALIA'],
+            'lu': ['Environmental Plantings'],
+            'Area Weighted Score (ha)': [0.0],
+            'Relative_Contribution_Percentage': [0.0],
+            'Type': ['Non-Agricultural Land-use'],
+            'Year': [yr_cal]
+        })
 
     if GBF2_score_am.empty:
-        GBF2_score_am.loc[0] = 0
-        GBF2_score_am = GBF2_score_am.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_score_am.loc[0, ['Type', 'lu' ,'Year']] = ['Non-Agricultural Land-use', 'Environmental Plantings', yr_cal]
+        GBF2_score_am = pd.DataFrame({
+            'region': ['AUSTRALIA', 'AUSTRALIA'],
+            'am': ['Savanna Burning', 'Savanna Burning'],
+            'lm': ['dry', 'dry'],
+            'lu': ['Beef - natural land', 'Sheep - natural land'],
+            'Area Weighted Score (ha)': [0.0, 0.0],
+            'Relative_Contribution_Percentage': [0.0, 0.0],
+            'Type': ['Agricultural Management', 'Agricultural Management'],
+            'Year': [yr_cal, yr_cal]
+        })
         
     # Save to disk  
     df = pd.concat([
@@ -2840,6 +3032,201 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     _save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity GBF2 priority scores written for year {yr_cal}"
+
+
+
+def write_biodiversity_GBF2_all_scores(data: Data, yr_cal, path):
+    """Write GBF2-style biodiversity scores for all cells in the LUTO study area."""
+
+    # Unpack the ag managements and land uses
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
+
+    # Get decision variables for the year
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
+        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
+        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
+        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+
+    # Use every LUTO cell rather than the GBF2 priority degraded area mask.
+    all_area_ha = data.REAL_AREA.astype(np.float32)
+    all_area_score_r = xr.DataArray(
+        all_area_ha,
+        dims=['cell'],
+        coords={'cell': range(data.NCELLS)}
+    )
+
+    # Get the impacts of each ag/non-ag/am to vegetation matrices
+    ag_impact_j = xr.DataArray(
+        ag_biodiversity.get_ag_biodiversity_contribution(data).astype(np.float32),
+        dims=['lu'],
+        coords={'lu': data.AGRICULTURAL_LANDUSES}
+    )
+    non_ag_impact_k = xr.DataArray(
+        np.array(list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()), dtype=np.float32),
+        dims=['lu'],
+        coords={'lu': data.NON_AGRICULTURAL_LANDUSES}
+    )
+    am_impact_ajr = xr.DataArray(
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
+        dims=['idx', 'cell'],
+        coords={
+            'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
+            'cell': range(data.NCELLS)}
+    ).unstack()
+
+    # Get the total all-cell area for the percentage denominator
+    total_all_area = all_area_ha.sum()
+
+    # Calculate xarray biodiversity GBF2-style scores
+    xr_gbf2_ag = all_area_score_r * ag_impact_j * ag_dvar_mrj
+    xr_gbf2_non_ag = all_area_score_r * non_ag_impact_k * non_ag_dvar_rk
+    xr_gbf2_am = all_area_score_r * am_impact_ajr * am_dvar_amrj
+
+    # Expand dimension (has to be after multiplication to avoid double counting)
+    xr_gbf2_ag = xr.concat([xr_gbf2_ag.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_gbf2_ag], dim='lm')
+    xr_gbf2_ag = xr.concat([xr_gbf2_ag.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_gbf2_ag], dim='lu')
+    xr_gbf2_non_ag = xr.concat([xr_gbf2_non_ag.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_gbf2_non_ag], dim='lu')
+    xr_gbf2_am = xr.concat([xr_gbf2_am.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_gbf2_am], dim='lm')
+    xr_gbf2_am = xr.concat([xr_gbf2_am.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_gbf2_am], dim='lu')
+    xr_gbf2_am = xr.concat([xr_gbf2_am.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), xr_gbf2_am], dim='am')
+
+    # Regional level aggregation
+    GBF2_score_ag_region = xr_gbf2_ag.groupby('region'
+        ).sum(['cell']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
+        ).assign(Relative_Contribution_Percentage=lambda x: ((x['Area Weighted Score (ha)'] / total_all_area) * 100)
+        ).assign(Type='Agricultural land-use', Year=yr_cal)
+    GBF2_score_non_ag_region = xr_gbf2_non_ag.groupby('region'
+        ).sum(['cell']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
+        ).assign(Relative_Contribution_Percentage=lambda x: (x['Area Weighted Score (ha)'] / total_all_area * 100)
+        ).assign(Type='Non-Agricultural Land-use', Year=yr_cal)
+    GBF2_score_am_region = xr_gbf2_am.groupby('region'
+        ).sum('cell'
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(allow_duplicates=True
+        ).assign(Relative_Contribution_Percentage=lambda x: (x['Area Weighted Score (ha)'] / total_all_area * 100)
+        ).assign(Type='Agricultural Management', Year=yr_cal)
+
+    # Australia level aggregation
+    GBF2_score_ag_AUS = xr_gbf2_ag.sum(['cell']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
+        ).assign(Relative_Contribution_Percentage=lambda x: ((x['Area Weighted Score (ha)'] / total_all_area) * 100)
+        ).assign(Type='Agricultural land-use', Year=yr_cal, region='AUSTRALIA')
+    GBF2_score_non_ag_AUS = xr_gbf2_non_ag.sum(['cell']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
+        ).assign(Relative_Contribution_Percentage=lambda x: (x['Area Weighted Score (ha)'] / total_all_area * 100)
+        ).assign(Type='Non-Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')
+    GBF2_score_am_AUS = xr_gbf2_am.sum('cell'
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(allow_duplicates=True
+        ).assign(Relative_Contribution_Percentage=lambda x: (x['Area Weighted Score (ha)'] / total_all_area * 100)
+        ).assign(Type='Agricultural Management', Year=yr_cal, region='AUSTRALIA')
+
+    # Combine regional and Australia level data
+    GBF2_score_ag = pd.concat([GBF2_score_ag_region, GBF2_score_ag_AUS], axis=0)
+    GBF2_score_non_ag = pd.concat([GBF2_score_non_ag_region, GBF2_score_non_ag_AUS], axis=0)
+    GBF2_score_am = pd.concat([GBF2_score_am_region, GBF2_score_am_AUS], axis=0)
+
+    # Fill nan to empty dataframes
+    if GBF2_score_ag.empty:
+        GBF2_score_ag = pd.DataFrame({
+            'region': ['AUSTRALIA', 'AUSTRALIA'],
+            'lm': ['dry', 'irr'],
+            'lu': ['Apples', 'Apples'],
+            'Area Weighted Score (ha)': [0.0, 0.0],
+            'Relative_Contribution_Percentage': [0.0, 0.0],
+            'Type': ['Agricultural land-use', 'Agricultural land-use'],
+            'Year': [yr_cal, yr_cal]
+        })
+
+    if GBF2_score_non_ag.empty:
+        GBF2_score_non_ag = pd.DataFrame({
+            'region': ['AUSTRALIA'],
+            'lu': ['Environmental Plantings'],
+            'Area Weighted Score (ha)': [0.0],
+            'Relative_Contribution_Percentage': [0.0],
+            'Type': ['Non-Agricultural Land-use'],
+            'Year': [yr_cal]
+        })
+
+    if GBF2_score_am.empty:
+        GBF2_score_am = pd.DataFrame({
+            'region': ['AUSTRALIA', 'AUSTRALIA'],
+            'am': ['Savanna Burning', 'Savanna Burning'],
+            'lm': ['dry', 'dry'],
+            'lu': ['Beef - natural land', 'Sheep - natural land'],
+            'Area Weighted Score (ha)': [0.0, 0.0],
+            'Relative_Contribution_Percentage': [0.0, 0.0],
+            'Type': ['Agricultural Management', 'Agricultural Management'],
+            'Year': [yr_cal, yr_cal]
+        })
+
+    # Save to disk
+    df = pd.concat([
+            GBF2_score_ag,
+            GBF2_score_non_ag,
+            GBF2_score_am], axis=0
+        ).assign(Priority_Target=(data.get_GBF2_target_for_yr_cal(yr_cal) / total_all_area) * 100,
+        ).rename(columns={
+            'lu': 'Landuse',
+            'lm': 'Water_supply',
+            'am': 'Agricultural Management',
+            'Relative_Contribution_Percentage': 'Contribution Relative to Pre-1750 Level (%)',
+            'Priority_Target': 'Priority Target (%)'}
+        ).reset_index(drop=True
+        ).infer_objects(copy=False
+        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+        )
+    df.to_csv(os.path.join(path, f'biodiversity_GBF2_all_scores_{yr_cal}.csv'), index=False)
+
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # ---- Ag valid layers ----
+    valid_ag_layers = pd.MultiIndex.from_frame(GBF2_score_ag_AUS.query('`Area Weighted Score (ha)` > 1')[['lm', 'lu']]).sort_values()
+    valid_layers_stack_ag = xr_gbf2_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+
+    # ---- Non-ag valid layers ----
+    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF2_score_non_ag_AUS.query('`Area Weighted Score (ha)` > 1')[['lu']]).sort_values()
+
+    if GBF2_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
+        valid_layers_stack_non_ag = xr.DataArray(
+            np.zeros((1, data.NCELLS), dtype=np.float32),
+            dims=['lu', 'cell'],
+            coords={'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['lu'])
+
+    else:
+        valid_layers_stack_non_ag = xr_gbf2_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+
+    # ---- Ag management valid layers ----
+    valid_am_layers = pd.MultiIndex.from_frame(GBF2_score_am_AUS.query('`Area Weighted Score (ha)` > 1')[['am', 'lm', 'lu']]).sort_values()
+
+    if GBF2_score_am_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
+        valid_layers_stack_am = xr.DataArray(
+            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
+            dims=['am', 'lm', 'lu', 'cell'],
+            coords={'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['am', 'lm', 'lu'])
+
+    else:
+        valid_layers_stack_am = xr_gbf2_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
+
+    # min/max should calculated using array without appending mosaic layers
+    _save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF2_all_ag_{yr_cal}.nc'))
+    _save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF2_all_non_ag_{yr_cal}.nc'))
+    _save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF2_all_ag_management_{yr_cal}.nc'))
+
+    return f"Biodiversity GBF2 all-cell scores written for year {yr_cal}"
 
 
 

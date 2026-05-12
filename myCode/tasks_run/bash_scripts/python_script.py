@@ -47,6 +47,33 @@ def is_zip_valid(path):
         return False
     return True
 
+
+def extract_output_from_archive(archive_path, output_path="output"):
+    """Extract only archived model outputs, keeping current code/settings intact."""
+    target_root = pathlib.Path(".").resolve()
+    output_root = pathlib.Path(output_path)
+
+    with zipfile.ZipFile(archive_path, 'r') as zf:
+        members = []
+        for member in zf.infolist():
+            member_name = member.filename.replace("\\", "/")
+            parts = pathlib.PurePosixPath(member_name).parts
+            if not parts or parts[0] != output_path or ".." in parts:
+                continue
+            members.append(member)
+
+        if not members:
+            raise FileNotFoundError(f"No '{output_path}/' entries found in {archive_path}")
+
+        if output_root.exists():
+            shutil.rmtree(output_root)
+
+        for member in members:
+            dest = (target_root / member.filename).resolve()
+            dest.relative_to(target_root)
+            zf.extract(member, target_root)
+
+
 def zip_only():
     """Load data from .lz4 and run create_zip (no simulation)."""
     import joblib
@@ -100,6 +127,44 @@ def write_only():
         report_zip_path = create_zip(data)
         print(f"Archiving complete. Report zip: {report_zip_path}")
 
+
+def rewrite_only():
+    """Extract archived outputs, re-run write_outputs, then re-zip.
+
+    Use this when results are already archived but new write functions have
+    been added and need to be run against existing simulation data.
+    Falls back to write_only() if no archive is found.
+    """
+    import joblib
+
+    archive_path = 'Run_Archive.zip'
+
+    if not is_zip_valid(archive_path):
+        print(f"'{archive_path}' not found or invalid - falling back to write_only().")
+        write_only()
+        return
+
+    print(f"Extracting outputs from '{archive_path}'...")
+    extract_output_from_archive(archive_path)
+    print("Output extraction complete; current code and settings were preserved.")
+
+    from luto.tools.write import write_outputs
+    import luto.settings as settings
+
+    lz4_path, _ = _find_lz4()
+    print(f"Loading data from: {lz4_path}")
+    data = joblib.load(lz4_path)
+
+    print("Writing outputs...")
+    write_outputs(data)
+    print("Write complete.")
+
+    if settings.KEEP_OUTPUTS:
+        print("KEEP_OUTPUTS is True. Skipping re-archiving.")
+    else:
+        report_zip_path = create_zip(data)
+        print(f"Re-archiving complete. Report zip: {report_zip_path}")
+
 def report_only():
     """Load .lz4 and run create_report (no simulation, no archiving)."""
     import joblib, shutil
@@ -137,15 +202,7 @@ def create_zip(data):
     """Zip results into two archives: full archive + report-only archive, then clean up."""
     import os, pathlib, shutil, zipfile
 
-    output_dir = pathlib.Path(data.path).absolute()
-    simulation_root = output_dir.parent.parent  # .../Run_XXXX/
-
-    run_idx = simulation_root.name
-    report_data_dir = simulation_root.parent / 'Report_Data'
-    report_data_dir.mkdir(parents=True, exist_ok=True)
-
-    report_zip_path = report_data_dir / f'{run_idx}.zip'
-    archive_path = simulation_root / 'Run_Archive.zip'
+    output_dir, simulation_root, report_zip_path, archive_path = get_archive_paths(data)
 
     with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as run_zip, \
          zipfile.ZipFile(report_zip_path, 'w', zipfile.ZIP_DEFLATED) as report_zip:
@@ -158,23 +215,45 @@ def create_zip(data):
                 else:
                     run_zip.write(abs_path, arcname=abs_path.relative_to(simulation_root))
 
+    # Remove the generated output tree first so the run folder only keeps the archive.
+    if output_dir.exists():
+        try:
+            shutil.rmtree(output_dir)
+        except Exception as e:
+            print(f"Failed to delete output directory {output_dir}. Reason: {e}")
+
     for item in os.listdir(simulation_root):
-        if item != 'Run_Archive.zip':
-            item_path = simulation_root / item
-            try:
-                if item_path.is_file() or item_path.is_symlink():
-                    item_path.unlink()
-                elif item_path.is_dir():
-                    shutil.rmtree(item_path)
-            except Exception as e:
-                print(f"Failed to delete {item}. Reason: {e}")
+        if item == 'Run_Archive.zip':
+            continue
+        item_path = simulation_root / item
+        try:
+            if item_path.is_file() or item_path.is_symlink():
+                item_path.unlink()
+            elif item_path.is_dir():
+                shutil.rmtree(item_path)
+        except Exception as e:
+            print(f"Failed to delete {item}. Reason: {e}")
 
     return report_zip_path
+
+def get_archive_paths(data):
+    output_dir = pathlib.Path(data.path).absolute()
+    simulation_root = output_dir.parent.parent  # .../Run_XXXX/
+
+    run_idx = simulation_root.name
+    report_data_dir = simulation_root.parent / 'Report_Data'
+    report_data_dir.mkdir(parents=True, exist_ok=True)
+
+    report_zip_path = report_data_dir / f'{run_idx}.zip'
+    archive_path = simulation_root / 'Run_Archive.zip'
+
+    return output_dir, simulation_root, report_zip_path, archive_path
 
 def main():
     import luto.simulation as sim
     import luto.settings as settings
 
+    data = None
     try:
         # 确保日志目录存在
         os.makedirs('output', exist_ok=True)
@@ -223,18 +302,24 @@ def main():
             pass
 
         else:
+            _, _, report_zip_path, _ = get_archive_paths(data)
             write_log("Archiving results...")
-            report_zip_path = create_zip(data)
-            write_log(f"Archiving complete. Report zip: {report_zip_path}")
-            write_log("Cleanup complete.")
+            write_log(f"Report zip target: {report_zip_path}")
+            write_log("Starting final archive and cleanup step.")
+            create_zip(data)
+            print(f"Archiving complete. Report zip: {report_zip_path}")
+            print("Cleanup complete.")
 
     except Exception as e:
         # 记录错误到日志文件
-        write_log(f"Run failed.", file=log_file)
-        write_log(f"Model finished in {data.last_year}", file=log_file)
-
         error_message = f"An error occurred during simulation:\n{str(e)}\n{traceback.format_exc()}"
-        write_log(error_message, file=error_log_file)
+        try:
+            write_log("Run failed.", file=log_file)
+            if data is not None and hasattr(data, 'last_year'):
+                write_log(f"Model finished in {data.last_year}", file=log_file)
+            write_log(error_message, file=error_log_file)
+        except Exception as log_error:
+            print(f"Failed to write error logs: {log_error}")
 
         # 打印错误信息，便于调试
         print(f"Error in simulation: {e}")
@@ -247,6 +332,8 @@ if __name__ == "__main__":
         zip_only()
     elif os.path.exists('write_mode.flag'):
         write_only()
+    elif os.path.exists('rewrite_mode.flag'):
+        rewrite_only()
     elif os.path.exists('report_mode.flag'):
         report_only()
     else:

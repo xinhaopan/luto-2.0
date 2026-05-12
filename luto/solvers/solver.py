@@ -308,7 +308,9 @@ class LutoSolver:
     def _setup_economy_objective(self):
         print("    ├── setting up objective for economy...")
         
-        # Get economic contributions
+        # `economic_contr_mrj` is the solver-side economy term assembled in
+        # luto/solvers/input_data.py. If biodiversity price is active, that
+        # monetised biodiversity payment is already included in these coefficients.
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
 
         ag_exprs = []
@@ -472,6 +474,12 @@ class LutoSolver:
             + x_non_ag_vars.sum(axis=0)
         )
         for r, expr, ub in zip(cells, X_sum_r, ag_mask[cells]):
+            # When all AG uses are culled and all non-ag uses are disabled for a cell,
+            # numpy sum returns a Python scalar instead of a Gurobi expression.
+            # Wrap it in LinExpr so Gurobi evaluates the constraint properly
+            # (0 == ub with ub > 0 will correctly trigger infeasibility detection).
+            if isinstance(expr, (int, float, bool, np.integer, np.floating)):
+                expr = gp.LinExpr(float(expr))
             self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(
                 expr == ub,
                 name=f"const_cell_usage_{r}"
@@ -526,15 +534,21 @@ class LutoSolver:
 
                 # Sum of all usage of the AM option must be less than the limit
                 ag_man_vars_sum = (
-                    gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, :]) 
+                    gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, :])
                     + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, :])
                 )
+                # gp.quicksum on an all-zero (no-variable) array may return Python scalar 0;
+                # wrap in LinExpr so Gurobi evaluates the constraint properly.
+                if isinstance(ag_man_vars_sum, (int, float, bool, np.integer, np.floating)):
+                    ag_man_vars_sum = gp.LinExpr(float(ag_man_vars_sum))
 
                 all_vars_sum = (
-                    gp.quicksum(self.X_ag_dry_vars_jr[j, :]) 
+                    gp.quicksum(self.X_ag_dry_vars_jr[j, :])
                     + gp.quicksum(self.X_ag_irr_vars_jr[j, :])
                 )
-                
+                if isinstance(all_vars_sum, (int, float, bool, np.integer, np.floating)):
+                    all_vars_sum = gp.LinExpr(float(all_vars_sum))
+
                 constr = self.gurobi_model.addConstr(
                     ag_man_vars_sum <= adoption_limit * all_vars_sum,
                     name=f"const_ag_mam_adoption_limit_{am}_{j}".replace(" ", "_"),
@@ -904,10 +918,10 @@ class LutoSolver:
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-            for j_idx in range(len(am_j_list)):
-                
-                ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.GBF2_mask_idx)
-                ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.GBF2_mask_idx)
+            for j_idx, j in enumerate(am_j_list):
+
+                ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.GBF2_mask_idx)
+                ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.GBF2_mask_idx)
                 bio_ag_man_exprs.append(
                     gp.quicksum(
                         self._input_data.GBF2_mask_area_r[ind_dry]
@@ -1576,23 +1590,25 @@ class LutoSolver:
 
         # Collect optimised decision variables in one X_mrj Numpy array.
         X_dry_sol_rj = np.zeros(
-            (self._input_data.ncells, self._input_data.n_ag_lus)
-        ).astype(np.float32)
+            (self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32
+        )
         X_irr_sol_rj = np.zeros(
-            (self._input_data.ncells, self._input_data.n_ag_lus)
-        ).astype(np.float32)
+            (self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32
+        )
         non_ag_X_sol_rk = np.zeros(
-            (self._input_data.ncells, self._input_data.n_non_ag_lus)
-        ).astype(np.float32)
+            (self._input_data.ncells, self._input_data.n_non_ag_lus), dtype=np.float32
+        )
         am_X_dry_sol_rj = {
-            am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(
-                np.float32
+            am: np.zeros(
+                (self._input_data.ncells, self._input_data.n_ag_lus),
+                dtype=np.float32,
             )
             for am in self._input_data.am2j
         }
         am_X_irr_sol_rj = {
-            am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(
-                np.float32
+            am: np.zeros(
+                (self._input_data.ncells, self._input_data.n_ag_lus),
+                dtype=np.float32,
             )
             for am in self._input_data.am2j
         }
@@ -1664,19 +1680,9 @@ class LutoSolver:
         # )
         # ag_X_mrj_processed = np.moveaxis(ag_X_mrj_processed, 0, 1)
 
-        # Process non-agricultural land usage information
-        # Boolean matrix where the maximum value for each cell across all non-ag LUs is True
-        non_ag_X_rk_processed = non_ag_X_sol_rk.argmax(axis=1)[:, np.newaxis] == range(
-            self._input_data.n_non_ag_lus
-        )
-
         # Make land use and land management maps
         # Vector indexed by cell that denotes whether the cell is non-agricultural land (True) or agricultural land (False)
         non_ag_bools_r = non_ag_X_sol_rk.max(axis=1) > ag_X_mrj.max(axis=(0, 2))
-
-        # Update processed variables accordingly
-        ag_X_mrj_processed[:, non_ag_bools_r, :] = False
-        non_ag_X_rk_processed[~non_ag_bools_r, :] = False
 
         # Process agricultural management variables
         # Repeat the steps for the regular agricultural management variables

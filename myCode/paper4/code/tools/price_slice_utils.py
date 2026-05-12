@@ -1,0 +1,262 @@
+import io
+import re
+import zipfile
+from pathlib import Path
+
+import cf_xarray as cfxr
+import matplotlib.ticker as ticker
+import numpy as np
+import pandas as pd
+import xarray as xr
+
+import tools.config as config
+
+
+CODE_DIR = Path(__file__).resolve().parent.parent
+TASK_ROOT = (CODE_DIR / ".." / ".." / ".." / "output" / config.TASK_NAME).resolve()
+OUT_DIR = TASK_ROOT / "paper4" / "figures"
+DATA_DIR = TASK_ROOT / "paper4" / "data"
+
+PAPER4_COLOR_OVERRIDES = {
+    "crops": "#5d1b41",
+    "livestock": "#cac559",
+    "modifiedlivestock": "#cac559",
+    "naturallivestock": "#cac559",
+    "unallocatedmodifiedland": "#f5ec7e",
+    "unallocatednaturalland": "#669b25",
+}
+
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def get_paper4_paths():
+    return TASK_ROOT, OUT_DIR, DATA_DIR
+
+
+def normalize_style_key(value):
+    return re.sub(r"[\s\-]+", "", str(value).strip().lower())
+
+
+def apply_paper4_color_overrides(color_map):
+    updated = dict(color_map)
+    for label in list(updated):
+        override = PAPER4_COLOR_OVERRIDES.get(normalize_style_key(label))
+        if override is not None:
+            updated[label] = override
+    return updated
+
+
+def apply_paper4_color_overrides_to_style_df(df):
+    df = df.copy()
+    label_columns = [column for column in ("desc_new", "desc") if column in df.columns]
+    if "color" not in df.columns or not label_columns:
+        return df
+
+    for idx, row in df.iterrows():
+        override = None
+        for column in label_columns:
+            value = row.get(column)
+            if pd.notna(value):
+                override = PAPER4_COLOR_OVERRIDES.get(normalize_style_key(value))
+            if override is not None:
+                break
+
+        if override is not None:
+            df.at[idx, "color"] = override
+
+    return df
+
+
+def parse_prices(run_name):
+    cp = re.search(r"CarbonPrice_([\d.]+)", run_name)
+    bp = re.search(r"BioPrice_([\d.]+)", run_name)
+    return (
+        float(cp.group(1)) if cp else None,
+        float(bp.group(1)) if bp else None,
+    )
+
+
+def build_run_map(task_root=None):
+    task_root = Path(task_root) if task_root is not None else TASK_ROOT
+    run_map = {}
+
+    for run_dir in task_root.iterdir():
+        if not run_dir.is_dir() or not run_dir.name.startswith("Run_"):
+            continue
+
+        cp, bp = parse_prices(run_dir.name)
+        if cp is None or bp is None:
+            continue
+
+        zip_path = run_dir / "Run_Archive.zip"
+        if zip_path.is_file():
+            run_map[(cp, bp)] = zip_path
+
+    cp_vals = sorted({key[0] for key in run_map})
+    bp_vals = sorted({key[1] for key in run_map})
+    return run_map, cp_vals, bp_vals
+
+
+def get_slice_key(varying_key, price_value):
+    if varying_key == "cp":
+        return price_value, 0.0
+    if varying_key == "bp":
+        return 0.0, price_value
+    raise ValueError(f"Unsupported varying_key: {varying_key}")
+
+
+def get_price_column(varying_key):
+    if varying_key == "cp":
+        return "CarbonPrice"
+    if varying_key == "bp":
+        return "BioPrice"
+    raise ValueError(f"Unsupported varying_key: {varying_key}")
+
+
+def get_price_axis_label(varying_key):
+    if varying_key == "cp":
+        return r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)"
+    if varying_key == "bp":
+        return r"Biodiversity price (AU\$/ha yr$^{-1}$)"
+    raise ValueError(f"Unsupported varying_key: {varying_key}")
+
+
+def format_thousands(value):
+    if pd.isna(value):
+        return ""
+
+    value = float(value)
+    if np.isclose(value, round(value)):
+        return f"{int(round(value)):,}"
+    return f"{value:,.2f}"
+
+
+PRICE_TICK_FORMATTER = ticker.FuncFormatter(lambda value, _: format_thousands(value))
+
+
+def apply_price_formatter(ax, axis="x"):
+    if axis == "x":
+        ax.xaxis.set_major_formatter(PRICE_TICK_FORMATTER)
+    elif axis == "y":
+        ax.yaxis.set_major_formatter(PRICE_TICK_FORMATTER)
+    else:
+        raise ValueError(f"Unsupported axis: {axis}")
+
+
+def style_box_axis(ax, linewidth=1.0):
+    ax.set_facecolor("#EAEAF2")
+    ax.set_axisbelow(True)
+    ax.grid(True, color="white", linewidth=1.0)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_linewidth(linewidth)
+        spine.set_color("black")
+    ax.tick_params(direction="out", length=4, width=linewidth, top=False, right=False)
+
+
+def add_zero_line(ax):
+    ax.axhline(0, color="#404040", linewidth=0.9, zorder=8)
+
+
+def apply_compact_ticks(ax, x_nbins=8, y_nbins=5):
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=x_nbins))
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=y_nbins))
+
+
+def stacked_area_pos_neg(ax, pivot_df, color_map, alpha=0.88):
+    if pivot_df.empty:
+        return []
+
+    x = pivot_df.index.to_numpy(dtype=float)
+    positive_bottoms = np.zeros(len(x))
+    negative_bottoms = np.zeros(len(x))
+    visible_categories = []
+
+    for category in pivot_df.columns:
+        heights = pivot_df[category].to_numpy(dtype=float)
+        if np.isclose(np.abs(heights).sum(), 0.0):
+            continue
+
+        color = color_map.get(category, "#888888")
+        positive = np.clip(heights, 0.0, None)
+        negative = np.clip(heights, None, 0.0)
+
+        if not np.isclose(positive.sum(), 0.0):
+            next_positive = positive_bottoms + positive
+            ax.fill_between(
+                x,
+                positive_bottoms,
+                next_positive,
+                facecolor=color,
+                edgecolor="white",
+                linewidth=0.55,
+                alpha=alpha,
+                zorder=3,
+            )
+            positive_bottoms = next_positive
+
+        if not np.isclose(np.abs(negative).sum(), 0.0):
+            next_negative = negative_bottoms + negative
+            ax.fill_between(
+                x,
+                negative_bottoms,
+                next_negative,
+                facecolor=color,
+                edgecolor="white",
+                linewidth=0.55,
+                alpha=alpha,
+                zorder=3,
+            )
+            negative_bottoms = next_negative
+
+        visible_categories.append(category)
+
+    if len(x) > 1:
+        pad = (float(np.nanmax(x)) - float(np.nanmin(x))) * 0.02
+        ax.set_xlim(float(np.nanmin(x)) - pad, float(np.nanmax(x)) + pad)
+
+    return visible_categories
+
+
+def _select_all_coords(da):
+    for coord_name in list(da.coords):
+        if coord_name in {"cell", "layer"}:
+            continue
+
+        coord_values = da.coords[coord_name].values
+        try:
+            has_all = "ALL" in coord_values
+        except TypeError:
+            has_all = False
+
+        if has_all:
+            da = da.sel({coord_name: "ALL"})
+
+    return da
+
+
+def read_sum(zip_path, file_stems, year):
+    total = 0.0
+    with zipfile.ZipFile(zip_path) as archive:
+        all_names = archive.namelist()
+        for stem in file_stems:
+            target = f"{stem}_{year}.nc"
+            matches = [name for name in all_names if name.endswith(target)]
+            if not matches:
+                continue
+
+            with archive.open(matches[0]) as file_obj:
+                ds = xr.open_dataset(io.BytesIO(file_obj.read()), engine="h5netcdf")
+
+            try:
+                if "layer" in ds.dims and "compress" in ds["layer"].attrs:
+                    ds = cfxr.decode_compress_to_multi_index(ds, "layer")
+
+                da = next(iter(ds.data_vars.values()))
+                da = _select_all_coords(da)
+                total += float(da.sum())
+            finally:
+                ds.close()
+
+    return total
