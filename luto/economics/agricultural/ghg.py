@@ -673,7 +673,7 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
             m = 0 if lm == 'dry' else 1
             for co2e_type in [
                 'CO2E_KG_HA_CROP_MGT',
-                'CO2E_KG_HA_SOIL',  # TODO: the column in the data refers to CO2E_KG_HA_SOIL_N_SURP
+                'CO2E_KG_HA_SOIL',
             ]:
                 # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:

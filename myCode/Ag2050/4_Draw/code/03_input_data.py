@@ -126,7 +126,7 @@ def _fit_ets_series(hist_s: pd.Series) -> pd.Series:
 
 def _load_productivity_abares():
     """Load ABARES productivity data for Beef, Crop, Dairy, and Sheep."""
-    df = pd.read_excel(ABARES_FORECAST_FILE, index_col=0)
+    df = pd.read_excel(ABARES_FORECAST_FILE, sheet_name='fitted_scenarios', index_col=0)
     hist, fut, trend = {}, {}, {}
     for cat, var in ABARES_VARS.items():
         sub = df[df['Variable'] == var]
@@ -139,7 +139,7 @@ def _load_productivity_abares():
 
 def _load_labour_cost():
     """Load labour cost history, forecast scenarios, and fitted line."""
-    df = pd.read_excel(LABOUR_COST_FORECAST, index_col=0)
+    df = pd.read_excel(LABOUR_COST_FORECAST, sheet_name='fitted_scenarios', index_col=0)
     hist = df.loc[df.index <= LC_HIST_END, 'Historical']
     trend = df.loc[df.index <= LC_HIST_END, 'Fitted']
     fut = {
@@ -353,8 +353,8 @@ def main():
                 ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(step))
                 break
 
-    out = os.path.join(OUTPUT_DIR, '03_input_data.png')
-    fig.savefig(out, dpi=250, bbox_inches='tight')
+    out = os.path.join(OUTPUT_DIR, '03_input_data.svg')
+    fig.savefig(out, dpi=600, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved: {out}')
 

@@ -639,31 +639,110 @@ For renewable products, the quantity is calculated as:
 
 def get_quantity_renewable(data, re_type: str, yr_idx: int):
     """
-    Return electricity yield [MWh] for renewable product `pr`.
-    
+    Return electricity yield [MWh] for renewable product `re_type`.
+
     Args:
-        data (object/module): Data object or module.
-        re_type (str): Renewable product that defined in settings.RENEWABLES_OPTIONS (e.g., 'Utility Solar PV').
+        data: Data object.
+        re_type (str): Renewable type defined in settings.RENEWABLES_OPTIONS (e.g., 'Utility Solar PV').
         yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
     """
+    if not settings.RENEWABLES_OPTIONS.get(re_type, False):
+        return np.zeros(data.NCELLS, dtype=np.float32)
 
     yr_cal = data.YR_CAL_BASE + yr_idx
-    
-    if not re_type in settings.RENEWABLES_OPTIONS:
-        raise KeyError(f"Renewable re_typeoduct '{re_type}' not found in settings.RENEWABLES_OPTIONS.")
-    
-    re_lyr = data.RENEWABLE_LAYERS.sel(Type=re_type, year=yr_cal)
-    
-    capacity_factor_multiplier = re_lyr['capacity_factor_multiplier']
-    distribution_loss_factor_multiplier = re_lyr['distribution_loss_factor_multiplier']
+
+    if re_type not in settings.RENEWABLES_OPTIONS:
+        raise KeyError(f"Renewable type '{re_type}' not found in settings.RENEWABLES_OPTIONS.")
+
+    yr_lyr = max(yr_cal, int(data.RENEWABLE_LAYERS['year'].values[0]))
+    re_lyr = data.RENEWABLE_LAYERS.sel(tech_name=re_type, year=yr_lyr)
+
     yield_per_ha = (
-        settings.INSTALL_CAPACITY_MW_HA[re_type] 
-        * capacity_factor_multiplier            # Range 0-1, indicates how much installed capacity is converted to electricity on average over the year.
-        * distribution_loss_factor_multiplier   # Range 0-1, indicates how much electricity was sent to customers.
+        settings.INSTALL_CAPACITY_MW_HA[re_type]
+        * re_lyr['capacity_factor_multiplier']
+        * re_lyr['distribution_loss_factor_multiplier']
         * 365 * 24
     )
+    return (yield_per_ha * data.REAL_AREA).data.astype(np.float32)
 
-    quantity = yield_per_ha * data.REAL_AREA
-    
-    return quantity.data.astype(np.float32)
+
+def get_exist_renewable_capacity(data, re_type: str, yr_cal: int):
+    """
+    Return per-cell delivered MWh for existing renewable capacity installed up to yr_cal (inclusive).
+
+    Args:
+        data: Data object.
+        re_type (str): 'Utility Solar PV' or 'Onshore Wind'.
+        yr_cal (int): Upper-bound calendar year (inclusive).
+
+    Returns:
+        xr.DataArray over 'cell' dimension [MWh/year].
+    """
+    layer = (
+        data.RENEWABLE_EXISTING_CAPACITY_LAYER_SOLAR_MWH_CELL
+        if re_type == 'Utility Solar PV'
+        else data.RENEWABLE_EXISTING_CAPACITY_LAYER_WIND_MWH_CELL
+    )
+    existing_yrs = layer['year'].values
+    valid_yrs    = existing_yrs[existing_yrs <= yr_cal]
+
+    if valid_yrs.size == 0:
+        return layer.isel(year=0).drop_vars('year') * 0.0
+
+    re_lyr = data.RENEWABLE_LAYERS.sel(year=2030)
+    return (
+        layer.sel(year=valid_yrs).sum('year')
+        * re_lyr['capacity_factor_multiplier'].sel(tech_name=re_type)
+        * re_lyr['distribution_loss_factor_multiplier']
+    )
+
+
+def get_exist_renewable_capacity_by_state(data, yr_cal: int) -> dict:
+    """
+    Return existing renewable capacity (delivered MWh) grouped by state and type.
+
+    Return format: {state: {'Utility Solar PV': MWh, 'Onshore Wind': MWh}}
+    """
+    if not any(settings.RENEWABLES_OPTIONS.values()):
+        return {}
+
+    solar_lyr = (
+        get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal)
+        .assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+    )
+    wind_lyr = (
+        get_exist_renewable_capacity(data, 'Onshore Wind', yr_cal)
+        .assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+    )
+    solar_dict = solar_lyr.groupby('state').sum('cell').to_dataframe('capacity_MWh').to_dict()['capacity_MWh']
+    wind_dict  = wind_lyr.groupby('state').sum('cell').to_dataframe('capacity_MWh').to_dict()['capacity_MWh']
+    return {
+        state: {'Utility Solar PV': solar_dict[state], 'Onshore Wind': wind_dict[state]}
+        for state in solar_dict.keys() | wind_dict.keys()
+    }
+
+
+def get_existing_renewable_dvar_fraction(data, re_type: str, yr_cal: int) -> np.ndarray:
+    """
+    Return the cumulative area fraction of existing renewable capacity up to yr_cal.
+
+    Args:
+        data: Data object.
+        re_type (str): 'Utility Solar PV' or 'Onshore Wind'.
+        yr_cal (int): Calendar year.
+    """
+    if not any(settings.RENEWABLES_OPTIONS.values()):
+        return np.zeros(data.NCELLS, dtype=np.float32)
+
+    if re_type == 'Utility Solar PV':
+        lyr = data.RENEWABME_EXISTING_DVAR_FRACTION_SOLAR
+    elif re_type == 'Onshore Wind':
+        lyr = data.RENEWABME_EXISTING_DVAR_FRACTION_WIND
+    else:
+        raise KeyError(f"Renewable type '{re_type}' not found in existing dvar fraction data.")
+
+    valid_yrs = lyr['year'].values[lyr['year'].values <= yr_cal]
+    if valid_yrs.size == 0:
+        return np.zeros(data.NCELLS, dtype=np.float32)
+    return lyr.sel(year=valid_yrs).sum('year').clip(max=1).data
 

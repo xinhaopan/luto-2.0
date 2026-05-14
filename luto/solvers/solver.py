@@ -22,6 +22,15 @@
 Provides minimalist Solver class and pure helper functions.
 """
 
+import os
+import pathlib
+
+# Prefer ~/gurobi.lic over system-wide C:\gurobi\gurobi.lic (which may hold an
+# expired token-server entry). Only applies if GRB_LICENSE_FILE is not already set.
+_home_lic = pathlib.Path.home() / 'gurobi.lic'
+if _home_lic.exists():
+    os.environ.setdefault('GRB_LICENSE_FILE', str(_home_lic))
+
 import numpy as np
 import gurobipy as gp
 import luto.settings as settings
@@ -295,7 +304,8 @@ class LutoSolver:
         """
         print("│   └── Setting up decision variables for soft constraints...")
         
-        self.V = self.gurobi_model.addMVar(self._input_data.ncms, lb=0, name="V") # force lb=0 to make sure demand penalties are positive; i.e., demand must be met or exceeded
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            self.V = self.gurobi_model.addMVar(self._input_data.ncms, lb=0, name="V")  # lb=0: demand must be met or exceeded
 
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.E = self.gurobi_model.addVar(name="E")
@@ -409,21 +419,24 @@ class LutoSolver:
     def _setup_penalty_objectives(self):
         print("    └── setting up objective for soft constraints...")
 
-        penalty_ghg = 0
-        penalty_water = 0
-        
+        penalty_ghg = gp.LinExpr(0)
+        penalty_water = gp.LinExpr(0)
+
         weight_ghg = 0
         weight_water = 0
 
         # Get the penalty values for each sector
-        penalty_demand = (
-            gp.quicksum(
-                self.V[c] * self._input_data.scale_factors['Demand'] * price
-                for c, price in enumerate(self._input_data.economic_prices)
-            ) 
-            * settings.SOLVER_WEIGHT_DEMAND
-            / 1e6  # Convert to million AUD
-        )
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            penalty_demand = (
+                gp.quicksum(
+                    self.V[c] * self._input_data.scale_factors['Demand'] * price
+                    for c, price in enumerate(self._input_data.economic_prices)
+                )
+                * settings.SOLVER_WEIGHT_DEMAND
+                / 1e6  # Convert to million AUD
+            )
+        else:
+            penalty_demand = gp.LinExpr(0)
     
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             weight_ghg = settings.SOLVER_WEIGHT_GHG
@@ -631,15 +644,36 @@ class LutoSolver:
             for c in range(self._input_data.ncms)
         ]
 
-        lower_bound_constraints = self.gurobi_model.addConstrs(
-            (
-                (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) == self.V[c] 
-                for c in range(self._input_data.ncms)
-            ),  name="demand_soft_bound_lower"
-        )
-
-        # self.demand_penalty_constraints.extend(upper_bound_constraints.values())
-        self.demand_penalty_constraints.extend(lower_bound_constraints.values())
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            lower_bound_constraints = self.gurobi_model.addConstrs(
+                (
+                    (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) == self.V[c]
+                    for c in range(self._input_data.ncms)
+                ),  name="demand_soft_bound_lower"
+            )
+            self.demand_penalty_constraints.extend(lower_bound_constraints.values())
+        else:
+            print("│   ├── Adding <hard> demand constraints (lower + upper bounds, no penalty)...")
+            lower_bound_constraints = self.gurobi_model.addConstrs(
+                (
+                    self.total_q_exprs_c[c] >= self._input_data.limits['demand_rescale'][c]
+                    for c in range(self._input_data.ncms)
+                ),  name="demand_hard_bound_lower"
+            )
+            upper_bound_constraints = self.gurobi_model.addConstrs(
+                (
+                    self.total_q_exprs_c[c] <= (
+                        self._input_data.limits['demand_rescale'][c]
+                        * settings.DEMAND_UPPER_BOUND.get(
+                            self._input_data.commodity_names[c],
+                            settings.DEMAND_UPPER_BOUND['__default__']
+                        )
+                    )
+                    for c in range(self._input_data.ncms)
+                ),  name="demand_hard_bound_upper"
+            )
+            self.demand_penalty_constraints.extend(lower_bound_constraints.values())
+            self.demand_penalty_constraints.extend(upper_bound_constraints.values())
 
 
     def _get_water_net_yield_expr_for_region(
@@ -732,7 +766,7 @@ class LutoSolver:
 
     def _add_renewable_energy_constraints(self) -> None:
 
-        if settings.RENEWABLE_ENERGY_CONSTRAINTS == "off":
+        if not any(settings.RENEWABLES_OPTIONS.values()):
             print("│   └── TURNING OFF renewable energy constraints ...")
             return
 

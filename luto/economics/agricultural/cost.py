@@ -29,7 +29,8 @@ import pandas as pd
 
 from luto.data import Data
 import luto.settings as settings
-from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
+import xarray as xr
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity, get_exist_renewable_capacity
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from functools import lru_cache
 
@@ -521,95 +522,191 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
     
     return cost_mrj
 
-def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
+def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool = True):
     """
     Applies Utility Solar PV cost effects.
-    Calculates: (Base Ag Cost * Multiplier) + (Solar CAPEX + OPEX)
+    Calculates: (Base Ag Cost * OM multiplier) + (Solar OPEX + amortised CAPEX)
+
+    Args:
+        aggregate: If True (default), return combined array. If False, return {'opex': ..., 'capex': ...}.
     """
-
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
-    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    
-    # Initialize output matrix: (LandManagements x Cells x LandUses)
-    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+    lu_codes  = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal    = data.YR_CAL_BASE + yr_idx
 
-    # Return zeros if management is disabled globally
+    zeros = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
-        return new_c_mrj
+        return zeros if aggregate else {'opex': zeros, 'capex': zeros.copy()}
+
+    opex_mrj  = np.zeros_like(zeros)
+    capex_mrj = np.zeros_like(zeros)
+
+    yr_lyr = max(yr_cal, int(data.RENEWABLE_LAYERS['year'].values[0]))
+    re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Utility Solar PV', year=yr_lyr)
+
+    re_cost_operation_AUD_cell = (
+        re_lyr['Cost_of_operation_AUD_kw']
+        * 1000                                                   # AUD/kW → AUD/MW
+        * 0.6944                                                 # 2024 AUD → 2010 AUD
+        * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # AUD/MW → AUD/ha
+        * data.REAL_AREA                                         # AUD/ha → AUD/cell
+    )
+    re_cost_install_AUD_cell = tools.amortise(
+        re_lyr['Cost_of_install_AUD_kw']
+        * 1000
+        * 0.6944
+        * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']
+        * data.REAL_AREA
+    )
 
     for lu_idx, lu in enumerate(land_uses):
-
         om_mult = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['OM_Cost_Multiplier'].item()
-        
-        # Cost of renewable energy impact on the original land-use
-        #   i.e., 1.05 means a 5% increase in operating costs
         j = lu_codes[lu_idx]
         ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
-        # Cost of renewable energy operation/maintenance
-        re_lyr = data.RENEWABLE_LAYERS.sel(Type='Utility Solar PV', year=yr_cal)
-        re_cost_operation_AUD_ha = (
-            re_lyr['Cost_of_operation_AUD_kw'] 
-            * 1000                                                  # Convert from AUD/kW to AUD/MW
-            * 0.6944                                                # Adjust AUD from 2024 to 2010
-            * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha 
-            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell 
-        )
+        opex_mrj[:, :, lu_idx]  = ag_cost_delta + re_cost_operation_AUD_cell.data[None, :]
+        capex_mrj[:, :, lu_idx] = re_cost_install_AUD_cell.data[None, :]
 
-        # Assign combined cost effects to output matrix
-        new_c_mrj[:, :, lu_idx] = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]
-        
-
-    return new_c_mrj
+    if aggregate:
+        return opex_mrj + capex_mrj
+    return {'opex': opex_mrj, 'capex': capex_mrj}
 
 
-
-def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
+def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool = True):
     """
     Applies Onshore Wind cost effects.
-    Calculates: (Base Ag Cost * Multiplier) + (Wind CAPEX + OPEX)
+    Calculates: (Base Ag Cost * OM multiplier) + (Wind OPEX + amortised CAPEX)
+
+    Args:
+        aggregate: If True (default), return combined array. If False, return {'opex': ..., 'capex': ...}.
     """
-
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
-    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    
-    # Initialize output matrix: (LandManagements x Cells x LandUses)
-    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+    lu_codes  = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal    = data.YR_CAL_BASE + yr_idx
 
-    # Return zeros if management is disabled globally
+    zeros = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
-        return new_c_mrj
+        return zeros if aggregate else {'opex': zeros, 'capex': zeros.copy()}
 
+    opex_mrj  = np.zeros_like(zeros)
+    capex_mrj = np.zeros_like(zeros)
+
+    yr_lyr = max(yr_cal, int(data.RENEWABLE_LAYERS['year'].values[0]))
+    re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Onshore Wind', year=yr_lyr)
+
+    re_cost_operation_AUD_cell = (
+        re_lyr['Cost_of_operation_AUD_kw']
+        * 1000
+        * 0.6944
+        * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']
+        * data.REAL_AREA
+    )
+    re_cost_install_AUD_cell = tools.amortise(
+        re_lyr['Cost_of_install_AUD_kw']
+        * 1000
+        * 0.6944
+        * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']
+        * data.REAL_AREA
+    )
 
     for lu_idx, lu in enumerate(land_uses):
-
         om_mult = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')
         if om_mult.empty:
-            print(f"Warning: No operationg cost multiplier found for {lu} in year {yr_cal} for Onshore Wind. Using 1.0 as default.")
+            print(f"Warning: No OM cost multiplier for {lu} in {yr_cal} (Onshore Wind). Using 1.0.")
             om_mult = 1.0
         else:
             om_mult = om_mult['OM_Cost_Multiplier'].item()
-        
-        # Cost of renewable energy impact on the original land-use
-        #   i.e., 1.05 means a 5% increase in operating costs
         j = lu_codes[lu_idx]
         ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
-        # Cost of renewable energy operation/maintenance
-        re_lyr = data.RENEWABLE_LAYERS.sel(Type='Onshore Wind', year=yr_cal) 
-        re_cost_operation_AUD_ha = (
-            re_lyr['Cost_of_operation_AUD_kw'] 
-            * 1000                                                  # Convert from AUD/kW to AUD/MW
-            * 0.6944                                                # Adjust AUD from 2024 to 2010
-            * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']       # Convert from AUD/MW to AUD/ha
-            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
-        )
+        opex_mrj[:, :, lu_idx]  = ag_cost_delta + re_cost_operation_AUD_cell.data[None, :]
+        capex_mrj[:, :, lu_idx] = re_cost_install_AUD_cell.data[None, :]
 
-        # Assign combined cost effects to output matrix
-        new_c_mrj[:, :, lu_idx] = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]
-    return new_c_mrj
+    if aggregate:
+        return opex_mrj + capex_mrj
+    return {'opex': opex_mrj, 'capex': capex_mrj}
+
+
+def get_utility_solar_pv_existing_cost_by_region(
+    data: Data, yr_idx: int, aggregate: bool = True, region: str = 'state', return_cells: bool = False
+) -> dict:
+    """
+    Return Utility Solar PV existing cost (OPEX + amortised CAPEX) grouped by region.
+
+    Args:
+        aggregate: If True (default), return {region: opex+capex}. If False, return {'opex': {...}, 'capex': {...}}.
+        region: 'state' (default) or 'NRM'.
+        return_cells: If True, return {'opex_r': DataArray, 'capex_r': DataArray} before regional groupby.
+    """
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        if return_cells:
+            zeros_r = xr.DataArray(np.zeros(data.NCELLS, dtype=np.float32), dims=['cell'])
+            return {'opex_r': zeros_r, 'capex_r': zeros_r}
+        return {} if aggregate else {'opex': {}, 'capex': {}}
+
+    region_names = data.REGION_NRM_NAME   if region == 'NRM' else data.REGION_STATE_NAME
+    region_key   = 'nrm'                  if region == 'NRM' else 'state'
+
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Utility Solar PV', year=2030)
+    cap_r  = get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal)
+
+    opex_r = (
+        cap_r / 8760 * 1000 * re_lyr['Cost_of_operation_AUD_kw']
+    ).assign_coords({region_key: ('cell', region_names)})
+
+    capex_r = (cap_r / 8760 * 1000 * re_lyr['Cost_of_install_AUD_kw']).assign_coords({region_key: ('cell', region_names)})
+    capex_r.data = tools.amortise(capex_r.data)
+
+    if return_cells:
+        return {'opex_r': opex_r, 'capex_r': capex_r}
+
+    opex_by_region  = opex_r.groupby(region_key).sum('cell').to_dataframe('v').to_dict()['v']
+    capex_by_region = capex_r.groupby(region_key).sum('cell').to_dataframe('v').to_dict()['v']
+    if aggregate:
+        return {r: opex_by_region[r] + capex_by_region[r] for r in opex_by_region}
+    return {'opex': opex_by_region, 'capex': capex_by_region}
+
+
+def get_onshore_wind_existing_cost_by_region(
+    data: Data, yr_idx: int, aggregate: bool = True, region: str = 'state', return_cells: bool = False
+) -> dict:
+    """
+    Return Onshore Wind existing cost (OPEX + amortised CAPEX) grouped by region.
+
+    Args:
+        aggregate: If True (default), return {region: opex+capex}. If False, return {'opex': {...}, 'capex': {...}}.
+        region: 'state' (default) or 'NRM'.
+        return_cells: If True, return {'opex_r': DataArray, 'capex_r': DataArray} before regional groupby.
+    """
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        if return_cells:
+            zeros_r = xr.DataArray(np.zeros(data.NCELLS, dtype=np.float32), dims=['cell'])
+            return {'opex_r': zeros_r, 'capex_r': zeros_r}
+        return {} if aggregate else {'opex': {}, 'capex': {}}
+
+    region_names = data.REGION_NRM_NAME   if region == 'NRM' else data.REGION_STATE_NAME
+    region_key   = 'nrm'                  if region == 'NRM' else 'state'
+
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Onshore Wind', year=2030)
+    cap_r  = get_exist_renewable_capacity(data, 'Onshore Wind', yr_cal)
+
+    opex_r = (
+        cap_r / 8760 * 1000 * re_lyr['Cost_of_operation_AUD_kw']
+    ).assign_coords({region_key: ('cell', region_names)})
+
+    capex_r = (cap_r / 8760 * 1000 * re_lyr['Cost_of_install_AUD_kw']).assign_coords({region_key: ('cell', region_names)})
+    capex_r.data = tools.amortise(capex_r.data)
+
+    if return_cells:
+        return {'opex_r': opex_r, 'capex_r': capex_r}
+
+    opex_by_region  = opex_r.groupby(region_key).sum('cell').to_dataframe('v').to_dict()['v']
+    capex_by_region = capex_r.groupby(region_key).sum('cell').to_dataframe('v').to_dict()['v']
+    if aggregate:
+        return {r: opex_by_region[r] + capex_by_region[r] for r in opex_by_region}
+    return {'opex': opex_by_region, 'capex': capex_by_region}
 
 
 def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):

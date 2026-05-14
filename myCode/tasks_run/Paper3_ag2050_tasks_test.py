@@ -27,7 +27,7 @@ Key differences from Paper2_tasks.py:
                         tables in settings.py
   • NON_AG_LAND_USES and AG_MANAGEMENTS are set per scenario via conditional_rules
   • Demand is loaded from All_LUTO_demand_scenarios_with_convergences.csv
-  • FLC multipliers from FLC_cost_multipliers.xlsx (scenario-specific sheet)
+  • FLC multipliers use the baseline cost_multipliers.xlsx/FLC_multiplier sheet
   • AC  multipliers from Area_cost.xlsx            (scenario-specific sheet)
   • Feedlot correction ratios applied per year for cost/revenue/water/GHG
 
@@ -95,9 +95,8 @@ _ag_man_limited = {                      # AgS3 & AgS4
     'Onshore Wind':            False,
 }
 
-
 grid_search = {
-    'TASK_NAME': ['20260324_Paper3_test'],
+    'TASK_NAME': ['20260513_Paper3_test'],
     'KEEP_OUTPUTS': [True],
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
@@ -113,13 +112,15 @@ grid_search = {
     # and BIODIVERSITY_TARGET_GBF_2 via the mapping tables in settings.py.
     'AG2050_MODE': [True],
     'AG2050_SCENARIO': ['AgS1', 'AgS2', 'AgS3', 'AgS4'],
+    # Keep normal FLC from cost_multipliers.xlsx/FLC_multiplier for this test.
+    'AG2050_USE_FLC_SCENARIO': [False],
 
     # ---- Model settings -----------------------------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [15],
+    'RESFACTOR': [5],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],
 
     # ---- GHG settings -------------------------------------------------------
@@ -170,7 +171,7 @@ grid_search = {
     # Demand is read from All_LUTO_demand_scenarios_with_convergences.csv when
     # AG2050_MODE is True; APPLY_DEMAND_MULTIPLIERS is skipped automatically.
     'DYNAMIC_PRICE': [False],
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],
+    'DEMAND_CONSTRAINT_TYPE': ['hard'],
 
     # ---- Per-scenario land use & management options -------------------------
     # Two variants each; conditional_rules below select the correct pair.

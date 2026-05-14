@@ -1,4 +1,4 @@
-import os, re, json
+import os, re, json, pathlib
 import shutil, itertools, subprocess, zipfile
 import pandas as pd
 import numpy as np
@@ -77,10 +77,11 @@ def submit_task(task_root_dir: str, col: str, platform: Literal['aquila', 'Denet
         'Write':   'write_mode.flag',
         'Rewrite': 'rewrite_mode.flag',
         'Report':  'report_mode.flag',
+        'Rereport':'rereport_mode.flag',
         'Zip':     'zip_mode.flag',
     }
     if model_name not in _FLAG_MAP:
-        raise ValueError('model_name must be either "Run", "Write", "Rewrite", "Report", or "Zip"!')
+        raise ValueError('model_name must be either "Run", "Write", "Rewrite", "Report", "Rereport", or "Zip"!')
     script_name = 'python_script.py'
     shutil.copyfile(f'bash_scripts/{script_name}', f'{task_root_dir}/{col}/{script_name}')
     for flag_name in [flag for flag in _FLAG_MAP.values() if flag]:
@@ -124,9 +125,16 @@ def submit_task(task_root_dir: str, col: str, platform: Literal['aquila', 'Denet
     try:
         with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
              open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
-            if platform == 'Denethor' or platform == 'aquila':
+            if platform == 'Denethor':
                 result = subprocess.run(['python', script_name],
                                         cwd=f'{task_root_dir}/{col}',
+                                        stdout=std_file, stderr=err_file)
+            elif platform == 'aquila':
+                _lic = pathlib.Path.home() / 'gurobi.lic'
+                _env = {**os.environ, 'GRB_LICENSE_FILE': str(_lic)} if _lic.exists() else None
+                result = subprocess.run(['python', script_name],
+                                        cwd=f'{task_root_dir}/{col}',
+                                        env=_env,
                                         stdout=std_file, stderr=err_file)
             elif platform == 'NCI':
                 result = subprocess.run(['bash', 'task_cmd.sh',script_name],
@@ -264,7 +272,7 @@ def create_task_runs(
     n_workers:int=4,
     max_concurrent_tasks:int=300,
     use_parallel:bool=True,
-    model_name:Literal['Run','Write','Rewrite','Report','Zip']='Run'
+    model_name:Literal['Run','Write','Rewrite','Report','Rereport','Zip']='Run'
 ) -> None:
     check_platform_system(platform)
     if platform == 'NCI':

@@ -444,13 +444,16 @@ class Data:
         # Only active when settings.AG2050_MODE is True.                     #
         # ------------------------------------------------------------------ #
         if settings.AG2050_MODE and settings.AG2050_SCENARIO:
-            flc_sheet = settings.AG2050_FLC_MAP[settings.AG2050_SCENARIO]
             ac_sheet  = settings.AG2050_AC_MAP[settings.AG2050_SCENARIO]
-            print(f"│   ├── [AG2050] Overriding FLC multipliers from FLC_cost_multipliers.xlsx sheet='{flc_sheet}'", flush=True)
-            self.FLC_COST_MULTS = pd.read_excel(
-                os.path.join(settings.INPUT_DIR, 'FLC_cost_multipliers.xlsx'),
-                sheet_name=flc_sheet, index_col="Year"
-            )
+            if not settings.AG2050_USE_FLC_SCENARIO:
+                print("│   ├── [AG2050] Keeping baseline FLC multipliers from cost_multipliers.xlsx sheet='FLC_multiplier'", flush=True)
+            else:
+                flc_sheet = settings.AG2050_FLC_MAP[settings.AG2050_SCENARIO]
+                print(f"│   ├── [AG2050] Overriding FLC multipliers from FLC_cost_multipliers.xlsx sheet='{flc_sheet}'", flush=True)
+                self.FLC_COST_MULTS = pd.read_excel(
+                    os.path.join(settings.INPUT_DIR, 'FLC_cost_multipliers.xlsx'),
+                    sheet_name=flc_sheet, index_col="Year"
+                )
             print(f"│   └── [AG2050] Overriding AC multipliers from Area_cost.xlsx sheet='{ac_sheet}'", flush=True)
             # Area_cost.xlsx has a two-row header: row 0 = lm (dry/irr), row 1 = LU name.
             # We read with header=1 (LU names as columns), drop the redundant Year
@@ -750,7 +753,7 @@ class Data:
         print("├── Loading agricultural management options' data", flush=True)
 
         # Asparagopsis taxiformis data
-        asparagopsis_file = os.path.join(settings.INPUT_DIR, "20250415_Bundle_MR.xlsx")
+        asparagopsis_file = os.path.join(settings.INPUT_DIR, "20260317_Bundle_MR.xlsx")
         self.ASPARAGOPSIS_DATA = {}
         self.ASPARAGOPSIS_DATA["Beef - modified land"] = pd.read_excel(
             asparagopsis_file, sheet_name="MR bundle (ext cattle)", index_col="Year"
@@ -766,7 +769,7 @@ class Data:
         ]
 
         # Precision agriculture data
-        prec_agr_file = os.path.join(settings.INPUT_DIR, "20231101_Bundle_AgTech_NE.xlsx")
+        prec_agr_file = os.path.join(settings.INPUT_DIR, "20260317_Bundle_AgTech_NE.xlsx")
         self.PRECISION_AGRICULTURE_DATA = {}
         int_cropping_data = pd.read_excel(
             prec_agr_file, sheet_name="AgTech NE bundle (int cropping)", index_col="Year"
@@ -776,7 +779,7 @@ class Data:
         )
         horticulture_data = pd.read_excel(
             prec_agr_file, sheet_name="AgTech NE bundle (horticulture)", index_col="Year"
-        )
+        ).rename(columns={'CO2E_KG_HA_SOIL_N_SURP': 'CO2E_KG_HA_SOIL'})
 
         for lu in [
             "Hay",
@@ -829,7 +832,7 @@ class Data:
 
 
         # Load AgTech EI data
-        prec_agr_file = os.path.join(settings.INPUT_DIR, '20231107_Bundle_AgTech_EI.xlsx')
+        prec_agr_file = os.path.join(settings.INPUT_DIR, '20260317_Bundle_AgTech_EI.xlsx')
         self.AGTECH_EI_DATA = {}
         int_cropping_data = pd.read_excel( prec_agr_file, sheet_name='AgTech EI bundle (int cropping)', index_col='Year' )
         cropping_data = pd.read_excel( prec_agr_file, sheet_name='AgTech EI bundle (cropping)', index_col='Year' )
@@ -850,7 +853,7 @@ class Data:
             self.AGTECH_EI_DATA[lu] = horticulture_data
 
         # Load BioChar data
-        biochar_file = os.path.join(settings.INPUT_DIR, '20240918_Bundle_BC.xlsx')
+        biochar_file = os.path.join(settings.INPUT_DIR, '20260401_Bundle_BC.xlsx')
         self.BIOCHAR_DATA = {}
         cropping_data = pd.read_excel(biochar_file, sheet_name='Biochar (cropping)', index_col='Year' )
         horticulture_data = pd.read_excel(biochar_file, sheet_name='Biochar (horticulture)', index_col='Year' )
@@ -870,31 +873,100 @@ class Data:
         # #########################################################
         # RENEWABLE ENERGY DATA LOADING                           #
         # #########################################################
-        print("├── Loading renewable energy data...", flush=True)
+        if any(settings.RENEWABLES_OPTIONS.values()):
 
-        # Renewable targets and prices
-        self.RENEWABLE_TARGETS = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv').sort_values('STATE')    # Ensure targets are sorted by state for consistent mapping to region codes.
-        self.RENEWABLE_TARGETS['Renewable_Target_MWh'] = self.RENEWABLE_TARGETS['Renewable_Target_TWh'] * 1e6       # Convert TWh to MWh
-        
-        #self.RENEWABLE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
-        self.SOLAR_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')
-        self.WIND_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
-        
-        # Renewable energy ralated raster layers
-        self.RENEWABLE_LAYERS = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc').isel(cell=self.MASK)
-        
-        # TODO: remove when all years of renewable layers are available. 
-        #   Now is a temporary fix to expand the 2010 layers across all years.
-        self.RENEWABLE_LAYERS = (
-            self.RENEWABLE_LAYERS
-            .squeeze('year', drop=True)
-            .expand_dims({'year': range(2010, 2051)})
-        )
-        
-        # Renewable bundle data (productivity impacts, cost multipliers, etc)
-        renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
-        self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
-        self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
+            print("├── Loading renewable energy data...", flush=True)
+
+            # Renewable bundle data (productivity impacts, cost multipliers, etc)
+            renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
+            self.RENEWABLE_BUNDLE_WIND  = renewable_bundle.query('Lever == "Onshore Wind"')
+            self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
+
+            # Renewable targets and prices
+            self.RENEWABLE_TARGETS = (
+                pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv')
+                .sort_values('state')
+                .query('scen == @settings.RENEWABLE_TARGET_SCENARIO_TARGETS')
+                .assign(Renewable_Target_MWh=lambda df: df['Renewable_Target_TWh'] * 1e6)
+            )
+            self.SOLAR_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')
+            self.WIND_PRICES  = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
+
+            # Renewable energy spatial layers (scenario-specific, multi-year)
+            self.RENEWABLE_LAYERS = (
+                xr.open_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc')
+                .sel(scenario=settings.RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS)
+                .compute()
+                .isel(cell=self.MASK)
+            )
+
+            # Existing installed capacity (MW per cell per year, per technology)
+            renewable_existing_capacity_lyr = xr.load_dataarray(
+                f'{settings.INPUT_DIR}/renewable_existing_capacity_MW_1D.nc'
+            )
+            renewable_existing_capacity_solar = [
+                xr.DataArray(
+                    self.get_resfactored_sum(
+                        renewable_existing_capacity_lyr.sel(year=year, tech_name='Utility Solar PV').values
+                    ),
+                    dims=['cell'],
+                    coords={'cell': np.where(self.MASK)[0]}
+                ).astype(np.float32)
+                for year in renewable_existing_capacity_lyr['year'].values
+            ]
+            renewable_existing_capacity_wind = [
+                xr.DataArray(
+                    self.get_resfactored_sum(
+                        renewable_existing_capacity_lyr.sel(year=year, tech_name='Onshore Wind').values
+                    ),
+                    dims=['cell'],
+                    coords={'cell': np.where(self.MASK)[0]}
+                ).astype(np.float32)
+                for year in renewable_existing_capacity_lyr['year'].values
+            ]
+            self.RENEWABLE_EXISTING_CAPACITY_LAYER_SOLAR_MWH_CELL = (
+                xr.concat(renewable_existing_capacity_solar, dim='year')
+                .assign_coords(year=renewable_existing_capacity_lyr['year'].values)
+                * 24 * 365
+            )
+            self.RENEWABLE_EXISTING_CAPACITY_LAYER_WIND_MWH_CELL = (
+                xr.concat(renewable_existing_capacity_wind, dim='year')
+                .assign_coords(year=renewable_existing_capacity_lyr['year'].values)
+                * 24 * 365
+            )
+
+            # Existing dvar area fraction (fraction of cell occupied by existing renewables)
+            re_exist_frac_lyr = xr.load_dataarray(
+                f'{settings.INPUT_DIR}/renewable_existing_capacity_area_fraction_1D.nc'
+            )
+            re_exist_frac_solar = [
+                xr.DataArray(
+                    self.get_resfactored_average_fraction(
+                        re_exist_frac_lyr.sel(year=year, tech_name='Utility Solar PV').values
+                    ),
+                    dims=['cell'],
+                    coords={'cell': np.where(self.MASK)[0]}
+                ).astype(np.float32)
+                for year in re_exist_frac_lyr['year'].values
+            ]
+            re_exist_frac_wind = [
+                xr.DataArray(
+                    self.get_resfactored_average_fraction(
+                        re_exist_frac_lyr.sel(year=year, tech_name='Onshore Wind').values
+                    ),
+                    dims=['cell'],
+                    coords={'cell': np.where(self.MASK)[0]}
+                ).astype(np.float32)
+                for year in re_exist_frac_lyr['year'].values
+            ]
+            self.RENEWABME_EXISTING_DVAR_FRACTION_SOLAR = (
+                xr.concat(re_exist_frac_solar, dim='year')
+                .assign_coords(year=re_exist_frac_lyr['year'].values)
+            )
+            self.RENEWABME_EXISTING_DVAR_FRACTION_WIND = (
+                xr.concat(re_exist_frac_wind, dim='year')
+                .assign_coords(year=re_exist_frac_lyr['year'].values)
+            )
         
 
     
@@ -1464,13 +1536,18 @@ class Data:
             }
         ) 
 
-        # Price elasticity data
-        demand_supply_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').drop(columns=['Unnamed: 0'])
-        demand_supply_elasticity = demand_supply_elasticity.sort_values('Commodity')    # Sort by commodity to ensure the order is correct
-        demand_supply_elasticity['Demand Elasticity(ED)'] = demand_supply_elasticity['Demand Elasticity(ED)'] * -1 # ED is subtracted from supply becase demand curve are given as negative numbers
-        
-        self.elasticity_demand = demand_supply_elasticity['Demand Elasticity(ED)']
-        self.elasticity_supply = demand_supply_elasticity['Supply Elasticity (Es)']
+        # Price elasticity data — only needed when DYNAMIC_PRICE is enabled
+        if settings.DYNAMIC_PRICE:
+            demand_supply_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv')
+            if 'Unnamed: 0' in demand_supply_elasticity.columns:
+                demand_supply_elasticity = demand_supply_elasticity.drop(columns=['Unnamed: 0'])
+            demand_supply_elasticity = demand_supply_elasticity.sort_values('Commodity')
+            demand_supply_elasticity['Demand Elasticity(ED)'] = demand_supply_elasticity['Demand Elasticity(ED)'] * -1
+            self.elasticity_demand = demand_supply_elasticity['Demand Elasticity(ED)']
+            self.elasticity_supply = demand_supply_elasticity['Supply Elasticity (Es)']
+        else:
+            self.elasticity_demand = None
+            self.elasticity_supply = None
 
    
 
@@ -1656,6 +1733,21 @@ class Data:
         ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
 
         self.BIO_GBF2_MASK = bio_quality_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
+
+        if any(settings.RENEWABLES_OPTIONS.values()) and settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+            self.RENEWABLE_GBF2_MASK_SOLAR = bio_quality_raw >= conservation_performance_curve[settings.RENEWABLE_GBF2_CUT_SOLAR]
+            self.RENEWABLE_GBF2_MASK_WIND  = bio_quality_raw >= conservation_performance_curve[settings.RENEWABLE_GBF2_CUT_WIND]
+
+        if any(settings.RENEWABLES_OPTIONS.values()) and settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+            mnes_rank_raw = xr.open_dataset(
+                os.path.join(settings.INPUT_DIR, 'renewable_QLD_EPBC_MNES_prioritization.nc')
+            )['data'].values[self.MASK]
+            mnes_performance = pd.read_csv(
+                os.path.join(settings.INPUT_DIR, 'renewable_QLD_EPBC_MNES_prioritization_performance.csv')
+            ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+            self.RENEWABLE_MNES_MASK_SOLAR = mnes_rank_raw >= mnes_performance[settings.RENEWABLE_EPBC_MNES_CUT_SOLAR]
+            self.RENEWABLE_MNES_MASK_WIND  = mnes_rank_raw >= mnes_performance[settings.RENEWABLE_EPBC_MNES_CUT_WIND]
+
         self.BIO_GBF2_MASK_LDS = np.where(
             self.SAVBURN_ELIGIBLE,
             self.BIO_GBF2_MASK  - (self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS)),
@@ -2058,7 +2150,36 @@ class Data:
 
         return arr_2d_xr_resfactored[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
 
-    
+
+    def get_resfactored_sum(self, arr: np.ndarray) -> np.ndarray:
+        """
+        Aggregate a full-resolution 1D array to the resfactored grid by summing.
+        Used for additive quantities (e.g., installed MW capacity).
+        When RESFACTOR == 1 the NLUM mask equals the study-area mask, so simple
+        boolean indexing is sufficient.
+        """
+        if settings.RESFACTOR == 1:
+            return arr[self.NLUM_MASK]
+
+        arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)
+        np.place(arr_2d, self.NLUM_MASK, arr)
+        arr_2d_xr = xr.DataArray(arr_2d, dims=['y', 'x'])
+        arr_2d_xr_rf = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').sum()
+        arr_2d_xr_rf = arr_2d_xr_rf.values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]]
+        return arr_2d_xr_rf[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
+
+
+    def get_resfactored_average_fraction(self, arr: np.ndarray) -> np.ndarray:
+        """
+        Aggregate a full-resolution 1D array to the resfactored grid by averaging.
+        Used for fractional quantities (e.g., area fraction occupied by renewables).
+        Delegates to get_average_fraction_from_int_map which uses .mean() coarsening.
+        """
+        if settings.RESFACTOR == 1:
+            return arr[self.NLUM_MASK]
+        return self.get_average_fraction_from_int_map(arr)
+
+
     def get_resfactored_lumap(self) -> np.ndarray:
         """
         Coarsens the LUMAP to the specified resolution factor.
@@ -2236,6 +2357,11 @@ class Data:
         if yr_cal in self.DEMAND_ELASTICITY_MUL:
             return self.DEMAND_ELASTICITY_MUL[yr_cal]
 
+        # When DYNAMIC_PRICE is off, skip elasticity calculation entirely
+        if not settings.DYNAMIC_PRICE:
+            self.DEMAND_ELASTICITY_MUL[yr_cal] = {c: 1 for c in self.COMMODITIES}
+            return self.DEMAND_ELASTICITY_MUL[yr_cal]
+
         # Get supply delta (0-based ratio)
         supply_base_dvar_base_production = self.BASE_YR_production_t
         supply_base_dvar_target_production = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
@@ -2248,12 +2374,7 @@ class Data:
 
         # Calculate price_multiplier (1-based ratio)
         price_delta = (delta_demand - delta_supply) / (self.elasticity_demand + self.elasticity_supply)
-        elasticity_multiplier = (price_delta + 1).to_dataframe('multiplier')['multiplier'].to_dict()
-
-        if settings.DYNAMIC_PRICE:
-            self.DEMAND_ELASTICITY_MUL[yr_cal] = elasticity_multiplier
-        else:
-            self.DEMAND_ELASTICITY_MUL[yr_cal] = {k: 1 for k in elasticity_multiplier.keys()}
+        self.DEMAND_ELASTICITY_MUL[yr_cal] = (price_delta + 1).to_dataframe('multiplier')['multiplier'].to_dict()
 
         return self.DEMAND_ELASTICITY_MUL[yr_cal]
     

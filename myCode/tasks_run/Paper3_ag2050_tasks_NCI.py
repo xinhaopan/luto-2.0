@@ -97,10 +97,10 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260414_Paper3_NCI'],
+    'TASK_NAME': ['20260512_Paper3_NCI'],
     'KEEP_OUTPUTS': [False],
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [3],
+    'NUMERIC_FOCUS': [0],
     # ---- Computational settings (not model parameters) ----------------------
     'MEM': ['68GB'],
     'NCPUS': ['17'],
@@ -170,7 +170,7 @@ grid_search = {
     # Demand is read from All_LUTO_demand_scenarios_with_convergences.csv when
     # AG2050_MODE is True; APPLY_DEMAND_MULTIPLIERS is skipped automatically.
     'DYNAMIC_PRICE': [False],
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],
+    'DEMAND_CONSTRAINT_TYPE': ['hard'],
 
     # ---- Per-scenario land use & management options -------------------------
     # Two variants each; conditional_rules below select the correct pair.

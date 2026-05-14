@@ -21,6 +21,7 @@ def predict_growth_index(
     use_index=True,
     draw_base_year=2010,
     align_scenarios_to_last_actual=True,
+    use_fitted_for_history=False,
 ):
     """
     Workflow:
@@ -31,6 +32,9 @@ def predict_growth_index(
 
     Returns:
         ax, df_return(index=Year, cols=['Low', 'Medium', 'High', 'Very_High'])
+        By default, scenario columns keep the historical actual values for
+        historical years. Set use_fitted_for_history=True to keep fitted values
+        in those scenario columns and retain actuals in the Historical column.
     """
     end_year = 2050
 
@@ -331,15 +335,16 @@ def predict_growth_index(
     df_return.columns = ["Year", "Low", "Medium", "High", "Very_High"]
     df_return = df_return.set_index("Year").reindex(np.arange(draw_base_year, end_year + 1))
 
-    hist_map = (
-        df[df["Year"] >= draw_base_year]
-        .set_index("Year")["Cost"]
-        .astype(float) / base_val
-    )
-    common_years = hist_map.index.intersection(df_return.index)
-    if len(common_years) > 0:
-        vals = hist_map.loc[common_years].values.reshape(-1, 1)
-        df_return.loc[common_years, ["Low", "Medium", "High", "Very_High"]] = vals
+    if not use_fitted_for_history:
+        hist_map = (
+            df[df["Year"] >= draw_base_year]
+            .set_index("Year")["Cost"]
+            .astype(float) / base_val
+        )
+        common_years = hist_map.index.intersection(df_return.index)
+        if len(common_years) > 0:
+            vals = hist_map.loc[common_years].values.reshape(-1, 1)
+            df_return.loc[common_years, ["Low", "Medium", "High", "Very_High"]] = vals
 
     # Save the exact data used in plotting as additional columns.
     df_return["Historical"] = np.nan
@@ -367,6 +372,7 @@ def predict_growth_index(
         if len(common_plot_years) > 0:
             df_return.loc[common_plot_years, col_name] = plot_idx.loc[common_plot_years]
 
-    df_return.fillna(1.0, inplace=True)
+    scenario_cols = ["Low", "Medium", "High", "Very_High"]
+    df_return[scenario_cols] = df_return[scenario_cols].fillna(1.0)
 
     return ax, df_return

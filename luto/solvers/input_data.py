@@ -116,6 +116,7 @@ class SolverInputData:
 
     lu2pr_pj: np.ndarray                                                # Conversion matrix: land-use to product(s).
     pr2cm_cp: np.ndarray                                                # Conversion matrix: product(s) to commodity.
+    commodity_names: list[str]                                          # Commodity names ordered by commodity index (matches pr2cm_cp rows).
     limits: dict                                                        # Targets to use.
     desc2aglu: dict                                                     # Map of agricultural land use descriptions to codes.
     real_area: np.ndarray                                               # Area of each cell, indexed by cell (r)
@@ -796,16 +797,16 @@ def get_limits(data: Data, base_year:int, target_year: int, resale_factors) -> d
         limits['ghg'] = data.GHG_TARGETS[target_year]
         limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
         
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on':
-        renewable_limit_tagt = data.RENEWABLE_TARGETS.query('Year == @target_year and SCENARIO == @settings.RENEWABLE_TARGET_SCENARIO')
-        renewbale_limit_base = data.RENEWABLE_TARGETS.query('Year == @base_year and SCENARIO == @settings.RENEWABLE_TARGET_SCENARIO')
+    if any(settings.RENEWABLES_OPTIONS.values()):
+        renewable_limit_tagt = data.RENEWABLE_TARGETS.query('Year == @target_year')
+        renewbale_limit_base = data.RENEWABLE_TARGETS.query('Year == @base_year')
         limits['renewable_solar'] = np.max([
-            renewable_limit_tagt.query('PRODUCT == "Electricity - Solar"')['Renewable_Target_MWh'].values,
-            renewbale_limit_base.query('PRODUCT == "Electricity - Solar"')['Renewable_Target_MWh'].values
+            renewable_limit_tagt.query('tech == "Utility Solar"')['Renewable_Target_MWh'].values,
+            renewbale_limit_base.query('tech == "Utility Solar"')['Renewable_Target_MWh'].values
         ], axis=0)
         limits['renewable_wind'] = np.max([
-            renewbale_limit_base.query('PRODUCT == "Electricity - Wind"')['Renewable_Target_MWh'].values,
-            renewable_limit_tagt.query('PRODUCT == "Electricity - Wind"')['Renewable_Target_MWh'].values
+            renewbale_limit_base.query('tech == "Wind"')['Renewable_Target_MWh'].values,
+            renewable_limit_tagt.query('tech == "Wind"')['Renewable_Target_MWh'].values
         ], axis=0)
         limits['renewable_solar_rescale'] = limits['renewable_solar'] / resale_factors['Renewable_Solar']
         limits['renewable_wind_rescale'] = limits['renewable_wind'] / resale_factors['Renewable_Wind']
@@ -945,7 +946,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     else:
         ghg_scale = 1.0
 
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on':
+    if any(settings.RENEWABLES_OPTIONS.values()):
         [renewable_solar_r], solar_scale = rescale_solver_input_data([renewable_solar_r])
         [renewable_wind_r],  wind_scale  = rescale_solver_input_data([renewable_wind_r])
     else:
@@ -1023,6 +1024,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
     lu2pr_pj=data.LU2PR
     pr2cm_cp=data.PR2CM
+    commodity_names=data.COMMODITIES
     limits=get_limits(data, base_year, target_year, scale_factors)
     desc2aglu=data.DESC2AGLU
     real_area=data.REAL_AREA
@@ -1095,6 +1097,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         lu2pr_pj,
         pr2cm_cp,
+        commodity_names,
         limits,
         desc2aglu,
         real_area,

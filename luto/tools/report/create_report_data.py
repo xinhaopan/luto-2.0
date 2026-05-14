@@ -1279,7 +1279,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     GHG_ag = GHG_files.query('base_name.str.contains("agricultural_landuse")').reset_index(drop=True)
     GHG_ag = pd.concat([pd.read_csv(path) for path in GHG_ag['path']], ignore_index=True)
     GHG_ag = GHG_ag.replace(GHG_NAMES).round({'Value (t CO2e)': 2})
-    GHG_ag_non_all = GHG_ag.query('Water_supply != "ALL" and Source != "ALL"').reset_index(drop=True)
+    GHG_ag_non_all = GHG_ag.query('Water_supply != "ALL" and Source != "ALL" and `Land-use` != "ALL"').reset_index(drop=True)
     
     GHG_non_ag = GHG_files.query('base_name.str.contains("no_ag_reduction")').reset_index(drop=True)
     _ghg_non_ag_list = [pd.read_csv(path) for path in GHG_non_ag['path'] if not pd.read_csv(path).empty]
@@ -2357,25 +2357,35 @@ def process_biodiversity_data(files, SAVE_DIR):
     
     
         
-    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
+    # Read the run-specific GBF2 setting from model_run_settings.txt (2 levels up from SAVE_DIR)
+    _run_settings_path = os.path.join(os.path.dirname(os.path.dirname(SAVE_DIR)), 'model_run_settings.txt')
+    _run_gbf2_setting = settings.BIODIVERSITY_TARGET_GBF_2  # fallback
+    if os.path.exists(_run_settings_path):
+        with open(_run_settings_path) as _f:
+            for _line in _f:
+                if _line.startswith('BIODIVERSITY_TARGET_GBF_2:'):
+                    _run_gbf2_setting = _line.split(':', 1)[1].strip()
+                    break
+
+    if _run_gbf2_setting != 'off':
 
         filter_str = '''
-            category == "biodiversity" 
+            category == "biodiversity"
             and base_name == "biodiversity_GBF2_priority_scores"
         '''.strip('').replace('\n','')
-        
+
         bio_paths = files.query(filter_str).reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round({'Value (%)': 2})
-            
+
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
-        
+
         # ---------------- (GBF2) ranking  ----------------
         bio_rank_total = bio_df_non_all\
             .groupby(['Year', 'region'])\
@@ -2393,13 +2403,18 @@ def process_biodiversity_data(files, SAVE_DIR):
             bio_rank_dict[region]['GBF2']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
             bio_rank_dict[region]['GBF2']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
             bio_rank_dict[region]['GBF2']['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
-            
+
 
         # ---------------- (GBF2) overview  ----------------
-        
-        # sum
-        bio_df_target = bio_df.groupby(['Year'])[['Priority Target (%)']].agg('first').reset_index()
-        bio_df_target = bio_df_target[['Year','Priority Target (%)']].values.tolist()
+
+        # sum: for maintain_historical the target is the fixed 2010 base-year value
+        _all_years = sorted(int(y) for y in bio_df['Year'].unique())
+        if _run_gbf2_setting == 'maintain_historical':
+            _base_target = round(float(bio_df[bio_df['Year'] == _all_years[0]]['Priority Target (%)'].iloc[0]), 2)
+            bio_df_target = [[yr, _base_target] for yr in _all_years]
+        else:
+            bio_df_target = bio_df.groupby(['Year'])[['Priority Target (%)']].agg('first').reset_index()
+            bio_df_target = bio_df_target[['Year','Priority Target (%)']].values.tolist()
 
         df_region = bio_df_non_all\
             .groupby(['Year', 'region', 'Type'])\

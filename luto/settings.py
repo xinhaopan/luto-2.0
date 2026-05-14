@@ -154,6 +154,20 @@ SOLVER_WEIGHT_DEMAND = 1
 SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 
+DEMAND_CONSTRAINT_TYPE = 'soft'   # 'soft': penalise under-production in objective (current behaviour)
+# DEMAND_CONSTRAINT_TYPE = 'hard'  # 'hard': enforce production >= demand (lower bound = 1.0x) and
+#                                  #         production <= DEMAND_UPPER_BOUND (upper bound per commodity)
+
+# Upper bound multipliers applied only when DEMAND_CONSTRAINT_TYPE == 'hard'.
+# Keys must match entries in data.COMMODITIES (lowercase). '__default__' applies to all others.
+DEMAND_UPPER_BOUND = {
+    'sheep meat':         1.15,
+    'sheep lexp':         1.10,
+    'sheep wool':         1.05,
+    'beef lexp':          1.05,
+    '__default__':        1.01,
+}
+
 RESCALE_FACTOR = 1e3
 '''
 All input data before feeding into the solver is rescaled in the range between 0 and this factor.
@@ -405,8 +419,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': None,   # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
-    'Onshore Wind': None,       # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
+    'Utility Solar PV': None,   # Set later from RENEWABLES_OPTIONS
+    'Onshore Wind': None,       # Set later from RENEWABLES_OPTIONS
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -463,51 +477,73 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 # ---------------------------------------------------------------------------- #
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
-RENEWABLE_ENERGY_CONSTRAINTS = 'off'         # 'on' or 'off'
+RENEWABLES_OPTIONS = {
+    'Utility Solar PV': False,
+    'Onshore Wind': False,
+}
 
-if RENEWABLE_ENERGY_CONSTRAINTS == 'on':
-    AG_MANAGEMENTS['Utility Solar PV'] = True
-    AG_MANAGEMENTS['Onshore Wind'] = True
-elif RENEWABLE_ENERGY_CONSTRAINTS == 'off':
-    AG_MANAGEMENTS['Utility Solar PV'] = False
-    AG_MANAGEMENTS['Onshore Wind'] = False
-else:
-    raise ValueError("Invalid value for RENEWABLE_ENERGY_CONSTRAINTS. Must be 'on' or 'off'.")
+AG_MANAGEMENTS['Utility Solar PV'] = RENEWABLES_OPTIONS['Utility Solar PV']
+AG_MANAGEMENTS['Onshore Wind']     = RENEWABLES_OPTIONS['Onshore Wind']
 
-RENEWABLES_OPTIONS = [
-    'Utility Solar PV',
-    'Onshore Wind'
-]
-
-RENEWABLE_TARGET_SCENARIO =  'CNS25 - Accelerated Transition' # one of 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
+EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS = True
 '''
-The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
-One of 'CNS25 - Accelerated Transition' or 'CNS25 - Current Targets', 
+Whether to exclude renewable energy installation on cells inside the GBF2 masked layer.
+'''
+RENEWABLE_GBF2_CUT_SOLAR = 20
+RENEWABLE_GBF2_CUT_WIND  = 20
+'''
+Biodiversity area coverage % threshold for GBF2-based renewable exclusion.
+Cells with biodiversity quality >= the conservation performance curve value at this cut are excluded.
+'''
+
+EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK = True
+'''
+Whether to exclude renewable energy installation on cells inside the EPBC MNES prioritization layer.
+'''
+RENEWABLE_EPBC_MNES_CUT_SOLAR = 10
+RENEWABLE_EPBC_MNES_CUT_WIND  = 10
+'''
+MNES area coverage % threshold for EPBC-based renewable exclusion.
+'''
+
+RENEWABLE_TARGET_SCENARIO_TARGETS = 'Gladstone - Core'
+'''
+The renewable energy target scenario to use for generation targets.
+One of:
+ - 'AEMO 2026 ISP - Accelerated Transition'
+ - 'AEMO 2026 ISP - Slower Growth'
+ - 'AEMO 2026 ISP - Step Change'
+ - 'Gladstone - BESS Sensitivity'
+ - 'Gladstone - Core'
+'''
+
+RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'
+'''
+The renewable energy scenario for spatial input layers.
+One of: 'step_change', 'accelerated_transition', 'ANU_transmission_T3',
+        'ANU_transmission_T5', 'ANU_transmission_T10'.
 '''
 
 RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
 '''
-The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+The spatial level at which to apply the renewable energy targets.
 Options include "STATE" or "NRM". Currently (20260205) only support STATE.
 '''
 
 INSTALL_CAPACITY_MW_HA = {
     "Utility Solar PV": 0.45,
-    "Onshore Wind": 0.04,  
+    "Onshore Wind": 0.04,
 }
 '''
-The per/ha capacity (Mw/ha) for each renewable energy management type.
+The per/ha capacity (MW/ha) for each renewable energy management type.
 '''
 
-
 RENEWABLES_ADOPTION_LIMITS = {
-    'Utility Solar PV': 1.0,        # Maximum proportion of land that can be used for Utility Solar PV
-    'Onshore Wind': 1.0,            # Maximum proportion of land that can be used for Onshore Wind
+    'Utility Solar PV': 1.0,
+    'Onshore Wind': 1.0,
 }
 '''
 The maximum proportion of land that can be used for each renewable energy management type.
-For example, if RENEWABLES_ADOPTION_LIMITS['Utility Solar PV'] = 0.5, then at most 50% of 
-the land can be used for Utility Solar PV.
 '''
 
 
@@ -1172,6 +1208,7 @@ AG2050_PRODUCTIVITY_MAP = {
 }
 
 # Fixed-labour-cost multiplier: maps to sheet name in FLC_cost_multipliers.xlsx
+AG2050_USE_FLC_SCENARIO = True
 AG2050_FLC_MAP = {
     'AgS1': 'FLC_multiplier_high',
     'AgS2': 'FLC_multiplier_high',   # Same sheet as AgS1

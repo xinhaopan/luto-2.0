@@ -9,7 +9,11 @@ import pandas as pd
 from pathlib import Path
 from openpyxl import load_workbook
 import copy
+import shutil
 import matplotlib.collections as mcoll
+
+RESULTS_DIR = Path("../3_Results")
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------- 配置 ----------
 def preprocessed_df(df):
@@ -56,7 +60,8 @@ for sheet_name, var_name in sheet_configs:
         base_year=2010,
         draw_base_year=1988,
         model='ETS',
-        align_scenarios_to_last_actual=False
+        align_scenarios_to_last_actual=False,
+        use_fitted_for_history=True
     )
 
     all_plots.append((var_name, ax))
@@ -187,7 +192,8 @@ for j in range(i + 1, len(axs)):
 
 
 plt.suptitle("Productivity Predictions", fontsize=16)
-plt.savefig("productivity_plots.png", dpi=300)
+plot_path = Path("productivity_plots.png")
+plt.savefig(plot_path, dpi=300)
 plt.show()
 
 # 保存预测结果
@@ -197,7 +203,17 @@ plt.show()
 # 确保年份为索引且为整型（或可被识别的索引）
 df_result = combined_df_result
 df_result.index = df_result.index.astype(int)
-df_result.to_excel("../2_processed_data/ABARES_productivity_forecast.xlsx", index=True)
+scenario_cols = ['Low', 'Medium', 'High', 'Very_High']
+df_result_actual_history = df_result.copy()
+if 'Historical' in df_result_actual_history.columns:
+    hist_mask = df_result_actual_history['Historical'].notna()
+    for scenario_col in scenario_cols:
+        df_result_actual_history.loc[hist_mask, scenario_col] = df_result_actual_history.loc[hist_mask, 'Historical']
+
+forecast_path = Path("../2_processed_data/ABARES_productivity_forecast.xlsx")
+with pd.ExcelWriter(forecast_path, engine="openpyxl") as writer:
+    df_result.to_excel(writer, sheet_name="fitted_scenarios", index=True)
+    df_result_actual_history.to_excel(writer, sheet_name="actual_history", index=True)
 
 # 获取模板的列（保留 MultiIndex 结构，如果有）
 df_template = pd.read_excel(output_file, header=[0, 1], sheet_name=1, index_col=0)
@@ -281,8 +297,56 @@ with pd.ExcelWriter(output_file, engine="openpyxl", mode=mode) as writer:
         for row in df_out.itertuples(index=False):
             ws.append(row)
 
-    # 安全删除默认 Sheet
+    # Write versions that preserve historical actual values.
+    for scenario in required_scenarios:
+        print(f"Processing actual-history scenario: {scenario}")
+
+        df_sheet = pd.DataFrame(index=years, columns=template_cols, dtype=float)
+        df_sheet.index.name = 'Year'
+
+        for y in years:
+            for var_name, col_list in var_to_columns.items():
+                value_row = df_result_actual_history.query("Variable == @var_name and Year == @y")
+                if not value_row.empty:
+                    val = value_row[scenario].values[0]
+                    for col in col_list:
+                        if col in df_sheet.columns:
+                            df_sheet.loc[y, col] = val
+                        else:
+                            print(f"[Skip] Column {col} is not in template")
+        df_sheet.fillna(1, inplace=True)
+        df_out = df_sheet.reset_index()
+        df_out.columns.names = [None, None]
+
+        wb = writer.book
+        sheet_name = f"{scenario.lower()}_actual"
+
+        if sheet_name in wb.sheetnames:
+            del wb[sheet_name]
+            print(f"  Deleted old sheet: {sheet_name}")
+
+        ws = wb.create_sheet(title=sheet_name)
+        sheets_created.append(sheet_name)
+
+        col_level_0 = ['Year'] + [col[0] for col in df_out.columns[1:]]
+        col_level_1 = [''] + [col[1] for col in df_out.columns[1:]]
+        ws.append(col_level_0)
+        ws.append(col_level_1)
+
+        for row in df_out.itertuples(index=False):
+            ws.append(row)
+
+    # Remove the default sheet if a new workbook created one.
     if 'Sheet' in writer.book.sheetnames and len(sheets_created) > 0:
         del writer.book['Sheet']
 
 print(f"Saved to {output_file}")
+
+for result_file in [Path(output_file), forecast_path, plot_path]:
+    dst = RESULTS_DIR / result_file.name
+    shutil.copy2(result_file, dst)
+    print(f"Copied {result_file} to {dst}")
+
+luto_input_name = RESULTS_DIR / "yieldincreases_ag_2050.xlsx"
+shutil.copy2(output_file, luto_input_name)
+print(f"Copied {output_file} to {luto_input_name}")

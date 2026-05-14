@@ -28,7 +28,7 @@ import pandas as pd
 import luto.settings as settings
 
 from luto.data import Data
-from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable
+from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable, get_exist_renewable_capacity
 from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
 from functools import lru_cache
 
@@ -515,6 +515,48 @@ def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
         new_r_mrj[:, :, lu_idx] = ag_revenue_delta + rev_total[None, :]
 
     return new_r_mrj
+
+def get_utility_solar_pv_existing_revenue_by_region(data: Data, target_year: int, region: str = 'state') -> dict:
+    """
+    Return Utility Solar PV existing revenue grouped by region.
+    Revenue = cumulative delivered MWh up to target_year × state solar price.
+    """
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return {}
+
+    mwh_r  = get_exist_renewable_capacity(data, 'Utility Solar PV', target_year)
+    prices = data.SOLAR_PRICES.query('Year == @target_year').set_index('State')['Price_AUD_per_MWh'].to_dict()
+
+    if region == 'NRM':
+        prices_lyr = np.vectorize(prices.get, otypes=[np.float32])(data.REGION_STATE_NAME)
+        rev_r = (mwh_r * prices_lyr).assign_coords({'nrm': ('cell', data.REGION_NRM_NAME)})
+        return rev_r.groupby('nrm').sum('cell').to_dataframe('v').to_dict()['v']
+
+    mwh_r        = mwh_r.assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+    mwh_by_state = mwh_r.groupby('state').sum('cell').to_dataframe('mwh').to_dict()['mwh']
+    return {state: mwh * prices[state] for state, mwh in mwh_by_state.items()}
+
+
+def get_onshore_wind_existing_revenue_by_region(data: Data, target_year: int, region: str = 'state') -> dict:
+    """
+    Return Onshore Wind existing revenue grouped by region.
+    Revenue = cumulative delivered MWh up to target_year × state wind price.
+    """
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return {}
+
+    mwh_r  = get_exist_renewable_capacity(data, 'Onshore Wind', target_year)
+    prices = data.WIND_PRICES.query('Year == @target_year').set_index('State')['Price_AUD_per_MWh'].to_dict()
+
+    if region == 'NRM':
+        prices_lyr = np.vectorize(prices.get, otypes=[np.float32])(data.REGION_STATE_NAME)
+        rev_r = (mwh_r * prices_lyr).assign_coords({'nrm': ('cell', data.REGION_NRM_NAME)})
+        return rev_r.groupby('nrm').sum('cell').to_dataframe('v').to_dict()['v']
+
+    mwh_r        = mwh_r.assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+    mwh_by_state = mwh_r.groupby('state').sum('cell').to_dataframe('mwh').to_dict()['mwh']
+    return {state: mwh * prices[state] for state, mwh in mwh_by_state.items()}
+
 
 def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx) -> dict[str, np.ndarray]:
     """

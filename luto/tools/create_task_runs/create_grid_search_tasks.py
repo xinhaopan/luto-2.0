@@ -126,8 +126,9 @@ grid_search = {
     'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
 
     # --------------- Renewable energy ---------------
-    'RENEWABLE_ENERGY_CONSTRAINTS': ['on'],                                 # 'on' or 'off'
-    'RENEWABLE_TARGET_SCENARIO': ['CNS25 - Accelerated Transition'],        # 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
+    # RENEWABLES_OPTIONS is a dict; to enable renewables override individual keys via task params
+    'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Core'],              # scenario name in renewable_targets.csv
+    'RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS': ['step_change'],              # scenario dim in renewable_energy_layers_1D.nc
 
     ###############################################################
     # Scenario settings for the model run
