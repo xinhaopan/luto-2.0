@@ -4,8 +4,8 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260503_paper4_HPC'],
-    'KEEP_OUTPUTS': [True],  # If False, only keep ZIP
+    'TASK_NAME': ['20260505_paper4_HPC'],
+    'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2], 
     # ---------Computational settings, which are not relevant to LUTO itself---------
@@ -61,7 +61,7 @@ grid_search = {
     "AG_MANAGEMENTS": [{
         'Asparagopsis taxiformis': True,
         'Precision Agriculture': True,
-        'Ecological Grazing': True,
+        'Ecological Grazing': False,
         'Savanna Burning': True,
         'AgTech EI': True,
         'Biochar': True,

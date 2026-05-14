@@ -4,15 +4,15 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260503_paper4_HPC_1'],
-    'KEEP_OUTPUTS': [True],  # If False, only keep ZIP
+    'TASK_NAME': ['20260514_paper4_HPC_tolerances'],
+    'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2], 
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['40GB'],
-    'NCPUS': ['10'], 
+    'MEM': ['60GB'],
+    'NCPUS': ['15'], 
     'WRITE_THREADS': ['2'],
-    'TIME': ['6:00:00'],
+    'TIME': ['24:00:00'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
     'BIODIVERSITY_TARGET_GBF_2': ['off'],
@@ -50,18 +50,20 @@ grid_search = {
     'WATER_STRESS': [0.6],
     'WATER_LIMITS': ['on'],
     'WATER_CONSTRAINT_TYPE': ['hard'],
-    'INCLUDE_WATER_LICENSE_COSTS': [0],
+    'INCLUDE_WATER_LICENSE_COSTS': [1],
     'WATER_REGION_DEF': ['Drainage Division'],
     'WATER_CLIMATE_CHANGE_IMPACT': ['on'],
     # ----------------------------------- Demand settings --------------------------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],
     #----------------------------------- other settings --------------------------------
+    'FEASIBILITY_TOLERANCE': [1e-6],
+    'OPTIMALITY_TOLERANCE': [1e-6],
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],
 
     "AG_MANAGEMENTS": [{
         'Asparagopsis taxiformis': True,
         'Precision Agriculture': True,
-        'Ecological Grazing': True,
+        'Ecological Grazing': False,
         'Savanna Burning': True,
         'AgTech EI': True,
         'Biochar': True,
