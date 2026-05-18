@@ -162,19 +162,49 @@ SOLVER_WEIGHT_DEMAND = 1
 SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 
-DEMAND_CONSTRAINT_TYPE = 'soft'   # 'soft': penalise under-production in objective (current behaviour)
-# DEMAND_CONSTRAINT_TYPE = 'hard'  # 'hard': enforce production >= demand (lower bound = 1.0x) and
-#                                  #         production <= DEMAND_UPPER_BOUND (upper bound per commodity)
+DEMAND_CONSTRAINT_TYPE = 'soft'   
+'''
+Options are 'soft', 'hard', or 'off'. This determines the type of demand constraint to apply in the model.
+- 'soft': commodity can be produced under/over the target, but the under/over part will pay a penalty that
+  equals the deviation amount multiplied by the corresponding prices. 
+- 'hard': commodity must be produced at the target amount, with a relaxation factor (DEMAND_BOUNDS) 
+  that allows for a certain percentage above the target to be produced (e.g., 1.05 allows for 5% overproduction).
+'''                      
 
-# Upper bound multipliers applied only when DEMAND_CONSTRAINT_TYPE == 'hard'.
-# Keys must match entries in data.COMMODITIES (lowercase). '__default__' applies to all others.
-DEMAND_UPPER_BOUND = {
-    'sheep meat':         1.15,
-    'sheep lexp':         1.10,
-    'sheep wool':         1.05,
-    'beef lexp':          1.05,
-    '__default__':        1.01,
+# Important: the order matters here. Must be the same order as data.COMMODITIES.
+DEMAND_BOUNDS = {
+    'apples':                   [1.0, 1.0],
+    'beef lexp':                [1.0, 1.0],
+    'beef meat':                [1.0, 1.0],
+    'citrus':                   [1.0, 1.0],
+    'cotton':                   [1.0, 1.0],
+    'dairy':                    [1.0, 1.0],
+    'grapes':                   [1.0, 1.0],
+    'hay':                      [1.0, 1.0],
+    'nuts':                     [1.0, 1.0],
+    'other non-cereal crops':   [1.0, 1.0],
+    'pears':                    [1.0, 1.0],
+    'plantation fruit':         [1.0, 1.0],
+    'rice':                     [1.0, 1.0],
+    'sheep lexp':               [1.0, 1.0],
+    'sheep meat':               [1.0, 1.0],
+    'sheep wool':               [0.95, 1.05],  # relaxed to allow 5% deviation for wool.
+    'stone fruit':              [1.0, 1.0],
+    'sugar':                    [1.0, 1.0],
+    'summer cereals':           [1.0, 1.0],
+    'summer legumes':           [1.0, 1.0],
+    'summer oilseeds':          [1.0, 1.0],
+    'tropical stone fruit':     [1.0, 1.0],
+    'vegetables':               [1.0, 1.0],
+    'winter cereals':           [1.0, 1.0],
+    'winter legumes':           [1.0, 1.0],
+    'winter oilseeds':          [1.0, 1.0],
 }
+'''
+Dictionary of upper bounds for demand constraints when DEMAND_CONSTRAINT_TYPE is set to 'hard'. The keys are commodity 
+names and the values are the upper bound multipliers. For example, if 'sheep meat': 1.15, then the model can produce up 
+to 15% more sheep meat than the target demand.
+'''
 
 RESCALE_FACTOR = 1e3
 '''

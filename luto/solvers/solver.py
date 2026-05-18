@@ -710,28 +710,23 @@ class LutoSolver:
                 ),  name="demand_soft_bound_lower"
             )
             self.demand_penalty_constraints.extend(lower_bound_constraints.values())
-        else:
+        elif settings.DEMAND_CONSTRAINT_TYPE == 'hard':
             print("│   ├── Adding <hard> demand constraints (lower + upper bounds, no penalty)...")
-            lower_bound_constraints = self.gurobi_model.addConstrs(
-                (
-                    self.total_q_exprs_c[c] >= self._input_data.limits['demand'][c] / demand_scale
-                    for c in range(self._input_data.ncms)
-                ),  name="demand_hard_bound_lower"
-            )
-            upper_bound_constraints = self.gurobi_model.addConstrs(
-                (
-                    self.total_q_exprs_c[c] <= (
-                        self._input_data.limits['demand'][c] / demand_scale
-                        * settings.DEMAND_UPPER_BOUND.get(
-                            self._input_data.commodity_names[c],
-                            settings.DEMAND_UPPER_BOUND['__default__']
-                        )
+            for c_idx, c_name in enumerate(self._input_data.commodity_names):
+                lb, ub = settings.DEMAND_BOUNDS[c_name]
+                lim = self._input_data.limits['demand'][c_idx] / demand_scale
+                self.demand_penalty_constraints.append(
+                    self.gurobi_model.addConstr(
+                        self.total_q_exprs_c[c_idx] >= lim * lb,
+                        name=f"demand_hard_bound_lower[{c_idx}]"
                     )
-                    for c in range(self._input_data.ncms)
-                ),  name="demand_hard_bound_upper"
-            )
-            self.demand_penalty_constraints.extend(lower_bound_constraints.values())
-            self.demand_penalty_constraints.extend(upper_bound_constraints.values())
+                )
+                self.demand_penalty_constraints.append(
+                    self.gurobi_model.addConstr(
+                        self.total_q_exprs_c[c_idx] <= lim * ub,
+                        name=f"demand_hard_bound_upper[{c_idx}]"
+                    )
+                )
 
 
     def _get_water_net_yield_expr_for_region(

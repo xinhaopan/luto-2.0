@@ -113,8 +113,7 @@ class SolverInputData:
 
     base_yr_prod: dict[str, tuple]                                      # Base year production of each commodity.
     scale_factors: dict[float]                                          # Scale factors for each input layer.
-
-    commodity_names: list[str]                                          # Commodity names ordered by commodity index (matches pr2cm_cp rows).
+    commodity_names: list[str]                                          # Commodity names (data.COMMODITIES order, alphabetical).
 
     economic_contr_mrj: float                                           # base year economic contribution matrix.
     economic_prices: np.ndarray                                         # base year commodity prices.
@@ -131,8 +130,7 @@ class SolverInputData:
                 
     @property
     def ncms(self):
-        # Number of commodities
-        return self.pr2cm_cp.shape[0]           
+        return len(self.commodity_names)
     
     @property
     def n_ag_lms(self):
@@ -1144,6 +1142,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         "BASE_YR GBF_2 (score)":       get_BASE_YR_GBF2_score(data),
     }
 
+    commodity_names = data.COMMODITIES
+
     economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs)
     economic_prices=get_commodity_prices_target_yr(data, target_year)
     economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year)
@@ -1222,7 +1222,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
         base_yr_prod,
         scale_factors,
-        data.COMMODITIES,
+        commodity_names,
 
         economic_contr_mrj,
         economic_prices,
