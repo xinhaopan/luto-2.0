@@ -167,8 +167,7 @@ grid_search = {
 
 
     # --------------- Objective function weights ---------------
-    'SOLVE_WEIGHT_ALPHA': [1],                                              # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA':  [0.5],         
+    'SOLVE_WEIGHT_BETA':  [0.5],
     
     # --------------- Ag management ---------------
     'AG_MANAGEMENTS': [{

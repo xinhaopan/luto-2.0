@@ -162,17 +162,24 @@ SOLVER_WEIGHT_DEMAND = 1
 SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 
-DEMAND_CONSTRAINT_TYPE = 'soft'   
+DEMAND_CONSTRAINT_TYPE = 'hard'   
 '''
-Options are 'soft', 'hard', or 'off'. This determines the type of demand constraint to apply in the model.
+Options are 'soft', or 'hard'. This determines the type of demand constraint to apply in the model.
 - 'soft': commodity can be produced under/over the target, but the under/over part will pay a penalty that
   equals the deviation amount multiplied by the corresponding prices. 
 - 'hard': commodity must be produced at the target amount, with a relaxation factor (DEMAND_BOUNDS) 
   that allows for a certain percentage above the target to be produced (e.g., 1.05 allows for 5% overproduction).
 '''                      
 
-# Important: the order matters here. Must be the same order as data.COMMODITIES.
 DEMAND_BOUNDS = {
+    # Commodities need relaxation
+    'sheep lexp':               [1.0, 1.0],     # small slack: lexp is spatially concentrated, slight flex needed
+    'sheep meat':               [0.90, 2.34],   # wide UB: sheep biologically co-produce meat+wool+lexp from the same land;
+                                                # soft-demand run shows meat overshoots up to 2.23x by 2050 when wool
+                                                # demand is met. UB = 2.34 = observed max * 1.05 safety margin.
+    'sheep wool':               [1.0, 1.0],     # anchor: wool drives total sheep area; keep tight.
+    
+    # Commodities with no relaxation (one-to-one land-use to commodity)
     'apples':                   [1.0, 1.0],
     'beef lexp':                [1.0, 1.0],
     'beef meat':                [1.0, 1.0],
@@ -186,9 +193,6 @@ DEMAND_BOUNDS = {
     'pears':                    [1.0, 1.0],
     'plantation fruit':         [1.0, 1.0],
     'rice':                     [1.0, 1.0],
-    'sheep lexp':               [1.0, 1.0],
-    'sheep meat':               [1.0, 1.0],
-    'sheep wool':               [0.95, 1.05],  # relaxed to allow 5% deviation for wool.
     'stone fruit':              [1.0, 1.0],
     'sugar':                    [1.0, 1.0],
     'summer cereals':           [1.0, 1.0],
@@ -201,9 +205,16 @@ DEMAND_BOUNDS = {
     'winter oilseeds':          [1.0, 1.0],
 }
 '''
-Dictionary of upper bounds for demand constraints when DEMAND_CONSTRAINT_TYPE is set to 'hard'. The keys are commodity 
-names and the values are the upper bound multipliers. For example, if 'sheep meat': 1.15, then the model can produce up 
-to 15% more sheep meat than the target demand.
+Dictionary of [lb, ub] bound multipliers for hard demand constraints. [lb, ub] = [1.0, 1.0] means the model must
+hit the demand target exactly. Values > 1.0 allow overproduction; values < 1.0 allow underproduction.
+
+Livestock co-production note: sheep (and beef) land-use cells simultaneously produce multiple commodities
+(sheep: meat + wool + live exports) in biologically fixed ratios that differ from demand ratios.
+The anchor commodity is wool (tight [1.0, 1.0]); meat must be given a wide UB because:
+  - biological median meat/wool ratio = 1.856, but demand meat/wool = 1.60-1.75 (and declining)
+  - soft-demand run shows sheep meat overshoots up to 2.23x by 2050 when wool demand is met
+  - setting UB=2.34 (= 2.23 * 1.05 safety margin) avoids infeasibility across all years 2010-2050
+Crops are one-to-one land-use to commodity — keep at [1.0, 1.0].
 '''
 
 RESCALE_FACTOR = 1e3
@@ -743,14 +754,6 @@ LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG
 
 GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
-
-# Weight for the GHG/Demand deviation in the objective function
-SOLVE_WEIGHT_ALPHA = 1  
-''' 
-Range from 0 to 1 that balances the relative important between economic values and biodiversity scores.
- - if approaching 0, the model will focus on maximising biodiversity scores.
- - if approaching 1, the model will focus on maximising prifit (or minimising cost).
-'''
 
 SOLVE_WEIGHT_BETA = 0.5
 '''

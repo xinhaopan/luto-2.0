@@ -2952,9 +2952,9 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     base_yr_score = bio_ag_priority_mrj.sel(lu='Unallocated - natural land', lm='dry').sum().item()
     
     # Calculate xarray biodiversity scores
-    xr_priority_ag = ag_dvar_mrj * bio_ag_priority_mrj
-    xr_priority_non_ag = non_ag_dvar_rk * bio_non_ag_priority_rk
-    xr_priority_am = ag_mam_dvar_mrj * bio_am_priority_amrj
+    xr_priority_ag      = ag_dvar_mrj * bio_ag_priority_mrj
+    xr_priority_non_ag  = non_ag_dvar_rk * bio_non_ag_priority_rk
+    xr_priority_am      = ag_mam_dvar_mrj * bio_am_priority_amrj
     xr_priority_all = xr.concat(
         [   xr_priority_ag.sum(dim=['lm', 'lu']).expand_dims({'Type': ['ag']}),
             xr_priority_non_ag.sum(dim=['lu']).expand_dims({'Type': ['non-ag']}),

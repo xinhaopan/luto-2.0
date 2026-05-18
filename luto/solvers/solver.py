@@ -175,30 +175,21 @@ class LutoSolver:
         """
         print(f"└── Setting up the objective function to {settings.OBJECTIVE}...")
 
-        # Get objectives 
-        self.obj_economy = self._setup_economy_objective()    
-        self.obj_biodiv = self._setup_biodiversity_objective()   
-        self.obj_penalties = self._setup_penalty_objectives()                                                                    
- 
+        # Get objectives
+        self.obj_economy = self._setup_economy_objective()
+        self.obj_penalties = self._setup_penalty_objectives()
+
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
-            obj_wrap = (
-                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA 
-                - self.obj_biodiv * (1 - settings.SOLVE_WEIGHT_ALPHA)
-            )
             objective = (
-                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) + 
+                self.obj_economy  * (1 - settings.SOLVE_WEIGHT_BETA) +
                 self.obj_penalties * settings.SOLVE_WEIGHT_BETA
             )
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
-            obj_wrap = (
-                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA 
-                + self.obj_biodiv * (1 - settings.SOLVE_WEIGHT_ALPHA)
-            )
             objective = (
-                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) 
+                self.obj_economy  * (1 - settings.SOLVE_WEIGHT_BETA)
                 - self.obj_penalties * settings.SOLVE_WEIGHT_BETA
             )
         else:
@@ -430,50 +421,6 @@ class LutoSolver:
         )  
     
     
-    def _setup_biodiversity_objective(self):
-        print("    ├── setting up objective for biodiversity...")
-        
-        ag_exprs = []
-        for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.ag_lu2cells[0, j]
-            irr_cells = self._input_data.ag_lu2cells[1, j]
-            ag_exprs.append(
-                _qsum(self._input_data.ag_b_mrj[0, dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
-                + _qsum(self._input_data.ag_b_mrj[1, irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
-            )
-
-        ag_mam_exprs = []
-        for am, am_j_list in self._input_data.am2j.items():
-            if not AG_MANAGEMENTS[am]:
-                continue
-
-            for j_idx, j in enumerate(am_j_list):
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
-                ag_mam_exprs.append(
-                    _qsum(self._input_data.ag_man_b_mrj[am][0, dry_cells, j_idx], self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells])
-                    + _qsum(self._input_data.ag_man_b_mrj[am][1, irr_cells, j_idx], self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells])
-                )
-
-        non_ag_exprs = []
-        for k, k_name in enumerate(NON_AG_LAND_USES):
-            if not NON_AG_LAND_USES[k_name]:
-                continue
-            non_ag_cells = self._input_data.non_ag_lu2cells[k]
-            non_ag_exprs.append(
-                _qsum(self._input_data.non_ag_b_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
-            )
-        
-        self.bio_ag_contr = gp.quicksum(ag_exprs)
-        self.bio_ag_man_contr = gp.quicksum(ag_mam_exprs)
-        self.bio_non_ag_contr = gp.quicksum(non_ag_exprs)
-        
-        return (
-            (self.bio_ag_contr + self.bio_non_ag_contr + self.bio_ag_man_contr) 
-            * self._input_data.scale_factors['Biodiversity']
-        )
-        
-        
     def _setup_penalty_objectives(self):
         print("    └── setting up objective for soft constraints...")
 
@@ -1467,17 +1414,12 @@ class LutoSolver:
                     else self.gurobi_model.ObjVal
                 ),
                 
-                "Obj Economy":                      self.obj_economy.getValue() * settings.SOLVE_WEIGHT_ALPHA,
-                "Obj Biodiversity":                 self.obj_biodiv.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA),
+                "Obj Economy":                      self.obj_economy.getValue(),
                 "Obj Penalties":                    self.obj_penalties.getValue() * settings.SOLVE_WEIGHT_BETA,
-                
+
                 'Economy (AUD) Ag':                 self.economy_ag_contr.getValue() * self._input_data.scale_factors['Economy'],
                 'Economy (AUD) Non-Ag Value':       self.economy_non_ag_contr.getValue() * self._input_data.scale_factors['Economy'],
-                'Economy (AUD) Ag-Man Value':       self.economy_ag_man_contr.getValue() * self._input_data.scale_factors['Economy'],                
-                
-                "Bio quality (score) Ag":           self.bio_ag_contr.getValue() * self._input_data.scale_factors['Biodiversity'],
-                "Bio quality (score) Non-Ag":       self.bio_non_ag_contr.getValue() * self._input_data.scale_factors['Biodiversity'],
-                "Bio quality (score) Ag-Man":       self.bio_ag_man_contr.getValue() * self._input_data.scale_factors['Biodiversity'],
+                'Economy (AUD) Ag-Man Value':       self.economy_ag_man_contr.getValue() * self._input_data.scale_factors['Economy'],
 
                 "Deviation Production (t)":[
                     prod_data["Production"][c] - self._input_data.limits['demand'][c]
