@@ -162,7 +162,7 @@ SOLVER_WEIGHT_DEMAND = 1
 SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 
-DEMAND_CONSTRAINT_TYPE = 'soft'   
+DEMAND_CONSTRAINT_TYPE = 'hard'   
 '''
 Options are 'soft', or 'hard'. This determines the type of demand constraint to apply in the model.
 - 'soft': commodity can be produced under/over the target, but the under/over part will pay a penalty that
@@ -175,7 +175,7 @@ DEMAND_BOUNDS = {
     # Commodities need relaxation
     'sheep lexp':               [1.0, 1.0],     # Sheep live exports can be met exactly because its not co-produced with sheep (some sheep just not exported). 
     'sheep meat':               [1.0, 1.0],     # Meat and wool are co-produced in biologically fixed ratios, so either overproduce meat (~2.5 times), or
-    'sheep wool':               [0.8, 1.0],     # underproduce wool (0.8 times).
+    'sheep wool':               [0.0, 1.0],     # underproduce wool (0.8 times).
     
     # Commodities with no relaxation (one-to-one land-use to commodity)
     'apples':                   [1.0, 1.0],
