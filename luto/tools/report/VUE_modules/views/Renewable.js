@@ -11,6 +11,8 @@ window.RenewableView = {
     const yearIndex = ref(0);
     const selectYear = ref(2020);
     const selectRegion = inject("globalSelectedRegion");
+    const availableRegionLevels = ['region_state', 'region_NRM'];
+    const selectRegionLevel = ref('region_state');
 
     const availableYears = ref([]);
     const availableAgMgt = ref([]);
@@ -34,7 +36,7 @@ window.RenewableView = {
 
     const selectChartData = computed(() => {
       if (!dataLoaded.value) return {};
-      const chartData = window[chartRegister["Ag Mgt"]?.["name"]]?.[selectRegion.value];
+      const chartData = window[chartRegister["Ag Mgt"]?.["name"]]?.[selectRegionLevel.value]?.[selectRegion.value];
       let seriesData = (chartData?.[selectAgMgt.value]?.[selectWater.value] || [])
         .filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
       return {
@@ -80,6 +82,7 @@ window.RenewableView = {
 
     const toggleDrawer = () => { isDrawerOpen.value = !isDrawerOpen.value; };
     watch(yearIndex, (i) => { selectYear.value = availableYears.value[i]; });
+    watch(selectRegionLevel, () => { selectRegion.value = 'AUSTRALIA'; });
 
     watch(selectAgMgt, async (newAgMgt) => {
       previousSelections.value.agMgt = newAgMgt;
@@ -109,6 +112,7 @@ window.RenewableView = {
 
     const _state = {
       yearIndex, selectYear, selectRegion,
+      availableRegionLevels, selectRegionLevel,
       availableYears, availableAgMgt, availableWater, availableLanduse,
       selectAgMgt, selectWater, selectLanduse,
       selectMapData, selectChartData,
@@ -125,13 +129,30 @@ window.RenewableView = {
   template: /*html*/`
     <div class="relative w-full h-screen">
 
-      <!-- Region selection dropdown -->
-      <div class="absolute w-[262px] top-32 left-[20px] z-50 bg-white/70 rounded-lg shadow-lg max-w-xs z-[9999]">
-        <filterable-dropdown region-type="STATE"></filterable-dropdown>
+      <!-- Region level tabs + Region selection dropdown -->
+      <div class="absolute w-[262px] top-24 left-[20px] z-[9999] max-w-xs">
+        <!-- Drawer-style region level tabs -->
+        <div class="flex gap-1 ml-2 mb-0">
+          <button v-for="lvl in availableRegionLevels" :key="lvl"
+            @click="selectRegionLevel = lvl"
+            class="px-2 py-0.5 text-[0.65rem] font-medium rounded-t-md border border-b-0 transition-colors"
+            :class="selectRegionLevel === lvl
+              ? 'bg-white/90 border-gray-300 text-sky-600'
+              : 'bg-white/40 border-gray-200 text-gray-500 hover:bg-white/60'">
+            {{ lvl === 'region_state' ? 'State' : 'NRM' }}
+          </button>
+        </div>
+        <!-- Dropdown panel -->
+        <div class="bg-white/70 rounded-lg shadow-lg">
+          <filterable-dropdown
+            :key="selectRegionLevel"
+            :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'">
+          </filterable-dropdown>
+        </div>
       </div>
 
       <!-- Year slider -->
-      <div class="absolute top-[200px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
+      <div class="absolute top-[240px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
         <p class="text-[0.8rem]">Year: <strong>{{ selectYear }}</strong></p>
         <el-slider
           v-if="availableYears && availableYears.length > 0"
@@ -147,7 +168,7 @@ window.RenewableView = {
       </div>
 
       <!-- Data selection controls container -->
-      <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
+      <div class="absolute top-[325px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
         <!-- Ag Mgt options -->
         <div v-if="dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
@@ -202,7 +223,7 @@ window.RenewableView = {
         <regions-map
           :mapData="selectMapData"
           :file-name="mapFileName"
-          region-type="STATE"
+          :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
           style="width: 100%; height: 100%;">
         </regions-map>
 

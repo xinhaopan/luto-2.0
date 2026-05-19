@@ -636,6 +636,17 @@ window.RegionsMap = {
       }
     });
 
+    Vue.watch(() => props.regionType, async (newType) => {
+      if (newType === 'STATE') {
+        await loadScript('data/geo/AUS_STATE_centroid_bbox.js', 'AUS_STATE_centroid_bbox');
+        await loadScript('data/geo/AUS_STATE.js', 'AUS_STATE');
+      } else {
+        await loadScript('data/geo/NRM_AUS_centroid_bbox.js', 'NRM_AUS_centroid_bbox');
+        await loadScript('data/geo/NRM_AUS.js', 'NRM_AUS');
+      }
+      updateMap(true);
+    });
+
     const handleBaseMapChange = (mapType) => {
       selectedBaseMap.value = mapType;
       // Map display names to internal values

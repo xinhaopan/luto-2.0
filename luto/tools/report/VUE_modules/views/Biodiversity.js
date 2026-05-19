@@ -11,6 +11,8 @@ window.BiodiversityView = {
     const yearIndex = ref(0);
     const selectYear = ref(2020);
     const selectRegion = inject("globalSelectedRegion");
+    const availableRegionLevels = ['region_state', 'region_NRM'];
+    const selectRegionLevel = ref('region_state');
 
     const availableYears = ref([]);
     const availableUnit = { Biodiversity: "Relative Percentage (Pre-1750 = 100%)" };
@@ -108,25 +110,25 @@ window.BiodiversityView = {
       if (cat === 'Sum') {
         const sumEntry = cr?.['Sum'] ?? cr?.['overview']?.['sum'];
         if (!sumEntry) return null;
-        const raw = qualityRoot(sumEntry.name)?.[region];
+        const raw = qualityRoot(sumEntry.name)?.[selectRegionLevel.value]?.[region];
         if (!raw) return null;
         candidate = withSpecies ? raw?.[species] : raw;
       } else if (cat === 'Ag') {
         const entry = cr?.['Ag'];
         if (!entry) return null;
         const root = qualityRoot(entry.name);
-        const node = withSpecies ? root?.[region]?.[species] : root?.[region];
+        const node = withSpecies ? root?.[selectRegionLevel.value]?.[region]?.[species] : root?.[selectRegionLevel.value]?.[region];
         candidate = node?.[water];
       } else if (cat === 'Ag Mgt') {
         const entry = cr?.['Ag Mgt'];
         if (!entry) return null;
         const root = qualityRoot(entry.name);
-        const node = withSpecies ? root?.[region]?.[species] : root?.[region];
+        const node = withSpecies ? root?.[selectRegionLevel.value]?.[region]?.[species] : root?.[selectRegionLevel.value]?.[region];
         candidate = node?.[agMgt]?.[water];
       } else if (cat === 'Non-Ag') {
         const entry = cr?.['Non-Ag'];
         if (!entry) return null;
-        const raw = qualityRoot(entry.name)?.[region];
+        const raw = qualityRoot(entry.name)?.[selectRegionLevel.value]?.[region];
         candidate = withSpecies ? raw?.[species] : raw;
       }
 
@@ -158,13 +160,13 @@ window.BiodiversityView = {
       if (!dataLoaded.value) return {};
       const cr = chartRegister[metric];
       const dataRoot = qualityRoot(cr?.[cat]?.["name"]);
-      const regionNode = dataRoot?.[region];
+      const regionNode = dataRoot?.[selectRegionLevel.value]?.[region];
       const chartData = withSpecies ? regionNode?.[species] : regionNode;
       let seriesData;
 
       if (cat === "Sum") {
         const sumEntry = cr?.['Sum'] ?? cr?.['overview']?.['sum'];
-        const rawSumData = qualityRoot(sumEntry?.['name'])?.[region];
+        const rawSumData = qualityRoot(sumEntry?.['name'])?.[selectRegionLevel.value]?.[region];
         const candidate = withSpecies ? rawSumData?.[species] : rawSumData;
         const isMultiInput = candidate && !Array.isArray(candidate) && candidate['Area'] !== undefined;
         seriesData = isMultiInput ? [] : (candidate || []);
@@ -384,6 +386,7 @@ window.BiodiversityView = {
 
     const toggleDrawer = () => { isDrawerOpen.value = !isDrawerOpen.value; };
     watch(yearIndex, (i) => { selectYear.value = availableYears.value[i]; });
+    watch(selectRegionLevel, () => { selectRegion.value = 'AUSTRALIA'; });
 
     watch(selectMetric, async (newMetric) => {
       const mr = mapRegister[newMetric] || {};
@@ -500,6 +503,7 @@ window.BiodiversityView = {
 
     const _state = {
       yearIndex, selectYear, selectRegion,
+      availableRegionLevels, selectRegionLevel,
       METRIC_LABELS, availableYears, availableMetrics, availableCategories,
       availableAgMgt, availableWater, availableSpecies, availableLanduse,
       selectMetric, selectCategory, selectAgMgt, selectWater, selectSpecies, selectLanduse,
@@ -519,13 +523,30 @@ window.BiodiversityView = {
   template: /*html*/`
     <div class="relative w-full h-screen">
 
-      <!-- Region selection dropdown -->
-      <div class="absolute w-[262px] top-32 left-[20px] z-50 bg-white/70 rounded-lg shadow-lg max-w-xs z-[9999]">
-        <filterable-dropdown></filterable-dropdown>
+      <!-- Region level tabs + Region selection dropdown -->
+      <div class="absolute w-[262px] top-24 left-[20px] z-[9999] max-w-xs">
+        <!-- Drawer-style region level tabs -->
+        <div class="flex gap-1 ml-2 mb-0">
+          <button v-for="lvl in availableRegionLevels" :key="lvl"
+            @click="selectRegionLevel = lvl"
+            class="px-2 py-0.5 text-[0.65rem] font-medium rounded-t-md border border-b-0 transition-colors"
+            :class="selectRegionLevel === lvl
+              ? 'bg-white/90 border-gray-300 text-sky-600'
+              : 'bg-white/40 border-gray-200 text-gray-500 hover:bg-white/60'">
+            {{ lvl === 'region_state' ? 'State' : 'NRM' }}
+          </button>
+        </div>
+        <!-- Dropdown panel -->
+        <div class="bg-white/70 rounded-lg shadow-lg">
+          <filterable-dropdown
+            :key="selectRegionLevel"
+            :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'">
+          </filterable-dropdown>
+        </div>
       </div>
 
       <!-- Year slider -->
-      <div class="absolute top-[200px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
+      <div class="absolute top-[240px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
         <p class="text-[0.8rem]">Year: <strong>{{ selectYear }}</strong></p>
         <el-slider
           v-if="availableYears && availableYears.length > 0"
@@ -541,7 +562,7 @@ window.BiodiversityView = {
       </div>
 
       <!-- Data selection controls container -->
-      <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
+      <div class="absolute top-[325px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
         <!-- Metric buttons (always visible) -->
         <div class="flex flex-wrap gap-1 max-w-[300px]">
@@ -655,6 +676,7 @@ window.BiodiversityView = {
         <regions-map
           :mapData="selectMapData"
           :file-name="mapFileName"
+          :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
           :overlayGeoJSON="gbf2MaskOverlay"
           :show-legend="!isDrawerOpen"
           style="width: 100%; height: 100%;">

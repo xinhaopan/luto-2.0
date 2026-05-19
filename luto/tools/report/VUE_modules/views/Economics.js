@@ -11,6 +11,8 @@ window.EconomicsView = {
     const yearIndex = ref(0);
     const selectYear = ref(2020);
     const selectRegion = inject("globalSelectedRegion");
+    const availableRegionLevels = ['region_state', 'region_NRM'];
+    const selectRegionLevel = ref('region_state');
 
     const availableYears = ref([]);
     const availableUnit = { Economics: "AUD" };
@@ -80,7 +82,7 @@ window.EconomicsView = {
       const effectiveMt = cat === "Sum" ? "Profit" : mt;
       const chartEntry = chartRegister[cat]?.[effectiveMt];
       if (!chartEntry) return emptyChart();
-      const chartData = window[chartEntry.name]?.[region];
+      const chartData = window[chartEntry.name]?.[selectRegionLevel.value]?.[region];
       if (!chartData) return emptyChart();
 
       let seriesData;
@@ -243,6 +245,7 @@ window.EconomicsView = {
 
     const toggleDrawer = () => { isDrawerOpen.value = !isDrawerOpen.value; };
     watch(yearIndex, (i) => { selectYear.value = availableYears.value[i]; });
+    watch(selectRegionLevel, () => { selectRegion.value = 'AUSTRALIA'; });
 
     watch([selectCategory, selectMapType], async ([newCat, newMapType], [oldCat]) => {
       if (!newCat) return;
@@ -348,6 +351,7 @@ window.EconomicsView = {
 
     const _state = {
       yearIndex, selectYear, selectRegion,
+      availableRegionLevels, selectRegionLevel,
       availableYears, availableCategories, availableMapTypes,
       availableAgMgt, availableWater, availableSource, availableLanduse,
       selectCategory, selectMapType, selectAgMgt, selectWater, selectSource, selectLanduse,
@@ -366,13 +370,30 @@ window.EconomicsView = {
   template: /*html*/`
     <div class="relative w-full h-screen">
 
-      <!-- Region selection dropdown -->
-      <div class="absolute w-[262px] top-32 left-[20px] z-50 bg-white/70 rounded-lg shadow-lg max-w-xs z-[9999]">
-        <filterable-dropdown></filterable-dropdown>
+      <!-- Region level tabs + Region selection dropdown -->
+      <div class="absolute w-[262px] top-24 left-[20px] z-[9999] max-w-xs">
+        <!-- Drawer-style region level tabs -->
+        <div class="flex gap-1 ml-2 mb-0">
+          <button v-for="lvl in availableRegionLevels" :key="lvl"
+            @click="selectRegionLevel = lvl"
+            class="px-2 py-0.5 text-[0.65rem] font-medium rounded-t-md border border-b-0 transition-colors"
+            :class="selectRegionLevel === lvl
+              ? 'bg-white/90 border-gray-300 text-sky-600'
+              : 'bg-white/40 border-gray-200 text-gray-500 hover:bg-white/60'">
+            {{ lvl === 'region_state' ? 'State' : 'NRM' }}
+          </button>
+        </div>
+        <!-- Dropdown panel -->
+        <div class="bg-white/70 rounded-lg shadow-lg">
+          <filterable-dropdown
+            :key="selectRegionLevel"
+            :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'">
+          </filterable-dropdown>
+        </div>
       </div>
 
       <!-- Year slider -->
-      <div class="absolute top-[200px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
+      <div class="absolute top-[240px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
         <p class="text-[0.8rem]">Year: <strong>{{ selectYear }}</strong></p>
         <el-slider
           v-if="availableYears && availableYears.length > 0"
@@ -388,7 +409,7 @@ window.EconomicsView = {
       </div>
 
       <!-- Data selection controls container -->
-      <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
+      <div class="absolute top-[325px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
         <!-- 1. Category -->
         <div class="flex space-x-1">
@@ -476,6 +497,7 @@ window.EconomicsView = {
         <regions-map
           :mapData="selectMapData"
           :file-name="mapFileName"
+          :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
           :show-legend="!isDrawerOpen"
           style="width: 100%; height: 100%;">
         </regions-map>
