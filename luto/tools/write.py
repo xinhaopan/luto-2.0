@@ -2919,182 +2919,231 @@ def write_water(data: Data, yr_cal, path):
 # ── Biodiversity ─────────────────────────────────────────────────────────────
 
 def write_biodiversity_quality_scores(data: Data, yr_cal, path):
-    ''' Biodiversity overall quality scores are always written to disk. '''
+    ''' Biodiversity overall quality scores — computed for every BIO_QUALITY_LAYER backend. '''
 
-    # Set up
-    yr_idx_previouse = sorted(data.lumaps.keys()).index(yr_cal) - 1
-    yr_cal_previouse = sorted(data.lumaps.keys())[yr_idx_previouse]
+    # Invariant setup
+    yr_idx_previous = sorted(data.lumaps.keys()).index(yr_cal) - 1
+    yr_cal_previous = sorted(data.lumaps.keys())[yr_idx_previous]
     yr_idx = yr_cal - data.YR_CAL_BASE
 
-    # Get the biodiversity scores b_mrj
-    bio_ag_priority_mrj =  tools.ag_mrj_to_xr(data, ag_biodiversity.get_bio_quality_score_mrj(data))   
-    bio_am_priority_amrj = tools.am_mrj_to_xr(data, ag_biodiversity.get_ag_mgt_biodiversity_matrices(data, bio_ag_priority_mrj.values, yr_idx))
-    bio_non_ag_priority_rk = tools.non_ag_rk_to_xr(data, non_ag_biodiversity.get_breq_matrix(data,bio_ag_priority_mrj.values, data.lumaps[yr_cal_previouse]))
-
-    if yr_cal == data.YR_CAL_BASE: # this means now is the base year, hence no ag-man and non-ag applied
-        bio_am_priority_amrj *= 0.0
-        bio_non_ag_priority_rk *= 0.0
-
-
-    # Get the decision variables for the year
+    # Decision variables are the same for every backend layer — load once
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    ag_mam_dvar_mrj =  tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
+    ag_mam_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
+    # Per-backend accumulators
+    all_ag_dfs, all_non_ag_dfs, all_am_dfs, all_priority_all_dfs = [], [], [], []
+    all_ag_dfs_AUS, all_non_ag_dfs_AUS, all_am_dfs_AUS, all_priority_all_dfs_AUS = [], [], [], []
+    xr_per_backend_ag, xr_per_backend_non_ag, xr_per_backend_am, xr_per_backend_all = [], [], [], []
 
-    # Calculate the biodiversity scores under pre-1750 conditions
-    base_yr_score = bio_ag_priority_mrj.sel(lu='Unallocated - natural land', lm='dry').sum().item()
-    
-    # Calculate xarray biodiversity scores
-    xr_priority_ag      = ag_dvar_mrj * bio_ag_priority_mrj
-    xr_priority_non_ag  = non_ag_dvar_rk * bio_non_ag_priority_rk
-    xr_priority_am      = ag_mam_dvar_mrj * bio_am_priority_amrj
-    xr_priority_all = xr.concat(
-        [   xr_priority_ag.sum(dim=['lm', 'lu']).expand_dims({'Type': ['ag']}),
-            xr_priority_non_ag.sum(dim=['lu']).expand_dims({'Type': ['non-ag']}),
-            xr_priority_am.sum(dim=['am', 'lu', 'lm']).expand_dims({'Type': ['ag-man']})
-        ], dim='Type'
-    )
-    
-    xr_priority_ag = add_all(xr_priority_ag, dims=['lm', 'lu'])
-    xr_priority_non_ag = add_all(xr_priority_non_ag, dims=['lu'])
-    xr_priority_am = add_all(xr_priority_am, dims=['am', 'lm', 'lu'])
-    xr_priority_all = add_all(xr_priority_all, dims=['Type'])
-    
-    priority_ag_df, priority_ag_df_AUS = bio_to_region_and_aus_df(
-        xr_priority_ag,
-        group_dims=['region', 'lm', 'lu'],
-        value_name='Area Weighted Score (ha)',
-        base_score=base_yr_score,
-        yr_cal=yr_cal
-    )
-    priority_non_ag_df, priority_non_ag_df_AUS = bio_to_region_and_aus_df(
-        xr_priority_non_ag,
-        group_dims=['region', 'lu'],
-        value_name='Area Weighted Score (ha)',
-        base_score=base_yr_score,
-        yr_cal=yr_cal
-    )
-    priority_am_df, priority_am_df_AUS = bio_to_region_and_aus_df(
-        xr_priority_am,
-        group_dims=['region', 'am', 'lm', 'lu'],
-        value_name='Area Weighted Score (ha)',
-        base_score=base_yr_score,
-        yr_cal=yr_cal
-    )
-    priority_all_df, priority_all_df_AUS = bio_to_region_and_aus_df(
-        xr_priority_all,
-        group_dims=['region', 'Type'],
-        value_name='Area Weighted Score (ha)',
-        base_score=base_yr_score,
-        yr_cal=yr_cal
-    )
-    
-    # Create zeros values to fill the first row for am/non-ag if their df is empty
-    if priority_ag_df.empty:
-        priority_ag_df = pd.DataFrame({
-            'region': ['AUSTRALIA'],
-            'Year': [yr_cal],
-            'lm': ['dry'],
-            'lu': ['Unallocated - natural land'],
-            'Area Weighted Score (ha)': [0.0],
-            'Relative_Contribution_Percentage': [0.0]
-        })
-    if priority_non_ag_df.empty:
-        priority_non_ag_df = pd.DataFrame({
-            'region': ['AUSTRALIA'],
-            'Year': [yr_cal],
-            'lu': ['Environmental Plantings'],
-            'lm': ['dry'],
-            'Area Weighted Score (ha)': [0.0],
-            'Relative_Contribution_Percentage': [0.0]
-        })
-    if priority_am_df.empty:
-        priority_am_df = pd.DataFrame({
-            'region': ['AUSTRALIA', 'AUSTRALIA'],
-            'Year': [yr_cal, yr_cal],
-            'am': ['ALL', 'Savanna Burning'],
-            'lm': ['dry', 'dry'],
-            'lu': ['Apples', 'Apples'],
-            'Area Weighted Score (ha)': [0.0, 0.0],
-            'Relative_Contribution_Percentage': [0.0, 0.0]
-        })
+    for backend_layer in settings.BIO_QUALITY_LAYERS:
+        # Load raw biodiversity arrays for this backend
+        bio_quality_raw, bio_quality_lds = data.compute_bio_quality_arrays(backend_layer)
 
+        # Compute biodiversity score matrices
+        bio_ag_priority_mrj = tools.ag_mrj_to_xr(
+            data, ag_biodiversity.get_bio_quality_score_mrj(data, bio_quality_raw, bio_quality_lds)
+        )
+        bio_am_priority_amrj = tools.am_mrj_to_xr(
+            data, ag_biodiversity.get_ag_mgt_biodiversity_matrices(
+                data, bio_ag_priority_mrj.values, yr_idx, bio_quality_raw
+            )
+        )
+        bio_non_ag_priority_rk = tools.non_ag_rk_to_xr(
+            data, non_ag_biodiversity.get_breq_matrix(
+                data, bio_ag_priority_mrj.values, data.lumaps[yr_cal_previous], bio_quality_raw
+            )
+        )
 
-    # Save the biodiversity scores
+        if yr_cal == data.YR_CAL_BASE:
+            bio_am_priority_amrj *= 0.0
+            bio_non_ag_priority_rk *= 0.0
+
+        # Base-year reference score normalises percentages for this backend
+        base_yr_score = bio_ag_priority_mrj.sel(lu='Unallocated - natural land', lm='dry').sum().item()
+
+        # Weighted biodiversity scores
+        xr_priority_ag = ag_dvar_mrj * bio_ag_priority_mrj
+        xr_priority_non_ag = non_ag_dvar_rk * bio_non_ag_priority_rk
+        xr_priority_am = ag_mam_dvar_mrj * bio_am_priority_amrj
+        xr_priority_all = xr.concat(
+            [
+                xr_priority_ag.sum(dim=['lm', 'lu']).expand_dims({'Type': ['ag']}),
+                xr_priority_non_ag.sum(dim=['lu']).expand_dims({'Type': ['non-ag']}),
+                xr_priority_am.sum(dim=['am', 'lu', 'lm']).expand_dims({'Type': ['ag-man']}),
+            ],
+            dim='Type',
+        )
+
+        xr_priority_ag = add_all(xr_priority_ag, dims=['lm', 'lu'])
+        xr_priority_non_ag = add_all(xr_priority_non_ag, dims=['lu'])
+        xr_priority_am = add_all(xr_priority_am, dims=['am', 'lm', 'lu'])
+        xr_priority_all = add_all(xr_priority_all, dims=['Type'])
+
+        # Aggregate to DataFrames
+        ag_df, ag_df_AUS = bio_to_region_and_aus_df(
+            xr_priority_ag, ['region', 'lm', 'lu'], 'Area Weighted Score (ha)', base_yr_score, yr_cal
+        )
+        non_ag_df, non_ag_df_AUS = bio_to_region_and_aus_df(
+            xr_priority_non_ag, ['region', 'lu'], 'Area Weighted Score (ha)', base_yr_score, yr_cal
+        )
+        am_df, am_df_AUS = bio_to_region_and_aus_df(
+            xr_priority_am, ['region', 'am', 'lm', 'lu'], 'Area Weighted Score (ha)', base_yr_score, yr_cal
+        )
+        priority_all_df, priority_all_df_AUS = bio_to_region_and_aus_df(
+            xr_priority_all, ['region', 'Type'], 'Area Weighted Score (ha)', base_yr_score, yr_cal
+        )
+
+        # Fill empty DataFrames
+        if ag_df.empty:
+            ag_df = pd.DataFrame({
+                'region': ['AUSTRALIA'], 'Year': [yr_cal], 'lm': ['dry'],
+                'lu': ['Unallocated - natural land'],
+                'Area Weighted Score (ha)': [0.0], 'Relative_Contribution_Percentage': [0.0],
+            })
+        if non_ag_df.empty:
+            non_ag_df = pd.DataFrame({
+                'region': ['AUSTRALIA'], 'Year': [yr_cal], 'lu': ['Environmental Plantings'],
+                'lm': ['dry'], 'Area Weighted Score (ha)': [0.0], 'Relative_Contribution_Percentage': [0.0],
+            })
+        if am_df.empty:
+            am_df = pd.DataFrame({
+                'region': ['AUSTRALIA', 'AUSTRALIA'], 'Year': [yr_cal, yr_cal],
+                'am': ['ALL', 'Savanna Burning'], 'lm': ['dry', 'dry'], 'lu': ['Apples', 'Apples'],
+                'Area Weighted Score (ha)': [0.0, 0.0], 'Relative_Contribution_Percentage': [0.0, 0.0],
+            })
+
+        # Tag backend
+        for df in [ag_df, non_ag_df, am_df, priority_all_df]:
+            df['backend'] = backend_layer
+
+        all_ag_dfs.append(ag_df)
+        all_non_ag_dfs.append(non_ag_df)
+        all_am_dfs.append(am_df)
+        all_priority_all_dfs.append(priority_all_df)
+        all_ag_dfs_AUS.append(ag_df_AUS.assign(backend=backend_layer))
+        all_non_ag_dfs_AUS.append(non_ag_df_AUS.assign(backend=backend_layer))
+        all_am_dfs_AUS.append(am_df_AUS.assign(backend=backend_layer))
+        all_priority_all_dfs_AUS.append(priority_all_df_AUS.assign(backend=backend_layer))
+
+        # Collect per-backend xr arrays for NC output
+        xr_per_backend_ag.append(xr_priority_ag.expand_dims({'backend': [backend_layer]}))
+        xr_per_backend_non_ag.append(xr_priority_non_ag.expand_dims({'backend': [backend_layer]}))
+        xr_per_backend_am.append(xr_priority_am.expand_dims({'backend': [backend_layer]}))
+        xr_per_backend_all.append(xr_priority_all.expand_dims({'backend': [backend_layer]}))
+
+    # ── Combine DataFrames and write CSVs ────────────────────────────────────
+    combined_ag_df     = pd.concat(all_ag_dfs, axis=0)
+    combined_non_ag_df = pd.concat(all_non_ag_dfs, axis=0)
+    combined_am_df     = pd.concat(all_am_dfs, axis=0)
+    combined_all_df    = pd.concat(all_priority_all_dfs, axis=0)
+
     pd.concat([
-        priority_ag_df.assign(Type = "Agricultural Land-use"), 
-        priority_non_ag_df.assign(Type = "Non-Agricultural Land-use"), 
-        priority_am_df.assign(Type = "Agricultural Management"), 
-        ], axis=0
-        ).rename(columns={
-            'lu':'Landuse',
-            'lm':'Water_supply',
-            'am':'Agricultural Management',
-            'Relative_Contribution_Percentage':'Contribution Relative to Base Year Level (%)'}
-        ).reset_index(drop=True
-        ).infer_objects(copy=False
-        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).to_csv(os.path.join(path, f'biodiversity_overall_priority_scores_{yr_cal}.csv'), index=False)
-        
-    priority_all_df.rename(columns={
-        'lu':'Landuse',
-        'lm':'Water_supply',
-        'am':'Agricultural Management',
-        'Relative_Contribution_Percentage':'Contribution Relative to Base Year Level (%)'}
-        ).reset_index(drop=True
-        ).infer_objects(copy=False
-        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).to_csv(os.path.join(path, f'biodiversity_overall_priority_scores_all_{yr_cal}.csv'), index=False)
-        
-        
-        
-    
+        combined_ag_df.assign(Type='Agricultural Land-use'),
+        combined_non_ag_df.assign(Type='Non-Agricultural Land-use'),
+        combined_am_df.assign(Type='Agricultural Management'),
+    ], axis=0
+    ).rename(columns={
+        'lu': 'Landuse',
+        'lm': 'Water_supply',
+        'am': 'Agricultural Management',
+        'Relative_Contribution_Percentage': 'Contribution Relative to Base Year Level (%)',
+    }).reset_index(drop=True
+    ).infer_objects(copy=False
+    ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+    ).to_csv(os.path.join(path, f'biodiversity_overall_priority_scores_{yr_cal}.csv'), index=False)
+
+    combined_all_df.rename(columns={
+        'lu': 'Landuse',
+        'lm': 'Water_supply',
+        'am': 'Agricultural Management',
+        'Relative_Contribution_Percentage': 'Contribution Relative to Base Year Level (%)',
+    }).reset_index(drop=True
+    ).infer_objects(copy=False
+    ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+    ).to_csv(os.path.join(path, f'biodiversity_overall_priority_scores_all_{yr_cal}.csv'), index=False)
+
+    # ── Build combined xr arrays (backend dim) and write NC ──────────────────
+    combined_ag_df_AUS     = pd.concat(all_ag_dfs_AUS, axis=0)
+    combined_non_ag_df_AUS = pd.concat(all_non_ag_dfs_AUS, axis=0)
+    combined_am_df_AUS     = pd.concat(all_am_dfs_AUS, axis=0)
+    combined_all_df_AUS    = pd.concat(all_priority_all_dfs_AUS, axis=0)
+
+    xr_combined_ag     = xr.concat(xr_per_backend_ag, dim='backend')
+    xr_combined_non_ag = xr.concat(xr_per_backend_non_ag, dim='backend')
+    xr_combined_am     = xr.concat(xr_per_backend_am, dim='backend')
+    xr_combined_all    = xr.concat(xr_per_backend_all, dim='backend')
 
     # ==================== Ag Valid Layers ====================
-    valid_ag_layers = pd.MultiIndex.from_frame(priority_ag_df_AUS[['lm', 'lu']]).sort_values()
-    valid_layers_stack_ag = xr_priority_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    valid_ag_layers = pd.MultiIndex.from_frame(combined_ag_df_AUS[['backend', 'lm', 'lu']]).sort_values()
+    valid_layers_stack_ag = (
+        xr_combined_ag.stack(layer=['backend', 'lm', 'lu'])
+        .sel(layer=valid_ag_layers)
+        .drop_vars('region')
+        .compute()
+    )
 
     # ==================== Non-Ag Valid Layers ====================
-    valid_non_ag_layers = pd.MultiIndex.from_frame(priority_non_ag_df_AUS[['lu']]).sort_values()
-
-    if priority_non_ag_df_AUS['Area Weighted Score (ha)'].abs().sum() < 1:
+    valid_non_ag_layers = pd.MultiIndex.from_frame(combined_non_ag_df_AUS[['backend', 'lu']]).sort_values()
+    if combined_non_ag_df_AUS['Area Weighted Score (ha)'].abs().sum() < 1:
         valid_layers_stack_non_ag = xr.DataArray(
-            np.zeros((1, data.NCELLS), dtype=np.float32),
-            dims=['lu', 'cell'],
-            coords={'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['lu'])
+            np.zeros((1, 1, data.NCELLS), dtype=np.float32),
+            dims=['backend', 'lu', 'cell'],
+            coords={
+                'backend': [settings.BIO_QUALITY_LAYERS[0]],
+                'lu': ['ALL'],
+                'cell': range(data.NCELLS),
+            },
+        ).stack(layer=['backend', 'lu'])
     else:
-        valid_layers_stack_non_ag = xr_priority_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+        valid_layers_stack_non_ag = (
+            xr_combined_non_ag.stack(layer=['backend', 'lu'])
+            .sel(layer=valid_non_ag_layers)
+            .drop_vars('region')
+            .compute()
+        )
 
     # ==================== Ag Management Valid Layers ====================
-    valid_am_layers = pd.MultiIndex.from_frame(priority_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
-
-    if priority_am_df_AUS['Area Weighted Score (ha)'].abs().sum() < 1:
+    valid_am_layers = pd.MultiIndex.from_frame(combined_am_df_AUS[['backend', 'am', 'lm', 'lu']]).sort_values()
+    if combined_am_df_AUS['Area Weighted Score (ha)'].abs().sum() < 1:
         valid_layers_stack_am = xr.DataArray(
-            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['am', 'lm', 'lu', 'cell'],
-            coords={'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['am', 'lm', 'lu'])
+            np.zeros((1, 1, 1, 1, data.NCELLS), dtype=np.float32),
+            dims=['backend', 'am', 'lm', 'lu', 'cell'],
+            coords={
+                'backend': [settings.BIO_QUALITY_LAYERS[0]],
+                'am': ['ALL'],
+                'lm': ['ALL'],
+                'lu': ['ALL'],
+                'cell': range(data.NCELLS),
+            },
+        ).stack(layer=['backend', 'am', 'lm', 'lu'])
     else:
-        valid_layers_stack_am = xr_priority_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
-        
-    # Quality 'All' layer (for the overall priority score)
-    valid_all_layers = pd.MultiIndex.from_frame(priority_all_df_AUS[['Type']]).sort_values()
-    valid_layers_stack_all = xr_priority_all.stack(layer=['Type']).sel(layer=valid_all_layers).drop_vars('region').compute()
-    
+        valid_layers_stack_am = (
+            xr_combined_am.stack(layer=['backend', 'am', 'lm', 'lu'])
+            .sel(layer=valid_am_layers)
+            .drop_vars('region')
+            .compute()
+        )
+
+    # ==================== All-Type Valid Layers ====================
+    valid_all_layers = pd.MultiIndex.from_frame(combined_all_df_AUS[['backend', 'Type']]).sort_values()
+    valid_layers_stack_all = (
+        xr_combined_all.stack(layer=['backend', 'Type'])
+        .sel(layer=valid_all_layers)
+        .drop_vars('region')
+        .compute()
+    )
 
     save2nc(valid_layers_stack_ag,     os.path.join(path, f'xr_biodiversity_overall_priority_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_overall_priority_non_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_am,     os.path.join(path, f'xr_biodiversity_overall_priority_ag_management_{yr_cal}.nc'))
     save2nc(valid_layers_stack_all,    os.path.join(path, f'xr_biodiversity_overall_priority_all_{yr_cal}.nc'))
-    
 
     magnitudes = {
         'bio_quality': {

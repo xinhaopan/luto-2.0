@@ -1398,7 +1398,8 @@ class Data:
                 connectivity_score = np.ones(self.NCELLS, dtype=np.float32)
             case _:
                 raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
-            
+        
+        self.CONNECTIVITY_SCORE = connectivity_score  
 
         # Get the HCAS contribution scale (0-1)
         match settings.CONTRIBUTION_PERCENTILE:
@@ -1417,10 +1418,10 @@ class Data:
         
         
         # Get the biodiversity quantity score for each land use in each cell
-        self.BIO_QUALITY_RAW = bio_quality_raw * connectivity_score                                           
+        self.BIO_QUALITY_RAW = bio_quality_raw * self.CONNECTIVITY_SCORE
         self.BIO_QUALITY_LDS = np.where(
-            self.SAVBURN_ELIGIBLE, 
-            self.BIO_QUALITY_RAW  - (self.BIO_QUALITY_RAW * (1 - settings.BIO_CONTRIBUTION_LDS)), 
+            self.SAVBURN_ELIGIBLE,
+            self.BIO_QUALITY_RAW  - (self.BIO_QUALITY_RAW * (1 - settings.BIO_CONTRIBUTION_LDS)),
             self.BIO_QUALITY_RAW
         )
         
@@ -2999,3 +3000,37 @@ class Data:
         dr_prop = self.DEEP_ROOTED_PROPORTION
 
         return (dr_prop * water_dr_yield + (1 - dr_prop) * water_sr_yield)
+
+    def compute_bio_quality_arrays(self, backend_layer: str) -> tuple[np.ndarray, np.ndarray]:
+        """Return (bio_quality_raw, bio_quality_lds) arrays for the given backend layer.
+
+        Uses the stored CONNECTIVITY_SCORE so the connectivity weighting is consistent
+        with what was used during __init__.  Reloads only the raw priority values from
+        disk (cheap — called at write time, not during optimisation).
+        """
+        if backend_layer == 'Suitability':
+            biodiv_raw = pd.read_hdf(
+                os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'),
+                where=self.MASK
+            )
+            raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values.astype(np.float32)
+        elif 'NES' in backend_layer:
+            raw = (
+                xr.open_dataarray(os.path.join(settings.INPUT_DIR, 'bio_NES_Zonation.nc'))
+                .sel(layer=backend_layer)
+                .compute()
+                .values[self.MASK]
+                .astype(np.float32)
+            )
+        else:
+            raise ValueError(
+                f"Invalid backend_layer '{backend_layer}': must be 'Suitability' or contain 'NES'."
+            )
+
+        bio_quality_raw = raw * self.CONNECTIVITY_SCORE
+        bio_quality_lds = np.where(
+            self.SAVBURN_ELIGIBLE,
+            bio_quality_raw - (bio_quality_raw * (1 - settings.BIO_CONTRIBUTION_LDS)),
+            bio_quality_raw,
+        ).astype(np.float32)
+        return bio_quality_raw, bio_quality_lds

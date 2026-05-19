@@ -45,6 +45,9 @@ window.BiodiversityView = {
     const selectWater = ref("");
     const selectSpecies = ref("");
     const selectLanduse = ref("");
+    const selectBackend = ref("");
+    const availableBackends = ref([]);
+    const modelBackend = ref("");
 
     const METRICS_WITH_SPECIES = ['GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8_GROUP', 'GBF8_SPECIES'];
     const hasSpecies = computed(() => METRICS_WITH_SPECIES.includes(selectMetric.value));
@@ -82,6 +85,12 @@ window.BiodiversityView = {
 
     const selectMapData = computed(() => currentLayerData.value?.[selectYear.value] ?? {});
 
+    // For the quality metric, chart data has an extra 'backend' outermost key.
+    function qualityRoot(name) {
+      const isQuality = selectMetric.value === 'quality' && selectBackend.value;
+      return isQuality ? window[name]?.[selectBackend.value] : window[name];
+    }
+
     const selectMultiInput = computed(() => {
       if (!dataLoaded.value) return null;
       const metric = selectMetric.value;
@@ -99,23 +108,25 @@ window.BiodiversityView = {
       if (cat === 'Sum') {
         const sumEntry = cr?.['Sum'] ?? cr?.['overview']?.['sum'];
         if (!sumEntry) return null;
-        const raw = window[sumEntry.name]?.[region];
+        const raw = qualityRoot(sumEntry.name)?.[region];
         if (!raw) return null;
         candidate = withSpecies ? raw?.[species] : raw;
       } else if (cat === 'Ag') {
         const entry = cr?.['Ag'];
         if (!entry) return null;
-        const node = withSpecies ? window[entry.name]?.[region]?.[species] : window[entry.name]?.[region];
+        const root = qualityRoot(entry.name);
+        const node = withSpecies ? root?.[region]?.[species] : root?.[region];
         candidate = node?.[water];
       } else if (cat === 'Ag Mgt') {
         const entry = cr?.['Ag Mgt'];
         if (!entry) return null;
-        const node = withSpecies ? window[entry.name]?.[region]?.[species] : window[entry.name]?.[region];
+        const root = qualityRoot(entry.name);
+        const node = withSpecies ? root?.[region]?.[species] : root?.[region];
         candidate = node?.[agMgt]?.[water];
       } else if (cat === 'Non-Ag') {
         const entry = cr?.['Non-Ag'];
         if (!entry) return null;
-        const raw = window[entry.name]?.[region];
+        const raw = qualityRoot(entry.name)?.[region];
         candidate = withSpecies ? raw?.[species] : raw;
       }
 
@@ -146,13 +157,14 @@ window.BiodiversityView = {
       const withSpecies = hasSpecies.value;
       if (!dataLoaded.value) return {};
       const cr = chartRegister[metric];
-      const regionNode = window[cr?.[cat]?.["name"]]?.[region];
+      const dataRoot = qualityRoot(cr?.[cat]?.["name"]);
+      const regionNode = dataRoot?.[region];
       const chartData = withSpecies ? regionNode?.[species] : regionNode;
       let seriesData;
 
       if (cat === "Sum") {
         const sumEntry = cr?.['Sum'] ?? cr?.['overview']?.['sum'];
-        const rawSumData = window[sumEntry?.['name']]?.[region];
+        const rawSumData = qualityRoot(sumEntry?.['name'])?.[region];
         const candidate = withSpecies ? rawSumData?.[species] : rawSumData;
         const isMultiInput = candidate && !Array.isArray(candidate) && candidate['Area'] !== undefined;
         seriesData = isMultiInput ? [] : (candidate || []);
@@ -178,7 +190,13 @@ window.BiodiversityView = {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     function getTree(metric, cat) {
-      return window[mapRegister[metric]?.[cat]?.indexName]?.tree ?? (cat === "Non-Ag" ? [] : {});
+      const rawTree = window[mapRegister[metric]?.[cat]?.indexName]?.tree ?? (cat === "Non-Ag" ? [] : {});
+      // For quality metric the outermost tree key is backend — slice it so doCascade
+      // sees the same structure as every other metric (lm → lu, am → lm → lu, etc.).
+      if (metric === 'quality' && selectBackend.value && !Array.isArray(rawTree)) {
+        return rawTree[selectBackend.value] ?? (cat === "Non-Ag" ? [] : {});
+      }
+      return rawTree;
     }
 
     async function ensureIndexLoaded(metric, cat) {
@@ -193,16 +211,18 @@ window.BiodiversityView = {
     // Build combo array for ensureComboLayer
     function buildCombo(cat, tree, withSpecies) {
       const metric = selectMetric.value;
+      const isQuality = metric === 'quality';
+      const b = isQuality ? [selectBackend.value] : [];
       if (cat === "Sum") {
-        return withSpecies ? [selectSpecies.value, selectLanduse.value] : [selectLanduse.value];
+        return [...b, ...(withSpecies ? [selectSpecies.value, selectLanduse.value] : [selectLanduse.value])];
       } else if (cat === "Ag") {
-        return withSpecies ? [selectWater.value, selectSpecies.value, selectLanduse.value] : [selectWater.value, selectLanduse.value];
+        return [...b, ...(withSpecies ? [selectWater.value, selectSpecies.value, selectLanduse.value] : [selectWater.value, selectLanduse.value])];
       } else if (cat === "Ag Mgt") {
-        return withSpecies ? [selectAgMgt.value, selectWater.value, selectSpecies.value, selectLanduse.value] : [selectAgMgt.value, selectWater.value, selectLanduse.value];
+        return [...b, ...(withSpecies ? [selectAgMgt.value, selectWater.value, selectSpecies.value, selectLanduse.value] : [selectAgMgt.value, selectWater.value, selectLanduse.value])];
       } else if (cat === "Non-Ag") {
-        return withSpecies ? [selectSpecies.value, selectLanduse.value] : [selectLanduse.value];
+        return [...b, ...(withSpecies ? [selectSpecies.value, selectLanduse.value] : [selectLanduse.value])];
       }
-      return [selectLanduse.value];
+      return [...b, selectLanduse.value];
     }
 
     async function doCascade(cat) {
@@ -347,6 +367,16 @@ window.BiodiversityView = {
       await Promise.all([ensureIndexLoaded(initMetric, initCat), loadAllCharts()]);
 
       selectMetric.value = initMetric;
+
+      // Discover available backends from BIO_quality_Ag top-level keys
+      if (window["BIO_quality_Ag"]) {
+        const backends = Object.keys(window["BIO_quality_Ag"]);
+        availableBackends.value = backends;
+        const mbSetting = (window.Supporting_info.model_run_settings || []).find(s => s.parameter === "BIO_QUALITY_LAYER")?.val || "";
+        modelBackend.value = mbSetting;
+        selectBackend.value = backends.includes(mbSetting) ? mbSetting : (backends[0] || "");
+      }
+
       await doCascade(initCat);
       selectCategory.value = initCat;
       dataLoaded.value = true;
@@ -463,11 +493,17 @@ window.BiodiversityView = {
       if (entry?.layerPrefix) await ensureComboLayer(entry.layerPrefix, buildCombo(cat, tree, withSpecies));
     });
 
+    watch(selectBackend, async () => {
+      if (selectMetric.value !== 'quality' || !selectCategory.value) return;
+      await doCascade(selectCategory.value);
+    });
+
     const _state = {
       yearIndex, selectYear, selectRegion,
       METRIC_LABELS, availableYears, availableMetrics, availableCategories,
       availableAgMgt, availableWater, availableSpecies, availableLanduse,
       selectMetric, selectCategory, selectAgMgt, selectWater, selectSpecies, selectLanduse,
+      selectBackend, availableBackends, modelBackend,
       hasSpecies, speciesLabel, formatLanduse,
       selectMapData, selectChartData, selectMultiInput, selectMultiYAxis, gbf2MaskOverlay,
       dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
@@ -518,6 +554,20 @@ window.BiodiversityView = {
           </button>
         </div>
 
+        <!-- Backend layer buttons (quality metric only) -->
+        <div v-if="dataLoaded && selectMetric === 'quality' && availableBackends.length > 1" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Backend:</span>
+          <button v-for="val in availableBackends" :key="val"
+            @click="selectBackend = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1 border border-transparent"
+            :class="{
+              'bg-sky-500 text-white': selectBackend === val,
+              '!border-dashed !border-sky-700': val === modelBackend,
+            }">
+            {{ val }}
+          </button>
+        </div>
+
         <!-- Category buttons -->
         <div class="flex space-x-1">
           <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
@@ -560,6 +610,13 @@ window.BiodiversityView = {
             :class="{'bg-sky-500 text-white': selectLanduse === val}">
             {{ formatLanduse(val) }}
           </button>
+        </div>
+
+        <!-- Backend legend note -->
+        <div v-if="dataLoaded && selectMetric === 'quality' && availableBackends.length > 1"
+          style="font-size:0.6rem; line-height:1.3;" class="flex items-center gap-1 text-gray-500">
+          <span class="inline-block px-1 py-0.5 rounded border border-dashed border-sky-700 text-[0.6rem] leading-none">abc</span>
+          <span>= model-selected backend</span>
         </div>
       </div>
 

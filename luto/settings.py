@@ -162,7 +162,7 @@ SOLVER_WEIGHT_DEMAND = 1
 SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 
-DEMAND_CONSTRAINT_TYPE = 'hard'   
+DEMAND_CONSTRAINT_TYPE = 'soft'   
 '''
 Options are 'soft', or 'hard'. This determines the type of demand constraint to apply in the model.
 - 'soft': commodity can be produced under/over the target, but the under/over part will pay a penalty that
@@ -173,11 +173,9 @@ Options are 'soft', or 'hard'. This determines the type of demand constraint to 
 
 DEMAND_BOUNDS = {
     # Commodities need relaxation
-    'sheep lexp':               [1.0, 1.0],     # small slack: lexp is spatially concentrated, slight flex needed
-    'sheep meat':               [0.90, 2.34],   # wide UB: sheep biologically co-produce meat+wool+lexp from the same land;
-                                                # soft-demand run shows meat overshoots up to 2.23x by 2050 when wool
-                                                # demand is met. UB = 2.34 = observed max * 1.05 safety margin.
-    'sheep wool':               [1.0, 1.0],     # anchor: wool drives total sheep area; keep tight.
+    'sheep lexp':               [1.0, 1.0],     # Sheep live exports can be met exactly because its not co-produced with sheep (some sheep just not exported). 
+    'sheep meat':               [1.0, 1.0],     # Meat and wool are co-produced in biologically fixed ratios, so either overproduce meat (~2.5 times), or
+    'sheep wool':               [0.8, 1.0],     # underproduce wool (0.8 times).
     
     # Commodities with no relaxation (one-to-one land-use to commodity)
     'apples':                   [1.0, 1.0],
@@ -886,7 +884,8 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 
 
 # Biodiversity quality options
-BIO_QUALITY_LAYER = 'MNES_likely' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'              
+BIO_QUALITY_LAYERS = ['Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely']
+BIO_QUALITY_LAYER = 'MNES_likely' 
 '''
 One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'.
     - 'Suitability': use the Zonation algorith to compute quanlity score over 10k species.

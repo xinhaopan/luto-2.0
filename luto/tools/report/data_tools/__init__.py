@@ -163,7 +163,11 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     4. 'lu' (Land-use) has to be the lowest level in the hierarchy.
     '''
     sel_rename = {}
-    
+
+    # 0: 'backend' (outermost dim for quality-metric layers)
+    if 'backend' in sel:
+        sel_rename['backend'] = sel['backend']
+
     # 1: 'am'
     if 'am' in sel:
         sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
