@@ -20,9 +20,10 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from tools.price_slice_utils import (
+    apply_carbon_price_ticks,
+    apply_compact_ticks,
     apply_price_formatter,
     build_run_map,
-    apply_compact_ticks,
     DATA_DIR,
     format_thousands,
     OUT_DIR,
@@ -135,18 +136,18 @@ else:
     df_ghg, df_bio = collect_slices()
 
 
-x_ghg = df_ghg["GHGEmissionsChange_vs_ZeroPrice_MtCO2e"].to_numpy()
-y_cp = df_ghg["CarbonPrice"].to_numpy()
+x_cp  = df_ghg["CarbonPrice"].to_numpy()
+y_ghg = -df_ghg["GHGEmissionsChange_vs_ZeroPrice_MtCO2e"].to_numpy()
 
-x_bio = df_bio["BioContributionChange_vs_ZeroPrice_ha_yr"].to_numpy() / 1e6
-y_bp = df_bio["BioPrice"].to_numpy()
+x_bp  = df_bio["BioPrice"].to_numpy()
+y_bio = df_bio["BioContributionChange_vs_ZeroPrice_ha_yr"].to_numpy() / 1e6
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-mask_ghg = ~np.isnan(x_ghg)
+mask_ghg = ~np.isnan(y_ghg)
 ax1.plot(
-    x_ghg[mask_ghg],
-    y_cp[mask_ghg],
+    x_cp[mask_ghg],
+    y_ghg[mask_ghg],
     color=COLOR_GHG,
     marker="o",
     linestyle="-",
@@ -155,17 +156,18 @@ ax1.plot(
     markeredgewidth=0,
 )
 ax1.set_title("Carbon price response", pad=8)
-ax1.set_xlabel(r"Change in GHG emissions vs zero price (Mt CO$_2$e yr$^{-1}$)")
-ax1.set_ylabel(r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)")
-ax1.set_ylim(bottom=0)
-apply_price_formatter(ax1, axis="y")
-apply_compact_ticks(ax1, x_nbins=7, y_nbins=6)
+ax1.set_xlabel(r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)")
+ax1.set_ylabel(r"Change in GHG abatement vs zero price (Mt CO$_2$e yr$^{-1}$)")
+ax1.set_xlim(left=0)
+apply_price_formatter(ax1, axis="x")
+apply_compact_ticks(ax1, x_nbins=6, y_nbins=7)
+apply_carbon_price_ticks(ax1, axis="x")
 style_box_axis(ax1)
 
-mask_bio = ~np.isnan(x_bio)
+mask_bio = ~np.isnan(y_bio)
 ax2.plot(
-    x_bio[mask_bio],
-    y_bp[mask_bio],
+    x_bp[mask_bio],
+    y_bio[mask_bio],
     color=COLOR_BIO,
     marker="o",
     linestyle="-",
@@ -174,11 +176,11 @@ ax2.plot(
     markeredgewidth=0,
 )
 ax2.set_title("Biodiversity price response", pad=8)
-ax2.set_xlabel(r"Change in biodiversity contribution score vs zero price (Mha yr$^{-1}$)")
-ax2.set_ylabel(r"Biodiversity price (AU\$/ha yr$^{-1}$)")
-ax2.set_ylim(bottom=0)
-apply_price_formatter(ax2, axis="y")
-apply_compact_ticks(ax2, x_nbins=7, y_nbins=6)
+ax2.set_xlabel(r"Biodiversity price (AU\$/ha yr$^{-1}$)")
+ax2.set_ylabel(r"Change in biodiversity contribution score vs zero price (Mha yr$^{-1}$)")
+ax2.set_xlim(left=0)
+apply_price_formatter(ax2, axis="x")
+apply_compact_ticks(ax2, x_nbins=6, y_nbins=7)
 style_box_axis(ax2)
 
 plt.tight_layout()

@@ -18,12 +18,12 @@ OUT_DIR = TASK_ROOT / "paper4" / "figures"
 DATA_DIR = TASK_ROOT / "paper4" / "data"
 
 PAPER4_COLOR_OVERRIDES = {
-    "crops": "#5d1b41",
-    "livestock": "#cac559",
-    "modifiedlivestock": "#cac559",
-    "naturallivestock": "#cac559",
-    "unallocatedmodifiedland": "#f5ec7e",
-    "unallocatednaturalland": "#669b25",
+    "crops": "#6200ac",
+    "livestock": "#fcca10",
+    "modifiedlivestock": "#fe7f2d",
+    "naturallivestock": "#fcca10",
+    "unallocatedmodifiedland": "#a1c181",
+    "unallocatednaturalland": "#619b8a",
 }
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -162,6 +162,14 @@ def add_zero_line(ax):
 def apply_compact_ticks(ax, x_nbins=8, y_nbins=5):
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=x_nbins))
     ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=y_nbins))
+
+
+def apply_carbon_price_ticks(ax, axis="x"):
+    locator = ticker.MultipleLocator(50)
+    if axis == "x":
+        ax.xaxis.set_major_locator(locator)
+    elif axis == "y":
+        ax.yaxis.set_major_locator(locator)
 
 
 def stacked_area_pos_neg(ax, pivot_df, color_map, alpha=0.88):

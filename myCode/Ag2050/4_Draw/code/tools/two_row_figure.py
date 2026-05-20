@@ -145,6 +145,17 @@ def classify_land_use(name):
     return None
 
 
+def _filter_region_level(df: pd.DataFrame, level: str = 'region_NRM') -> pd.DataFrame:
+    """Keep only one region_level to avoid double-counting with dual-region output.
+
+    Backward-compatible: returns df unchanged if 'region_level' column is absent
+    (old single-region format).
+    """
+    if 'region_level' not in df.columns:
+        return df
+    return df[df['region_level'] == level].drop(columns='region_level').reset_index(drop=True)
+
+
 def load_report_source_csv(scenario, csv_name):
     info = get_zip_info(scenario)
     frames = []
@@ -157,7 +168,7 @@ def load_report_source_csv(scenario, csv_name):
                 if 'Year' not in df.columns:
                     df = df.copy()
                     df['Year'] = int(year)
-                frames.append(df)
+                frames.append(_filter_region_level(df))
     else:
         base = get_path(scenario)
         for year in _list_years(base):
@@ -168,7 +179,7 @@ def load_report_source_csv(scenario, csv_name):
                     if 'Year' not in df.columns:
                         df = df.copy()
                         df['Year'] = int(year)
-                    frames.append(df)
+                    frames.append(_filter_region_level(df))
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
@@ -245,6 +256,7 @@ def _add_patch_legend(ax, colors):
         mpatches.Patch(facecolor=color, edgecolor='none', label=label)
         for label, color in colors.items()
     ]
+    handles = handles[::-1]  # top-of-stack first, matching visual order top→bottom
     ax.axis('off')
     ax.legend(
         handles,
@@ -265,6 +277,7 @@ def _add_mixed_legend(ax, patch_colors, line_label=None, line_color='black'):
         mpatches.Patch(facecolor=color, edgecolor='none', label=label)
         for label, color in patch_colors.items()
     ]
+    handles = handles[::-1]  # top-of-stack first, matching visual order top→bottom
     if line_label:
         handles.append(mlines.Line2D([], [], color=line_color, linewidth=1.5, label=line_label))
     ax.axis('off')

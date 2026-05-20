@@ -154,19 +154,55 @@ SOLVER_WEIGHT_DEMAND = 1
 SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 
-DEMAND_CONSTRAINT_TYPE = 'soft'   # 'soft': penalise under-production in objective (current behaviour)
-# DEMAND_CONSTRAINT_TYPE = 'hard'  # 'hard': enforce production >= demand (lower bound = 1.0x) and
-#                                  #         production <= DEMAND_UPPER_BOUND (upper bound per commodity)
+DEMAND_CONSTRAINT_TYPE = 'hard'
+'''
+Options are 'soft', or 'hard'. This determines the type of demand constraint to apply in the model.
+- 'soft': commodity can be produced under/over the target, but the under/over part will pay a penalty that
+  equals the deviation amount multiplied by the corresponding prices.
+- 'hard': commodity must be produced at the target amount, with a relaxation factor (DEMAND_BOUNDS)
+  that allows for a certain percentage above the target to be produced (e.g., 1.05 allows for 5% overproduction).
+'''
 
-# Upper bound multipliers applied only when DEMAND_CONSTRAINT_TYPE == 'hard'.
-# Keys must match entries in data.COMMODITIES (lowercase). '__default__' applies to all others.
-DEMAND_UPPER_BOUND = {
-    'sheep meat':         1.15,
-    'sheep lexp':         1.10,
-    'sheep wool':         1.05,
-    'beef lexp':          1.05,
-    '__default__':        1.01,
+DEMAND_BOUNDS = {
+    # Commodities need relaxation
+    'sheep lexp':               [1.0, 1.0],     # Sheep live exports can be met exactly because its not co-produced with sheep (some sheep just not exported).
+    'sheep meat':               [1.0, 1.0],     # Meat and wool are co-produced in biologically fixed ratios, so either overproduce meat (~2.5 times), or
+    'sheep wool':               [0.0, 1.0],     # underproduce wool (0.8 times).
+
+    # Commodities with no relaxation (one-to-one land-use to commodity)
+    'apples':                   [1.0, 1.0],
+    'beef lexp':                [1.0, 1.0],
+    'beef meat':                [1.0, 1.0],
+    'citrus':                   [1.0, 1.0],
+    'cotton':                   [1.0, 1.0],
+    'dairy':                    [1.0, 1.0],
+    'grapes':                   [1.0, 1.0],
+    'hay':                      [1.0, 1.0],
+    'nuts':                     [1.0, 1.0],
+    'other non-cereal crops':   [1.0, 1.0],
+    'pears':                    [1.0, 1.0],
+    'plantation fruit':         [1.0, 1.0],
+    'rice':                     [1.0, 1.0],
+    'stone fruit':              [1.0, 1.0],
+    'sugar':                    [1.0, 1.0],
+    'summer cereals':           [1.0, 1.0],
+    'summer legumes':           [1.0, 1.0],
+    'summer oilseeds':          [1.0, 1.0],
+    'tropical stone fruit':     [1.0, 1.0],
+    'vegetables':               [1.0, 1.0],
+    'winter cereals':           [1.0, 1.0],
+    'winter legumes':           [1.0, 1.0],
+    'winter oilseeds':          [1.0, 1.0],
 }
+'''
+Dictionary of [lb, ub] bound multipliers for hard demand constraints. [lb, ub] = [1.0, 1.0] means the model must
+hit the demand target exactly. Values > 1.0 allow overproduction; values < 1.0 allow underproduction.
+
+Livestock co-production note: sheep (and beef) land-use cells simultaneously produce multiple commodities
+(sheep: meat + wool + live exports) in biologically fixed ratios that differ from demand ratios.
+Wool is anchored at [1.0, 1.0] (target must be met). Sheep meat gets lb=1.0 (must produce at least demand),
+and ub derived from the maximum observed meat/wool ratio across the planning horizon.
+'''
 
 RESCALE_FACTOR = 1e3
 '''
@@ -764,7 +800,8 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 
 
 # Biodiversity quality options
-BIO_QUALITY_LAYER = 'Suitability' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'              
+BIO_QUALITY_LAYERS = ['Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely']
+BIO_QUALITY_LAYER = 'MNES_likely' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'              
 '''
 One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'.
     - 'Suitability': use the Zonation algorith to compute quanlity score over 10k species.

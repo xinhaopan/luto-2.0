@@ -333,14 +333,14 @@ def collect_carbon_rows(run_map, cp_vals):
 
             total_mt = 0.0
             for category in category_order:
-                contribution_mt = summary_2025[area_type].get(category, 0.0) / 1e6
+                contribution_mt = -summary_2025[area_type].get(category, 0.0) / 1e6
                 total_mt += contribution_mt
                 rows.append({
                     "PriceType": "CarbonPrice",
                     "Price": cp,
                     "AreaType": area_type,
                     "Category": category,
-                    "MetricType": "GHGEmissions_2025_MtCO2e",
+                    "MetricType": "GHGAbatement_2025_MtCO2e",
                     "ContributionValue": contribution_mt,
                 })
 
@@ -408,7 +408,7 @@ def load_cache():
         print("Cached contribution data schema is outdated; rebuilding.")
         return None
     expected_metric_types = {
-        "GHGEmissions_2025_MtCO2e",
+        "GHGAbatement_2025_MtCO2e",
         "BiodiversityContribution_2025_MhaYr",
     }
     if not set(df_long["MetricType"]).issubset(expected_metric_types):
@@ -663,7 +663,7 @@ y_mid_l = (max(b.y1 for b in bb_left) + min(b.y0 for b in bb_left)) / 2 / fig_h_
 y_mid_r = (max(b.y1 for b in bb_right) + min(b.y0 for b in bb_right)) / 2 / fig_h_px
 x_l = min(b.x0 for b in bb_left) / fig_w_px - 0.02
 x_r = max(b.x1 for b in bb_right) / fig_w_px + 0.02
-fig.text(x_l, y_mid_l, r"GHG emissions (Mt CO$_2$e yr$^{-1}$)",
+fig.text(x_l, y_mid_l, r"GHG abatement (Mt CO$_2$e yr$^{-1}$)",
          rotation=90, va='center', ha='center', fontsize=FS)
 fig.text(x_r, y_mid_r, r"Biodiversity contribution score (Mha yr$^{-1}$)",
          rotation=270, va='center', ha='center', fontsize=FS)

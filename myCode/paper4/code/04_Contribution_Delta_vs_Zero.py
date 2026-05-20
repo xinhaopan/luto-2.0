@@ -57,7 +57,7 @@ SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
 NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
-MODIFIED_LIVESTOCK_COLOR = "#cac559"
+MODIFIED_LIVESTOCK_COLOR = "#fe7f2d"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -347,7 +347,7 @@ def collect_carbon_rows(run_map, cp_vals):
 
             total_mt = 0.0
             for category in category_order:
-                contribution_mt = (
+                contribution_mt = -(
                     summary_2025[area_type].get(category, 0.0) -
                     baseline_2025[area_type].get(category, 0.0)
                 ) / 1e6
@@ -357,7 +357,7 @@ def collect_carbon_rows(run_map, cp_vals):
                     "Price": cp,
                     "AreaType": area_type,
                     "Category": category,
-                    "MetricType": "GHGEmissionsChange_vs_ZeroPrice_MtCO2e",
+                    "MetricType": "GHGAbatementChange_vs_ZeroPrice_MtCO2e",
                     "ContributionValue": contribution_mt,
                 })
 
@@ -435,7 +435,7 @@ def load_cache():
         print("Cached contribution data schema is outdated; rebuilding.")
         return None
     expected_metric_types = {
-        "GHGEmissionsChange_vs_ZeroPrice_MtCO2e",
+        "GHGAbatementChange_vs_ZeroPrice_MtCO2e",
         "BiodiversityContributionChange_vs_ZeroPrice_MhaYr",
     }
     if not set(df_long["MetricType"]).issubset(expected_metric_types):
@@ -655,7 +655,7 @@ y_mid_l = (max(b.y1 for b in bb_left) + min(b.y0 for b in bb_left)) / 2 / fig_h_
 y_mid_r = (max(b.y1 for b in bb_right) + min(b.y0 for b in bb_right)) / 2 / fig_h_px
 x_l = min(b.x0 for b in bb_left) / fig_w_px - 0.02
 x_r = max(b.x1 for b in bb_right) / fig_w_px + 0.02
-fig.text(x_l, y_mid_l, r"Change in GHG emissions vs zero price (Mt CO$_2$e yr$^{-1}$)",
+fig.text(x_l, y_mid_l, r"Change in GHG abatement vs zero price (Mt CO$_2$e yr$^{-1}$)",
          rotation=90, va='center', ha='center', fontsize=FS)
 fig.text(x_r, y_mid_r, r"Change in biodiversity contribution score vs zero price (Mha yr$^{-1}$)",
          rotation=270, va='center', ha='center', fontsize=FS)

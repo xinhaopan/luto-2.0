@@ -24,6 +24,45 @@ def get_max_memory_from_stream(stream):
     return f"{max_mem:.3f} GB" if max_mem > 0 else None
 
 
+def get_memory_summary_from_stream(stream):
+    """Parse runtime and peak memory from a RES_*_mem_log.txt stream."""
+    start_time = None
+    end_time = None
+    peak_time = None
+    max_mem = None
+
+    for line in stream:
+        parts = line.strip().split()
+        if len(parts) < 3:
+            continue
+
+        try:
+            timestamp = datetime.strptime(f"{parts[0]} {parts[1]}", "%Y-%m-%d %H:%M:%S")
+            mem_val = float(parts[-1])
+        except (ValueError, IndexError):
+            continue
+
+        if start_time is None:
+            start_time = timestamp
+        end_time = timestamp
+
+        if max_mem is None or mem_val > max_mem:
+            max_mem = mem_val
+            peak_time = timestamp
+
+    runtime = end_time - start_time if start_time and end_time else None
+
+    return {
+        "StartTime": start_time.strftime("%Y-%m-%d %H:%M:%S") if start_time else None,
+        "EndTime": end_time.strftime("%Y-%m-%d %H:%M:%S") if end_time else None,
+        "Runtime": str(runtime) if runtime else None,
+        "RuntimeHours": round(runtime.total_seconds() / 3600, 3) if runtime else None,
+        "Memory": f"{max_mem:.3f} GB" if max_mem is not None else None,
+        "MaxMemoryGB": round(max_mem, 3) if max_mem is not None else None,
+        "PeakTime": peak_time.strftime("%Y-%m-%d %H:%M:%S") if peak_time else None,
+    }
+
+
 def parse_year_from_stream(stream):
     """从文件流中解析 'Running for year XXXX' 并返回最大年份。"""
     years = []
@@ -101,7 +140,17 @@ def check_report_created(runing_file):
 def get_archived_run_info(archive_path):
     """从 Run_Archive.zip 中提取信息，如果文件损坏则报告失败。"""
     try:
-        running_year, memory = None, None
+        running_year = None
+        solver_state = None
+        memory_summary = {
+            "StartTime": None,
+            "EndTime": None,
+            "Runtime": None,
+            "RuntimeHours": None,
+            "Memory": None,
+            "MaxMemoryGB": None,
+            "PeakTime": None,
+        }
         archive_size_mb = None
         num_data_lz4 = 0
         stderr_error_summary = None
@@ -123,7 +172,7 @@ def get_archived_run_info(archive_path):
             if mem_log_path:
                 with zf.open(mem_log_path) as mem_file:
                     with io.TextIOWrapper(mem_file, encoding='utf-8', errors='ignore') as text_stream:
-                        memory = get_max_memory_from_stream(text_stream)
+                        memory_summary = get_memory_summary_from_stream(text_stream)
             if stderr_log_path:
                 with zf.open(stderr_log_path) as err_file:
                     with io.TextIOWrapper(err_file, encoding='utf-8', errors='ignore') as text_stream:
@@ -134,7 +183,7 @@ def get_archived_run_info(archive_path):
 
         return {
             "RunningYear": running_year,
-            "Memory": memory,
+            **memory_summary,
             "Solver Status": solver_state or ("Solved" if num_data_lz4 > 0 else "Unknown"),
             "Output Status": "Success",
             "ArchiveExists": True,
@@ -146,7 +195,13 @@ def get_archived_run_info(archive_path):
         print(f"Warning: Could not process archive {archive_path}. Reason: {e}")
         return {
             "RunningYear": None,
+            "StartTime": None,
+            "EndTime": None,
+            "Runtime": None,
+            "RuntimeHours": None,
             "Memory": None,
+            "MaxMemoryGB": None,
+            "PeakTime": None,
             "Solver Status": "Error",
             "Output Status": "Failed",
             "ArchiveExists": True,
@@ -208,6 +263,7 @@ if __name__ == "__main__":
     
     # 支持检查多个任务
     task_names = [
+        '20260514_paper4_HPC_tolerances',
         '20260324_Paper3_test',
         '20260324_Paper3_aquila',
         # 可以在此添加更多任务名称
@@ -249,7 +305,13 @@ if __name__ == "__main__":
             row = {
                 "Name": run_dir,
                 "RunningYear": None,
+                "StartTime": None,
+                "EndTime": None,
+                "Runtime": None,
+                "RuntimeHours": None,
                 "Memory": None,
+                "MaxMemoryGB": None,
+                "PeakTime": None,
                 "Solver Status": "Running",  # 默认状态
                 "Output Status": "Running",  # 默认状态
                 "ArchiveExists": False,
@@ -336,7 +398,7 @@ if __name__ == "__main__":
                 mem_log_files = glob.glob(mem_log_pattern)
                 if mem_log_files:
                     with open(mem_log_files[0], 'r', encoding='utf-8', errors='ignore') as f:
-                        row["Memory"] = get_max_memory_from_stream(f)
+                        row.update(get_memory_summary_from_stream(f))
                     mem_found = True
                     break
 
@@ -364,7 +426,11 @@ if __name__ == "__main__":
         results_df = pd.DataFrame(rows, columns=[
             "Name",
             "RunningYear",
+            "Runtime",
+            "RuntimeHours",
             "Memory",
+            "MaxMemoryGB",
+            "PeakTime",
             "Solver Status",
             "Output Status",
             # "ArchiveExists",

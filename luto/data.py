@@ -635,6 +635,7 @@ class Data:
             self.REGION_STATE_NAME2CODE.pop('Other Territories')                            # Remove 'Other Territories' from the dict.
         
         self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11'].values
+        self.REGION_STATE_NAME = REGION_STATE_r['STE_NAME11'].values.to_numpy()
 
 
         ###############################################################

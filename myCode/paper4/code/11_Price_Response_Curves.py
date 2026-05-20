@@ -20,6 +20,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from tools.price_slice_utils import (
+    apply_carbon_price_ticks,
     apply_price_formatter,
     build_run_map,
     DATA_DIR,
@@ -119,7 +120,7 @@ else:
     df_ghg, df_bio = collect_slices()
 
 
-x_ghg = df_ghg["GHGEmissions_2025_MtCO2e"].to_numpy()
+x_ghg = -df_ghg["GHGEmissions_2025_MtCO2e"].to_numpy()
 y_cp = df_ghg["CarbonPrice"].to_numpy()
 
 x_bio = df_bio["BioContribution_2025_ha_yr"].to_numpy() / 1e6
@@ -137,10 +138,11 @@ ax1.plot(
     linewidth=1.5,
     markersize=5,
 )
-ax1.set_xlabel(r"GHG emissions (Mt CO$_2$e yr$^{-1}$)")
+ax1.set_xlabel(r"GHG abatement (Mt CO$_2$e yr$^{-1}$)")
 ax1.set_ylabel(r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)")
 ax1.set_ylim(bottom=0)
 apply_price_formatter(ax1, axis="y")
+apply_carbon_price_ticks(ax1, axis="y")
 style_box_axis(ax1)
 
 mask_bio = ~np.isnan(x_bio)
