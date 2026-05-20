@@ -69,18 +69,23 @@ for setting colorbar limits in the report.
 '''
 
 MAX_CELL_MAGNITUDE = {
-    'area':                  {'ag': [], 'non_ag': [], 'am': []},
-    'bio_quality':           {'ag': [], 'non_ag': [], 'am': [], 'all': []},
-    'Economics_ag':          {'ag_revenue': [], 'ag_cost': [], 'ag2ag_cost': [], 'non_ag2ag_cost': [], 'profit_ag': []},
-    'Economics_am':          {'am_revenue': [], 'am_cost': [], 'am_profit': []},
-    'Economics_non_ag':      {'non_ag_revenue': [], 'non_ag_cost': [], 'nonag2nonag_cost': [], 'ag2nonag_cost': [], 'non_ag_profit': []},
-    'Economics_sum':         {'sum_profit': []},
-    'ghg_emission':          {'ag': [], 'non_ag': [], 'ag_man': [], 'transition': [], 'sum': []},
-    'production':            defaultdict(list),  # commodity names are dynamic
-    'water_yield':           {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
-    'renewable_energy':      [],
-    'renewable_existing_dvar': [],
-    'transition_area':       {'ag2ag': [], 'ag2non_ag': []},
+    'area':                     {'ag': [], 'non_ag': [], 'am': []},
+    'bio_quality':              {'ag': [], 'non_ag': [], 'am': [], 'all': []},
+    'biodiversity_GBF2':        {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+    'biodiversity_GBF3':        {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+    'biodiversity_GBF4_SNES':   {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+    'biodiversity_GBF4_ECNES':  {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+    'biodiversity_GBF8':        {'ag': [], 'non_ag': [], 'am': []},
+    'Economics_ag':             {'ag_revenue': [], 'ag_cost': [], 'ag2ag_cost': [], 'non_ag2ag_cost': [], 'profit_ag': []},
+    'Economics_am':             {'am_revenue': [], 'am_cost': [], 'am_profit': []},
+    'Economics_non_ag':         {'non_ag_revenue': [], 'non_ag_cost': [], 'nonag2nonag_cost': [], 'ag2nonag_cost': [], 'non_ag_profit': []},
+    'Economics_sum':            {'sum_profit': []},
+    'ghg_emission':             {'ag': [], 'non_ag': [], 'ag_man': [], 'transition': [], 'sum': []},
+    'production':               defaultdict(list),  # commodity names are dynamic
+    'water_yield':              {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+    'renewable_energy':         [],
+    'renewable_existing_dvar':  [],
+    'transition_area':          {'ag2ag': [], 'ag2non_ag': []},
 }
 
 # Quantiles to get a robust estimate of the magnitude for setting colorbar limits in the report.
@@ -134,7 +139,7 @@ def save_csv(df, rename_map, filepath):
        .to_csv(filepath, index=False))
 
 
-def to_region_and_aus_df(da, group_dims, yr_cal, region_levels):
+def to_region_and_aus_df(da: xr.DataArray, group_dims: list, yr_cal: int, region_levels: list):
     """Aggregate xarray to region-level DataFrame; return (AUS+region combined, AUS only).
 
     group_dims: non-region dims only (e.g. ['am', 'lm', 'lu']).
@@ -188,7 +193,7 @@ def expand_outside_record(outside_df: pd.DataFrame, region_values, group_col: st
     return result
 
 
-def bio_to_region_and_aus_df(da, group_dims, value_name, base_score, yr_cal, region_levels=None):
+def bio_to_region_and_aus_df(da: xr.DataArray, group_dims: list, value_name: str, base_score: float, yr_cal: int, region_levels: list = None):
     """
     Aggregate xarray to region-level DataFrame; return (AUS+region combined, AUS only).
     group_dims must NOT include the region coord name (region is added internally).
@@ -228,49 +233,70 @@ def bio_to_region_and_aus_df(da, group_dims, value_name, base_score, yr_cal, reg
 
 def process_chunks(trans_xr, data, yr_cal, chunk_size, groupby_cols, value_col, region_levels):
     """
-    Process large xarray in chunks and aggregate to DataFrame. This is because the input array
-    is a huge intermediate array that consumes a lot of memory. By manually selecting each chunk,
-    we can limit the size of the intermediate array.
+    Process large xarray in chunks and aggregate to a region-level DataFrame.
 
-    Memory usage at RESFACTOR=13 for trans_xr:
-    - Without manual chunking (trans_xr): ~5 GB
-    - With manual chunking:  ~70 MB
+    Keeps the chunk loop to cap memory (one materialised chunk at a time), but
+    replaces the per-chunk to_dataframe + pandas groupby (which created a full
+    Cartesian-product DataFrame per chunk — up to 31 M rows at RF5) with a BLAS
+    matrix multiply that contracts the cell dimension directly into a small
+    (*non_cell_dims, n_regions) accumulator.
 
     Args:
-        trans_xr: xarray DataArray to process
-        data: Data object with NCELLS attribute
-        yr_cal: Calendar year
-        chunk_size: Number of cells per chunk
-        groupby_cols: List of column names for groupby (must NOT include region coord names)
-        value_col: Name of value column
-        region_levels: List of cell-coord names to aggregate over (e.g. ['region_state', 'region_NRM'])
+        trans_xr:      xarray DataArray with a 'cell' dim and region coords on it
+        data:          Data object (needs NCELLS)
+        yr_cal:        Calendar year (written into the output DataFrame)
+        chunk_size:    Number of cells per chunk
+        groupby_cols:  Non-region dimension names (used to build the output index)
+        value_col:     Name of the value column in the output DataFrame
+        region_levels: Cell-coord names to aggregate over (e.g. ['region_state', 'region_NRM'])
 
     Returns:
         DataFrame with columns ['region_level', 'region'] + groupby_cols + [value_col, 'Year']
     """
-    # Stream-aggregate each chunk immediately into per-region accumulators to
-    # avoid materialising the full cell-level DataFrame (which can be 300M+ rows
-    # for transition arrays at full resolution).
-    accumulators = {r: [] for r in region_levels}
-    for i in range(0, data.NCELLS, chunk_size):
-        end_idx = min(i + chunk_size, data.NCELLS)
-        chunk_df = trans_xr.isel(cell=slice(i, end_idx)).compute().to_dataframe(value_col).reset_index()
-        for region in region_levels:
-            agg = chunk_df.groupby([region] + list(groupby_cols))[value_col].sum().reset_index()
-            accumulators[region].append(agg)
-        del chunk_df  # release full-resolution chunk immediately
+    non_cell_dims  = [d for d in trans_xr.dims if d != 'cell']
+    dim_coords     = {d: trans_xr.coords[d].values for d in non_cell_dims}
+    non_cell_shape = tuple(len(dim_coords[d]) for d in non_cell_dims)
+    n_combos       = int(np.prod(non_cell_shape))
+
+    # xarray broadcasts can leave 'cell' in the middle of the dim order.
+    # Transpose once so cell is the final axis — required for reshape(n_combos, -1).
+    trans_xr = trans_xr.transpose(*non_cell_dims, 'cell')
 
     level_frames = []
-    for region in region_levels:
+    for region_coord in region_levels:
+        labels = trans_xr.coords[region_coord].values           # [NCELLS] str
+        unique_regions, codes = np.unique(labels, return_inverse=True)
+        n_regions = len(unique_regions)
+
+        # Pre-allocated 2D accumulator — (n_combos, n_regions), stays tiny in memory
+        accum = np.zeros((n_combos, n_regions), dtype=np.float64)
+
+        for i in range(0, data.NCELLS, chunk_size):
+            sl       = slice(i, min(i + chunk_size, data.NCELLS))
+            chunk    = trans_xr.isel(cell=sl).compute().values  # (*non_cell_shape, chunk_cells)
+            codes_sl = codes[sl]                                 # (chunk_cells,) int
+
+            # One-hot region indicator: (chunk_cells, n_regions) — tiny
+            onehot = np.eye(n_regions, dtype=np.float32)[codes_sl]
+
+            # BLAS GEMM: (n_combos, chunk_cells) @ (chunk_cells, n_regions)
+            # Contracts the cell dimension in one vectorised call — no Python loop,
+            # no intermediate DataFrame.
+            accum += chunk.reshape(n_combos, -1).astype(np.float64) @ onehot
+
+        # Convert the small accumulator to DataFrame once, at the end
+        idx = pd.MultiIndex.from_product(
+            [dim_coords[d] for d in non_cell_dims], names=non_cell_dims
+        )
         level_df = (
-            pd.concat(accumulators[region], ignore_index=True)
-            .groupby([region] + list(groupby_cols))[value_col].sum()
+            pd.DataFrame(accum, index=idx, columns=unique_regions)
             .reset_index()
-            .rename(columns={region: 'region'})
-            .assign(Year=yr_cal, region_level=region)
+            .melt(id_vars=non_cell_dims, var_name='region', value_name=value_col)
             .query(f'abs(`{value_col}`) > 1')
+            .assign(Year=yr_cal, region_level=region_coord)
         )
         level_frames.append(level_df)
+
     return pd.concat(level_frames, ignore_index=True)
 
 
@@ -1020,7 +1046,7 @@ def write_economics(data: Data, yr_cal, path):
 
     # Am transition matrices are all zeros for every agMgt type so the transition term is skipped entirely.
     xr_revenue_am = am_dvar_mrj * am_revenue_mat
-    xr_cost_am    = am_dvar_mrj * am_cost_mat
+    xr_cost_am    = (am_dvar_mrj * am_cost_mat).expand_dims(Cost_type=['Operating Cost'])
 
     # ── Renewable cost injection (xarray level, before add_all) ──────────────
     # am_cost_mat / am_revenue_mat have zeros for solar/wind (zeroed above to avoid CAPEX
@@ -1053,18 +1079,39 @@ def write_economics(data: Data, yr_cal, path):
             solar_dvar_delta = solar_dvar_now - am_dvar_xr_pre.sel(am='Utility Solar PV')
             wind_dvar_delta  = wind_dvar_now  - am_dvar_xr_pre.sel(am='Onshore Wind')
 
-        solar_potential = (
-            (solar_dvar_now * solar_opex_xr + solar_dvar_delta * solar_capex_xr)
+        solar_cost_opex = (
+            (solar_dvar_now * solar_opex_xr)
             .reindex(lu=xr_cost_am.lu.values, fill_value=0.0)
             .expand_dims(am=['Utility Solar PV'])
+            .expand_dims(Cost_type=['Operating Cost'])
         )
-        wind_potential = (
-            (wind_dvar_now * wind_opex_xr + wind_dvar_delta * wind_capex_xr)
+        solar_cost_capex = (
+            (solar_dvar_delta * solar_capex_xr)
+            .reindex(lu=xr_cost_am.lu.values, fill_value=0.0)
+            .expand_dims(am=['Utility Solar PV'])
+            .expand_dims(Cost_type=['Capital expenditure'])
+        )
+        solar_potential = xr.concat([solar_cost_opex, solar_cost_capex], dim='Cost_type')
+
+        wind_cost_opex = (
+            (wind_dvar_now * wind_opex_xr)
             .reindex(lu=xr_cost_am.lu.values, fill_value=0.0)
             .expand_dims(am=['Onshore Wind'])
+            .expand_dims(Cost_type=['Operating Cost'])
         )
-        re_potential_xr = xr.concat([solar_potential, wind_potential], dim='am')
-        xr_cost_am = xr_cost_am + re_potential_xr.reindex_like(xr_cost_am, fill_value=0.0)
+        wind_cost_capex = (
+            (wind_dvar_delta * wind_capex_xr)
+            .reindex(lu=xr_cost_am.lu.values, fill_value=0.0)
+            .expand_dims(am=['Onshore Wind'])
+            .expand_dims(Cost_type=['Capital expenditure'])
+        )
+        wind_potential = xr.concat([wind_cost_opex, wind_cost_capex], dim='Cost_type')
+
+        re_potential_xr  = xr.concat([solar_potential, wind_potential], dim='am')
+        re_reindexed     = re_potential_xr.reindex(am=xr_cost_am.am.values, lu=xr_cost_am.lu.values, fill_value=0.0)
+        merged_opex      = (xr_cost_am.sel(Cost_type='Operating Cost') + re_reindexed.sel(Cost_type='Operating Cost')).expand_dims(Cost_type=['Operating Cost'])
+        re_capex         = re_reindexed.sel(Cost_type='Capital expenditure').expand_dims(Cost_type=['Capital expenditure'])
+        xr_cost_am       = xr.concat([merged_opex, re_capex], dim='Cost_type')
 
         # ── Part 1b: potential revenue (stack on value matrices, not dvar) ────
         solar_rev_opt = ag_revenue.get_utility_solar_pv_effect_r_mrj(data, ag_rev_mrj, yr_idx)
@@ -1117,19 +1164,20 @@ def write_economics(data: Data, yr_cal, path):
         exist_re_cost_full = (
             xr.concat([exist_re_cost_dry, exist_re_cost_irr], dim='lm')
             .reindex(am=xr_cost_am.am.values, fill_value=0.0)
+            .expand_dims(Cost_type=['Operating Cost'])
         )
 
         # Existing capacity revenue: MWh × state electricity price per cell
-        _solar_exist_mwh = ag_quantity.get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal)
-        _wind_exist_mwh  = ag_quantity.get_exist_renewable_capacity(data, 'Onshore Wind',     yr_cal)
-        _solar_prices = data.SOLAR_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
-        _wind_prices  = data.WIND_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
-        _solar_prices = {data.REGION_STATE_NAME2CODE[k]: v for k, v in _solar_prices.items()}
-        _wind_prices  = {data.REGION_STATE_NAME2CODE[k]: v for k, v in _wind_prices.items()}
-        _solar_price_map = np.vectorize(_solar_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
-        _wind_price_map  = np.vectorize(_wind_prices.get,  otypes=[np.float32])(data.REGION_STATE_CODE)
-        solar_exist_rev = _solar_exist_mwh.values * _solar_price_map
-        wind_exist_rev  = _wind_exist_mwh.values  * _wind_price_map
+        solar_exist_mwh = ag_quantity.get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal)
+        wind_exist_mwh  = ag_quantity.get_exist_renewable_capacity(data, 'Onshore Wind',     yr_cal)
+        solar_prices    = data.SOLAR_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
+        wind_prices     = data.WIND_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
+        solar_prices    = {data.REGION_STATE_NAME2CODE[k]: v for k, v in solar_prices.items()}
+        wind_prices     = {data.REGION_STATE_NAME2CODE[k]: v for k, v in wind_prices.items()}
+        solar_price_map = np.vectorize(solar_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
+        wind_price_map  = np.vectorize(wind_prices.get,  otypes=[np.float32])(data.REGION_STATE_CODE)
+        solar_exist_rev = solar_exist_mwh.values * solar_price_map
+        wind_exist_rev  = wind_exist_mwh.values  * wind_price_map
 
         exist_re_rev_dry = xr.DataArray(
             np.stack([solar_exist_rev, wind_exist_rev], axis=0),
@@ -1147,17 +1195,17 @@ def write_economics(data: Data, yr_cal, path):
             .reindex(am=xr_revenue_am.am.values, fill_value=0.0)
         )
 
-        xr_cost_am    = xr.concat([xr_cost_am,    exist_re_cost_full], dim='lu')
+        xr_cost_am    = xr.concat([xr_cost_am,    exist_re_cost_full.reindex(Cost_type=xr_cost_am.Cost_type.values, fill_value=0.0)], dim='lu')
         xr_revenue_am = xr.concat([xr_revenue_am, exist_re_rev_full],  dim='lu')
 
-    xr_profit_am  = xr_revenue_am - xr_cost_am
+    xr_profit_am  = xr_revenue_am - xr_cost_am.sum('Cost_type')
 
     xr_revenue_am = add_all(xr_revenue_am, ['lm', 'lu', 'am'])
     xr_cost_am    = add_all(xr_cost_am, ['lm', 'lu', 'am'])
     xr_profit_am  = add_all(xr_profit_am, ['lm', 'lu', 'am'])
 
     revenue_am_df, revenue_am_df_AUS = to_region_and_aus_df(xr_revenue_am, ['am', 'lm', 'lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
-    cost_am_df,    cost_am_df_AUS    = to_region_and_aus_df(xr_cost_am,    ['am', 'lm', 'lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    cost_am_df,    cost_am_df_AUS    = to_region_and_aus_df(xr_cost_am,    ['am', 'lm', 'lu', 'Cost_type'], yr_cal, region_levels=['region_state', 'region_NRM'])
     profit_am_df,  profit_am_df_AUS  = to_region_and_aus_df(xr_profit_am,  ['am', 'lm', 'lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
 
     rename_map_am = {'lu': 'Land-use', 'lm': 'Water_supply', 'am': 'Management Type', 'Value': 'Value ($)'}
@@ -1170,16 +1218,16 @@ def write_economics(data: Data, yr_cal, path):
     else:
         valid_layers_rev_am = pd.MultiIndex.from_frame(revenue_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
     if cost_am_df_AUS.empty:
-        valid_layers_cost_am = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL')], names=['am', 'lm', 'lu'])
+        valid_layers_cost_am = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL', 'Operating Cost')], names=['am', 'lm', 'lu', 'Cost_type'])
     else:
-        valid_layers_cost_am = pd.MultiIndex.from_frame(cost_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
+        valid_layers_cost_am = pd.MultiIndex.from_frame(cost_am_df_AUS[['am', 'lm', 'lu', 'Cost_type']]).sort_values()
     if profit_am_df_AUS.empty:
         valid_layers_profit_am = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL')], names=['am', 'lm', 'lu'])
     else:
         valid_layers_profit_am = pd.MultiIndex.from_frame(profit_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
 
     valid_layers_stack_rev_am    = xr_revenue_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_rev_am).drop_vars(['region_state', 'region_NRM'], errors='ignore')
-    valid_layers_stack_cost_am   = xr_cost_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_cost_am).drop_vars(['region_state', 'region_NRM'], errors='ignore')
+    valid_layers_stack_cost_am   = xr_cost_am.stack(layer=['am', 'lm', 'lu', 'Cost_type']).sel(layer=valid_layers_cost_am).drop_vars(['region_state', 'region_NRM'], errors='ignore')
     valid_layers_stack_profit_am = xr_profit_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_profit_am).drop_vars(['region_state', 'region_NRM'], errors='ignore')
 
     save2nc(valid_layers_stack_rev_am,    os.path.join(path, f'xr_economics_am_revenue_{yr_cal}.nc'))
@@ -3357,7 +3405,15 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     xr_sum_gbf2_cat = xr_gbf2_all.stack(layer=['Type']).drop_vars(['region_state', 'region_NRM'], errors='ignore').compute()
     save2nc(xr_sum_gbf2_cat, os.path.join(path, f'xr_biodiversity_GBF2_priority_sum_{yr_cal}.nc'))
 
-    return f"Biodiversity GBF2 priority scores written for year {yr_cal}"
+    magnitudes = {
+        'biodiversity_GBF2': {
+            'ag':     get_mag(valid_layers_stack_ag),
+            'non_ag': get_mag(valid_layers_stack_non_ag),
+            'am':     get_mag(valid_layers_stack_am),
+            'sum':    get_mag(xr_sum_gbf2_cat),
+        }
+    }
+    return (f"Biodiversity GBF2 priority scores written for year {yr_cal}", magnitudes)
 
 
 
@@ -3698,7 +3754,15 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     )
     save2nc(xr_sum_gbf3_cat, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_sum_{yr_cal}.nc'))
 
-    return f"Biodiversity GBF3 scores written for year {yr_cal}"
+    magnitudes = {
+        'biodiversity_GBF3': {
+            'ag':     get_mag(valid_layers_stack_ag) if GBF3_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3 else [],
+            'non_ag': get_mag(valid_layers_stack_non_ag) if GBF3_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3 else [],
+            'am':     get_mag(valid_layers_stack_am),
+            'sum':    get_mag(xr_sum_gbf3_cat),
+        }
+    }
+    return (f"Biodiversity GBF3 scores written for year {yr_cal}", magnitudes)
 
 
 
@@ -4093,7 +4157,15 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     )
     save2nc(xr_sum_gbf4_snes_cat, os.path.join(path, f'xr_biodiversity_GBF4_SNES_sum_{yr_cal}.nc'))
 
-    return f"Biodiversity GBF4 SNES scores written for year {yr_cal}"
+    magnitudes = {
+        'biodiversity_GBF4_SNES': {
+            'ag':     get_mag(valid_layers_stack_ag) if GBF4_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3 else [],
+            'non_ag': get_mag(valid_layers_stack_non_ag) if GBF4_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3 else [],
+            'am':     get_mag(valid_layers_stack_am),
+            'sum':    get_mag(xr_sum_gbf4_snes_cat),
+        }
+    }
+    return (f"Biodiversity GBF4 SNES scores written for year {yr_cal}", magnitudes)
 
 
 
@@ -4483,7 +4555,15 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     )
     save2nc(xr_sum_gbf4_ecnes_cat, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_sum_{yr_cal}.nc'))
 
-    return f"Biodiversity GBF4 ECNES scores written for year {yr_cal}"
+    magnitudes = {
+        'biodiversity_GBF4_ECNES': {
+            'ag':     get_mag(valid_layers_stack_ag) if GBF4_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3 else [],
+            'non_ag': get_mag(valid_layers_stack_non_ag) if GBF4_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3 else [],
+            'am':     get_mag(valid_layers_stack_am),
+            'sum':    get_mag(xr_sum_gbf4_ecnes_cat),
+        }
+    }
+    return (f"Biodiversity GBF4 ECNES scores written for year {yr_cal}", magnitudes)
 
 
 
@@ -4656,8 +4736,15 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
             .drop_vars('region').compute()
         )
     save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF8_groups_ag_management_{yr_cal}.nc'))
-    
-    return f"Biodiversity GBF8 groups scores written for year {yr_cal}"
+
+    magnitudes = {
+        'biodiversity_GBF8': {
+            'ag':     get_mag(valid_layers_stack_ag) if GBF8_scores_groups_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3 else [],
+            'non_ag': get_mag(valid_layers_stack_non_ag) if GBF8_scores_groups_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3 else [],
+            'am':     get_mag(valid_layers_stack_am),
+        }
+    }
+    return (f"Biodiversity GBF8 groups scores written for year {yr_cal}", magnitudes)
 
 
 
@@ -4840,8 +4927,15 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
             .drop_vars('region').compute()
         )
     save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF8_species_ag_management_{yr_cal}.nc'))
-    
-    return f"Biodiversity GBF8 species scores written for year {yr_cal}"
+
+    magnitudes = {
+        'biodiversity_GBF8': {
+            'ag':     get_mag(valid_layers_stack_ag) if GBF8_scores_species_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3 else [],
+            'non_ag': get_mag(valid_layers_stack_non_ag) if GBF8_scores_species_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3 else [],
+            'am':     get_mag(valid_layers_stack_am),
+        }
+    }
+    return (f"Biodiversity GBF8 species scores written for year {yr_cal}", magnitudes)
 
 
 

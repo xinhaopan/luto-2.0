@@ -443,14 +443,19 @@ def save_report_layer(raw_data_dir: str):
 
     files_bio = files.query('base_name.str.contains("biodiversity")')
     
-    bio_magnitudes = (
-        *cell_magnitudes['bio_quality']['ag'],
-        *cell_magnitudes['bio_quality']['non_ag'],
-        *cell_magnitudes['bio_quality']['am'],
-        *cell_magnitudes['bio_quality']['all']
-    )
+    bio_quality_vals = [v for lst in cell_magnitudes.get('bio_quality', {}).values() for v in lst]
+    gbf2_vals        = [v for lst in cell_magnitudes.get('biodiversity_GBF2',       {}).values() for v in lst]
+    gbf3_vals        = [v for lst in cell_magnitudes.get('biodiversity_GBF3',       {}).values() for v in lst]
+    gbf4_snes_vals   = [v for lst in cell_magnitudes.get('biodiversity_GBF4_SNES',  {}).values() for v in lst]
+    gbf4_ecnes_vals  = [v for lst in cell_magnitudes.get('biodiversity_GBF4_ECNES', {}).values() for v in lst]
+    gbf8_vals        = [v for lst in cell_magnitudes.get('biodiversity_GBF8',       {}).values() for v in lst]
     
-    bio_min_max = (min(bio_magnitudes), max(bio_magnitudes))
+    bio_min_max        = (min(bio_quality_vals),    max(bio_quality_vals))   # bio_quality always has values 
+    gbf2_min_max       = (min(gbf2_vals),           max(gbf2_vals))          if gbf2_vals          else bio_min_max
+    gbf3_min_max       = (min(gbf3_vals),           max(gbf3_vals))          if gbf3_vals          else bio_min_max
+    gbf4_snes_min_max  = (min(gbf4_snes_vals),      max(gbf4_snes_vals))     if gbf4_snes_vals     else bio_min_max
+    gbf4_ecnes_min_max = (min(gbf4_ecnes_vals),     max(gbf4_ecnes_vals))    if gbf4_ecnes_vals    else bio_min_max
+    gbf8_min_max       = (min(gbf8_vals),           max(gbf8_vals))          if gbf8_vals          else bio_min_max
     
     
     # Quality layers
@@ -474,116 +479,113 @@ def save_report_layer(raw_data_dir: str):
     # GBF2
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
-        get_map2json(bio_GBF2_ag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js', name_warp=name_warp)
+        get_map2json(bio_GBF2_ag, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF2 Ag layer saved.')
 
         bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
-        get_map2json(bio_GBF2_am, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js', name_warp=name_warp)
+        get_map2json(bio_GBF2_am, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF2 Am layer saved.')
 
         bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
-        get_map2json(bio_GBF2_nonag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js', name_warp=name_warp)
+        get_map2json(bio_GBF2_nonag, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF2 Non-Ag layer saved.')
 
         bio_GBF2_sum = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_sum"')
-        get_map2json(bio_GBF2_sum, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Sum.js', name_warp=name_warp)
+        get_map2json(bio_GBF2_sum, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Sum.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF2 Sum layer saved.')
-
-    # TODO: need to create cell magnitude and determine colorbar limit for these GBF layers.
-    # Now just use the quality magnitude, which could be incorrect for specific GBFs.
 
     # GBF3-NVIS (NRM aggregation mode)
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
         bio_GBF3_NVIS_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag"')
-        get_map2json(bio_GBF3_NVIS_ag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js', name_warp=name_warp)
+        get_map2json(bio_GBF3_NVIS_ag, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF3_NVIS Ag layer saved.')
 
         bio_GBF3_NVIS_am = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag_management"')
-        get_map2json(bio_GBF3_NVIS_am, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js', name_warp=name_warp)
+        get_map2json(bio_GBF3_NVIS_am, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF3_NVIS Am layer saved.')
 
         bio_GBF3_NVIS_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_non_ag"')
-        get_map2json(bio_GBF3_NVIS_nonag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js', name_warp=name_warp)
+        get_map2json(bio_GBF3_NVIS_nonag, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF3_NVIS Non-Ag layer saved.')
 
         bio_GBF3_NVIS_sum = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_sum"')
-        get_map2json(bio_GBF3_NVIS_sum, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Sum.js', name_warp=name_warp)
+        get_map2json(bio_GBF3_NVIS_sum, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Sum.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF3_NVIS Sum layer saved.')
 
     # GBF3-IBRA aggregation mode — writes to GBF3_NVIS map filenames
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and settings.GBF3_NVIS_REGION_MODE == 'IBRA':
         bio_GBF3_IBRA_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag"')
-        get_map2json(bio_GBF3_IBRA_ag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js', name_warp=name_warp)
+        get_map2json(bio_GBF3_IBRA_ag, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF3_IBRA Ag layer saved.')
 
         bio_GBF3_IBRA_am = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag_management"')
-        get_map2json(bio_GBF3_IBRA_am, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js', name_warp=name_warp)
+        get_map2json(bio_GBF3_IBRA_am, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF3_IBRA Am layer saved.')
 
         bio_GBF3_IBRA_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_non_ag"')
-        get_map2json(bio_GBF3_IBRA_nonag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js', name_warp=name_warp)
+        get_map2json(bio_GBF3_IBRA_nonag, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF3_IBRA Non-Ag layer saved.')
 
     # GBF4-SNES
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
         bio_GBF4_SNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag"')
-        get_map2json(bio_GBF4_SNES_ag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js', name_warp=name_warp)
+        get_map2json(bio_GBF4_SNES_ag, None, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF4_SNES Ag layer saved.')
 
         bio_GBF4_SNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag_management"')
-        get_map2json(bio_GBF4_SNES_am, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js', name_warp=name_warp)
+        get_map2json(bio_GBF4_SNES_am, None, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF4_SNES Am layer saved.')
 
         bio_GBF4_SNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_non_ag"')
-        get_map2json(bio_GBF4_SNES_nonag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js', name_warp=name_warp)
+        get_map2json(bio_GBF4_SNES_nonag, None, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF4_SNES Non-Ag layer saved.')
 
         bio_GBF4_SNES_sum = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_sum"')
-        get_map2json(bio_GBF4_SNES_sum, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Sum.js', name_warp=name_warp)
+        get_map2json(bio_GBF4_SNES_sum, None, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Sum.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF4_SNES Sum layer saved.')
 
     # GBF4_ECNES
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
         bio_GBF4_ECNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag"')
-        get_map2json(bio_GBF4_ECNES_ag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js', name_warp=name_warp)
+        get_map2json(bio_GBF4_ECNES_ag, None, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF4_ECNES Ag layer saved.')
 
         bio_GBF4_ECNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag_management"')
-        get_map2json(bio_GBF4_ECNES_am, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js', name_warp=name_warp)
+        get_map2json(bio_GBF4_ECNES_am, None, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF4_ECNES Am layer saved.')
 
         bio_GBF4_ECNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_non_ag"')
-        get_map2json(bio_GBF4_ECNES_nonag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js', name_warp=name_warp)
+        get_map2json(bio_GBF4_ECNES_nonag, None, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF4_ECNES Non-Ag layer saved.')
 
         bio_GBF4_ECNES_sum = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_sum"')
-        get_map2json(bio_GBF4_ECNES_sum, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Sum.js', name_warp=name_warp)
+        get_map2json(bio_GBF4_ECNES_sum, None, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Sum.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF4_ECNES Sum layer saved.')
 
     # GBF8
     if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':
         bio_GBF8_ag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag"')
-        get_map2json(bio_GBF8_ag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_ag, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF8 Ag layer saved.')
 
         bio_GBF8_am = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag_management"')
-        get_map2json(bio_GBF8_am, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_am, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF8 Am layer saved.')
 
         bio_GBF8_nonag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_non_ag"')
-        get_map2json(bio_GBF8_nonag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_nonag, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF8 Non-Ag layer saved.')
 
         bio_GBF8_ag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag"')
-        get_map2json(bio_GBF8_ag_group, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_ag_group, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF8 Groups Ag layer saved.')
 
         bio_GBF8_am_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag_management"')
-        get_map2json(bio_GBF8_am_group, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_am_group, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF8 Groups Am layer saved.')
 
         bio_GBF8_nonag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_non_ag"')
-        get_map2json(bio_GBF8_nonag_group, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_nonag_group, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF8 Groups Non-Ag layer saved.')
 
     

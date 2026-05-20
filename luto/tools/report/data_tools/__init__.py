@@ -210,6 +210,8 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Transition-cost-ag2nonag': 'Cost (trans Ag2NonAg)',
             'Transition-cost-nonag2ag': 'Cost (trans NonAg2Ag)',
             'Transition-cost-agMgt': 'Cost (trans AgMgt)',
+            'Operating Cost': 'Operating Cost',
+            'Capital expenditure': 'Capital expenditure',
         }.get(sel[key], sel[key])
 
     # 7: last: 'lu' or 'from_lu' (land-use is always the bottom-level UI selection)

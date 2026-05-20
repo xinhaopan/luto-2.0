@@ -797,24 +797,26 @@ def process_economics_data(files, SAVE_DIR):
         out_dict[region_level][region][am][water] = df.to_dict(orient='records')
     write_chart_js(out_dict, 'Economics_Am_revenue')
 
-    # Am Cost: region → AgMgt → Water → [series by LU]
+    # Am Cost: region → AgMgt → Water → Cost_type → [series by LU]
     am_cost = cost_am_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
-    df_wide = _groupby_to_records(am_cost, ['region_level', 'region', 'Management Type', 'Water_supply', 'Land-use'], ['region_level', 'region', 'am', 'water', 'name', 'data'], value_cols=('Year', 'Value ($)'))
+    df_wide = _groupby_to_records(am_cost, ['region_level', 'region', 'Management Type', 'Water_supply', 'Cost_type', 'Land-use'], ['region_level', 'region', 'am', 'water', 'cost_type', 'name', 'data'], value_cols=('Year', 'Value ($)'))
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS.get(x, '#999999'))
     df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x) if x in LANDUSE_ALL_RENAMED else 999)
     df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
     out_dict = {}
-    for (region_level, region, am, water), df in df_wide.groupby(['region_level', 'region', 'am', 'water']):
-        df = df.drop(['region_level', 'region', 'am', 'water'], axis=1)
+    for (region_level, region, am, water, cost_type), df in df_wide.groupby(['region_level', 'region', 'am', 'water', 'cost_type']):
+        df = df.drop(['region_level', 'region', 'am', 'water', 'cost_type'], axis=1)
         if region_level not in out_dict:
             out_dict[region_level] = {}
         if region not in out_dict[region_level]:
             out_dict[region_level][region] = {}
         if am not in out_dict[region_level][region]:
             out_dict[region_level][region][am] = {}
-        out_dict[region_level][region][am][water] = df.to_dict(orient='records')
+        if water not in out_dict[region_level][region][am]:
+            out_dict[region_level][region][am][water] = {}
+        out_dict[region_level][region][am][water][cost_type] = df.to_dict(orient='records')
     write_chart_js(out_dict, 'Economics_Am_cost')
 
     # Am Profit: region → AgMgt → Water → [series by LU]
@@ -1466,34 +1468,40 @@ def process_production_data(files, SAVE_DIR, years):
 
 
     # -------------------- Commodity production for ag-man --------------------
-    df_wide = _groupby_to_records(quantity_am, ['region_level', 'region', 'Water_supply', 'Commodity', 'am'], ['region_level', 'region', 'water', 'commodity', 'name', 'data'], value_cols=('Year', 'Production (t/KL)'))
-    
-    df_wide_c_ALL = quantity_am\
-        .groupby(['region_level', 'region', 'Water_supply', 'am', 'Year'])\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .groupby(['region_level', 'region', 'Water_supply', 'am'])[['Year','Production (t/KL)']]\
-        .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
-        .reset_index()
-    df_wide_c_ALL['Commodity'] = 'ALL'
-    df_wide_c_ALL.columns = ['region_level', 'region', 'water', 'name', 'data', 'commodity']
-    
-    
-    df_wide = pd.concat([df_wide, df_wide_c_ALL], axis=0, ignore_index=True)
+    # Hierarchy: region_level → region → am → water → [series(name=Commodity)]
+    # Matches Economics Am pattern so the chart is split by land use.
+    am_prod = quantity_am.query('Commodity != "ALL"').copy()
+
+    df_wide = _groupby_to_records(am_prod, ['region_level', 'region', 'am', 'Water_supply', 'Commodity'], ['region_level', 'region', 'am', 'water', 'name', 'data'], value_cols=('Year', 'Production (t/KL)'))
     df_wide['type'] = 'column'
-    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
-    
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS.get(x, '#999999'))
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x) if x in COMMODITIES_ALL else 999)
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    # Add am="ALL" rows: sum across all AgMgts, keep per-commodity series
+    am_all_agg = am_prod\
+        .groupby(['region_level', 'region', 'Water_supply', 'Commodity', 'Year'])\
+        .sum(numeric_only=True)\
+        .reset_index()
+    df_wide_am_ALL = _groupby_to_records(am_all_agg, ['region_level', 'region', 'Water_supply', 'Commodity'], ['region_level', 'region', 'water', 'name', 'data'], value_cols=('Year', 'Production (t/KL)'))
+    df_wide_am_ALL.insert(2, 'am', 'ALL')
+    df_wide_am_ALL['type'] = 'column'
+    df_wide_am_ALL['color'] = df_wide_am_ALL['name'].apply(lambda x: COLORS.get(x, '#999999'))
+    df_wide_am_ALL['name_order'] = df_wide_am_ALL['name'].apply(lambda x: COMMODITIES_ALL.index(x) if x in COMMODITIES_ALL else 999)
+    df_wide_am_ALL = df_wide_am_ALL.sort_values('name_order').drop(columns=['name_order'])
+
+    df_wide = pd.concat([df_wide, df_wide_am_ALL], axis=0, ignore_index=True)
 
     out_dict = {}
-    for (region_level, region, water, commodity), df in df_wide.groupby(['region_level', 'region', 'water', 'commodity']):
-        df = df.drop(['region_level', 'region', 'water', 'commodity'], axis=1)
+    for (region_level, region, am, water), df in df_wide.groupby(['region_level', 'region', 'am', 'water']):
+        df = df.drop(['region_level', 'region', 'am', 'water'], axis=1)
         if region_level not in out_dict:
             out_dict[region_level] = {}
         if region not in out_dict[region_level]:
             out_dict[region_level][region] = {}
-        if water not in out_dict[region_level][region]:
-            out_dict[region_level][region][water] = {}
-        out_dict[region_level][region][water][commodity] = df.to_dict(orient='records')
+        if am not in out_dict[region_level][region]:
+            out_dict[region_level][region][am] = {}
+        out_dict[region_level][region][am][water] = df.to_dict(orient='records')
 
     filename = f'Production_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -2338,6 +2346,13 @@ def process_water_data(files, SAVE_DIR):
         ], ignore_index=True)\
         .query('Landuse != "ALL" and `Water Supply` != "ALL"')
 
+    # Add ALL water aggregate
+    water_ag_all_water = water_ag\
+        .groupby(['region_level', 'region', 'Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True).reset_index()\
+        .assign(**{'Water Supply': 'ALL'})
+    water_ag = pd.concat([water_ag, water_ag_all_water], ignore_index=True)
+
     df_region_wide = water_ag.groupby(['region_level', 'region', 'Water Supply', 'Landuse'])[['Year','Value (ML)']]\
         .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
         .reset_index()
@@ -2384,6 +2399,14 @@ def process_water_data(files, SAVE_DIR):
         .assign(region_level='NRM')
 
     water_am = pd.concat([water_am_AUS, water_am_NRM], ignore_index=True).query('`Agricultural Management` != "ALL"')
+
+    # Add ALL water aggregate
+    water_am_all_water = water_am\
+        .query('`Water Supply` != "ALL"')\
+        .groupby(['region_level', 'region', 'Landuse', 'Agricultural Management', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True).reset_index()\
+        .assign(**{'Water Supply': 'ALL'})
+    water_am = pd.concat([water_am, water_am_all_water], ignore_index=True)
 
     df_region_wide = water_am.groupby(['region_level', 'region', 'Water Supply', 'Landuse', 'Agricultural Management'])[['Year','Value (ML)']]\
         .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
