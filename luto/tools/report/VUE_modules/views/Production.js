@@ -63,7 +63,11 @@ window.ProductionView = {
       if (cat === "Sum" || cat === "Ag") {
         seriesData = (chartData?.[water] || []).filter(s => commodity === "ALL" || s.name === commodity);
       } else if (cat === "Ag Mgt") {
-        seriesData = (chartData?.[water]?.[commodity] || []).filter(s => agMgt === "ALL" || s.name === agMgt);
+        // chart: am → water → [series by LU/Commodity] — matches Economics Am pattern
+        const items = chartData?.[agMgt]?.[water];
+        seriesData = (items && items.length)
+          ? ((commodity === "ALL" || !commodity) ? items : items.filter(s => s.name === commodity))
+          : [];
       } else if (cat === "Non-Ag") {
         seriesData = (chartData || []).filter(s => commodity === "ALL" || s.name === commodity);
       }

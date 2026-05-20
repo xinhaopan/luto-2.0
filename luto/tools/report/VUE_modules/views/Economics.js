@@ -21,6 +21,7 @@ window.EconomicsView = {
     const availableAgMgt = ref([]);
     const availableWater = ref([]);
     const availableSource = ref([]);
+    const availableCostType = ref([]);
     const availableLanduse = ref([]);
 
     const selectCategory = ref("");
@@ -28,12 +29,13 @@ window.EconomicsView = {
     const selectAgMgt = ref("");
     const selectWater = ref("");
     const selectSource = ref("");
+    const selectCostType = ref("");
     const selectLanduse = ref("");
 
     const previousSelections = ref({
       "Sum": { mapType: "", landuse: "" },
       "Ag": { mapType: "", water: "", source: "", landuse: "" },
-      "Ag Mgt": { mapType: "", agMgt: "", water: "", landuse: "" },
+      "Ag Mgt": { mapType: "", agMgt: "", water: "", costType: "", landuse: "" },
       "Non-Ag": { mapType: "", landuse: "" },
     });
 
@@ -49,6 +51,9 @@ window.EconomicsView = {
 
     const hasSourceLevel = computed(() =>
       selectCategory.value === "Ag" && selectMapType.value !== "Profit"
+    );
+    const hasCostTypeLevel = computed(() =>
+      selectCategory.value === "Ag Mgt" && selectMapType.value === "Cost"
     );
     const TRANSITION_AG = ["Transition (Ag2Ag)", "Transition (NonAg2Ag)"];
     const TRANSITION_NONAG = ["Transition (Ag2NonAg)", "Transition (NonAg2NonAg)"];
@@ -79,6 +84,7 @@ window.EconomicsView = {
       const region = selectRegion.value;
       const hasSrc = hasSourceLevel.value;
       if (!dataLoaded.value) return emptyChart();
+      const costType = selectCostType.value;
       const effectiveMt = cat === "Sum" ? "Profit" : mt;
       const chartEntry = chartRegister[cat]?.[effectiveMt];
       if (!chartEntry) return emptyChart();
@@ -100,8 +106,10 @@ window.EconomicsView = {
           ? ((landuse === "ALL" || !landuse) ? items : items.filter(s => s.name === landuse))
           : [];
       } else if (cat === "Ag Mgt") {
-        // chart: agMgt → water → [series by LU]
-        const items = chartData?.[agMgt]?.[water];
+        // chart: agMgt → water → [series by LU]  OR  agMgt → water → costType → [series by LU] for Cost
+        const items = mt === "Cost"
+          ? chartData?.[agMgt]?.[water]?.[costType]
+          : chartData?.[agMgt]?.[water];
         seriesData = (items && items.length)
           ? ((landuse === "ALL" || !landuse) ? items : items.filter(s => s.name === landuse))
           : [];
@@ -134,7 +142,7 @@ window.EconomicsView = {
       if (!cat) return;
       if (cat === "Sum") previousSelections.value["Sum"] = { mapType: selectMapType.value, landuse: selectLanduse.value };
       if (cat === "Ag") previousSelections.value["Ag"] = { mapType: selectMapType.value, water: selectWater.value, source: selectSource.value, landuse: selectLanduse.value };
-      if (cat === "Ag Mgt") previousSelections.value["Ag Mgt"] = { mapType: selectMapType.value, agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectLanduse.value };
+      if (cat === "Ag Mgt") previousSelections.value["Ag Mgt"] = { mapType: selectMapType.value, agMgt: selectAgMgt.value, water: selectWater.value, costType: selectCostType.value, landuse: selectLanduse.value };
       if (cat === "Non-Ag") previousSelections.value["Non-Ag"] = { mapType: selectMapType.value, landuse: selectLanduse.value };
     }
 
@@ -198,10 +206,21 @@ window.EconomicsView = {
         availableWater.value = Object.keys(tree[selectAgMgt.value] || {});
         const prevW = previousSelections.value["Ag Mgt"]?.water || curW;
         selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
-        availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value] || [];
-        const prevL = previousSelections.value["Ag Mgt"]?.landuse || curL;
-        selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
-        await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [selectAgMgt.value, selectWater.value, selectLanduse.value]);
+        if (mapType === "Cost") {
+          availableCostType.value = Object.keys(tree[selectAgMgt.value]?.[selectWater.value] || {});
+          const prevCt = previousSelections.value["Ag Mgt"]?.costType || selectCostType.value;
+          selectCostType.value = (prevCt && availableCostType.value.includes(prevCt)) ? prevCt : (availableCostType.value[0] || '');
+          availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value]?.[selectCostType.value] || [];
+          const prevL = previousSelections.value["Ag Mgt"]?.landuse || curL;
+          selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
+          await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [selectAgMgt.value, selectWater.value, selectCostType.value, selectLanduse.value]);
+        } else {
+          availableCostType.value = []; selectCostType.value = '';
+          availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value] || [];
+          const prevL = previousSelections.value["Ag Mgt"]?.landuse || curL;
+          selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
+          await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [selectAgMgt.value, selectWater.value, selectLanduse.value]);
+        }
 
       } else if (cat === "Non-Ag") {
         availableLanduse.value = Array.isArray(tree) ? tree : Object.keys(tree);
@@ -269,10 +288,21 @@ window.EconomicsView = {
       availableWater.value = Object.keys(tree[newAgMgt] || {});
       const prevW = previousSelections.value["Ag Mgt"].water;
       selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
-      availableLanduse.value = tree[newAgMgt]?.[selectWater.value] || [];
-      const prevL = previousSelections.value["Ag Mgt"].landuse;
-      selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
-      await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [newAgMgt, selectWater.value, selectLanduse.value]);
+      if (mapType === "Cost") {
+        availableCostType.value = Object.keys(tree[newAgMgt]?.[selectWater.value] || {});
+        const prevCt = previousSelections.value["Ag Mgt"].costType;
+        selectCostType.value = (prevCt && availableCostType.value.includes(prevCt)) ? prevCt : (availableCostType.value[0] || '');
+        availableLanduse.value = tree[newAgMgt]?.[selectWater.value]?.[selectCostType.value] || [];
+        const prevL = previousSelections.value["Ag Mgt"].landuse;
+        selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
+        await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [newAgMgt, selectWater.value, selectCostType.value, selectLanduse.value]);
+      } else {
+        availableCostType.value = []; selectCostType.value = '';
+        availableLanduse.value = tree[newAgMgt]?.[selectWater.value] || [];
+        const prevL = previousSelections.value["Ag Mgt"].landuse;
+        selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
+        await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [newAgMgt, selectWater.value, selectLanduse.value]);
+      }
     });
 
     watch(selectWater, async (newWater) => {
@@ -299,10 +329,21 @@ window.EconomicsView = {
       } else if (cat === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].water = newWater;
         const tree = getTree("Ag Mgt", mapType);
-        availableLanduse.value = tree[selectAgMgt.value]?.[newWater] || [];
-        const prev = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
-        await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [selectAgMgt.value, newWater, selectLanduse.value]);
+        if (mapType === "Cost") {
+          availableCostType.value = Object.keys(tree[selectAgMgt.value]?.[newWater] || {});
+          const prevCt = previousSelections.value["Ag Mgt"].costType;
+          selectCostType.value = (prevCt && availableCostType.value.includes(prevCt)) ? prevCt : (availableCostType.value[0] || '');
+          availableLanduse.value = tree[selectAgMgt.value]?.[newWater]?.[selectCostType.value] || [];
+          const prev = previousSelections.value["Ag Mgt"].landuse;
+          selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
+          await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [selectAgMgt.value, newWater, selectCostType.value, selectLanduse.value]);
+        } else {
+          availableCostType.value = []; selectCostType.value = '';
+          availableLanduse.value = tree[selectAgMgt.value]?.[newWater] || [];
+          const prev = previousSelections.value["Ag Mgt"].landuse;
+          selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
+          await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [selectAgMgt.value, newWater, selectLanduse.value]);
+        }
       }
     });
 
@@ -320,6 +361,16 @@ window.EconomicsView = {
       selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
       const waterKey = TRANSITION_AG.includes(mapType) ? 'ALL' : selectWater.value;
       await ensureComboLayer(mapRegister["Ag"][mapType].layerPrefix, [waterKey, newSource, selectLanduse.value]);
+    });
+
+    watch(selectCostType, async (newCostType) => {
+      if (!hasCostTypeLevel.value) return;
+      previousSelections.value["Ag Mgt"].costType = newCostType;
+      const tree = getTree("Ag Mgt", "Cost");
+      availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value]?.[newCostType] || [];
+      const prev = previousSelections.value["Ag Mgt"].landuse;
+      selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
+      await ensureComboLayer(mapRegister["Ag Mgt"]["Cost"].layerPrefix, [selectAgMgt.value, selectWater.value, newCostType, selectLanduse.value]);
     });
 
     watch(selectLanduse, async (newLanduse) => {
@@ -342,7 +393,11 @@ window.EconomicsView = {
         }
       } else if (cat === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].landuse = newLanduse;
-        await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [selectAgMgt.value, selectWater.value, newLanduse]);
+        if (mapType === "Cost") {
+          await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [selectAgMgt.value, selectWater.value, selectCostType.value, newLanduse]);
+        } else {
+          await ensureComboLayer(mapRegister["Ag Mgt"][mapType].layerPrefix, [selectAgMgt.value, selectWater.value, newLanduse]);
+        }
       } else if (cat === "Non-Ag") {
         previousSelections.value["Non-Ag"].landuse = newLanduse;
         await ensureComboLayer(mapRegister["Non-Ag"][mapType].layerPrefix, [newLanduse]);
@@ -353,9 +408,9 @@ window.EconomicsView = {
       yearIndex, selectYear, selectRegion,
       availableRegionLevels, selectRegionLevel,
       availableYears, availableCategories, availableMapTypes,
-      availableAgMgt, availableWater, availableSource, availableLanduse,
-      selectCategory, selectMapType, selectAgMgt, selectWater, selectSource, selectLanduse,
-      hasSourceLevel, isTransition,
+      availableAgMgt, availableWater, availableSource, availableCostType, availableLanduse,
+      selectCategory, selectMapType, selectAgMgt, selectWater, selectSource, selectCostType, selectLanduse,
+      hasSourceLevel, hasCostTypeLevel, isTransition,
       selectMapData, selectChartData, formatLanduse,
       dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
     };
@@ -455,7 +510,18 @@ window.EconomicsView = {
           </button>
         </div>
 
-        <!-- 5. Source (Ag non-Profit only) -->
+        <!-- 5. Cost Type (Ag Mgt + Cost only) -->
+        <div v-if="hasCostTypeLevel && dataLoaded && availableCostType.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Cost Type:</span>
+          <button v-for="(val, key) in availableCostType" :key="key"
+            @click="selectCostType = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectCostType === val}">
+            {{ val }}
+          </button>
+        </div>
+
+        <!-- 5b. Source (Ag non-Profit only) -->
         <div v-if="hasSourceLevel && dataLoaded && availableSource.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Source:</span>
           <button v-for="(val, key) in availableSource" :key="key"

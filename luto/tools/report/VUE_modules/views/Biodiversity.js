@@ -376,7 +376,7 @@ window.BiodiversityView = {
         availableBackends.value = backends;
         const mbSetting = (window.Supporting_info.model_run_settings || []).find(s => s.parameter === "BIO_QUALITY_LAYER")?.val || "";
         modelBackend.value = mbSetting;
-        selectBackend.value = backends.includes(mbSetting) ? mbSetting : (backends[0] || "");
+        selectBackend.value = backends[0] || "";
       }
 
       await doCascade(initCat);
@@ -637,7 +637,7 @@ window.BiodiversityView = {
         <div v-if="dataLoaded && selectMetric === 'quality' && availableBackends.length > 1"
           style="font-size:0.6rem; line-height:1.3;" class="flex items-center gap-1 text-gray-500">
           <span class="inline-block px-1 py-0.5 rounded border border-dashed border-sky-700 text-[0.6rem] leading-none">abc</span>
-          <span>= model-selected backend</span>
+          <span>= user-selected backend</span>
         </div>
       </div>
 

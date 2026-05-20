@@ -59,7 +59,8 @@ window.WaterView = {
       const landuse = selectLanduse.value;
       const region = selectRegion.value;
       if (!dataLoaded.value) return {};
-      const chartData = window[chartRegister["NRM"]?.[cat]?.["name"]]?.[selectRegionLevel.value]?.[region];
+      const dataObj = window[chartRegister["NRM"]?.[cat]?.["name"]];
+      const chartData = dataObj?.[selectRegionLevel.value]?.[region] ?? dataObj?.['AUSTRALIA']?.[region];
       let seriesData;
 
       if (cat === "Sum") {
