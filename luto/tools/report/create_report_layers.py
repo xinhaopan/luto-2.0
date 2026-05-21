@@ -222,8 +222,8 @@ def get_map2json(
     """
     # Per-worker memory: float32 2D output grid (EPSG:3857 is ~7× the 1D cell count).
     ncells = 5_000_000 // (settings.RESFACTOR ** 2)
-    mem_per_worker = ncells * 7 * 4 / 1e9
-    workers = min(60, max(1, int(settings.WRITE_REPORT_MAX_MEM_GB // mem_per_worker)))
+    mem_per_worker = ncells * 7 * 4 / 1e6
+    workers = min(60, max(1, int(settings.WRITE_REPORT_MAX_MEM_MB // mem_per_worker)))
 
     def get_legend_params(sel):
         if legend_int_level is None:

@@ -19,6 +19,7 @@
 
 
 import os
+import gc
 import re
 import json
 import shutil
@@ -60,6 +61,33 @@ import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 
+
+
+# ── Per-function peak memory (MB above data-object baseline, measured at RESFACTOR=5) ────────────
+# Used by write_data to compute n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb).
+# Full-resolution runs use proportionally more memory — treat these as lower bounds.
+# Source: jinzhu_inspect_code/Profile_write_RES5/data/profile_summary.csv
+WRITE_FUNC_PEAK_MB = {
+    'write_dvar_and_mosaic_map':                941,
+    'write_transition_nonag2ag':              7_558,  # heavy despite all-zero data: nested 9-LU × N_cost_type matrices
+    'write_transition_ag2ag':                 6_544,
+    'write_biodiversity_quality_scores':      6_101,  # 7 backends × 4 xr arrays accumulated before xr.concat
+    'write_economics':                        4_914,
+    'write_ghg':                              3_189,
+    'write_transition_ag2nonag':              3_167,
+    'write_quantity':                         2_916,
+    'write_water':                            2_496,
+    'write_biodiversity_GBF2_scores':         1_768,
+    'write_dvar_area':                        1_692,
+    'write_area_transition_start_end':        1_392,
+    'write_renewable_production':               718,
+    'write_crosstab':                            13,
+    'write_biodiversity_GBF3_NVIS_scores':        1,  # ~0 MB (disabled in this scenario); 1 avoids div-by-zero
+    'write_biodiversity_GBF4_SNES_scores':        1,
+    'write_biodiversity_GBF4_ECNES_scores':       1,
+    'write_biodiversity_GBF8_scores_groups':      1,
+    'write_biodiversity_GBF8_scores_species':     1,
+}
 
 
 # ── Magnitude parameters ─────────────────────────────────────────────────────────
@@ -173,24 +201,6 @@ def to_region_and_aus_df(da: xr.DataArray, group_dims: list, yr_cal: int, region
             aus_df = aus
     return pd.concat(frames, ignore_index=True), aus_df
 
-
-def expand_outside_record(outside_df: pd.DataFrame, region_values, group_col: str, am_values: list, region_level: str = 'region_NRM') -> pd.DataFrame:
-    """
-    Replicate per-group/species outside-LUTO rows across every (region, am, lm)
-    combination — including 'ALL' on each axis — so that stacked-column charts
-    always show an Outside slice no matter which am/lm filter the user selects.
-
-    `outside_df` is expected to contain `group_col` plus the score / percentage
-    columns; the returned DataFrame adds `region`, `am`, `lm` columns.
-    """
-    lm_values = ['ALL', 'dry', 'irr']
-    grid = pd.MultiIndex.from_product(
-        [list(region_values), list(am_values), lm_values, outside_df[group_col].tolist()],
-        names=['region', 'am', 'lm', group_col],
-    ).to_frame(index=False)
-    result = grid.merge(outside_df, on=group_col, how='left')
-    result['region_level'] = region_level
-    return result
 
 
 def bio_to_region_and_aus_df(da: xr.DataArray, group_dims: list, value_name: str, base_score: float, yr_cal: int, region_levels: list = None):
@@ -332,23 +342,24 @@ def write_data(data: Data):
     paths = [f"{data.path}/out_{yr}" for yr in years]
     write_settings(data.path)
 
+    # n_jobs per tier = floor(WRITE_REPORT_MAX_MEM_MB / peak_mb), capped at WRITE_THREADS
+    def get_n_jobs(peak_mb):
+        return max(1, min(settings.WRITE_THREADS, settings.WRITE_REPORT_MAX_MEM_MB // max(peak_mb, 1)))
+
     # DVars must be written first as other outputs depend on them
     dvar_jobs = [delayed(write_dvar_and_mosaic_map)(data, yr, path_yr) for yr, path_yr in zip(years, paths)]
-    for result in Parallel(n_jobs=min(len(years), settings.WRITE_THREADS), return_as="generator")(dvar_jobs):
+    for result in Parallel(n_jobs=get_n_jobs(WRITE_FUNC_PEAK_MB['write_dvar_and_mosaic_map']), return_as="generator")(dvar_jobs):
         print(result)
 
-    # Other outputs can be written in any order, but we run them in parallel to speed up the process. 
-    #   We also include the area transition start/end output as a job to ensure it runs after the 
-    #   dvars are written (it depends on the dvars of the last year).
-    jobs = [delayed(write_area_transition_start_end)(data, f'{data.path}/out_{years[-1]}', years[-1])]
+    # Collect all annotated tasks: (delayed_obj, peak_delta_mb)
+    annotated_tasks = [(
+        delayed(write_area_transition_start_end)(data, f'{data.path}/out_{years[-1]}', years[-1]),
+        WRITE_FUNC_PEAK_MB['write_area_transition_start_end'],
+    )]
     for yr, path_yr in zip(years, paths):
-        jobs += write_output_single_year(data, yr, path_yr)
-    jobs = [job for job in jobs if job is not None]  # None means task is skipped
+        annotated_tasks.extend(write_output_single_year(data, yr, path_yr))
 
-    # We use joblib.Parallel to run the jobs in parallel, but we set n_jobs=1 if WRITE_PARALLEL is False
-    #   to run them sequentially (this is useful for debugging or if there are memory issues with parallelization).
-    num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.WRITE_PARALLEL else 1
-    for result in Parallel(n_jobs=num_jobs, return_as='generator_unordered')(jobs):
+    def process_write_task(result):
         if isinstance(result, tuple):
             msg, mag = result
             for top_key, sub in mag.items():
@@ -361,6 +372,20 @@ def write_data(data: Data):
             print(msg)
         else:
             print(result)
+
+    # Dynamic scheduling: tasks that fit multiple times within budget run in parallel; heaviest run one at a time.
+    groups = {}
+    for task, peak_mb in annotated_tasks:
+        n = get_n_jobs(peak_mb)
+        if n not in groups:
+            groups[n] = []
+        groups[n].append(task)
+
+    # Run tiers from most memory-constrained (n_jobs=1) to least (n_jobs=max_workers)
+    for n_workers in sorted(groups.keys()):
+        tasks = groups[n_workers]
+        for result in Parallel(n_jobs=min(n_workers, len(tasks)), return_as='generator_unordered')(tasks):
+            process_write_task(result)
 
     clean = lambda lst: [0.0 if np.isnan(v) else float(v) for v in lst]
     with open(os.path.join(data.path, 'max_cell_magnitudes.json'), 'w') as f:
@@ -402,32 +427,35 @@ def create_report(data: Data):
 
 
 def write_output_single_year(data: Data, yr_cal, path_yr):
-    """Wrap write tasks for a single year"""
+    """Return list of (delayed_task, peak_delta_mb) for a single year.
 
+    peak_delta_mb values come from WRITE_FUNC_PEAK_MB (profiled at RESFACTOR=5).
+    write_data uses them to compute n_jobs = floor(WRITE_MEM_BUDGET_MB / peak_delta_mb),
+    so tasks that fit multiple times within the budget run in parallel automatically.
+    """
     if not os.path.isdir(path_yr):
         os.mkdir(path_yr)
-        
-    tasks = [
-        delayed(write_dvar_area)(data, yr_cal, path_yr),
-        delayed(write_crosstab)(data, yr_cal, path_yr),
-        delayed(write_quantity)(data, yr_cal, path_yr),
-        delayed(write_economics)(data, yr_cal, path_yr),
-        delayed(write_transition_ag2ag)(data, yr_cal, path_yr),
-        delayed(write_transition_ag2nonag)(data, yr_cal, path_yr),
-        delayed(write_transition_nonag2ag)(data, yr_cal, path_yr),
-        delayed(write_ghg)(data, yr_cal, path_yr),
-        delayed(write_water)(data, yr_cal, path_yr),
-        delayed(write_renewable_production)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_quality_scores)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_GBF3_NVIS_scores)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_GBF4_SNES_scores)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_GBF4_ECNES_scores)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_GBF8_scores_groups)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_GBF8_scores_species)(data, yr_cal, path_yr)
-    ]
 
-    return tasks
+    P = WRITE_FUNC_PEAK_MB
+    return [
+        (delayed(write_transition_nonag2ag)(data, yr_cal, path_yr),              P['write_transition_nonag2ag']),
+        (delayed(write_transition_ag2ag)(data, yr_cal, path_yr),                 P['write_transition_ag2ag']),
+        (delayed(write_biodiversity_quality_scores)(data, yr_cal, path_yr),      P['write_biodiversity_quality_scores']),
+        (delayed(write_economics)(data, yr_cal, path_yr),                        P['write_economics']),
+        (delayed(write_ghg)(data, yr_cal, path_yr),                              P['write_ghg']),
+        (delayed(write_transition_ag2nonag)(data, yr_cal, path_yr),              P['write_transition_ag2nonag']),
+        (delayed(write_quantity)(data, yr_cal, path_yr),                         P['write_quantity']),
+        (delayed(write_water)(data, yr_cal, path_yr),                            P['write_water']),
+        (delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),         P['write_biodiversity_GBF2_scores']),
+        (delayed(write_dvar_area)(data, yr_cal, path_yr),                        P['write_dvar_area']),
+        (delayed(write_crosstab)(data, yr_cal, path_yr),                         P['write_crosstab']),
+        (delayed(write_renewable_production)(data, yr_cal, path_yr),             P['write_renewable_production']),
+        (delayed(write_biodiversity_GBF3_NVIS_scores)(data, yr_cal, path_yr),    P['write_biodiversity_GBF3_NVIS_scores']),
+        (delayed(write_biodiversity_GBF4_SNES_scores)(data, yr_cal, path_yr),    P['write_biodiversity_GBF4_SNES_scores']),
+        (delayed(write_biodiversity_GBF4_ECNES_scores)(data, yr_cal, path_yr),   P['write_biodiversity_GBF4_ECNES_scores']),
+        (delayed(write_biodiversity_GBF8_scores_groups)(data, yr_cal, path_yr),  P['write_biodiversity_GBF8_scores_groups']),
+        (delayed(write_biodiversity_GBF8_scores_species)(data, yr_cal, path_yr), P['write_biodiversity_GBF8_scores_species']),
+    ]
 
 
 
@@ -889,174 +917,209 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
 # ── Economics ────────────────────────────────────────────────────────────────
 
 def write_economics(data: Data, yr_cal, path):
-    """Calculate agricultural, agricultural management, and non-agricultural revenue, cost, and profit.
-    Also produces a Sum profit layer combining all three categories."""
-
     yr_idx = yr_cal - data.YR_CAL_BASE
-    chunk = {'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+    chunk  = {'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
 
     if yr_idx == 0:
-        yr_cal_sim_pre = None
-        yr_idx_pre = None
+        yr_cal_sim_pre = None; yr_idx_pre = None
     else:
-        yr_cal_sim_pre = sorted(list(data.lumaps.keys()))[sorted(list(data.lumaps.keys())).index(yr_cal) - 1]
+        sy = sorted(data.lumaps.keys())
+        yr_cal_sim_pre = sy[sy.index(yr_cal) - 1]
         yr_idx_pre = yr_cal_sim_pre - data.YR_CAL_BASE
 
 
     # ==================== Agricultural Economics ====================
 
     ag_dvar_mrj = (
-        tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
-        .chunk(chunk)
-        .assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
+        tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk(chunk)
+        .assign_coords(region_state=('cell', data.REGION_STATE_NAME),
+                       region_NRM=('cell', data.REGION_NRM_NAME))
     )
 
-    ag_rev_df_rjms = ag_revenue.get_rev_matrices(data, yr_idx, aggregate=False)
-    ag_cost_df_rjms = ag_cost.get_cost_matrices(data, yr_idx, aggregate=False)
-    ag_rev_df_rjms.columns.names = ['lu', 'lm', 'source']
-    ag_cost_df_rjms.columns.names = ['lu', 'lm', 'source']
+    ag_rev_df = ag_revenue.get_rev_matrices(data, yr_idx, aggregate=False)
+    ag_cost_df = ag_cost.get_cost_matrices(data, yr_idx, aggregate=False)
+    ag_rev_df.columns.names = ag_cost_df.columns.names = ['lu', 'lm', 'source']
 
     if yr_cal_sim_pre is not None:
-        ag2ag_mrj = ag_transitions.get_transition_matrices_ag2ag_from_base_year(
-            data, yr_idx, yr_cal_sim_pre, separate=True
-        )
+        ag2ag_mrj   = ag_transitions.get_transition_matrices_ag2ag_from_base_year(
+            data, yr_idx, yr_cal_sim_pre, separate=True)
         nonag2ag_mrj = non_ag_transitions.get_transition_matrix_nonag2ag(
-            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
-        )
+            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True)
     else:
-        ag2ag_mrj = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)}
-        nonag2ag_mrj = {'Environmental Plantings': {'Transition cost (NonAg2Ag)': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)}}
+        ag2ag_mrj    = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)}
+        nonag2ag_mrj = {}
+    del nonag2ag_mrj  # intentionally unused in economics — see below
 
-    ag_rev_rjms = xr.DataArray(
-        ag_rev_df_rjms.values.astype(np.float32),
-        dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': ag_rev_df_rjms.columns}
+    # ── profit_ag: sum over source from DataFrames (never builds 4D array) ──
+    rev_sum_df  = ag_rev_df.T.groupby(level=['lu', 'lm']).sum().T.astype(np.float32)
+    cost_sum_df = ag_cost_df.T.groupby(level=['lu', 'lm']).sum().T.astype(np.float32)
+
+    rev_sum_xr = xr.DataArray(
+        rev_sum_df.values, dims=['cell', 'layer'],
+        coords={'cell': range(data.NCELLS), 'layer': rev_sum_df.columns}
+    ).chunk(chunk).unstack('layer')   # (cell, lu, lm) — 3D, no source
+
+    cost_sum_xr = xr.DataArray(
+        cost_sum_df.values, dims=['cell', 'layer'],
+        coords={'cell': range(data.NCELLS), 'layer': cost_sum_df.columns}
     ).chunk(chunk).unstack('layer')
 
-    ag_cost_rjms = xr.DataArray(
-        ag_cost_df_rjms.values.astype(np.float32),
-        dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': ag_cost_df_rjms.columns}
-    ).chunk(chunk).unstack('layer')
-
-    ag2ag_smrj = xr.DataArray(
-        np.stack(list(ag2ag_mrj.values())),
-        dims=['source', 'lm', 'cell', 'lu'],
-        coords={
-            'source': list(ag2ag_mrj.keys()),
-            'lm': data.LANDMANS,
-            'cell': range(data.NCELLS),
-            'lu': data.AGRICULTURAL_LANDUSES
-        }
+    ag2ag_sum_arr = np.sum(np.stack(list(ag2ag_mrj.values())), axis=0)  # (NLMS, NCELLS, N_AG_LUS)
+    ag2ag_sum_xr  = xr.DataArray(
+        ag2ag_sum_arr,
+        dims=['lm', 'cell', 'lu'],
+        coords={'lm': data.LANDMANS, 'cell': range(data.NCELLS), 'lu': data.AGRICULTURAL_LANDUSES}
     ).chunk(chunk)
+    del ag2ag_sum_arr
 
-    nonag2ag_k_v = [(k, _k) for k, v in nonag2ag_mrj.items() for _k, _v in v.items()]
-    nonag2ag_smrj = xr.DataArray(
-        np.zeros((len(nonag2ag_k_v), data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
-        dims=['layer', 'lm', 'cell', 'lu'],
-        coords={
-            'layer': pd.MultiIndex.from_tuples(nonag2ag_k_v, names=['from_lu', 'source']),
-            'lm': data.LANDMANS,
-            'cell': range(data.NCELLS),
-            'lu': data.AGRICULTURAL_LANDUSES
-        }
-    ).chunk(chunk).unstack('layer', fill_value=0)
+    # NonAg→Ag transition costs are intentionally excluded from profit_ag here.
+    # The original write_economics() always used np.zeros() for nonag2ag_smrj
+    # (the actual values from nonag2ag_mrj were never filled in). These costs are
+    # handled separately by write_transition_nonag2ag(). Matching that behaviour.
+    profit_ag = rev_sum_xr - cost_sum_xr - ag2ag_sum_xr
+    del rev_sum_xr, cost_sum_xr, ag2ag_sum_xr
 
-    profit_ag = (
-        ag_rev_rjms.sum('source')
-        - ag_cost_rjms.sum('source')
-        - ag2ag_smrj.sum('source')
-        - nonag2ag_smrj.sum(['source', 'from_lu'])
+    # raw_profit_ag for Sum Profit (computed now so ag_dvar_mrj can be freed)
+    raw_profit_ag = (ag_dvar_mrj * profit_ag).drop_vars(
+        ['region_state', 'region_NRM'], errors='ignore')
+
+    xr_profit_ag = ag_dvar_mrj * profit_ag
+    del profit_ag
+
+    # ── per-source products via loop (never builds full 4D unstack) ──────────
+    parts = []
+    for src in ag_rev_df.columns.get_level_values('source').unique():
+        src_df = ag_rev_df.xs(src, level='source', axis=1)
+        src_df.columns.names = ['lu', 'lm']
+        src_xr = xr.DataArray(src_df.values.astype(np.float32), dims=['cell', 'layer'],
+            coords={'cell': range(data.NCELLS), 'layer': src_df.columns}).unstack('layer')
+        parts.append((ag_dvar_mrj * src_xr).expand_dims({'source': [src]}).compute())
+        del src_xr
+        gc.collect()
+    xr_ag_rev = xr.concat(parts, dim='source')
+    del parts
+
+    parts = []
+    for src in ag_cost_df.columns.get_level_values('source').unique():
+        src_df = ag_cost_df.xs(src, level='source', axis=1)
+        src_df.columns.names = ['lu', 'lm']
+        src_xr = xr.DataArray(src_df.values.astype(np.float32), dims=['cell', 'layer'],
+            coords={'cell': range(data.NCELLS), 'layer': src_df.columns}).unstack('layer')
+        parts.append((ag_dvar_mrj * src_xr).expand_dims({'source': [src]}).compute())
+        del src_xr
+        gc.collect()
+    xr_ag_cost = xr.concat(parts, dim='source')
+    del parts
+
+    # ag2ag: loop over transition types (small, but keeps same pattern)
+    ag2ag_parts = []
+    for src_name, src_arr in ag2ag_mrj.items():
+        src_xr = xr.DataArray(
+            src_arr, dims=['lm', 'cell', 'lu'],
+            coords={'lm': data.LANDMANS, 'cell': range(data.NCELLS),
+                    'lu': data.AGRICULTURAL_LANDUSES}
+        ).chunk(chunk)
+        ag2ag_parts.append((ag_dvar_mrj * src_xr).expand_dims({'source': [src_name]}).compute())
+        del src_xr
+    xr_ag2ag_cost = xr.concat(ag2ag_parts, dim='source')
+    del ag2ag_parts, ag2ag_mrj
+
+    # ── nonag2ag: output zeros, matching original write_economics() design ────
+    # nonag2ag_mrj contains real cost arrays but they represent potential costs
+    # for cells CURRENTLY under NonAg land use. write_economics() has always
+    # excluded these from the Ag profit calculation (nonag2ag_smrj = np.zeros()
+    # in the original). The actual transition outputs live in write_transition_nonag2ag().
+    # Because we set valid_nonag2ag_cost_layers directly (never via to_region_and_aus_df),
+    # the original `if len(valid_nonag2ag_cost_layers) == 0` sentinel guard is not needed
+    # here. If this zero-bypass is ever removed, restore that guard.
+    _nonag2ag_lu = ['ALL'] + list(data.AGRICULTURAL_LANDUSES)
+    valid_nonag2ag_cost_layers = pd.MultiIndex.from_tuples(
+        [('ALL', 'ALL', 'ALL')], names=['lm', 'source', 'from_lu'])
+    nonag2ag_cost_jms = pd.DataFrame({
+        'from_lu': ['ALL'], 'lm': ['ALL'], 'source': ['ALL'],
+        'Year': [yr_cal], 'region': ['AUSTRALIA'], 'Value': [0.0],
+    })
+    nonag2ag_cost_jms_AUS = nonag2ag_cost_jms.copy()
+    nonag2ag_cost_valid_layers = xr.DataArray(
+        np.zeros((data.NCELLS, len(_nonag2ag_lu), 1), dtype=np.float32),
+        dims=['cell', 'lu', 'layer'],
+        coords={'cell': range(data.NCELLS), 'lu': _nonag2ag_lu,
+                'layer': valid_nonag2ag_cost_layers},
     )
 
-    xr_ag_rev      = ag_dvar_mrj * ag_rev_rjms
-    xr_ag_cost     = ag_dvar_mrj * ag_cost_rjms
-    xr_ag2ag_cost  = ag_dvar_mrj * ag2ag_smrj
-    xr_nonag2ag_cost = ag_dvar_mrj * nonag2ag_smrj
-    xr_profit_ag   = ag_dvar_mrj * profit_ag
+    del ag_dvar_mrj
+    gc.collect()
 
-    # Prepend ALL-aggregate slices (must be after multiplication to avoid double counting)
-    xr_ag_rev        = add_all(xr_ag_rev,        ['lu', 'lm', 'source'])
-    xr_ag_cost       = add_all(xr_ag_cost,       ['lu', 'lm', 'source'])
-    xr_ag2ag_cost    = add_all(xr_ag2ag_cost,    ['lu', 'lm', 'source'])
-    xr_nonag2ag_cost = add_all(xr_nonag2ag_cost, ['lu', 'lm', 'source'])
-    xr_nonag2ag_cost = add_all(xr_nonag2ag_cost, ['from_lu'])
-    xr_profit_ag     = add_all(xr_profit_ag,     ['lm', 'lu'])
+    # ── add_all, aggregate, save ──────────────────────────────────────────────
+    xr_ag_rev        = add_all(xr_ag_rev.assign_coords(
+        region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)),
+        ['lu', 'lm', 'source'])
+    xr_ag_cost       = add_all(xr_ag_cost.assign_coords(
+        region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)),
+        ['lu', 'lm', 'source'])
+    xr_ag2ag_cost    = add_all(xr_ag2ag_cost.assign_coords(
+        region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)),
+        ['lu', 'lm', 'source'])
+    xr_profit_ag     = add_all(xr_profit_ag.assign_coords(
+        region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)),
+        ['lm', 'lu'])
 
-    ag_rev_jms,       ag_rev_jms_AUS            = to_region_and_aus_df(xr_ag_rev,        ['lu', 'lm', 'source'], yr_cal, region_levels=['region_state', 'region_NRM'])
-    ag_cost_jms,      ag_cost_jms_AUS           = to_region_and_aus_df(xr_ag_cost,       ['lu', 'lm', 'source'], yr_cal, region_levels=['region_state', 'region_NRM'])
-    ag2ag_cost_jms,   ag2ag_cost_jms_AUS        = to_region_and_aus_df(xr_ag2ag_cost,   ['lu', 'lm', 'source'], yr_cal, region_levels=['region_state', 'region_NRM'])
-    nonag2ag_cost_jms, nonag2ag_cost_jms_AUS    = to_region_and_aus_df(xr_nonag2ag_cost, ['from_lu', 'lm', 'source'], yr_cal, region_levels=['region_state', 'region_NRM'])
-    profit_ag_jms,    profit_ag_jms_AUS         = to_region_and_aus_df(xr_profit_ag,     ['lu', 'lm'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    ag_rev_jms,     ag_rev_jms_AUS     = to_region_and_aus_df(xr_ag_rev,     ['lu', 'lm', 'source'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    ag_cost_jms,    ag_cost_jms_AUS    = to_region_and_aus_df(xr_ag_cost,    ['lu', 'lm', 'source'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    ag2ag_cost_jms, ag2ag_cost_jms_AUS = to_region_and_aus_df(xr_ag2ag_cost, ['lu', 'lm', 'source'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    profit_ag_jms,  profit_ag_jms_AUS  = to_region_and_aus_df(xr_profit_ag,  ['lu', 'lm'],           yr_cal, region_levels=['region_state', 'region_NRM'])
 
-    if nonag2ag_cost_jms.empty:
-        nonag2ag_cost_jms = pd.DataFrame({
-            'from_lu': ['ALL'], 'lm': ['ALL'], 'source': ['ALL'],
-            'Year': [yr_cal], 'region': ['AUSTRALIA'], 'Value': [0.0]
-        })
+    save_csv(ag_rev_jms,        {'lu': 'Land-use', 'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_revenue_{yr_cal}.csv'))
+    save_csv(ag_cost_jms,       {'lu': 'Land-use', 'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_cost_{yr_cal}.csv'))
+    save_csv(ag2ag_cost_jms,    {'lu': 'To_Land-use', 'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_transition_Ag2Ag_{yr_cal}.csv'))
+    save_csv(nonag2ag_cost_jms, {'from_lu': 'From_Land-use', 'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_transition_NonAg2Ag_{yr_cal}.csv'))
+    save_csv(profit_ag_jms,     {'lu': 'Land-use', 'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_profit_{yr_cal}.csv'))
 
-    save_csv(ag_rev_jms,          {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_revenue_{yr_cal}.csv'))
-    save_csv(ag_cost_jms,         {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_cost_{yr_cal}.csv'))
-    save_csv(ag2ag_cost_jms,      {'lu': 'To_Land-use',        'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_transition_Ag2Ag_{yr_cal}.csv'))
-    save_csv(nonag2ag_cost_jms,   {'from_lu': 'From_Land-use', 'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_transition_NonAg2Ag_{yr_cal}.csv'))
-    save_csv(profit_ag_jms,       {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_profit_{yr_cal}.csv'))
+    valid_rev_layers        = pd.MultiIndex.from_frame(ag_rev_jms_AUS[['lm', 'source', 'lu']]).sort_values()
+    valid_cost_layers       = pd.MultiIndex.from_frame(ag_cost_jms_AUS[['lm', 'source', 'lu']]).sort_values()
+    valid_ag2ag_cost_layers = pd.MultiIndex.from_frame(ag2ag_cost_jms_AUS[['lm', 'source', 'lu']]).sort_values()
+    valid_profit_ag_layers  = pd.MultiIndex.from_frame(profit_ag_jms_AUS[['lm', 'lu']]).sort_values()
+    ag_rev_valid_layers     = xr_ag_rev.stack(layer=['lm', 'source', 'lu']).sel(layer=valid_rev_layers).drop_vars(['region_state', 'region_NRM'], errors='ignore')
+    ag_cost_valid_layers    = xr_ag_cost.stack(layer=['lm', 'source', 'lu']).sel(layer=valid_cost_layers).drop_vars(['region_state', 'region_NRM'], errors='ignore')
+    ag2ag_cost_valid_layers = xr_ag2ag_cost.stack(layer=['lm', 'source', 'lu']).sel(layer=valid_ag2ag_cost_layers).drop_vars(['region_state', 'region_NRM'], errors='ignore')
+    profit_ag_valid_layers  = xr_profit_ag.stack(layer=['lm', 'lu']).sel(layer=valid_profit_ag_layers).drop_vars(['region_state', 'region_NRM'], errors='ignore')
 
-    valid_rev_layers          = pd.MultiIndex.from_frame(ag_rev_jms_AUS[['lm', 'source', 'lu']]).sort_values()
-    valid_cost_layers         = pd.MultiIndex.from_frame(ag_cost_jms_AUS[['lm', 'source', 'lu']]).sort_values()
-    valid_ag2ag_cost_layers   = pd.MultiIndex.from_frame(ag2ag_cost_jms_AUS[['lm', 'source', 'lu']]).sort_values()
-    valid_nonag2ag_cost_layers = pd.MultiIndex.from_frame(nonag2ag_cost_jms_AUS[['lm', 'source', 'from_lu']]).sort_values()
-    valid_profit_ag_layers    = pd.MultiIndex.from_frame(profit_ag_jms_AUS[['lm', 'lu']]).sort_values()
+    save2nc(ag_rev_valid_layers,        os.path.join(path, f'xr_economics_ag_revenue_{yr_cal}.nc'))
+    save2nc(ag_cost_valid_layers,       os.path.join(path, f'xr_economics_ag_cost_{yr_cal}.nc'))
+    save2nc(ag2ag_cost_valid_layers,    os.path.join(path, f'xr_economics_ag_transition_Ag2Ag_{yr_cal}.nc'))
+    save2nc(nonag2ag_cost_valid_layers, os.path.join(path, f'xr_economics_ag_transition_NonAg2Ag_{yr_cal}.nc'))
+    save2nc(profit_ag_valid_layers,     os.path.join(path, f'xr_economics_ag_profit_{yr_cal}.nc'))
 
-    if len(valid_nonag2ag_cost_layers) == 0:
-        valid_nonag2ag_cost_layers = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL')], names=['lm', 'source', 'from_lu'])
-        xr_nonag2ag_cost = xr_nonag2ag_cost.sel(lm=['ALL'], source=['ALL'], from_lu=['ALL'])
-
-    ag_rev_valid_layers        = xr_ag_rev.stack(layer=['lm', 'source', 'lu']).sel(layer=valid_rev_layers).drop_vars(['region_state', 'region_NRM'], errors='ignore')
-    ag_cost_valid_layers       = xr_ag_cost.stack(layer=['lm', 'source', 'lu']).sel(layer=valid_cost_layers).drop_vars(['region_state', 'region_NRM'], errors='ignore')
-    ag2ag_cost_valid_layers    = xr_ag2ag_cost.stack(layer=['lm', 'source', 'lu']).sel(layer=valid_ag2ag_cost_layers).drop_vars(['region_state', 'region_NRM'], errors='ignore')
-    nonag2ag_cost_valid_layers = xr_nonag2ag_cost.stack(layer=['lm', 'source', 'from_lu']).sel(layer=valid_nonag2ag_cost_layers).drop_vars(['region_state', 'region_NRM'], errors='ignore')
-    profit_ag_valid_layers     = xr_profit_ag.stack(layer=['lm', 'lu']).sel(layer=valid_profit_ag_layers).drop_vars(['region_state', 'region_NRM'], errors='ignore')
-
-    save2nc(ag_rev_valid_layers,         os.path.join(path, f'xr_economics_ag_revenue_{yr_cal}.nc'))
-    save2nc(ag_cost_valid_layers,        os.path.join(path, f'xr_economics_ag_cost_{yr_cal}.nc'))
-    save2nc(ag2ag_cost_valid_layers,     os.path.join(path, f'xr_economics_ag_transition_Ag2Ag_{yr_cal}.nc'))
-    save2nc(nonag2ag_cost_valid_layers,  os.path.join(path, f'xr_economics_ag_transition_NonAg2Ag_{yr_cal}.nc'))
-    save2nc(profit_ag_valid_layers,      os.path.join(path, f'xr_economics_ag_profit_{yr_cal}.nc'))
+    del xr_ag_rev, xr_ag_cost, xr_ag2ag_cost, xr_profit_ag
+    gc.collect()
 
 
     # ==================== Agricultural Management Economics ====================
 
     am_dvar_mrj = (
         chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]))
-        .assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
+        .assign_coords(region_state=('cell', data.REGION_STATE_NAME),
+                       region_NRM=('cell', data.REGION_NRM_NAME))
     )
 
     ag_rev_mrj  = ag_revenue.get_rev_matrices(data, yr_idx)
     ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
+
     am_revenue_mat = chunk_unify_size(tools.am_mrj_to_xr(data, ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx)))
     am_cost_mat    = chunk_unify_size(tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_cal)))
 
-    # Zero out wind/solar entries — the injection block below replaces these zeros with
-    # gap-CAPEX corrected values after the dvar multiplication, before add_all.
     renewable_ams = [am for am, enabled in settings.RENEWABLES_OPTIONS.items() if enabled]
     if renewable_ams:
         re_mask = am_revenue_mat.am.isin(renewable_ams)
         am_revenue_mat = am_revenue_mat.where(~re_mask, other=0.0)
         am_cost_mat    = am_cost_mat.where(~re_mask, other=0.0)
 
-    # Am transition matrices are all zeros for every agMgt type so the transition term is skipped entirely.
+    raw_profit_am_pre = (am_dvar_mrj * (am_revenue_mat - am_cost_mat))
+
     xr_revenue_am = am_dvar_mrj * am_revenue_mat
     xr_cost_am    = (am_dvar_mrj * am_cost_mat).expand_dims(Cost_type=['Operating Cost'])
 
-    # ── Renewable cost injection (xarray level, before add_all) ──────────────
-    # am_cost_mat / am_revenue_mat have zeros for solar/wind (zeroed above to avoid CAPEX
-    # duplication). We now inject the correct gap-CAPEX cost in two parts:
-    #   1. Potential (optimised) track: replace zeroed slices with dvar × gap-CAPEX cost.
-    #   2. Existing track: concat lu='Existing Capacity' carrying per-cell opex + gap-capex.
-    # Injecting here — before add_all — ensures xr_cost_am and cost_am_df_AUS are always
-    # in sync, so the downstream valid_layers .sel() never raises a KeyError.
     if renewable_ams:
-        # ── Part 1: potential cost (gap-CAPEX) ────────────────────────────────
         solar_cost_opt = ag_cost.get_utility_solar_pv_effect_c_mrj(data, ag_cost_mrj, yr_idx, aggregate=False)
         wind_cost_opt  = ag_cost.get_onshore_wind_effect_c_mrj(data, ag_cost_mrj, yr_idx, aggregate=False)
 
@@ -1072,195 +1135,144 @@ def write_economics(data: Data, yr_cal, path):
         wind_dvar_now  = am_dvar_mrj.sel(am='Onshore Wind')
 
         if yr_cal_sim_pre is None:
-            solar_dvar_delta = solar_dvar_now
-            wind_dvar_delta  = wind_dvar_now
+            solar_dvar_delta = solar_dvar_now; wind_dvar_delta = wind_dvar_now
         else:
             am_dvar_xr_pre   = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal_sim_pre])
             solar_dvar_delta = solar_dvar_now - am_dvar_xr_pre.sel(am='Utility Solar PV')
             wind_dvar_delta  = wind_dvar_now  - am_dvar_xr_pre.sel(am='Onshore Wind')
 
-        solar_cost_opex = (
-            (solar_dvar_now * solar_opex_xr)
-            .reindex(lu=xr_cost_am.lu.values, fill_value=0.0)
-            .expand_dims(am=['Utility Solar PV'])
-            .expand_dims(Cost_type=['Operating Cost'])
-        )
-        solar_cost_capex = (
-            (solar_dvar_delta * solar_capex_xr)
-            .reindex(lu=xr_cost_am.lu.values, fill_value=0.0)
-            .expand_dims(am=['Utility Solar PV'])
-            .expand_dims(Cost_type=['Capital expenditure'])
-        )
-        solar_potential = xr.concat([solar_cost_opex, solar_cost_capex], dim='Cost_type')
+        solar_potential = xr.concat([
+            (solar_dvar_now * solar_opex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Operating Cost']),
+            (solar_dvar_delta * solar_capex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Capital expenditure']),
+        ], dim='Cost_type')
+        wind_potential = xr.concat([
+            (wind_dvar_now * wind_opex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Operating Cost']),
+            (wind_dvar_delta * wind_capex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Capital expenditure']),
+        ], dim='Cost_type')
 
-        wind_cost_opex = (
-            (wind_dvar_now * wind_opex_xr)
-            .reindex(lu=xr_cost_am.lu.values, fill_value=0.0)
-            .expand_dims(am=['Onshore Wind'])
-            .expand_dims(Cost_type=['Operating Cost'])
-        )
-        wind_cost_capex = (
-            (wind_dvar_delta * wind_capex_xr)
-            .reindex(lu=xr_cost_am.lu.values, fill_value=0.0)
-            .expand_dims(am=['Onshore Wind'])
-            .expand_dims(Cost_type=['Capital expenditure'])
-        )
-        wind_potential = xr.concat([wind_cost_opex, wind_cost_capex], dim='Cost_type')
+        re_reindexed = xr.concat([solar_potential, wind_potential], dim='am').reindex(am=xr_cost_am.am.values, lu=xr_cost_am.lu.values, fill_value=0.0)
+        xr_cost_am = xr.concat([
+            (xr_cost_am.sel(Cost_type='Operating Cost') + re_reindexed.sel(Cost_type='Operating Cost')).expand_dims(Cost_type=['Operating Cost']),
+            re_reindexed.sel(Cost_type='Capital expenditure').expand_dims(Cost_type=['Capital expenditure']),
+        ], dim='Cost_type')
 
-        re_potential_xr  = xr.concat([solar_potential, wind_potential], dim='am')
-        re_reindexed     = re_potential_xr.reindex(am=xr_cost_am.am.values, lu=xr_cost_am.lu.values, fill_value=0.0)
-        merged_opex      = (xr_cost_am.sel(Cost_type='Operating Cost') + re_reindexed.sel(Cost_type='Operating Cost')).expand_dims(Cost_type=['Operating Cost'])
-        re_capex         = re_reindexed.sel(Cost_type='Capital expenditure').expand_dims(Cost_type=['Capital expenditure'])
-        xr_cost_am       = xr.concat([merged_opex, re_capex], dim='Cost_type')
-
-        # ── Part 1b: potential revenue (stack on value matrices, not dvar) ────
         solar_rev_opt = ag_revenue.get_utility_solar_pv_effect_r_mrj(data, ag_rev_mrj, yr_idx)
         wind_rev_opt  = ag_revenue.get_onshore_wind_effect_r_mrj(data, ag_rev_mrj, yr_idx)
+        re_rev = xr.concat([
+            (solar_dvar_now * xr.DataArray(solar_rev_opt, dims=['lm', 'cell', 'lu'], coords={'lu': solar_lu})).reindex(lu=xr_revenue_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']),
+            (wind_dvar_now  * xr.DataArray(wind_rev_opt,  dims=['lm', 'cell', 'lu'], coords={'lu': wind_lu})).reindex(lu=xr_revenue_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']),
+        ], dim='am')
+        xr_revenue_am = xr_revenue_am + re_rev.reindex_like(xr_revenue_am, fill_value=0.0)
 
-        solar_rev_xr = xr.DataArray(solar_rev_opt, dims=['lm', 'cell', 'lu'], coords={'lu': solar_lu})
-        wind_rev_xr  = xr.DataArray(wind_rev_opt,  dims=['lm', 'cell', 'lu'], coords={'lu': wind_lu})
-
-        solar_rev_potential = (
-            (solar_dvar_now * solar_rev_xr)
-            .reindex(lu=xr_revenue_am.lu.values, fill_value=0.0)
-            .expand_dims(am=['Utility Solar PV'])
-        )
-        wind_rev_potential = (
-            (wind_dvar_now * wind_rev_xr)
-            .reindex(lu=xr_revenue_am.lu.values, fill_value=0.0)
-            .expand_dims(am=['Onshore Wind'])
-        )
-        re_rev_potential_xr = xr.concat([solar_rev_potential, wind_rev_potential], dim='am')
-        xr_revenue_am = xr_revenue_am + re_rev_potential_xr.reindex_like(xr_revenue_am, fill_value=0.0)
-
-        # ── Part 2: existing capacity as lu='Existing Capacity' ───────────────
         solar_cells_now = ag_cost.get_utility_solar_pv_existing_cost_by_region(data, yr_idx, return_cells=True)
         wind_cells_now  = ag_cost.get_onshore_wind_existing_cost_by_region(data, yr_idx, return_cells=True)
+        solar_capex_pre = (
+            0.0
+            if yr_cal_sim_pre is None
+            else ag_cost.get_utility_solar_pv_existing_cost_by_region(data, yr_idx_pre, return_cells=True)['capex_r'].values
+        )
+        wind_capex_pre = (
+            0.0
+            if yr_cal_sim_pre is None
+            else ag_cost.get_onshore_wind_existing_cost_by_region(data, yr_idx_pre, return_cells=True)['capex_r'].values
+        )
 
-        if yr_cal_sim_pre is None:
-            solar_capex_pre_vals = 0.0
-            wind_capex_pre_vals  = 0.0
-        else:
-            solar_cells_pre      = ag_cost.get_utility_solar_pv_existing_cost_by_region(data, yr_idx_pre, return_cells=True)
-            wind_cells_pre       = ag_cost.get_onshore_wind_existing_cost_by_region(data, yr_idx_pre, return_cells=True)
-            solar_capex_pre_vals = solar_cells_pre['capex_r'].values
-            wind_capex_pre_vals  = wind_cells_pre['capex_r'].values
-
-        solar_exist_cost = solar_cells_now['opex_r'].values + solar_cells_now['capex_r'].values - solar_capex_pre_vals
-        wind_exist_cost  = wind_cells_now['opex_r'].values  + wind_cells_now['capex_r'].values  - wind_capex_pre_vals
-
-        exist_re_cost_dry = xr.DataArray(
+        solar_exist_cost = solar_cells_now['opex_r'].values + solar_cells_now['capex_r'].values - solar_capex_pre
+        wind_exist_cost  = wind_cells_now['opex_r'].values  + wind_cells_now['capex_r'].values  - wind_capex_pre
+        exist_cost_da  = xr.DataArray(
             np.stack([solar_exist_cost, wind_exist_cost], axis=0),
             dims=['am', 'cell'],
-            coords={
-                'am': ['Utility Solar PV', 'Onshore Wind'],
-                'cell': np.arange(data.NCELLS),
-                'region_state': ('cell', data.REGION_STATE_NAME),
-                'region_NRM': ('cell', data.REGION_NRM_NAME),
-            },
+            coords={'am': ['Utility Solar PV', 'Onshore Wind'], 'cell': np.arange(data.NCELLS),
+                    'region_state': ('cell', data.REGION_STATE_NAME),
+                    'region_NRM': ('cell', data.REGION_NRM_NAME)},
         ).expand_dims(lm=['dry'], lu=['Existing Capacity'])
-
-        exist_re_cost_irr  = xr.zeros_like(exist_re_cost_dry).assign_coords(lm=['irr'])
-        exist_re_cost_full = (
-            xr.concat([exist_re_cost_dry, exist_re_cost_irr], dim='lm')
+        exist_cost_full = (
+            xr.concat([exist_cost_da, xr.zeros_like(exist_cost_da).assign_coords(lm=['irr'])], dim='lm')
             .reindex(am=xr_cost_am.am.values, fill_value=0.0)
             .expand_dims(Cost_type=['Operating Cost'])
         )
+        xr_cost_am = xr.concat([xr_cost_am, exist_cost_full.reindex(Cost_type=xr_cost_am.Cost_type.values, fill_value=0.0)], dim='lu')
 
-        # Existing capacity revenue: MWh × state electricity price per cell
-        solar_exist_mwh = ag_quantity.get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal)
-        wind_exist_mwh  = ag_quantity.get_exist_renewable_capacity(data, 'Onshore Wind',     yr_cal)
-        solar_prices    = data.SOLAR_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
-        wind_prices     = data.WIND_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
-        solar_prices    = {data.REGION_STATE_NAME2CODE[k]: v for k, v in solar_prices.items()}
-        wind_prices     = {data.REGION_STATE_NAME2CODE[k]: v for k, v in wind_prices.items()}
-        solar_price_map = np.vectorize(solar_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
-        wind_price_map  = np.vectorize(wind_prices.get,  otypes=[np.float32])(data.REGION_STATE_CODE)
-        solar_exist_rev = solar_exist_mwh.values * solar_price_map
-        wind_exist_rev  = wind_exist_mwh.values  * wind_price_map
-
-        exist_re_rev_dry = xr.DataArray(
+        solar_prices = {data.REGION_STATE_NAME2CODE[k]: v for k, v in data.SOLAR_PRICES.query('Year==@yr_cal').set_index('State')['Price_AUD_per_MWh'].items()}
+        wind_prices  = {data.REGION_STATE_NAME2CODE[k]: v for k, v in data.WIND_PRICES.query('Year==@yr_cal').set_index('State')['Price_AUD_per_MWh'].items()}
+        solar_exist_rev = ag_quantity.get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal).values * np.vectorize(solar_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
+        wind_exist_rev  = ag_quantity.get_exist_renewable_capacity(data, 'Onshore Wind',     yr_cal).values * np.vectorize(wind_prices.get,  otypes=[np.float32])(data.REGION_STATE_CODE)
+        exist_rev_da  = xr.DataArray(
             np.stack([solar_exist_rev, wind_exist_rev], axis=0),
             dims=['am', 'cell'],
-            coords={
-                'am': ['Utility Solar PV', 'Onshore Wind'],
-                'cell': np.arange(data.NCELLS),
-                'region_state': ('cell', data.REGION_STATE_NAME),
-                'region_NRM': ('cell', data.REGION_NRM_NAME),
-            },
+            coords={'am': ['Utility Solar PV', 'Onshore Wind'], 'cell': np.arange(data.NCELLS),
+                    'region_state': ('cell', data.REGION_STATE_NAME),
+                    'region_NRM': ('cell', data.REGION_NRM_NAME)},
         ).expand_dims(lm=['dry'], lu=['Existing Capacity'])
-        exist_re_rev_irr  = xr.zeros_like(exist_re_rev_dry).assign_coords(lm=['irr'])
-        exist_re_rev_full = (
-            xr.concat([exist_re_rev_dry, exist_re_rev_irr], dim='lm')
-            .reindex(am=xr_revenue_am.am.values, fill_value=0.0)
-        )
+        exist_rev_full = xr.concat([exist_rev_da, xr.zeros_like(exist_rev_da).assign_coords(lm=['irr'])], dim='lm').reindex(am=xr_revenue_am.am.values, fill_value=0.0)
+        xr_revenue_am  = xr.concat([xr_revenue_am, exist_rev_full], dim='lu')
 
-        xr_cost_am    = xr.concat([xr_cost_am,    exist_re_cost_full.reindex(Cost_type=xr_cost_am.Cost_type.values, fill_value=0.0)], dim='lu')
-        xr_revenue_am = xr.concat([xr_revenue_am, exist_re_rev_full],  dim='lu')
+    del am_dvar_mrj, am_revenue_mat, am_cost_mat
+    gc.collect()
 
     xr_profit_am  = xr_revenue_am - xr_cost_am.sum('Cost_type')
-
     xr_revenue_am = add_all(xr_revenue_am, ['lm', 'lu', 'am'])
-    xr_cost_am    = add_all(xr_cost_am, ['lm', 'lu', 'am'])
-    xr_profit_am  = add_all(xr_profit_am, ['lm', 'lu', 'am'])
+    xr_cost_am    = add_all(xr_cost_am,    ['lm', 'lu', 'am'])
+    xr_profit_am  = add_all(xr_profit_am,  ['lm', 'lu', 'am'])
 
-    revenue_am_df, revenue_am_df_AUS = to_region_and_aus_df(xr_revenue_am, ['am', 'lm', 'lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    revenue_am_df, revenue_am_df_AUS = to_region_and_aus_df(xr_revenue_am, ['am', 'lm', 'lu'],            yr_cal, region_levels=['region_state', 'region_NRM'])
     cost_am_df,    cost_am_df_AUS    = to_region_and_aus_df(xr_cost_am,    ['am', 'lm', 'lu', 'Cost_type'], yr_cal, region_levels=['region_state', 'region_NRM'])
-    profit_am_df,  profit_am_df_AUS  = to_region_and_aus_df(xr_profit_am,  ['am', 'lm', 'lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    profit_am_df,  profit_am_df_AUS  = to_region_and_aus_df(xr_profit_am,  ['am', 'lm', 'lu'],            yr_cal, region_levels=['region_state', 'region_NRM'])
 
-    rename_map_am = {'lu': 'Land-use', 'lm': 'Water_supply', 'am': 'Management Type', 'Value': 'Value ($)'}
-    save_csv(revenue_am_df, rename_map_am, os.path.join(path, f'economics_am_revenue_{yr_cal}.csv'))
-    save_csv(cost_am_df,    rename_map_am, os.path.join(path, f'economics_am_cost_{yr_cal}.csv'))
-    save_csv(profit_am_df,  rename_map_am, os.path.join(path, f'economics_am_profit_{yr_cal}.csv'))
+    rename_am = {'lu': 'Land-use', 'lm': 'Water_supply', 'am': 'Management Type', 'Value': 'Value ($)'}
+    save_csv(revenue_am_df, rename_am, os.path.join(path, f'economics_am_revenue_{yr_cal}.csv'))
+    save_csv(cost_am_df,    rename_am, os.path.join(path, f'economics_am_cost_{yr_cal}.csv'))
+    save_csv(profit_am_df,  rename_am, os.path.join(path, f'economics_am_profit_{yr_cal}.csv'))
 
-    if revenue_am_df_AUS.empty:
-        valid_layers_rev_am = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL')], names=['am', 'lm', 'lu'])
-    else:
-        valid_layers_rev_am = pd.MultiIndex.from_frame(revenue_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
-    if cost_am_df_AUS.empty:
-        valid_layers_cost_am = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL', 'Operating Cost')], names=['am', 'lm', 'lu', 'Cost_type'])
-    else:
-        valid_layers_cost_am = pd.MultiIndex.from_frame(cost_am_df_AUS[['am', 'lm', 'lu', 'Cost_type']]).sort_values()
-    if profit_am_df_AUS.empty:
-        valid_layers_profit_am = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL')], names=['am', 'lm', 'lu'])
-    else:
-        valid_layers_profit_am = pd.MultiIndex.from_frame(profit_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
+    vl_rev_am = (
+        pd.MultiIndex.from_tuples([('ALL','ALL','ALL')], names=['am','lm','lu'])
+        if revenue_am_df_AUS.empty
+        else pd.MultiIndex.from_frame(revenue_am_df_AUS[['am','lm','lu']]).sort_values()
+    )
+    vl_cost_am = (
+        pd.MultiIndex.from_tuples([('ALL','ALL','ALL','Operating Cost')], names=['am','lm','lu','Cost_type'])
+        if cost_am_df_AUS.empty
+        else pd.MultiIndex.from_frame(cost_am_df_AUS[['am','lm','lu','Cost_type']]).sort_values()
+    )
+    vl_profit_am = (
+        pd.MultiIndex.from_tuples([('ALL','ALL','ALL')], names=['am','lm','lu'])
+        if profit_am_df_AUS.empty
+        else pd.MultiIndex.from_frame(profit_am_df_AUS[['am','lm','lu']]).sort_values()
+    )
 
-    valid_layers_stack_rev_am    = xr_revenue_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_rev_am).drop_vars(['region_state', 'region_NRM'], errors='ignore')
-    valid_layers_stack_cost_am   = xr_cost_am.stack(layer=['am', 'lm', 'lu', 'Cost_type']).sel(layer=valid_layers_cost_am).drop_vars(['region_state', 'region_NRM'], errors='ignore')
-    valid_layers_stack_profit_am = xr_profit_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_profit_am).drop_vars(['region_state', 'region_NRM'], errors='ignore')
+    valid_layers_stack_rev_am    = xr_revenue_am.stack(layer=['am','lm','lu']).sel(layer=vl_rev_am).drop_vars(['region_state','region_NRM'], errors='ignore')
+    valid_layers_stack_cost_am   = xr_cost_am.stack(layer=['am','lm','lu','Cost_type']).sel(layer=vl_cost_am).drop_vars(['region_state','region_NRM'], errors='ignore')
+    valid_layers_stack_profit_am = xr_profit_am.stack(layer=['am','lm','lu']).sel(layer=vl_profit_am).drop_vars(['region_state','region_NRM'], errors='ignore')
 
     save2nc(valid_layers_stack_rev_am,    os.path.join(path, f'xr_economics_am_revenue_{yr_cal}.nc'))
     save2nc(valid_layers_stack_cost_am,   os.path.join(path, f'xr_economics_am_cost_{yr_cal}.nc'))
     save2nc(valid_layers_stack_profit_am, os.path.join(path, f'xr_economics_am_profit_{yr_cal}.nc'))
 
+    del xr_revenue_am, xr_cost_am, xr_profit_am
+    gc.collect()
+
 
     # ==================== Non-Agricultural Economics ====================
 
     non_ag_dvar = (
-        tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
-        .chunk(chunk)
-        .assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
+        tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]).chunk(chunk)
+        .assign_coords(region_state=('cell', data.REGION_STATE_NAME),
+                       region_NRM=('cell', data.REGION_NRM_NAME))
     )
 
-    ag_rev_mrj  = ag_revenue.get_rev_matrices(data, yr_idx)
-    ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
-    non_ag_rev_mat       = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_rev_mrj, data.lumaps[yr_cal]))
-    non_ag_cost_mat      = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, data.lumaps[yr_cal], yr_cal))
+    non_ag_rev_mat  = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_rev_mrj, data.lumaps[yr_cal]))
+    non_ag_cost_mat = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, data.lumaps[yr_cal], yr_cal))
     nonag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_non_ag_to_non_ag_transition_matrix(data))
 
     if yr_cal_sim_pre is None:
-        ag2nonag_mat = xr.DataArray(
-            np.zeros((data.NCELLS, len(data.NON_AGRICULTURAL_LANDUSES)), dtype=np.float32),
-            dims=['cell', 'lu'],
-            coords={'cell': range(data.NCELLS), 'lu': data.NON_AGRICULTURAL_LANDUSES}
-        )
+        ag2nonag_mat = xr.DataArray(np.zeros((data.NCELLS, len(data.NON_AGRICULTURAL_LANDUSES)), dtype=np.float32),
+            dims=['cell', 'lu'], coords={'cell': range(data.NCELLS), 'lu': data.NON_AGRICULTURAL_LANDUSES})
     else:
         ag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_transition_matrix_ag2nonag(
-            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]
-        ).astype(np.float32))
+            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]).astype(np.float32))
 
     non_ag_profit_mat = non_ag_rev_mat - (non_ag_cost_mat + nonag2nonag_mat + ag2nonag_mat)
+    raw_profit_nonag = (non_ag_dvar * non_ag_profit_mat).drop_vars(['region_state', 'region_NRM'], errors='ignore')
 
     xr_revenue_non_ag = non_ag_dvar * non_ag_rev_mat
     xr_cost_non_ag    = non_ag_dvar * non_ag_cost_mat
@@ -1268,36 +1280,60 @@ def write_economics(data: Data, yr_cal, path):
     xr_ag2nonag       = non_ag_dvar * ag2nonag_mat
     xr_non_ag_profit  = non_ag_dvar * non_ag_profit_mat
 
+    del non_ag_rev_mat, non_ag_cost_mat, nonag2nonag_mat, ag2nonag_mat, non_ag_profit_mat, non_ag_dvar
+    del ag_rev_mrj, ag_cost_mrj
+    gc.collect()
+
     xr_revenue_non_ag = add_all(xr_revenue_non_ag, ['lu'])
     xr_cost_non_ag    = add_all(xr_cost_non_ag,    ['lu'])
     xr_nonag2nonag    = add_all(xr_nonag2nonag,    ['lu'])
     xr_ag2nonag       = add_all(xr_ag2nonag,       ['lu'])
     xr_non_ag_profit  = add_all(xr_non_ag_profit,  ['lu'])
 
-    revenue_na_df,       revenue_na_df_AUS       = to_region_and_aus_df(xr_revenue_non_ag, ['lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
-    cost_na_df,          cost_na_df_AUS          = to_region_and_aus_df(xr_cost_non_ag,    ['lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
-    t_nonag2nonag_df,    t_nonag2nonag_df_AUS    = to_region_and_aus_df(xr_nonag2nonag,    ['lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
-    t_ag2nonag_df,       t_ag2nonag_df_AUS       = to_region_and_aus_df(xr_ag2nonag,       ['lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
-    profit_na_df,        profit_na_df_AUS        = to_region_and_aus_df(xr_non_ag_profit,  ['lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    revenue_na_df,    revenue_na_df_AUS    = to_region_and_aus_df(xr_revenue_non_ag, ['lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    cost_na_df,       cost_na_df_AUS       = to_region_and_aus_df(xr_cost_non_ag,    ['lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    t_nonag2nonag_df, t_nonag2nonag_df_AUS = to_region_and_aus_df(xr_nonag2nonag,    ['lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    t_ag2nonag_df,    t_ag2nonag_df_AUS    = to_region_and_aus_df(xr_ag2nonag,       ['lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
+    profit_na_df,     profit_na_df_AUS     = to_region_and_aus_df(xr_non_ag_profit,  ['lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
 
-    rename_map_na = {'lu': 'Land-use', 'Value': 'Value ($)'}
-    save_csv(revenue_na_df,    rename_map_na, os.path.join(path, f'economics_non_ag_revenue_{yr_cal}.csv'))
-    save_csv(cost_na_df,       rename_map_na, os.path.join(path, f'economics_non_ag_cost_{yr_cal}.csv'))
-    save_csv(t_nonag2nonag_df, rename_map_na, os.path.join(path, f'economics_non_ag_transition_NonAg2NonAg_{yr_cal}.csv'))
-    save_csv(t_ag2nonag_df,    rename_map_na, os.path.join(path, f'economics_non_ag_transition_Ag2NonAg_{yr_cal}.csv'))
-    save_csv(profit_na_df,     rename_map_na, os.path.join(path, f'economics_non_ag_profit_{yr_cal}.csv'))
+    rename_na = {'lu': 'Land-use', 'Value': 'Value ($)'}
+    save_csv(revenue_na_df,    rename_na, os.path.join(path, f'economics_non_ag_revenue_{yr_cal}.csv'))
+    save_csv(cost_na_df,       rename_na, os.path.join(path, f'economics_non_ag_cost_{yr_cal}.csv'))
+    save_csv(t_nonag2nonag_df, rename_na, os.path.join(path, f'economics_non_ag_transition_NonAg2NonAg_{yr_cal}.csv'))
+    save_csv(t_ag2nonag_df,    rename_na, os.path.join(path, f'economics_non_ag_transition_Ag2NonAg_{yr_cal}.csv'))
+    save_csv(profit_na_df,     rename_na, os.path.join(path, f'economics_non_ag_profit_{yr_cal}.csv'))
 
-    vl_rev_na          = pd.MultiIndex.from_tuples([('ALL',)], names=['lu']) if revenue_na_df_AUS.empty    else pd.MultiIndex.from_frame(revenue_na_df_AUS[['lu']]).sort_values()
-    vl_cost_na         = pd.MultiIndex.from_tuples([('ALL',)], names=['lu']) if cost_na_df_AUS.empty       else pd.MultiIndex.from_frame(cost_na_df_AUS[['lu']]).sort_values()
-    vl_t_nonag2nonag   = pd.MultiIndex.from_tuples([('ALL',)], names=['lu']) if t_nonag2nonag_df_AUS.empty else pd.MultiIndex.from_frame(t_nonag2nonag_df_AUS[['lu']]).sort_values()
-    vl_t_ag2nonag      = pd.MultiIndex.from_tuples([('ALL',)], names=['lu']) if t_ag2nonag_df_AUS.empty    else pd.MultiIndex.from_frame(t_ag2nonag_df_AUS[['lu']]).sort_values()
-    vl_profit_na       = pd.MultiIndex.from_tuples([('ALL',)], names=['lu']) if profit_na_df_AUS.empty     else pd.MultiIndex.from_frame(profit_na_df_AUS[['lu']]).sort_values()
+    vl_rev_na = (
+        pd.MultiIndex.from_tuples([('ALL',)], names=['lu'])
+        if revenue_na_df_AUS.empty
+        else pd.MultiIndex.from_frame(revenue_na_df_AUS[['lu']]).sort_values()
+    )
+    vl_cost_na = (
+        pd.MultiIndex.from_tuples([('ALL',)], names=['lu'])
+        if cost_na_df_AUS.empty
+        else pd.MultiIndex.from_frame(cost_na_df_AUS[['lu']]).sort_values()
+    )
+    vl_t_nonag2nonag = (
+        pd.MultiIndex.from_tuples([('ALL',)], names=['lu'])
+        if t_nonag2nonag_df_AUS.empty
+        else pd.MultiIndex.from_frame(t_nonag2nonag_df_AUS[['lu']]).sort_values()
+    )
+    vl_t_ag2nonag = (
+        pd.MultiIndex.from_tuples([('ALL',)], names=['lu'])
+        if t_ag2nonag_df_AUS.empty
+        else pd.MultiIndex.from_frame(t_ag2nonag_df_AUS[['lu']]).sort_values()
+    )
+    vl_profit_na = (
+        pd.MultiIndex.from_tuples([('ALL',)], names=['lu'])
+        if profit_na_df_AUS.empty
+        else pd.MultiIndex.from_frame(profit_na_df_AUS[['lu']]).sort_values()
+    )
 
-    vl_stack_rev_na        = xr_revenue_non_ag.stack(layer=['lu']).sel(layer=vl_rev_na).drop_vars(['region_state', 'region_NRM'], errors='ignore').compute()
-    vl_stack_cost_na       = xr_cost_non_ag.stack(layer=['lu']).sel(layer=vl_cost_na).drop_vars(['region_state', 'region_NRM'], errors='ignore').compute()
-    vl_stack_t_nonag2nonag = xr_nonag2nonag.stack(layer=['lu']).sel(layer=vl_t_nonag2nonag).drop_vars(['region_state', 'region_NRM'], errors='ignore').compute()
-    vl_stack_t_ag2nonag    = xr_ag2nonag.stack(layer=['lu']).sel(layer=vl_t_ag2nonag).drop_vars(['region_state', 'region_NRM'], errors='ignore').compute()
-    vl_stack_profit_na     = xr_non_ag_profit.stack(layer=['lu']).sel(layer=vl_profit_na).drop_vars(['region_state', 'region_NRM'], errors='ignore').compute()
+    vl_stack_rev_na        = xr_revenue_non_ag.stack(layer=['lu']).sel(layer=vl_rev_na).drop_vars(['region_state','region_NRM'], errors='ignore').compute()
+    vl_stack_cost_na       = xr_cost_non_ag.stack(layer=['lu']).sel(layer=vl_cost_na).drop_vars(['region_state','region_NRM'], errors='ignore').compute()
+    vl_stack_t_nonag2nonag = xr_nonag2nonag.stack(layer=['lu']).sel(layer=vl_t_nonag2nonag).drop_vars(['region_state','region_NRM'], errors='ignore').compute()
+    vl_stack_t_ag2nonag    = xr_ag2nonag.stack(layer=['lu']).sel(layer=vl_t_ag2nonag).drop_vars(['region_state','region_NRM'], errors='ignore').compute()
+    vl_stack_profit_na     = xr_non_ag_profit.stack(layer=['lu']).sel(layer=vl_profit_na).drop_vars(['region_state','region_NRM'], errors='ignore').compute()
 
     save2nc(vl_stack_rev_na,        os.path.join(path, f'xr_economics_non_ag_revenue_{yr_cal}.nc'))
     save2nc(vl_stack_cost_na,       os.path.join(path, f'xr_economics_non_ag_cost_{yr_cal}.nc'))
@@ -1305,45 +1341,33 @@ def write_economics(data: Data, yr_cal, path):
     save2nc(vl_stack_t_ag2nonag,    os.path.join(path, f'xr_economics_non_ag_transition_Ag2NonAg_{yr_cal}.nc'))
     save2nc(vl_stack_profit_na,     os.path.join(path, f'xr_economics_non_ag_profit_{yr_cal}.nc'))
 
+    del xr_revenue_non_ag, xr_cost_non_ag, xr_nonag2nonag, xr_ag2nonag, xr_non_ag_profit
+    gc.collect()
+
 
     # ==================== Sum Profit (Ag + Am + NonAg) ====================
-    # Use pre-ALL profit arrays: ag has (lm, lu, cell), am has (am, lm, lu, cell), nonag has (lu, cell)
-    # xr_profit_ag before add_all is ag_dvar_mrj * profit_ag => dims (lm, lu, cell) with region coord
-    # We need the raw (pre-ALL) profits, so recompute from the pre-ALL vars
-    raw_profit_ag = (ag_dvar_mrj * profit_ag).drop_vars(['region_state', 'region_NRM'], errors='ignore')                          # (lm, lu, cell)
-    raw_profit_am = (xr_revenue_am - xr_cost_am)                                            # already has ALL dims
-    # Use pre-ALL am profit: select non-ALL am, sum over am => (lm, lu, cell)
-    raw_profit_am_pre = (am_dvar_mrj * (am_revenue_mat - am_cost_mat))                      # (am, lm, lu, cell)
-    am_sum_profit = raw_profit_am_pre.sel(lm=['dry', 'irr']).sum('am').drop_vars(['region_state', 'region_NRM'], errors='ignore')  # (lm, lu, cell)
 
-    # NonAg profit: assign to lm='dry', append nonag land uses to ag land uses
-    raw_profit_nonag = (non_ag_dvar * non_ag_profit_mat).drop_vars(['region_state', 'region_NRM'], errors='ignore')                # (lu, cell)
-    nonag_as_dry = raw_profit_nonag.expand_dims('lm').assign_coords(lm=['dry']).reindex(lm=['dry', 'irr'], fill_value=0)
-
-    # Combine: sum each Type (ag, ag-man, non-ag) over all land uses and water supplies, then add ALL
-    ag_lus = list(data.AGRICULTURAL_LANDUSES)
-    nonag_lus = list(data.NON_AGRICULTURAL_LANDUSES)
+    ag_lus        = list(data.AGRICULTURAL_LANDUSES)
+    nonag_lus     = list(data.NON_AGRICULTURAL_LANDUSES)
     am_types_list = [a for a in raw_profit_am_pre.coords['am'].values if a != 'ALL']
 
-    # ag: sum raw ag profit over all lm (dry+irr) and all ag land uses
-    sum_type_ag = raw_profit_ag.sel(lm=['dry', 'irr'], lu=ag_lus).sum(['lm', 'lu']).expand_dims({'Type': ['ag']})
-    # ag-man: sum raw am profit over am, lm, lu
-    if am_types_list:
-        sum_type_am = raw_profit_am_pre.sel(am=am_types_list, lm=['dry', 'irr'], lu=ag_lus).sum(['am', 'lm', 'lu']).expand_dims({'Type': ['ag-man']})
-    else:
-        sum_type_am = xr.zeros_like(sum_type_ag).assign_coords(Type=['ag-man'])
-    # non-ag: sum raw nonag profit over all non-ag land uses
+    sum_type_ag = raw_profit_ag.sel(lm=['dry','irr'], lu=ag_lus).sum(['lm','lu']).expand_dims({'Type': ['ag']})
+    sum_type_am = (
+        raw_profit_am_pre.sel(am=am_types_list, lm=['dry','irr'], lu=ag_lus).sum(['am','lm','lu']).expand_dims({'Type': ['ag-man']})
+        if am_types_list
+        else xr.zeros_like(sum_type_ag).assign_coords(Type=['ag-man'])
+    )
     sum_type_nonag = raw_profit_nonag.sel(lu=nonag_lus).sum('lu').expand_dims({'Type': ['non-ag']})
+    del raw_profit_ag, raw_profit_am_pre, raw_profit_nonag
 
-    sum_profit = xr.concat([sum_type_ag, sum_type_am, sum_type_nonag], dim='Type')
-    sum_profit = add_all(sum_profit, dims=['Type'])
-
-    # Stack and save
+    sum_profit       = add_all(xr.concat([sum_type_ag, sum_type_am, sum_type_nonag], dim='Type'), dims=['Type'])
     sum_profit_stack = sum_profit.stack(layer=['Type']).compute()
+    del sum_profit, sum_type_ag, sum_type_am, sum_type_nonag
     save2nc(sum_profit_stack, os.path.join(path, f'xr_economics_sum_profit_{yr_cal}.nc'))
 
 
     # ==================== Record Cell Magnitudes ====================
+
     magnitudes = {
         'Economics_ag': {
             'ag_revenue':       get_mag(ag_rev_valid_layers),
@@ -1364,11 +1388,10 @@ def write_economics(data: Data, yr_cal, path):
             'ag2nonag_cost':    get_mag(vl_stack_t_ag2nonag),
             'non_ag_profit':    get_mag(vl_stack_profit_na),
         },
-        'Economics_sum': {
-            'sum_profit':       get_mag(sum_profit_stack),
-        },
+        'Economics_sum': {'sum_profit': get_mag(sum_profit_stack)},
     }
-    return (f"Economics (Ag + Am + NonAg + Sum) written for year {yr_cal}", magnitudes)
+    return (f"Economics (Ag+Am+NonAg+Sum) written for year {yr_cal}", magnitudes)
+
 
 
 # ── Renewable energy ────────────────────────────────────────────────────────────────
@@ -1581,7 +1604,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         
     # Stack array and save to netcdf for later use in report (e.g., for setting colorbar limits)
     valid_trans_area_layers = pd.MultiIndex.from_frame(
-        transition_area_AUS[['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']]
+        transition_area_AUS[['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']].drop_duplicates()
     ).sort_values()
 
     # Save transition area to csv
@@ -1647,7 +1670,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get valid data layers (before renaming/replacing)
     valid_layers_transition = pd.MultiIndex.from_frame(
-        cost_df_AUS[['From-land-use', 'To-land-use', 'Cost-type']]
+        cost_df_AUS[['From-land-use', 'To-land-use', 'Cost-type']].drop_duplicates()
     ).sort_values()
 
     # Write to csv
@@ -1710,7 +1733,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).query('abs(`Value (t CO2e)`) > 1e-3') # Skip transitions under 1 t CO2e at national level
 
     # Get valid data layers (before renaming/replacing)
-    valid_transition_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['From-land-use', 'To-land-use', 'GHG-type']]).sort_values()
+    valid_transition_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['From-land-use', 'To-land-use', 'GHG-type']].drop_duplicates()).sort_values()
 
     # Write to csv
     pd.concat([ghg_df_AUS, ghg_df_region]
@@ -1776,7 +1799,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     water_df_AUS = water_df_AUS.loc[water_df_AUS['Water Yield Change (ML)'].abs() > 1e3] # Skip transitions under 1,000 ML at national level
         
     # Get valid data layers (before renaming/replacing)
-    valid_water_transition_layers = pd.MultiIndex.from_frame(water_df_AUS[['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply']]).sort_values()
+    valid_water_transition_layers = pd.MultiIndex.from_frame(water_df_AUS[['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply']].drop_duplicates()).sort_values()
 
     # Save to csv 
     pd.concat([water_df_region, water_df_AUS]
@@ -1874,7 +1897,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         
     # Get valid data layers (before renaming/replacing)
     valid_layers_transition = pd.MultiIndex.from_frame(
-        area_df_AUS[['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']]
+        area_df_AUS[['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']].drop_duplicates()
     ).sort_values()
     
     # Save to csv
@@ -1939,9 +1962,9 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         
     # Get valid data layers (before renaming/replacing)
     valid_layers_transition = pd.MultiIndex.from_frame(
-        cost_df_AUS[['From-land-use', 'To-land-use', 'Cost-type']]
+        cost_df_AUS[['From-land-use', 'To-land-use', 'Cost-type']].drop_duplicates()
     ).sort_values()
-    
+
     pd.concat([cost_df_AUS, cost_df_region]
         ).infer_objects(copy=False
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
@@ -1990,7 +2013,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).assign(region='AUSTRALIA'
         ).query('abs(`Value (t CO2e)`) > 1e-3')
 
-    valid_ghg_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['From-land-use', 'To-land-use']]).sort_values()
+    valid_ghg_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['From-land-use', 'To-land-use']].drop_duplicates()).sort_values()
 
     pd.concat([ghg_df_AUS, ghg_df_region]
         ).infer_objects(copy=False
@@ -2039,7 +2062,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).assign(region='AUSTRALIA')
     water_df_AUS = water_df_AUS.loc[water_df_AUS['Water Yield Change (ML)'].abs() > 1e3]
 
-    valid_water_layers = pd.MultiIndex.from_frame(water_df_AUS[['From-land-use', 'To-land-use']]).sort_values()
+    valid_water_layers = pd.MultiIndex.from_frame(water_df_AUS[['From-land-use', 'To-land-use']].drop_duplicates()).sort_values()
 
     pd.concat([water_df_region, water_df_AUS]
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
@@ -4031,7 +4054,14 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
             | set(GBF4_score_non_ag['region'].unique())
         )
         am_full = ['ALL'] + sorted(data.AG_MAN_LU_DESC.keys())
-        base_yr_score = expand_outside_record(base_yr_score, regions_full, 'species', am_full)
+        
+        lm_values = ['ALL', 'dry', 'irr']
+        grid = pd.MultiIndex.from_product(
+            [list(regions_full), list(am_full), lm_values, base_yr_score['species'].tolist()],
+            names=['region', 'am', 'lm', 'species'],
+        ).to_frame(index=False)
+        base_yr_score = grid.merge(base_yr_score, on='species', how='left')
+        base_yr_score['region_level'] = 'region_NRM'
 
     pd.concat([
             GBF4_score_ag,
@@ -4426,8 +4456,15 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
             | set(GBF4_score_non_ag['region'].unique())
         )
         am_full = ['ALL'] + sorted(data.AG_MAN_LU_DESC.keys())
-        base_yr_score = expand_outside_record(base_yr_score, regions_full, 'species', am_full)
-    
+        
+        lm_values = ['ALL', 'dry', 'irr']
+        grid = pd.MultiIndex.from_product(
+            [list(regions_full), list(am_full), lm_values, base_yr_score['species'].tolist()],
+            names=['region', 'am', 'lm', 'species'],
+        ).to_frame(index=False)
+        base_yr_score = grid.merge(base_yr_score, on='species', how='left')
+        base_yr_score['region_level'] = 'region_NRM'
+
     pd.concat([
             GBF4_score_ag,
             GBF4_score_am,

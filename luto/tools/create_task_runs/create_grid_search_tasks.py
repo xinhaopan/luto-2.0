@@ -37,7 +37,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['300GB'],
-    'WRITE_REPORT_MAX_MEM_GB': [300],                                        # Max memory for writing report (in GB)
+    'WRITE_REPORT_MAX_MEM_MB': [300 * 1024],                                 # Max memory for writing report (in MB)
     'NCPUS':[32],
     'TIME': ['24:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
@@ -49,7 +49,6 @@ grid_search = {
     'OBJECTIVE':        ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR':        [1],
     'SIM_YEARS':        [[2020, 2025, 2030, 2035, 2050]],                          # base year 2010 implicit; explicit step years
-    'WRITE_PARALLEL':   [True],
     'WRITE_THREADS':    [4],
     'DO_IIS':           [False],  
     'WRITE_OUTPUTS':    [True],
