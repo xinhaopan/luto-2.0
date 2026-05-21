@@ -4,7 +4,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260514_paper4_HPC_tolerances'],
+    'TASK_NAME': ['20260520_paper4_HPC_tolerances'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2], 
@@ -54,7 +54,36 @@ grid_search = {
     'WATER_REGION_DEF': ['Drainage Division'],
     'WATER_CLIMATE_CHANGE_IMPACT': ['on'],
     # ----------------------------------- Demand settings --------------------------------
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],
+    'DYNAMIC_PRICE': [False],
+    'DEMAND_CONSTRAINT_TYPE': ['hard'],
+    'DEMAND_BOUNDS': [{
+        'sheep lexp':             [1.0, 1.01],
+        'sheep meat':             [1.0, 1.01],
+        'sheep wool':             [1.0, 1.01],
+        'apples':                 [1.0, 1.01],
+        'beef lexp':              [1.0, 1.01],
+        'beef meat':              [1.0, 1.01],
+        'citrus':                 [1.0, 1.01],
+        'cotton':                 [1.0, 1.01],
+        'dairy':                  [1.0, 1.01],
+        'grapes':                 [1.0, 1.01],
+        'hay':                    [1.0, 1.01],
+        'nuts':                   [1.0, 1.01],
+        'other non-cereal crops': [1.0, 1.01],
+        'pears':                  [1.0, 1.01],
+        'plantation fruit':       [1.0, 1.01],
+        'rice':                   [1.0, 1.01],
+        'stone fruit':            [1.0, 1.01],
+        'sugar':                  [1.0, 1.01],
+        'summer cereals':         [1.0, 1.01],
+        'summer legumes':         [1.0, 1.01],
+        'summer oilseeds':        [1.0, 1.01],
+        'tropical stone fruit':   [1.0, 1.01],
+        'vegetables':             [1.0, 1.01],
+        'winter cereals':         [1.0, 1.01],
+        'winter legumes':         [1.0, 1.01],
+        'winter oilseeds':        [1.0, 1.01],
+    }],
     #----------------------------------- other settings --------------------------------
     'FEASIBILITY_TOLERANCE': [1e-6],
     'OPTIMALITY_TOLERANCE': [1e-6],

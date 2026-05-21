@@ -27,7 +27,7 @@ Key differences from Paper2_tasks.py:
                         tables in settings.py
   • NON_AG_LAND_USES and AG_MANAGEMENTS are set per scenario via conditional_rules
   • Demand is loaded from All_LUTO_demand_scenarios_with_convergences.csv
-  • FLC multipliers use the baseline cost_multipliers.xlsx/FLC_multiplier sheet
+  • FLC multipliers from FLC_cost_multipliers.xlsx (scenario-specific sheet)
   • AC  multipliers from Area_cost.xlsx            (scenario-specific sheet)
   • Feedlot correction ratios applied per year for cost/revenue/water/GHG
 
@@ -95,8 +95,9 @@ _ag_man_limited = {                      # AgS3 & AgS4
     'Onshore Wind':            False,
 }
 
+
 grid_search = {
-    'TASK_NAME': ['20260513_Paper3_test'],
+    'TASK_NAME': ['20260520_Paper3_aquila_test'],
     'KEEP_OUTPUTS': [True],
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
@@ -112,15 +113,13 @@ grid_search = {
     # and BIODIVERSITY_TARGET_GBF_2 via the mapping tables in settings.py.
     'AG2050_MODE': [True],
     'AG2050_SCENARIO': ['AgS1', 'AgS2', 'AgS3', 'AgS4'],
-    # Keep normal FLC from cost_multipliers.xlsx/FLC_multiplier for this test.
-    'AG2050_USE_FLC_SCENARIO': [False],
 
     # ---- Model settings -----------------------------------------------------
     'SOLVE_WEIGHT_ALPHA': [1],
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [5],
+    'RESFACTOR': [15],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],
 
     # ---- GHG settings -------------------------------------------------------
@@ -172,6 +171,35 @@ grid_search = {
     # AG2050_MODE is True; APPLY_DEMAND_MULTIPLIERS is skipped automatically.
     'DYNAMIC_PRICE': [False],
     'DEMAND_CONSTRAINT_TYPE': ['hard'],
+    'DEMAND_BOUNDS': [{
+        'sheep lexp':             [1.0, 1.01],
+        'sheep meat':             [1.0, 1.01],
+        'sheep wool':             [1.0, 1.01],
+        'apples':                 [1.0, 1.01],
+        'beef lexp':              [1.0, 1.01],
+        'beef meat':              [1.0, 1.01],
+        'citrus':                 [1.0, 1.01],
+        'cotton':                 [1.0, 1.01],
+        'dairy':                  [1.0, 1.01],
+        'grapes':                 [1.0, 1.01],
+        'hay':                    [1.0, 1.01],
+        'nuts':                   [1.0, 1.01],
+        'other non-cereal crops': [1.0, 1.01],
+        'pears':                  [1.0, 1.01],
+        'plantation fruit':       [1.0, 1.01],
+        'rice':                   [1.0, 1.01],
+        'stone fruit':            [1.0, 1.01],
+        'sugar':                  [1.0, 1.01],
+        'summer cereals':         [1.0, 1.01],
+        'summer legumes':         [1.0, 1.01],
+        'summer oilseeds':        [1.0, 1.01],
+        'tropical stone fruit':   [1.0, 1.01],
+        'vegetables':             [1.0, 1.01],
+        'winter cereals':         [1.0, 1.01],
+        'winter legumes':         [1.0, 1.01],
+        'winter oilseeds':        [1.0, 1.01],
+    }],
+
 
     # ---- Per-scenario land use & management options -------------------------
     # Two variants each; conditional_rules below select the correct pair.
