@@ -323,7 +323,6 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `VERBOSE`: Control solver output verbosity
 
 ### Output Control
-- `WRITE_PARALLEL`: Use parallel processing for output generation
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
 
 Refer to `luto/settings.py` for a complete list of configurable parameters and detailed descriptions.
