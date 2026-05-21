@@ -238,7 +238,7 @@ window.ProductionView = {
     <div class="relative w-full h-screen">
 
       <!-- Region level tabs + Region selection dropdown -->
-      <div class="absolute w-[262px] top-24 left-[20px] z-[9999] max-w-xs">
+      <div class="absolute w-[262px] top-28 left-[20px] z-[9999] max-w-xs">
         <!-- Drawer-style region level tabs -->
         <div class="flex gap-1 ml-2 mb-0">
           <button v-for="lvl in availableRegionLevels" :key="lvl"
