@@ -162,7 +162,7 @@ SOLVER_WEIGHT_DEMAND = 1
 SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 
-DEMAND_CONSTRAINT_TYPE = 'hard'   
+DEMAND_CONSTRAINT_TYPE = 'soft'   
 '''
 Options are 'soft', or 'hard'. This determines the type of demand constraint to apply in the model.
 - 'soft': commodity can be produced under/over the target, but the under/over part will pay a penalty that
@@ -174,8 +174,8 @@ Options are 'soft', or 'hard'. This determines the type of demand constraint to 
 DEMAND_BOUNDS = {
     # Commodities need relaxation
     'sheep lexp':               [1.0, 1.0],     # Sheep live exports can be met exactly because its not co-produced with sheep (some sheep just not exported). 
-    'sheep meat':               [1.0, 2.5],     # Meat and wool are co-produced in biologically fixed ratios, so either overproduce meat (~2.5 times), or
-    'sheep wool':               [1.0, 1.0],     # underproduce wool (0.8 times).
+    'sheep meat':               [1.0, 1.0],     # Meat and wool are co-produced in biologically fixed ratios, so either overproduce meat (~2.5 times), or
+    'sheep wool':               [0.7, 1.3],     # underproduce wool (0.8 times).
     
     # Commodities with no relaxation (one-to-one land-use to commodity)
     'apples':                   [1.0, 1.0],
@@ -258,7 +258,6 @@ for debugging infeasibility (e.g. as a grid_search parameter).
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 WRITE_OUTPUTS = True                        # Whether to write outputs (e.g., GeoTIFFs) at the end of the run. Set to False to skip output writing (e.g. when doing a quick test run or debugging IIS infeasibility).
-WRITE_THREADS = min(16, os.cpu_count())     # Number of parallel threads for output writing.
 
 WRITE_REPORT_MAX_MEM_MB = 64 * 1024         # The maximum memory (in MB) to use for writing report layers.
                                             #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13

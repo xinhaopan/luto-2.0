@@ -63,11 +63,10 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 
 
-# ── Per-function peak memory (MB above data-object baseline, measured at RESFACTOR=5) ────────────
+# ── Per-function peak memory  ────────────
 # Used by write_data to compute n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb).
-# Full-resolution runs use proportionally more memory — treat these as lower bounds.
-# Source: jinzhu_inspect_code/Profile_write_RES5/data/profile_summary.csv
-WRITE_FUNC_PEAK_MB = {
+# (MB above data-object baseline, measured at RESFACTOR=5)
+peak_mb_RES5 = {
     'write_dvar_and_mosaic_map':                941,
     'write_transition_nonag2ag':              7_558,  # heavy despite all-zero data: nested 9-LU × N_cost_type matrices
     'write_transition_ag2ag':                 6_544,
@@ -87,6 +86,13 @@ WRITE_FUNC_PEAK_MB = {
     'write_biodiversity_GBF4_ECNES_scores':       1,
     'write_biodiversity_GBF8_scores_groups':      1,
     'write_biodiversity_GBF8_scores_species':     1,
+}
+
+# Scale RES5 measurements to the actual run resolution.
+# Cell count grows as (5 / RESFACTOR)^2, so memory scales proportionally.
+WRITE_FUNC_PEAK_MB = {
+    k: max(1, round(v * (5 / settings.RESFACTOR) ** 2))
+    for k, v in peak_mb_RES5.items()
 }
 
 
@@ -342,9 +348,8 @@ def write_data(data: Data):
     paths = [f"{data.path}/out_{yr}" for yr in years]
     write_settings(data.path)
 
-    # n_jobs per tier = floor(WRITE_REPORT_MAX_MEM_MB / peak_mb), capped at WRITE_THREADS
     def get_n_jobs(peak_mb):
-        return max(1, min(settings.WRITE_THREADS, settings.WRITE_REPORT_MAX_MEM_MB // max(peak_mb, 1)))
+        return max(1, settings.WRITE_REPORT_MAX_MEM_MB // max(peak_mb, 1))
 
     # DVars must be written first as other outputs depend on them
     dvar_jobs = [delayed(write_dvar_and_mosaic_map)(data, yr, path_yr) for yr, path_yr in zip(years, paths)]
@@ -384,7 +389,8 @@ def write_data(data: Data):
     # Run tiers from most memory-constrained (n_jobs=1) to least (n_jobs=max_workers)
     for n_workers in sorted(groups.keys()):
         tasks = groups[n_workers]
-        for result in Parallel(n_jobs=min(n_workers, len(tasks)), return_as='generator_unordered')(tasks):
+        valid_workers = min(n_workers, len(tasks), os.cpu_count())
+        for result in Parallel(n_jobs=valid_workers, return_as='generator_unordered')(tasks):
             process_write_task(result)
 
     clean = lambda lst: [0.0 if np.isnan(v) else float(v) for v in lst]
@@ -429,7 +435,8 @@ def create_report(data: Data):
 def write_output_single_year(data: Data, yr_cal, path_yr):
     """Return list of (delayed_task, peak_delta_mb) for a single year.
 
-    peak_delta_mb values come from WRITE_FUNC_PEAK_MB (profiled at RESFACTOR=5).
+    peak_delta_mb values come from WRITE_FUNC_PEAK_MB (derived from peak_mb_RES5
+    profiled at RESFACTOR=5, then scaled by (5/RESFACTOR)^2 for the actual run resolution).
     write_data uses them to compute n_jobs = floor(WRITE_MEM_BUDGET_MB / peak_delta_mb),
     so tasks that fit multiple times within the budget run in parallel automatically.
     """
@@ -438,23 +445,23 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
 
     P = WRITE_FUNC_PEAK_MB
     return [
-        (delayed(write_transition_nonag2ag)(data, yr_cal, path_yr),              P['write_transition_nonag2ag']),
-        (delayed(write_transition_ag2ag)(data, yr_cal, path_yr),                 P['write_transition_ag2ag']),
-        (delayed(write_biodiversity_quality_scores)(data, yr_cal, path_yr),      P['write_biodiversity_quality_scores']),
-        (delayed(write_economics)(data, yr_cal, path_yr),                        P['write_economics']),
-        (delayed(write_ghg)(data, yr_cal, path_yr),                              P['write_ghg']),
-        (delayed(write_transition_ag2nonag)(data, yr_cal, path_yr),              P['write_transition_ag2nonag']),
-        (delayed(write_quantity)(data, yr_cal, path_yr),                         P['write_quantity']),
-        (delayed(write_water)(data, yr_cal, path_yr),                            P['write_water']),
-        (delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),         P['write_biodiversity_GBF2_scores']),
-        (delayed(write_dvar_area)(data, yr_cal, path_yr),                        P['write_dvar_area']),
-        (delayed(write_crosstab)(data, yr_cal, path_yr),                         P['write_crosstab']),
-        (delayed(write_renewable_production)(data, yr_cal, path_yr),             P['write_renewable_production']),
-        (delayed(write_biodiversity_GBF3_NVIS_scores)(data, yr_cal, path_yr),    P['write_biodiversity_GBF3_NVIS_scores']),
-        (delayed(write_biodiversity_GBF4_SNES_scores)(data, yr_cal, path_yr),    P['write_biodiversity_GBF4_SNES_scores']),
-        (delayed(write_biodiversity_GBF4_ECNES_scores)(data, yr_cal, path_yr),   P['write_biodiversity_GBF4_ECNES_scores']),
-        (delayed(write_biodiversity_GBF8_scores_groups)(data, yr_cal, path_yr),  P['write_biodiversity_GBF8_scores_groups']),
-        (delayed(write_biodiversity_GBF8_scores_species)(data, yr_cal, path_yr), P['write_biodiversity_GBF8_scores_species']),
+        (delayed(write_dvar_area)(data, yr_cal, path_yr),                           P['write_dvar_area']),
+        (delayed(write_crosstab)(data, yr_cal, path_yr),                            P['write_crosstab']),
+        (delayed(write_ghg)(data, yr_cal, path_yr),                                 P['write_ghg']),
+        (delayed(write_water)(data, yr_cal, path_yr),                               P['write_water']),
+        (delayed(write_quantity)(data, yr_cal, path_yr),                            P['write_quantity']),
+        (delayed(write_economics)(data, yr_cal, path_yr),                           P['write_economics']),
+        (delayed(write_transition_nonag2ag)(data, yr_cal, path_yr),                 P['write_transition_nonag2ag']),
+        (delayed(write_transition_ag2ag)(data, yr_cal, path_yr),                    P['write_transition_ag2ag']),
+        (delayed(write_transition_ag2nonag)(data, yr_cal, path_yr),                 P['write_transition_ag2nonag']),
+        (delayed(write_renewable_production)(data, yr_cal, path_yr),                P['write_renewable_production']),
+        (delayed(write_biodiversity_quality_scores)(data, yr_cal, path_yr),         P['write_biodiversity_quality_scores']),
+        (delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),            P['write_biodiversity_GBF2_scores']),
+        (delayed(write_biodiversity_GBF3_NVIS_scores)(data, yr_cal, path_yr),       P['write_biodiversity_GBF3_NVIS_scores']),
+        (delayed(write_biodiversity_GBF4_SNES_scores)(data, yr_cal, path_yr),       P['write_biodiversity_GBF4_SNES_scores']),
+        (delayed(write_biodiversity_GBF4_ECNES_scores)(data, yr_cal, path_yr),      P['write_biodiversity_GBF4_ECNES_scores']),
+        (delayed(write_biodiversity_GBF8_scores_groups)(data, yr_cal, path_yr),     P['write_biodiversity_GBF8_scores_groups']),
+        (delayed(write_biodiversity_GBF8_scores_species)(data, yr_cal, path_yr),    P['write_biodiversity_GBF8_scores_species']),
     ]
 
 
@@ -463,9 +470,9 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
 
 def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
 
-    ag_map = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-    non_ag_map = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-    am_map = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    ag_map = chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]))
+    non_ag_map = chunk_unify_size(tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]))
+    am_map = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]))
     
     ag_mask = ag_map.sum(['lm','lu']) > 0.001
     am_mask = am_map.sum(['am','lm', 'lu']) > 0.001
@@ -562,15 +569,12 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
 
 def write_dvar_area(data: Data, yr_cal, path):
 
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).assign_coords({'region_state': ('cell', data.REGION_STATE_NAME), 'region_NRM': ('cell', data.REGION_NRM_NAME)}
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-    non_ag_rj = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).assign_coords({'region_state': ('cell', data.REGION_STATE_NAME), 'region_NRM': ('cell', data.REGION_NRM_NAME)}
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-    am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).assign_coords({'region_state': ('cell', data.REGION_STATE_NAME), 'region_NRM': ('cell', data.REGION_NRM_NAME)}
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    ag_dvar_mrj = chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+        ).assign_coords({'region_state': ('cell', data.REGION_STATE_NAME), 'region_NRM': ('cell', data.REGION_NRM_NAME)})
+    non_ag_rj = chunk_unify_size(tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+        ).assign_coords({'region_state': ('cell', data.REGION_STATE_NAME), 'region_NRM': ('cell', data.REGION_NRM_NAME)})
+    am_dvar_mrj = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+        ).assign_coords({'region_state': ('cell', data.REGION_STATE_NAME), 'region_NRM': ('cell', data.REGION_NRM_NAME)})
 
 
     real_area_r = xr.DataArray(data.REAL_AREA.astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
@@ -599,7 +603,7 @@ def write_dvar_area(data: Data, yr_cal, path):
                 'region_NRM': ('cell', data.REGION_NRM_NAME),
             },
         ).expand_dims(lm=['dry'], lu=['Existing Capacity']
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+        ).pipe(chunk_unify_size)
 
         exist_re_irr = xr.zeros_like(exist_re_dry).assign_coords(lm=['irr'])  # zero — avoids double-counting
 
@@ -918,7 +922,6 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
 def write_economics(data: Data, yr_cal, path):
     yr_idx = yr_cal - data.YR_CAL_BASE
-    chunk  = {'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
 
     if yr_idx == 0:
         yr_cal_sim_pre = None; yr_idx_pre = None
@@ -931,7 +934,7 @@ def write_economics(data: Data, yr_cal, path):
     # ==================== Agricultural Economics ====================
 
     ag_dvar_mrj = (
-        tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk(chunk)
+        chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]))
         .assign_coords(region_state=('cell', data.REGION_STATE_NAME),
                        region_NRM=('cell', data.REGION_NRM_NAME))
     )
@@ -954,22 +957,22 @@ def write_economics(data: Data, yr_cal, path):
     rev_sum_df  = ag_rev_df.T.groupby(level=['lu', 'lm']).sum().T.astype(np.float32)
     cost_sum_df = ag_cost_df.T.groupby(level=['lu', 'lm']).sum().T.astype(np.float32)
 
-    rev_sum_xr = xr.DataArray(
+    rev_sum_xr = chunk_unify_size(xr.DataArray(
         rev_sum_df.values, dims=['cell', 'layer'],
         coords={'cell': range(data.NCELLS), 'layer': rev_sum_df.columns}
-    ).chunk(chunk).unstack('layer')   # (cell, lu, lm) — 3D, no source
+    ).unstack('layer'))   # (cell, lu, lm) — 3D, no source
 
-    cost_sum_xr = xr.DataArray(
+    cost_sum_xr = chunk_unify_size(xr.DataArray(
         cost_sum_df.values, dims=['cell', 'layer'],
         coords={'cell': range(data.NCELLS), 'layer': cost_sum_df.columns}
-    ).chunk(chunk).unstack('layer')
+    ).unstack('layer'))
 
     ag2ag_sum_arr = np.sum(np.stack(list(ag2ag_mrj.values())), axis=0)  # (NLMS, NCELLS, N_AG_LUS)
-    ag2ag_sum_xr  = xr.DataArray(
+    ag2ag_sum_xr  = chunk_unify_size(xr.DataArray(
         ag2ag_sum_arr,
         dims=['lm', 'cell', 'lu'],
         coords={'lm': data.LANDMANS, 'cell': range(data.NCELLS), 'lu': data.AGRICULTURAL_LANDUSES}
-    ).chunk(chunk)
+    ))
     del ag2ag_sum_arr
 
     # NonAg→Ag transition costs are intentionally excluded from profit_ag here.
@@ -1014,11 +1017,11 @@ def write_economics(data: Data, yr_cal, path):
     # ag2ag: loop over transition types (small, but keeps same pattern)
     ag2ag_parts = []
     for src_name, src_arr in ag2ag_mrj.items():
-        src_xr = xr.DataArray(
+        src_xr = chunk_unify_size(xr.DataArray(
             src_arr, dims=['lm', 'cell', 'lu'],
             coords={'lm': data.LANDMANS, 'cell': range(data.NCELLS),
                     'lu': data.AGRICULTURAL_LANDUSES}
-        ).chunk(chunk)
+        ))
         ag2ag_parts.append((ag_dvar_mrj * src_xr).expand_dims({'source': [src_name]}).compute())
         del src_xr
     xr_ag2ag_cost = xr.concat(ag2ag_parts, dim='source')
@@ -1098,8 +1101,7 @@ def write_economics(data: Data, yr_cal, path):
 
     am_dvar_mrj = (
         chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]))
-        .assign_coords(region_state=('cell', data.REGION_STATE_NAME),
-                       region_NRM=('cell', data.REGION_NRM_NAME))
+        .assign_coords(region_state=('cell', data.REGION_STATE_NAME),region_NRM=('cell', data.REGION_NRM_NAME))
     )
 
     ag_rev_mrj  = ag_revenue.get_rev_matrices(data, yr_idx)
@@ -1255,7 +1257,7 @@ def write_economics(data: Data, yr_cal, path):
     # ==================== Non-Agricultural Economics ====================
 
     non_ag_dvar = (
-        tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]).chunk(chunk)
+        chunk_unify_size(tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]))
         .assign_coords(region_state=('cell', data.REGION_STATE_NAME),
                        region_NRM=('cell', data.REGION_NRM_NAME))
     )
@@ -1402,11 +1404,11 @@ def write_renewable_production(data: Data, yr_cal, path):
     re_types = list(settings.RENEWABLES_OPTIONS.keys())
 
     # Get decision variable for renewable energy land-use
-    am_dvar_mrj_base = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
+    am_dvar_mrj_base = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
         ).assign_coords({
             'region_state': ('cell', data.REGION_STATE_NAME),
             'region_NRM':   ('cell', data.REGION_NRM_NAME),
-        }).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+        })
 
     am_dvar_mrj = xr.concat(
         [
@@ -2492,13 +2494,12 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 
     ag_g_xr = xr.Dataset(ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=False)
         ).rename({'dim_0': 'cell'})
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    ag_dvar_mrj = chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
 
     mindex = pd.MultiIndex.from_tuples(ag_g_xr.data_vars.keys(), names=['GHG_source', 'lm', 'lu'])
     mindex_coords = xr.Coordinates.from_pandas_multiindex(mindex, 'variable')
-    ag_g_rsmj = ag_g_xr.to_dataarray().assign_coords(mindex_coords).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}).unstack()
+    ag_g_rsmj = chunk_unify_size(ag_g_xr.to_dataarray().assign_coords(mindex_coords).unstack())
     ag_g_rsmj['GHG_source'] = ag_g_rsmj['GHG_source'].to_series().infer_objects(copy=False).replace(GHG_NAMES)
 
     ghg_e = ag_g_rsmj * ag_dvar_mrj
@@ -2520,9 +2521,8 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 
     # ==================== Non-Agricultural Land-use ====================
 
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    non_ag_dvar_rk = chunk_unify_size(tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
     non_ag_g_rk = tools.non_ag_rk_to_xr(
         data,
         non_ag_ghg.get_ghg_matrix(data, ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True), data.lumaps[yr_cal])
@@ -2551,9 +2551,8 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 
     # ==================== Agricultural Management ====================
 
-    ag_man_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    ag_man_dvar_mrj = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
     ag_man_g_mrj = tools.am_mrj_to_xr(data, ag_ghg.get_agricultural_management_ghg_matrices(data, yr_idx))
 
     xr_ghg_ag_man = ag_man_dvar_mrj * ag_man_g_mrj
@@ -2676,15 +2675,12 @@ def write_water(data: Data, yr_cal, path):
     region2code = {v: k for k, v in data.WATER_REGION_NAMES.items()}
 
     # Get the decision variables
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-    non_ag_dvar_rj = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-    am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    ag_dvar_mrj = chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+        ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME))
+    non_ag_dvar_rj = chunk_unify_size(tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+        ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME))
+    am_dvar_mrj = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+        ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME))
         
     # Get water target and domestic use
     w_limit_inside_luto = xr.DataArray(
@@ -2951,14 +2947,11 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Decision variables are the same for every backend layer — load once
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+    ag_dvar_mrj = chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
-    ag_mam_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+    ag_mam_dvar_mrj = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+    non_ag_dvar_rk = chunk_unify_size(tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
 
     # Per-backend accumulators

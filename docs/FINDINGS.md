@@ -113,7 +113,7 @@ currently prohibits nonag→ag transitions. The heavy allocation is structural, 
 Replaced the binary high/low split with a budget-driven n_jobs formula:
 
 ```python
-n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb)   # capped at WRITE_THREADS
+n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb)
 ```
 
 - `WRITE_FUNC_PEAK_MB` dict added at module level — maps each write function to its
@@ -127,7 +127,7 @@ n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb)   # capped at WRITE_THRE
   to allow direct use without unit conversion. Updated in `create_report_layers.py`
   (`mem_per_worker` divisor changed from `1e9` → `1e6`) and `create_grid_search_tasks.py`
 
-Example tier breakdown with `WRITE_REPORT_MAX_MEM_MB = 65536` and `WRITE_THREADS = 16`:
+Example tier breakdown with `WRITE_REPORT_MAX_MEM_MB = 65536`:
 
 | n_jobs | Functions (5 years each) |
 |---:|---|

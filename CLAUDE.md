@@ -236,8 +236,6 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ### Output Writing Configuration
 
-- `WRITE_PARALLEL`: Enable parallel output writing (default: True)
-- `WRITE_THREADS`: Number of parallel write threads (default: min(6, cpu_count))
 - `WRITE_REPORT_MAX_MEM_GB`: Max memory for report generation (default: 64)
 - `WRITE_CHUNK_SIZE`: Chunk size for NetCDF writing (default: 4096)
 

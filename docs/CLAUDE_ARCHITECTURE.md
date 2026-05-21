@@ -120,7 +120,7 @@ This document describes the core architecture, modules, and data flow of LUTO2.
    - Stage 1 uses `write_dvar_and_mosaic_map()` which combines dvar and mosaic generation in a single function
    - Mosaic maps are concatenated directly to dvar arrays before saving (optimizes file I/O)
    - Biodiversity outputs: GBF2/3/4/8 scores, species impacts, vegetation group restoration
-   - Parallel output writing with joblib (configurable via `WRITE_PARALLEL` and `WRITE_THREADS`)
+   - Parallel output writing with joblib (concurrency auto-determined by `WRITE_REPORT_MAX_MEM_MB`)
 
 ## Biodiversity Module Naming Conventions
 
