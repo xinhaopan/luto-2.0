@@ -5,6 +5,159 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260521 — Write phase dynamic tier scheduler and RF5 benchmark
+
+### Context
+
+Following the `process_chunks` optimisation (see 20260520), the write phase was
+re-profiled and a new scheduling strategy was designed to balance parallelism against
+peak memory. Three full 5-year RF5 runs were compared:
+
+| Run | Strategy | Wall time | Peak RAM |
+|---|---|---:|---:|
+| `2026_05_20__14_42_20` | All parallel, 12 workers (old) | **16.4 min** | **81.1 GB** |
+| `2026_05_20__20_33_57` | Binary high/low split, high=n_jobs=1 | 41.3 min | 34.5 GB |
+| `2026_05_21__11_50_58` | Dynamic tier scheduler (new) | **23.3 min** | **49.2 GB** |
+
+The binary split cut peak RAM by 57% but was 2.5× slower — all 8 high-mem functions
+× 5 years = 40 tasks ran sequentially. The tier scheduler recovers most of that speed
+while keeping peak RAM 39% lower than all-parallel.
+
+Artefacts: `jinzhu_inspect_code/Profile_write_RES5/`
+
+---
+
+### New RF5 benchmark profile (yr_cal = 2050)
+
+Data: `output/2026_05_20__13_10_03_RF5_2010-2050/Data_RES5.lz4`  
+Baseline data object: ~8,387 MB. All functions profiled sequentially with GC between each.
+
+| Function | Time (s) | Peak Δ (MB) | Peak absolute (MB) |
+|---|---:|---:|---:|
+| `write_transition_nonag2ag` | 30 | **7,558** | 15,802 |
+| `write_transition_ag2ag` | 265 | **6,544** | 14,718 |
+| `write_biodiversity_quality_scores` | 203 | **6,101** | 14,519 |
+| `write_economics` | 220 | 4,914 | 12,992 |
+| `write_ghg` | 53 | 3,189 | 11,517 |
+| `write_transition_ag2nonag` | 127 | 3,167 | 11,499 |
+| `write_quantity` | 111 | 2,916 | 10,924 |
+| `write_water` | 40 | 2,496 | 10,732 |
+| `write_biodiversity_GBF2_scores` | 21 | 1,768 | 10,112 |
+| `write_dvar_and_mosaic_map` | 51 | 941 | 8,809 |
+| `write_dvar_area` | 31 | 1,692 | 10,087 |
+| `write_area_transition_start_end` | 101 | 1,392 | 9,778 |
+| `write_renewable_production` | 21 | 718 | 9,029 |
+| `write_crosstab` | 1 | 13 | 8,320 |
+| GBF3/4/8 (5 funcs) | ~0 | ~0 | 8,387 |
+
+**Total sequential time (one year): ~1,277 s (~21 min)**
+
+---
+
+### Misclassifications in old binary split
+
+Two functions were assigned to the wrong group in `write_output_single_year`:
+
+| Function | Old group | Actual peak Δ | Correct group |
+|---|---|---:|---|
+| `write_biodiversity_quality_scores` | `low_mem` | **6,101 MB** | `high_mem` |
+| `write_biodiversity_GBF2_scores` | `high_mem` | 1,768 MB | `low_mem` |
+
+`write_biodiversity_quality_scores` was the 3rd heaviest function and ran silently
+alongside other low_mem tasks, causing uncontrolled memory spikes.
+
+---
+
+### Root cause: `write_biodiversity_quality_scores` high memory
+
+Loops over 7 `BIO_QUALITY_LAYERS` backends and appends 4 large xr arrays per backend
+to accumulator lists. After the loop, 28 arrays (7 × 4) are alive simultaneously before
+`xr.concat` creates combined arrays and `.compute()` materialises all of them:
+
+```
+loop iteration 7 ends → 28 arrays alive
+xr.concat(...)         → 4 combined arrays (28 originals still referenced)
+.compute()             → all materialised simultaneously → 6.1 GB peak
+```
+
+Using `del` on within-iteration intermediates does not help — the accumulator lists
+hold references across all 7 iterations. The fix requires writing per-backend NC files
+inside the loop and discarding each array before the next iteration.
+
+Also notable: **4,131 MB final Δ** — the combined xr arrays are not released after
+return, accumulating residual across years.
+
+---
+
+### Root cause: `write_transition_nonag2ag` heavier than `write_transition_ag2ag`
+
+Counterintuitive: `write_transition_nonag2ag` (7,558 MB) exceeds `write_transition_ag2ag`
+(6,544 MB) despite nonag→ag transitions being entirely zero in this scenario.
+
+`get_transition_matrix_nonag2ag(separate=True)` returns a **nested dict** — one sub-dict
+per non-ag land use, each containing the full ag-transition cost-type breakdown:
+
+```
+{9 non-ag LUs} × {N_cost_types each} = 9× more entries than ag2ag's flat N_cost_types
+```
+
+`np.stack(list(values()))` materialises all 9 × N_cost_types matrices simultaneously.
+After `unstack` and `add_all`, the full `(N_nonag_lu+1) × (N_cost_types+1) × NCELLS × (N_ag_lu+1)`
+tensor is allocated and computed entirely in memory — all zeros, because the model
+currently prohibits nonag→ag transitions. The heavy allocation is structural, not data-driven.
+
+---
+
+### Dynamic tier scheduler implementation
+
+Replaced the binary high/low split with a budget-driven n_jobs formula:
+
+```python
+n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb)   # capped at WRITE_THREADS
+```
+
+- `WRITE_FUNC_PEAK_MB` dict added at module level — maps each write function to its
+  profiled peak Δ MB at RF5
+- `write_output_single_year` now returns `[(delayed_task, peak_mb), ...]` — flat
+  annotated list instead of separate high_mem/low_mem lists
+- `write_data` groups tasks by computed n_jobs and runs each tier sequentially,
+  most constrained first
+- `WRITE_PARALLEL` setting removed — parallel is always used
+- `WRITE_REPORT_MAX_MEM_GB` renamed to `WRITE_REPORT_MAX_MEM_MB` (value = 64 × 1024)
+  to allow direct use without unit conversion. Updated in `create_report_layers.py`
+  (`mem_per_worker` divisor changed from `1e9` → `1e6`) and `create_grid_search_tasks.py`
+
+Example tier breakdown with `WRITE_REPORT_MAX_MEM_MB = 65536` and `WRITE_THREADS = 16`:
+
+| n_jobs | Functions (5 years each) |
+|---:|---|
+| 8 | `write_transition_nonag2ag` (7,558 MB) |
+| 10 | `write_transition_ag2ag` (6,544), `write_biodiversity_quality_scores` (6,101) |
+| 13 | `write_economics` (4,914) |
+| 16 | everything else (≤ 3,189 MB) |
+
+---
+
+### Windows loky spawn overhead between tiers
+
+Each `Parallel(...)` call on Windows creates a fresh loky process pool (no `fork()`).
+Pool creation and teardown costs ~3–10 s per tier transition. With ~5 distinct tiers
+there is ~25 s of unavoidable overhead.
+
+`prefer='threads'` was tested but reverted — a prior run encountered a pickle error
+suggesting the loky backend was being invoked despite the thread preference. Thread-based
+parallelism would eliminate spawn overhead entirely (threads share memory, no pickling),
+and the write workload is largely GIL-safe (numpy/xarray/NetCDF I/O all release the GIL).
+Further investigation needed to identify the pickle root cause before enabling threads.
+
+The remaining gap between tier-scheduler (23.3 min) and all-parallel (16.4 min) is
+explained by: (a) the n_jobs=1-equivalent tasks for the 3 heaviest functions, and
+(b) the inter-tier pool spin-up cost. Interleaving tiers within a single pool (proper
+work-stealing scheduler) would close this gap but requires custom dispatch logic beyond
+joblib's standard API.
+
+---
+
 ## 20260520 — Write phase profiling and `process_chunks` optimisation
 
 ### Context
