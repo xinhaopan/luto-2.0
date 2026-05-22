@@ -69,7 +69,7 @@ def get_settings_df(task_root_dir:str) -> pd.DataFrame:
 
 
 
-def get_grid_search_param_df(grid_dict:dict) -> None:
+def get_grid_search_param_df(grid_dict:dict) -> pd.DataFrame:
     '''
     Permutate the grid search parameters and save them to a datafram.
     '''
