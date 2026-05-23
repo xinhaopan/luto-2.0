@@ -178,18 +178,13 @@ def create_new_dataset(refresh=False):
     # Copy biodiversity GBF-3 data
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS.nc', outpath + 'bio_GBF3_NVIS_MVS.nc')
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG.nc', outpath + 'bio_GBF3_NVIS_MVG.nc')
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx')
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_NRM.xlsx', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_NRM.xlsx')
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_IBRA.xlsx', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_IBRA.xlsx')
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv')
 
     # Copy biodiversity GBF-4 files
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_GBF4_SNES.nc')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_GBF4_ECNES.nc')
-
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES.csv')
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target_NRM.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES_NRM.csv')
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES.csv')
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target_NRM.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES_NRM.csv')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target_ALL_REGIONS.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES.csv')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target_ALL_REGIONS.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES.csv')
     
     # Copy biodiversity GBF-8 files
     shutil.copyfile(bio_GBF8_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_GBF8_ssp126_EnviroSuit.nc')

@@ -966,18 +966,27 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-BIODIVERSITY_TARGET_GBF_3_NVIS = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3_NVIS = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
 
 - if 'off' is selected, turn off the GBF-3 NVIS target for biodiversity.
-- if 'medium' is selected, the conservation target is set to 30% for each vegetation group at 2050.
-- if 'high' is selected, the conservation target is set to 50% for each vegetation group at 2050.
+- if 'medium' is selected, the conservation target is set to 30% by 2030 and 30% by 2050 for each vegetation group.
+- if 'high' is selected, the conservation target is set to 30% by 2030 and 50% by 2050 for each vegetation group.
 - if 'USER_DEFINED' is selected, the conservation target is reading from input Excel file.
 '''
 
-GBF3_NVIS_TARGET_CLASS  = 'MVG'                  # 'MVG', 'MVS'
+
+GBF3_TARGETS_DICT = {
+    'off':     None,
+    'medium':  {2030: 30, 2050: 30},
+    'high':    {2030: 30, 2050: 50},
+    'USER_DEFINED': None
+}
+
+
+GBF3_NVIS_TARGET_CLASS  = 'NVIS_MVG'             # 'NVIS_MVG', 'NVIS_MVS'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
@@ -985,57 +994,12 @@ Also used as the class selector for IBRA bioregion layers when GBF3_NVIS_REGION_
 '''
 
 
-GBF3_TARGETS_DICT = {
-    'off':     None,
-    'medium':  30,
-    'high':    50,
-    'USER_DEFINED': None
-}
-
-
-
-
-# ------------------------------- GBF4 Parameters -------------------------------
-'''
-Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
-halt the extinction of known threatened species, protect genetic diversity, 
-and manage human-wildlife interactions
-'''
-
-
-BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
-
-
-BIODIVERSITY_GBF_4_TARGET_SOURCE_SNES = 'USER_DEFINED'  # 'USER_DEFINED' or 'dict'
-BIODIVERSITY_GBF_4_TARGET_SOURCE_ECNES = 'USER_DEFINED'  # 'USER_DEFINED' or 'dict'
-'''
-If 'USER_DEFINED', read targets from input Excel file; 
-If 'dict', read targets from the GBF4_TARGETS_DICT below.
-'''
-
-BIODIVERSITY_GBF_4_TARGET_DICT_SNES = {
-    '2030' : 30,
-    '2050' : 50,
-    '2100' : 50
-}
-BIODIVERSITY_GBF_4_TARGET_DICT_ECNES = {
-    '2030' : 30,
-    '2050' : 50,
-    '2100' : 50
-}
-
-
-# -------------- NRM region mode for GBF3 and GBF4 ----------------------
-# Each constraint type can independently choose 'Australia' (nationwide,
-# existing behaviour), 'NRM' (per-NRM-region), or 'IBRA' (IBRA bioregion).
-
-GBF3_NVIS_REGION_MODE = 'NRM'                    # 'Australia', 'NRM', or 'IBRA'
+GBF3_NVIS_REGION_MODE = 'NRM'                    # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
 '''
 Controls the spatial resolution of GBF3 NVIS constraints.
- - 'Australia' → nationwide NVIS vegetation-group targets (existing behaviour, default)
+ - 'AUSTRALIA' → nationwide NVIS vegetation-group targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region NVIS targets (masked to selected NRM regions)
- - 'IBRA'      → IBRA bioregion targets (bio_GBF3_MVG/MVS.nc + IBRA Excel file)
+ - 'IBRA_REG'  → IBRA bioregion targets (bio_GBF3_NVIS_MVG/MVS.nc + IBRA Excel file)
 '''
 
 GBF3_NVIS_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
@@ -1047,11 +1011,11 @@ Must match region names in REGION_NRM_NAME. Only used when GBF3_NVIS_REGION_MODE
 # -- GBF3 NVIS explicit (region, group) exclusions, keyed by GBF3_NVIS_TARGET_CLASS.
 # data.py automatically drops any group where IN_LUTO_HA <= 100 ha (structurally
 # infeasible: constraint LHS ≈ 0). The entries below document those groups for both
-# MVG and MVS target classes, confirmed from
+# NVIS_MVG and NVIS_MVS target classes, confirmed from
 # BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_NRM.xlsx on 2026-05-02.
 # To add IIS-diagnosed exclusions beyond the auto filter, append tuples here.
 GBF3_NVIS_EXCLUDE_REGION_GROUPS = {
-    'MVG': [
+    'NVIS_MVG': [
         # IN_LUTO_HA = 78.4 ha
         ('Goulburn Broken', 'Acacia Open Woodlands'),
         # IN_LUTO_HA = 24.8 ha
@@ -1081,7 +1045,7 @@ GBF3_NVIS_EXCLUDE_REGION_GROUPS = {
         # IN_LUTO_HA = 0.0 ha
         ('Goulburn Broken', 'Unclassified native vegetation'),
     ],
-    'MVS': [
+    'NVIS_MVS': [
         # IN_LUTO_HA = 0.0 ha
         ('Goulburn Broken', 'Boulders/rock with algae, lichen or scattered plants, or alpine fjaeldmarks'),
         # IN_LUTO_HA = 0.0 ha
@@ -1114,6 +1078,26 @@ GBF3_NVIS_EXCLUDE_REGION_GROUPS = {
         ('Goulburn Broken', 'Unclassified native vegetation'),
     ],
 }
+
+
+# ------------------------------- GBF4 Parameters -------------------------------
+'''
+Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
+halt the extinction of known threatened species, protect genetic diversity, 
+and manage human-wildlife interactions
+'''
+
+
+BIODIVERSITY_TARGET_GBF_4_SNES  = 'off'           # 'off', 'USER_DEFINED', or 'dict'
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'off', 'USER_DEFINED', or 'dict'
+'''
+'off'          — GBF4 SNES/ECNES constraints disabled.
+'USER_DEFINED' — read targets from input CSV file.
+'dict'         — overwrite all TARGET_LEVEL columns with values from GBF4_{SNES,ECNES}_TARGETS_DICT.
+'''
+
+GBF4_SNES_TARGETS_DICT  = {2030: 30, 2050: 50, 2100: 50}
+GBF4_ECNES_TARGETS_DICT = {2030: 30, 2050: 50, 2100: 50}
 
 GBF4_SNES_REGION_MODE = 'NRM'                    # 'Australia' or 'NRM'
 GBF4_SNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']

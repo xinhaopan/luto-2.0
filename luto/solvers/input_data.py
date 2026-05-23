@@ -312,25 +312,25 @@ def get_GBF3_NVIS_region_group(data: Data) -> dict[int,str]:
 
 
 def get_GBF4_SNES_pre_1750_area_sr(data: Data) -> xr.DataArray:
-    if settings.BIODIVERSITY_TARGET_GBF_4_SNES != "on":
+    if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'off':
         return np.empty(0)
     print('Getting GBF4 SNES species area matrices...', flush=True)
     return ag_biodiversity.get_GBF4_SNES_matrix_sr(data)
 
 def get_GBF4_SNES_region_species(data: Data) -> list:
-    if settings.BIODIVERSITY_TARGET_GBF_4_SNES != "on":
+    if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'off':
         return []
     print('Getting GBF4 SNES (region, species) constraint pairs...', flush=True)
     return data.BIO_GBF4_SNES_SEL
 
 def get_GBF4_ECNES_pre_1750_area_sr(data: Data) -> xr.DataArray:
-    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != "on":
+    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'off':
         return np.empty(0)
     print('Getting GBF4 ECNES community area matrices...', flush=True)
     return ag_biodiversity.get_GBF4_ECNES_matrix_sr(data)
 
 def get_GBF4_ECNES_region_species(data: Data) -> list:
-    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != "on":
+    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'off':
         return []
     print('Getting GBF4 ECNES (region, species) constraint pairs...', flush=True)
     return data.BIO_GBF4_ECNES_SEL
@@ -753,10 +753,10 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         limits["GBF3_NVIS"] = data.get_GBF3_NVIS_limit_score_inside_LUTO_by_yr(yr_cal)
 
-    if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
+    if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
         limits["GBF4_SNES"] = data.get_GBF4_SNES_target_inside_LUTO_by_year(yr_cal)
 
-    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
+    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
         limits["GBF4_ECNES"] = data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)
 
     if settings.BIODIVERSITY_TARGET_GBF_8 == "on":
@@ -1094,7 +1094,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     else:
         gbf3_nvis_scale = 1.0
 
-    if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
+    if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
         GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = rescale_lhs_rhs_region_species(
             GBF4_SNES_pre_1750_area_sr, GBF4_SNES_region_species, region_NRM_names_r,
             targets=limits['GBF4_SNES'],
@@ -1102,7 +1102,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     else:
         gbf4_snes_scale = 1.0
 
-    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
+    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
         GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = rescale_lhs_rhs_region_species(
             GBF4_ECNES_pre_1750_area_sr, GBF4_ECNES_region_species, region_NRM_names_r,
             targets=limits['GBF4_ECNES'],

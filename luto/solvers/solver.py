@@ -1045,8 +1045,8 @@ class LutoSolver:
 
             lb_rescale_vector = lb_raw_vector / scale_factors.sel(layer=(region, group)).item()
             val_vector = val_matrix.sel(group=group, drop=True).data
-            # Australia mode: no NRM cell is named 'Australia', so bypass region mask
-            if region == "Australia":
+            # AUSTRALIA mode: no NRM cell is named 'AUSTRALIA', so bypass region mask
+            if region == "AUSTRALIA":
                 ind = np.where(val_vector > 0)[0]
             else:
                 reg_vector = reg_matrix == region
@@ -1068,7 +1068,7 @@ class LutoSolver:
 
 
     def _add_GBF4_SNES_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_4_SNES != "on":
+        if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'off':
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 SNES...')
             return
 
@@ -1102,7 +1102,7 @@ class LutoSolver:
             )
 
     def _add_GBF4_ECNES_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != "on":
+        if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'off':
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 ECNES...')
             return
 
@@ -1392,13 +1392,13 @@ class LutoSolver:
         prod_data["BIO (GBF4) SNES value (ha)"] = (
             {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'].sel(dict(layer=k)).item()
              for k, v in self.bio_GBF4_SNES_exprs.items()}
-            if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"
+            if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off'
             else 0
         )
         prod_data["BIO (GBF4) ECNES value (ha)"] = (
             {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'].sel(dict(layer=k)).item()
              for k, v in self.bio_GBF4_ECNES_exprs.items()}
-            if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"
+            if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off'
             else 0
         )
         prod_data["BIO (GBF8) value (ha)"] = (
@@ -1469,7 +1469,7 @@ class LutoSolver:
                         v - self._input_data.limits['GBF4_SNES'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF4) SNES value (ha)"].items() 
                     ]                  
-                    if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"     
+                    if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off'     
                     else 0
                 ),
                 "Deviation BIO (GBF4) ECNES value (ha)":(
@@ -1477,7 +1477,7 @@ class LutoSolver:
                         v - self._input_data.limits['GBF4_ECNES'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF4) ECNES value (ha)"].items()
                     ]
-                    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"    
+                    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off'    
                     else 0
                 ),
                 "Deviation BIO (GBF8) value (ha)":(
