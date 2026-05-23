@@ -131,16 +131,16 @@ grid_search = {
 
     # --------------- Biodiversity settings - GBF 3 ---------------
     'BIODIVERSITY_TARGET_GBF_3_NVIS': ['high'],                             # 'off', 'medium', 'high', 'USER_DEFINED'
-    'GBF3_NVIS_TARGET_CLASS': ['MVS'],                                      # 'MVG' or 'MVS' NVIS class
-    'GBF3_NVIS_REGION_MODE': ['Australia'],                                 # 'Australia' or 'NRM'
+    'GBF3_NVIS_TARGET_CLASS': ['NVIS_MVS'],                                  # 'NVIS_MVG' or 'NVIS_MVS' NVIS class
+    'GBF3_NVIS_REGION_MODE': ['AUSTRALIA'],                                 # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
     'GBF3_NVIS_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
     'BIODIVERSITY_TARGET_GBF_3_IBRA': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
 
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['on'],                               # 'on' or 'off'
+    'BIODIVERSITY_TARGET_GBF_4_SNES': ['USER_DEFINED'],                     # 'off', 'USER_DEFINED', or 'dict'
     'GBF4_SNES_REGION_MODE': ['Australia'],                                 # 'Australia' or 'NRM'
     'GBF4_SNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['on'],                              # 'on' or 'off'
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['USER_DEFINED'],                    # 'off', 'USER_DEFINED', or 'dict'
     'GBF4_ECNES_REGION_MODE': ['Australia'],                                # 'Australia' or 'NRM'
     'GBF4_ECNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],     # Only used when mode = 'NRM'
 

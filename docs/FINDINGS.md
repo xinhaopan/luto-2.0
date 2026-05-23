@@ -5,6 +5,268 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260523 — Biodiversity regional scoring: xarray groupby bottleneck and optimisation
+
+### Context
+
+The upstream pipeline pre-computes weighted habitat area scores for three biodiversity
+datasets across all region levels × resfactors, writing the results to CSV so LUTO can
+do a simple lookup at runtime instead of recomputing at every model run.
+
+**Scale of the problem:**
+
+| Dataset | Species / groups | Presence types | Region levels | Resfactors |
+|---|---|---|---|---|
+| NVIS (MVG + MVS) | ~770 vegetation groups | 1 | 5 (incl. IBRA_SUB) | 10 |
+| SNES | ~2,055 threatened species | 2 (LIKELY, MAYBE) | 5 | 10 |
+| ECNES | ~400 threatened communities | 2 (LIKELY, MAYBE) | 5 | 10 |
+
+Region levels: `AUSTRALIA` (1 group), `NRM` (56), `STATE` (9), `IBRA_REG` (85), `IBRA_SUB` (410).
+Spatial domain: 6,956,407 NLUM cells at resfactor 1; fewer at higher resfactors.
+
+For each `(species, resfactor, region_level, region)` combination, four weighted-area scores
+are computed by groupby-summing a 1D species presence array multiplied by per-cell weights:
+
+```
+ALL_HA               = sum(species_arr × cell_ha)                           per region
+IN_LUTO_HA           = sum(species_arr × cell_ha × biodiv_degrade)         per region
+NATURAL_OUT_LUTO_HA  = sum(species_arr × cell_ha × out_luto_natural_mask)  per region
+NON_NATURAL_OUT_LUTO_HA = sum(species_arr × cell_ha × out_luto_nonnat_mask) per region
+```
+
+Per-task wall time was ~5 s, identical to a sequential for-loop, regardless of how many
+workers were used. Profiled via synthetic benchmarks in
+`Scripts/work_in_progress/trace_task/trace_bottlenecks.py` and `trace_groupby.py`.
+
+---
+
+### Finding 1 — `xr.groupby` is 28–45× slower than `pd.groupby` for this pattern
+
+The original implementation built an `xr.Dataset` with 4 separate DataArray multiplications
+and 4 separate `.groupby('region').sum('cell')` calls:
+
+```python
+arr = arr.assign_coords({'region': ('cell', region_labels)})
+xr.Dataset({
+    'ALL_HA':             (arr * area          ).groupby('region').sum('cell'),
+    'IN_LUTO_HA':         (arr * area * degrade).groupby('region').sum('cell'),
+    ...
+}).compute().to_dataframe()
+```
+
+Internal breakdown (6.9 M cells, NRM 56 regions, rf=1):
+
+| Operation | Time |
+|---|---:|
+| `arr * area` (DataArray multiply, once) | 9.8 ms |
+| — computed ×4 in original code | 39 ms total |
+| One `xr.groupby('region').sum('cell')` | **3,687 ms** |
+| — called ×4 in original code | **14,750 ms** total |
+| Full original `compute_region_scores` | **14,717 ms** |
+| Equivalent `pd.DataFrame.groupby().sum()` | **513 ms** |
+
+The xarray overhead is intrinsic — coordinate assignment, lazy graph construction, and
+Python-level dispatch add ~3.7 s per groupby call regardless of group count. AUSTRALIA
+(1 group, purely a sum) took 19,839 ms vs 430 ms in pandas — confirming the bottleneck
+is overhead, not the aggregation itself.
+
+**Fix:** replaced `compute_region_scores` entirely with a pandas implementation.
+`arr * area` is computed once and reused across all four weighted sums.
+
+---
+
+### Finding 2 — Integer region codes give an additional 4.5× pandas speedup
+
+Pandas groupby on string labels builds a hash map over all 6.9 M cells. Replacing strings
+with integer codes (via `pd.factorize` + `pd.Categorical`) triggers pandas' `np.bincount`
+path — O(n) with no hash map. Full 5-variant benchmark (6.9 M cells, NRM 56 regions):
+
+| Variant | Time (ms) | vs pandas-str |
+|---|---:|---:|
+| A. xarray Dataset, 4 groupbys, string labels (original) | 13,251 | 14.9× slower |
+| B. xarray DataArray, 1 groupby, string labels | 3,862 | 4.3× slower |
+| C. xarray DataArray, 1 groupby, int codes | 3,184 | 3.6× slower |
+| D. pandas DataFrame, string labels | 888 | 1.0× baseline |
+| **E. pandas DataFrame, int codes + restore** | **197** | **4.5× faster** |
+
+Note: int codes barely help xarray (C vs B: ~1.2×) — xarray's coordinate machinery dominates
+regardless of label type. All gains come from switching to pandas first (A→D: 15×), then
+switching labels to integers (D→E: 4.5×).
+
+**Combined speedup original → optimised: ~67×** (13,251 ms → 197 ms).
+
+**Implementation:** region labels are pre-factorized once into 2D int arrays
+(`region_int_2D`) at setup. `rf_meta` stores `pd.Categorical.from_codes(codes, categories)`
+per rf per region — the Categorical carries both int codes (for fast groupby) and the
+string categories array (restored automatically in the groupby output, no manual mapping).
+The 2D layout is required because the spatial coarsening mask (`masks[rf]`) is inherently
+2D (it selects the centre pixel of each coarse spatial block).
+
+---
+
+### Finding 3 — Redundant resfactoring in the NVIS loop (5× waste per species per rf)
+
+The original NVIS task-building loop had order `species → region → rf`. Inside each task,
+`get_resfactored_average_fraction(species_arr, rf, mask)` was called once per (region, rf)
+pair — meaning the **identical coarsened array** was computed 5 times (once per region level)
+for each (species, rf) combination.
+
+Cost of one resfactoring call at rf=5: ~147 ms. Wasted per species:
+4 redundant calls × 147 ms = **588 ms per (species, rf)**.
+
+Benchmarked end-to-end for all 5 regions at rf=5:
+
+| Structure | Total cost |
+|---|---:|
+| Original: 5 separate tasks, 5× resfactoring | 4,162 ms |
+| Fixed: 1 task, 1× resfactoring, all regions in one pass | 219 ms |
+| **Speedup** | **19×** |
+
+**Fix:** restructured loop to `species → rf → [all 5 regions inside single task]`.
+The resfactored array is computed once and passed to 5 sequential `compute_region_scores`
+calls, whose results are concatenated before returning.
+
+---
+
+### Finding 4 — `xr.coarsen` vs numpy reshape for spatial block-averaging
+
+`get_resfactored_average_fraction` used `xr.DataArray.coarsen(x=rf, y=rf).mean()` to
+block-average the 2D species/weight array. Replaced with pure numpy:
+
+```python
+arr_2d.reshape(h_blocks, rf, w_blocks, rf).mean(axis=(1, 3))
+```
+
+Benchmark (6.9 M cells, synthetic species array, 5 repeats):
+
+| rf | xr.coarsen (ms) | numpy reshape (ms) | speedup |
+|---|---:|---:|---:|
+| 2 | 256 | 160 | 1.6× |
+| 5 | 148 | 117 | 1.3× |
+| 10 | 119 | 103 | 1.2× |
+
+Moderate gain (1.2–1.6×). Not the dominant bottleneck but applied throughout since
+`get_resfactored_average_fraction` is called for every species at every resfactor.
+
+---
+
+### Finding 5 — Process backend (loky) serialises large globals per task
+
+After applying Findings 1–4, per-task wall time remained ~5 s with the loky process
+backend. Root cause: cloudpickle serialises every global variable the task function
+references. The `rf_meta` dict contains 10 rf values × 5 numpy arrays × ~7 M cells
+— hundreds of MB pickled for **every** task dispatched.
+
+With `prefer='threads'`: all threads share the same process memory. `rf_meta`, `masks`,
+`region_int_2D` are zero-copy shared globals. The dominant operations (numpy array math,
+pandas Cython groupby) all release the Python GIL, so threads achieve genuine parallelism.
+
+**Optimal thread count: 8** (empirical — 8 < 16 < 32 < 128 in wall time).
+
+Root cause of the ceiling: **memory bandwidth saturation**. Each task loads a ~28 MB
+species array (at rf=1) plus shared weight arrays. At 8 concurrent threads, the memory
+bus approaches capacity; adding more threads queues them at the memory controller. On
+the 192-core server (multi-socket NUMA), threads beyond one NUMA node also incur
+remote-memory penalties (~2–4× slower). A secondary contributor is GIL-bound Python
+overhead in `pd.DataFrame({...})` and `.reset_index()` — the 8-thread optimum implies
+roughly 1/8 of task time holds the GIL.
+
+---
+
+### Finding 6 — SNES/ECNES two-phase structure made Phase 1 sequential
+
+Original structure:
+- **Phase 1** (sequential): for each presence type, compute resfactored arrays for all
+  ~2,055 species × 10 rf = 20,550 calls to `get_resfactored_average_fraction`, stored
+  in a `snes_rf[(presence, rf)]` dict of `(n_species, n_cells)` numpy arrays.
+- **Phase 2** (parallel, 100 tasks): groupby using pre-stored 2D arrays, passing the
+  full `(n_species, n_cells)` DataArray to `compute_region_scores` per task.
+
+Extrapolated Phase 1 cost (5 real species at rf=5 = 732 ms → 2,055 species × 10 rf × 2 presence):
+**~42 min sequential** just for resfactoring, before Phase 2 starts.
+
+**Fix:** merged into a single parallel loop (mirrors NVIS structure). `.compute()` is
+called once per presence type to materialise the dask array, then each task receives
+a 1D numpy slice for one species. Resfactoring and groupby both run inside the parallel
+pool. The `snes_rf`/`ecnes_rf` pre-compute dicts are eliminated entirely.
+
+---
+
+### Summary
+
+| Optimisation | Speedup |
+|---|---|
+| `xr.groupby` → `pd.groupby` in `compute_region_scores` | **29–45× per call** |
+| String region labels → `pd.Categorical` int codes | **4.5× per call** |
+| Eliminate redundant resfactoring in NVIS (5× → 1× per task) | **19× per (species, rf)** |
+| `xr.coarsen` → numpy reshape in `get_resfactored_average_fraction` | 1.2–1.6× |
+| SNES/ECNES: parallelise resfactoring (was sequential Phase 1) | ~42 min → parallel |
+| loky process backend → threads (shared globals, no pickling) | eliminates ~5 s/task overhead |
+| Optimal N_JOBS = 8 (memory bandwidth ceiling, NUMA-local) | — |
+
+Benchmark artefacts: `Scripts/work_in_progress/trace_task/`
+
+---
+
+## 20260522 — Upstream pre-computation of NVIS / SNES / ECNES targets for all resfactors × regions
+
+### Background
+
+Previously, LUTO computed resfactored biodiversity targets at runtime inside `data.py`
+(via `get_resfactored_average_fraction`, `_recompute_nvis_targets_at_rf`, and equivalent
+loops for SNES/ECNES). This was expensive and required the full spatial arrays to be
+loaded and block-averaged on every run.
+
+`script_5_2` (upstream data pipeline) now pre-computes all combinations of
+**5 region levels × 10 resfactors (RF 1–10)** and bakes them into the input CSVs directly.
+
+---
+
+### New output files
+
+| Dataset | Output file | Key dimensions |
+|---------|-------------|----------------|
+| NVIS (MVG + MVS) | `BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv` | group × region_level × region × resfactor |
+| SNES | `bio_DCCEEW_SNES_target_ALL_REGIONS.csv` | SCIENTIFIC_NAME × region_level × region × resfactor |
+| ECNES | `bio_DCCEEW_ECNES_target_ALL_REGIONS.csv` | COMMUNITY × region_level × region × resfactor |
+
+Region levels available: `AUSTRALIA`, `NRM`, `STATE`, `IBRA_REG`, `IBRA_SUB` (NVIS only).
+
+---
+
+### How resfactoring is applied upstream
+
+For each resfactor RF, all components are block-averaged via `get_resfactored_average_fraction`:
+
+- species / vegetation fraction array (`arr`)
+- `cell_ha` — multiplied by RF² to give correct total block area at all RFs
+- `biodiv_degrade_ly × idx_in_LUTO` — degradation weight inside LUTO
+- `idx_out_LUTO_natural` and `idx_out_LUTO_non_natural` — outside-LUTO fractions
+
+Block-averaging all components (rather than sampling the centre pixel) ensures spatial
+consistency at every resolution. Degradation weights come from `HABITAT_CONDITION.csv`
+(`USER_DEFINED`, pre-normalised to lu=23 = 1.0 by script_4, with policy overrides
+lu=2, 6, 15 = 0.7). Parallelised via `joblib.Parallel` (32 workers).
+
+---
+
+### Implications for LUTO `data.py`
+
+Each CSV now carries a `resfactor` column. At runtime, `data.py` should simply filter to
+`resfactor == settings.RESFACTOR` instead of performing spatial aggregation:
+
+- `_recompute_nvis_targets_at_rf` — **no longer needed**; lookup replaces spatial recomputation
+- SNES / ECNES NRM loops that called `get_resfactored_average_fraction` — **no longer needed**
+- `get_NVIS_resfactord_array` — may still be required for layer construction (the spatial
+  `.nc` arrays are separate from the target CSVs), but target values come from the CSV lookup
+- Old single-resfactor SNES file `bio_DCCEEW_SNES_target` is superseded by
+  `bio_DCCEEW_SNES_target_ALL_REGIONS.csv`
+
+Loading code in `dataprep.py` (line ~188, `bio_DCCEEW_SNES_target`) and `data.py` must be
+updated to read from the new `_ALL_REGIONS` files and filter by `resfactor`.
+
+---
+
 ## 20260521 — Write phase dynamic tier scheduler and RF5 benchmark
 
 ### Context

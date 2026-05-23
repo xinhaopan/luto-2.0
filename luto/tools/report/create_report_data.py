@@ -3541,7 +3541,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     # IBRA reporting branch disabled (GBF3 IBRA pipeline incomplete).
 
 
-    if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'on':
+    if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
         
         filter_str = '''
             category == "biodiversity" 
@@ -3728,7 +3728,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
             
-    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'on':
+    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
         
         bio_paths = files.query('base_name.str.contains("biodiversity_GBF4_ECNES_scores")')
         bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path)).empty])
