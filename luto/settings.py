@@ -966,7 +966,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-GBF3_NVIS_TARGET = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+GBF3_NVIS_TARGET = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
@@ -1088,8 +1088,8 @@ and manage human-wildlife interactions
 '''
 
 
-GBF4_TARGET_SNES  = 'dict'           # 'off', 'USER_DEFINED', or 'dict'
-GBF4_TARGET_ECNES = 'dict'           # 'off', 'USER_DEFINED', or 'dict'
+GBF4_TARGET_SNES  = 'off'           # 'off', 'USER_DEFINED', or 'dict'
+GBF4_TARGET_ECNES = 'off'           # 'off', 'USER_DEFINED', or 'dict'
 '''
 'off'          — GBF4 SNES/ECNES constraints disabled.
 'USER_DEFINED' — read targets from input CSV file.
