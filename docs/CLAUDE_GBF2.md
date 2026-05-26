@@ -83,7 +83,7 @@ GBF2_TARGETS_DICT = {
 }
 ```
 
-For `BIODIVERSITY_TARGET_GBF_2 = 'high'` the model must restore 30% of the degradation by 2030 and 50% by 2050 and 2100.
+For `GBF2_TARGET = 'high'` the model must restore 30% of the degradation by 2030 and 50% by 2050 and 2100.
 
 ### Interpolation formula
 
@@ -185,7 +185,7 @@ Same reasoning — am options are absent at 2010.
 Relative_Contribution_Percentage = (Area_Weighted_Score / degreded_area_weighted_bio_contr) * 100
 ```
 
-For a hard constraint that is tight at `yr_cal`, the sum of non-ALL rows for the AUSTRALIA region across all three types equals the restoration target fraction. For `BIODIVERSITY_TARGET_GBF_2 = 'high'` at 2030 this should be ≈ 30%.
+For a hard constraint that is tight at `yr_cal`, the sum of non-ALL rows for the AUSTRALIA region across all three types equals the restoration target fraction. For `GBF2_TARGET = 'high'` at 2030 this should be ≈ 30%.
 
 ### Exclusions when summing
 
@@ -203,12 +203,12 @@ To avoid double-counting the `add_all`-generated aggregate rows:
 
 | Setting | Default | Effect |
 |---------|---------|--------|
-| `BIODIVERSITY_TARGET_GBF_2` | `'high'` | Scenario: `'off'`, `'low'`, `'medium'`, `'high'` |
+| `GBF2_TARGET` | `'high'` | Scenario: `'off'`, `'low'`, `'medium'`, `'high'` |
 | `GBF2_CONSTRAINT_TYPE` | `'hard'` | Hard or soft solver constraint |
 | `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT` | `20` | Top-N% of Zonation performance curve used as the priority mask |
 | `GBF2_TARGETS_DICT` | see above | Restoration fractions at key years per scenario |
 | `BIO_QUALITY_LAYER` | `'MNES_likely'` | Zonation quality layer used for both priority masking and bio-contribution scores |
-| `CONTRIBUTION_PERCENTILE` | `'USER_DEFINED'` | HCAS percentile or mode for bio-contribution lookup |
+| `HCAS_CONTRIBUTION_PERCENTILE` | `'USER_DEFINED'` | HCAS percentile or mode for bio-contribution lookup |
 | `BIO_CONTRIBUTION_LDS` | `0.8` | Biodiversity value retained under default LDS savanna fire regime |
 | `CONNECTIVITY_SOURCE` | `'NCI'` | Source of spatial connectivity weights applied to quality scores |
 | `CONNECTIVITY_LB` | `0.7` | Lower bound of the rescaled connectivity multiplier |
@@ -220,7 +220,7 @@ To avoid double-counting the `add_all`-generated aggregate rows:
 ```
 settings.py
   GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT
-  GBF2_TARGETS_DICT / BIODIVERSITY_TARGET_GBF_2
+  GBF2_TARGETS_DICT / GBF2_TARGET
   BIO_CONTRIBUTION_LDS
           │
           ▼

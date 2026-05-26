@@ -267,7 +267,7 @@ WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk 
                                             #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
                                             #   This makes memory usage to be ~1/200 of the original size.
 
-
+WRITE_SNES = 'off'                          # 'on' or 'off'. If write, will take ~5 hours to finish.
 
 
 # ---------------------------------------------------------------------------- #
@@ -854,7 +854,7 @@ GBF2_TARGETS_DICT = {
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSITY_TARGET_GBF_2 = 'high'            # 'off', 'low', 'medium', or 'high'
+GBF2_TARGET = 'high'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -931,10 +931,10 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], 'USER_DEFINED', or 'AG_UNIFORM'
+HCAS_CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of ['10', '25', '50', '75', '90'], 'USER_DEFINED', or 'AG_UNIFORM'
 '''
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
-suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of [10, 25, 50, 75, 90].
+suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of ['10', '25', '50', '75', '90'].
 
 For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land retains 22% biodiversity score compared
 to undisturbed natural land.
@@ -966,7 +966,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-BIODIVERSITY_TARGET_GBF_3_NVIS = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+GBF3_NVIS_TARGET = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
@@ -1088,8 +1088,8 @@ and manage human-wildlife interactions
 '''
 
 
-BIODIVERSITY_TARGET_GBF_4_SNES  = 'dict'           # 'off', 'USER_DEFINED', or 'dict'
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'dict'           # 'off', 'USER_DEFINED', or 'dict'
+GBF4_TARGET_SNES  = 'dict'           # 'off', 'USER_DEFINED', or 'dict'
+GBF4_TARGET_ECNES = 'dict'           # 'off', 'USER_DEFINED', or 'dict'
 '''
 'off'          — GBF4 SNES/ECNES constraints disabled.
 'USER_DEFINED' — read targets from input CSV file.
@@ -1176,7 +1176,7 @@ GBF4_SNES_EXCLUDE_REGION_SPECIES = [
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSITY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
+GBF8_TARGET = 'off'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.

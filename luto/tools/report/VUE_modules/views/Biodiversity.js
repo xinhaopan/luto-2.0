@@ -23,11 +23,12 @@ window.BiodiversityView = {
       'GBF8_GROUP': 'GBF8 Group', 'GBF8_SPECIES': 'GBF8 Species',
     };
     const METRIC_TO_SETTING = {
-      'quality': null, 'GBF2': 'BIODIVERSITY_TARGET_GBF_2',
-      'GBF3_NVIS': 'BIODIVERSITY_TARGET_GBF_3_NVIS',
-      'GBF4_SNES': 'BIODIVERSITY_TARGET_GBF_4_SNES',
-      'GBF4_ECNES': 'BIODIVERSITY_TARGET_GBF_4_ECNES',
-      'GBF8_GROUP': 'BIODIVERSITY_TARGET_GBF_8', 'GBF8_SPECIES': 'BIODIVERSITY_TARGET_GBF_8',
+      'quality': null, 'GBF2': 'GBF2_TARGET',
+      'GBF3_NVIS': 'GBF3_NVIS_TARGET',
+      'GBF4_SNES': 'GBF4_TARGET_SNES',
+      'GBF4_ECNES': 'GBF4_TARGET_ECNES',
+      'GBF8_GROUP': 'GBF8_TARGET',
+      'GBF8_SPECIES': 'GBF8_TARGET',
     };
 
     const availableMetrics = ref(['quality']);
@@ -137,7 +138,7 @@ window.BiodiversityView = {
       if (landuse !== 'ALL' && cat !== 'Sum') {
         return {
           Percent: (candidate.Percent || []).filter(s => s.name === landuse),
-          Area:    (candidate.Area    || []).filter(s => s.name === landuse),
+          Area: (candidate.Area || []).filter(s => s.name === landuse),
         };
       }
       return candidate;

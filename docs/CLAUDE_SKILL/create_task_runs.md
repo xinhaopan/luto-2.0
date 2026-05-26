@@ -261,7 +261,7 @@ These are the settings that task run scripts legitimately deviate from `settings
 | `GHG_EMISSIONS_LIMITS` | `'high'` | `'low'` (core) / `'high'` (sensitivity) | Per batch GHG ambition level |
 | `SIM_YEARS` | `[2010…2050]` | batch-specific start year | Skip base year when running from 2020 |
 | `WRITE_REPORT_MAX_MEM_GB` | `64` | `120` | Cluster memory allocation |
-| `BIODIVERSITY_TARGET_GBF_4_SNES/ECNES` | `'off'` | `'on'` | Enable GBF4 targets |
+| `GBF4_TARGET_SNES/ECNES` | `'off'` | `'on'` | Enable GBF4 targets |
 | `GBF4_*_REGION_MODE` | `'NRM'` | `'Australia'` | Australia-wide run (not NRM-restricted) |
 
 Everything else (`BIO_CONTRIBUTION_*`, `WATER_REGION_DEF`, `IMPORT_TREND`, `HIR_CEILING_PERCENTAGE`, etc.) matches `settings.py` and must **not** be listed in BASE_GRID.

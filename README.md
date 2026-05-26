@@ -222,12 +222,12 @@ settings.SIM_YEARS = [2010, 2020, 2030, 2040, 2050]
 
 settings.WATER_LIMITS = 'on'                            # 'on' or 'off'.
 settings.GHG_EMISSIONS_LIMITS = 'high'                  # 'off', 'low', 'medium', or 'high'
-settings.BIODIVERSITY_TARGET_GBF_2 = 'high'             # 'off', 'low', 'medium', or 'high'
-settings.BIODIVERSITY_TARGET_GBF_3_NVIS = 'off'         # 'off', 'medium', 'high', or 'USER_DEFINED'
+settings.GBF2_TARGET = 'high'             # 'off', 'low', 'medium', or 'high'
+settings.GBF3_NVIS_TARGET = 'off'         # 'off', 'medium', 'high', or 'USER_DEFINED'
 settings.BIODIVERSITY_TARGET_GBF_3_IBRA = 'off'         # 'off', 'medium', 'high', or 'USER_DEFINED'
-settings.BIODIVERSITY_TARGET_GBF_4_SNES = 'off'         # 'on' or 'off'
-settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'        # 'on' or 'off'
-settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'
+settings.GBF4_TARGET_SNES = 'off'         # 'on' or 'off'
+settings.GBF4_TARGET_ECNES = 'off'        # 'on' or 'off'
+settings.GBF8_TARGET = 'off'              # 'on' or 'off'
 
 settings.DYNAMIC_PRICE = False                          # Enable demand elasticity-based dynamic pricing
 
@@ -283,12 +283,12 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
   - Determines the time period over which carbon sequestration is averaged
   - Must match available ages in NetCDF input data
   - Default: 50 years (based on S-curve carbon accumulation pattern)
-- `BIODIVERSITY_TARGET_GBF_2`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
-- `BIODIVERSITY_TARGET_GBF_3_NVIS`: Conservation targets for NVIS vegetation types ('off', 'medium', 'high', 'USER_DEFINED')
+- `GBF2_TARGET`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
+- `GBF3_NVIS_TARGET`: Conservation targets for NVIS vegetation types ('off', 'medium', 'high', 'USER_DEFINED')
 - `BIODIVERSITY_TARGET_GBF_3_IBRA`: Conservation targets for IBRA bioregions ('off', 'medium', 'high', 'USER_DEFINED')
-- `BIODIVERSITY_TARGET_GBF_4_SNES`: Species of National Environmental Significance ('on' or 'off')
-- `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Communities of National Environmental Significance ('on' or 'off')
-- `BIODIVERSITY_TARGET_GBF_8`: Species and group targets ('on' or 'off')
+- `GBF4_TARGET_SNES`: Species of National Environmental Significance ('on' or 'off')
+- `GBF4_TARGET_ECNES`: Ecological Communities of National Environmental Significance ('on' or 'off')
+- `GBF8_TARGET`: Species and group targets ('on' or 'off')
 
 ### Renewable Energy Constraints
 - `RENEWABLES_OPTIONS`: Dict of renewable energy types and whether each is enabled (e.g., `{'Utility Solar PV': True, 'Onshore Wind': True}`). Set values to `False` to disable individual types.

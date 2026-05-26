@@ -928,7 +928,7 @@ class LutoSolver:
 
     def _add_GBF2_constraints(self) -> None:
         
-        if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
+        if settings.GBF2_TARGET == "off":
             print("│   │   ├── TURNING OFF constraints for biodiversity GBF 2...")
             return
         
@@ -1023,7 +1023,7 @@ class LutoSolver:
 
 
     def _add_GBF3_NVIS_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
+        if settings.GBF3_NVIS_TARGET == "off":
             print("│   │   ├── TURNING OFF constraints for biodiversity GBF 3 NVIS")
             return
 
@@ -1068,7 +1068,7 @@ class LutoSolver:
 
 
     def _add_GBF4_SNES_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'off':
+        if settings.GBF4_TARGET_SNES == 'off':
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 SNES...')
             return
 
@@ -1107,7 +1107,7 @@ class LutoSolver:
             )
 
     def _add_GBF4_ECNES_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'off':
+        if settings.GBF4_TARGET_ECNES == 'off':
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 ECNES...')
             return
 
@@ -1147,7 +1147,7 @@ class LutoSolver:
 
 
     def _add_GBF8_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_8 != "on":
+        if settings.GBF8_TARGET != "on":
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
             return
 
@@ -1387,12 +1387,12 @@ class LutoSolver:
         )
         prod_data["BIO (GBF2) value (ha)"] = (
             0                                                                               
-            if settings.BIODIVERSITY_TARGET_GBF_2 == "off"         
+            if settings.GBF2_TARGET == "off"         
             else self.bio_GBF2_expr.getValue() * self._input_data.scale_factors['GBF2']       
         )
         prod_data["BIO (GBF3) NVIS value (ha)"]=(
             0
-            if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"
+            if settings.GBF3_NVIS_TARGET == "off"
             else {
                 k: v.getValue() * self._input_data.scale_factors['GBF3_NVIS'].sel(layer=k).item()
                 for k,v in self.bio_GBF3_NVIS_exprs.items()
@@ -1402,19 +1402,19 @@ class LutoSolver:
         prod_data["BIO (GBF4) SNES value (ha)"] = (
             {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'].sel(dict(layer=k)).item()
              for k, v in self.bio_GBF4_SNES_exprs.items()}
-            if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off'
+            if settings.GBF4_TARGET_SNES != 'off'
             else 0
         )
         prod_data["BIO (GBF4) ECNES value (ha)"] = (
             {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'].sel(dict(layer=k)).item()
              for k, v in self.bio_GBF4_ECNES_exprs.items()}
-            if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off'
+            if settings.GBF4_TARGET_ECNES != 'off'
             else 0
         )
         prod_data["BIO (GBF8) value (ha)"] = (
             {k: v.getValue() * self._input_data.scale_factors['GBF8'].sel(layer=k).item()
              for k, v in self.bio_GBF8_exprs.items()}
-            if settings.BIODIVERSITY_TARGET_GBF_8 == "on"
+            if settings.GBF8_TARGET == "on"
             else 0
         )
                 
@@ -1460,14 +1460,14 @@ class LutoSolver:
                 ),
                 "Deviation BIO (GBF2) value (ha)":(
                     0                                                                             
-                    if settings.BIODIVERSITY_TARGET_GBF_2 == "off"         
+                    if settings.GBF2_TARGET == "off"         
                     else [
                         prod_data["BIO (GBF2) value (ha)"] - self._input_data.limits['GBF2']
                     ]         
                 ),
                 "Deviation BIO (GBF3) NVIS value (ha)":(
                     0                                                                               
-                    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"         
+                    if settings.GBF3_NVIS_TARGET == "off"         
                     else [
                         v - self._input_data.limits['GBF3_NVIS'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF3) NVIS value (ha)"].items()
@@ -1479,7 +1479,7 @@ class LutoSolver:
                         v - self._input_data.limits['GBF4_SNES'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF4) SNES value (ha)"].items() 
                     ]                  
-                    if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off'     
+                    if settings.GBF4_TARGET_SNES != 'off'     
                     else 0
                 ),
                 "Deviation BIO (GBF4) ECNES value (ha)":(
@@ -1487,7 +1487,7 @@ class LutoSolver:
                         v - self._input_data.limits['GBF4_ECNES'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF4) ECNES value (ha)"].items()
                     ]
-                    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off'    
+                    if settings.GBF4_TARGET_ECNES != 'off'    
                     else 0
                 ),
                 "Deviation BIO (GBF8) value (ha)":(
@@ -1495,7 +1495,7 @@ class LutoSolver:
                         v - self._input_data.limits['GBF8'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF8) value (ha)"].items()   
                     ]
-                    if settings.BIODIVERSITY_TARGET_GBF_8 == "on"          
+                    if settings.GBF8_TARGET == "on"          
                     else 0
                 ),
             }

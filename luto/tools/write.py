@@ -69,25 +69,25 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 # Used by write_data to compute n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb).
 # (MB above data-object baseline, measured at RESFACTOR=5)
 peak_mb_RES5 = {
-    'write_dvar_and_mosaic_map':                941,
-    'write_transition_nonag2ag':              7_558,  # heavy despite all-zero data: nested 9-LU × N_cost_type matrices
-    'write_transition_ag2ag':                 6_544,
-    'write_biodiversity_quality_scores':      6_101,  # 7 backends × 4 xr arrays accumulated before xr.concat
-    'write_economics':                        4_914,
-    'write_ghg':                              3_189,
-    'write_transition_ag2nonag':              3_167,
-    'write_quantity':                         2_916,
-    'write_water':                            2_496,
-    'write_biodiversity_GBF2_scores':         1_768,
-    'write_dvar_area':                        1_692,
-    'write_area_transition_start_end':        1_392,
-    'write_renewable_production':               718,
-    'write_crosstab':                            13,
-    'write_biodiversity_GBF3_NVIS_scores':        1,  # ~0 MB (disabled in this scenario); 1 avoids div-by-zero
-    'write_biodiversity_GBF4_SNES_scores':        1,
-    'write_biodiversity_GBF4_ECNES_scores':       1,
-    'write_biodiversity_GBF8_scores_groups':      1,
-    'write_biodiversity_GBF8_scores_species':     1,
+    'write_dvar_and_mosaic_map':                      941,
+    'write_transition_nonag2ag':                    7_558,  # heavy despite all-zero data: nested 9-LU × N_cost_type matrices
+    'write_transition_ag2ag':                       6_544,
+    'write_biodiversity_quality_scores':            6_101,  # 7 backends × 4 xr arrays accumulated before xr.concat
+    'write_economics':                              4_914,
+    'write_ghg':                                    3_189,
+    'write_transition_ag2nonag':                    3_167,
+    'write_quantity':                               2_916,
+    'write_water':                                  2_496,
+    'write_biodiversity_GBF2_scores':               1_768,
+    'write_dvar_area':                              1_692,
+    'write_area_transition_start_end':              1_392,
+    'write_renewable_production':                     718,
+    'write_crosstab':                                  13,
+    'write_biodiversity_GBF3_NVIS_scores':         25_000,  # a place holder, to be updated after profiling at RESFACTOR=5
+    'write_biodiversity_GBF4_SNES_scores':         25_000,  # a place holder, to be updated after profiling at RESFACTOR=5
+    'write_biodiversity_GBF4_ECNES_scores':        25_000,  # a place holder, to be updated after profiling at RESFACTOR=5
+    'write_biodiversity_GBF8_scores_groups':            1,
+    'write_biodiversity_GBF8_scores_species':           1,
 }
 
 # Scale RES5 measurements to the actual run resolution.
@@ -3253,11 +3253,11 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
 
 
 def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
-    ''' Biodiversity GBF2 only being written to disk when `BIODIVERSITY_TARGET_GBF_2` is not 'off' '''
+    ''' Biodiversity GBF2 only being written to disk when `GBF2_TARGET` is not 'off' '''
 
     # Do nothing if biodiversity limits are off and no need to report
-    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
-        return 'Skipped: Biodiversity GBF2 scores not written as `BIODIVERSITY_TARGET_GBF_2` is set to "off"'
+    if settings.GBF2_TARGET == 'off':
+        return 'Skipped: Biodiversity GBF2 scores not written as `GBF2_TARGET` is set to "off"'
 
         
     # Unpack the ag managements and land uses
@@ -3516,7 +3516,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
 
 def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
-    ''' Biodiversity GBF3 (NVIS) scores are always written regardless of BIODIVERSITY_TARGET_GBF_3_NVIS. '''
+    ''' Biodiversity GBF3 (NVIS) scores are always written regardless of GBF3_NVIS_TARGET. '''
 
     # All region-group pairs — used for baseline ALL_HA table.
     nvis_all_targets_df = (
@@ -3920,7 +3920,10 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
 
 
 def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
-    ''' Biodiversity GBF4 SNES only being written to disk when `BIODIVERSITY_TARGET_GBF_4_SNES` is not 'off' '''
+    ''' Biodiversity GBF4 SNES only being written to disk when `GBF4_TARGET_SNES` is not 'off' '''
+    
+    if settings.WRITE_SNES == 'off':
+        return f"Skipping Biodiversity GBF4 SNES scores for year {yr_cal} as `WRITE_SNES` is set to 'off'"
 
     # 1. Load all species target df and get species list.
     snes_all_targets_df = (
@@ -4304,10 +4307,10 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
 
 
 def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
-    ''' Biodiversity GBF4 ECNES only being written to disk when `BIODIVERSITY_TARGET_GBF_4_ECNES` is not 'off' '''
+    ''' Biodiversity GBF4 ECNES only being written to disk when `GBF4_TARGET_ECNES` is not 'off' '''
 
-    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'off':
-        return "Skipped: Biodiversity GBF4 ECNES scores not written as `BIODIVERSITY_TARGET_GBF_4_ECNES` is set to 'off'"
+    if settings.GBF4_TARGET_ECNES == 'off':
+        return "Skipped: Biodiversity GBF4 ECNES scores not written as `GBF4_TARGET_ECNES` is set to 'off'"
 
     # 1. Load all community target df and get species list.
     ecnes_all_targets_df = (
@@ -4683,11 +4686,11 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
 
 
 def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
-    ''' Biodiversity GBF8 groups only being written to disk when `BIODIVERSITY_TARGET_GBF_8` is 'on' '''
+    ''' Biodiversity GBF8 groups only being written to disk when `GBF8_TARGET` is 'on' '''
     
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSITY_TARGET_GBF_8 == 'on':
-        return "Skipped: Biodiversity GBF8 groups scores not written as `BIODIVERSITY_TARGET_GBF_8` is set to 'off'"
+    if not settings.GBF8_TARGET == 'on':
+        return "Skipped: Biodiversity GBF8 groups scores not written as `GBF8_TARGET` is set to 'off'"
 
         
     # Unpack the agricultural management land-use
@@ -4868,10 +4871,10 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
 
 
 def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
-    ''' Biodiversity GBF8 species only being written to disk when `BIODIVERSITY_TARGET_GBF_8` is 'on' and selected species are provided '''
+    ''' Biodiversity GBF8 species only being written to disk when `GBF8_TARGET` is 'on' and selected species are provided '''
 
-    if settings.BIODIVERSITY_TARGET_GBF_8 != 'on':
-        return "Skipped: Biodiversity GBF8 species scores not written as `BIODIVERSITY_TARGET_GBF_8` is set to 'off'"
+    if settings.GBF8_TARGET != 'on':
+        return "Skipped: Biodiversity GBF8 species scores not written as `GBF8_TARGET` is set to 'off'"
     if len(data.BIO_GBF8_SEL_SPECIES) == 0:
         return "Skipped: Biodiversity GBF8 species scores not written as no selected species provided in `BIO_GBF8_SEL_SPECIES`"
 

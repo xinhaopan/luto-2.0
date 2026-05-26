@@ -6,7 +6,7 @@ This skill automates debugging GBF4 ECNES biodiversity constraint infeasibility 
 
 ### Step 1: Ensure ECNES is enabled in settings
 
-Read `luto/settings.py` and verify that `BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'`. If it is `'off'`, change it to `'on'`.
+Read `luto/settings.py` and verify that `GBF4_TARGET_ECNES = 'on'`. If it is `'off'`, change it to `'on'`.
 
 ### Step 2: Run the LUTO simulation
 
@@ -97,13 +97,13 @@ Summarize:
 1. Which year the simulation became infeasible
 2. How many ECNES constraints were tested
 3. Which ecological communities are individually infeasible (with their target vs. maximum achievable values)
-4. Suggest the user consider relaxing targets for the infeasible communities, or switching `BIODIVERSITY_TARGET_GBF_4_ECNES` to `'off'`
+4. Suggest the user consider relaxing targets for the infeasible communities, or switching `GBF4_TARGET_ECNES` to `'off'`
 
 ## File Locations
 
 | File | Purpose |
 |------|---------|
-| `luto/settings.py` | ECNES on/off setting (`BIODIVERSITY_TARGET_GBF_4_ECNES`) |
+| `luto/settings.py` | ECNES on/off setting (`GBF4_TARGET_ECNES`) |
 | `luto/simulation.py` | Main simulation, generates `debug_model_*.mps` on infeasibility |
 | `luto/tests/find_infeasible_ecnes.py` | `submit_ecnes_checks()` and `collect_results()` |
 | `luto/tests/check_one_ecnes.py` | Worker script called by each PBS job |

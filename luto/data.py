@@ -1403,9 +1403,9 @@ class Data:
         self.CONNECTIVITY_SCORE = connectivity_score  
 
         # Get the HCAS contribution scale (0-1)
-        match settings.CONTRIBUTION_PERCENTILE:
-            case 10 | 25 | 50 | 75 | 90:
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.CONTRIBUTION_PERCENTILE}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+        match settings.HCAS_CONTRIBUTION_PERCENTILE:
+            case '10' | '25' | '50' | '75' | '90':
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HCAS_CONTRIBUTION_PERCENTILE}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
                 unallow_nat_scale = bio_HCAS_contribution_lookup[self.DESC2AGLU['Unallocated - natural land']]                                          # Get the biodiversity degradation score for unallocated natural land (float)
                 bio_HCAS_contribution_lookup = {int(k): v * (1 / unallow_nat_scale) for k, v in bio_HCAS_contribution_lookup.items()}                   # Normalise the biodiversity degradation score to the unallocated natural land score
             case 'USER_DEFINED':
@@ -1413,7 +1413,7 @@ class Data:
             case 'AG_UNIFORM':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['AG_UNIFORM'].to_dict()                                     
             case _:
-                print(f"│   ⚠ WARNING: Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], 'USER_DEFINED', or 'AG_UNIFORM'", flush=True)
+                print(f"│   ⚠ WARNING: Invalid habitat condition source: {settings.HCAS_CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], 'USER_DEFINED', or 'AG_UNIFORM'", flush=True)
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECIMALS) for j, x in bio_HCAS_contribution_lookup.items()}                 # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
@@ -1435,7 +1435,7 @@ class Data:
 
 
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
-        if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
+        if settings.GBF2_TARGET != 'off':
 
             # Get the mask of 'priority degraded areas' for habitat conservation
             self.BIO_GBF2_MASK = bio_quality_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
@@ -1482,7 +1482,7 @@ class Data:
         # Always load the full NVIS vegetation data into memory for writing all vegetation group scores.
         self.GBF3_NVIS_LAYERS_ALL = self.get_NVIS_sparse_array()
         
-        if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
+        if settings.GBF3_NVIS_TARGET != 'off':
             print(f"│   ├── Loading GBF3 vegetation data (NVIS)", flush=True)
             print(f"│   │   ├── NRM region mode: {settings.GBF3_NVIS_REGION_MODE} | selected regions: {settings.GBF3_NVIS_SELECTED_REGIONS}", flush=True)
 
@@ -1517,7 +1517,7 @@ class Data:
         self.GBF4_SNES_LAYERS_ALL = self.get_SNES_sparse_array()
         self.GBF4_ECNES_LAYERS_ALL = self.get_ECNES_sparse_array()
         
-        if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
+        if settings.GBF4_TARGET_SNES != 'off':
 
             print("│   ├── Loading environmental significance data (SNES)", flush=True)
 
@@ -1548,7 +1548,7 @@ class Data:
             ).astype(np.float32)
 
         
-        if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
+        if settings.GBF4_TARGET_ECNES != 'off':
             print("│   ├── Loading environmental significance data (ECNES)", flush=True)
 
             self.GBF4_ECNES_META             = self.get_ECNES_targets_df()
@@ -1582,7 +1582,7 @@ class Data:
         # Biodiversity species suitability under climate change (GBF8)            #
         ##########################################################################
         
-        if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':
+        if settings.GBF8_TARGET != 'off':
             
             print("│   ├── Loading Species suitability data", flush=True)
             
@@ -1659,7 +1659,7 @@ class Data:
         Applies cascading filters: target check → dict overwrite → TARGET_CLASS
         → REGION_MODE → SELECTED_REGIONS → EXCLUDE_REGION_GROUPS.
 
-        Returns an empty DataFrame when BIODIVERSITY_TARGET_GBF_3_NVIS is 'off'.
+        Returns an empty DataFrame when GBF3_NVIS_TARGET is 'off'.
 
         Used by __init__ (BIO_GBF3_NVIS_SEL) and the solver via
         get_GBF3_NVIS_limit_score_inside_LUTO_by_yr.
@@ -1668,8 +1668,8 @@ class Data:
             DataFrame with columns including 'region', 'group',
             'TARGET_LEVEL_2030', 'TARGET_LEVEL_2050', 'TARGET_LEVEL_2100'.
         """
-        # Step 1: check BIODIVERSITY_TARGET_GBF_3_NVIS
-        if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == 'off':
+        # Step 1: check GBF3_NVIS_TARGET
+        if settings.GBF3_NVIS_TARGET == 'off':
             return pd.DataFrame(columns=['region', 'group', 'TARGET_LEVEL_2030', 'TARGET_LEVEL_2050', 'TARGET_LEVEL_2100'])
 
         if settings.GBF3_NVIS_REGION_MODE not in ('AUSTRALIA', 'NRM', 'IBRA_REG'):
@@ -1693,7 +1693,7 @@ class Data:
             df = df.assign(region='AUSTRALIA')
 
         # Step 2: apply GBF3_TARGETS_DICT if not None (i.e. not USER_DEFINED)
-        target_dict = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3_NVIS]
+        target_dict = settings.GBF3_TARGETS_DICT[settings.GBF3_NVIS_TARGET]
         if target_dict is not None:
             df['TARGET_LEVEL_2030'] = target_dict[2030]
             df['TARGET_LEVEL_2050'] = target_dict[2050]
@@ -2222,13 +2222,13 @@ class Data:
 
         bio_habitat_target_proportion = [
             bio_habitat_score_base_yr_proportion + ((1 - bio_habitat_score_base_yr_proportion) * i)
-            for i in settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].values()
+            for i in settings.GBF2_TARGETS_DICT[settings.GBF2_TARGET].values()
         ]
 
         targets_key_years = {
             self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
             **dict(zip(
-                settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].keys(), 
+                settings.GBF2_TARGETS_DICT[settings.GBF2_TARGET].keys(), 
                 bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)
             ))
         }
@@ -2251,7 +2251,7 @@ class Data:
         NRM mode:       presence='LIKELY', region=NRM region name
         Dict targets are applied inside this function so all call sites stay consistent.
         """
-        if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'off':
+        if settings.GBF4_TARGET_SNES == 'off':
             return pd.DataFrame()
 
         snes_df = (
@@ -2269,7 +2269,7 @@ class Data:
                 snes_df = snes_df[~((snes_df['region'] == region) & (snes_df['SCIENTIFIC_NAME'] == species))].reset_index(drop=True)
             print(f"│   │   ├── Excluded {len(settings.GBF4_SNES_EXCLUDE_REGION_SPECIES)} SNES (region, species) pairs", flush=True)
 
-        if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'dict':
+        if settings.GBF4_TARGET_SNES == 'dict':
             for yr, pct in settings.GBF4_SNES_TARGETS_DICT.items():
                 col = f'TARGET_LEVEL_{yr}'
                 if col in snes_df.columns:
@@ -2289,7 +2289,7 @@ class Data:
         NRM mode:       presence='LIKELY', region=NRM region name
         Dict targets are applied inside this function so all call sites stay consistent.
         """
-        if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'off':
+        if settings.GBF4_TARGET_ECNES == 'off':
             return pd.DataFrame()
 
         ecnes_df = (
@@ -2310,7 +2310,7 @@ class Data:
             ].reset_index(drop=True)
             print(f"│   │   ├── Excluded {before - len(ecnes_df)} ECNES (region, community) pairs", flush=True)
 
-        if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'dict':
+        if settings.GBF4_TARGET_ECNES == 'dict':
             for yr, pct in settings.GBF4_ECNES_TARGETS_DICT.items():
                 col = f'TARGET_LEVEL_{yr}'
                 if col in ecnes_df.columns:

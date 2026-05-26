@@ -110,7 +110,7 @@ grid_search = {
     
     # --------------- Biodiversity overall ---------------
     'BIO_QUALITY_LAYER': ['Suitability'],
-    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (need to be 'USER_DEFINED', which is 50th percentile but with nudges for sheep/beef/dairy nat land)
+    'HCAS_CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (need to be 'USER_DEFINED', which is 50th percentile but with nudges for sheep/beef/dairy nat land)
     'CONNECTIVITY_SOURCE': ['NCI'],
     'CONNECTIVITY_LB': [0.7],                                               # Connectivity score importance: 0.7 per LUF Report 2026
 
@@ -125,27 +125,27 @@ grid_search = {
     'BIO_CONTRIBUTION_DESTOCKING': [0.75],                                  # Destocking (doc=0.75, default=None=uses HCAS lookup difference)
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
+    'GBF2_TARGET': ['high'],                                  # 'off', 'low', 'medium', 'high'
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15],                    # Core: 20% central; test [15,30] alongside (Third iteration)
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSITY_TARGET_GBF_3_NVIS': ['high'],                             # 'off', 'medium', 'high', 'USER_DEFINED'
+    'GBF3_NVIS_TARGET': ['high'],                             # 'off', 'medium', 'high', 'USER_DEFINED'
     'GBF3_NVIS_TARGET_CLASS': ['NVIS_MVS'],                                  # 'NVIS_MVG' or 'NVIS_MVS' NVIS class
     'GBF3_NVIS_REGION_MODE': ['AUSTRALIA'],                                 # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
     'GBF3_NVIS_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
     'BIODIVERSITY_TARGET_GBF_3_IBRA': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
 
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['USER_DEFINED'],                     # 'off', 'USER_DEFINED', or 'dict'
+    'GBF4_TARGET_SNES': ['USER_DEFINED'],                     # 'off', 'USER_DEFINED', or 'dict'
     'GBF4_SNES_REGION_MODE': ['Australia'],                                 # 'Australia' or 'NRM'
     'GBF4_SNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['USER_DEFINED'],                    # 'off', 'USER_DEFINED', or 'dict'
+    'GBF4_TARGET_ECNES': ['USER_DEFINED'],                    # 'off', 'USER_DEFINED', or 'dict'
     'GBF4_ECNES_REGION_MODE': ['Australia'],                                # 'Australia' or 'NRM'
     'GBF4_ECNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],     # Only used when mode = 'NRM'
 
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
+    'GBF8_TARGET': ['off'],                                   # 'on' or 'off'
 
     # --------------- Renewable energy ---------------
     # Core: RE OFF. REN1-REN4 are separate renewable energy scenario runs (not part of this grid search).
@@ -228,7 +228,7 @@ grid_search = {
 
 duplicate_runs = {
     'REGIONAL_ADOPTION_CONSTRAINTS': ('off', 'REGIONAL_ADOPTION_NON_AG_CAP'),
-    'BIODIVERSITY_TARGET_GBF_2': ('off', 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'),
+    'GBF2_TARGET': ('off', 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'),
 }
 
 

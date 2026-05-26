@@ -42,7 +42,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - `get_GBF2_target_for_yr_cal()` — baseline / base-year / restoration-fraction interpolation
 - `_add_GBF2_constraints()` in solver.py — how the hard/soft constraint is built
 - `write_biodiversity_GBF2_scores()` in write.py — denominator, ag/non-ag/am numerators, `Relative_Contribution_Percentage` formula and why it sums to ~30%
-- Settings: `BIODIVERSITY_TARGET_GBF_2`, `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT`, `BIO_CONTRIBUTION_LDS`, `GBF2_CONSTRAINT_TYPE`
+- Settings: `GBF2_TARGET`, `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT`, `BIO_CONTRIBUTION_LDS`, `GBF2_CONSTRAINT_TYPE`
 
 ### 📁 [docs/CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md)
 
@@ -200,13 +200,13 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - Determines annual sequestration rate by averaging total CO2 over this period
   - Default: 50 years (follows S-curve logic with rapid early accumulation)
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
-  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
+  - `GBF2_TARGET`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
   - `GBF2_CONSTRAINT_TYPE`: Hard or soft GBF2 constraint ('hard' or 'soft')
-  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
+  - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
   - `BIODIVERSITY_TARGET_GBF_3_IBRA`: IBRA bioregion targets ('off', 'medium', 'high', 'USER_DEFINED')
-  - `BIODIVERSITY_TARGET_GBF_4_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
-  - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Community NES ('on' or 'off')
-  - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
+  - `GBF4_TARGET_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
+  - `GBF4_TARGET_ECNES`: Ecological Community NES ('on' or 'off')
+  - `GBF8_TARGET`: Species conservation targets ('on' or 'off')
 
 ### Renewable Energy Settings
 

@@ -3120,7 +3120,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     
     
         
-    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
+    if settings.GBF2_TARGET != 'off':
 
         filter_str = '''
             category == "biodiversity" 
@@ -3345,7 +3345,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         'Outside LUTO study area': 'Outside LUTO study area',
     }
 
-    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
+    if settings.GBF3_NVIS_TARGET != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
         filter_str = '''
             category == "biodiversity"
             and base_name.str.contains("biodiversity_GBF3_NVIS_scores")
@@ -3541,7 +3541,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     # IBRA reporting branch disabled (GBF3 IBRA pipeline incomplete).
 
 
-    if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
+    if settings.GBF4_TARGET_SNES != 'off':
         
         filter_str = '''
             category == "biodiversity" 
@@ -3728,7 +3728,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
             
-    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
+    if settings.GBF4_TARGET_ECNES != 'off':
         
         bio_paths = files.query('base_name.str.contains("biodiversity_GBF4_ECNES_scores")')
         bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path)).empty])
@@ -3910,7 +3910,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         
         
 
-    if settings.BIODIVERSITY_TARGET_GBF_8 == 'on':
+    if settings.GBF8_TARGET == 'on':
         
         filter_str = '''
             category == "biodiversity" 

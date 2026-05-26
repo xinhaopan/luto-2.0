@@ -233,19 +233,19 @@ window.HomeView = {
       await loadScript(chartOverview_area_landuse['path'], chartOverview_area_landuse['name'], VIEW_NAME);
       await loadScript(chartOverview_bio_quality['path'], chartOverview_bio_quality['name'], VIEW_NAME);
       // Conditional biodiversity script loading based on runScenario
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
+      if (runScenario.value['GBF2_TARGET'] !== 'off') {
         await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name'], VIEW_NAME);
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
+      if (runScenario.value['GBF3_NVIS_TARGET'] !== 'off') {
         await loadScript(chartOverview_bio_GBF3_NVIS['path'], chartOverview_bio_GBF3_NVIS['name'], VIEW_NAME);
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
+      if (runScenario.value['GBF4_TARGET_SNES'] !== 'off') {
         await loadScript(chartOverview_bio_GBF4_SNES['path'], chartOverview_bio_GBF4_SNES['name'], VIEW_NAME);
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_ECNES'] !== 'off') {
+      if (runScenario.value['GBF4_TARGET_ECNES'] !== 'off') {
         await loadScript(chartOverview_bio_GBF4_ECNES['path'], chartOverview_bio_GBF4_ECNES['name'], VIEW_NAME);
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_8'] !== 'off') {
+      if (runScenario.value['GBF8_TARGET'] !== 'off') {
         await loadScript(chartOverview_bio_GBF8_SPECIES['path'], chartOverview_bio_GBF8_SPECIES['name'], VIEW_NAME);
         await loadScript(chartOverview_bio_GBF8_GROUP['path'], chartOverview_bio_GBF8_GROUP['name'], VIEW_NAME);
       }
@@ -329,19 +329,19 @@ window.HomeView = {
       };
 
       // Dynamically add GBF data based on what was loaded
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
+      if (runScenario.value['GBF2_TARGET'] !== 'off') {
         ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
+      if (runScenario.value['GBF3_NVIS_TARGET'] !== 'off') {
         ChartData.value['Biodiversity']['GBF3 (NVIS)'] = window[chartOverview_bio_GBF3_NVIS['name']];
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
+      if (runScenario.value['GBF4_TARGET_SNES'] !== 'off') {
         ChartData.value['Biodiversity']['GBF4 (SNES)'] = window[chartOverview_bio_GBF4_SNES['name']];
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_ECNES'] !== 'off') {
+      if (runScenario.value['GBF4_TARGET_ECNES'] !== 'off') {
         ChartData.value['Biodiversity']['GBF4 (ECNES)'] = window[chartOverview_bio_GBF4_ECNES['name']];
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_8'] !== 'off') {
+      if (runScenario.value['GBF8_TARGET'] !== 'off') {
         ChartData.value['Biodiversity']['GBF8 (SPECIES)'] = window[chartOverview_bio_GBF8_SPECIES['name']];
         ChartData.value['Biodiversity']['GBF8 (GROUP)'] = window[chartOverview_bio_GBF8_GROUP['name']];
       }
@@ -439,7 +439,7 @@ window.HomeView = {
         <p class="text-[#505051] font-bold p-1 pt-8">
           SSP - {{ runScenario.SSP }} |
           GHG - {{ runScenario.GHG_EMISSIONS_LIMITS }} |
-          Biodiversity - {{ runScenario.BIODIVERSITY_TARGET_GBF_2 }}
+          Biodiversity - {{ runScenario.GBF2_TARGET }}
         </p>
 
         <!-- Ranking Cards Section -->
