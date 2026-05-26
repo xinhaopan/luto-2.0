@@ -175,14 +175,18 @@ def create_new_dataset(refresh=False):
     # Copy biodiversity GBF-2 files
     shutil.copyfile(bio_GBF2_inpath + 'Biodiversity_conserve_performance.xlsx', outpath + 'Biodiversity_conserve_performance.xlsx')
 
-    # Copy biodiversity GBF-3 data
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS.nc', outpath + 'bio_GBF3_NVIS_MVS.nc')
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG.nc', outpath + 'bio_GBF3_NVIS_MVG.nc')
+    # Copy biodiversity GBF-3 data (sparse .npz replaces the dense .nc for runtime use)
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS_sparse.npz', outpath + 'bio_GBF3_NVIS_MVS_sparse.npz')
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG_sparse.npz', outpath + 'bio_GBF3_NVIS_MVG_sparse.npz')
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS_groups.npy',  outpath + 'bio_GBF3_NVIS_MVS_groups.npy')
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG_groups.npy',  outpath + 'bio_GBF3_NVIS_MVG_groups.npy')
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv')
 
-    # Copy biodiversity GBF-4 files
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_GBF4_SNES.nc')
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_GBF4_ECNES.nc')
+    # Copy biodiversity GBF-4 files (sparse .npz replaces the dense .nc for runtime use)
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_sparse.npz', outpath + 'bio_GBF4_SNES_sparse.npz')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_sparse.npz', outpath + 'bio_GBF4_ECNES_sparse.npz')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_species.npy', outpath + 'bio_GBF4_SNES_sparse_species.npy')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_species.npy', outpath + 'bio_GBF4_ECNES_sparse_species.npy')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target_ALL_REGIONS.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES.csv')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target_ALL_REGIONS.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES.csv')
     

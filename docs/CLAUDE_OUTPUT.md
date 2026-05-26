@@ -350,7 +350,7 @@ NRMs) so non-selected cells have non-zero values to grey out. `data.py` always b
 - `data.BIO_GBF4_COMUNITY_LAYERS_FULL` — `[species, cell]` full-Australia ECNES layers
 
 Both are available in **Australia mode and NRM mode**. In Australia mode they mirror
-`BIO_GBF4_SPECIES_LAYERS` (reshaped to drop the MultiIndex). In NRM mode they are built
+`GBF4_SNES_LAYERS_SEL` (reshaped to drop the MultiIndex). In NRM mode they are built
 without the per-region mask so every cell retains its habitat value. `write.py` reads
 these attrs directly — `get_GBF4_SNES_matrix_sr(data)` (the solver-facing function)
 is no longer called from write.py.

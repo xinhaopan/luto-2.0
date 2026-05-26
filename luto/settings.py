@@ -1088,31 +1088,34 @@ and manage human-wildlife interactions
 '''
 
 
-BIODIVERSITY_TARGET_GBF_4_SNES  = 'off'           # 'off', 'USER_DEFINED', or 'dict'
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'off', 'USER_DEFINED', or 'dict'
+BIODIVERSITY_TARGET_GBF_4_SNES  = 'dict'           # 'off', 'USER_DEFINED', or 'dict'
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'dict'           # 'off', 'USER_DEFINED', or 'dict'
 '''
 'off'          — GBF4 SNES/ECNES constraints disabled.
 'USER_DEFINED' — read targets from input CSV file.
 'dict'         — overwrite all TARGET_LEVEL columns with values from GBF4_{SNES,ECNES}_TARGETS_DICT.
 '''
 
+GBF4_SNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
+GBF4_ECNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
+
 GBF4_SNES_TARGETS_DICT  = {2030: 30, 2050: 50, 2100: 50}
 GBF4_ECNES_TARGETS_DICT = {2030: 30, 2050: 50, 2100: 50}
 
-GBF4_SNES_REGION_MODE = 'NRM'                    # 'Australia' or 'NRM'
-GBF4_SNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
+GBF4_SNES_REGION_MODE       = 'NRM'                    # 'AUSTRALIA' or 'NRM'
+GBF4_SNES_SELECTED_REGIONS  = ['North East', 'Goulburn Broken']
 '''
 Controls the spatial resolution of GBF4 SNES constraints.
- - 'Australia' → nationwide targets (existing behaviour, default)
+ - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region targets from NRM target files
 GBF4_SNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
 '''
 
-GBF4_ECNES_REGION_MODE = 'NRM'                   # 'Australia' or 'NRM'
+GBF4_ECNES_REGION_MODE      = 'NRM'                   # 'AUSTRALIA' or 'NRM'
 GBF4_ECNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
 '''
 Controls the spatial resolution of GBF4 ECNES constraints.
- - 'Australia' → nationwide targets (existing behaviour, default)
+ - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region targets from NRM target files
 GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
 '''
@@ -1121,7 +1124,7 @@ GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NR
 # GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES: list of (region, COMMUNITY) tuples to drop.
 # GBF4_SNES_EXCLUDE_REGION_SPECIES:      list of (region, SCIENTIFIC_NAME) tuples to drop.
 #   NRM mode       — matches on the (region, name) pair exactly.
-#   Australia mode — only the name part is used (region is ignored).
+#   AUSTRALIA mode — only the name part is used (region is ignored).
 # Match exactly the values in BIODIVERSITY_GBF4_TARGET_*[_NRM].csv.
 GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES = [
     # Community: "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived
@@ -1170,12 +1173,6 @@ GBF4_SNES_EXCLUDE_REGION_SPECIES = [
     #   INSIDE_LUTO_ha = 24.7  (present but below 100 ha threshold)
     ('North East', 'Zieria citriodora'),
 ]
-
-# -- Whitelist filters: if non-empty, KEEP ONLY the listed communities/species
-# (applied AFTER the EXCLUDE filter above). Empty list = keep all (default).
-# Used to enable single-target SNES/ECNES task runs.
-GBF4_ECNES_INCLUDE_COMMUNITIES = []
-GBF4_SNES_INCLUDE_SPECIES = []
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------

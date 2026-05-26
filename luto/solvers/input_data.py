@@ -97,10 +97,10 @@ class SolverInputData:
     GBF2_mask_area_r: np.ndarray                                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
     GBF3_NVIS_pre_1750_area_vr: np.ndarray                              # Raw areas (GBF3) from NVIS vegetation - indexed by group (v) and cell (r)
     GBF3_NVIS_region_group: dict[int, str]                                     # GBF3 NVIS vegetation group names - indexed by group (v).
-    GBF4_SNES_pre_1750_area_sr: xr.DataArray                            # Areas (GBF4) SNES - xr.DataArray[layer, cell], layer coord is MultiIndex(region, species).
-    GBF4_SNES_region_species: list                                      # GBF4 SNES constraint pairs - list[(region, species)].
-    GBF4_ECNES_pre_1750_area_sr: xr.DataArray                          # Areas (GBF4) ECNES - xr.DataArray[layer, cell], layer coord is MultiIndex(region, species).
-    GBF4_ECNES_region_species: list                                     # GBF4 ECNES constraint pairs - list[(region, species)].
+    GBF4_SNES_pre_1750_area_sr: xr.DataArray                            # Areas (GBF4) SNES - xr.DataArray[layer, cell], layer coord is MultiIndex(species, presence). No region dim — region masking applied in solver.
+    GBF4_SNES_region_species: list                                      # GBF4 SNES constraint triplets - list[(region, species, presence)].
+    GBF4_ECNES_pre_1750_area_sr: xr.DataArray                          # Areas (GBF4) ECNES - xr.DataArray[layer, cell], layer coord is MultiIndex(species, presence). No region dim — region masking applied in solver.
+    GBF4_ECNES_region_species: list                                     # GBF4 ECNES constraint triplets - list[(region, community, presence)].
     GBF8_pre_1750_area_sr: xr.DataArray                                 # Areas (GBF8) - xr.DataArray[species, cell], species coord = species name strings.
     GBF8_region_species: list                                           # GBF8 constraint pairs - list[(region, species)].
 
@@ -320,7 +320,7 @@ def get_GBF4_SNES_pre_1750_area_sr(data: Data) -> xr.DataArray:
 def get_GBF4_SNES_region_species(data: Data) -> list:
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'off':
         return []
-    print('Getting GBF4 SNES (region, species) constraint pairs...', flush=True)
+    print('Getting GBF4 SNES (region, species, presence) constraint triplets...', flush=True)
     return data.BIO_GBF4_SNES_SEL
 
 def get_GBF4_ECNES_pre_1750_area_sr(data: Data) -> xr.DataArray:
@@ -332,7 +332,7 @@ def get_GBF4_ECNES_pre_1750_area_sr(data: Data) -> xr.DataArray:
 def get_GBF4_ECNES_region_species(data: Data) -> list:
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'off':
         return []
-    print('Getting GBF4 ECNES (region, species) constraint pairs...', flush=True)
+    print('Getting GBF4 ECNES (region, community, presence) constraint triplets...', flush=True)
     return data.BIO_GBF4_ECNES_SEL
 
 def get_GBF8_pre_1750_area_sr(data: Data, target_year: int) -> xr.DataArray:
@@ -875,45 +875,63 @@ def rescale_lhs_rhs(arrays: list, rhs_target) -> tuple[list, float]:
 
 def rescale_lhs_rhs_region_species(
     arr: xr.DataArray,
-    region_species_list: list[tuple[str, str]],
+    constraint_list: list[tuple],
     region_NRM_names_r: np.ndarray,
     targets: xr.DataArray | None = None,
+    layer_coord_names: tuple[str, ...] = ('region', 'species'),
+    matrix_key_fn=None,
 ) -> tuple[xr.DataArray, xr.DataArray]:
     """
-    Rescale a biodiversity matrix per (region, species/group) pair using the
-    geometric mean of max(|LHS|) and the pair's RHS target.
+    Rescale a biodiversity matrix per constraint tuple using the geometric mean
+    of max(|LHS|) and the tuple's RHS target.
 
-    Calls :func:`calc_geomean_scale` for each pair::
+    Calls :func:`calc_geomean_scale` for each constraint::
 
         scale = calc_geomean_scale(region_max, abs(target_val))
 
-    When ``targets`` is ``None``, falls back to LHS-only (``region_max / RF``).
-
-    'Australia' as region uses all cells.
+    When ``targets`` is ``None``, falls back to LHS-only scaling.
 
     Supports two matrix layouts:
-    - ``row_coord = 'layer'`` (GBF4 SNES/ECNES): rows are (region, species) tuples.
-    - ``row_coord = 'group'`` or ``'species'`` (GBF3 NVIS, GBF8): rows are the
-      species/group string.
+    - ``row_coord = 'layer'`` (GBF4 ECNES): constraint tuples are (region, species);
+      the matrix row key equals the full tuple.
+    - ``row_coord = 'layer'`` with ``matrix_key_fn`` (GBF4 SNES): constraint tuples
+      are (region, species, presence); ``matrix_key_fn`` extracts (species, presence)
+      as the matrix row key, while region[0] drives the cell mask.
+    - ``row_coord = 'group'`` or ``'species'`` (GBF3 NVIS, GBF8): constraint tuples
+      are (region, species); the matrix row key is the last element (species/group).
 
-    The output ``scale_factors`` DataArray has ``layer=[(region, species)]`` coords
-    so callers can uniformly use ``scale_factors.sel(layer=(region, species))``.
+    Region masking: first element of each constraint tuple is the region.
+    ``'Australia'`` → all cells; any other value → ``region_NRM_names_r == region``.
+    In-place scaling is safe because NRM regions are non-overlapping — each cell
+    belongs to at most one NRM region.
+
+    ``layer_coord_names`` sets the MultiIndex level names on the returned
+    ``scale_factors`` DataArray. The scale_factors MultiIndex mirrors
+    ``constraint_list`` so callers can use ``scale_factors.sel(layer=constraint_tuple)``.
 
     Returns:
         scaled_arr: xr.DataArray, same shape as ``arr``.
-        scale_factors: xr.DataArray[layer=(region, species)].
+        scale_factors: xr.DataArray with ``layer`` MultiIndex matching constraint_list.
     """
     arr_np = arr.values.copy().astype(np.float32)
     row_coord = arr.dims[0]
     row_names = arr.coords[row_coord].values
     row_name_to_idx = {name: i for i, name in enumerate(row_names)}
-    use_tuple_key = (row_coord == 'layer')  # GBF4: row key is (region, species) tuple
+    use_tuple_key = (row_coord == 'layer')  # GBF4: row key is a tuple
 
     layers: list[tuple] = []
     sf_values: list[float] = []
 
-    for region, species in region_species_list:
-        row_key = (region, species) if use_tuple_key else species
+    for constraint_tuple in constraint_list:
+        region = constraint_tuple[0]
+
+        if matrix_key_fn is not None:
+            row_key = matrix_key_fn(constraint_tuple)
+        elif use_tuple_key:
+            row_key = constraint_tuple
+        else:
+            row_key = constraint_tuple[-1]
+
         row_idx = row_name_to_idx[row_key]
 
         cell_mask = (
@@ -925,7 +943,7 @@ def rescale_lhs_rhs_region_species(
         region_max = float(np.abs(arr_np[row_idx, cell_mask]).max()) if cell_mask.any() else 0.0
 
         if targets is not None:
-            target_val = abs(float(targets.sel(layer=(region, species)).item()))
+            target_val = abs(float(targets.sel(layer=constraint_tuple).item()))
         else:
             target_val = 0.0
 
@@ -933,14 +951,14 @@ def rescale_lhs_rhs_region_species(
 
         arr_np[row_idx, cell_mask] = arr_np[row_idx, cell_mask] / scale_factor
 
-        layers.append((region, species))
+        layers.append(constraint_tuple)
         sf_values.append(float(scale_factor))
 
     scaled_arr = xr.DataArray(arr_np, dims=arr.dims, coords=arr.coords, name=arr.name)
     scale_factors = xr.DataArray(
         np.array(sf_values, dtype=np.float32),
         dims=["layer"],
-        coords={"layer": pd.MultiIndex.from_tuples(layers, names=["region", "species"])},
+        coords={"layer": pd.MultiIndex.from_tuples(layers, names=list(layer_coord_names))},
     )
     return scaled_arr, scale_factors
 
@@ -1098,6 +1116,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = rescale_lhs_rhs_region_species(
             GBF4_SNES_pre_1750_area_sr, GBF4_SNES_region_species, region_NRM_names_r,
             targets=limits['GBF4_SNES'],
+            layer_coord_names=('region', 'species', 'presence'),
+            matrix_key_fn=lambda t: (t[1], t[2]),
         )
     else:
         gbf4_snes_scale = 1.0
@@ -1106,6 +1126,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = rescale_lhs_rhs_region_species(
             GBF4_ECNES_pre_1750_area_sr, GBF4_ECNES_region_species, region_NRM_names_r,
             targets=limits['GBF4_ECNES'],
+            layer_coord_names=('region', 'species', 'presence'),
+            matrix_key_fn=lambda t: (t[1], t[2]),
         )
     else:
         gbf4_ecnes_scale = 1.0

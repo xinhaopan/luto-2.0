@@ -850,8 +850,6 @@ different schema:
 | `label` | Filesystem-safe slug of species/community name |
 | `BIODIVERSITY_TARGET_GBF_4_ECNES` | `on` / `off` |
 | `BIODIVERSITY_TARGET_GBF_4_SNES` | `on` / `off` |
-| `GBF4_ECNES_INCLUDE_COMMUNITIES` | Python list literal, e.g. `['Alpine Sphagnum Bogs...']` |
-| `GBF4_SNES_INCLUDE_SPECIES` | Python list literal, e.g. `['Acacia phasmoides']` |
 | `GBF4_ECNES_SELECTED_REGIONS` | Python list literal of NRM region names |
 | `GBF4_SNES_SELECTED_REGIONS` | Python list literal of NRM region names |
 | `GBF3_NVIS_SELECTED_REGIONS` | Python list literal (same regions as target species) |

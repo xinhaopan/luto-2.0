@@ -5,6 +5,64 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260525 — Biodiversity input array sparsity and threading for GBF3/4 write loops
+
+### Context
+
+The GBF3/4 biodiversity write functions loop over vegetation groups or species,
+multiplying spatial arrays by land-use decision variables. Threading was investigated
+to speed up these loops. Sparsity of input NC files was profiled to evaluate
+sparse array pre-cooking as a complementary strategy.
+
+### NVIS Threading Benchmark (`write_biodiversity_GBF3_NVIS_scores`)
+
+| Config | Duration | Peak RAM | Notes |
+|--------|----------|----------|-------|
+| Serial (baseline) | 551s | ~9.2 GB | step_7 profiler |
+| n_jobs=8 threading | 360s | 14.8 GB | ~1.5× speedup, +5.9 GB overhead |
+
+**Root cause of limited speedup**: `save2tmp` NC writes serialised behind `threading.Lock`;
+`netCDF4` C library not thread-safe (global ID registry).
+
+**Fix applied**: Pre-load full NVIS array via `xr.open_dataarray(...).load()` once before
+the parallel loop — workers receive plain numpy slices, zero file I/O per thread.
+Eliminates `RuntimeError: NetCDF: Not a valid ID` from stale thread-local handles.
+
+### Input Array Sparsity
+
+| File | Shape | Dense size | Sparsity | COO size | Compression | Build time |
+|------|-------|-----------|----------|----------|-------------|------------|
+| `bio_GBF3_NVIS_MVG.nc` | (30, 6.9M) | 0.8 GB | 95.0% | ~125 MB | 7× | 0.5s |
+| `bio_GBF4_ECNES.nc` | (101, 2, 6.9M) | 5.6 GB | 99.6% | ~88 MB | 64× | 17s |
+| `bio_GBF4_SNES.nc` | (2021, 2, 6.9M) | 112 GB | 99.65% | ~1,565 MB | 72× | 447s |
+
+COO size estimated as `nonzero × (4 bytes data + 4 bytes × ndim coords)`.
+SNES/ECNES build time measured reading one species slice at a time (avoids
+materialising the full dense array).
+
+### Recommendations
+
+| Array | Action | Reason |
+|-------|--------|--------|
+| **NVIS** | Keep `.load()` dense | 0.8 GB fine; 7× compression not worth overhead |
+| **ECNES** | Pre-cook `bio_GBF4_ECNES_sparse.npz` in `dataprep.py` | 88 MB COO, 17s build, 64× savings; loads in seconds at runtime |
+| **SNES** | Pre-cook `bio_GBF4_SNES_sparse.npz` in `dataprep.py` | 112 GB dense impossible; 1.5 GB COO, 447s build (one-time); loads in seconds |
+
+Pre-cooked `.npz` files are plain numpy arrays — fully thread-safe, no file locks,
+instant per-species indexing in parallel workers.
+
+### SNES Runtime Projection
+
+| Strategy | Estimated time (2021 species) |
+|----------|-------------------------------|
+| Serial loop | ~36,700s (~10h) |
+| n_jobs=8 threading (dense) | Impossible — 112 GB RAM |
+| n_jobs=8 threading (sparse `.npz`) | ~4,600s (~1.3h, estimated) |
+
+Pre-cooking sparse arrays is a prerequisite for any viable SNES parallelism.
+
+---
+
 ## 20260523 — Biodiversity regional scoring: xarray groupby bottleneck and optimisation
 
 ### Context

@@ -1072,33 +1072,38 @@ class LutoSolver:
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 SNES...')
             return
 
-        region_species  = self._input_data.GBF4_SNES_region_species      # list[(region, species)]
-        v_limits        = self._input_data.limits["GBF4_SNES"]            # xr.DataArray[layer=(region,species)]
-        scale_factors   = self._input_data.scale_factors['GBF4_SNES']     # xr.DataArray[layer=(region,species)]
-        val_matrix      = self._input_data.GBF4_SNES_pre_1750_area_sr     # xr.DataArray[layer, cell]
+        region_sp_pres = self._input_data.GBF4_SNES_region_species       # list[(region, species, presence)]
+        v_limits       = self._input_data.limits["GBF4_SNES"]            # xr.DataArray[layer=(region,species,presence)]
+        scale_factors  = self._input_data.scale_factors['GBF4_SNES']     # xr.DataArray[layer=(region,species,presence)]
+        val_matrix     = self._input_data.GBF4_SNES_pre_1750_area_sr     # xr.DataArray[layer=(species,presence), cell]
+        reg_matrix     = self._input_data.region_NRM_names_r             # np.ndarray[cell]
 
         print("│   │   ├── Adding constraints for biodiversity GBF 4 SNES...")
 
-        for region, species in region_species:
-            lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
-            lb_rescale  = lb_raw / scale_factors.sel(dict(layer=(region, species))).item()
-            val_vector  = val_matrix.sel(dict(layer=(region, species)), drop=True).values
+        for region, species, presence in region_sp_pres:
+            lb_raw     = v_limits.sel(dict(layer=(region, species, presence))).item()
+            lb_rescale = lb_raw / scale_factors.sel(dict(layer=(region, species, presence))).item()
+            val_vector = val_matrix.sel(dict(layer=(species, presence)), drop=True).values
 
-            ind = np.where(val_vector > 0)[0]
+            if region == "Australia":
+                ind = np.where(val_vector > 0)[0]
+            else:
+                reg_vector = reg_matrix == region
+                ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
 
             if lb_raw <= 0:
-                print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} [{region}]")
+                print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} ({presence}) [{region}]")
                 continue
 
             if ind.size == 0:
-                print(f"│   │   │   ├── WARNING: SNES empty layer for {species} [{region}]")
+                print(f"│   │   │   ├── WARNING: SNES empty layer for {species} ({presence}) [{region}]")
                 continue
 
-            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
-            self.bio_GBF4_SNES_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
-            self.bio_GBF4_SNES_constrs[(region, species)] = self.gurobi_model.addConstr(
-                self.bio_GBF4_SNES_exprs[(region, species)] >= lb_rescale,
-                name=f"bio_GBF4_SNES_limit_{region}_{species}".replace(" ", "_"),
+            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} ({presence}) [{region}]")
+            self.bio_GBF4_SNES_exprs[(region, species, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
+            self.bio_GBF4_SNES_constrs[(region, species, presence)] = self.gurobi_model.addConstr(
+                self.bio_GBF4_SNES_exprs[(region, species, presence)] >= lb_rescale,
+                name=f"bio_GBF4_SNES_limit_{region}_{species}_{presence}".replace(" ", "_"),
             )
 
     def _add_GBF4_ECNES_constraints(self) -> None:
@@ -1106,33 +1111,38 @@ class LutoSolver:
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 ECNES...')
             return
 
-        region_species  = self._input_data.GBF4_ECNES_region_species      # list[(region, species)]
-        v_limits        = self._input_data.limits["GBF4_ECNES"]            # xr.DataArray[layer=(region,species)]
-        scale_factors   = self._input_data.scale_factors['GBF4_ECNES']     # xr.DataArray[layer=(region,species)]
-        val_matrix      = self._input_data.GBF4_ECNES_pre_1750_area_sr     # xr.DataArray[layer, cell]
+        region_comm_pres = self._input_data.GBF4_ECNES_region_species      # list[(region, community, presence)]
+        v_limits         = self._input_data.limits["GBF4_ECNES"]            # xr.DataArray[layer=(region,species,presence)]
+        scale_factors    = self._input_data.scale_factors['GBF4_ECNES']     # xr.DataArray[layer=(region,species,presence)]
+        val_matrix       = self._input_data.GBF4_ECNES_pre_1750_area_sr     # xr.DataArray[layer=(species,presence), cell]
+        reg_matrix       = self._input_data.region_NRM_names_r              # np.ndarray[cell]
 
         print("│   │   ├── Adding constraints for biodiversity GBF 4 ECNES...")
 
-        for region, species in region_species:
-            lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
-            lb_rescale  = lb_raw / scale_factors.sel(dict(layer=(region, species))).item()
-            val_vector  = val_matrix.sel(dict(layer=(region, species)), drop=True).values
+        for region, community, presence in region_comm_pres:
+            lb_raw     = v_limits.sel(dict(layer=(region, community, presence))).item()
+            lb_rescale = lb_raw / scale_factors.sel(dict(layer=(region, community, presence))).item()
+            val_vector = val_matrix.sel(dict(layer=(community, presence)), drop=True).values
 
-            ind = np.where(val_vector > 0)[0]
+            if region == "Australia":
+                ind = np.where(val_vector > 0)[0]
+            else:
+                reg_vector = reg_matrix == region
+                ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
 
             if lb_raw <= 0:
-                print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} [{region}]")
+                print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {community} ({presence}) [{region}]")
                 continue
 
             if ind.size == 0:
-                print(f"│   │   │   ├── WARNING: ECNES empty layer for {species} [{region}]")
+                print(f"│   │   │   ├── WARNING: ECNES empty layer for {community} ({presence}) [{region}]")
                 continue
 
-            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
-            self.bio_GBF4_ECNES_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
-            self.bio_GBF4_ECNES_constrs[(region, species)] = self.gurobi_model.addConstr(
-                self.bio_GBF4_ECNES_exprs[(region, species)] >= lb_rescale,
-                name=f"bio_GBF4_ECNES_limit_{region}_{species}".replace(" ", "_"),
+            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {community} ({presence}) [{region}]")
+            self.bio_GBF4_ECNES_exprs[(region, community, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
+            self.bio_GBF4_ECNES_constrs[(region, community, presence)] = self.gurobi_model.addConstr(
+                self.bio_GBF4_ECNES_exprs[(region, community, presence)] >= lb_rescale,
+                name=f"bio_GBF4_ECNES_limit_{region}_{community}_{presence}".replace(" ", "_"),
             )
 
 

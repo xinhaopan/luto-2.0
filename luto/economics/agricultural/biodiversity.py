@@ -404,15 +404,10 @@ def get_GBF4_SNES_matrix_sr(data: Data) -> xr.DataArray:
     Returns
     -------
     xr.DataArray
-        dims ['layer', 'cell'] — layer coord is a MultiIndex of (region, species).
-        Region masking is already baked into each layer row.
+        dims ['layer', 'cell'] — layer coord is a MultiIndex of (species, presence).
+        Full-Australia layers; no per-region masking.
     """
-    layers = data.BIO_GBF4_SPECIES_LAYERS  # xr.DataArray[layer, cell]
-    return xr.where(
-        data.SAVBURN_ELIGIBLE,
-        layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        layers * data.REAL_AREA,
-    ).astype(np.float32)
+    return data.GBF4_SNES_LAYERS_LDS * data.REAL_AREA
 
 
 def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
@@ -422,15 +417,10 @@ def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
     Returns
     -------
     xr.DataArray
-        dims ['layer', 'cell'] — layer coord is a MultiIndex of (region, species).
-        Region masking is already baked into each layer row.
+        dims ['layer', 'cell'] — layer coord is a MultiIndex of (species, presence).
+        Full-Australia layers; no per-region masking.
     """
-    layers = data.BIO_GBF4_COMUNITY_LAYERS  # xr.DataArray[layer, cell]
-    return xr.where(
-        data.SAVBURN_ELIGIBLE,
-        layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        layers * data.REAL_AREA,
-    ).astype(np.float32)
+    return data.GBF4_ECNES_LAYERS_LDS * data.REAL_AREA
 
 
 def get_GBF8_matrix_sr(data: Data, target_year: int) -> xr.DataArray:
