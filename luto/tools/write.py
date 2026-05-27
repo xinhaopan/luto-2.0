@@ -72,25 +72,25 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 #   v2 = profiled with 2026_05_23_RF5_2010-2050/Data_RES5.lz4
 #   v3 = profiled with 2026_05_26_RF5_2010-2050/Data_RES5.lz4
 peak_mb_RES5 = {
-    'write_dvar_and_mosaic_map':                    1_373,  # v2
-    'write_transition_nonag2ag':                    6_788,  # v2
-    'write_transition_ag2ag':                       6_316,  # v2
-    'write_biodiversity_quality_scores':            3_885,  # v2
-    'write_economics':                              4_989,  # v2
-    'write_ghg':                                    4_196,  # v2
-    'write_transition_ag2nonag':                    3_191,  # v2
-    'write_quantity':                               3_038,  # v2
-    'write_water':                                  2_447,  # v2
-    'write_dvar_area':                              2_590,  # v2
-    'write_biodiversity_GBF2_scores':               1_921,  # v2
-    'write_area_transition_start_end':              1_460,  # v2
-    'write_renewable_production':                     718,  # v2
-    'write_crosstab':                                  13,  # v2
-    'write_biodiversity_GBF3_NVIS_scores':         17_281,  # v3: 30 groups, full run
-    'write_biodiversity_GBF4_ECNES_scores':        18_933,  # v3: 101 communities, full run
-    'write_biodiversity_GBF4_SNES_scores':         17_878,  # v3: 100-species sample; peak is dominated by per-batch xr spike (~16 GB constant per 10-species batch, does not scale with total species count); DataFrame accumulation is negligible after zero-row filtering
-    'write_biodiversity_GBF8_scores_groups':            1,  # returns immediately when GBF8_TARGET == 'off'
-    'write_biodiversity_GBF8_scores_species':           1,  # returns immediately when GBF8_TARGET == 'off'
+    'write_dvar_and_mosaic_map':                    1_373,  
+    'write_transition_nonag2ag':                    6_788,  
+    'write_transition_ag2ag':                       6_316,  
+    'write_biodiversity_quality_scores':            3_885,  
+    'write_economics':                              4_989,  
+    'write_ghg':                                    4_196,  
+    'write_transition_ag2nonag':                    3_191,  
+    'write_quantity':                               3_038,  
+    'write_water':                                  2_447,  
+    'write_dvar_area':                              2_590,  
+    'write_biodiversity_GBF2_scores':               1_921,  
+    'write_area_transition_start_end':              1_460,  
+    'write_renewable_production':                     718,  
+    'write_crosstab':                                  13,  
+    'write_biodiversity_GBF3_NVIS_scores':         17_281,  
+    'write_biodiversity_GBF4_ECNES_scores':         7_000,  # The first 100 species takes 4528 MB, so here relaxed to 7000 MB.
+    'write_biodiversity_GBF4_SNES_scores':         17_878, 
+    'write_biodiversity_GBF8_scores_groups':            1,  
+    'write_biodiversity_GBF8_scores_species':           1,  
 }
 
 # Scale RES5 measurements to the actual run resolution.
