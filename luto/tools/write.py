@@ -68,26 +68,29 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 # ── Per-function peak memory  ────────────
 # Used by write_data to compute n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb).
 # (MB above data-object baseline, measured at RESFACTOR=5)
+# Sources:
+#   v2 = profiled with 2026_05_23_RF5_2010-2050/Data_RES5.lz4
+#   v3 = profiled with 2026_05_26_RF5_2010-2050/Data_RES5.lz4
 peak_mb_RES5 = {
-    'write_dvar_and_mosaic_map':                      941,
-    'write_transition_nonag2ag':                    7_558,  # heavy despite all-zero data: nested 9-LU × N_cost_type matrices
-    'write_transition_ag2ag':                       6_544,
-    'write_biodiversity_quality_scores':            6_101,  # 7 backends × 4 xr arrays accumulated before xr.concat
-    'write_economics':                              4_914,
-    'write_ghg':                                    3_189,
-    'write_transition_ag2nonag':                    3_167,
-    'write_quantity':                               2_916,
-    'write_water':                                  2_496,
-    'write_biodiversity_GBF2_scores':               1_768,
-    'write_dvar_area':                              1_692,
-    'write_area_transition_start_end':              1_392,
-    'write_renewable_production':                     718,
-    'write_crosstab':                                  13,
-    'write_biodiversity_GBF3_NVIS_scores':         25_000,  # a place holder, to be updated after profiling at RESFACTOR=5
-    'write_biodiversity_GBF4_SNES_scores':         25_000,  # a place holder, to be updated after profiling at RESFACTOR=5
-    'write_biodiversity_GBF4_ECNES_scores':        25_000,  # a place holder, to be updated after profiling at RESFACTOR=5
-    'write_biodiversity_GBF8_scores_groups':            1,
-    'write_biodiversity_GBF8_scores_species':           1,
+    'write_dvar_and_mosaic_map':                    1_373,  # v2
+    'write_transition_nonag2ag':                    6_788,  # v2
+    'write_transition_ag2ag':                       6_316,  # v2
+    'write_biodiversity_quality_scores':            3_885,  # v2
+    'write_economics':                              4_989,  # v2
+    'write_ghg':                                    4_196,  # v2
+    'write_transition_ag2nonag':                    3_191,  # v2
+    'write_quantity':                               3_038,  # v2
+    'write_water':                                  2_447,  # v2
+    'write_dvar_area':                              2_590,  # v2
+    'write_biodiversity_GBF2_scores':               1_921,  # v2
+    'write_area_transition_start_end':              1_460,  # v2
+    'write_renewable_production':                     718,  # v2
+    'write_crosstab':                                  13,  # v2
+    'write_biodiversity_GBF3_NVIS_scores':         17_281,  # v3: 30 groups, full run
+    'write_biodiversity_GBF4_ECNES_scores':        18_933,  # v3: 101 communities, full run
+    'write_biodiversity_GBF4_SNES_scores':         17_878,  # v3: 100-species sample; peak is dominated by per-batch xr spike (~16 GB constant per 10-species batch, does not scale with total species count); DataFrame accumulation is negligible after zero-row filtering
+    'write_biodiversity_GBF8_scores_groups':            1,  # returns immediately when GBF8_TARGET == 'off'
+    'write_biodiversity_GBF8_scores_species':           1,  # returns immediately when GBF8_TARGET == 'off'
 }
 
 # Scale RES5 measurements to the actual run resolution.
@@ -3641,7 +3644,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
                     .to_dataframe('Area Weighted Score (ha)').reset_index()
                     .assign(region='AUSTRALIA', Type='Agricultural Land-use', Year=yr_cal, region_level=rl)
             )
-            ag_frames.extend([ag_df_region, ag_df_AUS])
+            ag_frames.extend([ag_df_region.query('`Area Weighted Score (ha)` != 0'), ag_df_AUS.query('`Area Weighted Score (ha)` != 0')])
 
             am_df_region = (
                 xr_gbf3_am_g.groupby(rl).sum('cell')
@@ -3654,7 +3657,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
                     .to_dataframe('Area Weighted Score (ha)').reset_index(allow_duplicates=True)
                     .assign(region='AUSTRALIA', Type='Agricultural Management', Year=yr_cal, region_level=rl)
             )
-            am_frames.extend([am_df_region, am_df_AUS])
+            am_frames.extend([am_df_region.query('`Area Weighted Score (ha)` != 0'), am_df_AUS.query('`Area Weighted Score (ha)` != 0')])
 
             non_ag_df_region = (
                 xr_gbf3_non_ag_g.groupby(rl).sum('cell')
@@ -3667,17 +3670,20 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
                     .to_dataframe('Area Weighted Score (ha)').reset_index()
                     .assign(region='AUSTRALIA', Type='Non-Agricultural Land-use', Year=yr_cal, region_level=rl)
             )
-            non_ag_frames.extend([non_ag_df_region, non_ag_df_AUS])
+            non_ag_frames.extend([non_ag_df_region.query('`Area Weighted Score (ha)` != 0'), non_ag_df_AUS.query('`Area Weighted Score (ha)` != 0')])
 
-            sum_frames_raw.extend([
+            sum_df_region = (
                 xr_gbf3_all_g.groupby(rl).sum('cell')
                     .to_dataframe('Area Weighted Score (ha)').reset_index()
                     .rename(columns={rl: 'region'})
-                    .assign(Year=yr_cal, region_level=rl),
+                    .assign(Year=yr_cal, region_level=rl)
+            )
+            sum_df_AUS = (
                 xr_gbf3_all_g.sum('cell')
                     .to_dataframe('Area Weighted Score (ha)').reset_index()
-                    .assign(region='AUSTRALIA', Year=yr_cal, region_level=rl),
-            ])
+                    .assign(region='AUSTRALIA', Year=yr_cal, region_level=rl)
+            )
+            sum_frames_raw.extend([sum_df_region.query('`Area Weighted Score (ha)` != 0'), sum_df_AUS.query('`Area Weighted Score (ha)` != 0')])
 
         # ── Per-group valid-layer NC write (incremental, avoids full concat in RAM) ──
         # AG: save layers whose AUS score exceeds threshold (reuse ag_df_AUS from loop).
@@ -4034,9 +4040,9 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         xr_gbf4_am_s     = add_all(xr_gbf4_am_s,     ['lm', 'lu', 'am'])
         xr_gbf4_all_s    = add_all(xr_gbf4_all_s,    ['Type'])
 
-        # Aggregate by region level and append to frame lists.
+        # Aggregate by region level and append to frame lists (zero-score rows dropped to save memory).
         for rl in REGION_LEVELS:
-            
+
             # Ag
             ag_df_region = (
                 xr_gbf4_ag_s.groupby(rl).sum('cell')
@@ -4049,8 +4055,8 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
                 .to_dataframe('Area Weighted Score (ha)').reset_index()
                 .assign(region='AUSTRALIA', Type='Agricultural Land-use', Year=yr_cal, region_level=rl)
             )
-            ag_frames.extend([ag_df_region, ag_df_AUS])
-            
+            ag_frames.extend([ag_df_region.query('`Area Weighted Score (ha)` != 0'), ag_df_AUS.query('`Area Weighted Score (ha)` != 0')])
+
             # am
             am_df_region = (
                 xr_gbf4_am_s.groupby(rl).sum('cell')
@@ -4063,8 +4069,8 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
                 .to_dataframe('Area Weighted Score (ha)').reset_index(allow_duplicates=True)
                 .assign(region='AUSTRALIA', Type='Agricultural Management', Year=yr_cal, region_level=rl)
             )
-            am_frames.extend([am_df_region, am_df_AUS])
-            
+            am_frames.extend([am_df_region.query('`Area Weighted Score (ha)` != 0'), am_df_AUS.query('`Area Weighted Score (ha)` != 0')])
+
             # nonag
             non_ag_df_region = (
                 xr_gbf4_non_ag_s.groupby(rl).sum('cell')
@@ -4077,8 +4083,8 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
                     .to_dataframe('Area Weighted Score (ha)').reset_index()
                     .assign(region='AUSTRALIA', Type='Non-Agricultural Land-use', Year=yr_cal, region_level=rl)
             )
-            non_ag_frames.extend([non_ag_df_region, non_ag_df_AUS])
-            
+            non_ag_frames.extend([non_ag_df_region.query('`Area Weighted Score (ha)` != 0'), non_ag_df_AUS.query('`Area Weighted Score (ha)` != 0')])
+
             sum_df_region = (
                 xr_gbf4_all_s.groupby(rl).sum('cell')
                 .to_dataframe('Area Weighted Score (ha)').reset_index()
@@ -4090,8 +4096,8 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
                 .to_dataframe('Area Weighted Score (ha)').reset_index()
                 .assign(region='AUSTRALIA', Year=yr_cal, region_level=rl)
             )
-            sum_frames_raw.extend([sum_df_region, sum_df_AUS])
-                
+            sum_frames_raw.extend([sum_df_region.query('`Area Weighted Score (ha)` != 0'), sum_df_AUS.query('`Area Weighted Score (ha)` != 0')])
+
 
         # Stack, filter, and save to tmp dirs.
         ag_s_stacked = (
@@ -4421,7 +4427,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         xr_gbf4_am_s     = add_all(xr_gbf4_am_s,     ['lm', 'lu', 'am'])
         xr_gbf4_all_s    = add_all(xr_gbf4_all_s,    ['Type'])
 
-        # Aggregate by region level and append to frame lists.
+        # Aggregate by region level and append to frame lists (zero-score rows dropped to save memory).
         for rl in REGION_LEVELS:
             ag_df_region = (
                 xr_gbf4_ag_s.groupby(rl).sum('cell')
@@ -4434,7 +4440,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
                     .to_dataframe('Area Weighted Score (ha)').reset_index()
                     .assign(region='AUSTRALIA', Type='Agricultural Land-use', Year=yr_cal, region_level=rl)
             )
-            ag_frames.extend([ag_df_region, ag_df_AUS])
+            ag_frames.extend([ag_df_region.query('`Area Weighted Score (ha)` != 0'), ag_df_AUS.query('`Area Weighted Score (ha)` != 0')])
 
             am_df_region = (
                 xr_gbf4_am_s.groupby(rl).sum('cell')
@@ -4447,7 +4453,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
                     .to_dataframe('Area Weighted Score (ha)').reset_index(allow_duplicates=True)
                     .assign(region='AUSTRALIA', Type='Agricultural Management', Year=yr_cal, region_level=rl)
             )
-            am_frames.extend([am_df_region, am_df_AUS])
+            am_frames.extend([am_df_region.query('`Area Weighted Score (ha)` != 0'), am_df_AUS.query('`Area Weighted Score (ha)` != 0')])
 
             non_ag_df_region = (
                 xr_gbf4_non_ag_s.groupby(rl).sum('cell')
@@ -4460,17 +4466,20 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
                     .to_dataframe('Area Weighted Score (ha)').reset_index()
                     .assign(region='AUSTRALIA', Type='Non-Agricultural Land-use', Year=yr_cal, region_level=rl)
             )
-            non_ag_frames.extend([non_ag_df_region, non_ag_df_AUS])
+            non_ag_frames.extend([non_ag_df_region.query('`Area Weighted Score (ha)` != 0'), non_ag_df_AUS.query('`Area Weighted Score (ha)` != 0')])
 
-            sum_frames_raw.extend([
+            sum_df_region = (
                 xr_gbf4_all_s.groupby(rl).sum('cell')
                     .to_dataframe('Area Weighted Score (ha)').reset_index()
                     .rename(columns={rl: 'region'})
-                    .assign(Year=yr_cal, region_level=rl),
+                    .assign(Year=yr_cal, region_level=rl)
+            )
+            sum_df_AUS = (
                 xr_gbf4_all_s.sum('cell')
                     .to_dataframe('Area Weighted Score (ha)').reset_index()
-                    .assign(region='AUSTRALIA', Year=yr_cal, region_level=rl),
-            ])
+                    .assign(region='AUSTRALIA', Year=yr_cal, region_level=rl)
+            )
+            sum_frames_raw.extend([sum_df_region.query('`Area Weighted Score (ha)` != 0'), sum_df_AUS.query('`Area Weighted Score (ha)` != 0')])
 
         # Stack, filter, and save to tmp dirs (reuse AUS dfs from loop for valid mask).
         ag_s_stacked = (
