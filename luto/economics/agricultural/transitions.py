@@ -315,7 +315,7 @@ def get_asparagopsis_adoption_limits(data: Data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']:
         j = data.DESC2AGLU[lu]
-        asparagopsis_limits[j] = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Technical_Adoption']
+        asparagopsis_limits[j] = min(data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Technical_Adoption'] * settings.TECH_ADOPT_MULT, 1)
 
     return asparagopsis_limits
 
@@ -331,7 +331,7 @@ def get_precision_agriculture_adoption_limit(data: Data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']:
         j = data.DESC2AGLU[lu]
-        prec_agr_limits[j] = data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption']
+        prec_agr_limits[j] = min(data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption'] * settings.TECH_ADOPT_MULT, 1)
 
     return prec_agr_limits
 
@@ -378,7 +378,7 @@ def get_agtech_ei_adoption_limit(data: Data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']:
         j = data.DESC2AGLU[lu]
-        agtech_ei_limits[j] = data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption']
+        agtech_ei_limits[j] = min(data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption'] * settings.TECH_ADOPT_MULT, 1)
 
     return agtech_ei_limits
 
@@ -394,7 +394,7 @@ def get_biochar_adoption_limit(data: Data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar']:
         j = data.DESC2AGLU[lu]
-        biochar_limits[j] = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption']
+        biochar_limits[j] = min(data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption'] * settings.TECH_ADOPT_MULT, 1)
 
     return biochar_limits
 

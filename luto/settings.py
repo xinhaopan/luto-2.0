@@ -124,6 +124,14 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
+# Scenario multiplier for land-use transition costs (establishment + water license + carbon penalty).
+# 1 = baseline; <1 cheaper switching; >1 higher barrier. Applied on top of data.TRANS_COST_MULTS.
+TRANSITION_COST_MULT = 1
+
+# Scenario multiplier for technical-adoption ceilings (Asparagopsis, Precision Ag, AgTech EI, Biochar).
+# 1 = baseline; <1 tighter ceilings; >1 relaxed ceilings (capped at 1.0 to stay a valid proportion).
+TECH_ADOPT_MULT = 1
+
 # Set whether to use demand elasticity when calculating commodity prices
 DYNAMIC_PRICE = False
 
