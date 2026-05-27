@@ -5,6 +5,313 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260527 — SNES sparse nonzero writer implemented and benchmarked
+
+### Context
+
+The earlier SNES write investigation identified dask/xarray regional aggregation as the
+main bottleneck and proposed a BLAS-like sparse path. The implemented direction is now:
+
+1. Keep decision variables and impact arrays as in-memory numpy arrays with `cell` as the
+   last axis.
+2. For each 10-species batch, compute the resfactored vegetation score once.
+3. Build sparse pair indices from `np.nonzero(veg_score_np)`.
+4. Slice all downstream arrays only at those nonzero cells.
+5. Accumulate regional scores with sparse `np.add.at`.
+6. Build DataFrames once per species batch from compact accumulators.
+
+This avoids the previous full dense xarray products and `.groupby().sum().to_dataframe()`
+inside the region/species loops.
+
+---
+
+### Profile result: sparse path vs previous implementations
+
+100-species SNES profile at RF5, year 2050:
+
+| Implementation | Duration | Peak delta RAM | Notes |
+|---|---:|---:|---|
+| v3 / older xarray path | 607.42s | 17,878.1 MB | dask/xarray groupby path |
+| dense current numpy path | 348.09s | 4,639.0 MB | faster, but still dense-ish |
+| sparse nonzero path | 96.16s | 4,541.5 MB | first sparse implementation |
+| sparse path after readability refactor | **93.98s** | **4,528.1 MB** | current implementation |
+
+Extrapolating the current 100-species result to all 1,937 SNES species gives
+approximately **30.3 minutes per year** (`93.98s × 19.37`). This is still not as clean as
+transition `ag2ag`, but it removes the dominant dask/xarray recomputation cost.
+
+---
+
+### Resfactor average is not the main remaining culprit
+
+`get_resfactored_average_fraction` was timed separately for 100 species:
+
+| Component | Time |
+|---|---:|
+| Resfactor vegetation loading for 100 species | ~25–27s |
+| Full sparse SNES write for 100 species | ~94–96s |
+
+So resfactor averaging is meaningful, but not the whole bottleneck. In the sparse writer,
+the remaining time is a mix of:
+
+- vegetation resfactor loading
+- NetCDF temp writes and final concat
+- DataFrame construction/final CSV joins
+- valid-layer NetCDF filling
+
+The regional aggregation kernel itself is now tiny.
+
+---
+
+### Sparse aggregation benchmark: `np.add.at` beats pandas groupby
+
+Benchmark script:
+`jinzhu_inspect_code/Profile_write_RES5/benchmark_snes_sparse_groupby.py`
+
+100-species sparse batch:
+
+| Kernel | Duration | Delta working set |
+|---|---:|---:|
+| `addat_ag` | 0.018s | 2.0 MB |
+| `pandas_ag` | 0.418s | 33.7 MB |
+| `addat_nonag` | 0.003s | 1.4 MB |
+| `pandas_nonag` | 0.055s | 3.6 MB |
+| `addat_am` | 0.165s | 10.5 MB |
+| `pandas_am` | 5.978s | 38.8 MB |
+
+Conclusion: `DataFrame.groupby` is not competitive for the sparse region-aggregation
+kernel. The pandas path is ~18–36× slower depending on type, and allocates more memory.
+The current `np.add.at` path should remain the hot aggregation kernel.
+
+---
+
+### xarray `isel` benchmark: selection is cheap, rectangular expansion is expensive
+
+The idea tested: use xarray labels for readability, `isel(cell=nonzero_cells)`, then
+multiply and `groupby`.
+
+For 100 species:
+
+| Quantity | Count |
+|---|---:|
+| true sparse `(species, cell)` nonzero pairs | 17,680 |
+| unique nonzero cells | 16,797 |
+| xarray selected rectangle (`species × unique_cell`) | 1,679,700 |
+
+Timing:
+
+| Kernel | Duration |
+|---|---:|
+| `xarray_isel_only` | 0.004s |
+| `xarray_ag_groupby` | 0.443s |
+| `xarray_nonag_groupby` | 0.114s |
+| `xarray_am_groupby` | 4.472s |
+
+Conclusion: `isel` itself is cheap, but selecting the union of nonzero cells expands the
+work by ~95× compared with true sparse species-cell pairs. xarray is useful for setup and
+labels, but not for the SNES inner loop.
+
+---
+
+### Readability refactor applied
+
+The sparse numpy implementation was hard to read because region accumulation and NetCDF
+layer filling were embedded directly in the species loop. The current implementation keeps
+the sparse numpy performance path but extracts the indexing-heavy sections into named
+helpers inside `write_biodiversity_GBF4_SNES_scores`:
+
+- `_load_sparse_veg_scores`
+- `_empty_region_accumulators`
+- `_take_sparse_inputs`
+- `_accumulate_sparse_region_scores`
+- `_fill_sum_nc_scores`
+- `_fill_ag_nc_layer`
+- `_fill_am_nc_layer`
+- `_fill_non_ag_nc_layer`
+
+The main species loop now reads as orchestration: load sparse vegetation, accumulate
+regional scores, build CSV frames, fill NetCDF layers, save temp chunks.
+
+Profile after this refactor:
+
+| Metric | Value |
+|---|---:|
+| Duration | 93.98s |
+| Peak delta RAM | 4,528.1 MB |
+| Peak working set | 15,094.8 MB |
+| Status | ok |
+
+No speed regression was observed; the result is slightly faster than the prior sparse
+profile within normal run-to-run variation.
+
+---
+
+### NetCDF writing decision: keep `save2tmp` / `concat_tmp2nc` for now
+
+An incremental NetCDF writer was considered to append directly along `layer` and avoid
+the temp-folder concat stage. It is technically feasible if it writes the same
+CF-compressed MultiIndex schema expected by report generation:
+
+```python
+cfxr.decode_compress_to_multi_index(xr.open_dataset(path, chunks={}), 'layer')['data']
+```
+
+The final NC also must keep `data` chunked as `(layer=1, cell=NCELLS)`, matching current
+report access patterns.
+
+However, after review, the preference is to keep the existing `save2tmp` /
+`concat_tmp2nc` path because it is already compatible with downstream report code and is
+easier to reason about. The attempted incremental writer was reverted.
+
+---
+
+## 20260527 — SNES write bottleneck: dask recomputation vs BLAS GEMM plan
+
+### Context
+
+Production run `2026_05_26__11_58_52_RF5_2010-2050` (RF5, 5 years) showed that
+`write_biodiversity_GBF4_SNES_scores` dominated the entire run:
+
+| Phase | Wall time | Fraction of total |
+|---|---:|---:|
+| Write phase total | 4h 31min | — |
+| → SNES write | **3h 35min** | **79%** |
+| Report phase total | 2h 57min | — |
+| → SNES map layers | **2h 40min** | **91%** |
+| **Total run** | **8h 12min** | — |
+| → **Total SNES overhead** | **~6h 15min** | **~76%** |
+
+Peak RAM during SNES write: **235.8 GB** (17:12:22). Pre-SNES baseline: ~70 GB.
+
+---
+
+### Root cause: 1,552 full-array dask recomputations
+
+The SNES loop processes 1937 species in 194 batches of 10. Per batch, per 2 region levels,
+it triggers `.groupby().sum().to_dataframe()` on 4 large arrays, plus an AUS aggregate:
+
+```
+194 batches × 2 region levels × 4 array types × 2 (region + AUS) = 1,552 dask .compute() calls
+```
+
+Each call materialises `xr_gbf4_am_s` of shape `(10 species × 9 am × 3 lm × 28 lu × 186648 cells)` ≈ **5.7 GB**.
+Total data movement per year: ~8.8 TB.
+
+Compare `write_transition_ag2ag` (257s, all land uses at once): it uses `process_chunks` with
+a BLAS GEMM accumulator — **1 aggregation pass** over ~100 MB. No dask compute loop.
+
+---
+
+### Memory trace finding: xr IS freed between batches; DataFrames are the floor
+
+The SNES memory trace (100-species profiling run, v3) shows an **oscillatory** pattern —
+not monotonically increasing. Memory spikes up for each batch and drops almost fully back
+to near-baseline after each batch completes. This proves:
+
+1. **xr arrays ARE freed between batches** (Python GC reclaims them on loop variable reassignment)
+2. The **per-batch xr spike** (~16 GB, dominated by `xr_gbf4_am_s`) is the peak driver
+3. The **accumulated DataFrames** add a slowly rising baseline (~230 MB per batch before filtering)
+
+Implication for `peak_mb_RES5`: the earlier extrapolation of 346,299 MB assumed linear
+DataFrame accumulation as the driver. That was wrong. The xr spike (~16 GB) is constant
+per batch regardless of total species count. For 1937 species, the per-year peak is
+similar to the 100-species profile: **~17,878 MB**.
+
+**`peak_mb_RES5['write_biodiversity_GBF4_SNES_scores']` corrected from 346,299 → 17,878 MB.**
+
+With `WRITE_REPORT_MAX_MEM_MB = 65,536 MB`:
+- Old (1 MB placeholder): `n_jobs = 65,536` → all 5 years in parallel
+- New (17,878 MB): `n_jobs = 3` → 3 years in parallel, then 2
+
+---
+
+### Short-term fix applied: zero-row DataFrame filter
+
+Before each `extend()` call in the species-batch loop, filter out rows where
+`'Area Weighted Score (ha)' == 0`:
+
+```python
+ag_frames.extend([
+    ag_df_region.query('`Area Weighted Score (ha)` != 0'),
+    ag_df_AUS.query('`Area Weighted Score (ha)` != 0'),
+])
+```
+
+Applied to all 4 frame lists in SNES, ECNES, and NVIS (12 `extend` calls total).
+Since the SNES layers are very sparse, most species have zero score in most
+(region, lm, lu) combinations. This reduces the accumulated DataFrame floor from
+~44 GB to ~2 GB for the full 1937-species run, lowering the baseline from which
+each xr spike launches.
+
+---
+
+### BLAS GEMM plan (not yet implemented)
+
+The `process_chunks` function used by `write_transition_ag2ag` achieves its speed via:
+
+```
+chunk.reshape(n_combos, chunk_cells) @ onehot[chunk_cells, n_regions]  →  (n_combos, n_regions)
+```
+
+The same form applies to SNES scoring. For ag:
+
+```
+score_ag[s, lm, lu, region] = Σ_cell  veg[s, cell] × impact[lu] × dvar[lm, lu, cell] × indicator[cell → region]
+                             = combined[s, lm, lu, :].reshape(n_combos, NCELLS) @ onehot
+```
+
+For am (the dominant cost, shape `species × am × lm × lu × cell`):
+
+```
+score_am[s, am, lm, lu, region]
+    = Σ_cell  veg[s, cell] × am_impact[am, lu, cell] × am_dvar[am, lm, lu, cell] × indicator[cell → region]
+    = combined_am.reshape(n_combos_am, chunk_cells) @ onehot_chunk
+```
+
+**Proposed restructuring** — swap the loop axes:
+
+| | Current | Proposed |
+|---|---|---|
+| Outer loop | species batch (194×) | species batch (194×) — same |
+| Inner loop | 2 region levels × 8 `groupby().sum()` dask triggers | cell chunks (46×, 4096 cells each) |
+| Array per step | `(10, am, lm, lu, 186648)` = 5.7 GB materialised | `(10, am, lm, lu, 4096)` = 124 MB chunk |
+| Aggregation | xr `groupby().sum()` on full array | BLAS GEMM `@ onehot_chunk` |
+| Dask calls | 1,552 `.compute()` | 0 (pure numpy) |
+
+Per-batch cell-chunk GEMM:
+
+```python
+# onehot pre-computed once per region level: (NCELLS, n_regions), float32
+for sp_idx, species_batch in enumerate(...):
+    snes_chunk_all = snes_layers[sp_batch, :]   # (n_sp, NCELLS) — sparse→dense once per batch
+
+    for cell_start in range(0, NCELLS, chunk_size):
+        sl = slice(cell_start, cell_start + chunk_size)
+        combined_am = (snes_chunk_all[:, sl][:, None, None, None, :]   # (n_sp, 1, 1, 1, c)
+                       * am_impact[:, :, sl][None, :, None, :, :]       # (1, am, 1, lu, c)
+                       * am_dvar[:, :, :, sl][None, :, :, :, :])        # (1, am, lm, lu, c)
+        # → (n_sp, am, lm, lu, chunk_cells) = ~124 MB
+        accum_am += combined_am.reshape(-1, chunk_cells) @ onehot_sl   # BLAS GEMM → (n_combos, n_regions)
+
+    # Convert accumulator to DataFrame ONCE per batch (not 8×)
+    df_ag = pd.DataFrame(accum_ag.reshape(-1, n_regions), ...).melt(...)
+```
+
+**Expected impact:**
+
+| Metric | Current | After BLAS GEMM |
+|---|---|---|
+| Dask `.compute()` calls | 1,552 | 0 |
+| Memory per step | 5.7 GB | 124 MB |
+| Estimated time per year | ~196 min | ~20–40 min (similar to ECNES at 655s) |
+| Peak RAM per year | ~18 GB Δ | ~2 GB Δ (no full materialisation) |
+
+Same restructuring can be applied to ECNES and NVIS.
+
+**Status: planned, not yet implemented.**
+
+---
+
 ## 20260525 — Biodiversity input array sparsity and threading for GBF3/4 write loops
 
 ### Context
