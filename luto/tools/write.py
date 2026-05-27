@@ -22,7 +22,6 @@ import os
 import gc
 import re
 import glob
-import itertools
 import json
 import shutil
 import threading
@@ -3987,7 +3986,16 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     tmp_am     = os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_management_{yr_cal}_tmp')
     tmp_sum    = os.path.join(path, f'xr_biodiversity_GBF4_SNES_sum_{yr_cal}_tmp')
 
+    lm_vals = ag_dvar_mrj.coords['lm'].values
+    lu_ag_vals = ag_dvar_mrj.coords['lu'].values
+    am_vals = am_dvar_amrj.coords['am'].values
+    lu_non_ag_vals = non_ag_dvar_rk.coords['lu'].values
+    n_lm, n_lu_ag, n_am, n_lu_non_ag = len(lm_vals), len(lu_ag_vals), len(am_vals), len(lu_non_ag_vals)
+
     # Fast path: pre-extract arrays once and keep cell as the last axis.
+    # Unstacking the AM impact sorts the MultiIndex levels, so reindex by
+    # labels before dropping into NumPy positional multiplication.
+    am_impact_amr = am_impact_amr.reindex(am=am_vals, lu=lu_ag_vals, fill_value=0)
     ag_dvar_np     = ag_dvar_mrj.transpose('lm', 'lu', 'cell').compute().values
     am_dvar_np     = am_dvar_amrj.transpose('am', 'lm', 'lu', 'cell').compute().values
     non_ag_dvar_np = non_ag_dvar_rk.transpose('lu', 'cell').compute().values
@@ -3997,12 +4005,6 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     ).astype(np.float32)
     ag_impact_np = ag_impact_j.values.astype(np.float32)
     non_ag_impact_np = non_ag_impact_k.values.astype(np.float32)
-
-    lm_vals = ag_dvar_mrj.coords['lm'].values
-    lu_ag_vals = ag_dvar_mrj.coords['lu'].values
-    am_vals = list(data.AG_MAN_LU_DESC.keys())
-    lu_non_ag_vals = non_ag_dvar_rk.coords['lu'].values
-    n_lm, n_lu_ag, n_am, n_lu_non_ag = len(lm_vals), len(lu_ag_vals), len(am_vals), len(lu_non_ag_vals)
 
     lm_all = ['ALL'] + list(lm_vals)
     lu_ag_all = ['ALL'] + list(lu_ag_vals)
@@ -4681,7 +4683,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
             'cell': range(data.NCELLS),
         }
-    ).unstack()
+    ).unstack().fillna(0)
 
     # 4. Set up region levels and tmp dirs.
     REGION_LEVELS = ['region_NRM', 'region_state']
@@ -4692,164 +4694,148 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     tmp_sum    = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_sum_{yr_cal}_tmp')
 
 
+    type_raw = ['ag', 'non-ag', 'ag-man']
+
+    def _load_veg_scores(species_batch):
+        rows = np.array([
+            data.get_resfactored_average_fraction(
+                data.GBF4_ECNES_LAYERS_ALL.sel(
+                    species=sp, presence=settings.GBF4_ECNES_PRESENCE_CLASS
+                ).data.todense().astype(np.float32)
+            )
+            for sp in species_batch
+        ], dtype=np.float32)
+        rows = np.where(
+            data.SAVBURN_ELIGIBLE.astype(bool)[None, :],
+            rows * settings.BIO_CONTRIBUTION_LDS, rows,
+        ).astype(np.float32)
+        rows = (rows * data.REAL_AREA[None, :]).astype(np.float32)
+        return xr.DataArray(
+            rows,
+            dims=['species', 'cell'],
+            coords={
+                'species': species_batch,
+                'cell': np.arange(data.NCELLS),
+                'region_NRM': ('cell', data.REGION_NRM_NAME),
+                'region_state': ('cell', data.REGION_STATE_NAME),
+            },
+        ).pipe(chunk_unify_size)
+
     # 5-6. Loop through each community in batches of 10.
     species_slice_indices = np.arange(10, len(all_species), 10)
     for sp_idx, species_batch in enumerate(np.array_split(all_species, species_slice_indices)):
-        # Get resfactored average array from sparse data.
-        ecnes_layers_arr = xr.DataArray(
-            np.array(
-                [
-                    data.get_resfactored_average_fraction(
-                        data.GBF4_ECNES_LAYERS_ALL.sel(
-                            species=sp, presence=settings.GBF4_ECNES_PRESENCE_CLASS).data.todense().astype(np.float32)
-                    )
-                    for sp in species_batch
-                ],
-                dtype=np.float32,
-            ),
-            dims=['species', 'cell'],
-            coords={'species': species_batch, 'cell': np.arange(data.NCELLS)},
+        n_sp = len(species_batch)
+
+        veg_xr = _load_veg_scores(species_batch)
+
+        score_ag = add_all(
+            (ag_dvar_mrj * ag_impact_j * veg_xr).astype(np.float32),
+            ['lm', 'lu'],
+        )
+        score_am = add_all(
+            (am_dvar_amrj * am_impact_amr * veg_xr).astype(np.float32),
+            ['am', 'lm', 'lu'],
+        )
+        score_non_ag = add_all(
+            (non_ag_dvar_rk * non_ag_impact_k * veg_xr).astype(np.float32),
+            ['lu'],
         )
 
-        # Apply LDS correction.
-        ecnes_layers_arr = xr.where(
-            data.SAVBURN_ELIGIBLE, ecnes_layers_arr * settings.BIO_CONTRIBUTION_LDS, ecnes_layers_arr
-        ).astype(np.float32)
+        score_by_type = add_all(xr.concat([
+            score_ag.sel(lm='ALL', lu='ALL').expand_dims({'Type': ['ag']}),
+            score_non_ag.sel(lu='ALL').expand_dims({'Type': ['non-ag']}),
+            score_am.sel(am='ALL', lm='ALL', lu='ALL').expand_dims({'Type': ['ag-man']}),
+        ], dim='Type'), ['Type'])
 
-        # veg_score_r: community-weighted area per cell.
-        veg_score_r = xr.DataArray(
-            ecnes_layers_arr * data.REAL_AREA[None, :],
-            dims=['species', 'cell'],
-            coords={
-                'species':      species_batch,
-                'cell':         np.arange(data.NCELLS),
-                'region_state': ('cell', data.REGION_STATE_NAME),
-                'region_NRM':   ('cell', data.REGION_NRM_NAME),
-            }
-        )
+        def _score_df(score, group_dims, type_str, rl):
+            region_group_dims = [rl, 'species'] + group_dims
+            region_df = (
+                score.groupby(rl)
+                .sum(dim='cell')
+                .to_dataframe('Area Weighted Score (ha)').reset_index()
+                .groupby(region_group_dims)[['Area Weighted Score (ha)']]
+                .sum().reset_index()
+                .assign(Year=yr_cal)
+                .query('`Area Weighted Score (ha)` != 0')
+                .rename(columns={rl: 'region'})
+                .assign(region_level=rl)
+            )
+            aus_df = (
+                score.sum(dim='cell')
+                .to_dataframe('Area Weighted Score (ha)').reset_index()
+                .groupby(['species'] + group_dims)[['Area Weighted Score (ha)']]
+                .sum().reset_index()
+                .assign(region='AUSTRALIA', Year=yr_cal, region_level=rl)
+                .query('`Area Weighted Score (ha)` != 0')
+            )
+            if type_str:
+                region_df = region_df.assign(Type=type_str)
+                aus_df = aus_df.assign(Type=type_str)
+            return pd.concat([region_df, aus_df], ignore_index=True)
 
-        # Multiply veg_score by dvar and impact arrays.
-        xr_gbf4_ag_s     = veg_score_r * ag_impact_j     * ag_dvar_mrj
-        xr_gbf4_am_s     = veg_score_r * am_impact_amr   * am_dvar_amrj
-        xr_gbf4_non_ag_s = veg_score_r * non_ag_impact_k * non_ag_dvar_rk
-
-        # Build 'all' array (before add_all to avoid double-counting).
-        xr_gbf4_all_s = xr.concat(
-            [
-                xr_gbf4_ag_s.sum(dim=['lm', 'lu']).expand_dims({'Type': ['ag']}),
-                xr_gbf4_non_ag_s.sum(dim=['lu']).expand_dims({'Type': ['non-ag']}),
-                xr_gbf4_am_s.sum(dim=['am', 'lm', 'lu']).expand_dims({'Type': ['ag-man']}),
-            ], dim='Type'
-        )
-
-        xr_gbf4_ag_s     = add_all(xr_gbf4_ag_s,     ['lm', 'lu'])
-        xr_gbf4_non_ag_s = add_all(xr_gbf4_non_ag_s, ['lu'])
-        xr_gbf4_am_s     = add_all(xr_gbf4_am_s,     ['lm', 'lu', 'am'])
-        xr_gbf4_all_s    = add_all(xr_gbf4_all_s,    ['Type'])
-
-        # Aggregate by region level and append to frame lists (zero-score rows dropped to save memory).
         for rl in REGION_LEVELS:
-            ag_df_region = (
-                xr_gbf4_ag_s.groupby(rl).sum('cell')
-                    .to_dataframe('Area Weighted Score (ha)').reset_index()
-                    .rename(columns={rl: 'region'})
-                    .assign(Type='Agricultural Land-use', Year=yr_cal, region_level=rl)
-            )
-            ag_df_AUS = (
-                xr_gbf4_ag_s.sum('cell')
-                    .to_dataframe('Area Weighted Score (ha)').reset_index()
-                    .assign(region='AUSTRALIA', Type='Agricultural Land-use', Year=yr_cal, region_level=rl)
-            )
-            ag_frames.extend([ag_df_region.query('`Area Weighted Score (ha)` != 0'), ag_df_AUS.query('`Area Weighted Score (ha)` != 0')])
+            ag_frames.append(_score_df(score_ag, ['lm', 'lu'], 'Agricultural Land-use', rl))
+            am_frames.append(_score_df(score_am, ['am', 'lm', 'lu'], 'Agricultural Management', rl))
+            non_ag_frames.append(_score_df(score_non_ag, ['lu'], 'Non-Agricultural Land-use', rl))
+            sum_frames_raw.append(_score_df(score_by_type, ['Type'], None, rl))
 
-            am_df_region = (
-                xr_gbf4_am_s.groupby(rl).sum('cell')
-                    .to_dataframe('Area Weighted Score (ha)').reset_index(allow_duplicates=True)
-                    .rename(columns={rl: 'region'})
-                    .assign(Type='Agricultural Management', Year=yr_cal, region_level=rl)
+        def _valid_layers(score, layer_dims):
+            aus_df = (
+                score.sum(dim='cell')
+                .to_dataframe('Area Weighted Score (ha)').reset_index()
+                .query('`Area Weighted Score (ha)` > 1')
             )
-            am_df_AUS = (
-                xr_gbf4_am_s.sum('cell')
-                    .to_dataframe('Area Weighted Score (ha)').reset_index(allow_duplicates=True)
-                    .assign(region='AUSTRALIA', Type='Agricultural Management', Year=yr_cal, region_level=rl)
-            )
-            am_frames.extend([am_df_region.query('`Area Weighted Score (ha)` != 0'), am_df_AUS.query('`Area Weighted Score (ha)` != 0')])
+            if aus_df.empty:
+                return pd.MultiIndex.from_tuples(
+                    [tuple(score.coords[d].values[0] for d in layer_dims)],
+                    names=layer_dims,
+                )
+            return pd.MultiIndex.from_frame(aus_df[layer_dims]).sort_values()
 
-            non_ag_df_region = (
-                xr_gbf4_non_ag_s.groupby(rl).sum('cell')
-                    .to_dataframe('Area Weighted Score (ha)').reset_index()
-                    .rename(columns={rl: 'region'})
-                    .assign(Type='Non-Agricultural Land-use', Year=yr_cal, region_level=rl)
-            )
-            non_ag_df_AUS = (
-                xr_gbf4_non_ag_s.sum('cell')
-                    .to_dataframe('Area Weighted Score (ha)').reset_index()
-                    .assign(region='AUSTRALIA', Type='Non-Agricultural Land-use', Year=yr_cal, region_level=rl)
-            )
-            non_ag_frames.extend([non_ag_df_region.query('`Area Weighted Score (ha)` != 0'), non_ag_df_AUS.query('`Area Weighted Score (ha)` != 0')])
+        valid_ag_layers = _valid_layers(score_ag, ['species', 'lm', 'lu'])
+        valid_am_layers = _valid_layers(score_am, ['species', 'am', 'lm', 'lu'])
+        valid_non_ag_layers = _valid_layers(score_non_ag, ['species', 'lu'])
 
-            sum_df_region = (
-                xr_gbf4_all_s.groupby(rl).sum('cell')
-                    .to_dataframe('Area Weighted Score (ha)').reset_index()
-                    .rename(columns={rl: 'region'})
-                    .assign(Year=yr_cal, region_level=rl)
-            )
-            sum_df_AUS = (
-                xr_gbf4_all_s.sum('cell')
-                    .to_dataframe('Area Weighted Score (ha)').reset_index()
-                    .assign(region='AUSTRALIA', Year=yr_cal, region_level=rl)
-            )
-            sum_frames_raw.extend([sum_df_region.query('`Area Weighted Score (ha)` != 0'), sum_df_AUS.query('`Area Weighted Score (ha)` != 0')])
-
-        # Stack, filter, and save to tmp dirs (reuse AUS dfs from loop for valid mask).
-        ag_s_stacked = (
-            xr_gbf4_ag_s.stack(layer=['species', 'lm', 'lu'])
-            .drop_vars(['region_NRM', 'region_state'], errors='ignore')
+        valid_ag_s = (
+            score_ag.stack(layer=['species', 'lm', 'lu'])
+            .sel(layer=valid_ag_layers)
+            .drop_vars(['region_state', 'region_NRM'], errors='ignore')
+            .transpose('layer', 'cell')
+            .compute()
         )
-        valid_ag_s = ag_s_stacked.sel(
-            layer=pd.MultiIndex.from_frame(ag_df_AUS.query('`Area Weighted Score (ha)` > 1')[['species', 'lm', 'lu']])
-        )
-        if valid_ag_s.sizes['layer'] == 0:
-            fallback_midx = pd.MultiIndex.from_tuples([(species_batch[0], 'ALL', 'ALL')], names=['species', 'lm', 'lu'])
-            valid_ag_s = ag_s_stacked.sel(layer=fallback_midx)
         save2tmp(valid_ag_s, tmp_ag, sp_idx)
 
-        non_ag_s_stacked = (
-            xr_gbf4_non_ag_s.stack(layer=['species', 'lu'])
-            .drop_vars(['region_NRM', 'region_state'], errors='ignore')
+        valid_non_ag_s = (
+            score_non_ag.stack(layer=['species', 'lu'])
+            .sel(layer=valid_non_ag_layers)
+            .drop_vars(['region_state', 'region_NRM'], errors='ignore')
+            .transpose('layer', 'cell')
+            .compute()
         )
-        valid_non_ag_s = non_ag_s_stacked.sel(
-            layer=pd.MultiIndex.from_frame(non_ag_df_AUS.query('`Area Weighted Score (ha)` > 1')[['species', 'lu']])
-        )
-        if valid_non_ag_s.sizes['layer'] == 0:
-            fallback_midx = pd.MultiIndex.from_tuples([(species_batch[0], 'ALL')], names=['species', 'lu'])
-            valid_non_ag_s = non_ag_s_stacked.sel(layer=fallback_midx)
         save2tmp(valid_non_ag_s, tmp_non_ag, sp_idx)
 
-        am_s_stacked = (
-            xr_gbf4_am_s.stack(layer=['species', 'am', 'lm', 'lu'])
-            .drop_vars(['region_NRM', 'region_state'], errors='ignore')
+        valid_am_s = (
+            score_am.stack(layer=['species', 'am', 'lm', 'lu'])
+            .sel(layer=valid_am_layers)
+            .drop_vars(['region_state', 'region_NRM'], errors='ignore')
+            .transpose('layer', 'cell')
+            .compute()
         )
-        valid_am_s = am_s_stacked.sel(
-            layer=pd.MultiIndex.from_frame(am_df_AUS.query('`Area Weighted Score (ha)` > 1')[['species', 'am', 'lm', 'lu']])
-        )
-        if valid_am_s.sizes['layer'] == 0:
-            fallback_midx = pd.MultiIndex.from_tuples([(species_batch[0], 'ALL', 'ALL', 'ALL')], names=['species', 'am', 'lm', 'lu'])
-            valid_am_s = am_s_stacked.sel(layer=fallback_midx)
         save2tmp(valid_am_s, tmp_am, sp_idx)
 
-        sum_s_stacked = (
-            xr_gbf4_all_s.stack(layer=['Type', 'species'])
-            .drop_vars(['region_NRM', 'region_state'], errors='ignore')
+        valid_sum_s = (
+            score_by_type.sel(Type=type_raw)
+            .stack(layer=['Type', 'species'])
+            .drop_vars(['region_state', 'region_NRM'], errors='ignore')
+            .transpose('layer', 'cell')
+            .compute()
         )
-        non_all_mask = np.array([t != 'ALL' for t in sum_s_stacked.coords['Type'].values])
-        valid_sum_s = sum_s_stacked.isel(layer=non_all_mask)
         if valid_sum_s.sizes['layer'] > 0:
             save2tmp(valid_sum_s, tmp_sum, sp_idx)
 
     # 7. Concat frames from loop, combine with baseline df, compute percentages.
-    GBF4_score_ag     = pd.concat(ag_frames,     ignore_index=True)
-    GBF4_score_am     = pd.concat(am_frames,     ignore_index=True)
+    GBF4_score_ag     = pd.concat(ag_frames, ignore_index=True)
+    GBF4_score_am     = pd.concat(am_frames, ignore_index=True)
     GBF4_score_non_ag = pd.concat(non_ag_frames, ignore_index=True)
 
     all_ha_df_nrm = (

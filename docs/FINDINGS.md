@@ -5,7 +5,7 @@ Entries are in **descending date order** (newest first).
 
 ---
 
-## 20260527 — SNES sparse nonzero writer implemented and benchmarked
+## 20260527 — SNES sparse nonzero writer implemented, debugged, and benchmarked
 
 ### Context
 
@@ -35,9 +35,10 @@ inside the region/species loops.
 | dense current numpy path | 348.09s | 4,639.0 MB | faster, but still dense-ish |
 | sparse nonzero path | 96.16s | 4,541.5 MB | first sparse implementation |
 | sparse path after readability refactor | **93.98s** | **4,528.1 MB** | current implementation |
+| sparse path after AM-axis alignment fix | **118.51s** | **4,537.7 MB** | validated against archived run output |
 
-Extrapolating the current 100-species result to all 1,937 SNES species gives
-approximately **30.3 minutes per year** (`93.98s × 19.37`). This is still not as clean as
+Extrapolating the validated 100-species result to all 1,937 SNES species gives
+approximately **38.3 minutes per year** (`118.51s × 19.37`). This is still not as clean as
 transition `ag2ag`, but it removes the dominant dask/xarray recomputation cost.
 
 ---
@@ -143,6 +144,104 @@ Profile after this refactor:
 
 No speed regression was observed; the result is slightly faster than the prior sparse
 profile within normal run-to-run variation.
+
+---
+
+### AM-axis alignment bug found and fixed
+
+The archived production run at commit `0e3424f74d62e23709c1c9b4274e1d6f63363f3e`
+used the xarray path:
+
+```python
+xr_gbf4_am_s = veg_score_r * am_impact_amr * am_dvar_amrj
+```
+
+That path is slower, but xarray automatically aligns by coordinate label. The sparse
+implementation converts to NumPy arrays with `.values`, so all dimension alignment becomes
+positional and must be made explicit.
+
+The bug: `am_impact_amr.unstack()` sorts the MultiIndex level for `am`, producing:
+
+```text
+['AgTech EI', 'Asparagopsis taxiformis', 'Biochar', 'HIR - Beef', 'HIR - Sheep',
+ 'Onshore Wind', 'Precision Agriculture', 'Savanna Burning', 'Utility Solar PV']
+```
+
+while `am_dvar_amrj` remains in data order:
+
+```text
+['Asparagopsis taxiformis', 'Precision Agriculture', 'Savanna Burning', 'AgTech EI',
+ 'Biochar', 'HIR - Beef', 'HIR - Sheep', 'Utility Solar PV', 'Onshore Wind']
+```
+
+The LU axis was already aligned, but the AM axis was not. This caused the sparse
+implementation to multiply the wrong AM impact by the wrong AM decision variable. The clue
+was that an `ALL` agricultural-management score for a species became negative, even though
+the positive Savanna Burning / HIR contributions should dominate. Individual renewable
+management scores can legitimately be negative because renewables reduce SNES biodiversity
+scores, but the total `ALL` AM score should match the archived xarray result.
+
+Fix applied before converting to NumPy:
+
+```python
+am_vals = am_dvar_amrj.coords['am'].values
+lu_ag_vals = ag_dvar_mrj.coords['lu'].values
+am_impact_amr = am_impact_amr.reindex(am=am_vals, lu=lu_ag_vals, fill_value=0)
+```
+
+This restores the label alignment that the archived xarray implementation provided
+implicitly.
+
+---
+
+### Validation against archived output
+
+The current sparse SNES profile was rerun for the first 100 species and compared against
+the archived production output from:
+
+```text
+output/2026_05_26__11_58_52_RF5_2010-2050/out_2050
+```
+
+The archive was generated from commit:
+
+```text
+0e3424f74d62e23709c1c9b4274e1d6f63363f3e
+```
+
+After filtering the archive to the same 100 profile species:
+
+| CSV | Current rows | Archive rows | Key matches | Current-only | Archive-only |
+|---|---:|---:|---:|---:|---:|
+| `biodiversity_GBF4_SNES_scores_2050.csv` | 20,783 | 20,783 | 20,783 | 0 | 0 |
+| `biodiversity_GBF4_SNES_sum_scores_2050.csv` | 1,960 | 1,960 | 1,960 | 0 | 0 |
+
+Maximum absolute score differences are small and consistent with float32/order-of-sum
+differences in the sparse path:
+
+| CSV / Type | Max absolute score difference |
+|---|---:|
+| detailed CSV — Agricultural Management | 0.109375 |
+| detailed CSV — Non-Agricultural Land-use | 0.093750 |
+| detailed CSV — Agricultural Land-use | 24.000000 |
+| sum CSV — ag-man | 0.109375 |
+| sum CSV — non-ag | 0.093750 |
+| sum CSV — ag | 25.000000 |
+| sum CSV — ALL | 24.000000 |
+
+Spot checks after the fix:
+
+| Species | AM | Current | Archive | Difference |
+|---|---|---:|---:|---:|
+| `Acanthophis hawkei` | ALL | 214,972.546875 | 214,972.625000 | -0.078125 |
+| `Acanthophis hawkei` | Savanna Burning | 131,123.828125 | 131,123.828125 | 0 |
+| `Acanthophis hawkei` | HIR - Beef | 72,385.476562 | 72,385.484375 | -0.007812 |
+| `Acanthophis hawkei` | Onshore Wind | -805.271973 | -805.271973 | 0 |
+| `Acacia crombiei` | ALL | 112,579.671875 | 112,579.671875 | 0 |
+| `Acacia ammophila` | ALL | 20,845.052734 | 20,845.050781 | 0.001953 |
+
+Conclusion: the current sparse implementation is now equivalent to the archived xarray
+implementation for the profiled species set, with only tiny floating-point differences.
 
 ---
 
