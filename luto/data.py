@@ -1516,13 +1516,16 @@ class Data:
         # Load full SNES/ECNES into memory for writing all species scores
         self.GBF4_SNES_LAYERS_ALL = self.get_SNES_sparse_array()
         self.GBF4_ECNES_LAYERS_ALL = self.get_ECNES_sparse_array()
-        
+
+        self.GBF4_SNES_META     = self.get_SNES_targets_df()
+        self.BIO_GBF4_SNES_SEL  = [tuple(r) for r in self.GBF4_SNES_META[['region', 'SCIENTIFIC_NAME', 'presence']].values.tolist()]  # list of (region, species, presence) tuples for selection; presence is 'LIKELY' or 'LIKELY_AND_MAYBE'
+
+        self.GBF4_ECNES_META    = self.get_ECNES_targets_df()
+        self.BIO_GBF4_ECNES_SEL = [tuple(r) for r in self.GBF4_ECNES_META[['region', 'COMMUNITY', 'presence']].values.tolist()]
+
         if settings.GBF4_TARGET_SNES != 'off':
 
             print("│   ├── Loading environmental significance data (SNES)", flush=True)
-
-            self.GBF4_SNES_META     = self.get_SNES_targets_df()
-            self.BIO_GBF4_SNES_SEL  = [tuple(r) for r in self.GBF4_SNES_META[['region', 'SCIENTIFIC_NAME', 'presence']].values.tolist()]  # list of (region, species, presence) tuples for selection; presence is 'LIKELY' or 'LIKELY_AND_MAYBE'
 
             sel_sp_pres_pairs = [tuple(r) for r in self.GBF4_SNES_META[['SCIENTIFIC_NAME', 'presence']].drop_duplicates().values.tolist()]  # list of unique (species, presence) pairs for selection
             snes_layer_arr = xr.DataArray(
@@ -1551,9 +1554,6 @@ class Data:
         if settings.GBF4_TARGET_ECNES != 'off':
             print("│   ├── Loading environmental significance data (ECNES)", flush=True)
 
-            self.GBF4_ECNES_META             = self.get_ECNES_targets_df()
-            self.BIO_GBF4_ECNES_SEL          = [tuple(r) for r in self.GBF4_ECNES_META[['region', 'COMMUNITY', 'presence']].values.tolist()]
-            
             sel_comm_pres_pairs              = [tuple(r) for r in self.GBF4_ECNES_META[['COMMUNITY', 'presence']].drop_duplicates().values.tolist()]
             ecnes_layer_arr = xr.DataArray(
                 np.array([
@@ -2251,9 +2251,6 @@ class Data:
         NRM mode:       presence='LIKELY', region=NRM region name
         Dict targets are applied inside this function so all call sites stay consistent.
         """
-        if settings.GBF4_TARGET_SNES == 'off':
-            return pd.DataFrame()
-
         snes_df = (
             pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv', low_memory=False)
             .query(f"region_level == '{settings.GBF4_SNES_REGION_MODE}'")
@@ -2289,9 +2286,6 @@ class Data:
         NRM mode:       presence='LIKELY', region=NRM region name
         Dict targets are applied inside this function so all call sites stay consistent.
         """
-        if settings.GBF4_TARGET_ECNES == 'off':
-            return pd.DataFrame()
-
         ecnes_df = (
             pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv')
             .query(f"region_level == '{settings.GBF4_ECNES_REGION_MODE}'")
