@@ -2255,11 +2255,12 @@ class Data:
             pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv', low_memory=False)
             .query(f"region_level == '{settings.GBF4_SNES_REGION_MODE}'")
             .query(f"resfactor == {settings.RESFACTOR}")
-            .query(f"region.isin({settings.GBF4_SNES_SELECTED_REGIONS})")
             .query(f"presence == '{settings.GBF4_SNES_PRESENCE_CLASS}'")
             .query("TARGET_LEVEL_2030 > 0")
             .reset_index(drop=True)
         )
+        if settings.GBF4_SNES_REGION_MODE != 'AUSTRALIA':
+            snes_df = snes_df.query(f"region.isin({settings.GBF4_SNES_SELECTED_REGIONS})").reset_index(drop=True)
         
         if settings.GBF4_SNES_EXCLUDE_REGION_SPECIES:
             for region, species in settings.GBF4_SNES_EXCLUDE_REGION_SPECIES:
@@ -2290,11 +2291,12 @@ class Data:
             pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv')
             .query(f"region_level == '{settings.GBF4_ECNES_REGION_MODE}'")
             .query(f"resfactor == {settings.RESFACTOR}")
-            .query(f"region.isin({settings.GBF4_ECNES_SELECTED_REGIONS})")
             .query(f"presence == '{settings.GBF4_ECNES_PRESENCE_CLASS}'")
             .query("TARGET_LEVEL_2030 > 0")
             .reset_index(drop=True)
         )
+        if settings.GBF4_ECNES_REGION_MODE != 'AUSTRALIA':
+            ecnes_df = ecnes_df.query(f"region.isin({settings.GBF4_ECNES_SELECTED_REGIONS})").reset_index(drop=True)
 
         if settings.GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES:
             excl_set = set(settings.GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES)
