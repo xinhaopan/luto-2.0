@@ -86,7 +86,7 @@ def _groupby_to_records(df: pd.DataFrame, group_cols, out_cols, value_cols=('Yea
 
 
 
-def _bio_outside_series(bio_df: pd.DataFrame, cat: str) -> pd.DataFrame:
+def _bio_outside_series(bio_df: pd.DataFrame, cat: str, value_col: str = 'Value (%)') -> pd.DataFrame:
     """Build an "Outside LUTO study area" series df_wide for biodiversity per-Category charts.
 
     Outside rows in the underlying CSV are replicated across every (am, lm) combination
@@ -98,6 +98,7 @@ def _bio_outside_series(bio_df: pd.DataFrame, cat: str) -> pd.DataFrame:
 
     Returns a df_wide with the same columns the caller expects (including 'type', 'color', 'name').
     Returns an empty DataFrame when no outside rows exist (e.g. AUSTRALIA-mode CSVs).
+    Pass value_col='Area Weighted Score (ha)' to get area-mode outside series.
     """
     outside = bio_df.query('Type == "Outside LUTO study area"')
     if outside.empty:
@@ -107,19 +108,19 @@ def _bio_outside_series(bio_df: pd.DataFrame, cat: str) -> pd.DataFrame:
         sub = outside.query('`Agricultural Management` == "ALL"')
         df_wide = _groupby_to_records(
             sub, ['region_level', 'region', 'species', 'Water_supply'], ['region_level', 'region', 'species', 'water', 'data'],
-            value_cols=('Year', 'Value (%)'),
+            value_cols=('Year', value_col),
         )
     elif cat == 'Am':
         df_wide = _groupby_to_records(
             outside, ['region_level', 'region', 'species', 'Water_supply', 'Agricultural Management'],
             ['region_level', 'region', 'species', 'water', 'am', 'data'],
-            value_cols=('Year', 'Value (%)'),
+            value_cols=('Year', value_col),
         )
     elif cat == 'NonAg':
         sub = outside.query('`Agricultural Management` == "ALL" and Water_supply == "ALL"')
         df_wide = _groupby_to_records(
             sub, ['region_level', 'region', 'species'], ['region_level', 'region', 'species', 'data'],
-            value_cols=('Year', 'Value (%)'),
+            value_cols=('Year', value_col),
         )
     else:
         return pd.DataFrame()
@@ -3357,9 +3358,10 @@ def process_biodiversity_data(files, SAVE_DIR):
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
             .round(6)
-        # Drop the per-species 'ALL' aggregate so it is not surfaced as a selectable
-        # vegetation group in the report dropdowns; sum charts re-aggregate explicitly.
-        bio_df = bio_df.query('species != "ALL"')
+        # Drop the per-species 'ALL' aggregate; also drop the AUSTRALIA aggregate row
+        # (AUSTRALIA = exact sum of all NRM/state regions — including it alongside individual
+        # regions causes double counting wherever region-level sums are computed).
+        bio_df = bio_df.query('species != "ALL" and region != "AUSTRALIA"')
 
         # ---------------- (GBF3-NVIS) Ranking  ----------------
         bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
@@ -3386,9 +3388,15 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF3-NVIS) Overview  ----------------
-        
-        # sum (contribution percentage; species == 'ALL' excluded)
-        bio_df_target = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
+
+        # Build target lookup once (species × region → Target_by_Percent, BASE_TOTAL_SCORE)
+        # used by overview_sum, Sum, and Ag/Am/NonAg charts.
+        _gbf3_target_lk = (
+            bio_df[bio_df['Target_by_Percent'].notna()]
+            [['species', 'region', 'region_level', 'Target_by_Percent', 'BASE_TOTAL_SCORE']]
+            .drop_duplicates(['species', 'region', 'region_level'])
+        )
+
 
         # Sum-tab: normalise by ALL_HA (total pre-1750 baseline across all veg groups) so
         # the stacked bar shows sum(area)/ALL_HA*100, not a meaningless sum of per-group %.
@@ -3413,14 +3421,22 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide_pct['type'] = 'column'
         df_wide_pct['color'] = df_wide_pct['name'].apply(lambda x: COLORS[x])
 
+        df_wide_area = _groupby_to_records(df_region, ['region_level', 'Type', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+        df_wide_area['type'] = 'column'
+        df_wide_area['color'] = df_wide_area['name'].apply(lambda x: COLORS[x])
+
         out_dict = {}
-        for (region_level, region, species), df in df_wide_pct.groupby(['region_level', 'region', 'species']):
-            df = df.drop(['region_level', 'region', 'species'], axis=1)
+        for (region_level, region, species), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species']):
+            df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
+            df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
             if region_level not in out_dict:
                 out_dict[region_level] = {}
             if region not in out_dict[region_level]:
                 out_dict[region_level][region] = {}
-            out_dict[region_level][region][species] = df.to_dict(orient='records')
+            out_dict[region_level][region][species] = {
+                'Percent': df_pct.to_dict(orient='records'),
+                'Area':    df_area.to_dict(orient='records'),
+            }
 
         filename = f'BIO_GBF3_NVIS_overview_sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -3437,7 +3453,9 @@ def process_biodiversity_data(files, SAVE_DIR):
                 [df for p in sum_bio_paths['path'] if not (df := pd.read_csv(p, low_memory=False)).empty],
                 ignore_index=True,
             ).rename(columns={'Vegetation Group': 'species'})
-            sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
+            # Exclude AUSTRALIA aggregate (= sum of all NRM/state regions) to prevent
+            # double counting when any upstream code sums across regions.
+            sum_bio_df = sum_bio_df[(sum_bio_df['Type'] != 'ALL') & (sum_bio_df['region'] != 'AUSTRALIA')].copy()
             sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
             sum_bio_df['Sum_Pct (%)'] = (
                 sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
@@ -3447,14 +3465,37 @@ def process_biodiversity_data(files, SAVE_DIR):
             )
             df_wide_sum_pct['type'] = 'column'
             df_wide_sum_pct['color'] = df_wide_sum_pct['name'].apply(lambda x: COLORS[x])
+
+            df_wide_sum_area = _groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
+                value_cols=('Year', 'Area Weighted Score (ha)'),
+            )
+            df_wide_sum_area['type'] = 'column'
+            df_wide_sum_area['color'] = df_wide_sum_area['name'].apply(lambda x: COLORS[x])
+
+            _sum_years = sorted(sum_bio_df['Year'].unique().tolist())
+            _target_color = COLORS.get('Target (%)', '#040404')
+
             out_dict_sum = {}
-            for (region_level, region, species), df in df_wide_sum_pct.groupby(['region_level', 'region', 'species']):
-                df = df.drop(['region_level', 'region', 'species'], axis=1)
+            for (region_level, region, species), df_pct in df_wide_sum_pct.groupby(['region_level', 'region', 'species']):
+                df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
+                df_area = df_wide_sum_area[(df_wide_sum_area['region_level'] == region_level) & (df_wide_sum_area['region'] == region) & (df_wide_sum_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
+                pct_records = df_pct.to_dict(orient='records')
+                area_records = df_area.to_dict(orient='records')
+                # Add target line if this species×region has a constraint target
+                _trow = _gbf3_target_lk[(_gbf3_target_lk['species'] == species) & (_gbf3_target_lk['region'] == region) & (_gbf3_target_lk['region_level'] == region_level)]
+                if not _trow.empty:
+                    t_pct = float(_trow['Target_by_Percent'].iloc[0])
+                    t_area = t_pct / 100 * float(_trow['BASE_TOTAL_SCORE'].iloc[0])
+                    pct_records = pct_records + [{'name': 'Target (%)', 'type': 'line', 'color': _target_color, 'data': [[yr, t_pct] for yr in _sum_years]}]
+                    area_records = area_records + [{'name': 'Target (ha)', 'type': 'line', 'color': _target_color, 'data': [[yr, t_area] for yr in _sum_years]}]
                 if region_level not in out_dict_sum:
                     out_dict_sum[region_level] = {}
                 if region not in out_dict_sum[region_level]:
                     out_dict_sum[region_level][region] = {}
-                out_dict_sum[region_level][region][species] = df.to_dict(orient='records')
+                out_dict_sum[region_level][region][species] = {
+                    'Percent': pct_records,
+                    'Area':    area_records,
+                }
             filename = 'BIO_GBF3_NVIS_Sum'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
@@ -3465,21 +3506,32 @@ def process_biodiversity_data(files, SAVE_DIR):
         # ---------------- (GBF3-NVIS) - Ag  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
-        df_wide = _groupby_to_records(bio_df_ag, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-        df_wide['_ord'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-        df_wide = df_wide.sort_values('_ord').drop(columns=['_ord'])
-        df_wide = pd.concat([df_wide, _bio_outside_series(bio_df, 'Ag')], ignore_index=True)
+        df_wide_pct = _groupby_to_records(bio_df_ag, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+        df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+        df_wide_pct['_ord'] = df_wide_pct['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide_pct = df_wide_pct.sort_values('_ord').drop(columns=['_ord'])
+        df_wide_pct = pd.concat([df_wide_pct, _bio_outside_series(bio_df, 'Ag')], ignore_index=True)
+
+        df_wide_area = _groupby_to_records(bio_df_ag, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+        df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+        df_wide_area['_ord'] = df_wide_area['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide_area = df_wide_area.sort_values('_ord').drop(columns=['_ord'])
+        df_wide_area = pd.concat([df_wide_area, _bio_outside_series(bio_df, 'Ag', value_col='Area Weighted Score (ha)')], ignore_index=True)
+
         out_dict = {}
-        for (region_level, region, species, water), df in df_wide.groupby(['region_level', 'region', 'species', 'water']):
-            df = df.drop(['region_level', 'region', 'species', 'water'], axis=1)
+        for (region_level, region, species, water), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species', 'water']):
+            df_pct = df_pct.drop(['region_level', 'region', 'species', 'water'], axis=1)
+            df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species) & (df_wide_area['water'] == water)].drop(['region_level', 'region', 'species', 'water'], axis=1)
             if region_level not in out_dict:
                 out_dict[region_level] = {}
             if region not in out_dict[region_level]:
                 out_dict[region_level][region] = {}
             if species not in out_dict[region_level][region]:
                 out_dict[region_level][region][species] = {}
-            out_dict[region_level][region][species][water] = df.to_dict(orient='records')
+            out_dict[region_level][region][species][water] = {
+                'Percent': df_pct.to_dict(orient='records'),
+                'Area':    df_area.to_dict(orient='records'),
+            }
 
         filename = f'BIO_GBF3_NVIS_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -3489,15 +3541,24 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         # ---------------- (GBF3-NVIS) - Am  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
+        _bio_df_am_all = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')
 
-        df_wide = _groupby_to_records(bio_df_am, ['region_level', 'region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region_level', 'region', 'species', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-        wall = _groupby_to_records(bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"'), ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        wall['am'] = 'ALL'; wall['type'] = 'column'; wall['color'] = wall['name'].map(COLORS)
-        df_wide = pd.concat([df_wide, wall, _bio_outside_series(bio_df, 'Am')], ignore_index=True)
+        df_wide_pct = _groupby_to_records(bio_df_am, ['region_level', 'region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region_level', 'region', 'species', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+        df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+        wall_pct = _groupby_to_records(_bio_df_am_all, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+        wall_pct['am'] = 'ALL'; wall_pct['type'] = 'column'; wall_pct['color'] = wall_pct['name'].map(COLORS)
+        df_wide_pct = pd.concat([df_wide_pct, wall_pct, _bio_outside_series(bio_df, 'Am')], ignore_index=True)
+
+        df_wide_area = _groupby_to_records(bio_df_am, ['region_level', 'region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region_level', 'region', 'species', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+        df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+        wall_area = _groupby_to_records(_bio_df_am_all, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+        wall_area['am'] = 'ALL'; wall_area['type'] = 'column'; wall_area['color'] = wall_area['name'].map(COLORS)
+        df_wide_area = pd.concat([df_wide_area, wall_area, _bio_outside_series(bio_df, 'Am', value_col='Area Weighted Score (ha)')], ignore_index=True)
+
         out_dict = {}
-        for (region_level, region, species, am, water), df in df_wide.groupby(['region_level', 'region', 'species', 'am', 'water']):
-            df = df.drop(['region_level', 'region', 'species', 'am', 'water'], axis=1)
+        for (region_level, region, species, am, water), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species', 'am', 'water']):
+            df_pct = df_pct.drop(['region_level', 'region', 'species', 'am', 'water'], axis=1)
+            df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species) & (df_wide_area['am'] == am) & (df_wide_area['water'] == water)].drop(['region_level', 'region', 'species', 'am', 'water'], axis=1)
             if region_level not in out_dict:
                 out_dict[region_level] = {}
             if region not in out_dict[region_level]:
@@ -3506,7 +3567,10 @@ def process_biodiversity_data(files, SAVE_DIR):
                 out_dict[region_level][region][species] = {}
             if am not in out_dict[region_level][region][species]:
                 out_dict[region_level][region][species][am] = {}
-            out_dict[region_level][region][species][am][water] = df.to_dict(orient='records')
+            out_dict[region_level][region][species][am][water] = {
+                'Percent': df_pct.to_dict(orient='records'),
+                'Area':    df_area.to_dict(orient='records'),
+            }
 
         filename = f'BIO_GBF3_NVIS_Am'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -3517,19 +3581,30 @@ def process_biodiversity_data(files, SAVE_DIR):
         # ---------------- (GBF3-NVIS) - Non-Ag  ----------------
         _g3_nonag_src = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')
 
-        df_wide = _groupby_to_records(_g3_nonag_src, ['region_level', 'region', 'species', 'Landuse'], ['region_level', 'region', 'species', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-        df_wide['_ord'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-        df_wide = df_wide.sort_values('_ord').drop(columns=['_ord'])
-        df_wide = pd.concat([df_wide, _bio_outside_series(bio_df, 'NonAg')], ignore_index=True)
+        df_wide_pct = _groupby_to_records(_g3_nonag_src, ['region_level', 'region', 'species', 'Landuse'], ['region_level', 'region', 'species', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+        df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+        df_wide_pct['_ord'] = df_wide_pct['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide_pct = df_wide_pct.sort_values('_ord').drop(columns=['_ord'])
+        df_wide_pct = pd.concat([df_wide_pct, _bio_outside_series(bio_df, 'NonAg')], ignore_index=True)
+
+        df_wide_area = _groupby_to_records(_g3_nonag_src, ['region_level', 'region', 'species', 'Landuse'], ['region_level', 'region', 'species', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+        df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+        df_wide_area['_ord'] = df_wide_area['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide_area = df_wide_area.sort_values('_ord').drop(columns=['_ord'])
+        df_wide_area = pd.concat([df_wide_area, _bio_outside_series(bio_df, 'NonAg', value_col='Area Weighted Score (ha)')], ignore_index=True)
+
         out_dict = {}
-        for (region_level, region, species), df in df_wide.groupby(['region_level', 'region', 'species']):
-            df = df.drop(['region_level', 'region', 'species'], axis=1)
+        for (region_level, region, species), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species']):
+            df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
+            df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
             if region_level not in out_dict:
                 out_dict[region_level] = {}
             if region not in out_dict[region_level]:
                 out_dict[region_level][region] = {}
-            out_dict[region_level][region][species] = df.to_dict(orient='records')
+            out_dict[region_level][region][species] = {
+                'Percent': df_pct.to_dict(orient='records'),
+                'Area':    df_area.to_dict(orient='records'),
+            }
 
         filename = f'BIO_GBF3_NVIS_NonAg'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -3541,7 +3616,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     # IBRA reporting branch disabled (GBF3 IBRA pipeline incomplete).
 
 
-    if settings.GBF4_TARGET_SNES != 'off':
+    if settings.WRITE_SNES != 'off':
         
         filter_str = '''
             category == "biodiversity" 
@@ -3556,7 +3631,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             .round(6)
         # Drop the per-species 'ALL' aggregate so it is not surfaced as a selectable
         # species in the report dropdowns; sum charts re-aggregate explicitly.
-        bio_df = bio_df.query('species != "ALL"')
+        # Also drop the AUSTRALIA aggregate row to prevent double-counting across regions.
+        bio_df = bio_df.query('species != "ALL" and region != "AUSTRALIA"')
         # ---------------- (GBF4 SNES) Ranking  ----------------
         bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region_level', 'region'])\
@@ -3603,14 +3679,22 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide_pct['type'] = 'column'
         df_wide_pct['color'] = df_wide_pct['name'].apply(lambda x: COLORS[x])
 
+        df_wide_area = _groupby_to_records(df_region, ['region_level', 'Type', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+        df_wide_area['type'] = 'column'
+        df_wide_area['color'] = df_wide_area['name'].apply(lambda x: COLORS[x])
+
         out_dict = {}
-        for (region_level, region, species), df in df_wide_pct.groupby(['region_level', 'region', 'species']):
-            df = df.drop(['region_level', 'region', 'species'], axis=1)
+        for (region_level, region, species), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species']):
+            df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
+            df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
             if region_level not in out_dict:
                 out_dict[region_level] = {}
             if region not in out_dict[region_level]:
                 out_dict[region_level][region] = {}
-            out_dict[region_level][region][species] = df.to_dict(orient='records')
+            out_dict[region_level][region][species] = {
+                'Percent': df_pct.to_dict(orient='records'),
+                'Area':    df_area.to_dict(orient='records'),
+            }
 
         filename = f'BIO_GBF4_SNES_overview_sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -3627,7 +3711,9 @@ def process_biodiversity_data(files, SAVE_DIR):
                 [df for p in sum_bio_paths['path'] if not (df := pd.read_csv(p, low_memory=False)).empty],
                 ignore_index=True,
             )
-            sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
+            # Exclude AUSTRALIA aggregate (= sum of all NRM/state regions) to prevent
+            # double counting when any upstream code sums across regions.
+            sum_bio_df = sum_bio_df[(sum_bio_df['Type'] != 'ALL') & (sum_bio_df['region'] != 'AUSTRALIA')].copy()
             sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
             sum_bio_df['Sum_Pct (%)'] = (
                 sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
@@ -3637,14 +3723,23 @@ def process_biodiversity_data(files, SAVE_DIR):
             )
             df_wide_sum_pct['type'] = 'column'
             df_wide_sum_pct['color'] = df_wide_sum_pct['name'].apply(lambda x: COLORS[x])
+            df_wide_sum_area = _groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
+                value_cols=('Year', 'Area Weighted Score (ha)'),
+            )
+            df_wide_sum_area['type'] = 'column'
+            df_wide_sum_area['color'] = df_wide_sum_area['name'].apply(lambda x: COLORS[x])
             out_dict_sum = {}
-            for (region_level, region, species), df in df_wide_sum_pct.groupby(['region_level', 'region', 'species']):
-                df = df.drop(['region_level', 'region', 'species'], axis=1)
+            for (region_level, region, species), df_pct in df_wide_sum_pct.groupby(['region_level', 'region', 'species']):
+                df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
+                df_area = df_wide_sum_area[(df_wide_sum_area['region_level'] == region_level) & (df_wide_sum_area['region'] == region) & (df_wide_sum_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
                 if region_level not in out_dict_sum:
                     out_dict_sum[region_level] = {}
                 if region not in out_dict_sum[region_level]:
                     out_dict_sum[region_level][region] = {}
-                out_dict_sum[region_level][region][species] = df.to_dict(orient='records')
+                out_dict_sum[region_level][region][species] = {
+                    'Percent': df_pct.to_dict(orient='records'),
+                    'Area':    df_area.to_dict(orient='records'),
+                }
             filename = 'BIO_GBF4_SNES_Sum'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
@@ -3654,21 +3749,32 @@ def process_biodiversity_data(files, SAVE_DIR):
         # ---------------- (GBF4 SNES) Ag  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
-        df_wide = _groupby_to_records(bio_df_ag, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-        df_wide['_ord'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-        df_wide = df_wide.sort_values('_ord').drop(columns=['_ord'])
-        df_wide = pd.concat([df_wide, _bio_outside_series(bio_df, 'Ag')], ignore_index=True)
+        df_wide_pct = _groupby_to_records(bio_df_ag, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+        df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+        df_wide_pct['_ord'] = df_wide_pct['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide_pct = df_wide_pct.sort_values('_ord').drop(columns=['_ord'])
+        df_wide_pct = pd.concat([df_wide_pct, _bio_outside_series(bio_df, 'Ag')], ignore_index=True)
+
+        df_wide_area = _groupby_to_records(bio_df_ag, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+        df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+        df_wide_area['_ord'] = df_wide_area['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide_area = df_wide_area.sort_values('_ord').drop(columns=['_ord'])
+        df_wide_area = pd.concat([df_wide_area, _bio_outside_series(bio_df, 'Ag', value_col='Area Weighted Score (ha)')], ignore_index=True)
+
         out_dict = {}
-        for (region_level, region, species, water), df in df_wide.groupby(['region_level', 'region', 'species', 'water']):
-            df = df.drop(['region_level', 'region', 'species', 'water'], axis=1)
+        for (region_level, region, species, water), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species', 'water']):
+            df_pct = df_pct.drop(['region_level', 'region', 'species', 'water'], axis=1)
+            df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species) & (df_wide_area['water'] == water)].drop(['region_level', 'region', 'species', 'water'], axis=1)
             if region_level not in out_dict:
                 out_dict[region_level] = {}
             if region not in out_dict[region_level]:
                 out_dict[region_level][region] = {}
             if species not in out_dict[region_level][region]:
                 out_dict[region_level][region][species] = {}
-            out_dict[region_level][region][species][water] = df.to_dict(orient='records')
+            out_dict[region_level][region][species][water] = {
+                'Percent': df_pct.to_dict(orient='records'),
+                'Area':    df_area.to_dict(orient='records'),
+            }
 
         filename = f'BIO_GBF4_SNES_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -3678,15 +3784,24 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         # ---------------- (GBF4 SNES) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
+        _bio_df_snes_am_all = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')
 
-        df_wide = _groupby_to_records(bio_df_am, ['region_level', 'region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region_level', 'region', 'species', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-        wall = _groupby_to_records(bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"'), ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        wall['am'] = 'ALL'; wall['type'] = 'column'; wall['color'] = wall['name'].map(COLORS)
-        df_wide = pd.concat([df_wide, wall, _bio_outside_series(bio_df, 'Am')], ignore_index=True)
+        df_wide_pct = _groupby_to_records(bio_df_am, ['region_level', 'region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region_level', 'region', 'species', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+        df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+        wall_pct = _groupby_to_records(_bio_df_snes_am_all, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+        wall_pct['am'] = 'ALL'; wall_pct['type'] = 'column'; wall_pct['color'] = wall_pct['name'].map(COLORS)
+        df_wide_pct = pd.concat([df_wide_pct, wall_pct, _bio_outside_series(bio_df, 'Am')], ignore_index=True)
+
+        df_wide_area = _groupby_to_records(bio_df_am, ['region_level', 'region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region_level', 'region', 'species', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+        df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+        wall_area = _groupby_to_records(_bio_df_snes_am_all, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+        wall_area['am'] = 'ALL'; wall_area['type'] = 'column'; wall_area['color'] = wall_area['name'].map(COLORS)
+        df_wide_area = pd.concat([df_wide_area, wall_area, _bio_outside_series(bio_df, 'Am', value_col='Area Weighted Score (ha)')], ignore_index=True)
+
         out_dict = {}
-        for (region_level, region, species, am, water), df in df_wide.groupby(['region_level', 'region', 'species', 'am', 'water']):
-            df = df.drop(['region_level', 'region', 'species', 'am', 'water'], axis=1)
+        for (region_level, region, species, am, water), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species', 'am', 'water']):
+            df_pct = df_pct.drop(['region_level', 'region', 'species', 'am', 'water'], axis=1)
+            df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species) & (df_wide_area['am'] == am) & (df_wide_area['water'] == water)].drop(['region_level', 'region', 'species', 'am', 'water'], axis=1)
             if region_level not in out_dict:
                 out_dict[region_level] = {}
             if region not in out_dict[region_level]:
@@ -3695,7 +3810,10 @@ def process_biodiversity_data(files, SAVE_DIR):
                 out_dict[region_level][region][species] = {}
             if am not in out_dict[region_level][region][species]:
                 out_dict[region_level][region][species][am] = {}
-            out_dict[region_level][region][species][am][water] = df.to_dict(orient='records')
+            out_dict[region_level][region][species][am][water] = {
+                'Percent': df_pct.to_dict(orient='records'),
+                'Area':    df_area.to_dict(orient='records'),
+            }
 
         filename = f'BIO_GBF4_SNES_Am'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -3706,19 +3824,30 @@ def process_biodiversity_data(files, SAVE_DIR):
         # ---------------- (GBF4 SNES) Non-ag  ----------------
         _g4s_nonag_src = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')
 
-        df_wide = _groupby_to_records(_g4s_nonag_src, ['region_level', 'region', 'species', 'Landuse'], ['region_level', 'region', 'species', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-        df_wide['_ord'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-        df_wide = df_wide.sort_values('_ord').drop(columns=['_ord'])
-        df_wide = pd.concat([df_wide, _bio_outside_series(bio_df, 'NonAg')], ignore_index=True)
+        df_wide_pct = _groupby_to_records(_g4s_nonag_src, ['region_level', 'region', 'species', 'Landuse'], ['region_level', 'region', 'species', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+        df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+        df_wide_pct['_ord'] = df_wide_pct['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide_pct = df_wide_pct.sort_values('_ord').drop(columns=['_ord'])
+        df_wide_pct = pd.concat([df_wide_pct, _bio_outside_series(bio_df, 'NonAg')], ignore_index=True)
+
+        df_wide_area = _groupby_to_records(_g4s_nonag_src, ['region_level', 'region', 'species', 'Landuse'], ['region_level', 'region', 'species', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+        df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+        df_wide_area['_ord'] = df_wide_area['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide_area = df_wide_area.sort_values('_ord').drop(columns=['_ord'])
+        df_wide_area = pd.concat([df_wide_area, _bio_outside_series(bio_df, 'NonAg', value_col='Area Weighted Score (ha)')], ignore_index=True)
+
         out_dict = {}
-        for (region_level, region, species), df in df_wide.groupby(['region_level', 'region', 'species']):
-            df = df.drop(['region_level', 'region', 'species'], axis=1)
+        for (region_level, region, species), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species']):
+            df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
+            df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
             if region_level not in out_dict:
                 out_dict[region_level] = {}
             if region not in out_dict[region_level]:
                 out_dict[region_level][region] = {}
-            out_dict[region_level][region][species] = df.to_dict(orient='records')
+            out_dict[region_level][region][species] = {
+                'Percent': df_pct.to_dict(orient='records'),
+                'Area':    df_area.to_dict(orient='records'),
+            }
 
         filename = f'BIO_GBF4_SNES_NonAg'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -3728,187 +3857,263 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
             
-    if settings.GBF4_TARGET_ECNES != 'off':
-        
-        bio_paths = files.query('base_name.str.contains("biodiversity_GBF4_ECNES_scores")')
-        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path)).empty])
-        bio_df = bio_df.replace(RENAME_AM_NON_AG)\
-            .infer_objects(copy=False)\
-            .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
-            .round(6)
-        # Drop the per-species 'ALL' aggregate so it is not surfaced as a selectable
-        # species in the report dropdowns; sum charts re-aggregate explicitly.
-        bio_df = bio_df.query('species != "ALL"')
+    #---------------- (GBF4 ECNES) ----------------
+    bio_paths = files.query('base_name.str.contains("biodiversity_GBF4_ECNES_scores")')
+    bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path)).empty])
+    bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+        .infer_objects(copy=False)\
+        .rename(columns={
+            'Contribution Relative to Pre-1750 Level (%)': 'Value (%)',
+            'Target by Percent (%)': 'Target_by_Percent',
+        })\
+        .round(6)
+    # Drop the per-species 'ALL' aggregate; also drop the AUSTRALIA aggregate row
+    # (AUSTRALIA = exact sum of all NRM/state regions — including it alongside individual
+    # regions causes double counting wherever region-level sums are computed).
+    bio_df = bio_df.query('species != "ALL" and region != "AUSTRALIA"')
 
-        # ---------------- (GBF4 ECNES) Ranking  ----------------
-        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
-            .groupby(['Year', 'region_level', 'region'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .sort_values(['Year', 'region_level', 'Value (%)'], ascending=[True, True, False])\
-            .assign(Rank=lambda x: x.groupby(['Year', 'region_level']).cumcount())\
-            .assign(Type='Total')\
-            .assign(color=lambda x: x['Rank'].map(get_rank_color))
+    # Build target lookup once (species × region → Target_by_Percent, BASE_TOTAL_SCORE)
+    _ecnes_target_lk = (
+        bio_df[bio_df['Target_by_Percent'].notna()]
+        [['species', 'region', 'region_level', 'Target_by_Percent', 'BASE_TOTAL_SCORE']]
+        .drop_duplicates(['species', 'region', 'region_level'])
+    )
 
-        for (region_level, region), df in bio_rank_total.groupby(['region_level', 'region']):
-            df = df.drop(columns=['region_level', 'region'])
-            if region_level not in bio_rank_dict:
-                bio_rank_dict[region_level] = {}
-            if region not in bio_rank_dict[region_level]:
-                bio_rank_dict[region_level][region] = {}
-            if 'GBF4 (ECNES)' not in bio_rank_dict[region_level][region]:
-                bio_rank_dict[region_level][region]['GBF4 (ECNES)'] = {}
+    # ---------------- (GBF4 ECNES) Ranking  ----------------
+    bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
+        .groupby(['Year', 'region_level', 'region'])\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'region_level', 'Value (%)'], ascending=[True, True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year', 'region_level']).cumcount())\
+        .assign(Type='Total')\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))
 
-            bio_rank_dict[region_level][region]['GBF4 (ECNES)']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-            bio_rank_dict[region_level][region]['GBF4 (ECNES)']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-            bio_rank_dict[region_level][region]['GBF4 (ECNES)']['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
+    for (region_level, region), df in bio_rank_total.groupby(['region_level', 'region']):
+        df = df.drop(columns=['region_level', 'region'])
+        if region_level not in bio_rank_dict:
+            bio_rank_dict[region_level] = {}
+        if region not in bio_rank_dict[region_level]:
+            bio_rank_dict[region_level][region] = {}
+        if 'GBF4 (ECNES)' not in bio_rank_dict[region_level][region]:
+            bio_rank_dict[region_level][region]['GBF4 (ECNES)'] = {}
 
-        # ---------------- (GBF4 ECNES) Overview  ----------------
+        bio_rank_dict[region_level][region]['GBF4 (ECNES)']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        bio_rank_dict[region_level][region]['GBF4 (ECNES)']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+        bio_rank_dict[region_level][region]['GBF4 (ECNES)']['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
-        # sum: normalise by ALL_HA so the chart shows sum(area)/ALL_HA*100 not sum of per-community %.
-        _inside = bio_df.query(
-            'Type != "Outside LUTO study area" and species != "ALL" '
-            'and Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"'
+    # ---------------- (GBF4 ECNES) Overview  ----------------
+
+    # sum: normalise by ALL_HA so the chart shows sum(area)/ALL_HA*100 not sum of per-community %.
+    _inside = bio_df.query(
+        'Type != "Outside LUTO study area" and species != "ALL" '
+        'and Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"'
+    )
+    _outside = bio_df.query(
+        'Type == "Outside LUTO study area" and Water_supply == "ALL" and `Agricultural Management` == "ALL"'
+    )
+    df_region = (
+        pd.concat([_inside, _outside])
+        .groupby(['Year', 'region_level', 'region', 'species', 'Type'])
+        .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
+        .reset_index()
+        .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
+    )
+    df_wide_pct = _groupby_to_records(df_region, ['region_level', 'Type', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
+    df_wide_pct['type'] = 'column'
+    df_wide_pct['color'] = df_wide_pct['name'].apply(lambda x: COLORS[x])
+
+    df_wide_area = _groupby_to_records(df_region, ['region_level', 'Type', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+    df_wide_area['type'] = 'column'
+    df_wide_area['color'] = df_wide_area['name'].apply(lambda x: COLORS[x])
+
+    out_dict = {}
+    for (region_level, region, species), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species']):
+        df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
+        df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
+        if region_level not in out_dict:
+            out_dict[region_level] = {}
+        if region not in out_dict[region_level]:
+            out_dict[region_level][region] = {}
+        out_dict[region_level][region][species] = {
+            'Percent': df_pct.to_dict(orient='records'),
+            'Area':    df_area.to_dict(orient='records'),
+        }
+
+    filename = f'BIO_GBF4_ECNES_overview_sum'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+    # --- BIO_GBF4_ECNES_Sum: per-species Type breakdown from pre-computed sum CSV ---
+    sum_bio_paths = files.query(
+        'category == "biodiversity" and base_name.str.contains("biodiversity_GBF4_ECNES_sum_scores")'
+    )
+    if not sum_bio_paths.empty:
+        sum_bio_df = pd.concat(
+            [df for p in sum_bio_paths['path'] if not (df := pd.read_csv(p, low_memory=False)).empty],
+            ignore_index=True,
         )
-        _outside = bio_df.query(
-            'Type == "Outside LUTO study area" and Water_supply == "ALL" and `Agricultural Management` == "ALL"'
+        # Exclude AUSTRALIA aggregate (= sum of all NRM/state regions) to prevent
+        # double counting when any upstream code sums across regions.
+        sum_bio_df = sum_bio_df[(sum_bio_df['Type'] != 'ALL') & (sum_bio_df['region'] != 'AUSTRALIA')].copy()
+        sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
+        sum_bio_df['Sum_Pct (%)'] = (
+            sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
         )
-        df_region = (
-            pd.concat([_inside, _outside])
-            .groupby(['Year', 'region_level', 'region', 'species', 'Type'])
-            .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
-            .reset_index()
-            .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
+        df_wide_sum_pct = _groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
+            value_cols=('Year', 'Sum_Pct (%)'),
         )
-        df_wide_pct = _groupby_to_records(df_region, ['region_level', 'Type', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
-        df_wide_pct['type'] = 'column'
-        df_wide_pct['color'] = df_wide_pct['name'].apply(lambda x: COLORS[x])
+        df_wide_sum_pct['type'] = 'column'
+        df_wide_sum_pct['color'] = df_wide_sum_pct['name'].apply(lambda x: COLORS[x])
 
-        out_dict = {}
-        for (region_level, region, species), df in df_wide_pct.groupby(['region_level', 'region', 'species']):
-            df = df.drop(['region_level', 'region', 'species'], axis=1)
-            if region_level not in out_dict:
-                out_dict[region_level] = {}
-            if region not in out_dict[region_level]:
-                out_dict[region_level][region] = {}
-            out_dict[region_level][region][species] = df.to_dict(orient='records')
+        df_wide_sum_area = _groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
+            value_cols=('Year', 'Area Weighted Score (ha)'),
+        )
+        df_wide_sum_area['type'] = 'column'
+        df_wide_sum_area['color'] = df_wide_sum_area['name'].apply(lambda x: COLORS[x])
 
-        filename = f'BIO_GBF4_ECNES_overview_sum'
+        _ecnes_sum_years = sorted(sum_bio_df['Year'].unique().tolist())
+        _ecnes_target_color = COLORS.get('Target (%)', '#040404')
+
+        out_dict_sum = {}
+        for (region_level, region, species), df_pct in df_wide_sum_pct.groupby(['region_level', 'region', 'species']):
+            df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
+            df_area = df_wide_sum_area[(df_wide_sum_area['region_level'] == region_level) & (df_wide_sum_area['region'] == region) & (df_wide_sum_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
+            pct_records = df_pct.to_dict(orient='records')
+            area_records = df_area.to_dict(orient='records')
+            _trow = _ecnes_target_lk[(_ecnes_target_lk['species'] == species) & (_ecnes_target_lk['region'] == region) & (_ecnes_target_lk['region_level'] == region_level)]
+            if not _trow.empty:
+                t_pct = float(_trow['Target_by_Percent'].iloc[0])
+                t_area = t_pct / 100 * float(_trow['BASE_TOTAL_SCORE'].iloc[0])
+                pct_records = pct_records + [{'name': 'Target (%)', 'type': 'line', 'color': _ecnes_target_color, 'data': [[yr, t_pct] for yr in _ecnes_sum_years]}]
+                area_records = area_records + [{'name': 'Target (ha)', 'type': 'line', 'color': _ecnes_target_color, 'data': [[yr, t_area] for yr in _ecnes_sum_years]}]
+            if region_level not in out_dict_sum:
+                out_dict_sum[region_level] = {}
+            if region not in out_dict_sum[region_level]:
+                out_dict_sum[region_level][region] = {}
+            out_dict_sum[region_level][region][species] = {
+                'Percent': pct_records,
+                'Area':    area_records,
+            }
+        filename = 'BIO_GBF4_ECNES_Sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict_sum, f, separators=(',', ':'), indent=2)
             f.write(';\n')
 
-        # --- BIO_GBF4_ECNES_Sum: per-species Type breakdown from pre-computed sum CSV ---
-        sum_bio_paths = files.query(
-            'category == "biodiversity" and base_name.str.contains("biodiversity_GBF4_ECNES_sum_scores")'
-        )
-        if not sum_bio_paths.empty:
-            sum_bio_df = pd.concat(
-                [df for p in sum_bio_paths['path'] if not (df := pd.read_csv(p, low_memory=False)).empty],
-                ignore_index=True,
-            )
-            sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
-            sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
-            sum_bio_df['Sum_Pct (%)'] = (
-                sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
-            )
-            df_wide_sum_pct = _groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
-                value_cols=('Year', 'Sum_Pct (%)'),
-            )
-            df_wide_sum_pct['type'] = 'column'
-            df_wide_sum_pct['color'] = df_wide_sum_pct['name'].apply(lambda x: COLORS[x])
-            out_dict_sum = {}
-            for (region_level, region, species), df in df_wide_sum_pct.groupby(['region_level', 'region', 'species']):
-                df = df.drop(['region_level', 'region', 'species'], axis=1)
-                if region_level not in out_dict_sum:
-                    out_dict_sum[region_level] = {}
-                if region not in out_dict_sum[region_level]:
-                    out_dict_sum[region_level][region] = {}
-                out_dict_sum[region_level][region][species] = df.to_dict(orient='records')
-            filename = 'BIO_GBF4_ECNES_Sum'
-            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-                f.write(f'window["{filename}"] = ')
-                json.dump(out_dict_sum, f, separators=(',', ':'), indent=2)
-                f.write(';\n')
+    # ---------------- (GBF4 ECNES) Ag  ----------------
+    bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
-        # ---------------- (GBF4 ECNES) Ag  ----------------
-        bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
+    df_wide_pct = _groupby_to_records(bio_df_ag, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+    df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+    df_wide_pct['_ord'] = df_wide_pct['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide_pct = df_wide_pct.sort_values('_ord').drop(columns=['_ord'])
+    df_wide_pct = pd.concat([df_wide_pct, _bio_outside_series(bio_df, 'Ag')], ignore_index=True)
 
-        df_wide = _groupby_to_records(bio_df_ag, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-        df_wide['_ord'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-        df_wide = df_wide.sort_values('_ord').drop(columns=['_ord'])
-        df_wide = pd.concat([df_wide, _bio_outside_series(bio_df, 'Ag')], ignore_index=True)
-        out_dict = {}
-        for (region_level, region, species, water), df in df_wide.groupby(['region_level', 'region', 'species', 'water']):
-            df = df.drop(['region_level', 'region', 'species', 'water'], axis=1)
-            if region_level not in out_dict:
-                out_dict[region_level] = {}
-            if region not in out_dict[region_level]:
-                out_dict[region_level][region] = {}
-            if species not in out_dict[region_level][region]:
-                out_dict[region_level][region][species] = {}
-            out_dict[region_level][region][species][water] = df.to_dict(orient='records')
+    df_wide_area = _groupby_to_records(bio_df_ag, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+    df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+    df_wide_area['_ord'] = df_wide_area['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide_area = df_wide_area.sort_values('_ord').drop(columns=['_ord'])
+    df_wide_area = pd.concat([df_wide_area, _bio_outside_series(bio_df, 'Ag', value_col='Area Weighted Score (ha)')], ignore_index=True)
 
-        filename = f'BIO_GBF4_ECNES_Ag'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    out_dict = {}
+    for (region_level, region, species, water), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species', 'water']):
+        df_pct = df_pct.drop(['region_level', 'region', 'species', 'water'], axis=1)
+        df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species) & (df_wide_area['water'] == water)].drop(['region_level', 'region', 'species', 'water'], axis=1)
+        if region_level not in out_dict:
+            out_dict[region_level] = {}
+        if region not in out_dict[region_level]:
+            out_dict[region_level][region] = {}
+        if species not in out_dict[region_level][region]:
+            out_dict[region_level][region][species] = {}
+        out_dict[region_level][region][species][water] = {
+            'Percent': df_pct.to_dict(orient='records'),
+            'Area':    df_area.to_dict(orient='records'),
+        }
 
-        # ---------------- (GBF4 ECNES) Agricultural Management  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
+    filename = f'BIO_GBF4_ECNES_Ag'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
 
-        df_wide = _groupby_to_records(bio_df_am, ['region_level', 'region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region_level', 'region', 'species', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-        wall = _groupby_to_records(bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"'), ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        wall['am'] = 'ALL'; wall['type'] = 'column'; wall['color'] = wall['name'].map(COLORS)
-        df_wide = pd.concat([df_wide, wall, _bio_outside_series(bio_df, 'Am')], ignore_index=True)
-        out_dict = {}
-        for (region_level, region, species, am, water), df in df_wide.groupby(['region_level', 'region', 'species', 'am', 'water']):
-            df = df.drop(['region_level', 'region', 'species', 'am', 'water'], axis=1)
-            if region_level not in out_dict:
-                out_dict[region_level] = {}
-            if region not in out_dict[region_level]:
-                out_dict[region_level][region] = {}
-            if species not in out_dict[region_level][region]:
-                out_dict[region_level][region][species] = {}
-            if am not in out_dict[region_level][region][species]:
-                out_dict[region_level][region][species][am] = {}
-            out_dict[region_level][region][species][am][water] = df.to_dict(orient='records')
+    # ---------------- (GBF4 ECNES) Agricultural Management  ----------------
+    bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
+    _bio_df_ecnes_am_all = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')
 
-        filename = f'BIO_GBF4_ECNES_Am'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    df_wide_pct = _groupby_to_records(bio_df_am, ['region_level', 'region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region_level', 'region', 'species', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+    df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+    wall_pct = _groupby_to_records(_bio_df_ecnes_am_all, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+    wall_pct['am'] = 'ALL'; wall_pct['type'] = 'column'; wall_pct['color'] = wall_pct['name'].map(COLORS)
+    df_wide_pct = pd.concat([df_wide_pct, wall_pct, _bio_outside_series(bio_df, 'Am')], ignore_index=True)
 
-        # ---------------- (GBF4 ECNES) Non-ag  ----------------
-        _g4e_nonag_src = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')
+    df_wide_area = _groupby_to_records(bio_df_am, ['region_level', 'region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region_level', 'region', 'species', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+    df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+    wall_area = _groupby_to_records(_bio_df_ecnes_am_all, ['region_level', 'region', 'species', 'Water_supply', 'Landuse'], ['region_level', 'region', 'species', 'water', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+    wall_area['am'] = 'ALL'; wall_area['type'] = 'column'; wall_area['color'] = wall_area['name'].map(COLORS)
+    df_wide_area = pd.concat([df_wide_area, wall_area, _bio_outside_series(bio_df, 'Am', value_col='Area Weighted Score (ha)')], ignore_index=True)
 
-        df_wide = _groupby_to_records(_g4e_nonag_src, ['region_level', 'region', 'species', 'Landuse'], ['region_level', 'region', 'species', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-        df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-        df_wide['_ord'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-        df_wide = df_wide.sort_values('_ord').drop(columns=['_ord'])
-        df_wide = pd.concat([df_wide, _bio_outside_series(bio_df, 'NonAg')], ignore_index=True)
-        out_dict = {}
-        for (region_level, region, species), df in df_wide.groupby(['region_level', 'region', 'species']):
-            df = df.drop(['region_level', 'region', 'species'], axis=1)
-            if region_level not in out_dict:
-                out_dict[region_level] = {}
-            if region not in out_dict[region_level]:
-                out_dict[region_level][region] = {}
-            out_dict[region_level][region][species] = df.to_dict(orient='records')
+    out_dict = {}
+    for (region_level, region, species, am, water), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species', 'am', 'water']):
+        df_pct = df_pct.drop(['region_level', 'region', 'species', 'am', 'water'], axis=1)
+        df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species) & (df_wide_area['am'] == am) & (df_wide_area['water'] == water)].drop(['region_level', 'region', 'species', 'am', 'water'], axis=1)
+        if region_level not in out_dict:
+            out_dict[region_level] = {}
+        if region not in out_dict[region_level]:
+            out_dict[region_level][region] = {}
+        if species not in out_dict[region_level][region]:
+            out_dict[region_level][region][species] = {}
+        if am not in out_dict[region_level][region][species]:
+            out_dict[region_level][region][species][am] = {}
+        out_dict[region_level][region][species][am][water] = {
+            'Percent': df_pct.to_dict(orient='records'),
+            'Area':    df_area.to_dict(orient='records'),
+        }
 
-        filename = f'BIO_GBF4_ECNES_NonAg'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
-        
-        
-        
+    filename = f'BIO_GBF4_ECNES_Am'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+    # ---------------- (GBF4 ECNES) Non-ag  ----------------
+    _g4e_nonag_src = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')
+
+    df_wide_pct = _groupby_to_records(_g4e_nonag_src, ['region_level', 'region', 'species', 'Landuse'], ['region_level', 'region', 'species', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+    df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+    df_wide_pct['_ord'] = df_wide_pct['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide_pct = df_wide_pct.sort_values('_ord').drop(columns=['_ord'])
+    df_wide_pct = pd.concat([df_wide_pct, _bio_outside_series(bio_df, 'NonAg')], ignore_index=True)
+
+    df_wide_area = _groupby_to_records(_g4e_nonag_src, ['region_level', 'region', 'species', 'Landuse'], ['region_level', 'region', 'species', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+    df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+    df_wide_area['_ord'] = df_wide_area['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide_area = df_wide_area.sort_values('_ord').drop(columns=['_ord'])
+    df_wide_area = pd.concat([df_wide_area, _bio_outside_series(bio_df, 'NonAg', value_col='Area Weighted Score (ha)')], ignore_index=True)
+
+    out_dict = {}
+    for (region_level, region, species), df_pct in df_wide_pct.groupby(['region_level', 'region', 'species']):
+        df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
+        df_area = df_wide_area[(df_wide_area['region_level'] == region_level) & (df_wide_area['region'] == region) & (df_wide_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
+        if region_level not in out_dict:
+            out_dict[region_level] = {}
+        if region not in out_dict[region_level]:
+            out_dict[region_level][region] = {}
+        out_dict[region_level][region][species] = {
+            'Percent': df_pct.to_dict(orient='records'),
+            'Area':    df_area.to_dict(orient='records'),
+        }
+
+    filename = f'BIO_GBF4_ECNES_NonAg'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+    
+    
+    
 
     if settings.GBF8_TARGET == 'on':
         
@@ -4206,6 +4411,48 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
             mem_logs_df['mem (GB)'] = mem_logs_df['mem (GB)'].str.strip().astype(float)
             mem_logs_obj = [{'name': f'Memory Usage (RES {settings.RESFACTOR})', 'data': mem_logs_df.values.tolist()}]
 
+    _last_yr = max(years)
+
+    # Build GBF3 NVIS selected region-species map (species × region pairs with a constraint target).
+    # Uses one year's CSV (targets are constant across years); stored in supporting_info for downstream visuals.
+    gbf3_nvis_selected_region_species = {}
+    if settings.GBF3_NVIS_TARGET != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
+        _scores_path = os.path.join(raw_data_dir, f'out_{_last_yr}', f'biodiversity_GBF3_NVIS_scores_{_last_yr}.csv')
+        if os.path.exists(_scores_path):
+            _sc = pd.read_csv(_scores_path, low_memory=False, usecols=['Vegetation Group', 'region', 'region_level', 'Target_by_Percent'])
+            _sc = _sc[_sc['Target_by_Percent'].notna() & (_sc['region'] != 'AUSTRALIA')][['Vegetation Group', 'region', 'region_level']].drop_duplicates()
+            for _, row in _sc.iterrows():
+                rl, r, s = row['region_level'], row['region'], row['Vegetation Group']
+                gbf3_nvis_selected_region_species.setdefault(rl, {}).setdefault(r, [])
+                if s not in gbf3_nvis_selected_region_species[rl][r]:
+                    gbf3_nvis_selected_region_species[rl][r].append(s)
+
+    # Build GBF4 SNES selected region-species map (species × region pairs with a constraint target).
+    snes_selected_region_species = {}
+    if settings.WRITE_SNES != 'off':
+        _scores_path = os.path.join(raw_data_dir, f'out_{_last_yr}', f'biodiversity_GBF4_SNES_scores_{_last_yr}.csv')
+        if os.path.exists(_scores_path):
+            _sc = pd.read_csv(_scores_path, low_memory=False, usecols=['species', 'region', 'region_level', 'Target by Percent (%)'])
+            _sc = _sc[_sc['Target by Percent (%)'].notna() & (_sc['region'] != 'AUSTRALIA')][['species', 'region', 'region_level']].drop_duplicates()
+            for _, row in _sc.iterrows():
+                rl, r, s = row['region_level'], row['region'], row['species']
+                snes_selected_region_species.setdefault(rl, {}).setdefault(r, [])
+                if s not in snes_selected_region_species[rl][r]:
+                    snes_selected_region_species[rl][r].append(s)
+
+    # Build GBF4 ECNES selected region-species map (ecological communities × region pairs with a constraint target).
+    ecnes_selected_region_species = {}
+    if settings.GBF4_TARGET_ECNES != 'off':
+        _scores_path = os.path.join(raw_data_dir, f'out_{_last_yr}', f'biodiversity_GBF4_ECNES_scores_{_last_yr}.csv')
+        if os.path.exists(_scores_path):
+            _sc = pd.read_csv(_scores_path, low_memory=False, usecols=['species', 'region', 'region_level', 'Target by Percent (%)'])
+            _sc = _sc[_sc['Target by Percent (%)'].notna() & (_sc['region'] != 'AUSTRALIA')][['species', 'region', 'region_level']].drop_duplicates()
+            for _, row in _sc.iterrows():
+                rl, r, s = row['region_level'], row['region'], row['species']
+                ecnes_selected_region_species.setdefault(rl, {}).setdefault(r, [])
+                if s not in ecnes_selected_region_species[rl][r]:
+                    ecnes_selected_region_species[rl][r].append(s)
+
     supporting = {
         'model_run_settings': settings_dict,
         'years': years,
@@ -4214,6 +4461,9 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
         'mem_logs': mem_logs_obj,
         'renewables_enabled': any(settings.RENEWABLES_OPTIONS.values()),
         'GBF3_NVIS_REGION_MODE': settings.GBF3_NVIS_REGION_MODE,
+        'gbf3_nvis_selected_region_species': gbf3_nvis_selected_region_species,
+        'snes_selected_region_species': snes_selected_region_species,
+        'ecnes_selected_region_species': ecnes_selected_region_species,
     }
     
     filename = 'Supporting_info'
