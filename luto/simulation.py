@@ -1,6 +1,6 @@
-# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
-# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
-# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J.,
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S.,
 # Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
 # This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
@@ -25,8 +25,10 @@ functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
 
+import os
 import time
 import threading
+from pathlib import Path
 
 import numpy as np
 
@@ -53,13 +55,13 @@ def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
-    
+
     # Generate new timestamp each time and apply decorator dynamically
     current_timestamp = write_timestamp()
     save_dir = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}"
     log_path = f"{save_dir}/LUTO_RUN_"
     set_path()
-    
+
     # Apply the LogToFile decorator dynamically
     @LogToFile(log_path)
     def _load_data():
@@ -67,7 +69,7 @@ def load_data() -> Data:
         stop_event = threading.Event()
         memory_thread = threading.Thread(target=log_memory_usage, args=(save_dir, 'w', 1, stop_event))
         memory_thread.start()
-        
+
         try:
             data = Data()
             data.timestamp = read_timestamp()
@@ -81,22 +83,25 @@ def load_data() -> Data:
             memory_thread.join()
 
         return data
-    
+
     return _load_data()
 
 
 def run(
-    data: Data, 
+    data: Data | None = None,
     do_analyze_iis: bool = settings.DO_IIS,
     do_report: bool = settings.WRITE_OUTPUTS,
-) -> None:
+    checkpoint_dir: str | None = None,
+) -> Data:
     """
     Run the simulation.
 
     Parameters
     ----------
-    data : Data
-        Loaded simulation data.
+    data : Data or None
+        Loaded simulation data. Must be provided; if a checkpoint exists it will
+        replace this object internally, but a freshly loaded Data is still needed
+        to determine the year sequence and base year.
     do_analyze_iis : bool, default False
         If True, infeasible per-year solves trigger ``computeIIS()`` +
         ``analyze_iis()`` and write a debug .ilp file alongside the run output.
@@ -105,36 +110,78 @@ def run(
     do_report : bool, default True
         If True, write outputs at the end of the run. Set to False to skip output
         writing (e.g. when doing a quick test run or debugging IIS infeasibility).
+    checkpoint_dir : str or None, default None
+        If provided, enables checkpoint mode. After each successfully solved year
+        a ``data_<year>.lz4`` file is written to this directory. On re-run, the
+        latest valid checkpoint is loaded and the simulation resumes from the
+        next unsolved year. Useful for long NCI jobs that may be wall-time killed.
     """
     
+    if (data is None) and (checkpoint_dir is None):
+        raise ValueError("Either `data` must be provided or `checkpoint_dir` must be set to enable checkpoint loading.")
+
     # Generate new timestamp each time and apply decorator dynamically
     current_timestamp = read_timestamp()
     save_dir = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}"
     log_path = f"{save_dir}/LUTO_RUN_"
-    
+
     # Apply the LogToFile decorator dynamically
     @LogToFile(log_path)
     def _run():
-        # Get the years to run
+
         years = sorted(settings.SIM_YEARS).copy()
-        
+
+        # Use active_data to avoid Python closure scoping issues: assigning to
+        # `data` inside a nested function would make Python treat it as local
+        # throughout _run(), causing UnboundLocalError on non-checkpoint paths.
+        active_data = data
+        checkpoint_path = Path(checkpoint_dir) if checkpoint_dir is not None else None
+        resume_from_year = None
+
+        if checkpoint_path is not None:
+            print(f"Checkpoint mode enabled: {checkpoint_path}")
+            files = sorted(checkpoint_path.glob("data_*.lz4"))
+            if files:
+                checkpoint_file = files[-1]
+                resume_from_year = int(checkpoint_file.stem.split("_")[1])
+                active_data = joblib.load(str(checkpoint_file))
+                active_data.timestamp = read_timestamp()
+                active_data.path = save_dir
+                print(f"Found checkpoint for year {resume_from_year}: {checkpoint_file}")
+            elif data is None:
+                raise ValueError(
+                    f"No checkpoint files found in '{checkpoint_path}' and no `data` was provided; "
+                    "cannot start simulation."
+                )
+            else:
+                print(f"No valid checkpoint found in '{checkpoint_path}'; starting from {years[0]}.")
+
+        # active_data is guaranteed non-None from here on
+        if active_data.YR_CAL_BASE not in years:
+            years.insert(0, active_data.YR_CAL_BASE)
+
+        if resume_from_year is not None:
+            years_to_run = years[years.index(resume_from_year):]
+            print(f"Resuming simulation from {resume_from_year} to {years[-1]}.")
+        else:
+            years_to_run = years
+
         # Start recording memory usage
         stop_event = threading.Event()
         memory_thread = threading.Thread(target=log_memory_usage, args=(save_dir, 'a', 1, stop_event))
         memory_thread.start()
-        
+
         try:
             print('\n')
             print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years) - 1} runs!\n", flush=True)
-            # Insert the base year at the beginning of the years list if not already present
-            if data.YR_CAL_BASE not in years: 
-                years.insert(0, data.YR_CAL_BASE)
-            # Solve and write outputs
-            solve_timeseries(data, years, do_analyze_iis)
-            # Save and write outputs
-            save_data_to_disk(data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
+
+            if len(years_to_run) > 1:
+                solve_timeseries(active_data, years_to_run, do_analyze_iis, checkpoint_path)
+
+            # Save final data and write outputs
+            save_data_to_disk(active_data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
             if do_report:
-                write_outputs(data)
+                write_outputs(active_data)
         except Exception as e:
             print(f"An error occurred during the simulation: {e}")
             raise e
@@ -142,11 +189,18 @@ def run(
             # Ensure the memory logging thread is stopped
             stop_event.set()
             memory_thread.join()
-    
+
+        return active_data
+
     return _run()
 
 
-def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) -> None:
+def solve_timeseries(
+    data: Data,
+    years_to_run: list[int],
+    do_analyze_iis: bool,
+    checkpoint_path: Path | None = None,
+) -> None:
 
     for step in range(len(years_to_run) - 1):
         base_year = years_to_run[step]
@@ -155,29 +209,21 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
         print( "-------------------------------------------------")
         print( f"Running for year {target_year}"   )
         print( "-------------------------------------------------\n")
-        
+
         start_time = time.time()
         input_data = get_input_data(data, base_year, target_year)
         data.last_year = target_year
 
         # Retry loop with escalating numerical settings. settings.RETRY_PARAMS is a list
-        # of (NumericFocus, Method) tuples; each attempt sets Params.NumericFocus and
-        # Params.Method (overriding settings.SOLVE_METHOD for that attempt).
-        # We try each in order and break on GRB.OPTIMAL. We also accept the result —
-        # at any attempt if status is SUBOPTIMAL, or unconditionally on the last
-        # attempt — provided MaxVio is within 10x FEASIBILITY_TOLERANCE. At
-        # FEAS_TOL = 1e-2 the duality gap Gurobi can't certify is far smaller than
-        # the input-data noise floor, so a feasible-enough solution is preferred
-        # over a hard failure.
+        # of (NumericFocus, Method, Crossover) tuples tried in order; only GRB.OPTIMAL
+        # is accepted — any other status falls through to the failure path.
         nf_attempts = list(settings.RETRY_PARAMS)
-        suboptimal_accept_tol = 10 * settings.FEASIBILITY_TOLERANCE
         accepted = False
         luto_solver = LutoSolver(input_data)
         luto_solver.formulate()
-        
-        for attempt_idx, (nf, method, crossover) in enumerate(nf_attempts):
+
+        for nf, method, crossover in nf_attempts:
             print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover} for year {target_year}...")
-            is_last_attempt = (attempt_idx == len(nf_attempts) - 1)
             luto_solver.gurobi_model.Params.NumericFocus = nf
             luto_solver.gurobi_model.Params.Method = method
             luto_solver.gurobi_model.Params.Crossover = crossover
@@ -188,39 +234,6 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
                 print(f"Optimal solution found with NumericFocus={nf}, Method={method}")
                 accepted = True
                 break
-
-            # SUBOPTIMAL: barrier converged but Gurobi can't certify optimality.
-            # MaxVio is always available here; accept if it's within our tolerance band.
-            if status == GRB.SUBOPTIMAL:
-                max_vio = luto_solver.gurobi_model.MaxVio
-                if max_vio < suboptimal_accept_tol:
-                    print(
-                        f"Accepting SUBOPTIMAL solution: MaxVio={max_vio:.2e} < "
-                        f"{suboptimal_accept_tol:.2e} (10x FEASIBILITY_TOLERANCE)."
-                    )
-                    accepted = True
-                    break
-                print(
-                    f"Rejecting SUBOPTIMAL: MaxVio={max_vio:.2e} >= "
-                    f"{suboptimal_accept_tol:.2e}; falling through to error path."
-                )
-
-            # Last-resort acceptance: on the final attempt, if a feasible solution
-            # exists at all (SolCount > 0) and MaxVio is within tolerance, take it
-            # rather than failing hard.
-            elif is_last_attempt and luto_solver.gurobi_model.SolCount > 0:
-                max_vio = luto_solver.gurobi_model.MaxVio
-                if max_vio < suboptimal_accept_tol:
-                    print(
-                        f"Accepting last-attempt solution (status={status}): "
-                        f"MaxVio={max_vio:.2e} < {suboptimal_accept_tol:.2e}."
-                    )
-                    accepted = True
-                    break
-                print(
-                    f"Rejecting last-attempt solution (status={status}): "
-                    f"MaxVio={max_vio:.2e} >= {suboptimal_accept_tol:.2e}."
-                )
 
             print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.")
 
@@ -241,6 +254,13 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
 
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(target_year, data_type, prod_data)
+
+        if checkpoint_path is not None:
+            final_path = checkpoint_path / f"data_{target_year}.lz4"
+            tmp_path = Path(f"{final_path}.tmp")
+            save_data_to_disk(data, str(tmp_path))
+            os.replace(tmp_path, final_path)
+            print(f"Saved checkpoint for year {target_year}: {final_path}")
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
 
@@ -277,11 +297,11 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
 def save_data_to_disk(data: Data, path: str, compress_level=3) -> None:
     """Save using joblib - faster and more memory efficient."""
     print(f'Saving data to {path}...')
-    
+
     # joblib is optimized for large numpy/scipy data
     joblib.dump(data, path, compress=('lz4', compress_level))
-    
-    
+
+
 def load_data_from_disk(path: str) -> Data:
     """Load the Data object from disk.
 
@@ -294,14 +314,14 @@ def load_data_from_disk(path: str) -> Data:
     Returns
         Data: `Data` object.
     """
-    
+
     # Generate new timestamp each time and apply decorator dynamically
     current_timestamp = write_timestamp()
     save_dir = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}"
     log_path = f"{save_dir}/LUTO_RUN_"
-    
+
     set_path()
-    
+
     # Apply the LogToFile decorator dynamically
     @LogToFile(log_path, 'w')
     def _load_data():
@@ -315,8 +335,7 @@ def load_data_from_disk(path: str) -> Data:
         # Check if the resolution factor from the data object matches the settings.RESFACTOR
         if int(data.RESMULT ** 0.5) != settings.RESFACTOR:
             raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
-        
-        return data
-    
-    return _load_data()
 
+        return data
+
+    return _load_data()
