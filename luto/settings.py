@@ -60,13 +60,13 @@ SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
-SCENARIO = 'SSP' + SSP[0]           # SSP1, SSP2, SSP3, SSP4, SSP5
-DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
-DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
-CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
-IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports for each commodity) or 'Trend' (follows historical rate of change in shares of imports for each commodity)
-WASTE = 1                           # 1 for full waste, 0.5 for half waste
-FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
+SCENARIO        = 'SSP' + SSP[0]     # SSP1, SSP2, SSP3, SSP4, SSP5
+DIET_DOM        = 'BAU'              # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
+DIET_GLOB       = 'BAU'              # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
+CONVERGENCE     = 2050               # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
+IMPORT_TREND    = 'Static'           # 'Static' (assumes 2010 shares of imports for each commodity) or 'Trend' (follows historical rate of change in shares of imports for each commodity)
+WASTE           = 1                  # 1 for full waste, 0.5 for half waste
+FEED_EFFICIENCY = 'BAU'              # 'BAU' or 'High'
 
 # Set the demand and supply multipliers
 APPLY_DEMAND_MULTIPLIERS = True     # True or False. Whether to apply demand multipliers from AusTIME model.
