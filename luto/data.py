@@ -1517,10 +1517,10 @@ class Data:
         self.GBF4_SNES_LAYERS_ALL = self.get_SNES_sparse_array()
         self.GBF4_ECNES_LAYERS_ALL = self.get_ECNES_sparse_array()
 
-        self.GBF4_SNES_META     = self.get_SNES_targets_df()
+        self.GBF4_SNES_META     = self.get_SNES_targets_df(include_all=False)
         self.BIO_GBF4_SNES_SEL  = [tuple(r) for r in self.GBF4_SNES_META[['region', 'SCIENTIFIC_NAME', 'presence']].values.tolist()]  # list of (region, species, presence) tuples for selection; presence is 'LIKELY' or 'LIKELY_AND_MAYBE'
 
-        self.GBF4_ECNES_META    = self.get_ECNES_targets_df()
+        self.GBF4_ECNES_META    = self.get_ECNES_targets_df(include_all=False)
         self.BIO_GBF4_ECNES_SEL = [tuple(r) for r in self.GBF4_ECNES_META[['region', 'COMMUNITY', 'presence']].values.tolist()]
 
         if settings.GBF4_TARGET_SNES != 'off':
@@ -2243,25 +2243,35 @@ class Data:
         return f(yr_cal).item()  # Convert the interpolated value to a scalar
     
 
-    def get_SNES_targets_df(self, verbose: bool = False) -> pd.DataFrame:
+    def get_SNES_targets_df(self, include_all: bool = False, verbose: bool = False) -> pd.DataFrame:
         """Load and filter SNES targets from CSV.
 
         Returns a DataFrame with selected (region, SCIENTIFIC_NAME, presence) rows.
         Australia mode: presence in {'LIKELY', 'LIKELY_AND_MAYBE'}, region='Australia'
         NRM mode:       presence='LIKELY', region=NRM region name
+        Set include_all=True to return all NRM/STATE rows for writing/reporting.
         Dict targets are applied inside this function so all call sites stay consistent.
         """
         snes_df = (
             pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv', low_memory=False)
-            .query(f"region_level == '{settings.GBF4_SNES_REGION_MODE}'")
             .query(f"resfactor == {settings.RESFACTOR}")
             .query(f"presence == '{settings.GBF4_SNES_PRESENCE_CLASS}'")
+            .reset_index(drop=True)
+        )
+        
+        if include_all:
+            return snes_df
+
+        snes_df = (
+            snes_df
+            .query(f"region_level == '{settings.GBF4_SNES_REGION_MODE}'")
             .query("TARGET_LEVEL_2030 > 0")
             .reset_index(drop=True)
         )
+
         if settings.GBF4_SNES_REGION_MODE != 'AUSTRALIA':
             snes_df = snes_df.query(f"region.isin({settings.GBF4_SNES_SELECTED_REGIONS})").reset_index(drop=True)
-        
+
         if settings.GBF4_SNES_EXCLUDE_REGION_SPECIES:
             for region, species in settings.GBF4_SNES_EXCLUDE_REGION_SPECIES:
                 snes_df = snes_df[~((snes_df['region'] == region) & (snes_df['SCIENTIFIC_NAME'] == species))].reset_index(drop=True)
@@ -2279,19 +2289,27 @@ class Data:
         return snes_df
 
 
-    def get_ECNES_targets_df(self) -> pd.DataFrame:
+    def get_ECNES_targets_df(self, include_all: bool = False) -> pd.DataFrame:
         """Load and filter ECNES targets from CSV.
 
         Returns a DataFrame with selected (region, COMMUNITY, presence) rows.
         Australia mode: presence in {'LIKELY', 'LIKELY_AND_MAYBE'}, region='Australia'
         NRM mode:       presence='LIKELY', region=NRM region name
+        Set include_all=True to return all rows for writing/reporting.
         Dict targets are applied inside this function so all call sites stay consistent.
         """
         ecnes_df = (
             pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv')
-            .query(f"region_level == '{settings.GBF4_ECNES_REGION_MODE}'")
             .query(f"resfactor == {settings.RESFACTOR}")
             .query(f"presence == '{settings.GBF4_ECNES_PRESENCE_CLASS}'")
+            .reset_index(drop=True)
+        )
+        if include_all:
+            return ecnes_df
+
+        ecnes_df = (
+            ecnes_df
+            .query(f"region_level == '{settings.GBF4_ECNES_REGION_MODE}'")
             .query("TARGET_LEVEL_2030 > 0")
             .reset_index(drop=True)
         )

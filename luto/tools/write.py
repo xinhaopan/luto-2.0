@@ -3928,12 +3928,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         return f"Skipping Biodiversity GBF4 SNES scores for year {yr_cal} as `WRITE_SNES` is set to 'off'"
 
     # 1. Load all species target df and get species list.
-    snes_all_targets_df = (
-        pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv', low_memory=False)
-        .query('region_level in ["NRM", "STATE"]')
-        .query(f'resfactor == {settings.RESFACTOR}')
-        .query(f"presence == '{settings.GBF4_SNES_PRESENCE_CLASS}'")
-    )
+    snes_all_targets_df = data.get_SNES_targets_df(include_all=True)
     all_species = sorted(snes_all_targets_df['SCIENTIFIC_NAME'].unique())
 
     # 2. Unify chunk ag/agmgt/nonag decision variables.
@@ -4282,9 +4277,11 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         .rename(columns={'region_state': 'region'})
     )
     target_aus = target_nrm.groupby('species', as_index=False)['TARGET_INSIDE_SCORE'].sum()
+    # Strip any 'AUSTRALIA' from nrm/state rows — in AUSTRALIA mode target_nrm carries
+    # region='AUSTRALIA' which would duplicate the explicit Australia aggregates below.
     all_targets = pd.concat([
-        target_nrm.assign(region_level='region_NRM'),
-        target_state.assign(region_level='region_state'),
+        target_nrm[target_nrm['region'] != 'AUSTRALIA'].assign(region_level='region_NRM'),
+        target_state[target_state['region'] != 'AUSTRALIA'].assign(region_level='region_state'),
         target_aus.assign(region='AUSTRALIA', region_level='region_NRM'),
         target_aus.assign(region='AUSTRALIA', region_level='region_state'),
     ], ignore_index=True)
@@ -4392,18 +4389,10 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
 
 
 def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
-    ''' Biodiversity GBF4 ECNES only being written to disk when `GBF4_TARGET_ECNES` is not 'off' '''
-
-    if settings.GBF4_TARGET_ECNES == 'off':
-        return "Skipped: Biodiversity GBF4 ECNES scores not written as `GBF4_TARGET_ECNES` is set to 'off'"
+    ''' Biodiversity GBF4 ECNES only being written to disk regardless of `GBF4_TARGET_SNES` setting'''
 
     # 1. Load all community target df and get species list.
-    ecnes_all_targets_df = (
-        pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv')
-        .query('region_level in ["NRM", "STATE"]')
-        .query(f'resfactor == {settings.RESFACTOR}')
-        .query(f"presence == '{settings.GBF4_ECNES_PRESENCE_CLASS}'")
-    )
+    ecnes_all_targets_df = data.get_ECNES_targets_df(include_all=True)
     all_species = sorted(ecnes_all_targets_df['COMMUNITY'].unique())
 
     # 2. Unify chunk ag/agmgt/nonag decision variables.
@@ -4648,9 +4637,11 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         .rename(columns={'region_state': 'region'})
     )
     target_aus = target_nrm.groupby('species', as_index=False)['TARGET_INSIDE_SCORE'].sum()
+    # Strip any 'AUSTRALIA' from nrm/state rows — in AUSTRALIA mode target_nrm carries
+    # region='AUSTRALIA' which would duplicate the explicit Australia aggregates below.
     all_targets = pd.concat([
-        target_nrm.assign(region_level='region_NRM'),
-        target_state.assign(region_level='region_state'),
+        target_nrm[target_nrm['region'] != 'AUSTRALIA'].assign(region_level='region_NRM'),
+        target_state[target_state['region'] != 'AUSTRALIA'].assign(region_level='region_state'),
         target_aus.assign(region='AUSTRALIA', region_level='region_NRM'),
         target_aus.assign(region='AUSTRALIA', region_level='region_state'),
     ], ignore_index=True)
@@ -4753,7 +4744,6 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         }
     }
     return (f"Biodiversity GBF4 ECNES scores written for year {yr_cal}", magnitudes)
-
 
 
 
