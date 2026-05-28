@@ -5,6 +5,64 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260528 — RES5 peak memory updated for NVIS and ECNES biodiversity writers
+
+### Context
+
+The `peak_mb_RES5` table in `luto/tools/write.py` controls write-stage parallelism via:
+
+```python
+n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb)
+```
+
+NVIS and ECNES were re-profiled at RF5 using:
+
+```text
+jinzhu_inspect_code/Profile_write_RES5/profile_write_RES5_bio_nvis_snes_ecnes.py
+```
+
+The profiling data object was:
+
+```text
+output/2026_05_20__13_10_03_RF5_2010-2050/Data_RES5.lz4
+```
+
+### Profiling results
+
+| Writer | Duration | Peak delta RAM | Peak working set | Status | Summary |
+|---|---:|---:|---:|---|---|
+| `write_biodiversity_GBF3_NVIS_scores` | 219.58s | 15,447.3 MB | 23,568.7 MB | ok | `data_bio_nvis_snes100_ecnes/20260528_113110/profile_summary.csv` |
+| `write_biodiversity_GBF4_ECNES_scores` | 648.08s | 7,317.4 MB | 15,329.6 MB | ok | `data_bio_nvis_snes100_ecnes/20260528_113528/profile_summary.csv` |
+
+The successful ECNES run used `GBF4_ECNES_REGION_MODE = 'NRM'`, matching the current
+selected regions `['North East', 'Goulburn Broken']`. An earlier ECNES attempt with
+`GBF4_ECNES_REGION_MODE = 'AUSTRALIA'` failed before profiling completed because the
+selected regions were NRM names, leaving the filtered ECNES target table empty.
+
+### Code update
+
+`luto/tools/write.py` was updated by rounding the successful peak deltas up to integer MB:
+
+```python
+'write_biodiversity_GBF3_NVIS_scores':         15_448,
+'write_biodiversity_GBF4_ECNES_scores':         7_318,
+```
+
+Previous values were:
+
+```python
+'write_biodiversity_GBF3_NVIS_scores':         17_281,
+'write_biodiversity_GBF4_ECNES_scores':         7_000,
+```
+
+The updated file passed:
+
+```powershell
+conda run -n luto python -m py_compile luto\tools\write.py
+```
+
+---
+
 ## 20260527 — SNES sparse nonzero writer implemented, debugged, and benchmarked
 
 ### Context

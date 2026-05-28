@@ -845,22 +845,6 @@ INCLUDE_WATER_LICENSE_COSTS = 1
 
 # ------------------- Agricultural biodiversity parameters -------------------
 
-GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
-'''
-The constraint type for the biodiversity target.
-- 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
-- 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
-'''
-
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-GBF2_TARGETS_DICT = {
-    'off':     None,
-    'low':    {2030: 0,    2050: 0,    2100: 0},
-    'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
-    'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
-}
-
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 GBF2_TARGET = 'high'            # 'off', 'low', 'medium', or 'high'
 '''
@@ -871,6 +855,24 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
  - 'low' is the low level of biodiversity target (i.e., restore 0% of degreaded biodiversity socore in the 'priority degraded land').
  - 'medium' is the medium level of biodiversity target (i.e., restore 15% of degreaded biodiversity socore in the 'priority degraded land').
  - 'high' is the high level of biodiversity target (i.e., restore 25% of degreaded biodiversity socore in the 'priority degraded land').
+'''
+
+
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+GBF2_TARGETS_DICT = {
+    'off':     None,
+    'low':    {2030: 0,    2050: 0,    2100: 0},
+    'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
+    'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
+}
+
+
+GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+'''
+The constraint type for the biodiversity target.
+- 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
+- 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 
 
@@ -1110,7 +1112,7 @@ GBF4_ECNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 GBF4_SNES_TARGETS_DICT  = {2030: 30, 2050: 50, 2100: 50}
 GBF4_ECNES_TARGETS_DICT = {2030: 30, 2050: 50, 2100: 50}
 
-GBF4_SNES_REGION_MODE       = 'NRM'                    # 'AUSTRALIA' or 'NRM'
+GBF4_SNES_REGION_MODE       = 'AUSTRALIA'                    # 'AUSTRALIA' or 'NRM'
 GBF4_SNES_SELECTED_REGIONS  = ['North East', 'Goulburn Broken']
 '''
 Controls the spatial resolution of GBF4 SNES constraints.
@@ -1119,7 +1121,7 @@ Controls the spatial resolution of GBF4 SNES constraints.
 GBF4_SNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
 '''
 
-GBF4_ECNES_REGION_MODE      = 'NRM'                   # 'AUSTRALIA' or 'NRM'
+GBF4_ECNES_REGION_MODE      = 'AUSTRALIA'                   # 'AUSTRALIA' or 'NRM'
 GBF4_ECNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
 '''
 Controls the spatial resolution of GBF4 ECNES constraints.
