@@ -398,6 +398,12 @@ window.BiodiversityView = {
       }
 
       await _ensureLayer(cat, tree, withSpecies);
+      if (isPaged.value && currentPageInfo.value) {
+        const { start, end } = currentPageInfo.value;
+        isLoadingData.value = true;
+        await _loadChartPage(start, end);
+        isLoadingData.value = false;
+      }
     }
 
     async function loadAllCharts() {
@@ -407,14 +413,44 @@ window.BiodiversityView = {
         for (const [key, val] of Object.entries(metricCr || {})) {
           if (key === 'overview') {
             for (const entry of Object.values(val || {})) {
+              if (entry?.paged) continue; // loaded on demand when page changes
               if (entry?.name && !window[entry.name]) pending.push(loadScript(entry.path, entry.name, VIEW_NAME));
             }
-          } else if (val?.name && !window[val.name]) {
-            pending.push(loadScript(val.path, val.name, VIEW_NAME));
+          } else {
+            if (val?.paged) continue; // loaded on demand when page changes
+            if (val?.name && !window[val.name]) pending.push(loadScript(val.path, val.name, VIEW_NAME));
           }
         }
       }
       if (pending.length > 0) await Promise.allSettled(pending);
+    }
+
+    // Load chart page files for paged metrics and alias to base window names.
+    async function _loadChartPage(start, end) {
+      const metric = selectMetric.value;
+      const metricCr = chartRegister[metric];
+      if (!metricCr) return;
+      const pending = [];
+      const entries = [];
+      for (const [key, val] of Object.entries(metricCr)) {
+        if (key === 'overview') {
+          for (const entry of Object.values(val || {})) {
+            if (!entry?.paged || !entry.name) continue;
+            const pagedName = `${entry.name}_${start}_${end}`;
+            if (!window[pagedName]) pending.push(loadScript(`data/${pagedName}.js`, pagedName, VIEW_NAME));
+            entries.push({ base: entry.name, paged: pagedName });
+          }
+        } else if (val?.paged && val.name) {
+          const pagedName = `${val.name}_${start}_${end}`;
+          if (!window[pagedName]) pending.push(loadScript(`data/${pagedName}.js`, pagedName, VIEW_NAME));
+          entries.push({ base: val.name, paged: pagedName });
+        }
+      }
+      if (pending.length > 0) await Promise.allSettled(pending);
+      // Alias paged data to base names so existing chart lookup code is unchanged
+      for (const { base, paged } of entries) {
+        window[base] = window[paged];
+      }
     }
 
     onMounted(async () => {
@@ -604,6 +640,12 @@ window.BiodiversityView = {
       selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp))
           ? prevSp : (availableSpecies.value[0] || '');
       await _ensureLayer(cat, tree, hasSpecies.value);
+      if (currentPageInfo.value) {
+        const { start, end } = currentPageInfo.value;
+        isLoadingData.value = true;
+        await _loadChartPage(start, end);
+        isLoadingData.value = false;
+      }
     });
 
     watch(selectBackend, async () => {

@@ -320,7 +320,7 @@ def get_map2json(
     # parallelism with zero pickling cost. Standard layers have few tasks (2–30 per file),
     # so heap-allocator contention between threads is negligible.
     for hierarchy_tp, tif_bytes, attrs in Parallel(
-        n_jobs=workers, return_as='generator_unordered', prefer='threads'
+        n_jobs=workers, prefer='threads'
     )(tasks):
         flat_data[hierarchy_tp] = {'tif_b64': base64.b64encode(tif_bytes).decode(), **attrs}
 
@@ -553,7 +553,7 @@ def get_map2json_paged(
         # savings. Loky workers have isolated heaps so allocations never contend.
         # max_nbytes memmaps index_merc (≥200 MB) to avoid pickling it per task.
         for hierarchy_tp, tif_bytes, attrs in Parallel(
-            n_jobs=workers, return_as='generator_unordered', max_nbytes=1_000_000
+            n_jobs=workers, max_nbytes=1_000_000
         )(tasks):
             combo_tp = hierarchy_tp[:-2]
             sp_val   = hierarchy_tp[-2]

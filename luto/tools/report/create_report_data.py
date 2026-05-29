@@ -166,6 +166,52 @@ def build_out_dict_bulk(df_wide_pct, df_wide_area, key_cols):
     return out_dict
 
 
+def _write_paged_chart_js(
+    out_dict: dict,
+    filename_prefix: str,
+    save_dir: str,
+    page_size: int = 100,
+    species_order: list | None = None,
+) -> None:
+    """Write out_dict split by species into page-sized JS files.
+
+    out_dict must have structure: {region_level: {region: {species: <any>}}}
+    Writes {filename_prefix}_{start}_{end}.js for each page of species.
+    The Vue loads only the current page and aliases window[filename_prefix] to it.
+
+    species_order: if provided, use this sorted list to define page boundaries so
+    all chart files for the same metric share identical {start}_{end} ranges with
+    the map-layer index (which uses the full species universe).  If None, the order
+    is derived from out_dict itself.
+    """
+    if species_order is not None:
+        all_species = list(species_order)
+    else:
+        all_species = sorted({
+            sp
+            for rl_data in out_dict.values()
+            for r_data in rl_data.values()
+            for sp in r_data
+        })
+    for page_start in range(0, max(len(all_species), 1), page_size):
+        page_sp = all_species[page_start:page_start + page_size]
+        if not page_sp:
+            break
+        page_end = page_start + len(page_sp)
+        page_dict = {}
+        for rl, rl_data in out_dict.items():
+            page_dict[rl] = {}
+            for region, r_data in rl_data.items():
+                sliced = {sp: r_data[sp] for sp in page_sp if sp in r_data}
+                if sliced:
+                    page_dict[rl][region] = sliced
+        fname = f'{filename_prefix}_{page_start}_{page_end}'
+        with open(f'{save_dir}/{fname}.js', 'w') as f:
+            f.write(f'window["{fname}"] = ')
+            json.dump(page_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+
 def save_report_data(raw_data_dir:str):
     """
     Saves the report data in the specified directory.
@@ -3310,6 +3356,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         # Drop the per-species 'ALL' aggregate (it's re-aggregated explicitly in sum charts).
         # Keep AUSTRALIA rows so the AUSTRALIA region selection shows data in the report.
         bio_df = bio_df.query('species != "ALL"')
+        _nvis_species_order = sorted(bio_df['species'].unique().tolist())
 
         # ---------------- (GBF3-NVIS) Ranking  ----------------
         bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL" and region != "AUSTRALIA"')\
@@ -3376,11 +3423,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species'])
 
-        filename = f'BIO_GBF3_NVIS_overview_sum'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+        _write_paged_chart_js(out_dict, 'BIO_GBF3_NVIS_overview_sum', SAVE_DIR, species_order=_nvis_species_order)
 
         # --- BIO_GBF3_NVIS_Sum: per-species Type breakdown from pre-computed sum CSV ---
         sum_bio_paths = files.query(
@@ -3429,11 +3472,7 @@ def process_biodiversity_data(files, SAVE_DIR):
                     'Percent': pct_records,
                     'Area':    area_records,
                 }
-            filename = 'BIO_GBF3_NVIS_Sum'
-            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-                f.write(f'window["{filename}"] = ')
-                json.dump(out_dict_sum, f, separators=(',', ':'), indent=2)
-                f.write(';\n')
+            _write_paged_chart_js(out_dict_sum, 'BIO_GBF3_NVIS_Sum', SAVE_DIR, species_order=_nvis_species_order)
 
 
         # ---------------- (GBF3-NVIS) - Ag  ----------------
@@ -3453,11 +3492,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species', 'water'])
 
-        filename = f'BIO_GBF3_NVIS_Ag'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+        _write_paged_chart_js(out_dict, 'BIO_GBF3_NVIS_Ag', SAVE_DIR, species_order=_nvis_species_order)
 
         # ---------------- (GBF3-NVIS) - Am  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
@@ -3477,11 +3512,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species', 'am', 'water'])
 
-        filename = f'BIO_GBF3_NVIS_Am'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+        _write_paged_chart_js(out_dict, 'BIO_GBF3_NVIS_Am', SAVE_DIR, species_order=_nvis_species_order)
 
         # ---------------- (GBF3-NVIS) - Non-Ag  ----------------
         _g3_nonag_src = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')
@@ -3500,11 +3531,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species'])
 
-        filename = f'BIO_GBF3_NVIS_NonAg'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+        _write_paged_chart_js(out_dict, 'BIO_GBF3_NVIS_NonAg', SAVE_DIR, species_order=_nvis_species_order)
             
             
     # IBRA reporting branch disabled (GBF3 IBRA pipeline incomplete).
@@ -3527,6 +3554,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         # species in the report dropdowns; sum charts re-aggregate explicitly.
         # Keep AUSTRALIA rows so the AUSTRALIA region selection shows data in the report.
         bio_df = bio_df.query('species != "ALL"')
+        _snes_species_order = sorted(bio_df['species'].unique().tolist())
         # ---------------- (GBF4 SNES) Ranking  ----------------
         bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL" and region != "AUSTRALIA"')\
             .groupby(['Year', 'region_level', 'region'])\
@@ -3579,11 +3607,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species'])
 
-        filename = f'BIO_GBF4_SNES_overview_sum'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+        _write_paged_chart_js(out_dict, 'BIO_GBF4_SNES_overview_sum', SAVE_DIR, species_order=_snes_species_order)
 
         # --- BIO_GBF4_SNES_Sum: per-species Type breakdown from pre-computed sum CSV ---
         sum_bio_paths = files.query(
@@ -3607,11 +3631,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             df_wide_sum_area['type'] = 'column'
             df_wide_sum_area['color'] = df_wide_sum_area['name'].apply(lambda x: COLORS[x])
             out_dict_sum = build_out_dict_bulk(df_wide_sum_pct, df_wide_sum_area, ['region_level', 'region', 'species'])
-            filename = 'BIO_GBF4_SNES_Sum'
-            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-                f.write(f'window["{filename}"] = ')
-                json.dump(out_dict_sum, f, separators=(',', ':'), indent=2)
-                f.write(';\n')
+            _write_paged_chart_js(out_dict_sum, 'BIO_GBF4_SNES_Sum', SAVE_DIR, species_order=_snes_species_order)
 
         # ---------------- (GBF4 SNES) Ag  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
@@ -3630,11 +3650,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species', 'water'])
 
-        filename = f'BIO_GBF4_SNES_Ag'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+        _write_paged_chart_js(out_dict, 'BIO_GBF4_SNES_Ag', SAVE_DIR, species_order=_snes_species_order)
 
         # ---------------- (GBF4 SNES) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
@@ -3654,11 +3670,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species', 'am', 'water'])
 
-        filename = f'BIO_GBF4_SNES_Am'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+        _write_paged_chart_js(out_dict, 'BIO_GBF4_SNES_Am', SAVE_DIR, species_order=_snes_species_order)
 
         # ---------------- (GBF4 SNES) Non-ag  ----------------
         _g4s_nonag_src = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')
@@ -3677,11 +3689,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species'])
 
-        filename = f'BIO_GBF4_SNES_NonAg'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+        _write_paged_chart_js(out_dict, 'BIO_GBF4_SNES_NonAg', SAVE_DIR, species_order=_snes_species_order)
             
             
             
@@ -3698,6 +3706,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     # Drop the per-species 'ALL' aggregate (re-aggregated explicitly in sum charts).
     # Keep AUSTRALIA rows so the AUSTRALIA region selection shows data in the report.
     bio_df = bio_df.query('species != "ALL"')
+    _ecnes_species_order = sorted(bio_df['species'].unique().tolist())
 
     # Build target lookup once (species × region → Target_by_Percent, BASE_TOTAL_SCORE).
     # Target_by_Percent is NaN when no constraint is active (write.py sets it to NaN
@@ -3758,11 +3767,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
     out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species'])
 
-    filename = f'BIO_GBF4_ECNES_overview_sum'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-        f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
+    _write_paged_chart_js(out_dict, 'BIO_GBF4_ECNES_overview_sum', SAVE_DIR, species_order=_ecnes_species_order)
 
     # --- BIO_GBF4_ECNES_Sum: per-species Type breakdown from pre-computed sum CSV ---
     sum_bio_paths = files.query(
@@ -3811,11 +3816,7 @@ def process_biodiversity_data(files, SAVE_DIR):
                 'Percent': pct_records,
                 'Area':    area_records,
             }
-        filename = 'BIO_GBF4_ECNES_Sum'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict_sum, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+        _write_paged_chart_js(out_dict_sum, 'BIO_GBF4_ECNES_Sum', SAVE_DIR, species_order=_ecnes_species_order)
 
     # ---------------- (GBF4 ECNES) Ag  ----------------
     bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
@@ -3834,11 +3835,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
     out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species', 'water'])
 
-    filename = f'BIO_GBF4_ECNES_Ag'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-        f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
+    _write_paged_chart_js(out_dict, 'BIO_GBF4_ECNES_Ag', SAVE_DIR, species_order=_ecnes_species_order)
 
     # ---------------- (GBF4 ECNES) Agricultural Management  ----------------
     bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
@@ -3858,11 +3855,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
     out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species', 'am', 'water'])
 
-    filename = f'BIO_GBF4_ECNES_Am'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-        f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
+    _write_paged_chart_js(out_dict, 'BIO_GBF4_ECNES_Am', SAVE_DIR, species_order=_ecnes_species_order)
 
     # ---------------- (GBF4 ECNES) Non-ag  ----------------
     _g4e_nonag_src = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')
@@ -3881,11 +3874,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
     out_dict = build_out_dict_bulk(df_wide_pct, df_wide_area, ['region_level', 'region', 'species'])
 
-    filename = f'BIO_GBF4_ECNES_NonAg'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-        f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
+    _write_paged_chart_js(out_dict, 'BIO_GBF4_ECNES_NonAg', SAVE_DIR, species_order=_ecnes_species_order)
     
     
     
