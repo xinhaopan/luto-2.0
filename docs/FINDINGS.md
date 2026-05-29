@@ -5,6 +5,126 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260529 — Report layer pipeline: chunk magnitude tracking, get_all_files chunk discovery, _score_to_df BLAS optimisation, chunk_num JS merging
+
+### 1 — `save2chunk` now returns inline magnitude (avoids disk reload)
+
+`_mag_from_chunks` scanned every saved `chunk_*.nc` file after the loop to compute
+`[min, max]` quantiles — re-reading data that was already in memory when it was written.
+
+**Fix:** `save2chunk` now calls `get_mag(in_xr)` before writing and returns the result.
+`_save_fullsize_layers` (SNES inner helper) propagates the return via `return save2chunk(...)`.
+Each of the three chunk loops (GBF3, SNES, ECNES) was updated to:
+
+```python
+mags_ag, mags_non_ag, mags_am, mags_sum = [], [], [], []
+# inside loop:
+mags_ag.extend(save2chunk(valid_ag_g, chunks_ag, group_idx))
+```
+
+The end-of-function `magnitudes` dict uses the accumulated lists directly.
+`_mag_from_chunks` is removed entirely.
+
+---
+
+### 2 — `get_all_files` could not discover chunk NC files
+
+`extract_dtype_from_path` checked `os.path.basename(path)` against category patterns.
+For chunk files (`chunk_000000.nc` inside `xr_biodiversity_GBF4_SNES_ag_2050_chunks/`),
+the basename never matches `xr_` → classified as `Unknown` → dropped.
+`get_all_files` also stored `base_name = "chunk_000000"`, which no downstream query would match.
+
+**Fix in `extract_dtype_from_path`:** if the file is a `.nc` inside a `_YYYY_chunks/`
+directory, use the **parent directory name** (with `_YYYY_chunks` stripped) as the effective
+basename for pattern matching:
+
+```python
+parent = os.path.dirname(path)
+if path.endswith('.nc') and re.search(r'_\d{4}_chunks$', os.path.basename(parent)):
+    base_name = re.sub(r'_\d{4}_chunks$', '', os.path.basename(parent))
+else:
+    base_name = os.path.basename(path)
+```
+
+**Fix in `get_all_files` `_base_name_ext`:** same guard so `base_name` stored in the
+DataFrame is `xr_biodiversity_GBF4_SNES_ag` (not `chunk_000000`), matching
+`files.query('base_name == "xr_biodiversity_GBF4_SNES_ag"')`.
+
+`manifest.json` files inside chunk dirs are excluded from the chunk-dir logic via the
+`.endswith('.nc')` guard and remain `Unknown` → dropped.
+
+---
+
+### 3 — `_score_to_df` (SNES inner helper): per-species xarray loop replaced by BLAS matmul
+
+The original function looped over each species one at a time:
+- `.sel(cell=score['species'] == species)` — boolean mask per species
+- `.groupby(rl).sum()` + `.to_dataframe()` per species per region level
+- Result: O(n_species × n_region_levels) xarray groupby ops, many small DataFrames
+
+For a batch of 10 species with 2 region levels and 4 score types, this is 80 xarray
+groupby calls per batch, each doing a full `.compute()` on a dask-backed DataArray.
+
+**Fix:** stack `group_dims` once → `(n_layers, n_cells)` numpy matrix, then:
+
+- **AUSTRALIA**: single BLAS call `vals @ sp_onehot` → `(n_layers, n_sp)` where
+  `sp_onehot` is `(n_cells, n_sp)` — one call covers all species and all layers.
+- **Regional**: loop over `n_sp ≤ 10` species; for each, `vals[:, mask] @ rg_onehot[mask]`
+  → `(n_layers, n_rg)`. The per-species mask limits cells to that species' nonzero footprint,
+  keeping each matmul small.
+- Build DataFrames from `np.where(agg != 0)` indices — no intermediate DataFrame-per-species.
+
+Key: `score.compute()` is called once at the start, not inside any loop.
+
+---
+
+### 4 — `get_map2json_snes` `chunk_num` parameter: merge N chunk NCs per JS output
+
+With 10 species per chunk NC and ~270 SNES species, each combo generates ~27 JS files.
+A `chunk_num` parameter allows grouping N consecutive chunk files per JS output.
+
+**Python side (`get_map2json_snes`):**
+The `for chunk_idx in chunk_indices:` loop was replaced by:
+
+```python
+for group_start_pos in range(0, len(chunk_indices), chunk_num):
+    group = chunk_indices[group_start_pos : group_start_pos + chunk_num]
+    page_start = page_starts[group[0]]
+    page_end   = page_starts[group[-1]] + len(manifest[str(group[-1])])
+    chunk_data = {}
+    for chunk_idx in group:          # accumulate all years × all chunks
+        for year, chunks_dir in ...:
+            ...
+    # write one JS per combo, filename: {var_name}_{page_start}_{page_end}.js
+```
+
+With `chunk_num=10` and 10 species per NC: each JS covers 100 species, ~3× fewer files.
+
+**Index side (`_write_snes_index`):** the `pages` dict must be grouped by the same
+`chunk_num` so Vue constructs the correct filename. Without this fix, Vue reads
+`pages["0"] = {start:0, end:10}` and requests `_0_10.js` — which no longer exists.
+
+```python
+for group_start_pos in range(0, len(sorted_chunk_keys), chunk_num):
+    group_keys = [...]
+    page_start = chunk_starts[group_keys[0]]
+    page_end   = chunk_starts[group_keys[-1]] + len(chunk_species[group_keys[-1]])
+    species    = [sp for k in group_keys for sp in chunk_species[k]]
+    pages_out[str(page_idx)] = {'start': page_start, 'end': page_end, 'species': species}
+```
+
+`pageSize` is updated to `batch_size × chunk_num`.
+
+**Vue side:** no changes needed — `currentPageInfo = pages[selectPage]` drives
+`ensureComboLayer([start, end])` which constructs the filename. The species dropdown
+(`_pagedSpecies()`) reads `currentPageInfo.species` which now contains `chunk_num × 10`
+species. `totalPages = Object.keys(pages).length` is halved automatically.
+
+The `chunk_num` is set per call site in `save_report_layer` (not in `settings.py`) so it
+can be tuned independently for GBF3, SNES, and ECNES without a settings round-trip.
+
+---
+
 ## 20260529 — `write_biodiversity_GBF4_SNES_scores`: ~200 GB memory at full resolution diagnosed and fixed
 
 ### Context
