@@ -189,8 +189,49 @@ def map2geotiff(
                  'raw_min_max': [per_ha_min, per_ha_max]}
 
     return hierarchy_tp, tif_bytes, attrs
-    
-    
+
+
+
+def build_year_meta(year: int, base_dir: str) -> tuple:
+    """Build EPSG:3857 raster metadata for one simulation year.
+
+    Returns (index_merc, geo_meta_merc, real_area_1d):
+      index_merc    — (H, W) int32; cell index ≥0, -1 = nodata
+      geo_meta_merc — rasterio write kwargs for the reprojected grid
+      real_area_1d  — 1D float32[cell] ha per cell, or None if file missing
+    """
+    ds_template = os.path.join(base_dir, f'xr_map_template_{year}.nc')
+    with xr.load_dataset(ds_template) as ds:
+        crs   = ds['spatial_ref'].attrs['crs_wkt']
+        valid = ds['layer'].values >= 0
+        arr   = np.full(ds['layer'].shape, -1.0, dtype=np.float32)
+        arr[valid] = np.arange(valid.sum(), dtype=np.float32)
+        rxr_merc = (
+            ds['layer'].copy(data=arr)
+            .rio.write_nodata(-1.0)
+            .rio.write_crs(crs)
+            .rio.reproject('EPSG:3857', nodata=-1.0)
+        )
+
+    index_merc = np.round(rxr_merc.values).astype(np.int32)
+    geo_meta_merc = {
+        'driver': 'GTiff', 'count': 1,
+        'crs':       rxr_merc.rio.crs,
+        'transform': rxr_merc.rio.transform(),
+        'width':     int(rxr_merc.shape[-1]),
+        'height':    int(rxr_merc.shape[-2]),
+        'nodata':    -9999.0, 'compress': 'deflate', 'predictor': 2,
+    }
+
+    real_area_path = os.path.join(base_dir, f'xr_area_real_area_ha_{year}.nc')
+    real_area_1d = None
+    if os.path.exists(real_area_path):
+        with xr.open_dataset(real_area_path) as ra_ds:
+            real_area_1d = ra_ds['data'].values.squeeze().astype(np.float32)
+
+    return index_merc, geo_meta_merc, real_area_1d
+
+
 
 def get_map2json(
     files_df: pd.DataFrame,
@@ -208,7 +249,8 @@ def get_map2json(
     # Per-worker memory: float32 2D output grid (EPSG:3857 is ~7× the 1D cell count).
     ncells = 5_000_000 // (settings.RESFACTOR ** 2)
     mem_per_worker = ncells * 7 * 4 / 1e6
-    workers = min(60, max(1, int(settings.WRITE_REPORT_MAX_MEM_MB // mem_per_worker)))
+    cpu_cap = 61 if os.name == 'nt' else (os.cpu_count() or 1)
+    workers = min(cpu_cap, max(1, int(settings.WRITE_REPORT_MAX_MEM_MB // mem_per_worker)))
 
     def get_legend_params(sel):
         if legend_int_level is None:
@@ -226,59 +268,26 @@ def get_map2json(
 
     prefix = save_path.removesuffix('.js')
 
-    flat_data: dict = {}   # { hierarchy_tp: {tif_b64, intOrFloat, min_max/legendKey} }
+    flat_data: dict = {}
+    tasks: list = []
+    dim_names: list = []
 
+    # Accumulate all (year × layer) tasks across every file before launching workers.
+    # This keeps all workers busy across years instead of going idle between year files.
     for _, row in files_df.iterrows():
         xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path'], chunks={}), 'layer')['data']
-        ds_template = f'{os.path.dirname(row["path"])}/xr_map_template_{row["Year"]}.nc'
         valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
 
         if len(valid_layers) == 0:
             print(f'│   ├── No valid layers found in {row["base_name"]}_{row["Year"]}, skipping.')
             continue
-        
-        # dim_names is the same for all layers in the file, so get it once here for the index.js file.
+
         dim_names = list(rename_reorder_hierarchy(valid_layers[0]).keys())
-
-        # Build EPSG:3857 cell-index map once per year.
-        # index_merc[h,w] = 1D LUTO cell index, or -1 for nodata.
-        # joblib memmaps this array across workers (max_nbytes=1e6).
-        with xr.load_dataset(ds_template) as ds:
-            crs   = ds['spatial_ref'].attrs['crs_wkt']
-            valid = ds['layer'].values >= 0
-            arr   = np.full(ds['layer'].shape, -1.0, dtype=np.float32)
-            arr[valid] = np.arange(valid.sum(), dtype=np.float32)
-            rxr_merc = (
-                ds['layer'].copy(data=arr)
-                .rio.write_nodata(-1.0)
-                .rio.write_crs(crs)
-                .rio.reproject('EPSG:3857', nodata=-1.0)
-            )
-
-        index_merc = np.round(rxr_merc.values).astype(np.int32)
-
-        # Load real cell area (ha) for per-ha normalisation of float layers.
-        real_area_path = os.path.join(
-            os.path.dirname(row['path']),
-            f'xr_area_real_area_ha_{row["Year"]}.nc'
-        )
-        if os.path.exists(real_area_path):
-            with xr.open_dataset(real_area_path) as ra_ds:
-                real_area_1d = ra_ds['data'].values.squeeze().astype(np.float32)
-        else:
-            real_area_1d = None
-        geo_meta_merc = {
-            'driver': 'GTiff', 'count': 1,
-            'crs':       rxr_merc.rio.crs,
-            'transform': rxr_merc.rio.transform(),
-            'width':     int(rxr_merc.shape[-1]),
-            'height':    int(rxr_merc.shape[-2]),
-            'nodata':    -9999.0, 'compress': 'deflate', 'predictor': 2,
-        } 
+        index_merc, geo_meta_merc, real_area_1d = build_year_meta(int(row['Year']), os.path.dirname(row['path']))
 
         # GBF NRM-mode layers carry an is_selected coord marking which cells belong to the
         # selected NRM region; prebuilt once per file rather than reconstructed per layer.
-        is_selected_arr    = (
+        is_selected_arr = (
             np.asarray(xr_arr['is_selected'].values, dtype=bool)
             if 'is_selected' in xr_arr.coords else None
         )
@@ -286,34 +295,35 @@ def get_map2json(
             {'is_selected': ('cell', is_selected_arr)} if is_selected_arr is not None else None
         )
 
-        # Batch to avoid OOM on large layer counts (e.g. GBF4 ECNES ~2700 layers).
-        for batch in (valid_layers[i:i+workers] for i in range(0, len(valid_layers), workers)):
-            tasks = []
-            for sel in batch:
-                isInt, layer_magnitude, legend_key = get_legend_params(sel)
-                renamed = rename_reorder_hierarchy(sel)
-                hierarchy_tp = tuple(list(renamed.values()) + [int(row['Year'])])
-                vals = xr_arr.sel(**sel).values.copy()
-                # Transition layers (From-lu × To-lu MultiIndex) sometimes leave a residual
-                # size-1 non-cell dimension after .sel(); squeeze then reshape to guarantee 1-D.
-                vals = np.asarray(vals).squeeze()
-                if vals.ndim != 1:
-                    vals = vals.reshape(-1)
-                arr_sel = xr.DataArray(vals, dims=('cell',), coords=is_selected_coords)
-                tasks.append(delayed(map2geotiff)(
-                    index_merc, geo_meta_merc, arr_sel, isInt, hierarchy_tp, layer_magnitude, legend_key,
-                    real_area_1d,
-                ))
-
-            for hierarchy_tp, tif_bytes, attrs in Parallel(
-                n_jobs=workers, return_as='generator', max_nbytes=1_000_000
-            )(tasks):
-                flat_data[hierarchy_tp] = {'tif_b64': base64.b64encode(tif_bytes).decode(), **attrs}
+        for sel in valid_layers:
+            isInt, layer_magnitude, legend_key = get_legend_params(sel)
+            renamed = rename_reorder_hierarchy(sel)
+            hierarchy_tp = tuple(list(renamed.values()) + [int(row['Year'])])
+            vals = xr_arr.sel(**sel).values.copy()
+            # Transition layers (From-lu × To-lu MultiIndex) sometimes leave a residual
+            # size-1 non-cell dimension after .sel(); squeeze then reshape to guarantee 1-D.
+            vals = np.asarray(vals).squeeze()
+            if vals.ndim != 1:
+                vals = vals.reshape(-1)
+            arr_sel = xr.DataArray(vals, dims=('cell',), coords=is_selected_coords)
+            tasks.append(delayed(map2geotiff)(
+                index_merc, geo_meta_merc, arr_sel, isInt, hierarchy_tp, layer_magnitude, legend_key,
+                real_area_1d,
+            ))
 
         xr_arr.close()
 
-    if not flat_data:
+    if not tasks:
         return
+
+    # threads: map2geotiff is NumPy + Rasterio (both release the GIL), so threads get true
+    # parallelism with zero pickling cost. Standard layers have few tasks (2–30 per file),
+    # so heap-allocator contention between threads is negligible.
+    for hierarchy_tp, tif_bytes, attrs in Parallel(
+        n_jobs=workers, return_as='generator_unordered', prefer='threads'
+    )(tasks):
+        flat_data[hierarchy_tp] = {'tif_b64': base64.b64encode(tif_bytes).decode(), **attrs}
+
     write_split_by_combo_geotiff(flat_data, dim_names, prefix)
         
 
@@ -328,11 +338,42 @@ def find_chunks_dirs(raw_data_dir: str, base_pattern: str, years: list) -> dict:
     return result
 
 
-def write_snes_index(combo_attrs: dict, dim_names: list, manifest: dict,
-                      prefix: str, chunk_num: int = 1) -> None:
-    """Write the __index.js for a paged SNES/ECNES/NVIS layer set.
+def write_split_by_combo_paged(
+    combo_sp_data: dict,    # {combo_tp: {sp: {year: {tif_b64, ...}}}}
+    page_start: int,
+    page_end: int,
+    prefix: str,
+) -> None:
+    """Write one JS file per combo for a single page of a paged (NVIS/SNES/ECNES) layer.
 
-    chunk_num must match the value used in get_map2json_snes so that each
+    Mirrors write_split_by_combo_geotiff for the paged case.
+
+    JS filename:  {prefix}__{combo}_{page_start}_{page_end}.js
+    JS var name:  {prefix}__{combo}               (no page suffix — Vue overwrites per page)
+    JS content:   window["prefix__combo"] = {
+                    "Species A": {2020: {tif_b64, ...}, 2025: {...}},
+                    "Species B": {...},
+                  }
+    """
+    base_name = os.path.basename(prefix)
+    tif_dir   = os.path.dirname(prefix)
+    os.makedirs(tif_dir, exist_ok=True)
+
+    for combo_tp, sp_year_data in combo_sp_data.items():
+        var_suffix  = '__'.join(safe_key(v) for v in combo_tp)
+        var_name    = f'{base_name}__{var_suffix}'
+        js_filename = f'{var_name}_{page_start}_{page_end}.js'
+        with open(os.path.join(tif_dir, js_filename), 'w') as f:
+            f.write(f'window["{var_name}"] = ')
+            json.dump(sp_year_data, f, separators=(',', ':'))
+            f.write(';\n')
+
+
+def write_paged_index(combo_attrs: dict, dim_names: list, manifest: dict,
+                      prefix: str, chunk_num: int = 1) -> None:
+    """Write the __index.js for a paged (NVIS/SNES/ECNES) layer set.
+
+    chunk_num must match the value used in get_map2json_paged so that each
     page entry's [start, end] maps to an existing JS file.
 
     Index format::
@@ -341,7 +382,7 @@ def write_snes_index(combo_attrs: dict, dim_names: list, manifest: dict,
           dims:     ["lm", "lu"],          // no species dim
           tree:     {"Dryland": ["Nuts"]},
           combos:   {"Dryland__Nuts": {intOrFloat, min_max, raw_min_max}},
-          pages:    {"0": {start:0, end:20, species:[...]}, ...},  // end-start == chunk_num * batch_size
+          pages:    {"0": {start:0, end:20, species:[...]}, ...},
           pageSize: 20,
           paged:    true
         }
@@ -393,19 +434,19 @@ def write_snes_index(combo_attrs: dict, dim_names: list, manifest: dict,
         f.write(';\n')
 
 
-def get_map2json_snes(
+def get_map2json_paged(
     chunks_dirs: dict,        # {year: path_to_chunks_dir}
     float_magnitude: tuple,
     save_path: str,
     chunk_num: int = 1,
 ) -> None:
-    """Process per-batch chunk NCs for SNES/ECNES/NVIS (minimal adaptation of get_map2json).
+    """Convert chunked NCs (NVIS/SNES/ECNES) to paged JS layer files.
 
     chunk_num controls how many chunk NC files are merged into one JS output.
-    Each chunk NC holds N species (default 10). chunk_num=4 → 40 species per JS file.
+    Each chunk NC holds N species (default 10). chunk_num=10 → 100 species per JS file.
 
     JS filename:  {prefix}__{combo}_{page_start}_{page_end}.js
-    JS var name:  {prefix}__{combo}               (no page suffix)
+    JS var name:  {prefix}__{combo}               (no page suffix — Vue overwrites per page)
     JS content:   window["prefix__combo"] = {
                     "Species A": {2020: {tif_b64, intOrFloat, min_max, raw_min_max}, ...},
                     "Species B": {...},
@@ -416,44 +457,15 @@ def get_map2json_snes(
 
     ncells = 5_000_000 // (settings.RESFACTOR ** 2)
     mem_per_worker = ncells * 7 * 4 / 1e6
-    workers = min(60, max(1, int(settings.WRITE_REPORT_MAX_MEM_MB // mem_per_worker)))
+    cpu_cap = 61 if os.name == 'nt' else (os.cpu_count() or 1)
+    workers = min(cpu_cap, max(1, int(settings.WRITE_REPORT_MAX_MEM_MB // mem_per_worker)))
 
-    prefix  = save_path.removesuffix('.js')
-    tif_dir = os.path.dirname(prefix)
-    os.makedirs(tif_dir, exist_ok=True)
+    prefix = save_path.removesuffix('.js')
 
-    # Pre-build EPSG:3857 index_merc + real_area_1d once per year.
+    # Pre-build EPSG:3857 metadata once per year.
     year_meta: dict = {}
     for year, chunks_dir in chunks_dirs.items():
-        ds_template = os.path.join(os.path.dirname(chunks_dir), f'xr_map_template_{year}.nc')
-        with xr.load_dataset(ds_template) as ds:
-            crs   = ds['spatial_ref'].attrs['crs_wkt']
-            valid = ds['layer'].values >= 0
-            arr   = np.full(ds['layer'].shape, -1.0, dtype=np.float32)
-            arr[valid] = np.arange(valid.sum(), dtype=np.float32)
-            rxr_merc = (
-                ds['layer'].copy(data=arr)
-                .rio.write_nodata(-1.0)
-                .rio.write_crs(crs)
-                .rio.reproject('EPSG:3857', nodata=-1.0)
-            )
-        index_merc = np.round(rxr_merc.values).astype(np.int32)
-        real_area_path = os.path.join(
-            os.path.dirname(chunks_dir), f'xr_area_real_area_ha_{year}.nc'
-        )
-        real_area_1d = None
-        if os.path.exists(real_area_path):
-            with xr.open_dataset(real_area_path) as ra_ds:
-                real_area_1d = ra_ds['data'].values.squeeze().astype(np.float32)
-        geo_meta_merc = {
-            'driver': 'GTiff', 'count': 1,
-            'crs':       rxr_merc.rio.crs,
-            'transform': rxr_merc.rio.transform(),
-            'width':     int(rxr_merc.shape[-1]),
-            'height':    int(rxr_merc.shape[-2]),
-            'nodata':    -9999.0, 'compress': 'deflate', 'predictor': 2,
-        }
-        year_meta[year] = (index_merc, geo_meta_merc, real_area_1d)
+        year_meta[year] = build_year_meta(year, os.path.dirname(chunks_dir))
 
     # Read manifest from the first year's chunks dir.
     first_dir  = next(iter(chunks_dirs.values()))
@@ -483,7 +495,6 @@ def get_map2json_snes(
         page_starts[int(idx_str)] = cumulative
         cumulative += len(manifest[idx_str])
 
-    base_name = os.path.basename(prefix)
     all_combo_attrs: dict = {}   # {combo_tuple: attrs}  — for the index JS
 
     for group_start_pos in range(0, len(chunk_indices), chunk_num):
@@ -492,8 +503,9 @@ def get_map2json_snes(
         last_idx   = group[-1]
         page_end   = page_starts[last_idx] + len(manifest[str(last_idx)])
 
-        # Accumulate all years × all chunks in this group before writing JS.
+        # Accumulate all (chunk × year) tasks for this page before launching workers.
         chunk_data: dict = {}   # {(combo_tp, sp): {year: {tif_b64, ...}}}
+        tasks: list = []
 
         for chunk_idx in group:
             for year, chunks_dir in sorted(chunks_dirs.items()):
@@ -516,55 +528,50 @@ def get_map2json_snes(
                     if is_selected_arr is not None else None
                 )
 
-                for batch in (valid_layers[i:i+workers] for i in range(0, len(valid_layers), workers)):
-                    tasks = []
-                    for sel in batch:
-                        sp_val    = sel[species_dim]
-                        sel_no_sp = {k: v for k, v in sel.items() if k != species_dim}
-                        renamed   = rename_reorder_hierarchy(sel_no_sp)
-                        combo_tp  = tuple(renamed.values())
-                        hierarchy_tp = (*combo_tp, sp_val, int(year))
+                for sel in valid_layers:
+                    sp_val    = sel[species_dim]
+                    sel_no_sp = {k: v for k, v in sel.items() if k != species_dim}
+                    renamed   = rename_reorder_hierarchy(sel_no_sp)
+                    combo_tp  = tuple(renamed.values())
+                    hierarchy_tp = (*combo_tp, sp_val, int(year))
 
-                        vals = xr_arr.sel(**sel).values.copy()
-                        vals = np.asarray(vals).squeeze()
-                        if vals.ndim != 1:
-                            vals = vals.reshape(-1)
-                        arr_sel = xr.DataArray(vals, dims=('cell',), coords=is_selected_coords)
-                        tasks.append(delayed(map2geotiff)(
-                            index_merc, geo_meta_merc, arr_sel, False,
-                            hierarchy_tp, float_magnitude, None, real_area_1d,
-                        ))
-
-                    for hierarchy_tp, tif_bytes, attrs in Parallel(
-                        n_jobs=workers, return_as='generator', max_nbytes=1_000_000
-                    )(tasks):
-                        combo_tp = hierarchy_tp[:-2]
-                        sp_val   = hierarchy_tp[-2]
-                        year_val = hierarchy_tp[-1]
-                        key = (combo_tp, sp_val)
-                        chunk_data.setdefault(key, {})[year_val] = {
-                            'tif_b64': base64.b64encode(tif_bytes).decode(),
-                            **attrs,
-                        }
-                        all_combo_attrs[combo_tp] = attrs   # last-write wins — all years share attrs
+                    vals = xr_arr.sel(**sel).values.copy()
+                    vals = np.asarray(vals).squeeze()
+                    if vals.ndim != 1:
+                        vals = vals.reshape(-1)
+                    arr_sel = xr.DataArray(vals, dims=('cell',), coords=is_selected_coords)
+                    tasks.append(delayed(map2geotiff)(
+                        index_merc, geo_meta_merc, arr_sel, False,
+                        hierarchy_tp, float_magnitude, None, real_area_1d,
+                    ))
 
                 xr_arr.close()
 
-        # Write one JS file per (combo, page) — species are outer keys.
+        # loky (processes): paged layers submit 1000+ tasks per page, each allocating a large
+        # arr_2d buffer. Under threads, all workers share one heap — the OS allocator serialises
+        # concurrent malloc/free calls, causing heavy lock contention that outweighs pickling
+        # savings. Loky workers have isolated heaps so allocations never contend.
+        # max_nbytes memmaps index_merc (≥200 MB) to avoid pickling it per task.
+        for hierarchy_tp, tif_bytes, attrs in Parallel(
+            n_jobs=workers, return_as='generator_unordered', max_nbytes=1_000_000
+        )(tasks):
+            combo_tp = hierarchy_tp[:-2]
+            sp_val   = hierarchy_tp[-2]
+            year_val = hierarchy_tp[-1]
+            key = (combo_tp, sp_val)
+            chunk_data.setdefault(key, {})[year_val] = {
+                'tif_b64': base64.b64encode(tif_bytes).decode(),
+                **attrs,
+            }
+            all_combo_attrs[combo_tp] = attrs   # last-write wins — all years share attrs
+
         combo_sp_data: dict = {}   # {combo_tp: {sp: {year: data}}}
         for (combo_tp, sp_val), year_data in chunk_data.items():
             combo_sp_data.setdefault(combo_tp, {})[sp_val] = year_data
 
-        for combo_tp, sp_year_data in combo_sp_data.items():
-            var_suffix  = '__'.join(safe_key(v) for v in combo_tp)
-            var_name    = f'{base_name}__{var_suffix}'
-            js_filename = f'{var_name}_{page_start}_{page_end}.js'
-            with open(os.path.join(tif_dir, js_filename), 'w') as f:
-                f.write(f'window["{var_name}"] = ')
-                json.dump(sp_year_data, f, separators=(',', ':'))
-                f.write(';\n')
+        write_split_by_combo_paged(combo_sp_data, page_start, page_end, prefix)
 
-    write_snes_index(all_combo_attrs, dim_names, manifest, prefix, chunk_num=chunk_num)
+    write_paged_index(all_combo_attrs, dim_names, manifest, prefix, chunk_num=chunk_num)
 
 
 def save_report_layer(raw_data_dir: str):
@@ -588,9 +595,8 @@ def save_report_layer(raw_data_dir: str):
 
 
     ####################################################
-    #               0) Legend and Name Warp            #
+    #                    0) Legend                     #
     ####################################################
-    # Get legend info (used only for legend_registry.js)
 
     legend_registry = {
         'ag':     build_map_legend(COLOR_AG),
@@ -732,7 +738,7 @@ def save_report_layer(raw_data_dir: str):
     ]
     for base_pat, map_name, label in _nvis_types:
         cdirs = find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
-        get_map2json_snes(cdirs, gbf3_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
+        get_map2json_paged(cdirs, gbf3_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
         print(f'│   ├── {label} layer saved.')
 
     # GBF4-SNES (chunked)
@@ -745,7 +751,7 @@ def save_report_layer(raw_data_dir: str):
         ]
         for base_pat, map_name, label in _snes_types:
             cdirs = find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
-            get_map2json_snes(cdirs, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
+            get_map2json_paged(cdirs, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
             print(f'│   ├── {label} layer saved.')
 
     # GBF4-ECNES (chunked)
@@ -757,7 +763,7 @@ def save_report_layer(raw_data_dir: str):
     ]
     for base_pat, map_name, label in _ecnes_types:
         cdirs = find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
-        get_map2json_snes(cdirs, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
+        get_map2json_paged(cdirs, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
         print(f'│   ├── {label} layer saved.')
 
     # GBF8
