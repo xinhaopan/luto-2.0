@@ -1256,21 +1256,38 @@ def write_economics(data: Data, yr_cal, path):
             else ag_cost.get_onshore_wind_existing_cost_by_region(data, yr_idx_pre, return_cells=True)['capex_r'].values
         )
 
-        solar_exist_cost = solar_cells_now['opex_r'].values + solar_cells_now['capex_r'].values - solar_capex_pre
-        wind_exist_cost  = wind_cells_now['opex_r'].values  + wind_cells_now['capex_r'].values  - wind_capex_pre
-        exist_cost_da  = xr.DataArray(
-            np.stack([solar_exist_cost, wind_exist_cost], axis=0),
-            dims=['am', 'cell'],
-            coords={'am': ['Utility Solar PV', 'Onshore Wind'], 'cell': np.arange(data.NCELLS),
-                    'region_state': ('cell', data.REGION_STATE_NAME),
-                    'region_NRM': ('cell', data.REGION_NRM_NAME)},
-        ).expand_dims(lm=['dry'], lu=['Existing Capacity'])
-        exist_cost_full = (
-            xr.concat([exist_cost_da, xr.zeros_like(exist_cost_da).assign_coords(lm=['irr'])], dim='lm')
-            .reindex(am=xr_cost_am.am.values, fill_value=0.0)
-            .expand_dims(Cost_type=['Operating Cost'])
-        )
-        xr_cost_am = xr.concat([xr_cost_am, exist_cost_full.reindex(Cost_type=xr_cost_am.Cost_type.values, fill_value=0.0)], dim='lu')
+        # Split existing capacity cost into OPEX (all cumulative capacity) and CAPEX delta
+        # (new installations this period). Previously these were lumped into 'Operating Cost',
+        # causing apparent OPEX to decrease in years with few new installations.
+        solar_exist_opex  = solar_cells_now['opex_r'].values
+        wind_exist_opex   = wind_cells_now['opex_r'].values
+        solar_exist_capex = solar_cells_now['capex_r'].values - solar_capex_pre
+        wind_exist_capex  = wind_cells_now['capex_r'].values  - wind_capex_pre
+
+        def _make_exist_cost_da(solar_vals, wind_vals):
+            return xr.DataArray(
+                np.stack([solar_vals, wind_vals], axis=0),
+                dims=['am', 'cell'],
+                coords={'am': ['Utility Solar PV', 'Onshore Wind'], 'cell': np.arange(data.NCELLS),
+                        'region_state': ('cell', data.REGION_STATE_NAME),
+                        'region_NRM': ('cell', data.REGION_NRM_NAME)},
+            ).expand_dims(lm=['dry'], lu=['Existing Capacity'])
+
+        exist_opex_da  = _make_exist_cost_da(solar_exist_opex,  wind_exist_opex)
+        exist_capex_da = _make_exist_cost_da(solar_exist_capex, wind_exist_capex)
+
+        def _expand_exist(da, cost_type_label):
+            return (
+                xr.concat([da, xr.zeros_like(da).assign_coords(lm=['irr'])], dim='lm')
+                .reindex(am=xr_cost_am.am.values, fill_value=0.0)
+                .expand_dims(Cost_type=[cost_type_label])
+            )
+
+        exist_cost_full = xr.concat([
+            _expand_exist(exist_opex_da,  'Operating Cost'),
+            _expand_exist(exist_capex_da, 'Capital expenditure'),
+        ], dim='Cost_type')
+        xr_cost_am = xr.concat([xr_cost_am, exist_cost_full], dim='lu')
 
         solar_prices = {data.REGION_STATE_NAME2CODE[k]: v for k, v in data.SOLAR_PRICES.query('Year==@yr_cal').set_index('State')['Price_AUD_per_MWh'].items()}
         wind_prices  = {data.REGION_STATE_NAME2CODE[k]: v for k, v in data.WIND_PRICES.query('Year==@yr_cal').set_index('State')['Price_AUD_per_MWh'].items()}
@@ -1291,7 +1308,7 @@ def write_economics(data: Data, yr_cal, path):
 
     xr_profit_am  = xr_revenue_am - xr_cost_am.sum('Cost_type')
     xr_revenue_am = add_all(xr_revenue_am, ['lm', 'lu', 'am'])
-    xr_cost_am    = add_all(xr_cost_am,    ['lm', 'lu', 'am'])
+    xr_cost_am    = add_all(xr_cost_am,    ['lm', 'lu', 'am', 'Cost_type'])
     xr_profit_am  = add_all(xr_profit_am,  ['lm', 'lu', 'am'])
 
     revenue_am_df, revenue_am_df_AUS = to_region_and_aus_df(xr_revenue_am, ['am', 'lm', 'lu'],            yr_cal, region_levels=['region_state', 'region_NRM'])
