@@ -5,6 +5,196 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260529 — `create_report_data` profiling: manifest.json registration, pyarrow CSV reader, bulk nested-dict builder (166× speedup)
+
+### Context
+
+A full RF5 run (`2026_05_29__16_52_22_RF5_2010-2050`) was used to profile the complete
+report generation pipeline. File timestamps in `DATA_REPORT/data/` gave precise wall-clock
+costs for each output JS file produced by `create_report_data.py`.
+
+---
+
+### 1 — `write_outputs` wall-clock breakdown (from stdout log timestamps)
+
+| Stage | Elapsed | Notes |
+|---|---:|---|
+| Mosaic maps (all 5 years) | 0.1 min | fast |
+| GBF3 NVIS scores (5 years parallel) | ~6 min | |
+| **ECNES scores (5 years parallel)** | **~20 min** | ~13 min per year |
+| **SNES scores (5 years parallel)** | **~19 min** | ~12 min per year |
+| GBF2 priority scores | ~10 min | 2040/2050 notably slower |
+| Renewable energy | ~6 min | |
+| Ag-to-ag transitions | ~2 min | |
+| Economics, GHG, water, etc. | ~5 min | |
+| **Total `write_outputs`** | **88 min** | |
+
+`create_report_data` starts at t = 88 min; the write phase itself is the primary bottleneck.
+
+---
+
+### 2 — `create_report_data` wall-clock breakdown (from JS file modification times)
+
+| Elapsed | File written | Size |
+|---:|---|---:|
+| 0 min | All non-bio parallel jobs (area, GHG, water, economics, etc.) | ✓ |
+| 0.4 min | GBF3 NVIS overview + Sum | ✓ |
+| 0.9 min | GBF3 NVIS Ag | 34 MB |
+| **8.2 min** | **GBF3 NVIS Am** | **66 MB** |
+| 8.3 min | GBF3 NVIS NonAg | ✓ |
+| 9.5 min | GBF4 SNES overview | ✓ |
+| 10.3 min | GBF4 SNES Sum | ✓ |
+| **30.2 min** | **GBF4 SNES Ag** | **208 MB** |
+| ❌ never | SNES Am, SNES NonAg, all ECNES, BIO_ranking | run interrupted |
+
+The notebook was cut off after SNES Ag (30 min). SNES Am — the most expensive section due
+to the extra `am` dimension — never completed.
+
+---
+
+### 3 — `manifest.json` files in `_chunks` directories classified as `Unknown`
+
+`get_all_files` logged "Unknown files found" for every `manifest.json` inside
+`xr_biodiversity_*_YYYY_chunks/` directories. These files were then silently dropped.
+
+**Root cause**: `extract_dtype_from_path` and `_base_name_ext` in
+`luto/tools/report/data_tools/__init__.py` applied the parent-directory-name logic only
+to `.nc` files:
+
+```python
+if path.endswith('.nc') and re.search(r'_\d{4}_chunks$', os.path.basename(parent)):
+```
+
+`manifest.json` does not end with `.nc`, so it fell through to `Unknown`.
+
+**Fix**: extended the condition to cover `manifest.json` as well:
+
+```python
+_in_chunks = re.search(r'_\d{4}_chunks$', os.path.basename(parent))
+if (path.endswith('.nc') or os.path.basename(path) == 'manifest.json') and _in_chunks:
+    base_name = re.sub(r'_\d{4}_chunks$', '', os.path.basename(parent))
+```
+
+Applied identically in both `extract_dtype_from_path` and `_base_name_ext`. `manifest.json`
+files now classify as `xarray_layer` (parent dir name matches `xr_` prefix) with
+`base_ext = '.json'`.
+
+---
+
+### 4 — `pd.read_csv` replaced with `engine='pyarrow'` for biodiversity score CSVs
+
+The large biodiversity score CSVs (SNES: 135 MB/year × 5 years = 675 MB total; NVIS: 16 MB;
+ECNES: 11 MB) were loaded via `pd.read_csv` — the slowest path for large files.
+
+**Benchmark** (`jinzhu_inspect_code/Speed_up_SNES_csv/benchmark.py`, 5 SNES files, 3 runs):
+
+| Approach | min(s) | Speedup | Peak RAM |
+|---|---:|---:|---:|
+| `pd.read_csv` (baseline) | 9.0 | 1.0× | 793 MB |
+| `pd.read_csv(engine='pyarrow')` | 1.5 | **6.0×** | 567 MB |
+| `polars` + `.to_pandas()` | 1.6 | 5.7× | 180 MB |
+| `pyarrow.csv.read_csv` | 1.2 | 7.3× | 180 MB |
+| Parquet (recurring read) | 1.2 | 7.5× | 567 MB |
+| Feather (recurring read) | 1.1 | 8.0× | 567 MB |
+| Dask | 20.9 | 0.4× | 1860 MB |
+
+`engine='pyarrow'` was chosen: one-keyword change, no new imports, no column filtering,
+identical DataFrame output, also silences the `DtypeWarning` on the mixed-type
+`Agricultural Management` column.
+
+**Applied** to all 6 bio `pd.read_csv` calls in `process_biodiversity_data`:
+overall quality, GBF3 NVIS, GBF4 SNES, GBF4 ECNES, GBF8 species, GBF8 groups.
+
+---
+
+### 5 — O(N²) nested-dict builder replaced by `_build_out_dict_bulk` (166× speedup)
+
+**Root cause of the multi-hour `create_report_data` runtime:**
+
+Every biodiversity chart section (Ag, Am, NonAg, overview, Sum) built its output dict
+with this pattern:
+
+```python
+out_dict = {}
+for (region_level, region, species, am, water), df_pct in df_wide_pct.groupby([...]):
+    df_pct = df_pct.drop([...], axis=1)
+    df_area = df_wide_area[
+        (df_wide_area['region_level'] == region_level) & ... & (df_wide_area['water'] == water)
+    ].drop([...], axis=1)             # ← full table-scan every iteration
+    out_dict[...][am][water] = {
+        'Percent': df_pct.to_dict(orient='records'),   # ← small to_dict per group
+        'Area':    df_area.to_dict(orient='records'),
+    }
+```
+
+Two compounding problems:
+1. **O(N²) boolean filter**: `df_wide_area[boolean_mask]` scans the full DataFrame for
+   every group. With SNES Am having ~4,300 groups (50-species sample), this alone costs
+   ~7 s/50 species → extrapolated ~5.5 min for 1,937 species.
+2. **N small `to_dict` calls**: calling `to_dict(orient='records')` on a tiny sub-DataFrame
+   4,300 × 2 = 8,600 times has severe Python overhead. This dominates the remaining time.
+
+**Benchmark** (`jinzhu_inspect_code/Speed_up_SNES_csv/benchmark_am_loop.py`, 50-species
+sample, N=3 runs, extrapolated to full 1,937 species via ×39 scale factor):
+
+| Approach | min(s) | Speedup | Extrapolated full run |
+|---|---:|---:|---:|
+| baseline (O(N²) filter + N small to_dict) | 26.9 | 1.0× | ~17 min |
+| pre-index area dict, O(1) lookup | 23.8 | 1.1× | ~15 min |
+| merge pct+area, one loop | 23.7 | 1.1× | ~15 min |
+| zip column lists per group | 14.3 | 1.9× | ~9 min |
+| **bulk_to_dict** (one `to_dict` on full df, group via `defaultdict`) | **0.63** | **43×** | **~24 s** |
+| **bulk_zip** (no `to_dict` at all — `zip` columns, group in Python) | **0.16** | **166×** | **~6 s** |
+
+The winning approach (`bulk_zip`) converts the entire DataFrame to Python lists via
+column `.tolist()` calls, then groups rows into a `defaultdict` — zero pandas groupby,
+zero `to_dict`. The key insight: **one big column-list extraction is 166× cheaper than
+N small `to_dict` calls on sub-DataFrames**.
+
+**Fix**: `_build_out_dict_bulk(df_wide_pct, df_wide_area, key_cols)` helper added at
+line 136 of `create_report_data.py`:
+
+```python
+def _build_out_dict_bulk(df_wide_pct, df_wide_area, key_cols):
+    from collections import defaultdict
+    def _df_to_keyed(df):
+        keys = list(zip(*[df[c].tolist() for c in key_cols]))
+        leaf_cols = [c for c in df.columns if c not in key_cols]
+        rows = [dict(zip(leaf_cols, r)) for r in zip(*[df[c].tolist() for c in leaf_cols])]
+        grouped = defaultdict(list)
+        for k, row in zip(keys, rows):
+            grouped[k].append(row)
+        return grouped
+    pct_grouped  = _df_to_keyed(df_wide_pct)
+    area_grouped = _df_to_keyed(df_wide_area)
+    out_dict = {}
+    for key, pct_list in pct_grouped.items():
+        d = out_dict
+        for k in key[:-1]:
+            d = d.setdefault(k, {})
+        d[key[-1]] = {'Percent': pct_list, 'Area': area_grouped.get(key, [])}
+    return out_dict
+```
+
+**Applied at 21 call sites** across all biodiversity modules:
+
+| Module | Sections replaced |
+|---|---|
+| Quality | overview, Ag, Am, NonAg |
+| GBF2 | overview, Ag, Am, NonAg |
+| GBF3 NVIS | overview, Ag, Am, NonAg |
+| GBF4 SNES | overview, Sum, Ag, Am, NonAg |
+| GBF4 ECNES | overview, Ag, Am, NonAg |
+
+Two Sum sections (GBF3 NVIS Sum, GBF4 ECNES Sum) were **not** changed: they inject a
+per-species target line into the records, which requires per-group logic. They use the
+small `sum_scores` CSVs (4.9 MB / 393 KB) so they are not a bottleneck.
+
+**Expected total `create_report_data` biodiversity time**: reduced from >1 hour (never
+completing) to an estimated 2–5 minutes.
+
+---
+
 ## 20260529 — Report layer pipeline: chunk magnitude tracking, get_all_files chunk discovery, _score_to_df BLAS optimisation, chunk_num JS merging
 
 ### 1 — `save2chunk` now returns inline magnitude (avoids disk reload)
