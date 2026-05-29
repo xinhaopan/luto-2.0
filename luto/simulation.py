@@ -136,6 +136,7 @@ def run(
         # throughout _run(), causing UnboundLocalError on non-checkpoint paths.
         active_data = data
         checkpoint_path = Path(checkpoint_dir) if checkpoint_dir is not None else None
+        recent_year_path = checkpoint_path if checkpoint_path is not None else Path(save_dir)
         resume_from_year = None
 
         if checkpoint_path is not None:
@@ -177,7 +178,7 @@ def run(
             print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years) - 1} runs!\n", flush=True)
 
             if len(years_to_run) > 1:
-                solve_timeseries(active_data, years_to_run, do_analyze_iis, checkpoint_path)
+                solve_timeseries(active_data, years_to_run, do_analyze_iis, recent_year_path)
 
             # Save final data and write outputs
             save_data_to_disk(active_data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
