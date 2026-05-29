@@ -5,6 +5,84 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260529 — `write_biodiversity_GBF4_SNES_scores`: ~200 GB memory at full resolution diagnosed and fixed
+
+### Context
+
+A res5 profiling run with 100 SNES species reported ~7 GB peak memory for
+`write_biodiversity_GBF4_SNES_scores`. The question was why a full-resolution run
+(~2,600 species) would consume ~200 GB — far more than a simple NCELLS × species scaling
+would predict — and whether the cause was array accumulation across batches.
+
+### Root cause: dense intermediate in `_save_fullsize_layers`
+
+The function `_save_fullsize_layers` was called four times per species batch (ag, non_ag,
+am, sum). Each call allocated a fully dense numpy array of shape:
+
+```
+[n_am, n_lm, n_lu, batch_size, NCELLS]
+```
+
+For `score_am` (the dominant case) with 9 AM types + ALL = 10, 3 lm, 30 lu, batch = 10:
+
+| Resolution | NCELLS | `full_arr` size | After `.stack()` (copy) | Per-batch peak (4 calls) |
+|---|---:|---:|---:|---:|
+| res5 | ~20,000 | 0.72 GB | 0.72 GB | ~6 GB |
+| res1 | ~500,000 | 18 GB | 18 GB | ~72 GB |
+
+The `.stack(layer=['am','lm','lu','species'])` call on a numpy array written via `.loc[]`
+is non-contiguous in memory and forces a copy, so `full_arr` (18 GB) and the stacked
+result (18 GB) were both live simultaneously — **36 GB per `_save_fullsize_layers` call**.
+With 4 calls per batch and Python's reference-counting freeing the arrays only at function
+return (no GC lag needed — this is synchronous), the synchronous peak per batch was
+**~72 GB**. Residuals from preceding batches not yet freed by the OS pushed observed RSS
+to **~200 GB**.
+
+The DataFrame accumulation (`pd.concat` in a loop) was also investigated as a potential
+cause but ruled out: the score DataFrames are aggregate tables (species × region × lu
+rows, not cell-level), so even with 260 batches the O(N²) copy overhead is at most a few
+MB of extra memory — negligible.
+
+### Fix: build only valid layers, skip the dense intermediate
+
+`_save_fullsize_layers` was rewritten to avoid `full_arr` entirely. Instead of allocating
+the full `[n_am × n_lm × n_lu × batch × NCELLS]` tensor and selecting valid layers
+afterwards, the new implementation iterates directly over `valid_layers` and writes each
+layer's 1D array into `out_data`:
+
+```python
+n_valid = len(valid_layers)
+out_data = np.zeros((n_valid, data.NCELLS), dtype=np.float32)
+
+for i, layer_tuple in enumerate(valid_layers):
+    species_val = layer_tuple[species_pos]
+    sel_coords = {d: layer_tuple[layer_dims.index(d)] for d in score_layer_dims}
+    layer_slice = score.sel(cell=score['species'] == species_val, **sel_coords)
+    out_data[i, nz_idx] = layer_slice.values
+```
+
+Peak memory per call: `n_valid_layers × NCELLS × 4 bytes`. With typically 50–200 valid
+layers at res1, this is **~400 MB per call** — down from **36 GB**.
+
+The previous convention-based `layer_dims[:-1]` / `layer_tuple[-1]` for extracting the
+species dimension was replaced with explicit label indexing:
+
+```python
+score_layer_dims = [d for d in layer_dims if d in score.dims]
+species_pos      = layer_dims.index('species')
+```
+
+This makes the function robust regardless of argument order.
+
+### GC lag risk with new code
+
+With plain numpy arrays and no reference cycles, CPython's reference counter frees
+`out_data` and `valid_arr` immediately when `_save_fullsize_layers` returns. Even if
+OS-level lag held 2–3 batches in RSS, the worst case is: 3 × 400 MB = 1.2 GB — negligible.
+The previous worst case was 3 × 72 GB = 216 GB, which matched the observed ~200 GB.
+
+---
+
 ## 20260528 — RES5 peak memory updated for NVIS and ECNES biodiversity writers
 
 ### Context

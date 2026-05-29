@@ -4073,38 +4073,37 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         return pd.MultiIndex.from_frame(aus_df[layer_cols].drop_duplicates()).sort_values()
 
     def _save_fullsize_layers(score, species_batch, species_nz_map, valid_layers, layer_dims, tmp_dir, sp_idx):
-        non_cell_dims = [dim for dim in score.dims if dim != 'cell']
-        full_dims = non_cell_dims + ['species', 'cell']
-        full_shape = [score.sizes[dim] for dim in non_cell_dims] + [len(species_batch), data.NCELLS]
-        full_coords = {dim: score.coords[dim].values for dim in non_cell_dims}
-        full_coords.update({'species': species_batch, 'cell': np.arange(data.NCELLS)})
-
-        full_arr = xr.DataArray(
-            np.zeros(full_shape, dtype=np.float32),
-            dims=full_dims,
-            coords=full_coords,
-        )
-
-        for species, nz_idx in species_nz_map.items():
-            if len(nz_idx) == 0:
-                continue
-            species_score = score.sel(cell=score['species'] == species)
-            full_arr.loc[dict(species=species, cell=nz_idx)] = (
-                species_score
-                .transpose(*non_cell_dims, 'cell')
-                .values
-            )
+        score_layer_dims = [d for d in layer_dims if d in score.dims]
+        species_pos = layer_dims.index('species')
 
         if len(valid_layers) == 0:
-            fallback = tuple(full_arr.coords[dim].values[0] for dim in layer_dims)
+            fallback = tuple(
+                score.coords[d].values[0] if d in score.dims else species_batch[0]
+                for d in layer_dims
+            )
             valid_layers = pd.MultiIndex.from_tuples([fallback], names=layer_dims)
 
-        valid_arr = (
-            full_arr
-            .stack(layer=layer_dims)
-            .sel(layer=valid_layers)
-            .transpose('layer', 'cell')
-        )
+        # Build output only for the (usually small) set of valid layers.
+        # Peak memory: n_valid_layers × NCELLS × float32 — avoids the dense
+        # [n_am × n_lm × n_lu × batch × NCELLS] intermediate that caused ~200 GB usage.
+        n_valid = len(valid_layers)
+        out_data = np.zeros((n_valid, data.NCELLS), dtype=np.float32)
+
+        for i, layer_tuple in enumerate(valid_layers):
+            species_val = layer_tuple[species_pos]
+            nz_idx = species_nz_map.get(species_val, np.empty(0, dtype=np.int32))
+            if len(nz_idx) == 0:
+                continue
+            sel_coords = {d: layer_tuple[layer_dims.index(d)] for d in score_layer_dims}
+            layer_slice = score.sel(cell=score['species'] == species_val, **sel_coords)
+            out_data[i, nz_idx] = layer_slice.values
+
+        valid_arr = xr.DataArray(
+            out_data,
+            dims=['layer', 'cell'],
+            coords={'layer': np.arange(n_valid), 'cell': np.arange(data.NCELLS)},
+        ).assign_coords(xr.Coordinates.from_pandas_multiindex(valid_layers, 'layer'))
+
         save2tmp(valid_arr, tmp_dir, sp_idx)
 
 
