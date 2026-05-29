@@ -55,10 +55,12 @@ if __name__ == '__main__':
 import luto.simulation as sim
 import luto.settings as settings
 
-
 # Run the simulation
+# Checkpoints always enabled — saves data_<year>.lz4 after each solved year,
+# deletes the previous one, so only the most recent survives. Re-submitting
+# the same PBS job after a wall-time kill resumes automatically.
 data = sim.load_data()
-sim.run(data=data, do_analyze_iis=settings.DO_IIS, do_report=settings.WRITE_OUTPUTS)
+sim.run(data=data, do_analyze_iis=settings.DO_IIS, do_report=settings.WRITE_OUTPUTS, checkpoint_dir='.')
 
 
 # Set up report directory and archive path

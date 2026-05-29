@@ -139,6 +139,7 @@ def run(
         resume_from_year = None
 
         if checkpoint_path is not None:
+            checkpoint_path.mkdir(parents=True, exist_ok=True)
             print(f"Checkpoint mode enabled: {checkpoint_path}")
             files = sorted(checkpoint_path.glob("data_*.lz4"))
             if files:
@@ -260,6 +261,9 @@ def solve_timeseries(
             tmp_path = Path(f"{final_path}.tmp")
             save_data_to_disk(data, str(tmp_path))
             os.replace(tmp_path, final_path)
+            for old in checkpoint_path.glob("data_*.lz4"):
+                if old != final_path:
+                    old.unlink()
             print(f"Saved checkpoint for year {target_year}: {final_path}")
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
