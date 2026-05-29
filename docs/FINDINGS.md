@@ -5,6 +5,170 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260530 — Biodiversity report fixes: resfactor denominator, Target_by_Percent NaN sentinel, Relative_Contribution_Percentage formula, AUSTRALIA region rows, GBF4_SNES Vue setting key
+
+### Context
+
+A cluster of related bugs was identified and fixed across `write.py`, `data.py`,
+`create_report_data.py`, and `Biodiversity.js`. The bugs shared a common root: incorrect
+handling of sparse biodiversity layers at coarsened resolution and a poorly-defined
+`Relative_Contribution_Percentage` denominator.
+
+---
+
+### 1 — `use_valid_cell_count=False` for sparse biodiversity layer resfactoring
+
+`get_resfactored_average_fraction` averages a 1D species/habitat array over coarsened
+spatial blocks of size RF². It has two denominator modes:
+
+- **Default** (`use_valid_cell_count=True`): divides each block sum by the count of
+  non-zero (valid) cells in that block.
+- **`use_valid_cell_count=False`**: divides by RF² — the total number of cells in the block.
+
+For dense arrays (e.g. land-use masks that cover most cells), both modes give nearly the
+same result. For **sparse biodiversity layers** (GBF3 NVIS: 95% zero; GBF4 SNES: 99.65%
+zero; GBF4 ECNES: 99.6% zero), the distinction is critical.
+
+**The bug**: with `use_valid_cell_count=True`, a block containing 3 habitat cells out of
+RF²=25 cells would divide the block sum by 3 instead of 25, inflating the resfactored
+fraction by ~8×. This propagated into solver input arrays (`GBF3_NVIS_LAYERS_ALL`,
+`GBF4_SNES_LAYERS_ALL`, `GBF4_ECNES_LAYERS_ALL`) and into the biodiversity score CSVs
+written by `write_biodiversity_GBF3_NVIS_scores`, `write_biodiversity_GBF4_SNES_scores`,
+and `write_biodiversity_GBF4_ECNES_scores`.
+
+**Fix**: `use_valid_cell_count=False` added to all 7 call sites:
+
+| File | Function | Affected arrays |
+|---|---|---|
+| `data.py` | `Data.__init__` | `GBF3_NVIS_LAYERS_ALL`, `GBF4_SNES_LAYERS_ALL`, `GBF4_ECNES_LAYERS_ALL` |
+| `write.py` | `write_biodiversity_GBF3_NVIS_scores` | `nvis_layers_arr` (used in score CSV + map layers) |
+| `write.py` | `write_biodiversity_GBF4_SNES_scores` | `snes_layers_arr` (used in score CSV + map layers) |
+| `write.py` | `write_biodiversity_GBF4_ECNES_scores` | `ecnes_layers_arr` (used in score CSV + map layers) |
+
+This matches the LUMASK-fix reasoning from Step 8 (2026-05-02): the solver needs the
+correct fraction of habitat within each coarse block, not the fraction among only the
+habitat-containing fine cells.
+
+---
+
+### 2 — `Target_by_Percent` set to NaN when no constraint is active
+
+Previously, `write.py` always computed:
+
+```python
+df['Target_by_Percent'] = (
+    (df['TARGET_INSIDE_SCORE'] + df['BASE_OUTSIDE_SCORE']) / df['BASE_TOTAL_SCORE'] * 100
+)
+```
+
+When `TARGET_INSIDE_SCORE = 0` (no active biodiversity constraint for that group/species
+× region combination), this still produced a numeric value (`BASE_OUTSIDE_SCORE /
+BASE_TOTAL_SCORE * 100`), which the downstream filter in `create_report_data.py`:
+
+```python
+bio_df[bio_df['Target_by_Percent'].notna()]
+```
+
+could not distinguish from a real target. Result: the target lookup table
+(`_gbf3_target_lk`, `_ecnes_target_lk`) was polluted with spurious zero-constraint rows,
+which caused incorrect target lines to appear in the report.
+
+**Fix**: replaced with `np.where(TARGET_INSIDE_SCORE > 0, formula, np.nan)` in all six
+places across GBF3 NVIS, GBF4 SNES, and GBF4 ECNES (both per-region and outside rows).
+`create_report_data.py` updated its comment to reflect the new invariant: `.notna()` now
+correctly selects only rows with a real active constraint.
+
+---
+
+### 3 — `Relative_Contribution_Percentage` formula: area / ALL_HA replaces (area + outside) / baseline
+
+The old formula for GBF3 NVIS, GBF4 SNES, and GBF4 ECNES sum CSVs was:
+
+```python
+# Old: inside LUTO + outside LUTO as fraction of pre-1750 baseline
+(Area Weighted Score (ha) + BASE_OUTSIDE_SCORE) / BASE_TOTAL_SCORE * 100
+```
+
+This was a "restoration fraction" — it answered "what fraction of the pre-1750 habitat is
+maintained or restored?" The problem: `BASE_TOTAL_SCORE` is the pre-1750 total across
+all land (in and out of LUTO), making it an awkward denominator for a column that is
+intended to track just the inside-LUTO contribution. When stacked with the "Outside LUTO
+study area" row (which uses the same denominator), the sum of all Type rows could
+substantially exceed or fall short of 100%, confusing report chart rendering.
+
+**New formula**:
+
+```python
+# New: area weighted score as fraction of total regional land area
+Area Weighted Score (ha) / ALL_HA * 100
+```
+
+`ALL_HA` is the total cell-area (ha) of all LUTO cells in the region, loaded from a
+per-(region, region_level) lookup. This makes `Relative_Contribution_Percentage` a
+consistent area-fraction that sums correctly across Types (Ag + Am + NonAg + Outside
+LUTO = 100% of the regional land area).
+
+**Applied identically** to both the Type-specific `sum_df` rows and the `outside_sum`
+rows in all three write functions. `create_report_data.py` updated to use this column
+directly instead of recomputing `Sum_Pct (%)` from `Area Weighted Score (ha) /
+BASE_TOTAL_SCORE`.
+
+---
+
+### 4 — AUSTRALIA rows kept in `bio_df`; ranking queries explicitly exclude them
+
+All three biodiversity `process_biodiversity_data` sections previously dropped AUSTRALIA
+rows from `bio_df` with:
+
+```python
+bio_df = bio_df.query('species != "ALL" and region != "AUSTRALIA"')
+```
+
+**Intent**: prevent double-counting when downstream code summed across regions (since
+`AUSTRALIA` = sum of all NRM/STATE regions). **Side effect**: the AUSTRALIA region
+selection in the report dropdown showed no data.
+
+**Fix**: AUSTRALIA rows are now retained in `bio_df` so the AUSTRALIA selection is
+populated, but ranking queries (which group by `region` to compare NRM/STATE regions)
+explicitly exclude AUSTRALIA:
+
+```python
+# Main bio_df — keep AUSTRALIA for dropdown data
+bio_df = bio_df.query('species != "ALL"')
+
+# Ranking — exclude AUSTRALIA (it's the sum of all regions, not a peer)
+bio_rank_total = bio_df.query(
+    'Water_supply != "ALL" and Landuse != "ALL" and '
+    '`Agricultural Management` != "ALL" and region != "AUSTRALIA"'
+).groupby(...)
+```
+
+The same pattern applied to GBF3 NVIS, GBF4 SNES, and GBF4 ECNES sections.
+`sum_bio_df` continues to drop AUSTRALIA (only the Type=ALL filter needed; the
+`Relative_Contribution_Percentage` column already carries the correct region-level value).
+
+---
+
+### 5 — Vue.js: GBF4_SNES metric uses `WRITE_SNES` setting key
+
+`Biodiversity.js` `METRIC_TO_SETTING` maps each metric name to the settings key that
+controls whether data for that metric was written:
+
+```js
+// Before (wrong key):
+'GBF4_SNES': 'GBF4_TARGET_SNES',
+
+// After (correct key):
+'GBF4_SNES': 'WRITE_SNES',
+```
+
+`GBF4_TARGET_SNES` does not exist in settings — the flag that enables SNES output writing
+is `WRITE_SNES`. With the wrong key, the Vue component would always treat GBF4_SNES
+data as absent and hide the metric from the selection dropdown even when the SNES scores
+had been written.
+
+---
+
 ## 20260529 — `create_report_data` profiling: manifest.json registration, pyarrow CSV reader, bulk nested-dict builder (166× speedup)
 
 ### Context
