@@ -68,25 +68,26 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 # Used by write_data to compute n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb).
 # (MB above data-object baseline, measured at RESFACTOR=5)
 peak_mb_RES5 = {
-    'write_dvar_and_mosaic_map':                    1_373,  
-    'write_transition_nonag2ag':                    6_788,  
-    'write_transition_ag2ag':                       6_316,  
-    'write_biodiversity_quality_scores':            3_885,  
-    'write_economics':                              4_989,  
-    'write_ghg':                                    4_196,  
-    'write_transition_ag2nonag':                    3_191,  
-    'write_quantity':                               3_038,  
-    'write_water':                                  2_447,  
-    'write_dvar_area':                              2_590,  
-    'write_biodiversity_GBF2_scores':               1_921,  
-    'write_area_transition_start_end':              1_460,  
-    'write_renewable_production':                     718,  
-    'write_crosstab':                                  13,  
-    'write_biodiversity_GBF3_NVIS_scores':         15_448,  
-    'write_biodiversity_GBF4_ECNES_scores':         7_318,  
-    'write_biodiversity_GBF4_SNES_scores':          7_878,
-    'write_biodiversity_GBF8_scores_groups':            1,  
-    'write_biodiversity_GBF8_scores_species':           1,  
+    # Profiled 2026-05-30 using output/2026_05_29__16_37_37_RF5_2010-2050/Data_RES5.lz4, yr_cal=2050
+    'write_dvar_and_mosaic_map':                    1_452,  #    44s
+    'write_transition_nonag2ag':                    6_783,  #    52s
+    'write_transition_ag2ag':                       6_506,  #   353s
+    'write_biodiversity_quality_scores':            6_300,  #   192s
+    'write_economics':                              4_627,  #   352s
+    'write_ghg':                                    4_693,  #    77s
+    'write_transition_ag2nonag':                    2_895,  #   210s
+    'write_quantity':                               2_956,  #   127s
+    'write_water':                                  2_575,  #    38s
+    'write_dvar_area':                              1_672,  #    32s
+    'write_biodiversity_GBF2_scores':               1_929,  #    28s
+    'write_area_transition_start_end':              1_493,  #   289s
+    'write_renewable_production':                     876,  #    22s
+    'write_crosstab':                                  13,  #     1s
+    'write_biodiversity_GBF4_ECNES_scores':        10_852,  #  2402s
+    'write_biodiversity_GBF3_NVIS_scores':         15_147,  #   431s
+    'write_biodiversity_GBF4_SNES_scores':          3_585,  #  4727s
+    'write_biodiversity_GBF8_scores_groups':            1,  #     1s
+    'write_biodiversity_GBF8_scores_species':           1,  #     1s
 }
 
 # Scale RES5 measurements to the actual run resolution.

@@ -755,16 +755,17 @@ def save_report_layer(raw_data_dir: str):
             print(f'│   ├── {label} layer saved.')
 
     # GBF4-ECNES (chunked)
-    _ecnes_types = [
-        ('xr_biodiversity_GBF4_ECNES_ag',            'map_bio_GBF4_ECNES_Ag',    'Biodiversity GBF4_ECNES Ag'),
-        ('xr_biodiversity_GBF4_ECNES_ag_management', 'map_bio_GBF4_ECNES_Am',    'Biodiversity GBF4_ECNES Am'),
-        ('xr_biodiversity_GBF4_ECNES_non_ag',        'map_bio_GBF4_ECNES_NonAg', 'Biodiversity GBF4_ECNES Non-Ag'),
-        ('xr_biodiversity_GBF4_ECNES_sum',           'map_bio_GBF4_ECNES_Sum',   'Biodiversity GBF4_ECNES Sum'),
-    ]
-    for base_pat, map_name, label in _ecnes_types:
-        cdirs = find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
-        get_map2json_paged(cdirs, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
-        print(f'│   ├── {label} layer saved.')
+    if settings.WRITE_SNES != 'off':
+        _ecnes_types = [
+            ('xr_biodiversity_GBF4_ECNES_ag',            'map_bio_GBF4_ECNES_Ag',    'Biodiversity GBF4_ECNES Ag'),
+            ('xr_biodiversity_GBF4_ECNES_ag_management', 'map_bio_GBF4_ECNES_Am',    'Biodiversity GBF4_ECNES Am'),
+            ('xr_biodiversity_GBF4_ECNES_non_ag',        'map_bio_GBF4_ECNES_NonAg', 'Biodiversity GBF4_ECNES Non-Ag'),
+            ('xr_biodiversity_GBF4_ECNES_sum',           'map_bio_GBF4_ECNES_Sum',   'Biodiversity GBF4_ECNES Sum'),
+        ]
+        for base_pat, map_name, label in _ecnes_types:
+            cdirs = find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
+            get_map2json_paged(cdirs, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
+            print(f'│   ├── {label} layer saved.')
 
     # GBF8
     if settings.GBF8_TARGET != 'off':
