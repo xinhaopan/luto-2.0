@@ -144,15 +144,22 @@ def get_mag(arr: xr.DataArray) -> list:
     return [float(np.nanquantile(vals, MIN_P)), float(np.nanquantile(vals, MAX_P))]
 
 
-def save2tmp(in_xr: xr.DataArray, tmp_dir: str, group_idx: int):
-    """Save a (layer × cell) DataArray slice to tmp_dir as NC + coord CSV.
+def save2chunk(in_xr: xr.DataArray, chunks_dir: str, chunk_idx: int) -> list:
+    """Save one species/group batch as a self-contained CF-encoded chunk NC.
 
-    Drops the MultiIndex 'layer' coord before writing so the NC stays CF-clean.
-    The matching CSV preserves the level values for reconstruction in concat_tmp2nc.
+    Identical format to save2nc / concat_tmp2nc output (layer × cell, MultiIndex
+    CF-compressed) so create_report_layers can read it with
+    cfxr.decode_compress_to_multi_index without any pre-processing.
+    Returns [min, max] magnitude of the chunk (computed before writing to avoid disk reload).
     """
-    os.makedirs(tmp_dir, exist_ok=True)
-    in_xr.drop_vars('layer', errors='ignore').rename('data').to_netcdf(os.path.join(tmp_dir, f'layer_{group_idx:06d}.nc'))
-    in_xr['layer'].to_index().to_frame(index=False).to_csv(os.path.join(tmp_dir, f'layer_{group_idx:06d}_coords.csv'), index=False)
+    os.makedirs(chunks_dir, exist_ok=True)
+    n_cells = in_xr.sizes['cell']
+    ds = cfxr.encode_multi_index_as_compress(in_xr.to_dataset(name='data'), 'layer')
+    chunksizes = [n_cells if d == 'cell' else 1 for d in ds['data'].dims]
+    enc = {'data': {'dtype': 'float32', 'zlib': True, 'complevel': 1, 'chunksizes': chunksizes}}
+    ds.to_netcdf(os.path.join(chunks_dir, f'chunk_{chunk_idx:06d}.nc'), encoding=enc)
+    return get_mag(in_xr)
+
 
 
 
@@ -197,7 +204,7 @@ def save2nc(in_xr: xr.DataArray, save_path: str):
     CF-encode and write a complete (layer × cell) DataArray to save_path.
 
     If in_xr is dask-backed it is computed once before writing — no repeated
-    graph traversal.  Use save2tmp + concat_tmp2nc for incremental accumulation.
+    graph traversal. 
     """
     in_xr = in_xr.compute()
     n_cells  = in_xr.sizes['cell']
@@ -3569,14 +3576,15 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     REGION_LEVELS = ['region_NRM', 'region_state']
     ag_frames, am_frames, non_ag_frames, sum_frames_raw = [], [], [], []
 
-    # Tmp dirs for incremental per-group NC writes — each group appends its valid layers.
-    tmp_ag     = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_{yr_cal}_tmp')
-    tmp_non_ag = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_non_ag_{yr_cal}_tmp')
-    tmp_am     = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_management_{yr_cal}_tmp')
-    tmp_sum    = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_sum_{yr_cal}_tmp')
+    # Chunk dirs — each group batch is saved as a self-contained CF-encoded NC chunk.
+    chunks_ag     = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_{yr_cal}_chunks')
+    chunks_non_ag = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_non_ag_{yr_cal}_chunks')
+    chunks_am     = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_management_{yr_cal}_chunks')
+    chunks_sum    = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_sum_{yr_cal}_chunks')
+    mags_ag, mags_non_ag, mags_am, mags_sum = [], [], [], []
 
     # ── Loop over each vegetation group ──────────────────────────────────────────
-    group_slice_indices = np.arange(10, len(all_groups), 10)  # process groups in batches of 10 to manage memory
+    group_slice_indices = np.arange(10, len(all_groups), 10)
     
     for group_idx,group in enumerate(np.array_split(all_groups, group_slice_indices)):
         
@@ -3696,7 +3704,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
                 [(group[0], 'ALL', 'ALL')], names=['group', 'lm', 'lu']
             )
             valid_ag_g = ag_g_stacked.sel(layer=fallback_midx)
-        save2tmp(valid_ag_g, tmp_ag, group_idx)
+        mags_ag.extend(save2chunk(valid_ag_g, chunks_ag, group_idx))
 
         # Non-AG: same pattern.
         non_ag_g_stacked = (
@@ -3712,9 +3720,9 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
                 [(group[0], 'ALL')], names=['group', 'lu']
             )
             valid_non_ag_g = non_ag_g_stacked.sel(layer=fallback_midx)
-        save2tmp(valid_non_ag_g, tmp_non_ag, group_idx)
+        mags_non_ag.extend(save2chunk(valid_non_ag_g, chunks_non_ag, group_idx))
 
-        # AM: save valid layers; fall back to ALL/ALL/ALL so tmp dir is never empty.
+        # AM: save valid layers; fall back to ALL/ALL/ALL so chunks dir is never empty.
         am_g_stacked = (
             xr_gbf3_am_g
             .stack(layer=['group', 'am', 'lm', 'lu'])
@@ -3728,7 +3736,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
                 [(group[0], 'ALL', 'ALL', 'ALL')], names=['group', 'am', 'lm', 'lu']
             )
             valid_am_g = am_g_stacked.sel(layer=fallback_midx)
-        save2tmp(valid_am_g, tmp_am, group_idx)
+        mags_am.extend(save2chunk(valid_am_g, chunks_am, group_idx))
 
         # Sum: save non-ALL Type layers (ALL is aggregate, excluded per convention).
         sum_g_stacked = (
@@ -3739,7 +3747,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         non_all_mask = np.array([t != 'ALL' for t in sum_g_stacked.coords['Type'].values])
         valid_sum_g = sum_g_stacked.isel(layer=non_all_mask)
         if valid_sum_g.sizes['layer'] > 0:
-            save2tmp(valid_sum_g, tmp_sum, group_idx)
+            mags_sum.extend(save2chunk(valid_sum_g, chunks_sum, group_idx))
 
 
     # ── Concat frames from loop ───────────────────────────────────────────────────
@@ -3886,35 +3894,20 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF3_NVIS_sum_scores_{yr_cal}.csv'), index=False)
 
-    # ── Assemble final NC files from tmp dirs ─────────────────────────────────────
-    nc_ag     = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_{yr_cal}.nc')
-    nc_non_ag = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_non_ag_{yr_cal}.nc')
-    nc_am     = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_management_{yr_cal}.nc')
-    nc_sum    = os.path.join(path, f'xr_biodiversity_GBF3_NVIS_sum_{yr_cal}.nc')
-
-    if os.path.isdir(tmp_ag):
-        concat_tmp2nc(tmp_ag, nc_ag)
-    if os.path.isdir(tmp_non_ag):
-        concat_tmp2nc(tmp_non_ag, nc_non_ag)
-    concat_tmp2nc(tmp_am, nc_am)   # always written (fallback ensures tmp_am is non-empty)
-    if os.path.isdir(tmp_sum):
-        concat_tmp2nc(tmp_sum, nc_sum)
-
-    # ── Magnitudes (open final NC files lazily) ───────────────────────────────────
-    def _mag_from_nc(nc_path):
-        if not os.path.exists(nc_path):
-            return []
-        da = xr.open_dataarray(nc_path)
-        mag = get_mag(da)
-        da.close()
-        return mag
+    # ── Write manifest (group name per chunk — used by create_report_layers for pagination) ──
+    nvis_batches = list(enumerate(np.array_split(all_groups, group_slice_indices)))
+    manifest = {str(idx): list(batch) for idx, batch in nvis_batches}
+    for cdir in [chunks_ag, chunks_non_ag, chunks_am, chunks_sum]:
+        if os.path.isdir(cdir):
+            with open(os.path.join(cdir, 'manifest.json'), 'w') as f:
+                json.dump(manifest, f)
 
     magnitudes = {
         'biodiversity_GBF3': {
-            'ag':     _mag_from_nc(nc_ag),
-            'non_ag': _mag_from_nc(nc_non_ag),
-            'am':     _mag_from_nc(nc_am),
-            'sum':    _mag_from_nc(nc_sum),
+            'ag':     mags_ag,
+            'non_ag': mags_non_ag,
+            'am':     mags_am,
+            'sum':    mags_sum,
         }
     }
     return (f"Biodiversity GBF3 scores written for year {yr_cal}", magnitudes)
@@ -3973,10 +3966,11 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     GBF4_score_am = pd.DataFrame()
     GBF4_score_non_ag = pd.DataFrame()
     GBF4_score_sum = pd.DataFrame()
-    tmp_ag     = os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_{yr_cal}_tmp')
-    tmp_non_ag = os.path.join(path, f'xr_biodiversity_GBF4_SNES_non_ag_{yr_cal}_tmp')
-    tmp_am     = os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_management_{yr_cal}_tmp')
-    tmp_sum    = os.path.join(path, f'xr_biodiversity_GBF4_SNES_sum_{yr_cal}_tmp')
+    chunks_ag     = os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_{yr_cal}_chunks')
+    chunks_non_ag = os.path.join(path, f'xr_biodiversity_GBF4_SNES_non_ag_{yr_cal}_chunks')
+    chunks_am     = os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_management_{yr_cal}_chunks')
+    chunks_sum    = os.path.join(path, f'xr_biodiversity_GBF4_SNES_sum_{yr_cal}_chunks')
+    mags_ag, mags_non_ag, mags_am, mags_sum = [], [], [], []
 
     am_impact_amr = (
         am_impact_amr
@@ -4104,7 +4098,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
             coords={'layer': np.arange(n_valid), 'cell': np.arange(data.NCELLS)},
         ).assign_coords(xr.Coordinates.from_pandas_multiindex(valid_layers, 'layer'))
 
-        save2tmp(valid_arr, tmp_dir, sp_idx)
+        return save2chunk(valid_arr, tmp_dir, sp_idx)
 
 
     # 5-6. Loop through each species in batches of 10.
@@ -4165,42 +4159,42 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         GBF4_score_am = pd.concat([GBF4_score_am, score_am_df], ignore_index=True, copy=False)
         GBF4_score_sum = pd.concat([GBF4_score_sum, score_sum_df], ignore_index=True, copy=False)
 
-        _save_fullsize_layers(
+        mags_ag.extend(_save_fullsize_layers(
             score_ag,
             species_batch,
             species_nz_map,
             _valid_layers_from_aus(score_ag_df, ['lm', 'lu', 'species']),
             ['lm', 'lu', 'species'],
-            tmp_ag,
+            chunks_ag,
             sp_idx,
-        )
-        _save_fullsize_layers(
+        ))
+        mags_non_ag.extend(_save_fullsize_layers(
             score_non_ag,
             species_batch,
             species_nz_map,
             _valid_layers_from_aus(score_non_ag_df, ['lu', 'species']),
             ['lu', 'species'],
-            tmp_non_ag,
+            chunks_non_ag,
             sp_idx,
-        )
-        _save_fullsize_layers(
+        ))
+        mags_am.extend(_save_fullsize_layers(
             score_am,
             species_batch,
             species_nz_map,
             _valid_layers_from_aus(score_am_df, ['am', 'lm', 'lu', 'species']),
             ['am', 'lm', 'lu', 'species'],
-            tmp_am,
+            chunks_am,
             sp_idx,
-        )
-        _save_fullsize_layers(
+        ))
+        mags_sum.extend(_save_fullsize_layers(
             score_sum,
             species_batch,
             species_nz_map,
             _valid_layers_from_aus(score_sum_df, ['Type', 'species']),
             ['Type', 'species'],
-            tmp_sum,
+            chunks_sum,
             sp_idx,
-        )
+        ))
         del (
             veg_nz,
             dvar_species_nz,
@@ -4353,34 +4347,20 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     sum_out = sum_out[sum_out['Area Weighted Score (ha)'].abs() > 0]
     sum_out.to_csv(os.path.join(path, f'biodiversity_GBF4_SNES_sum_scores_{yr_cal}.csv'), index=False)
 
-    # 9. Lazily concatenate saved tmp NCs into final NC files.
-    nc_ag     = os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_{yr_cal}.nc')
-    nc_non_ag = os.path.join(path, f'xr_biodiversity_GBF4_SNES_non_ag_{yr_cal}.nc')
-    nc_am     = os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_management_{yr_cal}.nc')
-    nc_sum    = os.path.join(path, f'xr_biodiversity_GBF4_SNES_sum_{yr_cal}.nc')
-
-    if os.path.isdir(tmp_ag):
-        concat_tmp2nc(tmp_ag, nc_ag)
-    if os.path.isdir(tmp_non_ag):
-        concat_tmp2nc(tmp_non_ag, nc_non_ag)
-    concat_tmp2nc(tmp_am, nc_am)
-    if os.path.isdir(tmp_sum):
-        concat_tmp2nc(tmp_sum, nc_sum)
-
-    def _mag_from_nc(nc_path):
-        if not os.path.exists(nc_path):
-            return []
-        da = xr.open_dataarray(nc_path)
-        mag = get_mag(da)
-        da.close()
-        return mag
+    # 9. Write manifest (species per chunk) and compute magnitudes from chunk dirs.
+    snes_batches = list(enumerate(np.array_split(all_species, species_slice_indices)))
+    manifest = {str(idx): list(batch) for idx, batch in snes_batches}
+    for cdir in [chunks_ag, chunks_non_ag, chunks_am, chunks_sum]:
+        if os.path.isdir(cdir):
+            with open(os.path.join(cdir, 'manifest.json'), 'w') as f:
+                json.dump(manifest, f)
 
     magnitudes = {
         'biodiversity_GBF4_SNES': {
-            'ag':     _mag_from_nc(nc_ag),
-            'non_ag': _mag_from_nc(nc_non_ag),
-            'am':     _mag_from_nc(nc_am),
-            'sum':    _mag_from_nc(nc_sum),
+            'ag':     mags_ag,
+            'non_ag': mags_non_ag,
+            'am':     mags_am,
+            'sum':    mags_sum,
         }
     }
     return (f"Biodiversity GBF4 SNES scores written for year {yr_cal}", magnitudes)
@@ -4433,10 +4413,11 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     # 4. Set up region levels and tmp dirs.
     REGION_LEVELS = ['region_NRM', 'region_state']
     ag_frames, am_frames, non_ag_frames, sum_frames_raw = [], [], [], []
-    tmp_ag     = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_{yr_cal}_tmp')
-    tmp_non_ag = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_non_ag_{yr_cal}_tmp')
-    tmp_am     = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_management_{yr_cal}_tmp')
-    tmp_sum    = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_sum_{yr_cal}_tmp')
+    chunks_ag     = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_{yr_cal}_chunks')
+    chunks_non_ag = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_non_ag_{yr_cal}_chunks')
+    chunks_am     = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_management_{yr_cal}_chunks')
+    chunks_sum    = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_sum_{yr_cal}_chunks')
+    mags_ag, mags_non_ag, mags_am, mags_sum = [], [], [], []
 
 
     type_raw = ['ag', 'non-ag', 'ag-man']
@@ -4469,7 +4450,6 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     # 5-6. Loop through each community in batches of 10.
     species_slice_indices = np.arange(10, len(all_species), 10)
     for sp_idx, species_batch in enumerate(np.array_split(all_species, species_slice_indices)):
-        n_sp = len(species_batch)
 
         veg_xr = _load_veg_scores(species_batch)
 
@@ -4548,7 +4528,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
             .transpose('layer', 'cell')
             .compute()
         )
-        save2tmp(valid_ag_s, tmp_ag, sp_idx)
+        mags_ag.extend(save2chunk(valid_ag_s, chunks_ag, sp_idx))
 
         valid_non_ag_s = (
             score_non_ag.stack(layer=['species', 'lu'])
@@ -4557,7 +4537,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
             .transpose('layer', 'cell')
             .compute()
         )
-        save2tmp(valid_non_ag_s, tmp_non_ag, sp_idx)
+        mags_non_ag.extend(save2chunk(valid_non_ag_s, chunks_non_ag, sp_idx))
 
         valid_am_s = (
             score_am.stack(layer=['species', 'am', 'lm', 'lu'])
@@ -4566,7 +4546,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
             .transpose('layer', 'cell')
             .compute()
         )
-        save2tmp(valid_am_s, tmp_am, sp_idx)
+        mags_am.extend(save2chunk(valid_am_s, chunks_am, sp_idx))
 
         valid_sum_s = (
             score_by_type.sel(Type=type_raw)
@@ -4576,7 +4556,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
             .compute()
         )
         if valid_sum_s.sizes['layer'] > 0:
-            save2tmp(valid_sum_s, tmp_sum, sp_idx)
+            mags_sum.extend(save2chunk(valid_sum_s, chunks_sum, sp_idx))
 
     # 7. Concat frames from loop, combine with baseline df, compute percentages.
     GBF4_score_ag     = pd.concat(ag_frames, ignore_index=True)
@@ -4712,34 +4692,20 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF4_ECNES_sum_scores_{yr_cal}.csv'), index=False)
 
-    # 9. Lazily concatenate saved tmp NCs into final NC files.
-    nc_ag     = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_{yr_cal}.nc')
-    nc_non_ag = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_non_ag_{yr_cal}.nc')
-    nc_am     = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_management_{yr_cal}.nc')
-    nc_sum    = os.path.join(path, f'xr_biodiversity_GBF4_ECNES_sum_{yr_cal}.nc')
-
-    if os.path.isdir(tmp_ag):
-        concat_tmp2nc(tmp_ag, nc_ag)
-    if os.path.isdir(tmp_non_ag):
-        concat_tmp2nc(tmp_non_ag, nc_non_ag)
-    concat_tmp2nc(tmp_am, nc_am)
-    if os.path.isdir(tmp_sum):
-        concat_tmp2nc(tmp_sum, nc_sum)
-
-    def _mag_from_nc(nc_path):
-        if not os.path.exists(nc_path):
-            return []
-        da = xr.open_dataarray(nc_path)
-        mag = get_mag(da)
-        da.close()
-        return mag
+    # 9. Write manifest and compute magnitudes from chunk dirs.
+    ecnes_batches = list(enumerate(np.array_split(all_species, species_slice_indices)))
+    manifest = {str(idx): list(batch) for idx, batch in ecnes_batches}
+    for cdir in [chunks_ag, chunks_non_ag, chunks_am, chunks_sum]:
+        if os.path.isdir(cdir):
+            with open(os.path.join(cdir, 'manifest.json'), 'w') as f:
+                json.dump(manifest, f)
 
     magnitudes = {
         'biodiversity_GBF4_ECNES': {
-            'ag':     _mag_from_nc(nc_ag),
-            'non_ag': _mag_from_nc(nc_non_ag),
-            'am':     _mag_from_nc(nc_am),
-            'sum':    _mag_from_nc(nc_sum),
+            'ag':     mags_ag,
+            'non_ag': mags_non_ag,
+            'am':     mags_am,
+            'sum':    mags_sum,
         }
     }
     return (f"Biodiversity GBF4 ECNES scores written for year {yr_cal}", magnitudes)

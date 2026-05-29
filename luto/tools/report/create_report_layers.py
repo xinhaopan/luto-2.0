@@ -20,6 +20,7 @@
 
 import os
 import re
+import glob
 import json
 import base64
 import hashlib
@@ -333,6 +334,263 @@ def get_map2json(
         
 
 
+def _find_chunks_dirs(raw_data_dir: str, base_pattern: str, years: list) -> dict:
+    """Return {year: chunks_dir_path} for every year that has a chunks directory."""
+    result = {}
+    for yr in years:
+        cdir = os.path.join(raw_data_dir, f'out_{yr}', f'{base_pattern}_{yr}_chunks')
+        if os.path.isdir(cdir):
+            result[yr] = cdir
+    return result
+
+
+def _write_snes_index(combo_attrs: dict, dim_names: list, manifest: dict,
+                      prefix: str, name_warp: dict | None,
+                      chunk_num: int = 1) -> None:
+    """Write the __index.js for a paged SNES/ECNES/NVIS layer set.
+
+    chunk_num must match the value used in get_map2json_snes so that each
+    page entry's [start, end] maps to an existing JS file.
+
+    Index format::
+
+        window["<base>__index"] = {
+          dims:     ["lm", "lu"],          // no species dim
+          tree:     {"Dryland": ["Nuts"]},
+          combos:   {"Dryland__Nuts": {intOrFloat, min_max, raw_min_max}},
+          pages:    {"0": {start:0, end:20, species:[...]}, ...},  // end-start == chunk_num * batch_size
+          pageSize: 20,
+          paged:    true
+        }
+    """
+    base_name = os.path.basename(prefix)
+    os.makedirs(os.path.dirname(prefix) or '.', exist_ok=True)
+
+    tree = _build_tree(list(combo_attrs.keys()))
+    combos_out = {
+        '__'.join(safe_key(v) for v in combo): {k: v for k, v in attrs.items() if k != 'tif_b64'}
+        for combo, attrs in combo_attrs.items()
+    }
+
+    # Build cumulative species list from manifest (chunk order).
+    sorted_chunk_keys = sorted(manifest.keys(), key=int)
+    cumulative = 0
+    chunk_starts = {}
+    chunk_species = {}
+    for idx_str in sorted_chunk_keys:
+        chunk_starts[int(idx_str)] = cumulative
+        chunk_species[int(idx_str)] = manifest[idx_str]
+        cumulative += len(manifest[idx_str])
+
+    # Merge chunk_num chunks per page so [start, end] matches the JS filenames.
+    pages_out = {}
+    page_idx = 0
+    for group_start_pos in range(0, len(sorted_chunk_keys), chunk_num):
+        group_keys = [int(sorted_chunk_keys[i]) for i in range(group_start_pos, min(group_start_pos + chunk_num, len(sorted_chunk_keys)))]
+        page_start = chunk_starts[group_keys[0]]
+        last_key   = group_keys[-1]
+        page_end   = chunk_starts[last_key] + len(chunk_species[last_key])
+        species    = [sp for k in group_keys for sp in chunk_species[k]]
+        pages_out[str(page_idx)] = {'start': page_start, 'end': page_end, 'species': species}
+        page_idx += 1
+
+    batch_size = len(manifest['0']) if manifest else 10
+    index = {
+        'dims':     dim_names,
+        'tree':     tree,
+        'combos':   combos_out,
+        'pages':    pages_out,
+        'pageSize': batch_size * chunk_num,
+        'paged':    True,
+    }
+    index_name = f'{base_name}__index'
+    with open(f'{prefix}__index.js', 'w') as f:
+        f.write(f'window["{index_name}"] = ')
+        json.dump(index, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+
+def get_map2json_snes(
+    chunks_dirs: dict,        # {year: path_to_chunks_dir}
+    float_magnitude: tuple,
+    save_path: str,
+    name_warp: dict | None = None,
+    chunk_num: int = 1,
+) -> None:
+    """Process per-batch chunk NCs for SNES/ECNES/NVIS (minimal adaptation of get_map2json).
+
+    chunk_num controls how many chunk NC files are merged into one JS output.
+    Each chunk NC holds N species (default 10). chunk_num=4 → 40 species per JS file.
+
+    JS filename:  {prefix}__{combo}_{page_start}_{page_end}.js
+    JS var name:  {prefix}__{combo}               (no page suffix)
+    JS content:   window["prefix__combo"] = {
+                    "Species A": {2020: {tif_b64, intOrFloat, min_max, raw_min_max}, ...},
+                    "Species B": {...},
+                  }
+    """
+    if not chunks_dirs:
+        return
+
+    ncells = 5_000_000 // (settings.RESFACTOR ** 2)
+    mem_per_worker = ncells * 7 * 4 / 1e6
+    workers = min(60, max(1, int(settings.WRITE_REPORT_MAX_MEM_MB // mem_per_worker)))
+
+    prefix  = save_path.removesuffix('.js')
+    tif_dir = os.path.dirname(prefix)
+    os.makedirs(tif_dir, exist_ok=True)
+
+    # Pre-build EPSG:3857 index_merc + real_area_1d once per year.
+    year_meta: dict = {}
+    for year, chunks_dir in chunks_dirs.items():
+        ds_template = os.path.join(os.path.dirname(chunks_dir), f'xr_map_template_{year}.nc')
+        with xr.load_dataset(ds_template) as ds:
+            crs   = ds['spatial_ref'].attrs['crs_wkt']
+            valid = ds['layer'].values >= 0
+            arr   = np.full(ds['layer'].shape, -1.0, dtype=np.float32)
+            arr[valid] = np.arange(valid.sum(), dtype=np.float32)
+            rxr_merc = (
+                ds['layer'].copy(data=arr)
+                .rio.write_nodata(-1.0)
+                .rio.write_crs(crs)
+                .rio.reproject('EPSG:3857', nodata=-1.0)
+            )
+        index_merc = np.round(rxr_merc.values).astype(np.int32)
+        real_area_path = os.path.join(
+            os.path.dirname(chunks_dir), f'xr_area_real_area_ha_{year}.nc'
+        )
+        real_area_1d = None
+        if os.path.exists(real_area_path):
+            with xr.open_dataset(real_area_path) as ra_ds:
+                real_area_1d = ra_ds['data'].values.squeeze().astype(np.float32)
+        geo_meta_merc = {
+            'driver': 'GTiff', 'count': 1,
+            'crs':       rxr_merc.rio.crs,
+            'transform': rxr_merc.rio.transform(),
+            'width':     int(rxr_merc.shape[-1]),
+            'height':    int(rxr_merc.shape[-2]),
+            'nodata':    -9999.0, 'compress': 'deflate', 'predictor': 2,
+        }
+        year_meta[year] = (index_merc, geo_meta_merc, real_area_1d)
+
+    # Read manifest from the first year's chunks dir.
+    first_dir  = next(iter(chunks_dirs.values()))
+    chunk_files_first = sorted(glob.glob(os.path.join(first_dir, 'chunk_*.nc')))
+    if not chunk_files_first:
+        return
+    with open(os.path.join(first_dir, 'manifest.json')) as f:
+        manifest = json.load(f)   # {"0": [sp1, sp2, ...], "1": [...], ...}
+
+    # Introspect dimension names from the first chunk (species-like dim excluded).
+    SPECIES_DIMS = {'species', 'group', 'community'}
+    with xr.open_dataset(chunk_files_first[0]) as ds:
+        sample_da = cfxr.decode_compress_to_multi_index(ds, 'layer')['data']
+        sample_layers = sample_da['layer'].to_index().to_frame().to_dict(orient='records')
+    species_dim = next((k for k in sample_layers[0] if k in SPECIES_DIMS), 'species')
+    sample_no_sp = {k: v for k, v in sample_layers[0].items() if k != species_dim}
+    dim_names = list(rename_reorder_hierarchy(sample_no_sp).keys())
+
+    chunk_indices = sorted(
+        int(re.search(r'chunk_(\d+)', os.path.basename(f)).group(1))
+        for f in chunk_files_first
+    )
+    # Pre-compute cumulative page starts from the manifest (agnostic to batch size).
+    cumulative = 0
+    page_starts: dict = {}
+    for idx_str in sorted(manifest.keys(), key=int):
+        page_starts[int(idx_str)] = cumulative
+        cumulative += len(manifest[idx_str])
+
+    base_name = os.path.basename(prefix)
+    all_combo_attrs: dict = {}   # {combo_tuple: attrs}  — for the index JS
+
+    for group_start_pos in range(0, len(chunk_indices), chunk_num):
+        group = chunk_indices[group_start_pos : group_start_pos + chunk_num]
+        page_start = page_starts[group[0]]
+        last_idx   = group[-1]
+        page_end   = page_starts[last_idx] + len(manifest[str(last_idx)])
+
+        # Accumulate all years × all chunks in this group before writing JS.
+        chunk_data: dict = {}   # {(combo_tp, sp): {year: {tif_b64, ...}}}
+
+        for chunk_idx in group:
+            for year, chunks_dir in sorted(chunks_dirs.items()):
+                nc_path = os.path.join(chunks_dir, f'chunk_{chunk_idx:06d}.nc')
+                if not os.path.exists(nc_path):
+                    continue
+
+                index_merc, geo_meta_merc, real_area_1d = year_meta[year]
+
+                xr_arr = cfxr.decode_compress_to_multi_index(
+                    xr.open_dataset(nc_path, chunks={}), 'layer'
+                )['data']
+                valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
+                is_selected_arr = (
+                    np.asarray(xr_arr['is_selected'].values, dtype=bool)
+                    if 'is_selected' in xr_arr.coords else None
+                )
+                is_selected_coords = (
+                    {'is_selected': ('cell', is_selected_arr)}
+                    if is_selected_arr is not None else None
+                )
+
+                for batch in (valid_layers[i:i+workers] for i in range(0, len(valid_layers), workers)):
+                    tasks = []
+                    for sel in batch:
+                        sp_val    = sel[species_dim]
+                        sel_no_sp = {k: v for k, v in sel.items() if k != species_dim}
+                        renamed   = rename_reorder_hierarchy(sel_no_sp)
+                        combo_tp  = tuple(renamed.values())
+                        hierarchy_tp = (*combo_tp, sp_val, int(year))
+
+                        vals = xr_arr.sel(**sel).values.copy()
+                        vals = np.asarray(vals).squeeze()
+                        if vals.ndim != 1:
+                            vals = vals.reshape(-1)
+                        arr_sel = xr.DataArray(vals, dims=('cell',), coords=is_selected_coords)
+                        tasks.append(delayed(map2geotiff)(
+                            index_merc, geo_meta_merc, arr_sel, False,
+                            hierarchy_tp, float_magnitude, None, real_area_1d,
+                        ))
+
+                    for hierarchy_tp, tif_bytes, attrs in Parallel(
+                        n_jobs=workers, return_as='generator', max_nbytes=1_000_000
+                    )(tasks):
+                        combo_tp = hierarchy_tp[:-2]
+                        sp_val   = hierarchy_tp[-2]
+                        year_val = hierarchy_tp[-1]
+                        key = (combo_tp, sp_val)
+                        chunk_data.setdefault(key, {})[year_val] = {
+                            'tif_b64': base64.b64encode(tif_bytes).decode(),
+                            **attrs,
+                        }
+                        all_combo_attrs[combo_tp] = attrs   # last-write wins — all years share attrs
+
+                xr_arr.close()
+
+        # Write one JS file per (combo, page) — species are outer keys.
+        combo_sp_data: dict = {}   # {combo_tp: {sp: {year: data}}}
+        for (combo_tp, sp_val), year_data in chunk_data.items():
+            combo_sp_data.setdefault(combo_tp, {})[sp_val] = year_data
+
+        for combo_tp, sp_year_data in combo_sp_data.items():
+            var_suffix  = '__'.join(safe_key(v) for v in combo_tp)
+            var_name    = f'{base_name}__{var_suffix}'
+            js_filename = f'{var_name}_{page_start}_{page_end}.js'
+            if len(js_filename) > FILENAME_WRAP_THRESHOLD:
+                hash12      = hashlib.md5(js_filename.encode()).hexdigest()[:12]
+                wrapped     = f'{base_name}__{hash12}_{page_start}_{page_end}.js'
+                if name_warp is not None:
+                    name_warp[wrapped] = js_filename
+                js_filename = wrapped
+            with open(os.path.join(tif_dir, js_filename), 'w') as f:
+                f.write(f'window["{var_name}"] = ')
+                json.dump(sp_year_data, f, separators=(',', ':'))
+                f.write(';\n')
+
+    _write_snes_index(all_combo_attrs, dim_names, manifest, prefix, name_warp, chunk_num=chunk_num)
+
+
 def save_report_layer(raw_data_dir: str):
     name_warp: dict[str, str] = {}
 
@@ -494,58 +752,42 @@ def save_report_layer(raw_data_dir: str):
         get_map2json(bio_GBF2_sum, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Sum.js', name_warp=name_warp)
         print('│   ├── Biodiversity GBF2 Sum layer saved.')
 
-    # GBF3-NVIS (NRM aggregation mode)
-    bio_GBF3_NVIS_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag"')
-    get_map2json(bio_GBF3_NVIS_ag, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js', name_warp=name_warp)
-    print('│   ├── Biodiversity GBF3_NVIS Ag layer saved.')
+    # GBF3-NVIS (chunked)
+    _nvis_types = [
+        ('xr_biodiversity_GBF3_NVIS_ag',             'map_bio_GBF3_NVIS_Ag',    'Biodiversity GBF3_NVIS Ag'),
+        ('xr_biodiversity_GBF3_NVIS_ag_management',  'map_bio_GBF3_NVIS_Am',    'Biodiversity GBF3_NVIS Am'),
+        ('xr_biodiversity_GBF3_NVIS_non_ag',         'map_bio_GBF3_NVIS_NonAg', 'Biodiversity GBF3_NVIS Non-Ag'),
+        ('xr_biodiversity_GBF3_NVIS_sum',            'map_bio_GBF3_NVIS_Sum',   'Biodiversity GBF3_NVIS Sum'),
+    ]
+    for base_pat, map_name, label in _nvis_types:
+        cdirs = _find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
+        get_map2json_snes(cdirs, gbf3_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', name_warp=name_warp, chunk_num=10)
+        print(f'│   ├── {label} layer saved.')
 
-    bio_GBF3_NVIS_am = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag_management"')
-    get_map2json(bio_GBF3_NVIS_am, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js', name_warp=name_warp)
-    print('│   ├── Biodiversity GBF3_NVIS Am layer saved.')
-
-    bio_GBF3_NVIS_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_non_ag"')
-    get_map2json(bio_GBF3_NVIS_nonag, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js', name_warp=name_warp)
-    print('│   ├── Biodiversity GBF3_NVIS Non-Ag layer saved.')
-
-    bio_GBF3_NVIS_sum = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_sum"')
-    get_map2json(bio_GBF3_NVIS_sum, None, gbf3_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Sum.js', name_warp=name_warp)
-    print('│   ├── Biodiversity GBF3_NVIS Sum layer saved.')
-        
-
-    # GBF4-SNES
+    # GBF4-SNES (chunked)
     if settings.WRITE_SNES != 'off':
-        bio_GBF4_SNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag"')
-        get_map2json(bio_GBF4_SNES_ag, None, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js', name_warp=name_warp)
-        print('│   ├── Biodiversity GBF4_SNES Ag layer saved.')
+        _snes_types = [
+            ('xr_biodiversity_GBF4_SNES_ag',            'map_bio_GBF4_SNES_Ag',    'Biodiversity GBF4_SNES Ag'),
+            ('xr_biodiversity_GBF4_SNES_ag_management', 'map_bio_GBF4_SNES_Am',    'Biodiversity GBF4_SNES Am'),
+            ('xr_biodiversity_GBF4_SNES_non_ag',        'map_bio_GBF4_SNES_NonAg', 'Biodiversity GBF4_SNES Non-Ag'),
+            ('xr_biodiversity_GBF4_SNES_sum',           'map_bio_GBF4_SNES_Sum',   'Biodiversity GBF4_SNES Sum'),
+        ]
+        for base_pat, map_name, label in _snes_types:
+            cdirs = _find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
+            get_map2json_snes(cdirs, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', name_warp=name_warp, chunk_num=10)
+            print(f'│   ├── {label} layer saved.')
 
-        bio_GBF4_SNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag_management"')
-        get_map2json(bio_GBF4_SNES_am, None, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js', name_warp=name_warp)
-        print('│   ├── Biodiversity GBF4_SNES Am layer saved.')
-
-        bio_GBF4_SNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_non_ag"')
-        get_map2json(bio_GBF4_SNES_nonag, None, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js', name_warp=name_warp)
-        print('│   ├── Biodiversity GBF4_SNES Non-Ag layer saved.')
-
-        bio_GBF4_SNES_sum = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_sum"')
-        get_map2json(bio_GBF4_SNES_sum, None, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Sum.js', name_warp=name_warp)
-        print('│   ├── Biodiversity GBF4_SNES Sum layer saved.')
-
-    # GBF4_ECNES
-    bio_GBF4_ECNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag"')
-    get_map2json(bio_GBF4_ECNES_ag, None, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js', name_warp=name_warp)
-    print('│   ├── Biodiversity GBF4_ECNES Ag layer saved.')
-
-    bio_GBF4_ECNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag_management"')
-    get_map2json(bio_GBF4_ECNES_am, None, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js', name_warp=name_warp)
-    print('│   ├── Biodiversity GBF4_ECNES Am layer saved.')
-
-    bio_GBF4_ECNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_non_ag"')
-    get_map2json(bio_GBF4_ECNES_nonag, None, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js', name_warp=name_warp)
-    print('│   ├── Biodiversity GBF4_ECNES Non-Ag layer saved.')
-
-    bio_GBF4_ECNES_sum = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_sum"')
-    get_map2json(bio_GBF4_ECNES_sum, None, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Sum.js', name_warp=name_warp)
-    print('│   ├── Biodiversity GBF4_ECNES Sum layer saved.')
+    # GBF4-ECNES (chunked)
+    _ecnes_types = [
+        ('xr_biodiversity_GBF4_ECNES_ag',            'map_bio_GBF4_ECNES_Ag',    'Biodiversity GBF4_ECNES Ag'),
+        ('xr_biodiversity_GBF4_ECNES_ag_management', 'map_bio_GBF4_ECNES_Am',    'Biodiversity GBF4_ECNES Am'),
+        ('xr_biodiversity_GBF4_ECNES_non_ag',        'map_bio_GBF4_ECNES_NonAg', 'Biodiversity GBF4_ECNES Non-Ag'),
+        ('xr_biodiversity_GBF4_ECNES_sum',           'map_bio_GBF4_ECNES_Sum',   'Biodiversity GBF4_ECNES Sum'),
+    ]
+    for base_pat, map_name, label in _ecnes_types:
+        cdirs = _find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
+        get_map2json_snes(cdirs, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', name_warp=name_warp, chunk_num=10)
+        print(f'│   ├── {label} layer saved.')
 
     # GBF8
     if settings.GBF8_TARGET != 'off':

@@ -55,8 +55,12 @@ def extract_dtype_from_path(path):
             'xarray_layer':['xr_'],
     }
 
-    # Get the base name of the file path
-    base_name = os.path.basename(path)
+    # For .nc files inside a _chunks directory, classify by the directory name (stripped of _{year}_chunks).
+    parent = os.path.dirname(path)
+    if path.endswith('.nc') and re.search(r'_\d{4}_chunks$', os.path.basename(parent)):
+        base_name = re.sub(r'_\d{4}_chunks$', '', os.path.basename(parent))
+    else:
+        base_name = os.path.basename(path)
 
     # Check the file type
     for ftype, fpat in f_cat.items():
@@ -112,8 +116,17 @@ def get_all_files(data_root):
     # Append the year type and category to the file paths
     file_paths.insert(1, 'category', f_cats)
 
-    # Get the base name and extension of the file path
-    file_paths[['base_name','base_ext']] = [os.path.splitext(os.path.basename(i)) for i in file_paths['path']]
+    # Get the base name and extension of the file path.
+    # For chunk files (inside a _YYYY_chunks dir) use the directory name as base_name.
+    def _base_name_ext(path):
+        parent = os.path.dirname(path)
+        parent_base = os.path.basename(parent)
+        if path.endswith('.nc') and re.search(r'_\d{4}_chunks$', parent_base):
+            stem = re.sub(r'_\d{4}_chunks$', '', parent_base)
+            return stem, '.nc'
+        return os.path.splitext(os.path.basename(path))
+
+    file_paths[['base_name','base_ext']] = [_base_name_ext(i) for i in file_paths['path']]
     file_paths = file_paths.reindex(columns=['Year','category','base_name','base_ext','path'])
 
     # Remove the datatime stamp <YYYY_MM_DD__HH_mm_SS> from the base_name
