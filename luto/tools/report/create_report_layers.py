@@ -23,7 +23,6 @@ import re
 import glob
 import json
 import base64
-import hashlib
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -48,17 +47,12 @@ from luto.tools.report.data_tools.parameters import (
 
 
 
-# 2/3 of the NTFS per-component filename limit (255 chars).
-# Any generated .tif filename longer than this is hashed and recorded in nameWarp.js.
-FILENAME_WRAP_THRESHOLD = 170
-
-
 def safe_key(s: str) -> str:
     """Convert arbitrary string to a safe filename/JS-variable suffix."""
     return re.sub(r'[^a-zA-Z0-9]+', '_', str(s)).strip('_')
 
 
-def _build_tree(combos: list) -> list | dict:
+def build_tree(combos: list) -> list | dict:
     """Recursively build a nested tree from combo tuples; the last level becomes a list."""
     if not combos:
         return []
@@ -70,11 +64,11 @@ def _build_tree(combos: list) -> list | dict:
     for combo in combos:
         groups.setdefault(combo[0], []).append(combo[1:])
     sorted_keys = (['ALL'] if 'ALL' in groups else []) + sorted(k for k in groups if k != 'ALL')
-    return {k: _build_tree(groups[k]) for k in sorted_keys}
+    return {k: build_tree(groups[k]) for k in sorted_keys}
 
 
 
-def _write_geotiff_index(flat_data: dict, dim_names: list, prefix: str) -> None:
+def write_geotiff_index(flat_data: dict, dim_names: list, prefix: str) -> None:
     """Write ``<prefix>__index.js`` with the dimension tree and per-combo display attrs.
 
     flat_data : { (dim1, …, dimN, year): data_dict }
@@ -89,7 +83,7 @@ def _write_geotiff_index(flat_data: dict, dim_names: list, prefix: str) -> None:
         combo = tp[:-1]
         combo_map[combo] = {k: v for k, v in data.items() if k != 'tif_b64'}
 
-    tree = _build_tree(list(combo_map.keys()))
+    tree = build_tree(list(combo_map.keys()))
     combo_attrs = {
         '__'.join(safe_key(v) for v in combo): attrs
         for combo, attrs in combo_map.items()
@@ -103,7 +97,7 @@ def _write_geotiff_index(flat_data: dict, dim_names: list, prefix: str) -> None:
         f.write(';\n')
 
 
-def _write_split_by_combo_geotiff(flat_data: dict, dim_names: list, prefix: str, name_warp: dict) -> None:
+def write_split_by_combo_geotiff(flat_data: dict, dim_names: list, prefix: str) -> None:
     """Write one JS file per unique combo (all years) and an index JS file.
 
     Each per-combo JS file contains the base64-encoded GeoTIFF and display attrs
@@ -112,7 +106,6 @@ def _write_split_by_combo_geotiff(flat_data: dict, dim_names: list, prefix: str,
           2010: {tif_b64: "...", intOrFloat: "float", min_max: [0, 500]},
           2025: {tif_b64: "...", ...},
       };
-    Long filenames (JS or TIF) are hashed and recorded in name_warp.
     """
     base_name = os.path.basename(prefix)
     tif_dir = os.path.dirname(prefix)
@@ -126,18 +119,13 @@ def _write_split_by_combo_geotiff(flat_data: dict, dim_names: list, prefix: str,
     for combo, year_data in combos.items():
         var_suffix = '__'.join(safe_key(v) for v in combo)
         js_filename = f'{base_name}__{var_suffix}.js'
-        if len(js_filename) > FILENAME_WRAP_THRESHOLD:
-            hash12 = hashlib.md5(js_filename.encode()).hexdigest()[:12]
-            wrapped = f'{base_name}__{hash12}.js'
-            name_warp[wrapped] = js_filename
-            js_filename = wrapped
         var_name = js_filename.removesuffix('.js')
         with open(os.path.join(tif_dir, js_filename), 'w') as f:
             f.write(f'window["{var_name}"] = ')
             json.dump(year_data, f, separators=(',', ':'))
             f.write(';\n')
 
-    _write_geotiff_index(flat_data, dim_names, prefix)
+    write_geotiff_index(flat_data, dim_names, prefix)
 
 
 
@@ -210,15 +198,11 @@ def get_map2json(
     float_magnitude: tuple | dict,
     save_path: str,
     legend_key_int: str | None = None,
-    name_warp: dict | None = None,
 ) -> None:
     """Convert all layers in *files_df* to GeoTIFF files (EPSG:3857).
 
-    For each unique (combo × year) one ``<prefix>__<combo>__<year>.tif`` file is
-    written to the same directory as *save_path*.  Filenames that exceed
-    FILENAME_WRAP_THRESHOLD chars are hashed and recorded in the module-level
-    ``_name_warp`` dict; ``save_report_layer`` writes that dict to nameWarp.js.
-    A companion ``<prefix>__index.js`` records the dimension tree and per-combo
+    For each unique (combo × year) one JS file is written per combo (all years)
+    plus a companion ``<prefix>__index.js`` with the dimension tree and per-combo
     display attrs (intOrFloat, min_max / legendKey) for the Vue UI.
     """
     # Per-worker memory: float32 2D output grid (EPSG:3857 is ~7× the 1D cell count).
@@ -330,11 +314,11 @@ def get_map2json(
 
     if not flat_data:
         return
-    _write_split_by_combo_geotiff(flat_data, dim_names, prefix, name_warp)
+    write_split_by_combo_geotiff(flat_data, dim_names, prefix)
         
 
 
-def _find_chunks_dirs(raw_data_dir: str, base_pattern: str, years: list) -> dict:
+def find_chunks_dirs(raw_data_dir: str, base_pattern: str, years: list) -> dict:
     """Return {year: chunks_dir_path} for every year that has a chunks directory."""
     result = {}
     for yr in years:
@@ -344,9 +328,8 @@ def _find_chunks_dirs(raw_data_dir: str, base_pattern: str, years: list) -> dict
     return result
 
 
-def _write_snes_index(combo_attrs: dict, dim_names: list, manifest: dict,
-                      prefix: str, name_warp: dict | None,
-                      chunk_num: int = 1) -> None:
+def write_snes_index(combo_attrs: dict, dim_names: list, manifest: dict,
+                      prefix: str, chunk_num: int = 1) -> None:
     """Write the __index.js for a paged SNES/ECNES/NVIS layer set.
 
     chunk_num must match the value used in get_map2json_snes so that each
@@ -366,7 +349,7 @@ def _write_snes_index(combo_attrs: dict, dim_names: list, manifest: dict,
     base_name = os.path.basename(prefix)
     os.makedirs(os.path.dirname(prefix) or '.', exist_ok=True)
 
-    tree = _build_tree(list(combo_attrs.keys()))
+    tree = build_tree(list(combo_attrs.keys()))
     combos_out = {
         '__'.join(safe_key(v) for v in combo): {k: v for k, v in attrs.items() if k != 'tif_b64'}
         for combo, attrs in combo_attrs.items()
@@ -414,7 +397,6 @@ def get_map2json_snes(
     chunks_dirs: dict,        # {year: path_to_chunks_dir}
     float_magnitude: tuple,
     save_path: str,
-    name_warp: dict | None = None,
     chunk_num: int = 1,
 ) -> None:
     """Process per-batch chunk NCs for SNES/ECNES/NVIS (minimal adaptation of get_map2json).
@@ -577,22 +559,15 @@ def get_map2json_snes(
             var_suffix  = '__'.join(safe_key(v) for v in combo_tp)
             var_name    = f'{base_name}__{var_suffix}'
             js_filename = f'{var_name}_{page_start}_{page_end}.js'
-            if len(js_filename) > FILENAME_WRAP_THRESHOLD:
-                hash12      = hashlib.md5(js_filename.encode()).hexdigest()[:12]
-                wrapped     = f'{base_name}__{hash12}_{page_start}_{page_end}.js'
-                if name_warp is not None:
-                    name_warp[wrapped] = js_filename
-                js_filename = wrapped
             with open(os.path.join(tif_dir, js_filename), 'w') as f:
                 f.write(f'window["{var_name}"] = ')
                 json.dump(sp_year_data, f, separators=(',', ':'))
                 f.write(';\n')
 
-    _write_snes_index(all_combo_attrs, dim_names, manifest, prefix, name_warp, chunk_num=chunk_num)
+    write_snes_index(all_combo_attrs, dim_names, manifest, prefix, chunk_num=chunk_num)
 
 
 def save_report_layer(raw_data_dir: str):
-    name_warp: dict[str, str] = {}
 
     SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
 
@@ -636,7 +611,7 @@ def save_report_layer(raw_data_dir: str):
     #                   1) LUMAP Layer                 #
     ####################################################
     lumap_ly = files.query('base_name == "xr_map_lumap"')
-    get_map2json(lumap_ly, 'lm', None, f'{SAVE_DIR}/map_layers/map_dvar_lumap.js', legend_key_int='lumap', name_warp=name_warp)
+    get_map2json(lumap_ly, 'lm', None, f'{SAVE_DIR}/map_layers/map_dvar_lumap.js', legend_key_int='lumap')
     print('│   ├── LUMAP layer saved.')
 
 
@@ -648,19 +623,15 @@ def save_report_layer(raw_data_dir: str):
     dvar_min_max = (0, 1)
 
     dvar_ag = files.query('base_name == "xr_dvar_ag"')
-    get_map2json(dvar_ag, {'lu':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js', legend_key_int='ag', name_warp=name_warp)
+    get_map2json(dvar_ag, {'lu':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js', legend_key_int='ag')
     print('│   ├── Dvar Ag layer saved.')
-    
-    files_df,legend_int_level,float_magnitude,save_path,legend_key_int,name_warp = (
-        dvar_ag, {'lu':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js', 'ag', name_warp
-    )
 
     dvar_am = files.query('base_name == "xr_dvar_am"')
-    get_map2json(dvar_am, {'am':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Am.js', legend_key_int='am', name_warp=name_warp)
+    get_map2json(dvar_am, {'am':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Am.js', legend_key_int='am')
     print('│   ├── Dvar Am layer saved.')
 
     dvar_nonag = files.query('base_name == "xr_dvar_non_ag"')
-    get_map2json(dvar_nonag, {'lu':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js', legend_key_int='non_ag', name_warp=name_warp)
+    get_map2json(dvar_nonag, {'lu':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js', legend_key_int='non_ag')
     print('│   ├── Dvar Non-Ag layer saved.')
     
     
@@ -681,17 +652,17 @@ def save_report_layer(raw_data_dir: str):
     
 
     area_ag = files_area.query('base_name == "xr_area_agricultural_landuse"')
-    get_map2json(area_ag, {'lu':'ALL'}, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js', legend_key_int='ag', name_warp=name_warp)
+    get_map2json(area_ag, {'lu':'ALL'}, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js', legend_key_int='ag')
     print('│   ├── Area Ag layer saved.')
     
     # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js'
     
     area_nonag = files_area.query('base_name == "xr_area_non_agricultural_landuse"')
-    get_map2json(area_nonag, {'lu':'ALL'}, area_min_max, f'{SAVE_DIR}/map_layers/map_area_NonAg.js', legend_key_int='non_ag', name_warp=name_warp)
+    get_map2json(area_nonag, {'lu':'ALL'}, area_min_max, f'{SAVE_DIR}/map_layers/map_area_NonAg.js', legend_key_int='non_ag')
     print('│   ├── Area Non-Ag layer saved.')
 
     area_am = files_area.query('base_name == "xr_area_agricultural_management"')
-    get_map2json(area_am, {'am':'ALL'}, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Am.js', legend_key_int='am', name_warp=name_warp)
+    get_map2json(area_am, {'am':'ALL'}, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Am.js', legend_key_int='am')
     print('│   ├── Area Am layer saved.')
 
 
@@ -718,38 +689,38 @@ def save_report_layer(raw_data_dir: str):
     
     # Quality layers
     bio_overall_ag = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag"')
-    get_map2json(bio_overall_ag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js', name_warp=name_warp)
+    get_map2json(bio_overall_ag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
     print('│   ├── Biodiversity Overall Ag layer saved.')
 
     bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
-    get_map2json(bio_overall_nonag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js', name_warp=name_warp)
+    get_map2json(bio_overall_nonag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
     print('│   ├── Biodiversity Overall Non-Ag layer saved.')
 
     bio_overall_am = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag_management"')
-    get_map2json(bio_overall_am, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js', name_warp=name_warp)
+    get_map2json(bio_overall_am, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
     print('│   ├── Biodiversity Overall Am layer saved.')
 
     bio_overall_all = files_bio.query('base_name == "xr_biodiversity_overall_priority_all"')
-    get_map2json(bio_overall_all, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_All.js', name_warp=name_warp)
+    get_map2json(bio_overall_all, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_All.js')
     print('│   ├── Biodiversity Overall All layer saved.')
 
 
     # GBF2
     if settings.GBF2_TARGET != 'off':
         bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
-        get_map2json(bio_GBF2_ag, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js', name_warp=name_warp)
+        get_map2json(bio_GBF2_ag, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
         print('│   ├── Biodiversity GBF2 Ag layer saved.')
 
         bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
-        get_map2json(bio_GBF2_am, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js', name_warp=name_warp)
+        get_map2json(bio_GBF2_am, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
         print('│   ├── Biodiversity GBF2 Am layer saved.')
 
         bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
-        get_map2json(bio_GBF2_nonag, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js', name_warp=name_warp)
+        get_map2json(bio_GBF2_nonag, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
         print('│   ├── Biodiversity GBF2 Non-Ag layer saved.')
 
         bio_GBF2_sum = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_sum"')
-        get_map2json(bio_GBF2_sum, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Sum.js', name_warp=name_warp)
+        get_map2json(bio_GBF2_sum, None, gbf2_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Sum.js')
         print('│   ├── Biodiversity GBF2 Sum layer saved.')
 
     # GBF3-NVIS (chunked)
@@ -760,8 +731,8 @@ def save_report_layer(raw_data_dir: str):
         ('xr_biodiversity_GBF3_NVIS_sum',            'map_bio_GBF3_NVIS_Sum',   'Biodiversity GBF3_NVIS Sum'),
     ]
     for base_pat, map_name, label in _nvis_types:
-        cdirs = _find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
-        get_map2json_snes(cdirs, gbf3_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', name_warp=name_warp, chunk_num=10)
+        cdirs = find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
+        get_map2json_snes(cdirs, gbf3_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
         print(f'│   ├── {label} layer saved.')
 
     # GBF4-SNES (chunked)
@@ -773,8 +744,8 @@ def save_report_layer(raw_data_dir: str):
             ('xr_biodiversity_GBF4_SNES_sum',           'map_bio_GBF4_SNES_Sum',   'Biodiversity GBF4_SNES Sum'),
         ]
         for base_pat, map_name, label in _snes_types:
-            cdirs = _find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
-            get_map2json_snes(cdirs, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', name_warp=name_warp, chunk_num=10)
+            cdirs = find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
+            get_map2json_snes(cdirs, gbf4_snes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
             print(f'│   ├── {label} layer saved.')
 
     # GBF4-ECNES (chunked)
@@ -785,34 +756,34 @@ def save_report_layer(raw_data_dir: str):
         ('xr_biodiversity_GBF4_ECNES_sum',           'map_bio_GBF4_ECNES_Sum',   'Biodiversity GBF4_ECNES Sum'),
     ]
     for base_pat, map_name, label in _ecnes_types:
-        cdirs = _find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
-        get_map2json_snes(cdirs, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', name_warp=name_warp, chunk_num=10)
+        cdirs = find_chunks_dirs(raw_data_dir, base_pat, sorted(settings.SIM_YEARS))
+        get_map2json_snes(cdirs, gbf4_ecnes_min_max, f'{SAVE_DIR}/map_layers/{map_name}.js', chunk_num=10)
         print(f'│   ├── {label} layer saved.')
 
     # GBF8
     if settings.GBF8_TARGET != 'off':
         bio_GBF8_ag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag"')
-        get_map2json(bio_GBF8_ag, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_ag, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js')
         print('│   ├── Biodiversity GBF8 Ag layer saved.')
 
         bio_GBF8_am = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag_management"')
-        get_map2json(bio_GBF8_am, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_am, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js')
         print('│   ├── Biodiversity GBF8 Am layer saved.')
 
         bio_GBF8_nonag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_non_ag"')
-        get_map2json(bio_GBF8_nonag, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_nonag, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js')
         print('│   ├── Biodiversity GBF8 Non-Ag layer saved.')
 
         bio_GBF8_ag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag"')
-        get_map2json(bio_GBF8_ag_group, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_ag_group, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js')
         print('│   ├── Biodiversity GBF8 Groups Ag layer saved.')
 
         bio_GBF8_am_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag_management"')
-        get_map2json(bio_GBF8_am_group, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_am_group, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js')
         print('│   ├── Biodiversity GBF8 Groups Am layer saved.')
 
         bio_GBF8_nonag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_non_ag"')
-        get_map2json(bio_GBF8_nonag_group, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js', name_warp=name_warp)
+        get_map2json(bio_GBF8_nonag_group, None, gbf8_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js')
         print('│   ├── Biodiversity GBF8 Groups Non-Ag layer saved.')
 
     
@@ -852,68 +823,68 @@ def save_report_layer(raw_data_dir: str):
 
     # ---------------- Profit ----------------
     profit_ag = files.query('base_name == "xr_economics_ag_profit"')
-    get_map2json(profit_ag, None, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_profit.js', name_warp=name_warp)
+    get_map2json(profit_ag, None, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_profit.js')
     print('│   ├── Economics Ag profit layer saved.')
 
     profit_am = files.query('base_name == "xr_economics_am_profit"')
-    get_map2json(profit_am, None, economic_min_max_am, f'{SAVE_DIR}/map_layers/map_economics_Am_profit.js', name_warp=name_warp)
+    get_map2json(profit_am, None, economic_min_max_am, f'{SAVE_DIR}/map_layers/map_economics_Am_profit.js')
     print('│   ├── Economics Am profit layer saved.')
 
     profit_nonag = files.query('base_name == "xr_economics_non_ag_profit"')
-    get_map2json(profit_nonag, None, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_profit.js', name_warp=name_warp)
+    get_map2json(profit_nonag, None, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_profit.js')
     print('│   ├── Economics NonAg profit layer saved.')
 
     # Sum profit (Ag + Am + NonAg)
     economic_magnitudes_sum = cell_magnitudes.get('Economics_sum', {}).get('sum_profit', [0.0, 0.0])
     economic_min_max_sum = (min(economic_magnitudes_sum), max(economic_magnitudes_sum))
     profit_sum = files.query('base_name == "xr_economics_sum_profit"')
-    get_map2json(profit_sum, None, economic_min_max_sum, f'{SAVE_DIR}/map_layers/map_economics_Sum_profit.js', name_warp=name_warp)
+    get_map2json(profit_sum, None, economic_min_max_sum, f'{SAVE_DIR}/map_layers/map_economics_Sum_profit.js')
     print('│   ├── Economics Sum profit layer saved.')
 
 
     # ---------------- Revenue ----------------
     revenue_ag = files.query('base_name == "xr_economics_ag_revenue"')
-    get_map2json(revenue_ag, None, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_revenue.js', name_warp=name_warp)
+    get_map2json(revenue_ag, None, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_revenue.js')
     print('│   ├── Economics Ag revenue layer saved.')
 
     revenue_am = files.query('base_name == "xr_economics_am_revenue"')
-    get_map2json(revenue_am, None, economic_min_max_am, f'{SAVE_DIR}/map_layers/map_economics_Am_revenue.js', name_warp=name_warp)
+    get_map2json(revenue_am, None, economic_min_max_am, f'{SAVE_DIR}/map_layers/map_economics_Am_revenue.js')
     print('│   ├── Economics Am revenue layer saved.')
     
     revenue_nonag = files.query('base_name == "xr_economics_non_ag_revenue"')
-    get_map2json(revenue_nonag, None, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_revenue.js', name_warp=name_warp)
+    get_map2json(revenue_nonag, None, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_revenue.js')
     print('│   ├── Economics NonAg revenue layer saved.')
 
 
     # ---------------- Cost ----------------
     cost_ag = files.query('base_name == "xr_economics_ag_cost"')
-    get_map2json(cost_ag, None, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_cost.js', name_warp=name_warp)
+    get_map2json(cost_ag, None, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_cost.js')
     print('│   ├── Economics Ag cost layer saved.')
 
     cost_am = files.query('base_name == "xr_economics_am_cost"')
-    get_map2json(cost_am, None, economic_min_max_am, f'{SAVE_DIR}/map_layers/map_economics_Am_cost.js', name_warp=name_warp)
+    get_map2json(cost_am, None, economic_min_max_am, f'{SAVE_DIR}/map_layers/map_economics_Am_cost.js')
     print('│   ├── Economics Am cost layer saved.')
 
     cost_nonag = files.query('base_name == "xr_economics_non_ag_cost"')
-    get_map2json(cost_nonag, None, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_cost.js', name_warp=name_warp)
+    get_map2json(cost_nonag, None, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_cost.js')
     print('│   ├── Economics NonAg cost layer saved.')
 
 
     # ---------------- Transition Cost ----------------
     cost_trans_ag2ag = files.query('base_name == "xr_economics_ag_transition_Ag2Ag"')
-    get_map2json(cost_trans_ag2ag, None, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2ag.js', name_warp=name_warp)
+    get_map2json(cost_trans_ag2ag, None, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2ag.js')
     print('│   ├── Economics Ag transition ag2ag layer saved.')
 
     cost_trans_nonag2ag = files.query('base_name == "xr_economics_ag_transition_NonAg2Ag"')
-    get_map2json(cost_trans_nonag2ag, None, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_nonag2ag.js', name_warp=name_warp)
+    get_map2json(cost_trans_nonag2ag, None, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_nonag2ag.js')
     print('│   ├── Economics Ag transition nonag2ag layer saved.')
 
     cost_trans_ag2nonag = files.query('base_name == "xr_economics_non_ag_transition_Ag2NonAg"')
-    get_map2json(cost_trans_ag2nonag, None, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_transition_ag2non_ag.js', name_warp=name_warp)
+    get_map2json(cost_trans_ag2nonag, None, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_transition_ag2non_ag.js')
     print('│   ├── Economics NonAg transition ag2nonag layer saved.')
 
     cost_trans_nonag2nonag = files.query('base_name == "xr_economics_non_ag_transition_NonAg2NonAg"')
-    get_map2json(cost_trans_nonag2nonag, None, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_transition_nonag2nonag.js', name_warp=name_warp)
+    get_map2json(cost_trans_nonag2nonag, None, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_transition_nonag2nonag.js')
     print('│   ├── Economics NonAg transition nonag2nonag layer saved.')
 
     # AgMgt has 0 transition cost, so skipping
@@ -942,19 +913,19 @@ def save_report_layer(raw_data_dir: str):
     ghg_min_max = (min(ghg_magnitudes), max(ghg_magnitudes))
 
     ghg_ag = files_ghg.query('base_name == "xr_GHG_ag"')
-    get_map2json(ghg_ag, None, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js', name_warp=name_warp)
+    get_map2json(ghg_ag, None, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
     print('│   ├── GHG Ag layer saved.')
 
     ghg_am = files_ghg.query('base_name == "xr_GHG_ag_management"')
-    get_map2json(ghg_am, None, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_Am.js', name_warp=name_warp)
+    get_map2json(ghg_am, None, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
     print('│   ├── GHG Am layer saved.')
 
     ghg_nonag = files_ghg.query('base_name == "xr_GHG_non_ag"')
-    get_map2json(ghg_nonag, None, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js', name_warp=name_warp)
+    get_map2json(ghg_nonag, None, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
     print('│   ├── GHG Non-Ag layer saved.')
 
     ghg_sum = files_ghg.query('base_name == "xr_GHG_sum"')
-    get_map2json(ghg_sum, None, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_Sum.js', name_warp=name_warp)
+    get_map2json(ghg_sum, None, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_Sum.js')
     print('│   ├── GHG Sum layer saved.')
 
 
@@ -969,19 +940,19 @@ def save_report_layer(raw_data_dir: str):
     prod_min_max = {k: (min(v), max(v)) for k, v in prod_magnitudes.items()}
 
     quantities_ag = files_quantities.query('base_name == "xr_quantities_agricultural"')
-    get_map2json(quantities_ag, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js', legend_key_int='ag', name_warp=name_warp)
+    get_map2json(quantities_ag, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js', legend_key_int='ag')
     print('│   ├── Quantities Ag layer saved.')
 
     quantities_am = files_quantities.query('base_name == "xr_quantities_agricultural_management"')
-    get_map2json(quantities_am, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Am.js', legend_key_int='am', name_warp=name_warp)
+    get_map2json(quantities_am, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Am.js', legend_key_int='am')
     print('│   ├── Quantities Am layer saved.')
 
     quantities_nonag = files_quantities.query('base_name == "xr_quantities_non_agricultural"')
-    get_map2json(quantities_nonag, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js', legend_key_int='non_ag', name_warp=name_warp)
+    get_map2json(quantities_nonag, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js', legend_key_int='non_ag')
     print('│   ├── Quantities Non-Ag layer saved.')
 
     quantities_sum = files_quantities.query('base_name == "xr_quantities_sum"')
-    get_map2json(quantities_sum, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Sum.js', legend_key_int='ag', name_warp=name_warp)
+    get_map2json(quantities_sum, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Sum.js', legend_key_int='ag')
     print('│   ├── Quantities Sum layer saved.')
 
 
@@ -994,7 +965,7 @@ def save_report_layer(raw_data_dir: str):
     files_transition_area_ag2ag = files.query('base_name == "xr_transition_ag2ag_area"')
     trans_area_ag2ag_magnitudes = cell_magnitudes['transition_area']['ag2ag']
     trans_area_ag2ag_min_max = (min(trans_area_ag2ag_magnitudes), max(trans_area_ag2ag_magnitudes))
-    get_map2json(files_transition_area_ag2ag, None, trans_area_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2ag.js', name_warp=name_warp)
+    get_map2json(files_transition_area_ag2ag, None, trans_area_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2ag.js')
     print('│   ├── Transition Area (Ag2Ag) layer saved.')
 
 
@@ -1002,7 +973,7 @@ def save_report_layer(raw_data_dir: str):
     files_transition_area_ag2nonag = files.query('base_name == "xr_transition_ag2nonag_area"')
     trans_area_ag2non_ag_magnitudes = cell_magnitudes['transition_area']['ag2non_ag']
     trans_area_ag2non_ag_min_max = (min(trans_area_ag2non_ag_magnitudes), max(trans_area_ag2non_ag_magnitudes))
-    get_map2json(files_transition_area_ag2nonag, None, trans_area_ag2non_ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2nonag.js', name_warp=name_warp)
+    get_map2json(files_transition_area_ag2nonag, None, trans_area_ag2non_ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2nonag.js')
     print('│   ├── Transition Area (Ag2NonAg) layer saved.')
 
 
@@ -1010,7 +981,7 @@ def save_report_layer(raw_data_dir: str):
     files_transition_cost_ag2ag = files.query('base_name == "xr_transition_ag2ag_cost"')
     trans_cost_ag2ag_magnitudes = cell_magnitudes['Economics_ag']['ag2ag_cost']
     trans_cost_ag2ag_min_max = (min(trans_cost_ag2ag_magnitudes), max(trans_cost_ag2ag_magnitudes))
-    get_map2json(files_transition_cost_ag2ag, None, trans_cost_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_cost_ag2ag.js', name_warp=name_warp)
+    get_map2json(files_transition_cost_ag2ag, None, trans_cost_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_cost_ag2ag.js')
     print('│   ├── Transition Cost (Ag2Ag) layer saved.')
 
 
@@ -1018,7 +989,7 @@ def save_report_layer(raw_data_dir: str):
     files_transition_cost_ag2nonag = files.query('base_name == "xr_transition_ag2nonag_cost"')
     trans_cost_ag2nonag_magnitudes = cell_magnitudes['Economics_non_ag']['ag2nonag_cost']
     trans_cost_ag2nonag_min_max = (min(trans_cost_ag2nonag_magnitudes), max(trans_cost_ag2nonag_magnitudes))
-    get_map2json(files_transition_cost_ag2nonag, None, trans_cost_ag2nonag_min_max, f'{SAVE_DIR}/map_layers/map_transition_cost_ag2nonag.js', name_warp=name_warp)
+    get_map2json(files_transition_cost_ag2nonag, None, trans_cost_ag2nonag_min_max, f'{SAVE_DIR}/map_layers/map_transition_cost_ag2nonag.js')
     print('│   ├── Transition Cost (Ag2NonAg) layer saved.')
 
 
@@ -1040,19 +1011,19 @@ def save_report_layer(raw_data_dir: str):
     water_min_max = (min(water_magnitudes), max(water_magnitudes))
 
     water_sum = files_water.query('base_name == "xr_water_yield_sum"')
-    get_map2json(water_sum, None, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Sum.js', name_warp=name_warp)
+    get_map2json(water_sum, None, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Sum.js')
     print('│   ├── Water Yield Sum layer saved.')
 
     water_ag = files_water.query('base_name == "xr_water_yield_ag"')
-    get_map2json(water_ag, None, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js', name_warp=name_warp)
+    get_map2json(water_ag, None, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js')
     print('│   ├── Water Yield Ag layer saved.')
 
     water_am = files_water.query('base_name == "xr_water_yield_ag_management"')
-    get_map2json(water_am, None, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Am.js', name_warp=name_warp)
+    get_map2json(water_am, None, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Am.js')
     print('│   ├── Water Yield Am layer saved.')
 
     water_nonag = files_water.query('base_name == "xr_water_yield_non_ag"')
-    get_map2json(water_nonag, None, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js', name_warp=name_warp)
+    get_map2json(water_nonag, None, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')
     print('│   ├── Water Yield Non-Ag layer saved.')
 
 
@@ -1066,7 +1037,7 @@ def save_report_layer(raw_data_dir: str):
         re_magnitudes = cell_magnitudes.get('renewable_energy', [0.0, 0.0])
         re_min_max = (min(re_magnitudes), max(re_magnitudes))
 
-        get_map2json(files_renewable, None, re_min_max, f'{SAVE_DIR}/map_layers/map_renewable_energy_Am.js', name_warp=name_warp)
+        get_map2json(files_renewable, None, re_min_max, f'{SAVE_DIR}/map_layers/map_renewable_energy_Am.js')
         print('│   ├── Renewable Energy Am layer saved.')
 
     files_renewable_exist = files.query('base_name == "xr_renewable_existing_dvar"')
@@ -1075,22 +1046,12 @@ def save_report_layer(raw_data_dir: str):
         exist_magnitudes = cell_magnitudes.get('renewable_existing_dvar', [0.0, 1.0])
         exist_min_max = (min(exist_magnitudes), max(exist_magnitudes))
 
-        get_map2json(files_renewable_exist, None, exist_min_max, f'{SAVE_DIR}/map_layers/map_renewable_existing_dvar_Am.js', name_warp=name_warp)
+        get_map2json(files_renewable_exist, None, exist_min_max, f'{SAVE_DIR}/map_layers/map_renewable_existing_dvar_Am.js')
         print('│   ├── Renewable Existing Dvar Am layer saved.')
         
         
         
         
-    ####################################################
-    #               11) Name Warp                      #
-    ####################################################
-    
-    with open(f'{SAVE_DIR}/map_layers/nameWarp.js', 'w') as f:
-        f.write('window["nameWarp"] = ')
-        json.dump(name_warp, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
-        
-    print(f'│   └── nameWarp.js saved ({len(name_warp)} wrapped filename{"s" if len(name_warp) != 1 else ""}).')
 
-    
+
 

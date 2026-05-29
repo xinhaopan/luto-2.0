@@ -86,11 +86,6 @@ window.createMapLayerLoader = function(viewName) {
     const currentLayerData = ref(null);
     const loadedComboKey   = ref(null);
 
-    async function ensureNameWarp() {
-        if (window['nameWarp'] !== undefined) return;
-        await window.loadScript('data/map_layers/nameWarp.js', 'nameWarp');
-    }
-
     async function ensureComboLayer(layerPrefix, comboValues, pageRange = null) {
         // pageRange: [start, end] for paged SNES/ECNES/NVIS layers; null for standard layers.
         // The var name never includes the page so each new page overwrites the window variable,
@@ -99,17 +94,10 @@ window.createMapLayerLoader = function(viewName) {
         const key     = `${layerPrefix}||${comboValues.join('||')}${pageKey}`;
         if (loadedComboKey.value === key && currentLayerData.value) return;
 
-        await ensureNameWarp();
-
         const varName  = `${layerPrefix}__${comboValues.map(_safeKey).join('__')}`;
-        let   filename = pageRange
+        const filename = pageRange
             ? `${varName}_${pageRange[0]}_${pageRange[1]}.js`
             : `${varName}.js`;
-
-        // Resolve hashed filename if the combo key exceeded FILENAME_WRAP_THRESHOLD
-        const nameWarp = window['nameWarp'] ?? {};
-        const warpKey  = Object.keys(nameWarp).find(k => nameWarp[k] === filename);
-        if (warpKey) filename = warpKey;
 
         const filePath = `data/map_layers/${filename}`;
         currentLayerData.value = null;

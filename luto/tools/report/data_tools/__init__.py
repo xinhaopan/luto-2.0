@@ -55,9 +55,10 @@ def extract_dtype_from_path(path):
             'xarray_layer':['xr_'],
     }
 
-    # For .nc files inside a _chunks directory, classify by the directory name (stripped of _{year}_chunks).
+    # For .nc/.json files inside a _chunks directory, classify by the directory name (stripped of _{year}_chunks).
     parent = os.path.dirname(path)
-    if path.endswith('.nc') and re.search(r'_\d{4}_chunks$', os.path.basename(parent)):
+    in_chunks = re.search(r'_\d{4}_chunks$', os.path.basename(parent))
+    if (path.endswith('.nc') or os.path.basename(path) == 'manifest.json') and in_chunks:
         base_name = re.sub(r'_\d{4}_chunks$', '', os.path.basename(parent))
     else:
         base_name = os.path.basename(path)
@@ -121,9 +122,11 @@ def get_all_files(data_root):
     def _base_name_ext(path):
         parent = os.path.dirname(path)
         parent_base = os.path.basename(parent)
-        if path.endswith('.nc') and re.search(r'_\d{4}_chunks$', parent_base):
+        in_chunks = re.search(r'_\d{4}_chunks$', parent_base)
+        if (path.endswith('.nc') or os.path.basename(path) == 'manifest.json') and in_chunks:
             stem = re.sub(r'_\d{4}_chunks$', '', parent_base)
-            return stem, '.nc'
+            ext = '.nc' if path.endswith('.nc') else '.json'
+            return stem, ext
         return os.path.splitext(os.path.basename(path))
 
     file_paths[['base_name','base_ext']] = [_base_name_ext(i) for i in file_paths['path']]
