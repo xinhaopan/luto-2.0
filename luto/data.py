@@ -1494,7 +1494,8 @@ class Data:
             nvis_layers_arr = xr.DataArray(
                 np.array(
                     [self.get_resfactored_average_fraction(
-                        self.GBF3_NVIS_LAYERS_ALL.sel(group=g).data.todense().astype(np.float32)
+                        self.GBF3_NVIS_LAYERS_ALL.sel(group=g).data.todense().astype(np.float32),
+                        use_valid_cell_count=False,
                      ) for g in sel_group],
                     dtype=np.float32,
                 ),
@@ -1533,7 +1534,8 @@ class Data:
                     self.get_resfactored_average_fraction(
                         self.GBF4_SNES_LAYERS_ALL.sel(
                             species=sp, presence=('LIKELY' if pres == 'LIKELY' else 'LIKELY_AND_MAYBE')
-                        ).data.todense().astype(np.float32) * self.LUMASK
+                        ).data.todense().astype(np.float32) * self.LUMASK,
+                        use_valid_cell_count=False,
                     )
                     for sp, pres in sel_sp_pres_pairs
                 ], dtype=np.float32),
@@ -1560,7 +1562,8 @@ class Data:
                     self.get_resfactored_average_fraction(
                         self.GBF4_ECNES_LAYERS_ALL.sel(
                             species=comm, presence=('LIKELY' if pres == 'LIKELY' else 'LIKELY_AND_MAYBE')
-                        ).data.todense().astype(np.float32) * self.LUMASK
+                        ).data.todense().astype(np.float32) * self.LUMASK,
+                        use_valid_cell_count=False,
                     )
                     for comm, pres in sel_comm_pres_pairs
                 ], dtype=np.float32),

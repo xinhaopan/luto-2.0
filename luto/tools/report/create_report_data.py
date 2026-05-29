@@ -3307,13 +3307,12 @@ def process_biodiversity_data(files, SAVE_DIR):
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
             .round(6)
-        # Drop the per-species 'ALL' aggregate; also drop the AUSTRALIA aggregate row
-        # (AUSTRALIA = exact sum of all NRM/state regions — including it alongside individual
-        # regions causes double counting wherever region-level sums are computed).
-        bio_df = bio_df.query('species != "ALL" and region != "AUSTRALIA"')
+        # Drop the per-species 'ALL' aggregate (it's re-aggregated explicitly in sum charts).
+        # Keep AUSTRALIA rows so the AUSTRALIA region selection shows data in the report.
+        bio_df = bio_df.query('species != "ALL"')
 
         # ---------------- (GBF3-NVIS) Ranking  ----------------
-        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
+        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL" and region != "AUSTRALIA"')\
             .groupby(['Year', 'region_level', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3338,8 +3337,9 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         # ---------------- (GBF3-NVIS) Overview  ----------------
 
-        # Build target lookup once (species × region → Target_by_Percent, BASE_TOTAL_SCORE)
-        # used by overview_sum, Sum, and Ag/Am/NonAg charts.
+        # Build target lookup once (species × region → Target_by_Percent, BASE_TOTAL_SCORE).
+        # Target_by_Percent is NaN when no constraint is active (write.py sets it to NaN
+        # when TARGET_INSIDE_SCORE = 0), so .notna() correctly selects only real targets.
         _gbf3_target_lk = (
             bio_df[bio_df['Target_by_Percent'].notna()]
             [['species', 'region', 'region_level', 'Target_by_Percent', 'BASE_TOTAL_SCORE']]
@@ -3391,15 +3391,10 @@ def process_biodiversity_data(files, SAVE_DIR):
                 [df for p in sum_bio_paths['path'] if not (df := pd.read_csv(p, low_memory=False)).empty],
                 ignore_index=True,
             ).rename(columns={'Vegetation Group': 'species'})
-            # Exclude AUSTRALIA aggregate (= sum of all NRM/state regions) to prevent
-            # double counting when any upstream code sums across regions.
-            sum_bio_df = sum_bio_df[(sum_bio_df['Type'] != 'ALL') & (sum_bio_df['region'] != 'AUSTRALIA')].copy()
+            sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
             sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
-            sum_bio_df['Sum_Pct (%)'] = (
-                sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
-            )
             df_wide_sum_pct = groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
-                value_cols=('Year', 'Sum_Pct (%)'),
+                value_cols=('Year', 'Relative_Contribution_Percentage'),
             )
             df_wide_sum_pct['type'] = 'column'
             df_wide_sum_pct['color'] = df_wide_sum_pct['name'].apply(lambda x: COLORS[x])
@@ -3530,10 +3525,10 @@ def process_biodiversity_data(files, SAVE_DIR):
             .round(6)
         # Drop the per-species 'ALL' aggregate so it is not surfaced as a selectable
         # species in the report dropdowns; sum charts re-aggregate explicitly.
-        # Also drop the AUSTRALIA aggregate row to prevent double-counting across regions.
-        bio_df = bio_df.query('species != "ALL" and region != "AUSTRALIA"')
+        # Keep AUSTRALIA rows so the AUSTRALIA region selection shows data in the report.
+        bio_df = bio_df.query('species != "ALL"')
         # ---------------- (GBF4 SNES) Ranking  ----------------
-        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
+        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL" and region != "AUSTRALIA"')\
             .groupby(['Year', 'region_level', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3599,15 +3594,10 @@ def process_biodiversity_data(files, SAVE_DIR):
                 [df for p in sum_bio_paths['path'] if not (df := pd.read_csv(p, low_memory=False)).empty],
                 ignore_index=True,
             )
-            # Exclude AUSTRALIA aggregate (= sum of all NRM/state regions) to prevent
-            # double counting when any upstream code sums across regions.
-            sum_bio_df = sum_bio_df[(sum_bio_df['Type'] != 'ALL') & (sum_bio_df['region'] != 'AUSTRALIA')].copy()
+            sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
             sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
-            sum_bio_df['Sum_Pct (%)'] = (
-                sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
-            )
             df_wide_sum_pct = groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
-                value_cols=('Year', 'Sum_Pct (%)'),
+                value_cols=('Year', 'Relative_Contribution_Percentage'),
             )
             df_wide_sum_pct['type'] = 'column'
             df_wide_sum_pct['color'] = df_wide_sum_pct['name'].apply(lambda x: COLORS[x])
@@ -3705,12 +3695,13 @@ def process_biodiversity_data(files, SAVE_DIR):
             'Target by Percent (%)': 'Target_by_Percent',
         })\
         .round(6)
-    # Drop the per-species 'ALL' aggregate; also drop the AUSTRALIA aggregate row
-    # (AUSTRALIA = exact sum of all NRM/state regions — including it alongside individual
-    # regions causes double counting wherever region-level sums are computed).
-    bio_df = bio_df.query('species != "ALL" and region != "AUSTRALIA"')
+    # Drop the per-species 'ALL' aggregate (re-aggregated explicitly in sum charts).
+    # Keep AUSTRALIA rows so the AUSTRALIA region selection shows data in the report.
+    bio_df = bio_df.query('species != "ALL"')
 
-    # Build target lookup once (species × region → Target_by_Percent, BASE_TOTAL_SCORE)
+    # Build target lookup once (species × region → Target_by_Percent, BASE_TOTAL_SCORE).
+    # Target_by_Percent is NaN when no constraint is active (write.py sets it to NaN
+    # when TARGET_INSIDE_SCORE = 0), so .notna() correctly selects only real targets.
     _ecnes_target_lk = (
         bio_df[bio_df['Target_by_Percent'].notna()]
         [['species', 'region', 'region_level', 'Target_by_Percent', 'BASE_TOTAL_SCORE']]
@@ -3718,7 +3709,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     )
 
     # ---------------- (GBF4 ECNES) Ranking  ----------------
-    bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
+    bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL" and region != "AUSTRALIA"')\
         .groupby(['Year', 'region_level', 'region'])\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -3782,15 +3773,11 @@ def process_biodiversity_data(files, SAVE_DIR):
             [df for p in sum_bio_paths['path'] if not (df := pd.read_csv(p, low_memory=False)).empty],
             ignore_index=True,
         )
-        # Exclude AUSTRALIA aggregate (= sum of all NRM/state regions) to prevent
-        # double counting when any upstream code sums across regions.
-        sum_bio_df = sum_bio_df[(sum_bio_df['Type'] != 'ALL') & (sum_bio_df['region'] != 'AUSTRALIA')].copy()
+        sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
         sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
-        sum_bio_df['Sum_Pct (%)'] = (
-            sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
-        )
+        sum_bio_df['_Pct_AllHA'] = sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['ALL_HA'] * 100
         df_wide_sum_pct = groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
-            value_cols=('Year', 'Sum_Pct (%)'),
+            value_cols=('Year', '_Pct_AllHA'),
         )
         df_wide_sum_pct['type'] = 'column'
         df_wide_sum_pct['color'] = df_wide_sum_pct['name'].apply(lambda x: COLORS[x])

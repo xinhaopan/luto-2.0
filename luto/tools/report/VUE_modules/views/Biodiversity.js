@@ -39,7 +39,7 @@ window.BiodiversityView = {
     const METRIC_TO_SETTING = {
       'quality': null, 'GBF2': 'GBF2_TARGET',
       'GBF3_NVIS': null,
-      'GBF4_SNES': 'GBF4_TARGET_SNES',
+      'GBF4_SNES': 'WRITE_SNES',
       'GBF4_ECNES': null,
       'GBF8_GROUP': 'GBF8_TARGET',
       'GBF8_SPECIES': 'GBF8_TARGET',
