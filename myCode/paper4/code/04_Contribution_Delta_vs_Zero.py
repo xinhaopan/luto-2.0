@@ -1,5 +1,5 @@
 # ==============================================================================
-# Figure 04: contribution response vs carbon price / biodiversity price
+# Figure 04: contribution response by carbon price / biodiversity price
 #   Left column:  BioPrice = 0, carbon price varies
 #   Right column: CarbonPrice = 0, biodiversity price varies
 #   Rows: Agricultural land-use / Ag management / Non-ag
@@ -7,8 +7,8 @@
 #         as a separate stacked segment labelled "Transition".
 #
 #   Values are differences from the zero-price run for YEAR.
-#   Carbon uses net GHG emissions:
-#       GHG emissions change = GHG(price run) - GHG(zero-price run)
+#   Carbon uses GHG abatement:
+#       GHG abatement difference = GHG(zero-price run) - GHG(price run)
 # ==============================================================================
 
 import io
@@ -57,7 +57,7 @@ SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
 NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
-MODIFIED_LIVESTOCK_COLOR = "#fe7f2d"
+MODIFIED_LIVESTOCK_COLOR = "#762500"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -330,7 +330,7 @@ def collect_carbon_rows(run_map, cp_vals):
         raise FileNotFoundError("Could not find zero-price run (CarbonPrice=0, BioPrice=0).")
     baseline_2025 = get_ghg_summaries(zero_zip_path, YEAR)
 
-    print(f"\n--- Slice A: GHG emissions change at {YEAR}; BioPrice=0 and carbon price varies ---")
+    print(f"\n--- Slice A: GHG abatement difference at {YEAR}; BioPrice=0 and carbon price varies ---")
     for cp in cp_vals:
         zip_path = run_map.get((cp, 0.0))
         if zip_path is None:
@@ -361,7 +361,7 @@ def collect_carbon_rows(run_map, cp_vals):
                     "ContributionValue": contribution_mt,
                 })
 
-            print(f"  cp={format_thousands(cp)} | {area_type}: change={total_mt:.2f} Mt CO2e")
+            print(f"  cp={format_thousands(cp)} | {area_type}: difference={total_mt:.2f} Mt CO2e")
 
     return rows
 
@@ -373,7 +373,7 @@ def collect_biodiversity_rows(run_map, bp_vals):
         raise FileNotFoundError("Could not find zero-price run (CarbonPrice=0, BioPrice=0).")
     baseline_2025 = get_bio_summaries(zero_zip_path, YEAR)
 
-    print(f"\n--- Slice B: biodiversity contribution change at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
+    print(f"\n--- Slice B: biodiversity contribution difference at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
     for bp in bp_vals:
         zip_path = run_map.get((0.0, bp))
         if zip_path is None:
@@ -406,7 +406,7 @@ def collect_biodiversity_rows(run_map, bp_vals):
 
             print(
                 f"  bp={format_thousands(bp)} | {area_type}: "
-                f"change={total_mha_yr:.2f} Mha yr^-1"
+                f"difference={total_mha_yr:.2f} Mha yr^-1"
             )
 
     return rows
@@ -593,9 +593,6 @@ if df_long is None:
 fig, axes = plt.subplots(4, 2, figsize=(10, 16), sharex="col")
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
-axes[0, 0].set_title("Carbon price varies\n(BioPrice=0)", pad=8)
-axes[0, 1].set_title("Biodiversity price varies\n(CarbonPrice=0)", pad=8)
-
 total_pivot_cp = build_total_pivot(df_long, "CarbonPrice")
 total_pivot_bp = build_total_pivot(df_long, "BioPrice")
 
@@ -655,9 +652,9 @@ y_mid_l = (max(b.y1 for b in bb_left) + min(b.y0 for b in bb_left)) / 2 / fig_h_
 y_mid_r = (max(b.y1 for b in bb_right) + min(b.y0 for b in bb_right)) / 2 / fig_h_px
 x_l = min(b.x0 for b in bb_left) / fig_w_px - 0.02
 x_r = max(b.x1 for b in bb_right) / fig_w_px + 0.02
-fig.text(x_l, y_mid_l, r"Change in GHG abatement vs zero price (Mt CO$_2$e yr$^{-1}$)",
+fig.text(x_l, y_mid_l, r"Difference in GHG abatement relative to zero price (Mt CO$_2$e yr$^{-1}$)",
          rotation=90, va='center', ha='center', fontsize=FS)
-fig.text(x_r, y_mid_r, r"Change in biodiversity contribution score vs zero price (Mha yr$^{-1}$)",
+fig.text(x_r, y_mid_r, r"Difference in biodiversity contribution score relative to zero price (Mha yr$^{-1}$)",
          rotation=270, va='center', ha='center', fontsize=FS)
 
 all_rows = [("_total", 0)] + [(area_type, i + 1) for i, area_type in enumerate(row_area_types)]

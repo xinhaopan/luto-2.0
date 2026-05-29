@@ -1,8 +1,8 @@
 """
-04_Mapping.py
-4-row x 2-col figure: land use (col 1) and agricultural management (col 2)
-AM data: xr_dvar_am_2050.nc (values are 0-based am indices; +1 converts to am codes 1-8).
-State boundaries overlaid on every panel.
+03_Mapping.py — Combined SVG figure with three panels (a), (b), (c).
+  (a) 2×2 grid (all 4 scenarios), 8-category LU with dryland/irrigated split
+  (b) 1×2 grid (AgS1+AgS2 only), AG management types
+  (c) single map (AgS2), non-ag land-use sub-types with side legend
 """
 import os
 import numpy as np
@@ -13,7 +13,7 @@ matplotlib.use('Agg')
 matplotlib.rcParams.update({
     'font.family': 'Arial',
     'font.sans-serif': ['Arial'],
-    'font.size':   9,
+    'font.size': 9,
     'svg.fonttype': 'none',
 })
 import matplotlib.pyplot as plt
@@ -24,57 +24,51 @@ import rasterio
 from tools.parameters import TIFF_DIR, OUTPUT_DIR, input_files, SCENARIO_LABELS
 from tools.data_helper import get_zip_info, extract_nc_layer_as_tiff
 
-NO_AM_COLOR = '#E0E0E0'   # lighter grey: research area cells with no AM applied
-
-# ── Geography constants (from tiff metadata, EPSG:4283) ───────────────────────
+# ── Geography constants (EPSG:4283 / GDA94) ──────────────────────────────────
 TIFF_LEFT, TIFF_BOTTOM, TIFF_RIGHT, TIFF_TOP = 112.925, -43.665, 153.625, -10.015
 TIFF_CRS_EPSG = 4283
-IMG_H, IMG_W   = 673, 814
-EXTENT = [TIFF_LEFT, TIFF_RIGHT, TIFF_BOTTOM, TIFF_TOP]  # imshow extent
+EXTENT = [TIFF_LEFT, TIFF_RIGHT, TIFF_BOTTOM, TIFF_TOP]
 
-# ── Assets dir (state-boundary shapefile) ────────────────────────────────────
-_HERE   = os.path.dirname(os.path.abspath(__file__))         # code/
+_HERE   = os.path.dirname(os.path.abspath(__file__))
 ASSETS  = os.path.normpath(os.path.join(_HERE, '../../../draw_all/code/Assets'))
 STE_SHP = os.path.join(ASSETS, 'AUS_adm/STE11aAust_mercator_simplified.shp')
 
-# ── Land-use category mapping ─────────────────────────────────────────────────
-LU_CAT_MAP = {
-    **{k: 1 for k in [0, 3, 4, 7, 8, 9, 10, 11, 12, 13,
-                       16, 17, 18, 19, 20, 21, 24, 25, 26, 27]},
-    **{k: 2 for k in [1, 5, 14]},
-    **{k: 3 for k in [2, 6, 15]},
-    **{k: 4 for k in [22, 23]},
-    **{k: 5 for k in range(100, 120)},
+# ── 8-category LU scheme ──────────────────────────────────────────────────────
+CROPLAND = frozenset([0, 3, 4, 7, 8, 9, 10, 11, 12, 13,
+                      16, 17, 18, 19, 20, 21, 24, 25, 26, 27])
+MOD_PAST = frozenset([1, 5, 14])
+NAT_PAST = frozenset([2, 6, 15])
+UNALLOC  = frozenset([22, 23])
+
+LU_CAT_8 = {
+    1: ("Dryland cropland and horticulture",                              "#aecb75"),
+    2: ("Irrigated cropland and horticulture",                            "#83b5ff"),
+    3: ("Dryland grazing (modified pastures)",                            "#762400"),
+    4: ("Irrigated grazing (modified pastures)",                          "#c4669b"),
+    5: ("Grazing (native vegetation)",                                    "#c4996b"),
+    6: ("Unallocated land",                                               "#e5d8a8"),
+    7: ("Non-agricultural land-use",                                      "#3A7F4A"),
+    8: ("Public and indigenous land, urban land, plantation forestry,\nand water bodies", "#bfbfbf"),
 }
-LU_CAT_INFO = {
-    1: ("Cropland and horticulture",     "#AECB75"),
-    2: ("Grazing (modified pastures)",   "#762400"),
-    3: ("Grazing (native vegetation)",   "#C4996B"),
-    4: ("Unallocated land",              "#E5D8A8"),
-    5: ("Non-agricultural land",         "#3A7F4A"),
-    6: ("Public and indigenous land, urban land, plantation forestry, and water bodies", "#BFBFBF"),
+
+# Non-ag sub-type info (codes 100–108, from land use colors xlsx 'non_ag' sheet)
+NON_AG_INFO = {
+    100: ("Environmental plantings (mixed local native species)", "#267300"),
+    101: ("Riparian buffer restoration (mixed species)",          "#005ce6"),
+    102: ("Agroforestry (mixed species + sheep)",                 "#c500ff"),
+    103: ("Agroforestry (mixed species + beef)",                  "#ff0000"),
+    104: ("Carbon plantings (monoculture)",                       "#F2A361"),
+    105: ("Farm forestry (hardwood timber + sheep)",              "#20B2AA"),
+    106: ("Farm forestry (hardwood timber + beef)",               "#A0522D"),
+    107: ("BECCS (Bioenergy with carbon capture and storage)",    "#FFFF00"),
+    108: ("Destocked (natural land)",                             "#abcd66"),
 }
 
+NO_AM_COLOR = '#E0E0E0'
 
-def _load_am_info():
-    df  = pd.read_excel('tools/land use colors.xlsx', sheet_name='am')
-    col = 'desc_new' if 'desc_new' in df.columns else 'desc'
-    return {int(r['code']): (r[col], r['color']) for _, r in df.iterrows()}
-
-
+# ── Helpers ───────────────────────────────────────────────────────────────────
 def _hex_rgb(h):
     return int(h[1:3], 16)/255, int(h[3:5], 16)/255, int(h[5:7], 16)/255
-
-
-# ── Raster helpers ────────────────────────────────────────────────────────────
-
-def read_tiff(path):
-    with rasterio.open(path) as src:
-        arr = src.read(1).astype('float32')
-        nd  = src.nodata if src.nodata is not None else -9999
-        arr[arr == nd] = np.nan
-    arr[arr < -9000] = np.nan       # catches float32 overflow from int NaN
-    return arr
 
 
 def _to_rgba(cat_arr, cat_info):
@@ -85,45 +79,25 @@ def _to_rgba(cat_arr, cat_info):
     return rgba
 
 
-def lumap_to_rgba(arr):
-    cat = np.full(arr.shape, np.nan, dtype='float32')
-    for code, cid in LU_CAT_MAP.items():
-        cat[arr == code] = cid
-    cat[(~np.isnan(arr)) & np.isnan(cat)] = 6
-    cat[np.isnan(arr)] = np.nan
-    return _to_rgba(cat, LU_CAT_INFO)
+def read_tiff(path):
+    with rasterio.open(path) as src:
+        arr = src.read(1).astype('float32')
+        nd  = src.nodata if src.nodata is not None else -9999
+        arr[arr == nd] = np.nan
+    arr[arr < -9000] = np.nan
+    return arr
 
 
-def ammap_to_rgba(arr, am_info):
-    arr = arr.copy()
-    valid = ~np.isnan(arr)
-    # xr_dvar_am stores 0-based am index; add 1 to convert to actual am codes (1-8)
-    arr[valid] += 1
-    cat = np.full(arr.shape, np.nan, dtype='float32')
-    for code in am_info:
-        cat[arr == code] = float(code)
-    cat[np.isnan(arr)] = np.nan
-    return _to_rgba(cat, am_info)
+def _style(ax):
+    ax.set_xticks([]);  ax.set_yticks([])
+    ax.set_xlim(TIFF_LEFT, TIFF_RIGHT)
+    ax.set_ylim(TIFF_BOTTOM, TIFF_TOP)
+    ax.set_aspect('equal', adjustable='box')
+    for sp in ax.spines.values():
+        sp.set_visible(False)
 
 
-# ── Tiff path helpers ─────────────────────────────────────────────────────────
-
-def get_lu_tiff(scen):
-    cached = os.path.join(TIFF_DIR, f'_extracted_{scen}_map_lumap_lmALL.tiff')
-    if os.path.exists(cached):
-        return cached
-    from tools.data_helper import extract_nc_layer_as_tiff
-    return extract_nc_layer_as_tiff(scen, 'map_lumap', {'lm': 'ALL'}, 2050)
-
-
-def get_am_tiff(scen):
-    """Use xr_dvar_am_2050.nc (values are 0-based am indices; +1 in ammap_to_rgba)."""
-    return extract_nc_layer_as_tiff(scen, 'dvar_am',
-                                    {'am': 'ALL', 'lm': 'ALL', 'lu': 'ALL'}, 2050)
-
-
-# ── State boundaries ──────────────────────────────────────────────────────────
-
+# ── Geography helpers ─────────────────────────────────────────────────────────
 def load_states():
     if not os.path.exists(STE_SHP):
         print(f'State shp not found: {STE_SHP}')
@@ -132,7 +106,6 @@ def load_states():
 
 
 def fill_states(ax, gdf, color='#BFBFBF'):
-    """Fill state polygons with grey as background (shows non-LUTO land areas)."""
     if gdf is not None:
         gdf.plot(ax=ax, color=color, zorder=0)
 
@@ -142,153 +115,429 @@ def add_states(ax, gdf, lw=0.4, color='#555555'):
         gdf.boundary.plot(ax=ax, color=color, linewidth=lw, zorder=4)
 
 
-# ── Figure ────────────────────────────────────────────────────────────────────
+# ── Tiff extraction helpers ───────────────────────────────────────────────────
+def _get_tiff(scen, layer_name, sel, year, cache_key):
+    cached = os.path.join(TIFF_DIR, f'_extracted_{scen}_{layer_name}_{cache_key}.tiff')
+    if os.path.exists(cached):
+        return cached
+    return extract_nc_layer_as_tiff(scen, layer_name, sel, year)
+
+
+def get_lu_all(scen):  return _get_tiff(scen, 'map_lumap', {'lm': 'ALL'}, 2050, 'lmALL')
+def get_lu_dry(scen):  return _get_tiff(scen, 'map_lumap', {'lm': 'dry'}, 2050, 'lmDRY')
+def get_am_tiff(scen): return _get_tiff(scen, 'dvar_am',   {'am': 'ALL', 'lm': 'ALL', 'lu': 'ALL'}, 2050, 'dvarAM')
+
+
+# ── Classification helpers ────────────────────────────────────────────────────
+def lumap_to_rgba_8cat(all_arr, dry_arr):
+    """
+    all_arr: lu codes for all LUTO research-area cells (lm='ALL')
+    dry_arr: lu codes only for dryland-managed cells (lm='dry'); NaN for irrigated/non-ag.
+    Dryland vs irrigated distinction: cell has code in dry_arr ↔ dryland management.
+    """
+    cat   = np.full(all_arr.shape, np.nan, dtype='float32')
+    valid  = ~np.isnan(all_arr)
+    is_dry = ~np.isnan(dry_arr)
+
+    for code in CROPLAND:
+        at = all_arr == code
+        cat[at & is_dry]  = 1   # dryland cropland
+        cat[at & ~is_dry] = 2   # irrigated cropland
+    for code in MOD_PAST:
+        at = all_arr == code
+        cat[at & is_dry]  = 3   # dryland grazing (modified)
+        cat[at & ~is_dry] = 4   # irrigated grazing (modified)
+    for code in NAT_PAST:
+        cat[all_arr == code] = 5
+    for code in UNALLOC:
+        cat[all_arr == code] = 6
+
+    cat[valid & (all_arr >= 100)] = 7   # non-agricultural land-use
+
+    cat[valid & np.isnan(cat)] = 8      # public/indigenous/urban/plantation/water
+
+    return _to_rgba(cat, LU_CAT_8)
+
+
+def nonag_to_rgba(all_arr):
+    """Show non-ag sub-types (100–108); agricultural cells in #DADADA."""
+    rgba = np.zeros((*all_arr.shape, 4), dtype='float32')
+    ag_r, ag_g, ag_b = _hex_rgb('#DADADA')
+    for code in (CROPLAND | MOD_PAST | NAT_PAST | UNALLOC):
+        rgba[all_arr == code] = [ag_r, ag_g, ag_b, 1.0]
+    for code, (_, hexc) in NON_AG_INFO.items():
+        r, g, b = _hex_rgb(hexc)
+        rgba[all_arr == code] = [r, g, b, 1.0]
+    return rgba
+
+
+def _load_am_info():
+    df  = pd.read_excel('tools/land use colors.xlsx', sheet_name='am')
+    col = 'desc_new' if 'desc_new' in df.columns else 'desc'
+    rename = {
+        "Human-Induced Regeneration (beef)":  "Managed regeneration (beef)",
+        "Human-Induced Regeneration (sheep)": "Managed regeneration (sheep)",
+    }
+    return {
+        int(r['code']): (rename.get(r[col], r[col]), r['color'])
+        for _, r in df.iterrows()
+    }
+
+
+def ammap_to_rgba(arr, am_info):
+    arr  = arr.copy()
+    valid = ~np.isnan(arr)
+    arr[valid] += 1          # 0-based index → 1-based am code
+    cat  = np.full(arr.shape, np.nan, dtype='float32')
+    for code in am_info:
+        cat[arr == code] = float(code)
+    cat[np.isnan(arr)] = np.nan
+    return _to_rgba(cat, am_info)
+
+
+# ── Figure A: 2×2 land-use maps ───────────────────────────────────────────────
+def save_lu_maps(gdf_states):
+    asp    = (TIFF_TOP - TIFF_BOTTOM) / (TIFF_RIGHT - TIFF_LEFT)  # ≈ 0.827
+    MAP_W  = 4.4
+    MAP_H  = MAP_W * asp
+    HSPACE = 0.06
+    WSPACE = 0.06
+    LEG_H  = 1.6          # height reserved below maps for the horizontal legend
+
+    ncols, nrows = 2, 2
+    fig_w = ncols * MAP_W + (ncols - 1) * WSPACE
+    fig_h = nrows * MAP_H + (nrows - 1) * HSPACE + LEG_H
+
+    fig = plt.figure(figsize=(fig_w, fig_h), facecolor='white')
+    gs  = gridspec.GridSpec(
+        nrows, ncols, figure=fig,
+        left=0, right=1,
+        top=1,
+        bottom=LEG_H / fig_h,
+        wspace=WSPACE / MAP_W,
+        hspace=HSPACE / MAP_H,
+    )
+
+    for idx, scen in enumerate(input_files):
+        row, col = divmod(idx, ncols)
+        ax = fig.add_subplot(gs[row, col])
+        fill_states(ax, gdf_states)
+
+        tp_all = get_lu_all(scen)
+        tp_dry = get_lu_dry(scen)
+        ok_all = tp_all and os.path.exists(tp_all)
+        ok_dry = tp_dry and os.path.exists(tp_dry)
+        if ok_all:
+            all_arr = read_tiff(tp_all)
+            dry_arr = read_tiff(tp_dry) if ok_dry else np.full_like(all_arr, np.nan)
+            ax.imshow(lumap_to_rgba_8cat(all_arr, dry_arr),
+                      extent=EXTENT, origin='upper', interpolation='nearest', zorder=1)
+
+        add_states(ax, gdf_states)
+        _style(ax)
+        label = SCENARIO_LABELS.get(scen, scen).split('\n')[0]
+        ax.set_title(label, fontsize=9, fontweight='bold', pad=3)
+
+    # Horizontal legend: 2 rows × 4 cols for 8 categories
+    handles = [mpatches.Patch(facecolor=hexc, label=lbl, edgecolor='none')
+               for _, (lbl, hexc) in LU_CAT_8.items()]
+    fig.legend(handles, [h.get_label() for h in handles],
+               loc='upper center',
+               bbox_to_anchor=(0.5, LEG_H / fig_h),
+               bbox_transform=fig.transFigure,
+               ncol=4, fontsize=8.5, frameon=False,
+               handlelength=1.0, handleheight=1.0,
+               handletextpad=0.4, columnspacing=1.0, borderpad=0)
+
+    out = os.path.join(OUTPUT_DIR, '03a_landuse_maps.svg')
+    fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
+    plt.close(fig)
+    print(f'Saved: {out}')
+
+
+# ── Figure B: 1×2 AG management maps (AgS1 + AgS2 only) ─────────────────────
+def save_agmgt_maps(gdf_states):
+    am_info  = _load_am_info()
+    am_plot  = {k: v for k, v in am_info.items() if 1 <= k <= 8}
+
+    asp    = (TIFF_TOP - TIFF_BOTTOM) / (TIFF_RIGHT - TIFF_LEFT)
+    MAP_W  = 4.4
+    MAP_H  = MAP_W * asp
+    WSPACE = 0.06
+    LEG_H  = 2.0
+
+    scens_2 = input_files[:2]   # AgS1, AgS2
+    fig_w   = 2 * MAP_W + WSPACE
+    fig_h   = MAP_H + LEG_H
+
+    fig = plt.figure(figsize=(fig_w, fig_h), facecolor='white')
+    gs  = gridspec.GridSpec(
+        1, 2, figure=fig,
+        left=0, right=1,
+        top=1, bottom=LEG_H / fig_h,
+        wspace=WSPACE / MAP_W,
+    )
+
+    all_ag_codes = list(CROPLAND | MOD_PAST | NAT_PAST | UNALLOC)
+
+    for col, scen in enumerate(scens_2):
+        ax = fig.add_subplot(gs[0, col])
+        fill_states(ax, gdf_states)
+
+        tp_all = get_lu_all(scen)
+        if tp_all and os.path.exists(tp_all):
+            lu_arr   = read_tiff(tp_all)
+            research = np.zeros(lu_arr.shape, dtype=bool)
+            for code in all_ag_codes:
+                research[lu_arr == code] = True
+            no_am_rgba = np.zeros((*lu_arr.shape, 4), dtype='float32')
+            r, g, b = _hex_rgb(NO_AM_COLOR)
+            no_am_rgba[research] = [r, g, b, 1.0]
+            ax.imshow(no_am_rgba, extent=EXTENT, origin='upper',
+                      interpolation='nearest', zorder=1)
+
+        tp_am = get_am_tiff(scen)
+        if tp_am and os.path.exists(tp_am):
+            ax.imshow(ammap_to_rgba(read_tiff(tp_am), am_plot),
+                      extent=EXTENT, origin='upper', interpolation='nearest', zorder=2)
+
+        add_states(ax, gdf_states)
+        _style(ax)
+        label = SCENARIO_LABELS.get(scen, scen).split('\n')[0]
+        ax.set_title(label, fontsize=9, fontweight='bold', pad=3)
+
+    handles = [
+        *[mpatches.Patch(facecolor=hexc, label=lbl, edgecolor='none')
+          for _, (lbl, hexc) in sorted(am_plot.items())],
+        mpatches.Patch(facecolor=NO_AM_COLOR, edgecolor='none',
+                       label='No agricultural management'),
+    ]
+    fig.legend(handles, [h.get_label() for h in handles],
+               loc='upper center',
+               bbox_to_anchor=(0.5, LEG_H / fig_h),
+               bbox_transform=fig.transFigure,
+               ncol=3, fontsize=8.5, frameon=False,
+               handlelength=1.0, handleheight=1.0,
+               handletextpad=0.4, columnspacing=1.0, borderpad=0)
+
+    out = os.path.join(OUTPUT_DIR, '03b_agmgt_maps.svg')
+    fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
+    plt.close(fig)
+    print(f'Saved: {out}')
+
+
+# ── Figure C: single non-ag map (AgS2) with side legend ──────────────────────
+def save_nonag_map(gdf_states):
+    asp    = (TIFF_TOP - TIFF_BOTTOM) / (TIFF_RIGHT - TIFF_LEFT)
+    MAP_W  = 5.0
+    MAP_H  = MAP_W * asp
+    LEG_W  = 3.5
+
+    scen  = input_files[1]   # AgS2: tree-planting scenario
+    fig_w = MAP_W + LEG_W
+    fig_h = MAP_H
+
+    fig = plt.figure(figsize=(fig_w, fig_h), facecolor='white')
+    gs  = gridspec.GridSpec(
+        1, 2, figure=fig,
+        left=0, right=1, top=1, bottom=0,
+        width_ratios=[MAP_W, LEG_W],
+        wspace=0.05,
+    )
+
+    ax_map = fig.add_subplot(gs[0, 0])
+    fill_states(ax_map, gdf_states)
+
+    tp = get_lu_all(scen)
+    if tp and os.path.exists(tp):
+        arr  = read_tiff(tp)
+        rgba = nonag_to_rgba(arr)
+        ax_map.imshow(rgba, extent=EXTENT, origin='upper',
+                      interpolation='nearest', zorder=1)
+
+    add_states(ax_map, gdf_states)
+    _style(ax_map)
+    label = SCENARIO_LABELS.get(scen, scen).split('\n')[0]
+    ax_map.set_title(label, fontsize=9, fontweight='bold', pad=3)
+
+    # Legend in the right panel (vertical / columnar)
+    ax_leg = fig.add_subplot(gs[0, 1])
+    ax_leg.axis('off')
+    handles = [mpatches.Patch(facecolor=hexc, label=lbl, edgecolor='none')
+               for _, (lbl, hexc) in NON_AG_INFO.items()]
+    ax_leg.legend(handles, [h.get_label() for h in handles],
+                  loc='center left', fontsize=8.5, frameon=False,
+                  handlelength=1.0, handleheight=1.0,
+                  handletextpad=0.4, labelspacing=0.6, borderpad=0)
+
+    out = os.path.join(OUTPUT_DIR, '03c_nonag_map.svg')
+    fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
+    plt.close(fig)
+    print(f'Saved: {out}')
+
+
+# ── Combined figure: panels (a), (b), (c) in one SVG ────────────────────────
+def save_combined_maps(gdf_states):
+    FONT_SIZE = 9
+    asp = (TIFF_TOP - TIFF_BOTTOM) / (TIFF_RIGHT - TIFF_LEFT)  # ≈ 0.8268
+
+    MAP_H  = 3.5
+    MAP_W  = MAP_H / asp      # ≈ 4.23"
+    WGAP   = 0.08             # horizontal gap between map columns
+    HGAP   = 0.08             # vertical gap between map rows in panel (a)
+    LEG_H_A = 1.05            # panel (a) legend height
+    LEG_H_B = 1.25            # panel (b) legend height
+    GAP_H  = 0.02             # blank gap between panels
+    LEG_W_C = 3.8             # panel (c) side-legend width
+
+    FIG_W = 2 * MAP_W + WGAP
+    hr    = [2 * MAP_H + HGAP, LEG_H_A, GAP_H, MAP_H, LEG_H_B, GAP_H, MAP_H]
+    FIG_H = sum(hr)
+
+    fig = plt.figure(figsize=(FIG_W, FIG_H), facecolor='white')
+    outer_gs = gridspec.GridSpec(
+        7, 1, figure=fig,
+        left=0.0, right=1.0, top=1.0, bottom=0.0,
+        height_ratios=hr, hspace=0.0,
+    )
+
+    # ── Panel (a): 2×2 LU maps ────────────────────────────────────────────────
+    gs_a = gridspec.GridSpecFromSubplotSpec(
+        2, 2, subplot_spec=outer_gs[0],
+        hspace=HGAP / MAP_H, wspace=WGAP / MAP_W,
+    )
+    first_a = None
+    for idx, scen in enumerate(input_files):
+        row, col = divmod(idx, 2)
+        ax = fig.add_subplot(gs_a[row, col])
+        if first_a is None:
+            first_a = ax
+        fill_states(ax, gdf_states)
+        tp_all = get_lu_all(scen)
+        tp_dry = get_lu_dry(scen)
+        ok_all = tp_all and os.path.exists(tp_all)
+        ok_dry = tp_dry and os.path.exists(tp_dry)
+        if ok_all:
+            all_arr = read_tiff(tp_all)
+            dry_arr = read_tiff(tp_dry) if ok_dry else np.full_like(all_arr, np.nan)
+            ax.imshow(lumap_to_rgba_8cat(all_arr, dry_arr),
+                      extent=EXTENT, origin='upper', interpolation='nearest', zorder=1)
+        add_states(ax, gdf_states)
+        _style(ax)
+        label = SCENARIO_LABELS.get(scen, scen).split('\n')[0]
+        ax.set_title(label, fontsize=FONT_SIZE, fontweight='bold', pad=3)
+
+    ax_leg_a = fig.add_subplot(outer_gs[1])
+    ax_leg_a.axis('off')
+    handles_a = [mpatches.Patch(facecolor=hexc, label=lbl, edgecolor='none')
+                 for k, (lbl, hexc) in LU_CAT_8.items() if k != 8]
+    ax_leg_a.legend(handles_a, [h.get_label() for h in handles_a],
+                    loc='upper center', ncol=4, fontsize=FONT_SIZE, frameon=False,
+                    handlelength=1.0, handleheight=1.0,
+                    handletextpad=0.4, columnspacing=1.0, borderpad=0)
+
+    # ── Panel (b): 1×2 AM maps ────────────────────────────────────────────────
+    am_info = _load_am_info()
+    am_plot = {k: v for k, v in am_info.items() if 1 <= k <= 8}
+    all_ag_codes = list(CROPLAND | MOD_PAST | NAT_PAST | UNALLOC)
+
+    gs_b = gridspec.GridSpecFromSubplotSpec(
+        1, 2, subplot_spec=outer_gs[3],
+        wspace=WGAP / MAP_W,
+    )
+    first_b = None
+    for col, scen in enumerate(input_files[:2]):
+        ax = fig.add_subplot(gs_b[0, col])
+        if first_b is None:
+            first_b = ax
+        fill_states(ax, gdf_states)
+        tp_all = get_lu_all(scen)
+        if tp_all and os.path.exists(tp_all):
+            lu_arr = read_tiff(tp_all)
+            research = np.zeros(lu_arr.shape, dtype=bool)
+            for code in all_ag_codes:
+                research[lu_arr == code] = True
+            no_am_rgba = np.zeros((*lu_arr.shape, 4), dtype='float32')
+            rc, gc, bc = _hex_rgb(NO_AM_COLOR)
+            no_am_rgba[research] = [rc, gc, bc, 1.0]
+            ax.imshow(no_am_rgba, extent=EXTENT, origin='upper',
+                      interpolation='nearest', zorder=1)
+        tp_am = get_am_tiff(scen)
+        if tp_am and os.path.exists(tp_am):
+            ax.imshow(ammap_to_rgba(read_tiff(tp_am), am_plot),
+                      extent=EXTENT, origin='upper', interpolation='nearest', zorder=2)
+        add_states(ax, gdf_states)
+        _style(ax)
+        label = SCENARIO_LABELS.get(scen, scen).split('\n')[0]
+        ax.set_title(label, fontsize=FONT_SIZE, fontweight='bold', pad=3)
+
+    ax_leg_b = fig.add_subplot(outer_gs[4])
+    ax_leg_b.axis('off')
+    handles_b = [
+        *[mpatches.Patch(facecolor=hexc, label=lbl, edgecolor='none')
+          for _, (lbl, hexc) in sorted(am_plot.items())],
+        mpatches.Patch(facecolor=NO_AM_COLOR, edgecolor='none',
+                       label='No agricultural management'),
+    ]
+    ax_leg_b.legend(handles_b, [h.get_label() for h in handles_b],
+                    loc='upper center', ncol=3, fontsize=FONT_SIZE, frameon=False,
+                    handlelength=1.0, handleheight=1.0,
+                    handletextpad=0.4, columnspacing=1.0, borderpad=0)
+
+    # ── Panel (c): single non-ag map (AgS2) + side legend ────────────────────
+    gs_c = gridspec.GridSpecFromSubplotSpec(
+        1, 2, subplot_spec=outer_gs[6],
+        width_ratios=[FIG_W - LEG_W_C - WGAP, LEG_W_C],
+        wspace=WGAP / MAP_W,
+    )
+    scen_c = input_files[1]   # AgS2
+    ax_c_map = fig.add_subplot(gs_c[0, 0])
+    fill_states(ax_c_map, gdf_states, color='#B7B7B7')
+    tp_c = get_lu_all(scen_c)
+    if tp_c and os.path.exists(tp_c):
+        arr  = read_tiff(tp_c)
+        rgba = nonag_to_rgba(arr)
+        ax_c_map.imshow(rgba, extent=EXTENT, origin='upper',
+                        interpolation='nearest', zorder=1)
+    add_states(ax_c_map, gdf_states)
+    _style(ax_c_map)
+    label_c = SCENARIO_LABELS.get(scen_c, scen_c).split('\n')[0]
+    ax_c_map.set_title(label_c, fontsize=FONT_SIZE, fontweight='bold', pad=3)
+    ax_c_leg = fig.add_subplot(gs_c[0, 1])
+    ax_c_leg.axis('off')
+    handles_c = [mpatches.Patch(facecolor=hexc, label=lbl, edgecolor='none')
+                 for _, (lbl, hexc) in NON_AG_INFO.items()]
+    handles_c.append(mpatches.Patch(facecolor='#DADADA', label='Agricultural land-use',
+                                    edgecolor='none'))
+    handles_c.append(mpatches.Patch(
+        facecolor='#B7B7B7',
+        label='Public and indigenous land, urban land,\nplantation forestry, and water bodies',
+        edgecolor='none'))
+    ax_c_leg.legend(handles_c, [h.get_label() for h in handles_c],
+                    loc='center left', fontsize=FONT_SIZE, frameon=False,
+                    handlelength=1.0, handleheight=1.0,
+                    handletextpad=0.4, labelspacing=0.6, borderpad=0)
+
+    fig.canvas.draw()
+    for ax, title in [(first_a, 'Agricultural land-use'),
+                      (first_b, 'Agricultural management'),
+                      (ax_c_map, 'Non-agricultural land-use')]:
+        pos = ax.get_position()
+        fig.text(0.5, pos.y1 + 0.012, title,
+                 ha='center', va='bottom',
+                 fontsize=FONT_SIZE + 4, fontfamily='Arial', fontweight='bold')
+
+    out = os.path.join(OUTPUT_DIR, '03_maps.svg')
+    fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
+    plt.close(fig)
+    print(f'Saved: {out}')
+
 
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(TIFF_DIR, exist_ok=True)
-
-    am_info    = _load_am_info()
     gdf_states = load_states()
-
-    # ── Step 1: extract all 8 tiffs first ────────────────────────────────────
-    tiff_lu = {}
-    tiff_am = {}
-    for scen in input_files:
-        tiff_lu[scen] = get_lu_tiff(scen)
-        tiff_am[scen] = get_am_tiff(scen)
-        lu_ok = tiff_lu[scen] and os.path.exists(tiff_lu[scen])
-        am_ok = tiff_am[scen] and os.path.exists(tiff_am[scen])
-        print(f'{scen}: lu={tiff_lu[scen] if lu_ok else "MISSING"}, '
-              f'am={tiff_am[scen] if am_ok else "MISSING"}')
-
-    n           = len(input_files)
-    asp         = (TIFF_TOP - TIFF_BOTTOM) / (TIFF_RIGHT - TIFF_LEFT)  # ≈ 0.827
-
-    MAP_W_IN   = 4.6
-    MAP_H_IN   = MAP_W_IN * asp
-    LABEL_W_IN = 0.24
-    WSPACE_IN  = 0.06
-    HSPACE_IN  = 0.06
-    TOP_IN     = 0.25
-    BOT_IN     = 1.95
-
-    fig_w = LABEL_W_IN + MAP_W_IN + WSPACE_IN + MAP_W_IN + 0.15
-    fig_h = TOP_IN + n * MAP_H_IN + (n - 1) * HSPACE_IN + BOT_IN
-
-    fig = plt.figure(figsize=(fig_w, fig_h), facecolor='white')
-
-    gs = gridspec.GridSpec(
-        n, 3,
-        figure=fig,
-        width_ratios=[LABEL_W_IN / MAP_W_IN, 1.0, 1.0],
-        left   = 0.0,
-        right  = 1.0,
-        top    = 1.0 - TOP_IN  / fig_h,
-        bottom = BOT_IN / fig_h,
-        wspace = WSPACE_IN / MAP_W_IN,
-        hspace = HSPACE_IN / MAP_H_IN,
-    )
-
-    for row, scen in enumerate(input_files):
-        short = SCENARIO_LABELS.get(scen, scen).split('\n')[0]
-
-        # ── Row label ────────────────────────────────────────────────────────
-        ax_lbl = fig.add_subplot(gs[row, 0])
-        ax_lbl.set_axis_off()
-        ax_lbl.text(0.68, 0.5, short,
-                    ha='center', va='center',
-                    transform=ax_lbl.transAxes,
-                    fontsize=9, rotation=90,
-                    fontweight='bold',
-                    clip_on=False)
-
-        def _style(ax):
-            ax.set_xticks([]); ax.set_yticks([])
-            ax.set_xlim(TIFF_LEFT, TIFF_RIGHT)
-            ax.set_ylim(TIFF_BOTTOM, TIFF_TOP)
-            ax.set_aspect('equal', adjustable='box')
-            for sp in ax.spines.values():
-                sp.set_visible(False)
-
-        # ── Land-use column ──────────────────────────────────────────────────
-        ax_lu = fig.add_subplot(gs[row, 1])
-        fill_states(ax_lu, gdf_states)           # grey background for non-LUTO land
-        tp = tiff_lu[scen]
-        if tp and os.path.exists(tp):
-            ax_lu.imshow(lumap_to_rgba(read_tiff(tp)),
-                         extent=EXTENT, origin='upper', interpolation='nearest',
-                         zorder=1)
-        add_states(ax_lu, gdf_states)
-        _style(ax_lu)
-
-        # ── AM column ────────────────────────────────────────────────────────
-        ax_am = fig.add_subplot(gs[row, 2])
-        # zorder=0: #BFBFBF fill for public/urban/water (all Australian land)
-        fill_states(ax_am, gdf_states)
-        # zorder=1: lighter grey for research area (LU cats 1-5) = "no AM used"
-        lu_tp = tiff_lu[scen]
-        if lu_tp and os.path.exists(lu_tp):
-            lu_arr = read_tiff(lu_tp)
-            research = np.zeros(lu_arr.shape, dtype=bool)
-            for code, cid in LU_CAT_MAP.items():
-                if cid in (1, 2, 3, 4, 5):
-                    research[lu_arr == code] = True
-            no_am_rgba = np.zeros((*lu_arr.shape, 4), dtype='float32')
-            r, g, b = _hex_rgb(NO_AM_COLOR)
-            no_am_rgba[research] = [r, g, b, 1.0]
-            ax_am.imshow(no_am_rgba, extent=EXTENT, origin='upper',
-                         interpolation='nearest', zorder=1)
-        # zorder=2: actual AM colors where AM is applied
-        tp = tiff_am[scen]
-        if tp and os.path.exists(tp):
-            ax_am.imshow(ammap_to_rgba(read_tiff(tp), am_info),
-                         extent=EXTENT, origin='upper', interpolation='nearest',
-                         zorder=2)
-        add_states(ax_am, gdf_states)
-        _style(ax_am)
-
-    # ── Column titles ─────────────────────────────────────────────────────────
-    total = LABEL_W_IN / MAP_W_IN + 2.0
-    cf    = np.array([LABEL_W_IN / MAP_W_IN, 1.0, 1.0]) / total
-    x_lu  = cf[0] + cf[1] / 2
-    x_am  = cf[0] + cf[1] + cf[2] / 2
-    ty    = 1.0 - TOP_IN / fig_h  # just above gridspec top
-
-    fig.text(x_lu, ty, 'Land-use',
-             ha='center', va='bottom', fontsize=9)
-    fig.text(x_am, ty, 'Agricultural management',
-             ha='center', va='bottom', fontsize=9)
-
-    # ── Legends (no titles, equal spacing, AM = 8 types only) ────────────────
-    lu_handles = [
-        mpatches.Patch(facecolor=hexc, label=lbl, edgecolor='none')
-        for _, (lbl, hexc) in LU_CAT_INFO.items()
-    ]
-    am_handles = [
-        *[mpatches.Patch(facecolor=hexc, label=lbl, edgecolor='none')
-          for code, (lbl, hexc) in sorted(am_info.items())
-          if 1 <= code <= 8],
-        mpatches.Patch(facecolor=NO_AM_COLOR, edgecolor='none',
-                       label='No agricultural management'),
-    ]
-
-    leg_y = BOT_IN / fig_h  # = gridspec bottom; legends anchor at top and extend down
-    fig.legend(lu_handles, [h.get_label() for h in lu_handles],
-               loc='upper center',
-               bbox_to_anchor=(x_lu, leg_y), bbox_transform=fig.transFigure,
-               ncol=1, fontsize=9, frameon=False,
-               handlelength=1.0, handleheight=1.0, borderpad=0)
-    fig.legend(am_handles, [h.get_label() for h in am_handles],
-               loc='upper center',
-               bbox_to_anchor=(x_am, leg_y), bbox_transform=fig.transFigure,
-               ncol=1, fontsize=9, frameon=False,
-               handlelength=1.0, handleheight=1.0, borderpad=0)
-
-    out = os.path.join(OUTPUT_DIR, '03_land use and ag management map.svg')
-    fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
-    plt.close(fig)
-    print(f'Saved: {out}')
+    save_combined_maps(gdf_states)
 
 
 if __name__ == '__main__':

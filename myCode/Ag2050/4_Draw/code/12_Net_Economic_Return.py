@@ -124,7 +124,9 @@ def prepare_land_use():
             if not cost_ag.empty:
                 cost_ag['Value ($)'] = cost_ag['Value ($)'] * -1
             economics_ag = pd.concat([revenue_ag, cost_ag], ignore_index=True)
-            economics_ag['category'] = economics_ag['Land-use'].map(classify_land_use)
+            economics_ag['category'] = economics_ag.apply(
+                lambda r: classify_land_use(r['Land-use'], r['Water_supply']), axis=1
+            )
             economics_ag = economics_ag.dropna(subset=['category'])
             economics_ag = economics_ag.groupby(['Year', 'category'], as_index=False)['Value ($)'].sum()
             for _, row in economics_ag.iterrows():
@@ -153,7 +155,7 @@ def prepare_land_use():
                 rows.append({
                     'year': int(row['Year']),
                     'scenario': scenario,
-                    'category': 'Non-agricultural land',
+                    'category': 'Non-agricultural land-use',
                     'value': float(row['Value ($)']) / 1e9,
                 })
 
@@ -221,7 +223,7 @@ def main():
         'Net economic returns (Billion AU$ yr⁻¹)',
         '12_net_economic_return.svg',
         total_legend_label='Net economic return',
-        y_label_x=0.028,
+        y_label_x=0.020,
     )
 
 

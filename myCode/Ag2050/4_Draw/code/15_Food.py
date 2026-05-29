@@ -64,7 +64,9 @@ def prepare_land_use():
         food = food.copy()
 
         food_ag = food.query('`Landuse Type` == "Agricultural Landuse"').copy()
-        food_ag['category'] = food_ag['Landuse'].map(classify_land_use)
+        food_ag['category'] = food_ag.apply(
+            lambda r: classify_land_use(r['Landuse'], r['Land management']), axis=1
+        )
         food_ag = food_ag.dropna(subset=['category'])
         food_ag = food_ag.groupby(['Year', 'category'], as_index=False)[VALUE_COL].sum()
         for _, row in food_ag.iterrows():
@@ -83,7 +85,7 @@ def prepare_land_use():
                 rows.append({
                     'year': int(row['Year']),
                     'scenario': scenario,
-                    'category': 'Non-agricultural land',
+                    'category': 'Non-agricultural land-use',
                     'value': float(row[VALUE_COL]) / 1e6,
                 })
 
@@ -135,7 +137,7 @@ def main():
         am_colors,
         'Agri-food production (Mt yr⁻¹)',
         '15_food.svg',
-        y_label_x=0.030,
+        y_label_x=0.020,
     )
 
 

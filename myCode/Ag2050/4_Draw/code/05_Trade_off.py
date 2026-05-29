@@ -486,6 +486,21 @@ def _draw_sector_grid(ax, theta: float, width: float, score: float, radii: list[
         )
 
 
+def _draw_sector_separators(ax, boundaries: np.ndarray, width: float, radius: float = 1.0):
+    for theta in boundaries:
+        ax.bar(
+            theta,
+            radius,
+            width=width,
+            bottom=0.0,
+            color="white",
+            edgecolor="white",
+            linewidth=0,
+            align="center",
+            zorder=7,
+        )
+
+
 
 
 def _draw_pointed_gradient_legend(fig, cmap):
@@ -536,6 +551,8 @@ def plot_circular_synthesis(raw_values: pd.DataFrame, score_values: pd.DataFrame
     sector_width = (2 * np.pi) / n_indicators
     thetas = np.linspace(0, 2 * np.pi, n_indicators, endpoint=False)
     bar_width = sector_width * 0.94
+    separator_width = sector_width * 0.075
+    sector_boundaries = (thetas + sector_width / 2) % (2 * np.pi)
     radial_grid = [0.25, 0.5, 0.75, 1.0]
     label_jobs: list[tuple[object, float, IndicatorSpec, float, float]] = []
     title_artists = []
@@ -566,6 +583,20 @@ def plot_circular_synthesis(raw_values: pd.DataFrame, score_values: pd.DataFrame
             _draw_sector_grid(ax, theta, bar_width, float(score), radial_grid)
             label_jobs.append((ax, theta, spec, float(score), indicator_value))
 
+        theta_ring = np.linspace(0, 2 * np.pi, 361)
+        ax.fill(theta_ring, np.ones_like(theta_ring), color="#f0f0f0", zorder=0, linewidth=0)
+        for radius in radial_grid:
+            ax.plot(
+                theta_ring,
+                np.full_like(theta_ring, radius),
+                color="#d6d2cb",
+                linewidth=0.9,
+                zorder=6,
+            )
+        # Extend beyond the performance radius so the separators cut through
+        # the full stroke width of the outermost ring.
+        _draw_sector_separators(ax, sector_boundaries, separator_width, radius=1.06)
+
         t = ax.text(
             0.5, 0.97, SCENARIO_PANEL_LABELS.get(scenario, scenario),
             transform=ax.transAxes,
@@ -595,8 +626,8 @@ def plot_circular_synthesis(raw_values: pd.DataFrame, score_values: pd.DataFrame
         for ax, theta, spec, score, indicator_value in jobs:
             rotation = _sector_text_rotation(theta)
             edge = float(np.clip(score, 0.0, 1.0))
-            value_start_r = edge + 0.07
-            label_start_r = edge + 0.20
+            value_start_r = max(edge, 1.0) + 0.07
+            label_start_r = max(edge, 1.0) + 0.20
             _place_text_pair_outward(
                 ax, renderer, panel_occupied, theta,
                 value_start_r, label_start_r,
@@ -608,20 +639,17 @@ def plot_circular_synthesis(raw_values: pd.DataFrame, score_values: pd.DataFrame
     _draw_pointed_gradient_legend(fig, base_cmap)
 
     svg_path = output_dir / "05_scenario_synthesis_circular.svg"
-    png_path = output_dir / "05_scenario_synthesis_circular.png"
     fig.savefig(svg_path, dpi=600, bbox_inches="tight")
-    fig.savefig(png_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    return svg_path, png_path
+    return svg_path
 
 
 def main():
     raw_values, score_values, long_df = build_summary_tables()
     table_path = save_summary_tables(raw_values, score_values, long_df)
-    svg_path, png_path = plot_circular_synthesis(raw_values, score_values)
+    svg_path = plot_circular_synthesis(raw_values, score_values)
     print(f"Saved: {table_path}")
     print(f"Saved: {svg_path}")
-    print(f"Saved: {png_path}")
 
 
 if __name__ == "__main__":

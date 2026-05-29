@@ -10,15 +10,19 @@ import os
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.gridspec as gridspec
+import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import pandas as pd
+import xarray as xr
 
 from tools.two_row_figure import (
     RENAME_AM_NON_AG,
+    export_long_tables,
     input_files,
     load_report_source_csv,
 )
+from tools.data_helper import get_path
 from tools.parameters import OUTPUT_DIR, SCENARIO_LABELS, font_size
 from tools.plot_helper import calc_y_range, set_plot_style, stacked_area_pos_neg
 
@@ -55,9 +59,12 @@ BIO_COLORS = {
 }
 
 FOOD_COLORS = {
-    'Non-agricultural land-use':  '#4eb5a0',
-    'Agricultural management':    '#c97bb5',
-    'Agricultural land-use':      '#e8a038',
+    'Meat & live animals':      '#9B4528',
+    'Livestock products':       '#CA927E',
+    'Grains & oilseeds':        '#EB8500',
+    'All other crops':          '#F3BD8B',
+    'Fruit & vegetables':       '#5A8529',
+    'All other horticulture':   '#D1D9BF',
 }
 
 WATER_COLORS = {
@@ -65,15 +72,24 @@ WATER_COLORS = {
     'Climate change impact':     '#d95f02',
     'Dryland agriculture':       '#92c5de',
     'Irrigated agriculture':     '#2166ac',
-    'Agricultural management':   '#619b8a',
+    'Agricultural management':   '#B1A7C6',
 }
 
 WATER_LEGEND_ORDER = [
     'Agricultural management',
-    'Non-agricultural land-use',
-    'Climate change impact',
     'Dryland agriculture',
     'Irrigated agriculture',
+    'Non-agricultural land-use',
+    'Climate change impact',
+]
+
+FOOD_LEGEND_ORDER = [
+    'Meat & live animals',
+    'Livestock products',
+    'Grains & oilseeds',
+    'All other crops',
+    'Fruit & vegetables',
+    'All other horticulture',
 ]
 
 # (label, colors, unit_label_two_lines, legend_order_or_None)
@@ -81,8 +97,8 @@ ROW_CONFIG = [
     ('NER',          NER_COLORS,   'Net economic returns\n(Billion AU$ yr⁻¹)', NER_LEGEND_ORDER),
     ('GHG',          GHG_COLORS,   'GHG emissions\n(MtCO₂e yr⁻¹)',       None),
     ('Biodiversity', BIO_COLORS,   'Biodiversity contribution-\nweighted area (Mha yr⁻¹)', None),
-    ('Agri-food',    FOOD_COLORS,  'Agri-food production\n(Mt yr⁻¹)',     None),
-    ('Water',        WATER_COLORS, 'Change in water yield\nrelative to 2010 (GL yr⁻¹)', None),
+    ('Agri-food',    FOOD_COLORS,  'Agri-food production\n(Mt yr⁻¹)',     FOOD_LEGEND_ORDER),
+    ('Water',        WATER_COLORS, 'Difference in water yield\nrelative to 2010 (GL yr⁻¹)', WATER_LEGEND_ORDER),
 ]
 
 # ── Data preparation ───────────────────────────────────────────────────────────
@@ -215,32 +231,100 @@ def prepare_bio():
 def prepare_food():
     rows = []
     vcol = 'Production (tonnes, KL)'
-    cat_map = {
-        'Agricultural Landuse':     'Agricultural land-use',
-        'Agricultural Management':  'Agricultural management',
-        'Non-agricultural Landuse': 'Non-agricultural land-use',
+    landuse_to_food_group = {
+        'Beef - modified land': 'Meat & live animals',
+        'Beef - natural land': 'Meat & live animals',
+        'Beef Agroforestry': 'Meat & live animals',
+        'Beef Carbon Plantings (Belt)': 'Meat & live animals',
+        'Sheep - modified land': 'Meat & live animals',
+        'Sheep - natural land': 'Meat & live animals',
+        'Sheep Agroforestry': 'Meat & live animals',
+        'Sheep Carbon Plantings (Belt)': 'Meat & live animals',
+        'Dairy - modified land': 'Livestock products',
+        'Dairy - natural land': 'Livestock products',
+        'Summer cereals': 'Grains & oilseeds',
+        'Winter cereals': 'Grains & oilseeds',
+        'Summer legumes': 'Grains & oilseeds',
+        'Winter legumes': 'Grains & oilseeds',
+        'Summer oilseeds': 'Grains & oilseeds',
+        'Winter oilseeds': 'Grains & oilseeds',
+        'Rice': 'Grains & oilseeds',
+        'Cotton': 'All other crops',
+        'Hay': 'All other crops',
+        'Other non-cereal crops': 'All other crops',
+        'Sugar': 'All other crops',
+        'Apples': 'Fruit & vegetables',
+        'Citrus': 'Fruit & vegetables',
+        'Grapes': 'Fruit & vegetables',
+        'Pears': 'Fruit & vegetables',
+        'Plantation fruit': 'Fruit & vegetables',
+        'Stone fruit': 'Fruit & vegetables',
+        'Tropical stone fruit': 'Fruit & vegetables',
+        'Vegetables': 'Fruit & vegetables',
+        'Nuts': 'All other horticulture',
     }
     for scenario in input_files:
         food = load_report_source_csv(scenario, 'quantity_production_kt_separate')
         if food.empty:
             continue
-        for raw, cat in cat_map.items():
-            data = food.query('`Landuse Type` == @raw').groupby('Year', as_index=False)[vcol].sum()
-            for _, row in data.iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario,
-                             'category': cat, 'value': float(row[vcol]) / 1e6})
+        food = food.copy()
+        food['category'] = food['Landuse'].map(landuse_to_food_group)
+        food = food.dropna(subset=['category'])
+        data = food.groupby(['Year', 'category'], as_index=False)[vcol].sum()
+        for _, row in data.iterrows():
+            rows.append({'year': int(row['Year']), 'scenario': scenario,
+                         'category': row['category'], 'value': float(row[vcol]) / 1e6})
     return pd.DataFrame(rows)
 
 
-def _subtract_2010(df):
-    if df.empty:
-        return df
-    baseline = df[df['year'] == 2010].set_index(['scenario', 'category'])['value']
-    df = df.copy()
-    df['value'] = df.apply(
-        lambda r: r['value'] - baseline.get((r['scenario'], r['category']), 0.0), axis=1
-    )
-    return df
+def _load_water_correction(base_path):
+    """
+    Per-cell attribution correction for water yield.
+
+    For each year, identifies cells that have non-ag land-use and returns their
+    total 2010 ag water yield split into (dryland_ML, irrigated_ML).
+
+    This correction re-attributes the baseline yield from "Dryland/Irrigated
+    agriculture" to "Non-agricultural land-use" so the non-ag delta correctly
+    shows the net effect of land conversion (typically negative for tree planting).
+    """
+    nc_ag10 = os.path.join(base_path, 'out_2010', 'xr_water_yield_ag_2010.nc')
+    if not os.path.exists(nc_ag10):
+        return {}
+    try:
+        ds = xr.open_dataset(nc_ag10)
+        data = ds['data'].values   # (cell, layer)
+        n_lu = len(ds.lu)          # 29: 'ALL' + 28 specific land-uses
+        # layer = lm_idx * n_lu + lu_idx  (lm: 0=ALL, 1=dry, 2=irr; lu_idx=0 for ALL)
+        ag10_dry = data[:, n_lu]       # lm=dry, lu=ALL
+        ag10_irr = data[:, 2 * n_lu]   # lm=irr, lu=ALL
+        ds.close()
+    except Exception:
+        return {}
+
+    corrections = {}
+    for entry in os.scandir(base_path):
+        if not (entry.is_dir() and entry.name.startswith('out_')):
+            continue
+        try:
+            year = int(entry.name[4:])
+        except ValueError:
+            continue
+        if year == 2010:
+            corrections[year] = (0.0, 0.0)
+            continue
+        nc_nag = os.path.join(entry.path, f'xr_water_yield_non_ag_{year}.nc')
+        if not os.path.exists(nc_nag):
+            corrections[year] = (0.0, 0.0)
+            continue
+        try:
+            ds_nag = xr.open_dataset(nc_nag)
+            mask = ds_nag['data'].values[:, 0] > 0   # lu=ALL layer; True where non-ag exists
+            ds_nag.close()
+            corrections[year] = (float(ag10_dry[mask].sum()), float(ag10_irr[mask].sum()))
+        except Exception:
+            corrections[year] = (0.0, 0.0)
+    return corrections
 
 
 def prepare_water():
@@ -275,17 +359,41 @@ def prepare_water():
         agmgt_d  = {} if agmgt.empty  else agmgt.set_index('Year')[vcol].to_dict()
         non_ag_d = {} if non_ag.empty else non_ag.set_index('Year')[vcol].to_dict()
 
-        for year in sorted(set(irr_d) | set(dry_d) | set(agmgt_d) | set(non_ag_d) | set(cci_by_year)):
-            rows.append({'year': int(year), 'scenario': scenario, 'category': 'Irrigated agriculture',     'value': irr_d.get(year, 0.0) / 1e3})
-            rows.append({'year': int(year), 'scenario': scenario, 'category': 'Dryland agriculture',       'value': dry_d.get(year, 0.0) / 1e3})
-            rows.append({'year': int(year), 'scenario': scenario, 'category': 'Climate change impact',     'value': cci_by_year.get(year, 0.0)})
-            rows.append({'year': int(year), 'scenario': scenario, 'category': 'Agricultural management',   'value': agmgt_d.get(year, 0.0) / 1e3})
-            rows.append({'year': int(year), 'scenario': scenario, 'category': 'Non-agricultural land-use', 'value': non_ag_d.get(year, 0.0) / 1e3})
+        # 2010 baselines for delta calculation
+        dry_2010   = dry_d.get(2010, 0.0)
+        irr_2010   = irr_d.get(2010, 0.0)
+        agmgt_2010 = agmgt_d.get(2010, 0.0)
 
-    df = pd.DataFrame(rows)
-    climate = df[df['category'] == 'Climate change impact'].copy()
-    rest    = _subtract_2010(df[df['category'] != 'Climate change impact'].copy())
-    return pd.concat([rest, climate], ignore_index=True)
+        # Per-cell correction: for each year, get the 2010 ag yield of cells now non-ag.
+        # Corrected non-ag delta  = (non_ag_yield_y) − (2010 ag yield of those cells)
+        # Corrected dryland delta = (dry_yield_y − dry_2010) + dry_corr
+        # Corrected irrigated delta = (irr_yield_y − irr_2010) + irr_corr
+        # This ensures the total water change is conserved while removing the
+        # artificial positive contribution from 2010-baseline = 0 for non-ag.
+        try:
+            corrections = _load_water_correction(get_path(scenario))
+        except Exception:
+            corrections = {}
+
+        for year in sorted(set(irr_d) | set(dry_d) | set(agmgt_d) | set(non_ag_d) | set(cci_by_year)):
+            dry_corr, irr_corr = corrections.get(int(year), (0.0, 0.0))
+            rows.append({'year': int(year), 'scenario': scenario,
+                         'category': 'Irrigated agriculture',
+                         'value': (irr_d.get(year, 0.0) - irr_2010 + irr_corr) / 1e3})
+            rows.append({'year': int(year), 'scenario': scenario,
+                         'category': 'Dryland agriculture',
+                         'value': (dry_d.get(year, 0.0) - dry_2010 + dry_corr) / 1e3})
+            rows.append({'year': int(year), 'scenario': scenario,
+                         'category': 'Agricultural management',
+                         'value': (agmgt_d.get(year, 0.0) - agmgt_2010) / 1e3})
+            rows.append({'year': int(year), 'scenario': scenario,
+                         'category': 'Non-agricultural land-use',
+                         'value': (non_ag_d.get(year, 0.0) - dry_corr - irr_corr) / 1e3})
+            rows.append({'year': int(year), 'scenario': scenario,
+                         'category': 'Climate change impact',
+                         'value': cci_by_year.get(year, 0.0)})
+
+    return pd.DataFrame(rows)
 
 
 # ── Figure ─────────────────────────────────────────────────────────────────────
@@ -301,7 +409,7 @@ def _add_row_unit_label(fig, x, y, text):
 
 def _draw_indicators_row(fig, gs, row_idx, df_long, colors, y_range):
     years = list(range(2010, 2051))
-    cats  = list(colors.keys())
+    cats  = sorted(colors.keys(), reverse=True)  # reverse-alpha: Z=bottom, A=top of positive stack
     axes  = []
     for col_idx, scenario in enumerate(input_files):
         ax = (fig.add_subplot(gs[row_idx, col_idx]) if col_idx == 0
@@ -318,6 +426,14 @@ def _draw_indicators_row(fig, gs, row_idx, df_long, colors, y_range):
         stacked_area_pos_neg(
             ax, df_wide, colors=colors, alpha=0.60,
             title_name='', ylabel='', y_ticks_all=y_range, show_legend=False,
+        )
+        total = df_wide.fillna(0).sum(axis=1)
+        ax.plot(
+            years,
+            total.values,
+            color='black',
+            linewidth=1.5,
+            zorder=60,
         )
         ax.plot([0, 1], [0, 0], transform=ax.transAxes,
                 color='black', linewidth=1.2, zorder=50, clip_on=False)
@@ -345,23 +461,24 @@ def save_indicators_figure(all_dfs):
     fig.subplots_adjust(left=0.13, right=0.95, top=0.94, bottom=0.07)
 
     all_row_axes = []
-    for row_idx, (_, colors, _, legend_order) in enumerate(ROW_CONFIG):
+    for row_idx, (_, colors, _, _legend_order) in enumerate(ROW_CONFIG):
         df = all_dfs[row_idx]
         df = df[df['category'].isin(colors)].copy()
         y_range = calc_y_range(df, 5)
         axes = _draw_indicators_row(fig, gs, row_idx, df, colors, y_range)
         all_row_axes.append(axes)
 
-        # Legend — order matches visual top-to-bottom in chart
+        # Legend — use _legend_order if provided, otherwise A-Z alphabetical
         legend_ax = fig.add_subplot(gs[row_idx, 4])
-        if legend_order is not None:
-            ordered_cats = [c for c in legend_order if c in colors]
+        patch_map = {cat: mpatches.Patch(facecolor=colors[cat], edgecolor='none', label=cat)
+                     for cat in colors}
+        if _legend_order:
+            ordered = [patch_map[k] for k in _legend_order if k in patch_map]
+            ordered += [patch_map[k] for k in sorted(patch_map) if k not in set(_legend_order)]
+            handles = ordered
         else:
-            ordered_cats = list(reversed(colors.keys()))
-        handles = [
-            mpatches.Patch(facecolor=colors[cat], edgecolor='none', label=cat)
-            for cat in ordered_cats
-        ]
+            handles = sorted(patch_map.values(), key=lambda h: h.get_label())
+        handles.append(mlines.Line2D([], [], color='black', linewidth=1.5, label='Sum'))
         legend_ax.axis('off')
         legend_ax.legend(handles, [h.get_label() for h in handles],
                          loc='center left', ncol=1, frameon=False,
@@ -401,14 +518,20 @@ def save_indicators_figure(all_dfs):
 
 
 def main():
-    dfs = [
-        prepare_ner(),
-        prepare_ghg(),
-        prepare_bio(),
-        prepare_food(),
-        prepare_water(),
-    ]
-    save_indicators_figure(dfs)
+    ner   = prepare_ner()
+    ghg   = prepare_ghg()
+    bio   = prepare_bio()
+    food  = prepare_food()
+    water = prepare_water()
+    export_long_tables(
+        '04_indicators_long_tables.xlsx',
+        net_economic_return=ner,
+        ghg=ghg,
+        biodiversity=bio,
+        food=food,
+        water=water,
+    )
+    save_indicators_figure([ner, ghg, bio, food, water])
 
 
 if __name__ == '__main__':

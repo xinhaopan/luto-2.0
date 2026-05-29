@@ -19,7 +19,7 @@ from matplotlib.ticker import FuncFormatter, MaxNLocator
 import pandas as pd
 
 from tools.parameters import OUTPUT_DIR, font_size, SCENARIO_LABELS
-from tools.two_row_figure import _add_vertical_unit_label
+from tools.two_row_figure import _add_vertical_unit_label, export_long_tables
 
 # ── Scenario groups ───────────────────────────────────────────────────────────
 # Each entry: (scenario_key, panel_label)
@@ -32,8 +32,10 @@ SCENARIO_GROUPS = [
 ]
 
 # ── Stack colors ──────────────────────────────────────────────────────────────
+# Imports are shown as NEGATIVE (below zero) so the net positive area equals
+# All_demand = domestic + exports + feed − imports, matching LUTO's production target.
 COLORS = ['#66c2a5', '#fcbd62', '#bda0cb', '#fc8d62']
-LABELS = ['domestic', 'exports', 'feed', 'imports']
+LABELS = ['Domestic', 'Exports', 'Feed', 'Imports']
 OFF_LAND_COMMODITIES = {'aquaculture', 'chicken', 'eggs', 'pork'}
 
 N_ROWS_G = 13
@@ -101,6 +103,35 @@ def draw_figure():
     df_raw      = load_demand()
     commodities = get_commodities(df_raw)[:N_ROWS_G * N_COLS_G]
 
+    # Export filtered long-format demand table to Excel
+    long_rows = []
+    for scen_key, scen_label in SCENARIO_GROUPS:
+        sub = prepare(df_raw, scen_key)
+        sub = sub[sub['SPREAD_Commodity'].isin(commodities)]
+        for _, row in sub.iterrows():
+            for component in ('domestic', 'exports', 'feed', 'imports'):
+                long_rows.append({
+                    'scenario': f'Run_{scen_key}',
+                    'year':     int(row['Year']),
+                    'commodity': row['SPREAD_Commodity'],
+                    'category':  component,
+                    'value':     float(row[component]) / 1e6,  # t → Mt
+                })
+            # All_demand = domestic + exports + feed − imports (LUTO's production target)
+            all_d = sum(float(row[c]) for c in ('domestic', 'exports', 'feed')
+                        if pd.notna(row[c])) - (float(row['imports']) if pd.notna(row['imports']) else 0)
+            long_rows.append({
+                'scenario': f'Run_{scen_key}',
+                'year':     int(row['Year']),
+                'commodity': row['SPREAD_Commodity'],
+                'category':  'All_demand (net)',
+                'value':     all_d / 1e6,
+            })
+    export_long_tables(
+        '11_demand_long_tables.xlsx',
+        demand=pd.DataFrame(long_rows),
+    )
+
     plt.rcParams.update({
         'font.family':     'Arial',
         'font.sans-serif': ['Arial'],
@@ -127,6 +158,7 @@ def draw_figure():
 
     first_row_edge  = []   # (ax_first_in_row, ax_last_in_row) for title placement
     bottom_row_axes = []   # bottom-row axes for x-label ha adjustment
+    ref_axes        = {}   # c_idx -> ax from scen_idx==0, used for sharey
 
     for scen_idx, (scen_key, _) in enumerate(SCENARIO_GROUPS):
         sub_df = prepare(df_raw, scen_key)
@@ -144,7 +176,13 @@ def draw_figure():
             r = c_idx // N_COLS_G
             c = c_idx % N_COLS_G
 
-            ax = fig.add_subplot(inner[r, c])
+            # Share y-axis with the same commodity in scenario 0
+            if scen_idx == 0:
+                ax = fig.add_subplot(inner[r, c])
+                ref_axes[c_idx] = ax
+            else:
+                ax = fig.add_subplot(inner[r, c], sharey=ref_axes[c_idx])
+                ax.tick_params(axis='y', labelleft=False)
 
             if r == 0:
                 if c == 0:
@@ -158,19 +196,27 @@ def draw_figure():
                 agg = (comm_sub.groupby('Year')[['domestic', 'exports', 'feed', 'imports']]
                        .sum()
                        .reindex(YEARS, fill_value=0)
+                       .fillna(0)
                        / 1e6)                          # → Mt yr⁻¹
+                # Positive stack: domestic + exports + feed (= what Australia must produce)
                 ax.stackplot(
                     YEARS,
                     agg['domestic'].values,
                     agg['exports'].values,
                     agg['feed'].values,
-                    agg['imports'].values,
-                    colors=COLORS,
+                    colors=COLORS[:3],
+                    alpha=0.85,
+                )
+                # Negative stack: imports shown below zero (offset against production requirement)
+                ax.stackplot(
+                    YEARS,
+                    -agg['imports'].values,
+                    colors=[COLORS[3]],
                     alpha=0.85,
                 )
             ax.axhline(0, color='black', linewidth=0.4, zorder=5)
 
-            ax.set_title(commodity, fontsize=comm_fs, pad=5,
+            ax.set_title(commodity.title(), fontsize=comm_fs, pad=5,
                          fontfamily='Arial', loc='center')
 
             # X-axis: 2010 and 2050, labels set centrally, ha adjusted after draw
@@ -181,10 +227,11 @@ def draw_figure():
             else:
                 ax.set_xticklabels([])
 
-            ax.tick_params(axis='y', labelsize=tick_fs, length=2, pad=2)
             ax.tick_params(axis='x', length=2, pad=4)
-            ax.yaxis.set_major_locator(MaxNLocator(nbins=3, min_n_ticks=2))
-            ax.yaxis.set_major_formatter(FuncFormatter(_compact_tick_label))
+            if scen_idx == 0:
+                ax.tick_params(axis='y', labelsize=tick_fs, length=2, pad=2)
+                ax.yaxis.set_major_locator(MaxNLocator(nbins=3, min_n_ticks=2))
+                ax.yaxis.set_major_formatter(FuncFormatter(_compact_tick_label))
 
         first_row_edge.append((ax_first, ax_last))
 
@@ -221,7 +268,7 @@ def draw_figure():
         for col, lbl in zip(COLORS, LABELS)
     ]
     ax_leg.legend(
-        handles, LABELS,
+        handles, [h.get_label() for h in handles],
         loc='center',
         bbox_to_anchor=(0.5, 0.1),
         ncol=len(LABELS),

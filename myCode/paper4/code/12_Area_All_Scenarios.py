@@ -47,7 +47,7 @@ SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
 NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
-MODIFIED_LIVESTOCK_COLOR = "#F77B00"
+MODIFIED_LIVESTOCK_COLOR = "#762500"
 
 plt.rcParams.update({
     "font.family": "sans-serif",

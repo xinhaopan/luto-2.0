@@ -12,12 +12,10 @@
 #     `luto/solvers/input_data.py`.
 #   - In that solver pathway, biodiversity payment is monetised as
 #     `bio_score x bio_price` before the economic objective is formed.
-#   - Archived `xr_economics_*_profit` outputs can be used directly for the
-#     carbon-price slice because carbon pricing is already embedded there.
-#   - For the biodiversity-price slice in these archived paper4 runs, we do not
-#     assume biodiversity payment is already included in `xr_economics_*_profit`.
-#     To match solver-side accounting, this script adds it back explicitly at the
-#     category level using absolute 2025 biodiversity contribution.
+#   - Archived `xr_economics_*_profit` outputs already include price-linked
+#     revenue, including biodiversity-price revenue, so this absolute composition
+#     figure uses those profit layers directly and does not add an extra
+#     biodiversity payment.
 # ==============================================================================
 
 import io
@@ -62,7 +60,7 @@ SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
 NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
-MODIFIED_LIVESTOCK_COLOR = "#F77B00"
+MODIFIED_LIVESTOCK_COLOR = "#762500"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -76,7 +74,7 @@ plt.rcParams.update({
     "mathtext.fontset": "stixsans",
 })
 
-ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS = True
+ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS = False
 
 NON_AG_EXCLUDE = {
     "agriculturallanduse",
@@ -349,7 +347,7 @@ def collect_slice_rows(run_map, price_vals, varying_key):
                 total_net_econ += net_econ_2025_baud
 
                 rows.append({
-                    "AccountingMode": "Absolute2025",
+                    "AccountingMode": "Absolute2025ArchivedProfit",
                     "PriceType": price_type,
                     "Price": price,
                     "AreaType": area_type,
@@ -393,7 +391,7 @@ def load_cache():
     if not required_columns.issubset(df_long.columns):
         print("Cached net economic data schema is outdated; rebuilding.")
         return None
-    if set(df_long["AccountingMode"]) != {"Absolute2025"}:
+    if set(df_long["AccountingMode"]) != {"Absolute2025ArchivedProfit"}:
         print("Cached net economic data uses relative accounting; rebuilding.")
         return None
     if OLD_LIVESTOCK_LABEL in set(df_long["Category"]):

@@ -25,8 +25,8 @@ RENAME_AM = {
     "Savanna Burning": "Early dry-season savanna burning",
     "AgTech EI": "Agricultural technology (energy)",
     "Biochar": "Biochar (soil amendment)",
-    "HIR - Beef": "Human-induced regeneration (Beef)",
-    "HIR - Sheep": "Human-induced regeneration (Sheep)",
+    "HIR - Beef": "Managed regeneration (beef)",
+    "HIR - Sheep": "Managed regeneration (sheep)",
     "Utility Solar PV": "Utility Solar PV",
     "Onshore Wind": "Onshore wind",
 }
@@ -46,10 +46,13 @@ RENAME_NON_AG = {
 RENAME_AM_NON_AG = {**RENAME_AM, **RENAME_NON_AG}
 
 LU_COLORS = {
-    "Cropland and horticulture": "#AECB75",
-    "Grazing (modified pastures)": "#762400",
-    "Grazing (native vegetation)": "#C4996B",
-    "Non-agricultural land": "#3A7F4A",
+    "Dryland cropland and horticulture": "#aecb75",
+    "Irrigated cropland and horticulture": "#83b5ff",
+    "Dryland grazing (modified pastures)": "#762400",
+    "Irrigated grazing (modified pastures)": "#c4669b",
+    "Grazing (native vegetation)": "#c4996b",
+    "Unallocated land": "#e5d8a8",
+    "Non-agricultural land-use": "#3A7F4A",
 }
 
 CROPLAND_LUS = {
@@ -66,6 +69,10 @@ MODIFIED_PASTURE_LUS = {
 
 NATIVE_PASTURE_LUS = {
     "Beef - natural land", "Dairy - natural land", "Sheep - natural land",
+}
+
+UNALLOCATED_LUS = {
+    "Unallocated - modified land", "Unallocated - natural land",
 }
 
 COLORS_FILE = 'tools/land use colors.xlsx'
@@ -135,13 +142,27 @@ def _add_vertical_unit_label(fig, x, y, text, fontsize, fontweight='normal'):
         cursor += width
 
 
-def classify_land_use(name):
+def _water_supply_prefix(water_supply):
+    if water_supply is None or pd.isna(water_supply):
+        return None
+    value = str(water_supply).strip().lower()
+    if value in {'dryland', 'dry'}:
+        return 'Dryland'
+    if value in {'irrigated', 'irr'}:
+        return 'Irrigated'
+    return None
+
+
+def classify_land_use(name, water_supply=None):
+    prefix = _water_supply_prefix(water_supply)
     if name in CROPLAND_LUS:
-        return "Cropland and horticulture"
+        return f"{prefix} cropland and horticulture" if prefix else None
     if name in MODIFIED_PASTURE_LUS:
-        return "Grazing (modified pastures)"
+        return f"{prefix} grazing (modified pastures)" if prefix else None
     if name in NATIVE_PASTURE_LUS:
         return "Grazing (native vegetation)"
+    if name in UNALLOCATED_LUS:
+        return "Unallocated land"
     return None
 
 
@@ -197,7 +218,7 @@ def get_am_colors():
 
 def _draw_row(fig, gs, row_idx, df_long, colors, y_range, show_titles):
     years = list(range(2010, 2051))
-    cats = list(colors.keys())
+    cats = sorted(colors.keys(), reverse=True)  # reverse-alpha: Z=bottom, A=top of positive stack
     axes = []
 
     for col_idx, scenario in enumerate(input_files):
@@ -251,12 +272,16 @@ def _draw_row(fig, gs, row_idx, df_long, colors, y_range, show_titles):
     return axes
 
 
-def _add_patch_legend(ax, colors):
+def _add_patch_legend(ax, colors, legend_order=None):
+    if legend_order:
+        ordered_labels = [label for label in legend_order if label in colors]
+        ordered_labels += sorted(label for label in colors if label not in ordered_labels)
+    else:
+        ordered_labels = sorted(colors)
     handles = [
-        mpatches.Patch(facecolor=color, edgecolor='none', label=label)
-        for label, color in colors.items()
+        mpatches.Patch(facecolor=colors[label], edgecolor='none', label=label)
+        for label in ordered_labels
     ]
-    handles = handles[::-1]  # top-of-stack first, matching visual order top→bottom
     ax.axis('off')
     ax.legend(
         handles,
@@ -273,11 +298,11 @@ def _add_patch_legend(ax, colors):
 
 
 def _add_mixed_legend(ax, patch_colors, line_label=None, line_color='black'):
-    handles = [
-        mpatches.Patch(facecolor=color, edgecolor='none', label=label)
-        for label, color in patch_colors.items()
-    ]
-    handles = handles[::-1]  # top-of-stack first, matching visual order top→bottom
+    handles = sorted(
+        [mpatches.Patch(facecolor=color, edgecolor='none', label=label)
+         for label, color in patch_colors.items()],
+        key=lambda h: h.get_label(),
+    )  # A-Z alphabetical order
     if line_label:
         handles.append(mlines.Line2D([], [], color=line_color, linewidth=1.5, label=line_label))
     ax.axis('off')
@@ -362,6 +387,8 @@ def save_three_row_figure(
     output_name,
     total_legend_label='Sum',
     y_label_x=0.038,
+    overview_required_ticks=None,
+    top_legend_order=None,
 ):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     set_plot_style(font_size=font_size)
@@ -371,16 +398,22 @@ def save_three_row_figure(
     df_bottom = df_bottom[df_bottom['category'].isin(bottom_colors)].copy()
 
     y_range_overview = calc_y_range(df_overview, 5)
+    if overview_required_ticks:
+        min_v, max_v, ticks = y_range_overview
+        ticks = sorted(set(ticks) | set(overview_required_ticks))
+        min_v = min(min_v, ticks[0])
+        max_v = max(max_v, ticks[-1])
+        y_range_overview = (min_v, max_v, ticks)
     y_range_top = calc_y_range(df_top, 5)
     y_range_bottom = calc_y_range(df_bottom, 5)
 
-    fig = plt.figure(figsize=(21.5, 12.8))
+    fig = plt.figure(figsize=(21.5, 19.5))
     gs = gridspec.GridSpec(
         3, 5, figure=fig,
         width_ratios=[1, 1, 1, 1, 0.82],
         hspace=0.24, wspace=0.10,
     )
-    fig.subplots_adjust(left=0.08, right=0.95, top=0.84, bottom=0.10)
+    fig.subplots_adjust(left=0.07, right=0.97, top=0.84, bottom=0.10)
 
     axes_overview = _draw_row(fig, gs, 0, df_overview, overview_colors, y_range_overview, show_titles=False)
     axes_top = _draw_row(fig, gs, 1, df_top, top_colors, y_range_top, show_titles=False)
@@ -411,7 +444,7 @@ def save_three_row_figure(
     pos_bt = axes_bottom[0].get_position()
 
     _section_gap = 0.008   # gap between row top edge and section-label bottom
-    _header_gap  = 0.038   # additional gap from section label to column-header bottom
+    _header_gap  = 0.020   # additional gap from section label to column-header bottom
 
     fig.text(
         0.43, pos_ov.y1 + _section_gap, 'Total',
@@ -440,7 +473,7 @@ def save_three_row_figure(
                  fontsize=font_size, fontweight='bold', fontfamily='Arial')
 
     _add_mixed_legend(fig.add_subplot(gs[0, 4]), overview_colors, line_label=total_legend_label)
-    _add_patch_legend(fig.add_subplot(gs[1, 4]), top_colors)
+    _add_patch_legend(fig.add_subplot(gs[1, 4]), top_colors, top_legend_order)
     _add_patch_legend(fig.add_subplot(gs[2, 4]), bottom_colors)
 
     out = os.path.join(OUTPUT_DIR, output_name)

@@ -71,7 +71,9 @@ def prepare_land_use():
         ).copy()
 
         bio_ag = bio.query('Type == "Agricultural land-use"').copy()
-        bio_ag['category'] = bio_ag['Landuse'].map(classify_land_use)
+        bio_ag['category'] = bio_ag.apply(
+            lambda r: classify_land_use(r['Landuse'], r['Water_supply']), axis=1
+        )
         bio_ag = bio_ag.dropna(subset=['category'])
         bio_ag = bio_ag.groupby(['Year', 'category'], as_index=False)[VALUE_COL].sum()
         for _, row in bio_ag.iterrows():
@@ -89,7 +91,7 @@ def prepare_land_use():
                 rows.append({
                     'year': int(row['Year']),
                     'scenario': scenario,
-                    'category': 'Non-agricultural land',
+                    'category': 'Non-agricultural land-use',
                     'value': float(row[VALUE_COL]) / 1e6,
                 })
 
@@ -142,7 +144,7 @@ def main():
         am_colors,
         "Biodiversity contribution-weighted area (Mha yr⁻¹)",
         '14_biodiversity.svg',
-        y_label_x=0.030,
+        y_label_x=0.020,
     )
 
 

@@ -36,8 +36,8 @@ RENAME_AM = {
     "Savanna Burning": "Early dry-season savanna burning",
     "AgTech EI": "Agricultural technology (energy)",
     "Biochar": "Biochar (soil amendment)",
-    "HIR - Beef": "Human-induced regeneration (Beef)",
-    "HIR - Sheep": "Human-induced regeneration (Sheep)",
+    "HIR - Beef": "Managed regeneration (beef)",
+    "HIR - Sheep": "Managed regeneration (sheep)",
     "Utility Solar PV": "Utility Solar PV",
     "Onshore Wind": "Onshore wind",
 }
@@ -57,10 +57,12 @@ RENAME_NON_AG = {
 RENAME_AM_NON_AG = {**RENAME_AM, **RENAME_NON_AG}
 
 LU_COLORS = {
-    "Cropland and horticulture": "#AECB75",
-    "Grazing (modified pastures)": "#762400",
-    "Grazing (native vegetation)": "#C4996B",
-    "Non-agricultural land": "#3A7F4A",
+    "Dryland cropland and horticulture":     "#aecb75",
+    "Irrigated cropland and horticulture":   "#83b5ff",
+    "Dryland grazing (modified pastures)":   "#762400",
+    "Irrigated grazing (modified pastures)": "#c4669b",
+    "Grazing (native vegetation)":           "#c4996b",
+    "Unallocated land":                      "#e5d8a8",
 }
 
 CROPLAND_LUS = {
@@ -76,16 +78,22 @@ MODIFIED_PASTURE_LUS = {
 NATIVE_PASTURE_LUS = {
     "Beef - natural land", "Dairy - natural land", "Sheep - natural land",
 }
+UNALLOCATED_LUS = {
+    "Unallocated - modified land", "Unallocated - natural land",
+}
 COLORS_FILE = 'tools/land use colors.xlsx'
 
 
-def classify_land_use(name):
+def classify_land_use(name, water_supply):
+    prefix = "Dryland" if water_supply == "Dryland" else "Irrigated"
     if name in CROPLAND_LUS:
-        return "Cropland and horticulture"
+        return f"{prefix} cropland and horticulture"
     if name in MODIFIED_PASTURE_LUS:
-        return "Grazing (modified pastures)"
+        return f"{prefix} grazing (modified pastures)"
     if name in NATIVE_PASTURE_LUS:
         return "Grazing (native vegetation)"
+    if name in UNALLOCATED_LUS:
+        return "Unallocated land"
     return None
 
 
@@ -117,7 +125,9 @@ def prepare_land_use():
         area_ag = load_report_source_csv(scenario, 'area_agricultural_landuse')
         if not area_ag.empty:
             area_ag = area_ag.query('region == "AUSTRALIA" and Water_supply != "ALL"').copy()
-            area_ag['category'] = area_ag['Land-use'].map(classify_land_use)
+            area_ag['category'] = area_ag.apply(
+                lambda r: classify_land_use(r['Land-use'], r['Water_supply']), axis=1
+            )
             area_ag = area_ag.dropna(subset=['category'])
             for _, row in area_ag.iterrows():
                 rows.append({
@@ -136,7 +146,7 @@ def prepare_land_use():
                 rows.append({
                     'year': int(row['Year']),
                     'scenario': scenario,
-                    'category': 'Non-agricultural land',
+                    'category': 'Non-agricultural land-use',
                     'value': float(row['Area (ha)']) / 1e6,
                 })
 
@@ -167,8 +177,8 @@ def prepare_am():
 
 def draw_row(fig, gs, row_idx, df_long, colors, y_range, row_label, show_titles):
     years = list(range(2010, 2051))
-    cats = list(colors.keys())
-    clrs = list(colors.values())
+    cats = sorted(colors.keys(), reverse=True)  # reverse-alpha: Z=bottom, A=top of positive stack
+    clrs = [colors[k] for k in cats]
     axes = []
 
     for col_idx, scenario in enumerate(input_files):
@@ -219,11 +229,11 @@ def draw_row(fig, gs, row_idx, df_long, colors, y_range, row_label, show_titles)
 
 
 def add_patch_legend(ax, colors, ncol):
-    handles = [
-        mpatches.Patch(facecolor=color, edgecolor='none', label=label)
-        for label, color in colors.items()
-    ]
-    handles = handles[::-1]  # top-of-stack first, matching visual order top→bottom
+    handles = sorted(
+        [mpatches.Patch(facecolor=color, edgecolor='none', label=label)
+         for label, color in colors.items()],
+        key=lambda h: h.get_label(),
+    )  # A-Z alphabetical order
     ax.axis('off')
     ax.legend(
         handles,
@@ -277,7 +287,7 @@ def main():
         width_ratios=[1, 1, 1, 1, 0.78],
         hspace=0.26, wspace=0.10
     )
-    fig.subplots_adjust(left=0.08, right=0.95, top=0.84, bottom=0.12)
+    fig.subplots_adjust(left=0.08, right=0.95, top=0.90, bottom=0.12)
 
     axes_top = draw_row(fig, gs, 0, area_lu, LU_COLORS, y_range_lu, 'Land-use', show_titles=False)
     axes_bot = draw_row(fig, gs, 1, area_am, am_colors, y_range_am, 'Agricultural management', show_titles=False)
@@ -287,15 +297,19 @@ def main():
     for ax in axes_bot:
         ax.set_xlabel('')
 
-    # Section labels (below the scenario-name header line)
-    fig.text(0.43, 0.87, 'Land-use', ha='center', va='bottom',
+    fig.canvas.draw()
+    label_gap = 0.015
+    top_pos = axes_top[0].get_position()
+    bot_pos = axes_bot[0].get_position()
+
+    # Section labels sit the same distance above each corresponding row.
+    fig.text(0.43, top_pos.y1 + label_gap, 'Land-use', ha='center', va='bottom',
              fontsize=font_size, fontfamily='Arial', fontweight='normal')
-    fig.text(0.43, 0.44, 'Agricultural management', ha='center', va='bottom',
+    fig.text(0.43, bot_pos.y1 + label_gap, 'Agricultural management', ha='center', va='bottom',
              fontsize=font_size, fontfamily='Arial', fontweight='normal')
     _add_vertical_unit_label(fig, 0.038, 0.50, 'Area (Mha yr⁻¹)', font_size)
 
     # Bold scenario column headers at the very top
-    fig.canvas.draw()
     for ax, scenario in zip(axes_top, input_files):
         pos = ax.get_position()
         cx = (pos.x0 + pos.x1) / 2

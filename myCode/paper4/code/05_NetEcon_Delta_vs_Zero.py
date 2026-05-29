@@ -1,5 +1,5 @@
 # ==============================================================================
-# Figure 05: net economic return response vs carbon price /
+# Figure 05: net economic return response by carbon price /
 #            biodiversity price
 #   Left column:  BioPrice = 0, carbon price varies
 #   Right column: CarbonPrice = 0, biodiversity price varies
@@ -12,12 +12,13 @@
 #     `luto/solvers/input_data.py`.
 #   - In that solver pathway, biodiversity payment is monetised as
 #     `bio_score x bio_price` before the economic objective is formed.
-#   - Archived `xr_economics_*_profit` outputs can be used directly for the
-#     carbon-price slice because carbon pricing is already embedded there.
-#   - For the biodiversity-price slice in these archived paper4 runs, we do not
-#     assume biodiversity payment is already included in `xr_economics_*_profit`.
-#     To match solver-side accounting, this script adds it back explicitly at the
-#     category level using absolute biodiversity contribution for YEAR.
+#   - Do not use `xr_economics_*_profit` here because those archived profit
+#     layers already mix in absolute biodiversity-price revenue.
+#   - Instead, recompute net economic returns from cell-level NC outputs:
+#     revenue - cost - transition, removing absolute biodiversity-price revenue.
+#   - For the biodiversity-price slice, add only the incremental biodiversity
+#     payment:
+#     bio_price x (scenario biodiversity contribution - zero-price contribution).
 # ==============================================================================
 
 import io
@@ -60,13 +61,14 @@ DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 CACHE_PATH = DATA_DIR / f"05_NetEcon_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
+NC_CACHE_DIR = DATA_DIR / f"05_NetEcon_nc_cache_{YEAR}"
 
 FS = 11
 SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
 NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
-MODIFIED_LIVESTOCK_COLOR = "#fe7f2d"
+MODIFIED_LIVESTOCK_COLOR = "#762500"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -83,7 +85,7 @@ plt.rcParams.update({
     "grid.linewidth": 1.0,
 })
 
-ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS = True
+ADD_BIO_PAYMENT_CHANGE = True
 
 NON_AG_EXCLUDE = {
     "agriculturallanduse",
@@ -198,23 +200,165 @@ TOTAL_COLOR_MAP = {
 }
 
 
-def open_metric_da(zip_path, file_name):
+def open_metric_da(zip_path, file_name, keep_coord=None):
+    zip_path = Path(zip_path)
+    cache_run_dir = NC_CACHE_DIR / f"{zip_path.parents[1].name}_{zip_path.parent.name}"
+    cache_run_dir.mkdir(parents=True, exist_ok=True)
+    cached_nc = cache_run_dir / file_name
+
     with zipfile.ZipFile(zip_path) as archive:
         matches = [name for name in archive.namelist() if name.endswith(file_name)]
         if not matches:
             return None
 
-        with archive.open(matches[0]) as file_obj:
-            ds = xr.open_dataset(io.BytesIO(file_obj.read()), engine="h5netcdf")
+        if not cached_nc.is_file():
+            with archive.open(matches[0]) as src, open(cached_nc, "wb") as dst:
+                dst.write(src.read())
+
+    ds = xr.open_dataset(cached_nc, engine="h5netcdf")
 
     try:
         if "layer" in ds.dims and "compress" in ds["layer"].attrs:
             ds = cfxr.decode_compress_to_multi_index(ds, "layer")
 
         da = next(iter(ds.data_vars.values()))
+        if keep_coord is not None:
+            for coord_name in list(da.coords):
+                if coord_name in {"cell", "layer", keep_coord}:
+                    continue
+
+                coord = da.coords[coord_name]
+                if "ALL" not in coord.values:
+                    continue
+
+                if coord.dims == ("layer",):
+                    da = da.isel(layer=(coord.values == "ALL"))
+                elif coord_name in da.dims:
+                    da = da.sel({coord_name: "ALL"})
+
         return da.load()
     finally:
         ds.close()
+
+
+def filter_coord(da, coord_name, value):
+    if coord_name not in da.coords:
+        return da
+
+    coord = da.coords[coord_name]
+    if coord_name in da.dims:
+        if value in coord.values:
+            return da.sel({coord_name: value})
+        return da.isel({coord_name: []})
+
+    if coord.dims == ("layer",):
+        return da.isel(layer=(coord.values == value))
+
+    return da
+
+
+def to_item_cell_da(zip_path, file_name, item_coord, selectors=None, exclude_items=None):
+    da = open_metric_da(zip_path, file_name)
+    if da is None:
+        return None
+
+    selectors = selectors or {}
+    exclude_items = set(exclude_items or {"ALL"})
+
+    for coord_name, value in selectors.items():
+        da = filter_coord(da, coord_name, value)
+
+    if item_coord in da.coords and da.coords[item_coord].dims == ("layer",):
+        item_values = da.coords[item_coord].values
+        mask = np.array([item not in exclude_items for item in item_values], dtype=bool)
+        da = da.isel(layer=mask)
+        item_values = da.coords[item_coord].values
+        da = da.assign_coords(item=("layer", item_values)).swap_dims({"layer": "item"})
+        da = da.drop_vars("layer")
+    elif item_coord in da.dims:
+        item_values = da.coords[item_coord].values
+        keep_items = [item for item in item_values if item not in exclude_items]
+        da = da.sel({item_coord: keep_items}).rename({item_coord: "item"})
+    else:
+        raise KeyError(f"{file_name} does not contain item coordinate {item_coord!r}")
+
+    if "layer" in da.dims:
+        if da.sizes["layer"] == 1:
+            da = da.isel(layer=0, drop=True)
+        else:
+            da = da.sum("layer")
+
+    if "item" not in da.dims:
+        raise ValueError(f"{file_name} could not be reduced to an item dimension")
+
+    if da.sizes["item"] == 0:
+        return None
+
+    return da.transpose("cell", "item").load()
+
+
+def zeros_like_items(reference):
+    return xr.zeros_like(reference)
+
+
+def align_item_arrays(*arrays):
+    present = [arr for arr in arrays if arr is not None]
+    if not present:
+        return arrays
+
+    aligned = xr.align(*present, join="outer", fill_value=0)
+    result = []
+    idx = 0
+    template = aligned[0]
+    for arr in arrays:
+        if arr is None:
+            result.append(zeros_like_items(template))
+        else:
+            result.append(aligned[idx])
+            idx += 1
+    return result
+
+
+def item_delta_value(delta_dvar, scenario_value, scenario_dvar, baseline_value, baseline_dvar):
+    delta_dvar, scenario_value, scenario_dvar, baseline_value, baseline_dvar = align_item_arrays(
+        delta_dvar,
+        scenario_value,
+        scenario_dvar,
+        baseline_value,
+        baseline_dvar,
+    )
+
+    tol = 1e-10
+    scenario_unit = xr.where(np.abs(scenario_dvar) > tol, scenario_value / scenario_dvar, 0)
+    baseline_unit = xr.where(np.abs(baseline_dvar) > tol, baseline_value / baseline_dvar, 0)
+    positive = xr.where(delta_dvar > tol, delta_dvar * scenario_unit, 0)
+    negative = xr.where(delta_dvar < -tol, delta_dvar * baseline_unit, 0)
+    return positive + negative
+
+
+def group_item_values(da, area_type):
+    if da is None:
+        return {}
+
+    values_by_item = da.sum("cell").to_series()
+    result = {}
+    for item, value in values_by_item.items():
+        if np.isclose(value, 0.0):
+            continue
+
+        if area_type == "Agricultural land-use":
+            category = LU_TO_AG_GROUP.get(normalize_name(item), "Other land")
+        elif area_type == "Ag management":
+            category = AM_LABEL_MAP.get(normalize_name(item), item)
+        elif area_type == "Non-ag":
+            if normalize_name(item) in NON_AG_EXCLUDE:
+                continue
+            category = NON_AG_LABEL_MAP.get(normalize_name(item), item)
+        else:
+            raise ValueError(f"Unknown area type: {area_type}")
+
+        result[category] = result.get(category, 0.0) + float(value)
+    return result
 
 
 def sum_with_total_coords(da, **selectors):
@@ -237,7 +381,7 @@ def sum_with_total_coords(da, **selectors):
 
 
 def read_ag_group_summary(zip_path, file_name):
-    da = open_metric_da(zip_path, file_name)
+    da = open_metric_da(zip_path, file_name, keep_coord="lu")
     if da is None:
         return {}
 
@@ -257,7 +401,7 @@ def read_ag_group_summary(zip_path, file_name):
 
 
 def read_ag_management_summary(zip_path, file_name):
-    da = open_metric_da(zip_path, file_name)
+    da = open_metric_da(zip_path, file_name, keep_coord="am")
     if da is None:
         return {}
 
@@ -277,7 +421,7 @@ def read_ag_management_summary(zip_path, file_name):
 
 
 def read_non_ag_summary(zip_path, file_name):
-    da = open_metric_da(zip_path, file_name)
+    da = open_metric_da(zip_path, file_name, keep_coord="lu")
     if da is None:
         return {}
 
@@ -296,19 +440,179 @@ def read_non_ag_summary(zip_path, file_name):
     return result
 
 
-def get_profit_summaries(zip_path, year):
-    return {
-        "Agricultural land-use": read_ag_group_summary(zip_path, f"xr_economics_ag_profit_{year}.nc"),
-        "Ag management": read_ag_management_summary(zip_path, f"xr_economics_am_profit_{year}.nc"),
-        "Non-ag": read_non_ag_summary(zip_path, f"xr_economics_non_ag_profit_{year}.nc"),
-    }
-
-
 def get_bio_summaries(zip_path, year):
     return {
         "Agricultural land-use": read_ag_group_summary(zip_path, f"xr_biodiversity_overall_priority_ag_{year}.nc"),
         "Ag management": read_ag_management_summary(zip_path, f"xr_biodiversity_overall_priority_ag_management_{year}.nc"),
         "Non-ag": read_non_ag_summary(zip_path, f"xr_biodiversity_overall_priority_non_ag_{year}.nc"),
+    }
+
+
+def combine_summaries(*terms):
+    result = {}
+    for sign, summary in terms:
+        for category, value in summary.items():
+            result[category] = result.get(category, 0.0) + sign * value
+    return {k: v for k, v in result.items() if not np.isclose(v, 0.0)}
+
+
+def scale_summaries(summary_by_area, scalar):
+    return {
+        area_type: {
+            category: value * scalar
+            for category, value in summary.items()
+        }
+        for area_type, summary in summary_by_area.items()
+    }
+
+
+def sum_item_arrays(*arrays):
+    present = [arr for arr in arrays if arr is not None]
+    if not present:
+        return None
+
+    aligned = xr.align(*present, join="outer", fill_value=0)
+    total = aligned[0].copy()
+    for arr in aligned[1:]:
+        total = total + arr
+    return total
+
+
+def get_area_item_inputs(zip_path, year, area_type, bio_price):
+    if area_type == "Agricultural land-use":
+        dvar = to_item_cell_da(
+            zip_path,
+            f"xr_dvar_ag_{year}.nc",
+            "lu",
+            selectors={"lm": "ALL"},
+        )
+        bio = to_item_cell_da(
+            zip_path,
+            f"xr_biodiversity_overall_priority_ag_{year}.nc",
+            "lu",
+            selectors={"lm": "ALL"},
+        )
+        revenue = to_item_cell_da(
+            zip_path,
+            f"xr_economics_ag_revenue_{year}.nc",
+            "lu",
+            selectors={"lm": "ALL", "source": "ALL"},
+        )
+        cost = to_item_cell_da(
+            zip_path,
+            f"xr_economics_ag_cost_{year}.nc",
+            "lu",
+            selectors={"lm": "ALL", "source": "ALL"},
+        )
+        transition_ag2ag = to_item_cell_da(
+            zip_path,
+            f"xr_economics_ag_transition_ag2ag_{year}.nc",
+            "lu",
+            selectors={"lm": "ALL", "source": "ALL"},
+        )
+        transition_non_ag2ag = to_item_cell_da(
+            zip_path,
+            f"xr_economics_ag_transition_non_ag2ag_{year}.nc",
+            "lu",
+            selectors={"lm": "ALL", "source": "ALL", "from_lu": "ALL"},
+        )
+        revenue, bio, cost, transition_ag2ag, transition_non_ag2ag = align_item_arrays(
+            revenue,
+            bio,
+            cost,
+            transition_ag2ag,
+            transition_non_ag2ag,
+        )
+        net_excl_bio_price = (
+            revenue
+            - bio * bio_price
+            - cost
+            - transition_ag2ag
+            - transition_non_ag2ag
+        )
+        return dvar, net_excl_bio_price, bio
+
+    if area_type == "Ag management":
+        selectors = {"lm": "ALL", "lu": "ALL"}
+        dvar = to_item_cell_da(zip_path, f"xr_dvar_am_{year}.nc", "am", selectors=selectors)
+        bio = to_item_cell_da(
+            zip_path,
+            f"xr_biodiversity_overall_priority_ag_management_{year}.nc",
+            "am",
+            selectors=selectors,
+        )
+        revenue = to_item_cell_da(
+            zip_path,
+            f"xr_economics_am_revenue_{year}.nc",
+            "am",
+            selectors=selectors,
+        )
+        cost = to_item_cell_da(
+            zip_path,
+            f"xr_economics_am_cost_{year}.nc",
+            "am",
+            selectors=selectors,
+        )
+        transition = to_item_cell_da(
+            zip_path,
+            f"xr_economics_am_transition_{year}.nc",
+            "am",
+            selectors=selectors,
+        )
+        revenue, bio, cost, transition = align_item_arrays(revenue, bio, cost, transition)
+        net_excl_bio_price = revenue - bio * bio_price - cost - transition
+        return dvar, net_excl_bio_price, bio
+
+    if area_type == "Non-ag":
+        dvar = to_item_cell_da(zip_path, f"xr_dvar_non_ag_{year}.nc", "lu")
+        bio = to_item_cell_da(
+            zip_path,
+            f"xr_biodiversity_overall_priority_non_ag_{year}.nc",
+            "lu",
+        )
+        revenue = to_item_cell_da(
+            zip_path,
+            f"xr_economics_non_ag_revenue_{year}.nc",
+            "lu",
+        )
+        cost = to_item_cell_da(
+            zip_path,
+            f"xr_economics_non_ag_cost_{year}.nc",
+            "lu",
+        )
+        transition_non_ag2non_ag = to_item_cell_da(
+            zip_path,
+            f"xr_economics_non_ag_transition_non_ag2non_ag_{year}.nc",
+            "lu",
+        )
+        transition_non_ag2ag = to_item_cell_da(
+            zip_path,
+            f"xr_economics_non_ag_transition_non_ag2ag_{year}.nc",
+            "lu",
+        )
+        revenue, bio, cost, transition_non_ag2non_ag, transition_non_ag2ag = align_item_arrays(
+            revenue,
+            bio,
+            cost,
+            transition_non_ag2non_ag,
+            transition_non_ag2ag,
+        )
+        net_excl_bio_price = (
+            revenue
+            - bio * bio_price
+            - cost
+            - transition_non_ag2non_ag
+            - transition_non_ag2ag
+        )
+        return dvar, net_excl_bio_price, bio
+
+    raise ValueError(f"Unknown area type: {area_type}")
+
+
+def get_all_area_item_inputs(zip_path, year, bio_price):
+    return {
+        area_type: get_area_item_inputs(zip_path, year, area_type, bio_price)
+        for area_type in PANEL_CONFIG
     }
 
 
@@ -319,7 +623,7 @@ def get_category_order(area_type, categories_seen):
     return ordered
 
 
-def collect_slice_rows(run_map, price_vals, varying_key, baseline_profit_2025):
+def collect_slice_rows(run_map, price_vals, varying_key, baseline_inputs):
     rows = []
     price_type = "CarbonPrice" if varying_key == "cp" else "BioPrice"
 
@@ -329,52 +633,69 @@ def collect_slice_rows(run_map, price_vals, varying_key, baseline_profit_2025):
         if zip_path is None:
             continue
 
-        profit_2025 = get_profit_summaries(zip_path, YEAR)
-        bio_2025 = get_bio_summaries(zip_path, YEAR) if varying_key == "bp" else {}
+        bio_price = price if varying_key == "bp" else 0.0
+        scenario_inputs = get_all_area_item_inputs(zip_path, YEAR, bio_price)
 
         for area_type in PANEL_CONFIG:
+            scenario_dvar, scenario_net, scenario_bio = scenario_inputs[area_type]
+            baseline_dvar, baseline_net, baseline_bio = baseline_inputs[area_type]
+
+            scenario_dvar, baseline_dvar = align_item_arrays(scenario_dvar, baseline_dvar)
+            delta_dvar = scenario_dvar - baseline_dvar
+            net_econ_change = item_delta_value(
+                delta_dvar,
+                scenario_net,
+                scenario_dvar,
+                baseline_net,
+                baseline_dvar,
+            )
+            bio_change = item_delta_value(
+                delta_dvar,
+                scenario_bio,
+                scenario_dvar,
+                baseline_bio,
+                baseline_dvar,
+            )
+            bio_payment_change = bio_change * price if varying_key == "bp" and ADD_BIO_PAYMENT_CHANGE else bio_change * 0
+            total_change = net_econ_change + bio_payment_change
+
+            net_summary = group_item_values(net_econ_change, area_type)
+            bio_summary = group_item_values(bio_change, area_type)
+            bio_payment_summary = group_item_values(bio_payment_change, area_type)
+            total_summary = group_item_values(total_change, area_type)
+
             categories = list(dict.fromkeys(
-                list(profit_2025[area_type]) +
-                list(bio_2025.get(area_type, {})) +
-                list(baseline_profit_2025[area_type])
+                list(net_summary) +
+                list(bio_summary) +
+                list(bio_payment_summary) +
+                list(total_summary)
             ))
             category_order = get_category_order(area_type, categories)
 
             total_net_econ = 0.0
             for category in category_order:
-                base_net_econ_2025_aud = profit_2025[area_type].get(category, 0.0)
-                zero_net_econ_2025_aud = baseline_profit_2025[area_type].get(category, 0.0)
-                bio_2025_ha_yr = bio_2025.get(area_type, {}).get(category, 0.0)
-
-                # Carbon pricing is already embedded in archived profit outputs.
-                # For the biodiversity-price slice, add back bio_price x absolute
-                # biodiversity contribution at YEAR so this figure matches
-                # solver-side accounting.
-                add_back_bio_payment = varying_key == "bp" and ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS
-                bio_payment_2025_aud = price * bio_2025_ha_yr if add_back_bio_payment else 0.0
-
-                net_econ_2025_aud = base_net_econ_2025_aud + bio_payment_2025_aud
-                net_econ_delta_2025_aud = net_econ_2025_aud - zero_net_econ_2025_aud
+                net_econ_change_2025_aud = net_summary.get(category, 0.0)
+                bio_change_2025_ha_yr = bio_summary.get(category, 0.0)
+                bio_payment_change_2025_aud = bio_payment_summary.get(category, 0.0)
+                net_econ_delta_2025_aud = total_summary.get(category, 0.0)
                 net_econ_delta_2025_baud = net_econ_delta_2025_aud / 1e9
                 total_net_econ += net_econ_delta_2025_baud
 
                 rows.append({
-                    "AccountingMode": "DeltaVsZeroPrice",
+                    "AccountingMode": "DvarDeltaVsZeroPrice",
                     "PriceType": price_type,
                     "Price": price,
                     "AreaType": area_type,
                     "Category": category,
-                    "BaseNetEcon_2025_BAUD": base_net_econ_2025_aud / 1e9,
-                    "ZeroPriceNetEcon_2025_BAUD": zero_net_econ_2025_aud / 1e9,
-                    "Bio_2025_ha_yr": bio_2025_ha_yr,
-                    "BioPayment_2025_BAUD": bio_payment_2025_aud / 1e9,
-                    "NetEcon_2025_BAUD": net_econ_2025_aud / 1e9,
+                    "NetEconChangeExclBioPrice_2025_BAUD": net_econ_change_2025_aud / 1e9,
+                    "BioChange_vs_ZeroPrice_ha_yr": bio_change_2025_ha_yr,
+                    "BioPaymentChange_2025_BAUD": bio_payment_change_2025_aud / 1e9,
                     "NetEconChange_vs_ZeroPrice_BAUD": net_econ_delta_2025_baud,
                 })
 
             print(
                 f"  {varying_key}={format_thousands(price)} | {area_type}: "
-                f"net_econ_change={total_net_econ:.2f} B AUD"
+                f"net_econ_difference={total_net_econ:.2f} B AUD"
             )
 
     return rows
@@ -397,17 +718,15 @@ def load_cache():
         "Price",
         "AreaType",
         "Category",
-        "BaseNetEcon_2025_BAUD",
-        "ZeroPriceNetEcon_2025_BAUD",
-        "Bio_2025_ha_yr",
-        "BioPayment_2025_BAUD",
-        "NetEcon_2025_BAUD",
+        "NetEconChangeExclBioPrice_2025_BAUD",
+        "BioChange_vs_ZeroPrice_ha_yr",
+        "BioPaymentChange_2025_BAUD",
         "NetEconChange_vs_ZeroPrice_BAUD",
     }
     if not required_columns.issubset(df_long.columns):
         print("Cached net economic data schema is outdated; rebuilding.")
         return None
-    if set(df_long["AccountingMode"]) != {"DeltaVsZeroPrice"}:
+    if set(df_long["AccountingMode"]) != {"DvarDeltaVsZeroPrice"}:
         print("Cached net economic data uses a different accounting mode; rebuilding.")
         return None
     if OLD_LIVESTOCK_LABEL in set(df_long["Category"]):
@@ -422,13 +741,13 @@ def collect_and_cache():
     zero_zip_path = run_map.get((0.0, 0.0))
     if zero_zip_path is None:
         raise FileNotFoundError("Could not find zero-price run (CarbonPrice=0, BioPrice=0).")
-    baseline_profit_2025 = get_profit_summaries(zero_zip_path, YEAR)
+    baseline_inputs = get_all_area_item_inputs(zero_zip_path, YEAR, 0.0)
 
-    print(f"\n--- Slice A: net economic return change at {YEAR}; BioPrice=0 and carbon price varies ---")
-    rows_cp = collect_slice_rows(run_map, cp_vals, "cp", baseline_profit_2025)
+    print(f"\n--- Slice A: net economic return difference at {YEAR}; BioPrice=0 and carbon price varies ---")
+    rows_cp = collect_slice_rows(run_map, cp_vals, "cp", baseline_inputs)
 
-    print(f"\n--- Slice B: net economic return change at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
-    rows_bp = collect_slice_rows(run_map, bp_vals, "bp", baseline_profit_2025)
+    print(f"\n--- Slice B: net economic return difference at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
+    rows_bp = collect_slice_rows(run_map, bp_vals, "bp", baseline_inputs)
 
     df_long = pd.DataFrame(rows_cp + rows_bp)
     df_long = df_long.sort_values(["PriceType", "AreaType", "Price", "Category"]).reset_index(drop=True)
@@ -543,6 +862,7 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
         ax.tick_params(axis="x", labelbottom=False)
 
     apply_price_formatter(ax, axis="x")
+    apply_price_formatter(ax, axis="y")
     apply_compact_ticks(ax, x_nbins=8, y_nbins=5)
     if show_xlabel:
         for label in ax.get_xticklabels():
@@ -560,9 +880,6 @@ if df_long is None:
 fig, axes = plt.subplots(4, 2, figsize=(10, 17), sharex="col")
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
-axes[0, 0].set_title("Carbon price varies\n(BioPrice=0)", pad=8)
-axes[0, 1].set_title("Biodiversity price varies\n(CarbonPrice=0)", pad=8)
-
 total_pivot_cp = build_total_pivot(df_long, "CarbonPrice")
 total_pivot_bp = build_total_pivot(df_long, "BioPrice")
 total_cats_left = stacked_bar(axes[0, 0], total_pivot_cp, "Total", "cp", show_xlabel=False, color_map=TOTAL_COLOR_MAP, show_sum_line=True)
@@ -606,9 +923,9 @@ LEGEND_FS = {
     "Non-ag": FS - 1,
 }
 
-fig.supylabel(r"Change in net economic returns vs zero price (Billion AU\$ yr$^{-1}$)", fontsize=FS)
+fig.supylabel(r"Difference in net economic returns relative to zero price (Billion AU\$ yr$^{-1}$)", fontsize=FS)
 plt.tight_layout()
-plt.subplots_adjust(hspace=0.35, wspace=0.12)
+plt.subplots_adjust(hspace=0.35, wspace=0.28)
 fig.canvas.draw()
 renderer = fig.canvas.get_renderer()
 fig_w_px = fig.get_figwidth() * fig.dpi

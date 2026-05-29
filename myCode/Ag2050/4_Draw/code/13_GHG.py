@@ -72,7 +72,9 @@ def prepare_land_use():
             ghg_ag = ghg_ag.query(
                 'region == "AUSTRALIA" and Water_supply != "ALL" and Source != "ALL"'
             ).copy()
-            ghg_ag['category'] = ghg_ag['Land-use'].map(classify_land_use)
+            ghg_ag['category'] = ghg_ag.apply(
+                lambda r: classify_land_use(r['Land-use'], r['Water_supply']), axis=1
+            )
             ghg_ag = ghg_ag.dropna(subset=['category'])
             ghg_ag = ghg_ag.groupby(['Year', 'category'], as_index=False)['Value (t CO2e)'].sum()
             for _, row in ghg_ag.iterrows():
@@ -93,7 +95,7 @@ def prepare_land_use():
                 rows.append({
                     'year': int(row['Year']),
                     'scenario': scenario,
-                    'category': 'Non-agricultural land',
+                    'category': 'Non-agricultural land-use',
                     'value': float(row['Value (t CO2e)']) / 1e6,
                 })
 
@@ -148,7 +150,8 @@ def main():
         am_colors,
         "GHG emissions (MtCO₂e yr⁻¹)",
         '13_ghg.svg',
-        y_label_x=0.030,
+        y_label_x=0.020,
+        overview_required_ticks=[-100, 100],
     )
 
 

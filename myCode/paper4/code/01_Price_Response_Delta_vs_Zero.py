@@ -1,8 +1,8 @@
 # ==============================================================================
 # Figure 01: price response curves
-#   Panel A: change in GHG emissions vs carbon price
-#            (BioPrice=0; price run minus zero-price run)
-#   Panel B: change in biodiversity contribution vs biodiversity price
+#   Panel A: difference in GHG abatement by carbon price
+#            (BioPrice=0; zero-price run minus price run)
+#   Panel B: difference in biodiversity contribution by biodiversity price
 #            (CarbonPrice=0; price run minus zero-price run)
 #
 #   Values are differences from the zero-price run for YEAR.
@@ -77,24 +77,26 @@ def collect_slices():
     bio_zero = read_sum(zero_zip_path, BIO_FILES, YEAR)
 
     rows_ghg = []
-    print(f"\n--- GHG emissions change at {YEAR} vs carbon price (BioPrice=0) ---")
+    print(f"\n--- GHG abatement difference at {YEAR} by carbon price (BioPrice=0) ---")
     for cp in cp_vals:
         zip_path = run_map.get((cp, 0.0))
         ghg_2025 = read_sum(zip_path, GHG_FILES, YEAR) / 1e6 if zip_path else np.nan
         ghg_delta = ghg_2025 - ghg_zero
+        ghg_abatement_difference = -ghg_delta
         rows_ghg.append({
             "CarbonPrice": cp,
             "GHGEmissions_2025_MtCO2e": ghg_2025,
             "GHGEmissions_ZeroPrice_2025_MtCO2e": ghg_zero,
             "GHGEmissionsChange_vs_ZeroPrice_MtCO2e": ghg_delta,
+            "GHGAbatementDifference_from_ZeroPrice_MtCO2e": ghg_abatement_difference,
         })
         print(
             f"  cp={format_thousands(cp)}: "
-            f"GHG emissions change={ghg_delta:.1f} Mt CO2e"
+            f"GHG abatement difference={ghg_abatement_difference:.1f} Mt CO2e"
         )
 
     rows_bio = []
-    print(f"\n--- Biodiversity contribution change at {YEAR} vs bio price (CarbonPrice=0) ---")
+    print(f"\n--- Biodiversity contribution difference at {YEAR} by bio price (CarbonPrice=0) ---")
     for bp in bp_vals:
         zip_path = run_map.get((0.0, bp))
         bio_2025 = read_sum(zip_path, BIO_FILES, YEAR) if zip_path else np.nan
@@ -105,10 +107,11 @@ def collect_slices():
             "BioContribution_2025_ha_yr": bio_2025,
             "BioContribution_ZeroPrice_2025_ha_yr": bio_zero,
             "BioContributionChange_vs_ZeroPrice_ha_yr": bio_delta,
+            "BioContributionDifference_from_ZeroPrice_ha_yr": bio_delta,
         })
         print(
             f"  bp={format_thousands(bp)}: "
-            f"bio contribution change={bio_delta:.2f}"
+            f"bio contribution difference={bio_delta:.2f}"
         )
 
     df_ghg = pd.DataFrame(rows_ghg)
@@ -127,8 +130,8 @@ if CACHE_PATH.is_file():
     df_ghg = pd.read_excel(CACHE_PATH, sheet_name="GHG_slice")
     df_bio = pd.read_excel(CACHE_PATH, sheet_name="Bio_slice")
     if (
-        "GHGEmissionsChange_vs_ZeroPrice_MtCO2e" not in df_ghg.columns
-        or "BioContributionChange_vs_ZeroPrice_ha_yr" not in df_bio.columns
+        "GHGAbatementDifference_from_ZeroPrice_MtCO2e" not in df_ghg.columns
+        or "BioContributionDifference_from_ZeroPrice_ha_yr" not in df_bio.columns
     ):
         print("Cached schema is outdated; rebuilding.")
         df_ghg, df_bio = collect_slices()
@@ -137,10 +140,10 @@ else:
 
 
 x_cp  = df_ghg["CarbonPrice"].to_numpy()
-y_ghg = -df_ghg["GHGEmissionsChange_vs_ZeroPrice_MtCO2e"].to_numpy()
+y_ghg = df_ghg["GHGAbatementDifference_from_ZeroPrice_MtCO2e"].to_numpy()
 
 x_bp  = df_bio["BioPrice"].to_numpy()
-y_bio = df_bio["BioContributionChange_vs_ZeroPrice_ha_yr"].to_numpy() / 1e6
+y_bio = df_bio["BioContributionDifference_from_ZeroPrice_ha_yr"].to_numpy() / 1e6
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
@@ -157,8 +160,9 @@ ax1.plot(
 )
 ax1.set_title("Carbon price response", pad=8)
 ax1.set_xlabel(r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)")
-ax1.set_ylabel(r"Change in GHG abatement vs zero price (Mt CO$_2$e yr$^{-1}$)")
+ax1.set_ylabel(r"GHG abatement difference" "\n" r"relative to zero price (Mt CO$_2$e yr$^{-1}$)")
 ax1.set_xlim(left=0)
+ax1.set_ylim(bottom=0)
 apply_price_formatter(ax1, axis="x")
 apply_compact_ticks(ax1, x_nbins=6, y_nbins=7)
 apply_carbon_price_ticks(ax1, axis="x")
@@ -177,8 +181,12 @@ ax2.plot(
 )
 ax2.set_title("Biodiversity price response", pad=8)
 ax2.set_xlabel(r"Biodiversity price (AU\$/ha yr$^{-1}$)")
-ax2.set_ylabel(r"Change in biodiversity contribution score vs zero price (Mha yr$^{-1}$)")
+ax2.set_ylabel(
+    "Biodiversity contribution score difference\n"
+    r"relative to zero price (Mha yr$^{-1}$)"
+)
 ax2.set_xlim(left=0)
+ax2.set_ylim(bottom=0)
 apply_price_formatter(ax2, axis="x")
 apply_compact_ticks(ax2, x_nbins=6, y_nbins=7)
 style_box_axis(ax2)

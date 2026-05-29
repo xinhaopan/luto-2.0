@@ -18,12 +18,12 @@ OUT_DIR = TASK_ROOT / "paper4" / "figures"
 DATA_DIR = TASK_ROOT / "paper4" / "data"
 
 PAPER4_COLOR_OVERRIDES = {
-    "crops": "#6200ac",
-    "livestock": "#fcca10",
-    "modifiedlivestock": "#fe7f2d",
-    "naturallivestock": "#fcca10",
-    "unallocatedmodifiedland": "#a1c181",
-    "unallocatednaturalland": "#619b8a",
+    "crops": "#aecb75",
+    "livestock": "#c49a67",
+    "modifiedlivestock": "#762500",
+    "naturallivestock": "#c49a67",
+    "unallocatedmodifiedland": "#fbbc45",
+    "unallocatednaturalland": "#e6d8a8",
 }
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)

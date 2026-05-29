@@ -54,6 +54,14 @@ def get_colors(excel_file, sheet=None):
     df = pd.read_excel(excel_file, **kw)
     if "desc_new" in df.columns:
         df["desc"] = df["desc_new"].fillna(df["desc"])
+    df["desc"] = df["desc"].replace({
+        "Human-Induced Regeneration (beef)": "Managed regeneration (beef)",
+        "Human-Induced Regeneration (sheep)": "Managed regeneration (sheep)",
+        "Human-induced Regeneration (beef)": "Managed regeneration (beef)",
+        "Human-induced Regeneration (sheep)": "Managed regeneration (sheep)",
+        "Human-induced regeneration (beef)": "Managed regeneration (beef)",
+        "Human-induced regeneration (sheep)": "Managed regeneration (sheep)",
+    })
     df = df[df["color"].notna() & (df["color"].astype(str) != "-")]
     return dict(zip(df["desc"], df["color"]))
 

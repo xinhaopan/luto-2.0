@@ -53,7 +53,7 @@ SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
 NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
-MODIFIED_LIVESTOCK_COLOR = "#fe7f2d"
+MODIFIED_LIVESTOCK_COLOR = "#762500"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -308,7 +308,7 @@ def collect_slice_rows(run_map, price_vals, varying_key, baseline_summaries):
             )
 
             total_delta = sum(summary_2025.values()) - sum(summary_zero.values())
-            print(f"    {area_type}: change={total_delta:.2f} Mha")
+            print(f"    {area_type}: difference={total_delta:.2f} Mha")
 
             for category in category_order:
                 area_2025 = summary_2025.get(category, 0.0)
@@ -374,10 +374,10 @@ def collect_and_cache():
         "Non-ag": read_non_ag_area(zero_zip_path, YEAR),
     }
 
-    print(f"\n--- Slice A: area change at {YEAR}, BioPrice=0 and carbon price varies ---")
+    print(f"\n--- Slice A: area difference at {YEAR}, BioPrice=0 and carbon price varies ---")
     rows_cp = collect_slice_rows(run_map, cp_vals, "cp", baseline_summaries)
 
-    print(f"\n--- Slice B: area change at {YEAR}, CarbonPrice=0 and biodiversity price varies ---")
+    print(f"\n--- Slice B: area difference at {YEAR}, CarbonPrice=0 and biodiversity price varies ---")
     rows_bp = collect_slice_rows(run_map, bp_vals, "bp", baseline_summaries)
 
     df_long = pd.DataFrame(rows_cp + rows_bp)
@@ -531,9 +531,6 @@ fig, axes = plt.subplots(
 
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
-axes[0, 0].set_title("Carbon price varies\n(BioPrice=0)", pad=8)
-axes[0, 1].set_title("Biodiversity price varies\n(CarbonPrice=0)", pad=8)
-
 for row_idx, area_type in enumerate(row_area_types):
     ax_left = axes[row_idx, 0]
     ax_right = axes[row_idx, 1]
@@ -563,7 +560,7 @@ LEGEND_FS = {
     "Non-ag": FS - 1,
 }
 
-fig.supylabel(r"Area change vs zero price (Mha)", fontsize=FS)
+fig.supylabel(r"Area difference relative to zero price (Mha)", fontsize=FS)
 plt.tight_layout()
 plt.subplots_adjust(hspace=0.35, wspace=0.12)
 fig.canvas.draw()
