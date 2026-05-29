@@ -3346,7 +3346,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         'Outside LUTO study area': 'Outside LUTO study area',
     }
 
-    if settings.GBF3_NVIS_TARGET != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
+    if True:  # GBF3_NVIS scores are always written; always generate chart data
         filter_str = '''
             category == "biodiversity"
             and base_name.str.contains("biodiversity_GBF3_NVIS_scores")
@@ -4416,16 +4416,15 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
     # Build GBF3 NVIS selected region-species map (species × region pairs with a constraint target).
     # Uses one year's CSV (targets are constant across years); stored in supporting_info for downstream visuals.
     gbf3_nvis_selected_region_species = {}
-    if settings.GBF3_NVIS_TARGET != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
-        _scores_path = os.path.join(raw_data_dir, f'out_{_last_yr}', f'biodiversity_GBF3_NVIS_scores_{_last_yr}.csv')
-        if os.path.exists(_scores_path):
-            _sc = pd.read_csv(_scores_path, low_memory=False, usecols=['Vegetation Group', 'region', 'region_level', 'Target_by_Percent'])
-            _sc = _sc[_sc['Target_by_Percent'].notna() & (_sc['region'] != 'AUSTRALIA')][['Vegetation Group', 'region', 'region_level']].drop_duplicates()
-            for _, row in _sc.iterrows():
-                rl, r, s = row['region_level'], row['region'], row['Vegetation Group']
-                gbf3_nvis_selected_region_species.setdefault(rl, {}).setdefault(r, [])
-                if s not in gbf3_nvis_selected_region_species[rl][r]:
-                    gbf3_nvis_selected_region_species[rl][r].append(s)
+    _scores_path = os.path.join(raw_data_dir, f'out_{_last_yr}', f'biodiversity_GBF3_NVIS_scores_{_last_yr}.csv')
+    if os.path.exists(_scores_path):
+        _sc = pd.read_csv(_scores_path, low_memory=False, usecols=['Vegetation Group', 'region', 'region_level', 'Target_by_Percent'])
+        _sc = _sc[_sc['Target_by_Percent'].notna() & (_sc['region'] != 'AUSTRALIA')][['Vegetation Group', 'region', 'region_level']].drop_duplicates()
+        for _, row in _sc.iterrows():
+            rl, r, s = row['region_level'], row['region'], row['Vegetation Group']
+            gbf3_nvis_selected_region_species.setdefault(rl, {}).setdefault(r, [])
+            if s not in gbf3_nvis_selected_region_species[rl][r]:
+                gbf3_nvis_selected_region_species[rl][r].append(s)
 
     # Build GBF4 SNES selected region-species map (species × region pairs with a constraint target).
     snes_selected_region_species = {}
@@ -4442,16 +4441,15 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
 
     # Build GBF4 ECNES selected region-species map (ecological communities × region pairs with a constraint target).
     ecnes_selected_region_species = {}
-    if settings.GBF4_TARGET_ECNES != 'off':
-        _scores_path = os.path.join(raw_data_dir, f'out_{_last_yr}', f'biodiversity_GBF4_ECNES_scores_{_last_yr}.csv')
-        if os.path.exists(_scores_path):
-            _sc = pd.read_csv(_scores_path, low_memory=False, usecols=['species', 'region', 'region_level', 'Target by Percent (%)'])
-            _sc = _sc[_sc['Target by Percent (%)'].notna() & (_sc['region'] != 'AUSTRALIA')][['species', 'region', 'region_level']].drop_duplicates()
-            for _, row in _sc.iterrows():
-                rl, r, s = row['region_level'], row['region'], row['species']
-                ecnes_selected_region_species.setdefault(rl, {}).setdefault(r, [])
-                if s not in ecnes_selected_region_species[rl][r]:
-                    ecnes_selected_region_species[rl][r].append(s)
+    _scores_path = os.path.join(raw_data_dir, f'out_{_last_yr}', f'biodiversity_GBF4_ECNES_scores_{_last_yr}.csv')
+    if os.path.exists(_scores_path):
+        _sc = pd.read_csv(_scores_path, low_memory=False, usecols=['species', 'region', 'region_level', 'Target by Percent (%)'])
+        _sc = _sc[_sc['Target by Percent (%)'].notna() & (_sc['region'] != 'AUSTRALIA')][['species', 'region', 'region_level']].drop_duplicates()
+        for _, row in _sc.iterrows():
+            rl, r, s = row['region_level'], row['region'], row['species']
+            ecnes_selected_region_species.setdefault(rl, {}).setdefault(r, [])
+            if s not in ecnes_selected_region_species[rl][r]:
+                ecnes_selected_region_species[rl][r].append(s)
 
     supporting = {
         'model_run_settings': settings_dict,
