@@ -24,10 +24,8 @@
 import argparse, re, pathlib, os, sys
 import shutil
 import zipfile
-
-# Always run relative to the script's own directory so that relative paths
-# in settings.py (OUTPUT_DIR, etc.) resolve correctly regardless of cwd.
-os.chdir(pathlib.Path(__file__).parent)
+import luto.simulation as sim
+import luto.settings as settings
 
 # Force UTF-8 on Windows consoles (default cp1252 can't handle box-drawing chars).
 sys.stdout.reconfigure(encoding='utf-8')
@@ -35,8 +33,8 @@ sys.stderr.reconfigure(encoding='utf-8')
 
 
 def patch_input_dir(input_dir: str):
-    settings_path = pathlib.Path(__file__).parent / 'luto' / 'settings.py'
-    new_dir = input_dir.replace('\\', '/')
+    settings_path = pathlib.Path('luto/settings.py')
+    new_dir = pathlib.Path(input_dir).as_posix()
     text = settings_path.read_text(encoding='utf-8')
 
     # Replace INPUT_DIR=... line only — NO_GO_VECTORS uses relative paths so needs no patching
@@ -52,15 +50,17 @@ if __name__ == '__main__':
     if args.input_dir:
         patch_input_dir(args.input_dir)
 
-import luto.simulation as sim
-import luto.settings as settings
+# If a checkpoint exists, restore the original timestamp BEFORE load_data() so
+# sim.run() reuses the existing output directory. load_data() is skipped —
+# sim.run() loads the checkpoint internally when data=None.
+_checkpoint_dir = next(
+    (str(d) for d in sorted(pathlib.Path(settings.OUTPUT_DIR).iterdir(), key=lambda d: d.name)
+     if d.is_dir() and any(re.match(r'data_\d{4}\.lz4', f.name) for f in d.iterdir())),
+    None
+)
+data = None if _checkpoint_dir else sim.load_data()
 
-# Run the simulation
-# Checkpoints always enabled — saves data_<year>.lz4 after each solved year,
-# deletes the previous one, so only the most recent survives. Re-submitting
-# the same PBS job after a wall-time kill resumes automatically.
-data = sim.load_data()
-sim.run(data=data, do_analyze_iis=settings.DO_IIS, do_report=settings.WRITE_OUTPUTS, checkpoint_dir='.')
+data = sim.run(data=data, do_analyze_iis=settings.DO_IIS, do_report=settings.WRITE_OUTPUTS, checkpoint_dir=_checkpoint_dir)
 
 
 # Set up report directory and archive path

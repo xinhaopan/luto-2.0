@@ -26,6 +26,7 @@ model that has 'global' varying state.
 """
 
 import os
+import re
 import time
 import threading
 from pathlib import Path
@@ -136,20 +137,18 @@ def run(
         # throughout _run(), causing UnboundLocalError on non-checkpoint paths.
         active_data = data
         checkpoint_path = Path(checkpoint_dir) if checkpoint_dir is not None else None
-        recent_year_path = checkpoint_path if checkpoint_path is not None else Path(save_dir)
         resume_from_year = None
 
         if checkpoint_path is not None:
-            checkpoint_path.mkdir(parents=True, exist_ok=True)
             print(f"Checkpoint mode enabled: {checkpoint_path}")
-            files = sorted(checkpoint_path.glob("data_*.lz4"))
+            files = sorted(f for f in checkpoint_path.iterdir() if re.match(r'data_\d{4}\.lz4', f.name))
             if files:
                 checkpoint_file = files[-1]
                 resume_from_year = int(checkpoint_file.stem.split("_")[1])
                 active_data = joblib.load(str(checkpoint_file))
                 active_data.timestamp = read_timestamp()
                 active_data.path = save_dir
-                print(f"Found checkpoint for year {resume_from_year}: {checkpoint_file}")
+                print(f"Resuming from checkpoint (year {resume_from_year}): {checkpoint_file}")
             elif data is None:
                 raise ValueError(
                     f"No checkpoint files found in '{checkpoint_path}' and no `data` was provided; "
@@ -178,7 +177,7 @@ def run(
             print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years) - 1} runs!\n", flush=True)
 
             if len(years_to_run) > 1:
-                solve_timeseries(active_data, years_to_run, do_analyze_iis, recent_year_path)
+                solve_timeseries(active_data, years_to_run, do_analyze_iis, Path(save_dir))
 
             # Save final data and write outputs
             save_data_to_disk(active_data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
@@ -262,8 +261,8 @@ def solve_timeseries(
             tmp_path = Path(f"{final_path}.tmp")
             save_data_to_disk(data, str(tmp_path))
             os.replace(tmp_path, final_path)
-            for old in checkpoint_path.glob("data_*.lz4"):
-                if old != final_path:
+            for old in checkpoint_path.iterdir():
+                if re.match(r'data_\d{4}\.lz4', old.name) and old != final_path:
                     old.unlink()
             print(f"Saved checkpoint for year {target_year}: {final_path}")
 
