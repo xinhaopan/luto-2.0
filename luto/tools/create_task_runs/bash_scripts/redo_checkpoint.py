@@ -7,14 +7,26 @@ A run is classified as:
   • checkpoint — has a data_<year>.lz4 inside its output subdir
   • incomplete — none of the above
 
-For each checkpoint run the script writes redo_param.py (updated PBS settings)
-and calls `bash redo_cmd.sh` from the run dir. python_script.py detects the
-existing checkpoint, skips load_data(), and resumes from the saved year.
+For each checkpoint run the script reads PBS settings from the run's
+task_param.py, writes redo_param.py (overriding any CLI-supplied values),
+then calls `bash redo_cmd.sh` from that run dir. python_script.py detects
+the existing checkpoint, skips load_data(), and resumes from the saved year.
+
+Arguments:
+    --dry-run        Classify runs and print what would happen; no files written, no qsub.
+    --mem   <val>    Override PBS memory    (default: inherit from task_param.py, fallback 320gb)
+    --ncpus <val>    Override PBS CPU count (default: inherit from task_param.py, fallback 64)
+    --time  <val>    Override PBS walltime  (default: inherit from task_param.py, fallback 48:00:00)
+    --queue <val>    Override PBS queue     (default: inherit from task_param.py, fallback normalsr)
 
 Usage:
-    python redo_checkpoint.py                    # inherit PBS settings from each run's task_param.py
-    python redo_checkpoint.py --dry-run          # print what would happen; no files written, no qsub
-    python redo_checkpoint.py --time 24:00:00    # override one param; rest inherited from task_param.py
+    # Run from the task root directory (where Run_G* subdirs live)
+    cd /g/data/jk53/jinzhu/LUTO/Custom_runs/REM_RES1
+
+    python redo_checkpoint.py                        # use each run's own task_param.py settings
+    python redo_checkpoint.py --dry-run              # preview only — no files written, no qsub
+    python redo_checkpoint.py --time 24:00:00        # shorten walltime; other params from task_param.py
+    python redo_checkpoint.py --mem 160gb --ncpus 32 # override memory and CPUs for all redo jobs
 """
 
 import argparse
@@ -25,16 +37,38 @@ from pathlib import Path
 
 
 def get_running_workdirs() -> set[Path]:
-    """Return PBS_O_WORKDIR paths for all live jobs owned by $USER."""
-    result = subprocess.run(
-        ["qstat", "-f", "-u", os.environ.get("USER", "")],
-        capture_output=True, text=True, check=True,
+    """Return PBS_O_WORKDIR paths for all live jobs owned by $USER.
+
+    On Gadi, `qstat -f -u USER` outputs only the short table (no attributes).
+    We therefore get job IDs first, then query each with `qstat -f <id>`.
+    qstat -f also wraps long lines with a leading tab; those are joined before parsing.
+    """
+    user = os.environ.get("USER", "")
+    id_result = subprocess.run(
+        ["qstat", "-u", user],
+        capture_output=True, text=True,
     )
+    job_ids = [
+        line.split()[0]
+        for line in id_result.stdout.splitlines()
+        if line and "." in line.split()[0] and not line.startswith("-") and not line.startswith(" ")
+    ]
 
     dirs: set[Path] = set()
-    for line in result.stdout.splitlines():
-        line = line.strip()
-        if "PBS_O_WORKDIR=" in line:
+    for job_id in job_ids:
+        detail = subprocess.run(
+            ["qstat", "-f", job_id],
+            capture_output=True, text=True,
+        )
+        joined_lines: list[str] = []
+        for raw in detail.stdout.splitlines():
+            if raw.startswith("\t") and joined_lines:
+                joined_lines[-1] += raw.strip()
+            else:
+                joined_lines.append(raw.strip())
+        for line in joined_lines:
+            if "PBS_O_WORKDIR=" not in line:
+                continue
             for token in line.split(","):
                 token = token.strip()
                 if token.startswith("PBS_O_WORKDIR="):
