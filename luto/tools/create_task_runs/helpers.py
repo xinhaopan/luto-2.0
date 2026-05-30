@@ -167,7 +167,8 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cl
         return
 
     # cluster mode — copy PBS helper scripts
-    shutil.copyfile(os.path.join(_bash_scripts, 'task_cmd.sh'), f'{task_root_dir}/{col}/task_cmd.sh')
+    shutil.copyfile(os.path.join(_bash_scripts, 'task_cmd.sh'),      f'{task_root_dir}/{col}/task_cmd.sh')
+    shutil.copyfile(os.path.join(_bash_scripts, 'redo_cmd.sh'),      f'{task_root_dir}/{col}/redo_cmd.sh')
     shutil.copyfile(os.path.join(_bash_scripts, 'python_script.py'), f'{task_root_dir}/{col}/python_script.py')
 
     import time
@@ -230,7 +231,7 @@ def write_settings(task_dir:str, settings_dict:dict):
         
                 
 def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
-    with open(f'{task_dir}/luto/settings_bash.py', 'w') as bash_file:
+    with open(f'{task_dir}/task_param.py', 'w') as bash_file:
         for key, value in settings_dict.items():
             if key not in SERVER_PARAMS:
                 continue
@@ -259,7 +260,12 @@ def create_task_runs(
     
     if mode not in ['single', 'cluster']:
         raise ValueError('Mode must be either "single" or "cluster"!')
-   
+
+    _bash_scripts = os.path.join(LUTO_ROOT, 'luto/tools/create_task_runs/bash_scripts')
+    shutil.copyfile(os.path.join(_bash_scripts, 'run_all.py'),         os.path.join(task_root_dir, 'run_all.py'))
+    shutil.copyfile(os.path.join(_bash_scripts, 'redo_checkpoint.py'), os.path.join(task_root_dir, 'redo_checkpoint.py'))
+    shutil.copyfile(os.path.join(_bash_scripts, 'redo_cmd.sh'),        os.path.join(task_root_dir, 'redo_cmd.sh'))
+
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
     custom_settings = custom_settings.set_index('Name')

@@ -5,6 +5,145 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260530 — PBS checkpoint/redo pipeline: simulation.py per-year checkpointing, python_script.py auto-detect, redo_checkpoint.py batch resubmit
+
+### Context
+
+Gadi PBS jobs for multi-year LUTO simulations are frequently wall-time killed before
+completing all years. Previously, such runs were unrecoverable — the full 320 GB data
+object had to be reloaded from scratch on resubmit. A checkpoint/redo pipeline was
+implemented to resume from the last solved year without reloading data.
+
+---
+
+### 1 — `simulation.py`: per-year checkpoint saves into the timestamped output subdir
+
+`solve_timeseries()` now accepts `checkpoint_path: Path | None`. After each successfully
+solved year it writes `data_{year}.lz4` (via a `.tmp` rename to be atomic), then deletes
+any previous `data_*.lz4` in the same directory — keeping only the most recent checkpoint:
+
+```python
+if checkpoint_path is not None:
+    final_path = checkpoint_path / f"data_{target_year}.lz4"
+    tmp_path = Path(f"{final_path}.tmp")
+    save_data_to_disk(data, str(tmp_path))
+    os.replace(tmp_path, final_path)
+    for old in checkpoint_path.iterdir():
+        if re.match(r'data_\d{4}\.lz4', old.name) and old != final_path:
+            old.unlink()
+```
+
+`run()` passes `Path(save_dir)` as `checkpoint_path` so the lz4 lives inside the
+timestamped output subdir (`output/TIMESTAMP_RF1_2020-2050/data_2025.lz4`), not in the
+run root where it would appear as an untracked code change.
+
+On resume, `run()` scans that directory for `data_\d{4}\.lz4`, loads the latest via
+`joblib.load`, restores `active_data.timestamp` and `active_data.path` from the
+already-written `.timestamp` file, then calls `solve_timeseries` with only the remaining
+years:
+
+```python
+files = sorted(f for f in checkpoint_path.iterdir() if re.match(r'data_\d{4}\.lz4', f.name))
+if files:
+    resume_from_year = int(files[-1].stem.split("_")[1])
+    active_data = joblib.load(str(files[-1]))
+    active_data.timestamp = read_timestamp()
+    active_data.path = save_dir
+```
+
+**Why `\d{4}` not `data_*.lz4`**: `pathlib.glob` does not support regex alternation;
+`re.match` over `iterdir()` is used throughout so the pattern is exact.
+
+---
+
+### 2 — `python_script.py`: auto-detects checkpoint, skips `load_data()`
+
+The key invariant: `sim.load_data()` calls `write_timestamp()`, overwriting
+`output/.timestamp` with a new value — which would cause `sim.run()` to construct a
+**new** output directory, losing the connection to the existing partial output.
+
+The script avoids this by scanning `output/` subdirs for `data_\d{4}.lz4` before
+deciding whether to call `load_data()`:
+
+```python
+_checkpoint_dir = next(
+    (str(d) for d in sorted(pathlib.Path(settings.OUTPUT_DIR).iterdir(), key=lambda d: d.name)
+     if d.is_dir() and any(re.match(r'data_\d{4}\.lz4', f.name) for f in d.iterdir())),
+    None
+)
+data = None if _checkpoint_dir else sim.load_data()
+data = sim.run(data=data, ..., checkpoint_dir=_checkpoint_dir)
+```
+
+If a checkpoint dir is found: `load_data()` is skipped → `.timestamp` is unchanged →
+`sim.run()` reconstructs the same `save_dir` → the simulation continues writing into
+the original output directory. The `data = sim.run(...)` capture is critical — without it
+`data` remains `None` and the downstream archive step (`pathlib.Path(data.path)`) raises
+`AttributeError`.
+
+---
+
+### 3 — `redo_checkpoint.py`: batch resubmit for stalled runs
+
+Deployed to the task root (e.g. `REM_RES1/`) alongside `run_all.py`. Classifies every
+`Run_G*` directory as one of four states:
+
+| State | Condition |
+|---|---|
+| finished | `Run_Archive.zip` exists |
+| running | directory is the `PBS_O_WORKDIR` of a live Gadi job (`qstat -f -u $USER`) |
+| checkpoint | has `data_\d{4}.lz4` inside any `output/` subdir |
+| incomplete | none of the above |
+
+For each checkpoint run:
+1. Reads `task_param.py` (the original PBS settings written at submission time) to
+   extract base `MEM`, `NCPUS`, `TIME`, `QUEUE`.
+2. Overrides only the params explicitly passed as CLI flags; all others are inherited.
+3. Writes `redo_param.py` with the merged settings.
+4. Calls `bash redo_cmd.sh` from the run directory, which submits a new PBS job via
+   `qsub`.
+
+`--dry-run` is fully read-only: classification and output printing happen, but no files
+are written and no jobs are submitted.
+
+**CLI interface:**
+
+```bash
+# inherit all PBS settings from each run's task_param.py
+python redo_checkpoint.py --dry-run
+
+# override walltime only; mem/ncpus/queue still inherited
+python redo_checkpoint.py --time 24:00:00
+
+# override everything explicitly
+python redo_checkpoint.py --mem 500gb --ncpus 96 --time 24:00:00 --queue normal
+```
+
+---
+
+### 4 — `redo_cmd.sh`: mirrors `task_cmd.sh`, sources `redo_param.py`
+
+`task_cmd.sh` sources `task_param.py` and submits `python_script.py` via `conda run`.
+`redo_cmd.sh` is identical except it sources `redo_param.py`. Because `python_script.py`
+auto-detects the checkpoint internally, no additional arguments are needed — the redo
+job calls the same script as the original submission.
+
+`SCRIPT_DIR` is resolved from `${BASH_SOURCE[0]}` so the absolute path to
+`python_script.py` is correct regardless of where `redo_cmd.sh` is called from.
+
+---
+
+### 5 — `helpers.py`: redo scripts copied at task-create and submit time
+
+`create_task_runs()` now copies `redo_checkpoint.py` and `redo_cmd.sh` to the task root
+alongside `run_all.py` (two plain `shutil.copyfile` calls, no loop).
+
+`submit_task()` in cluster mode copies `redo_cmd.sh` and `python_script.py` into each
+`Run_G*/` directory alongside `task_cmd.sh`, so every run dir is self-contained for both
+initial submission and checkpoint redo.
+
+---
+
 ## 20260530 — Biodiversity report fixes: resfactor denominator, Target_by_Percent NaN sentinel, Relative_Contribution_Percentage formula, AUSTRALIA region rows, GBF4_SNES Vue setting key
 
 ### Context
