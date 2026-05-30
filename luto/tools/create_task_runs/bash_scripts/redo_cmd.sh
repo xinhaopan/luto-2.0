@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Read the settings_bash file ==> JOB_NAME, QUEUE, NCPUS, MEM, TIME
-source task_param.py
+# Source redo_param.py ==> JOB_NAME, QUEUE, NCPUS, MEM, TIME
+source redo_param.py
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
