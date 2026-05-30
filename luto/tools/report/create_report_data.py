@@ -210,6 +210,11 @@ def _write_paged_chart_js(
             f.write(f'window["{fname}"] = ')
             json.dump(page_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
+    # Also write a flat combined file so Home.js can load all species in one request.
+    with open(f'{save_dir}/{filename_prefix}.js', 'w') as f:
+        f.write(f'window["{filename_prefix}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
 
 
 def save_report_data(raw_data_dir:str):

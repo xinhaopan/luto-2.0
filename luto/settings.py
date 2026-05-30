@@ -275,7 +275,7 @@ WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk 
                                             #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
                                             #   This makes memory usage to be ~1/200 of the original size.
 
-WRITE_SNES = 'on'                          # 'on' or 'off'. If write, will take ~5 hours to finish.
+WRITE_SNES = 'off'                          # 'on' or 'off'. If write, will take ~5 hours to finish.
 
 
 # ---------------------------------------------------------------------------- #
