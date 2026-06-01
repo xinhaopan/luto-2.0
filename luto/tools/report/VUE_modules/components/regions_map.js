@@ -230,6 +230,10 @@ window.RegionsMap = {
       type: Object,
       default: null
     },
+    rezOverlay: {
+      type: Object,
+      default: null
+    },
     regionType: {
       type: String,
       default: 'NRM'  // 'NRM' or 'STATE'
@@ -252,6 +256,8 @@ window.RegionsMap = {
     const map = ref(null);
     const boundingBox = ref(null);
     const gbf2Layer = ref(null);
+    const rezLayer = ref(null);
+    const showREZ = ref(true);
     const loadScript = window.loadScript;
     const selectedBaseMap = ref('CartoDB');
     const tileLayers = ref({});
@@ -628,6 +634,21 @@ window.RegionsMap = {
       }
     });
 
+    const updateREZLayer = () => {
+      if (!map.value) return;
+      if (rezLayer.value) {
+        map.value.removeLayer(rezLayer.value);
+        rezLayer.value = null;
+      }
+      if (props.rezOverlay && showREZ.value) {
+        rezLayer.value = L.geoJSON(props.rezOverlay, {
+          style: { color: '#f59e0b', weight: 1.5, fillColor: '#f59e0b', fillOpacity: 0.12, opacity: 0.85 }
+        }).addTo(map.value);
+      }
+    };
+    Vue.watch(() => props.rezOverlay, updateREZLayer);
+    Vue.watch(showREZ, updateREZLayer);
+
     Vue.watch(selectedRegion, (newValue, oldValue) => {
       if (newValue) {
         // Only trigger animation if this is a real region change (not a page navigation)
@@ -833,6 +854,7 @@ window.RegionsMap = {
       isExporting,
       exportLayer,
       canExport: computed(() => !!props.mapData?.tif_b64),
+      showREZ,
     };
   },
   template: `
@@ -874,6 +896,17 @@ window.RegionsMap = {
               </svg>
               Export GeoTIFF (GDA94)
             </span>
+          </button>
+
+          <!-- REZ toggle button — only shown in views that pass rezOverlay -->
+          <button v-if="$props.rezOverlay"
+            @click="showREZ = !showREZ"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg shadow-lg text-[0.72rem] font-medium transition-all select-none cursor-pointer"
+            :class="showREZ ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-white/70 text-gray-500 hover:bg-white/90'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Renewable Energy Zones
           </button>
         </div>
 

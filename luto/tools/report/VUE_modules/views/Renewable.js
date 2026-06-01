@@ -49,6 +49,8 @@ window.RenewableView = {
 
     onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
 
+    const rezOverlay = ref(null);
+
     function getTree() {
       return window[mapRegister["Ag Mgt"]?.indexName]?.tree ?? {};
     }
@@ -61,7 +63,9 @@ window.RenewableView = {
       await Promise.all([
         loadScript(mapRegister["Ag Mgt"].indexPath, mapRegister["Ag Mgt"].indexName, VIEW_NAME),
         loadScript(chartRegister["Ag Mgt"].path, chartRegister["Ag Mgt"].name, VIEW_NAME),
+        loadScript("./data/geo/REZ.js", "RENEWABLE_REZ", VIEW_NAME),
       ]);
+      rezOverlay.value = window.RENEWABLE_REZ || null;
       isLoadingData.value = false;
 
       availableYears.value = window.Supporting_info.years;
@@ -117,6 +121,7 @@ window.RenewableView = {
       selectAgMgt, selectWater, selectLanduse,
       selectMapData, selectChartData,
       dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
+      rezOverlay,
     };
     const _fn = v => String(v).trim().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     _state.mapFileName = computed(() =>
@@ -224,6 +229,7 @@ window.RenewableView = {
           :mapData="selectMapData"
           :file-name="mapFileName"
           :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
+          :rez-overlay="rezOverlay"
           style="width: 100%; height: 100%;">
         </regions-map>
 
