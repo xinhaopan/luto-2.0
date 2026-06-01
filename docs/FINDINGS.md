@@ -5,6 +5,182 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260601 — Riparian Plantings area incorrectly reduced despite `NON_AG_LAND_USES_REVERSIBLE = False`
+
+### Context
+
+Run `2026_05_31__13_46_26_RF5_2020-2050` showed Riparian Plantings (RP) area declining
+between years despite `NON_AG_LAND_USES_REVERSIBLE['Riparian Plantings'] = False`. The
+stdout log contained repeated `NonAg lb capped` messages with gaps up to 0.3 — far larger
+than the 1e-2 `FEASIBILITY_TOLERANCE` that the existing capping code was designed to absorb.
+Total RP dvar peaked at 112.48 (2045) and fell to 99.44 (2050); earlier periods showed
+similar erosion.
+
+Inspection script: `jinzhu_inspect_code/Check_RP_reduce/check_rp_reduce.py`
+
+---
+
+### 1 — Root cause: transition matrix evicts existing RP from EP-dominated cells
+
+`get_lower_bound_non_agricultural_matrices()` (non_agricultural/transitions.py ~L1137)
+sets the lb for each non-ag land use to the previous year's dvar (floor-truncated), then
+caps it against the solver's UB from `get_to_non_ag_exclude_matrices()`:
+
+```python
+non_ag_x_rk = get_to_non_ag_exclude_matrices(data, data.lumaps[base_year])
+lb_capped = np.minimum(lb_capped, non_ag_x_rk)
+```
+
+`non_ag_x_rk` for RP is built as:
+
+```python
+t_rk[non_ag_cells, :] *= T_MAT[lumap_by → RP]   # current dominant land use → RP
+t_rk[non_ag_cells, :] *= T_MAT[lumap_2010 → RP]  # 2010 base land use → RP
+t_rk = where(isnan(t_rk), 0, 1)
+UB_RP = t_rk × RP_PROPORTION
+```
+
+`T_MAT['Environmental Plantings' → 'Riparian Plantings'] = NaN` (transition not in matrix).
+`T_MAT['Riparian Plantings' → 'Riparian Plantings'] = 0.0` (self-transition costs nothing,
+and is non-NaN, so it is **allowed**).
+
+Many cells hold a partial RP allocation (dvar_rp > 0) while their dominant land use is
+Environmental Plantings (EP). When `lumap_by = 'EP'`:
+
+```
+T_MAT[EP → RP] = NaN  →  t_rk = 0  →  UB = 0
+lb_rk = previous dvar (e.g. 0.12)  →  lb capped to 0  →  RP deleted
+```
+
+The transition matrix is intended to gate *new* allocations; it should not evict
+*existing* allocations in irreversible land uses. The capping code conflates these two cases.
+
+**Confirmed by data**: all capped RP cells have `t_rk = 0`; none are caused by
+`RP_PROPORTION` (FEASIBILITY_TOLERANCE) overrun. The capped-cells CSV
+(`rp_capped_cells.csv`) shows every row has `ub_rp = 0.0` and `t_rk = 0`, with
+`lumap_by` = EP or another non-ag LU.
+
+---
+
+### 2 — Why RP is the only affected non-ag land use
+
+`RP_PROPORTION = (2 × BUFFER_WIDTH × STREAM_LENGTH) / (REAL_AREA_NO_RESFACTOR × 10000)`
+
+Its maximum across all cells is **0.39**, meaning RP can occupy at most 39% of any cell.
+Therefore, the cell's `lumap` is **always** some other land use (EP, Agroforestry, or an
+agricultural land use). The cell never has `lumap = 'Riparian Plantings'`.
+
+Consequence: for every cell that carries an RP dvar, the transition lookup is
+`T_MAT[other_LU → RP]`. Because most non-ag → RP cross-transitions are NaN in T_MAT,
+`t_rk = 0` for virtually all existing RP allocations. The bug affects **all** RP cells
+every year.
+
+All other irreversible non-ag land uses (EP, Carbon Plantings, Agroforestry) can occupy
+100% of a cell, so their dominant `lumap` equals themselves, the self-transition
+`T_MAT[X → X]` is valid, and `t_rk = 1`. The transition-matrix eviction only hits them
+for rare minority allocations, with negligible area loss. RP is structurally excluded from
+ever being its own `lumap` by the `RP_PROPORTION` physical constraint.
+
+---
+
+### 3 — Why the fix must touch both the UB and the lb
+
+`non_ag_x_rk` (the UB) does double duty in the solver:
+
+```python
+# input_data.py
+non_ag_lu2cells = {k: np.where(non_ag_x_rk[:, k])[0] ...}
+
+# solver.py
+for r in non_ag_lu2cells[k]:          # only cells with UB > 0 get a variable
+    addVar(lb=non_ag_lb_rk[r,k], ub=non_ag_x_rk[r,k])
+```
+
+If `non_ag_x_rk[cell, RP] = 0`, the cell never enters `non_ag_lu2cells`, no Gurobi
+variable is created for it, and its dvar is implicitly 0 in the next period — regardless
+of what the lb says. A lb-only fix is therefore ineffective.
+
+---
+
+### 4 — Fix: one parameter in `get_to_non_ag_exclude_matrices` (transitions.py)
+
+`get_to_non_ag_exclude_matrices` is the single source of both the UB (`get_non_ag_x_rk`
+in input_data.py) and the UB used to cap the lb (`get_lower_bound_non_agricultural_matrices`
+in transitions.py). Adding one optional parameter fixes both call sites at once:
+
+```python
+def get_to_non_ag_exclude_matrices(data, lumap, existing_dvars_rk=None):
+    ...
+    t_rk = np.where(np.isnan(t_rk), 0, 1).astype(np.int8)
+
+    # Cells that already hold an irreversible non-ag allocation bypass the transition
+    # matrix — the matrix gates *new* allocations only, not existing ones.
+    if existing_dvars_rk is not None:
+        for k, k_name in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+            if not settings.NON_AG_LAND_USES_REVERSIBLE.get(k_name, True):
+                t_rk[existing_dvars_rk[:, k] > 0, k] = 1
+    ...
+```
+
+Both callers pass the previous period's dvars:
+
+```python
+# transitions.py — get_lower_bound_non_agricultural_matrices
+non_ag_x_rk = get_to_non_ag_exclude_matrices(
+    data, data.lumaps[base_year],
+    existing_dvars_rk=data.non_ag_dvars[base_year],
+)
+
+# input_data.py — get_non_ag_x_rk
+existing_dvars = data.non_ag_dvars.get(base_year) if base_year != data.YR_CAL_BASE else None
+return get_to_non_ag_exclude_matrices(data, data.lumaps[base_year], existing_dvars_rk=existing_dvars)
+```
+
+No recovery scaffolding anywhere. The fix is entirely inside `get_to_non_ag_exclude_matrices`.
+
+---
+
+### 5 — Other irreversible LUs also affected (small scale)
+
+The same bug affected EP, Sheep/Beef Agroforestry, and Carbon Plantings wherever they
+appeared as minority allocations in cells dominated by a different non-ag LU. Pre-fix
+area losses (transition-matrix eviction only):
+
+| Land use | Total area lost 2020–2050 | Peak cells/period |
+|---|---:|---:|
+| Riparian Plantings | **61.2** | **240** |
+| Environmental Plantings | 1.07 | 29 |
+| Sheep Agroforestry | 0.030 | 8 |
+| Beef Agroforestry | 0.0005 | 29 |
+| Others | < 0.003 | — |
+
+RP is 57× worse because `RP_PROPORTION` max = 0.39 means RP can **never** be the
+dominant land use — its `lumap` is always another LU, so the transition matrix always
+blocks it.
+
+Inspection scripts: `jinzhu_inspect_code/Check_RP_reduce/`
+
+---
+
+### 6 — Verification
+
+`verify_fix.py` checks both `non_ag_lb_rk` (lb) and `non_ag_x_rk` (UB / cell inclusion)
+against the same `Data_RES5.lz4`:
+
+| Year transition | Before (RP area lost) | After |
+|---|---:|---:|
+| 2020 → 2025 | 0.877 | 0.000 |
+| 2025 → 2030 | 9.920 | 0.000 |
+| 2030 → 2035 | 6.226 | 0.000 |
+| 2035 → 2040 | 6.225 | 0.000 |
+| 2040 → 2045 | 24.921 | 0.000 |
+| 2045 → 2050 | 13.024 | 0.000 |
+
+Remaining `NonAg lb capped` messages show `max gap = 2.97e-08` — pure float32 rounding,
+not real area loss. RP total dvar is now monotonically non-decreasing as intended.
+
+---
+
 ## 20260530 — PBS checkpoint/redo pipeline: simulation.py per-year checkpointing, python_script.py auto-detect, redo_checkpoint.py batch resubmit
 
 ### Context

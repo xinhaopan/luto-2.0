@@ -438,8 +438,10 @@ def get_ag_x_mrj(data: Data, base_year):
 
 def get_non_ag_x_rk(data: Data, base_year):
     print('Getting non-agricultural exclude matrices...', flush = True)
-    output = non_ag_transition.get_to_non_ag_exclude_matrices(data, data.lumaps[base_year])
-    return output
+    existing_dvars = data.non_ag_dvars.get(base_year) if base_year != data.YR_CAL_BASE else None
+    return non_ag_transition.get_to_non_ag_exclude_matrices(
+        data, data.lumaps[base_year], existing_dvars_rk=existing_dvars
+    )
 
 
 def get_ag_man_lb_mrj(data: Data, base_year):

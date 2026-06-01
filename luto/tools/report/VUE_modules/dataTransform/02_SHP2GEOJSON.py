@@ -1,5 +1,6 @@
 import json
 import geopandas as gpd
+import pandas as pd
 from io import BytesIO
 from shapely.ops import unary_union
 
@@ -59,3 +60,34 @@ centroid_bbox = AUS_STATE.drop_duplicates(subset='STATE_NAME').set_index('STATE_
 
 with open('luto/tools/report/VUE_modules/data/geo/AUS_STATE_centroid_bbox.js', 'w', encoding='utf-8') as f:
     f.write(f'window.AUS_STATE_centroid_bbox = {json.dumps(centroid_bbox, indent=2)};\n')
+    
+    
+    
+    
+    
+# Save REZ to JS object
+REZ = gpd.read_file('luto/tools/report/VUE_modules/assets/REZ_boundary/aemo_rez_boundaries_2025.shp')
+REZ = REZ.dissolve(by='Name')[['geometry']].reset_index()
+REZ_crs = REZ.crs  # Save before reprojection
+
+# Reproject to EPSG:4326 (WGS84 lat/lng) for Leaflet compatibility
+if REZ.crs.to_epsg() != 4326:
+    REZ = REZ.to_crs('EPSG:4326')
+    
+with BytesIO() as geojson_bytes:
+    REZ.to_file(geojson_bytes, driver='GeoJSON')
+    geojson_bytes.seek(0)
+    geojson_str = eval(geojson_bytes.getvalue().decode('utf-8'))
+
+with open('luto/tools/report/VUE_modules/data/geo/REZ.js', 'w', encoding='utf-8') as f:
+    f.write(f'window.RENEWABLE_REZ = {json.dumps(geojson_str, indent=2)};\n')
+    
+# Save centroids and bounding box of REZ to JS object
+REZ.loc[len(REZ)] = ['AUSTRALIA', unary_union(REZ.geometry.values)]
+REZ = REZ.set_crs(REZ_crs, allow_override=True)
+REZ['centroid'] = REZ.geometry.centroid.apply(lambda p: [p.y, p.x])
+REZ['bounding_box'] = REZ.geometry.bounds.values.tolist()
+centroid_bbox = REZ.set_index('Name')[['centroid', 'bounding_box']].to_dict(orient='index')
+
+with open('luto/tools/report/VUE_modules/data/geo/REZ_centroid_bbox.js', 'w', encoding='utf-8') as f:
+    f.write(f'window.RENEWABLE_REZ_centroid_bbox = {json.dumps(centroid_bbox, indent=2)};\n')
