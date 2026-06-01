@@ -146,10 +146,12 @@ def submit_job(run_dir: Path, args: argparse.Namespace) -> None:
         cwd=run_dir,
         capture_output=True, text=True,
     )
-    if result.returncode == 0:
-        print(f"    [submitted] {result.stdout.strip()}")
+    job_id = result.stdout.strip()
+    if result.returncode == 0 and job_id:
+        print(f"    [submitted] {job_id}")
     else:
-        print(f"    [error] {result.stderr.strip()}")
+        err = result.stderr.strip() or result.stdout.strip() or "(no output)"
+        print(f"    [error] {err}")
 
 
 def main():

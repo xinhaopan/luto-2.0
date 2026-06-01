@@ -245,6 +245,7 @@ def create_task_runs(
     mode:Literal['single','cluster']='cluster',
     n_workers:int=4,
     max_concurrent_tasks:int=300,
+    overwrite:bool=False,
 ) -> None:
     '''
     Submit the tasks to the cluster using the custom settings.\n
@@ -281,7 +282,8 @@ def create_task_runs(
         create_run_folders(task_root_dir, col, n_workers)
         write_settings(f'{task_root_dir}/{col}', settings_dict)
         write_terminal_vars(f'{task_root_dir}/{col}', col, settings_dict)
-        submit_task(task_root_dir, col, mode, max_concurrent_tasks)
+        if not overwrite:
+            submit_task(task_root_dir, col, mode, max_concurrent_tasks)
     
     # Run the tasks in parallel
     tasks = [delayed(task_wraper)(col) for col in custom_settings.columns]

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Source redo_param.py ==> JOB_NAME, QUEUE, NCPUS, MEM, TIME
 source redo_param.py
