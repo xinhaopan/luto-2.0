@@ -191,9 +191,6 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cl
         print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
         time.sleep(10)
 
-    # task_cmd.sh sources setup_internet.sh (SSH to DM) then calls qsub and exits.
-    # 120 s is generous: SSH ConnectTimeout=5 × 6 DMs + qsub overhead << 60 s normally.
-    # If it exceeds 120 s something is badly wrong — fail loudly rather than hang forever.
     TASK_CMD_TIMEOUT = 120
     with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
          open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
