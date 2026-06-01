@@ -1083,53 +1083,56 @@ def get_non_ag_to_non_ag_transition_matrix(data: Data) -> np.ndarray:
 
 
 
-def get_to_non_ag_exclude_matrices(data: Data, lumap) -> np.ndarray:
+def get_to_non_ag_exclude_matrices(data: Data, lumap, existing_dvars_rk=None) -> np.ndarray:
     """
-    Get the non-agricultural exclusions matrix.
+    Get the non-agricultural exclusions matrix (upper bounds for the solver).
 
     Parameters
     ----------
     data : object
-        The data object containing information about the model.
-    lumap : object
-        The lumap object containing land usage mapping information.
+    lumap : array
+        Land-use map for the current period.
+    existing_dvars_rk : ndarray, optional
+        Previous-period non-ag dvars (NCELLS × N_NON_AG_LUS).  When provided, cells
+        that already carry a positive allocation in an irreversible non-ag LU bypass
+        the transition-matrix check — the matrix gates *new* allocations only.
 
     Returns
     -------
-    np.ndarray
-        A 2-D array indexed by (r, k) where r is the cell and k is the non-agricultural land usage.
-
-    Notes
-    -----
-    This function calculates the non-agricultural exclusions matrix by combining several exclusion matrices
-    related to different non-agricultural land uses. The resulting matrix is a concatenation of these matrices
-    along the k indexing.
+    np.ndarray  shape (NCELLS, N_NON_AG_LUS)
+        Upper bound for each (cell, non-ag LU) pair.
     """
 
-    # Get transition costs for to_non_ag 2D array (r, k)
+    # Transition-matrix flag: 1 = allowed, 0 = not allowed (NaN in T_MAT)
     t_ik = data.T_MAT.sel(to_lu=data.NON_AGRICULTURAL_LANDUSES).copy()
     lumap2desc = np.vectorize(data.ALLLU2DESC.get, otypes=[str])
-    ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)                            
-    
-    t_rk = np.ones((data.NCELLS, len(data.NON_AGRICULTURAL_LANDUSES))).astype(np.float32)    # Empty ones_rj array to be filled with transition flag (1 allow, 0 not allow)
-    t_rk[ag_cells, :] = t_ik[lumap[ag_cells]]                                                # For ag cells in the base year lumap, get transition cost (np.nan is not-allow) for them
-    t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(lumap[non_ag_cells]))               # For non-ag cells in the base year lumap, get transition cost (np.nan is not-allow) for them
-    t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(data.LUMAP[non_ag_cells]))          # For non-ag cells, find its ag status in BASE_YR (2010), then get transition cost based on these 2010-ag status
-    t_rk = np.where(np.isnan(t_rk), 0, 1).astype(np.int8)  
+    ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
 
-    # No-go exclusion; user-defined layer specifying which land-use are not disallowd at where
-    no_go_x_rk = np.ones((data.NCELLS, data.N_NON_AG_LUS))  
+    t_rk = np.ones((data.NCELLS, len(data.NON_AGRICULTURAL_LANDUSES))).astype(np.float32)
+    t_rk[ag_cells, :]     = t_ik[lumap[ag_cells]]
+    t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(lumap[non_ag_cells]))
+    t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(data.LUMAP[non_ag_cells]))
+    t_rk = np.where(np.isnan(t_rk), 0, 1).astype(np.int8)
+
+    # Cells that already hold an irreversible non-ag allocation must not be evicted
+    # by the transition-matrix check.  Override t_rk to 1 for those (cell, LU) pairs.
+    if existing_dvars_rk is not None:
+        for k, k_name in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+            if not settings.NON_AG_LAND_USES_REVERSIBLE.get(k_name, True):
+                t_rk[existing_dvars_rk[:, k] > 0, k] = 1
+
+    # No-go exclusion zones
+    no_go_x_rk = np.ones((data.NCELLS, data.N_NON_AG_LUS))
     if settings.EXCLUDE_NO_GO_LU:
         for no_go_x_r, no_go_desc in zip(data.NO_GO_REGION_NON_AG, data.NO_GO_LANDUSE_NON_AG):
-            no_go_j = data.NON_AGRICULTURAL_LANDUSES.index(no_go_desc)   # Get the index of the non-agricultural land use
+            no_go_j = data.NON_AGRICULTURAL_LANDUSES.index(no_go_desc)
             no_go_x_rk[:, no_go_j] = no_go_x_r
-            
-    # Assign non-ag maximum land-use proportions
+
     no_go_x_rk = (t_rk * no_go_x_rk).astype(np.float32)
-    
-    # Riparian Plantings can not exceed its proportion to the cell
+
+    # Riparian Plantings cannot exceed its stream-buffer proportion of the cell
     RP_j = data.NON_AGRICULTURAL_LANDUSES.index('Riparian Plantings')
-    no_go_x_rk[:, RP_j] *= data.RP_PROPORTION                  
+    no_go_x_rk[:, RP_j] *= data.RP_PROPORTION
 
     return no_go_x_rk
 
@@ -1160,12 +1163,13 @@ def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarr
     # make the cell-usage equality constraint structurally infeasible.
     lb_capped = np.minimum(lb_rk, data.AG_MASK_PROPORTION_R[:, np.newaxis]).astype(np.float32)
 
-    # Also cap each lb against the variable's own upper bound (non_ag_x_rk).
-    # For Riparian Plantings, ub = RP_PROPORTION which is an area value independent of
-    # AG_MASK_PROPORTION_R.  When RP_PROPORTION < AG_MASK_PROPORTION_R (common), the
-    # AG_MASK cap above does not prevent lb > RP_PROPORTION, causing a trivially
-    # infeasible variable (lb > ub) that Gurobi detects before any constraint is checked.
-    non_ag_x_rk = get_to_non_ag_exclude_matrices(data, data.lumaps[base_year]).astype(np.float32)
+    # Cap lb against the solver UB.  Pass existing dvars so that cells with an
+    # irreversible allocation are not evicted by the transition-matrix check inside
+    # get_to_non_ag_exclude_matrices (see that function's docstring for details).
+    non_ag_x_rk = get_to_non_ag_exclude_matrices(
+        data, data.lumaps[base_year],
+        existing_dvars_rk=data.non_ag_dvars[base_year],
+    ).astype(np.float32)
     lb_capped = np.minimum(lb_capped, non_ag_x_rk)
 
     lb_update = lb_capped < lb_rk
