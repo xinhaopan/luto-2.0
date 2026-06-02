@@ -1160,6 +1160,11 @@ GBF4_SNES_EXCLUDE_REGION_SPECIES = [
     # component alone (19.6%) cannot meet the 50% target → structurally infeasible.
     ('Goulburn Broken', 'Burramys parvus'),
 
+    # Swainsona recta — flagged in IIS across 8 NECMA_follow_runs at RF=3 (2026-06-01).
+    # 32 variables locked by transition bounds from 2035 solution; 150 free variables
+    # cannot deliver enough habitat restoration to meet the target >= 2188.68 (rescaled).
+    ('Goulburn Broken', 'Swainsona recta'),
+
     # North East — 8 species with BASEYEAR_SCORE_INSIDE_LUTO_NATURAL_LIKELY ≤ 100 ha.
     # data.py drops these in NRM mode (threshold = 100 ha) because the constraint LHS
     # is effectively zero and the target can never be met → ValueError at Data() init.

@@ -219,6 +219,13 @@ def write_settings(task_dir:str, settings_dict:dict):
     settings_dict = {k: settings_dict[k] for k in src_key_order if k in settings_dict} | \
                     {k: v for k, v in settings_dict.items() if k not in src_key_order}
 
+    # Sync AG_MANAGEMENTS renewable entries from RENEWABLES_OPTIONS.
+    # write_settings flattens all values to literals, breaking the dynamic link
+    # in settings.py. Values are already evaluated here (via non_str_val.txt).
+    for re_type, enabled in settings_dict['RENEWABLES_OPTIONS'].items():
+        if re_type in settings_dict['AG_MANAGEMENTS']:
+            settings_dict['AG_MANAGEMENTS'][re_type] = enabled
+
     with open(f'{task_dir}/luto/settings.py', 'w') as file:
         for k, v in settings_dict.items():
             if isinstance(v, str):
