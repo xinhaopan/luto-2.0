@@ -45,16 +45,15 @@ from luto.settings import (
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
 gurenv.setParam("Method", settings.SOLVE_METHOD)
 gurenv.setParam("OutputFlag", settings.VERBOSE)
-gurenv.setParam("Presolve", settings.PRESOLVE)
 gurenv.setParam("Aggregate", settings.AGGREGATE)
-# NumericFocus is set per-solve in simulation.py (retry loop over settings.RETRY_PARAMS list)
+# NumericFocus, Presolve, Crossover are set per-attempt in simulation.py
+# (retry loop over settings.RETRY_PARAMS tuples).
 gurenv.setParam("OptimalityTol", settings.OPTIMALITY_TOLERANCE)
 gurenv.setParam("FeasibilityTol", settings.FEASIBILITY_TOLERANCE)
 gurenv.setParam("BarConvTol", settings.BARRIER_CONVERGENCE_TOLERANCE)
 gurenv.setParam("ScaleFlag", settings.SCALE_FLAG)
 gurenv.setParam("Threads", settings.THREADS)
 gurenv.setParam("BarHomogeneous", settings.BARHOMOGENOUS)
-gurenv.setParam("Crossover", settings.CROSSOVER)
 gurenv.start()
 
 

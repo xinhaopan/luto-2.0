@@ -203,6 +203,14 @@ def solve_timeseries(
     checkpoint_path: Path | None = None,
 ) -> None:
 
+    # Save the base-year state before any solving so a retry can re-attempt the
+    # first target year. Skipped on resume (file already exists from a prior run).
+    if checkpoint_path is not None:
+        base_ckpt = checkpoint_path / f"data_{years_to_run[0]}.lz4"
+        if not base_ckpt.exists():
+            save_data_to_disk(data, str(base_ckpt))
+            print(f"Saved base checkpoint for year {years_to_run[0]}: {base_ckpt}")
+
     for step in range(len(years_to_run) - 1):
         base_year = years_to_run[step]
         target_year = years_to_run[step + 1]
@@ -223,11 +231,12 @@ def solve_timeseries(
         luto_solver = LutoSolver(input_data)
         luto_solver.formulate()
 
-        for nf, method, crossover in nf_attempts:
-            print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover} for year {target_year}...")
-            luto_solver.gurobi_model.Params.NumericFocus = nf
-            luto_solver.gurobi_model.Params.Method = method
-            luto_solver.gurobi_model.Params.Crossover = crossover
+        for nf, method, crossover, presolve in nf_attempts:
+            print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve} for year {target_year}...")
+            luto_solver.gurobi_model.Params.NumericFocus    = nf
+            luto_solver.gurobi_model.Params.Method          = method
+            luto_solver.gurobi_model.Params.Crossover       = crossover
+            luto_solver.gurobi_model.Params.Presolve        = presolve
             solution = luto_solver.solve()
             status = luto_solver.gurobi_model.Status
 
@@ -256,11 +265,9 @@ def solve_timeseries(
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(target_year, data_type, prod_data)
 
-        if checkpoint_path is not None:
+        if checkpoint_path is not None and accepted:
             final_path = checkpoint_path / f"data_{target_year}.lz4"
-            tmp_path = Path(f"{final_path}.tmp")
-            save_data_to_disk(data, str(tmp_path))
-            os.replace(tmp_path, final_path)
+            save_data_to_disk(data, str(final_path))
             for old in checkpoint_path.iterdir():
                 if re.match(r'data_\d{4}\.lz4', old.name) and old != final_path:
                     old.unlink()
@@ -299,11 +306,14 @@ def solve_timeseries(
 
 
 def save_data_to_disk(data: Data, path: str, compress_level=3) -> None:
-    """Save using joblib - faster and more memory efficient."""
+    """Save using joblib with atomic tmp→rename to prevent partial writes."""
     print(f'Saving data to {path}...')
-
-    # joblib is optimized for large numpy/scipy data
-    joblib.dump(data, path, compress=('lz4', compress_level))
+    tmp = Path(f"{path}.tmp")
+    joblib.dump(data, str(tmp), compress=('lz4', compress_level))
+    # Write to .tmp first, then rename atomically (os.replace → POSIX rename()).
+    # If the job is killed mid-write, only the .tmp is left partial; the final
+    # .lz4 is never created until the write completes successfully.
+    os.replace(tmp, path)
 
 
 def load_data_from_disk(path: str) -> Data:

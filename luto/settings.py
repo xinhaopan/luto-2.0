@@ -291,12 +291,6 @@ Range from 1e-2 to 1e-8 (default), that larger the number the faster but
 the less exact the solve. 1e-5 is a good compromise between optimality and speed.
 '''
 
-CROSSOVER = 0
-'''
-Whether to use crossover in barrier solve. 0 = off, -1 = automatic. 
-Auto cleans up sub-optimal termination errors without much additional compute time 
-(apart from 2050 when it sometimes never finishes).
-'''
 
 SCALE_FLAG = 0                      
 ''' 
@@ -308,25 +302,42 @@ that 1 tripled solve time, 3 led to numerical problems.
 '''
 
 RETRY_PARAMS = [
-    (0, 2,  0),   # NF, Method, Crossover
-    (3, 2,  0),
+    (0, 2, 0, 0 ),   # NF, Method, Crossover, Presolve
+    (0, 1, 0, -1),
 ]
 '''
-List of solve attempts to try in order, per year. Each entry MUST be a 
-(NumericFocus, Method, Crossover) tuple. simulation.py loops this list and 
-retries the solve with the next entry whenever Gurobi returns a non-OPTIMAL 
+List of solve attempts to try in order, per year. Each entry MUST be a
+(NumericFocus, Method, Crossover, Presolve) tuple. simulation.py loops this
+list and retries with the next entry whenever Gurobi returns a non-OPTIMAL
 status (e.g. NUMERIC, SUBOPTIMAL, or false-INFEASIBLE).
 
-The Method/Crossover values override settings.SOLVE_METHOD/CROSSOVER for that
-attempt. Method values:
-  -1 = automatic, 0 = primal simplex, 1 = dual simplex, 2 = barrier,
-   3 = concurrent, 4 = deterministic concurrent, 5 = deterministic concurrent simplex.
-Crossover values: -1 = automatic, 0 = off, 1/2/3 = forced variants.
+NumericFocus:
+    0 = automatic (slight preference for speed); 1-3 = increasingly careful.
+    NF=0 is safe for all attempts since geometry mean rescaling (2026-05)
+    keeps LHS/RHS coefficients well within Gurobi's recommended range.
+
+Method:
+    -1 = automatic, 0 = primal simplex, 1 = dual simplex, 2 = barrier,
+     3 = concurrent, 4 = deterministic concurrent, 5 = det. concurrent simplex.
+
+Crossover:
+    -1 = automatic, 0 = off, 1/2/3 = forced variants.
+    Converts a barrier interior-point solution to a vertex; can be slow on
+    large models. Use -1 (auto) as a fallback if barrier stagnates.
+
+Presolve:
+    -1 = automatic, 0 = off, 1 = conservative, 2 = aggressive.
+    Keep OFF (0) for barrier (Method=2) — observed to introduce numerical
+    errors that cause the homogeneous barrier to declare false infeasibility.
+    Safe to enable for simplex (Method=0 or 1).
 
 Default sequence:
-  (0, 2,  0)  NF=0 barrier, no crossover, fast first pass
-  (3, 2,  0)  NF=3 barrier, no crossover, careful for stubborn numerical cases
+  (0, 2, 0,  0)  barrier, no crossover, presolve off       — fast first pass
+  (0, 1, 0, -1)  dual simplex, presolve auto                — fallback; simplex
+                 walks the boundary so it cannot misdiagnose feasibility from
+                 an interior-point argument; presolve safe with simplex
 '''
+
 
 BARHOMOGENOUS = 1                   
 '''
