@@ -5,6 +5,249 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260602 — RP fix (commit 94971ea) causes infeasibility in REM_RES5 and NECMA_follow_runs
+
+### Context
+
+After commit `94971ea` (Riparian Plantings transition-matrix eviction fix), all six
+`REM_RES5` runs and 11 of 13 `NECMA_follow_runs` became infeasible at various years
+(2020–2045). Runs that were previously optimal are now reported as `INFEASIBLE` by Gurobi.
+Three distinct root causes were identified; only the first is directly caused by the fix.
+
+---
+
+### Run inventory — REM_RES5 (`N:\LUF-Modelling\LUTO2_JZ\Custom_runs\REM_RES5`)
+
+Shared settings: `GBF2_TARGET=high (hard)`, `GHG=low (hard)`, `WATER=on (hard)`,
+`RENEWABLE_TARGET=Gladstone - Core`, `GBF4=off`, `GBF3=off`.
+
+| Run | Spatial layers | Excl. GBF2 cells | GBF2 cut Solar/Wind | Fails at | Root cause |
+|---|---|---|---|---|---|
+| G0001 / RE0001 | step_change | No | 0 / 0 | **2040** | Cause 1 |
+| G0002 / RE0002 | step_change | Yes | 25 / 25 | **2035** | Cause 1 (earlier: fewer renewable cells) |
+| G0003 / RE0003 | accelerated_transition | No | 0 / 0 | **2045** | Cause 1 |
+| G0004 / RE0004 | accelerated_transition | Yes | 25 / 25 | **2035** | Cause 1 (earlier: fewer renewable cells) |
+| G0005 / RE0005 | ANU_transmission_T10 | No | 0 / 0 | **2045** | Cause 1 |
+| G0006 / RE0006 | ANU_transmission_T10 | Yes | 25 / 25 | **2035** | Cause 1 (earlier: fewer renewable cells) |
+
+---
+
+### Run inventory — NECMA_follow_runs (`N:\LUF-Modelling\LUTO2_JZ\Custom_runs\NECMA_follow_runs`)
+
+Shared settings: `GBF2_TARGET=high (hard)`, `WATER=on (hard)`, `RENEWABLE_TARGET=Gladstone - Core`,
+`RENEWABLE_LAYERS=step_change`, `GBF4_SNES/ECNES=USER_DEFINED`.
+
+| Run | Group | GHG | GBF2 cut % | GBF4 mode | Water stress | SSP | Adoption cap | Fails at | Root cause |
+|---|---|---|---|---|---|---|---|---|---|
+| G0001 | CORE | low | 15 | NRM | 0.6 | 245 | — | **2040** | Cause 1 |
+| G0002 | GHG_SENSITIVITY | **high** | 15 | NRM | 0.6 | 245 | — | **2040** | Cause 1 |
+| G0003 | WATER_SENSITIVITY | low | 15 | NRM | **0.5** | 245 | — | **2040** | Cause 1 |
+| G0004 | WATER_SENSITIVITY | low | 15 | NRM | **0.7** | 245 | — | **2020** | Cause 2 (water too tight) |
+| G0005 | WATER_SENSITIVITY | low | 15 | NRM | **0.8** | 245 | — | **2020** | Cause 2 (water too tight) |
+| G0006 | CLIMATE_SENSITIVITY | low | 15 | NRM | 0.6 | **126** | — | **2040** | Cause 1 |
+| G0007 | CLIMATE_SENSITIVITY | low | 15 | NRM | 0.6 | **370** | — | **2040** | Cause 1 |
+| G0008 | BIO_SENSITIVITY | low | **0** | NRM | 0.6 | 245 | — | **2040** | Cause 1 |
+| G0009 | BIO_SENSITIVITY | low | **10** | NRM | 0.6 | 245 | — | **2040** | Cause 1 |
+| G0010 | BIO_SENSITIVITY | low | **20** | NRM | 0.6 | 245 | — | **2040** | Cause 1 |
+| G0011 | BIO_SENSITIVITY | low | 15 | **AUSTRALIA** | 0.6 | 245 | — | **passes** | AUSTRALIA mode relaxes GBF4 |
+| G0012 | SOCIAL_LICENCE | low | 15 | NRM | 0.6 | 245 | **5%** | **2025** | Cause 3 (adoption cap) |
+| G0013 | SOCIAL_LICENCE | low | 15 | NRM | 0.6 | 245 | **10%** | **2030** | Cause 3 (adoption cap) |
+
+---
+
+### 1 — Primary cause (REM_RES5 all 6; NECMA G0001–G0003, G0006–G0010): non-ag land accumulation exhausts the joint land budget
+
+**Mechanism — pre-fix (bug present):**
+
+`get_to_non_ag_exclude_matrices` set `t_rk = 0` (UB = 0) for RP cells each period because
+their dominant `lumap` entry was not RP (see 20260601 entry). `get_lower_bound_non_agricultural_matrices`
+then capped `lb_rk` against this zero UB, silently zeroing the lower bound and freeing
+every RP cell back to the general pool each year. The optimizer could re-allocate those
+cells jointly to both biodiversity targets and renewable energy management — effectively
+double-using the land.
+
+**Mechanism — post-fix (correct):**
+
+RP cells now maintain their lower bounds across periods. Irreversible non-ag land
+(EP, RP, CP, Agroforestry, BECCS) accumulates monotonically. By year 2035–2045:
+
+- GBF2 high hard target (30% restoration by 2030, 50% by 2050) has locked hundreds of
+  thousands of cell-proportions into non-ag land uses
+- Gladstone Core renewable targets require large and growing generation (e.g. NSW Solar
+  61.6 TWh in 2040, up from 9.4 TWh existing; WA Wind 48 TWh with 3 TWh existing)
+- The joint land budget — non-ag biodiversity + renewable-eligible ag — is exceeded
+
+**Why the pre-fix runs appeared feasible:**
+
+The optimizer exploited the annual eviction to strategically reassign RP cells. It could
+choose each year which cells go to non-ag vs. renewables, avoiding locking high-value
+renewable cells into permanent RP. With the fix, early-year non-ag allocations (made
+before renewable targets grew large) are irreversibly retained, even in prime renewable
+zones.
+
+**Infeasibility onset by run:**
+
+| Run set | Fails at | Notes |
+|---|---|---|
+| REM_RES5 G0002, G0004, G0006 (`EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS=True`) | 2035 | GBF2 cells excluded from renewables → pool shrinks faster |
+| REM_RES5 G0001, G0003, G0005 (`EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS=False`) | 2040–2045 | |
+| NECMA G0001–G0003, G0006–G0010 | 2040 | All use `WATER_STRESS=0.6`, `GBF4=NRM` mode |
+
+**Nature of infeasibility:** The renewable energy constraints are hard (`>=` with no slack).
+When locked-in non-ag land reduces the effective renewable-eligible area below what is
+needed to meet state-level generation targets, Gurobi returns status 3 (INFEASIBLE).
+No `lb > ub` variable-level infeasibility is involved — this is a global land-budget
+infeasibility.
+
+**Why NECMA G0011 passes:** `GBF4_SNES_REGION_MODE=AUSTRALIA`, `GBF4_ECNES_REGION_MODE=AUSTRALIA`.
+National-level aggregation is far looser than per-NRM constraints, giving the optimizer
+enough flexibility to jointly satisfy biodiversity and renewable targets through 2050.
+
+---
+
+### 2 — Secondary cause (NECMA G0004, G0005): `WATER_STRESS` too tight — infeasible from year 2020
+
+`WATER_STRESS=0.7` (G0004) and `WATER_STRESS=0.8` (G0005) require the model to maintain
+70%/80% of natural water yield in every river region. This is structurally infeasible from
+year 2020 given the simultaneous hard constraints:
+
+- GBF2 high hard (large afforestation lowers water yield)
+- Gladstone Core renewable targets at year 2020
+- GHG hard constraint
+
+**Unrelated to the RP fix**: year 2020 uses `base_year = YR_CAL_BASE`, so
+`existing_dvars_rk = None` and the fix never engages. These runs were likely infeasible
+before the fix as well. G0003 (`WATER_STRESS=0.5`) passes 2020 and fails only at 2040
+(Cause 1), confirming the threshold is between 0.5 and 0.7.
+
+---
+
+### 3 — Tertiary cause (NECMA G0012, G0013): `NON_AG_CAP` prevents GBF2 ramp
+
+`REGIONAL_ADOPTION_CONSTRAINTS=NON_AG_CAP` with `NON_AG_CAP=5` (G0012) and `NON_AG_CAP=10`
+(G0013) caps non-ag adoption at 5%/10% per NRM region per period. The GBF2 hard target
+requires faster restoration than the cap permits:
+
+- G0012 (5% cap): meets 2020 target, fails at **2025**
+- G0013 (10% cap): meets 2020 and 2025, fails at **2030**
+
+Not caused by the RP fix — the adoption rate constraint independently prevents the
+biodiversity target from being reached.
+
+---
+
+### 4 — Options for resolution
+
+| Option | Addresses | Trade-off |
+|---|---|---|
+| Make renewable energy constraints **soft** (add slack + penalty in `_add_renewable_energy_constraints`) | Cause 1 | Model reports shortfall instead of crashing; renewable targets become aspirational |
+| Set `GBF2_CONSTRAINT_TYPE=soft` in REM/NECMA scenarios | Cause 1 | Biodiversity gives way when land budget is exhausted |
+| Reduce `GBF2_TARGET` to `medium` in renewable-heavy scenarios | Cause 1 | Accepts lower biodiversity target where renewables are required |
+| Reduce `WATER_STRESS` to ≤ 0.6 | Cause 2 | G0004/G0005 water scenarios were structurally too tight |
+| Reduce `NON_AG_CAP` or use soft GBF2 | Cause 3 | Social licence scenarios need lower ramp rate or relaxed biodiversity |
+
+The infeasibility from Cause 1 is **correct model behaviour** after the RP fix — the
+scenarios were only feasible before because the eviction bug provided illegal land
+flexibility. The pre-fix solutions violated irreversibility.
+
+---
+
+### 5 — Why the GBF2–renewable conflict is temporal, not spatial
+
+A natural question: GBF2 is a national target (can be met anywhere in Australia) and,
+without `EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS`, renewables are not spatially excluded
+from GBF2 priority cells. Both targets therefore appear spatially compatible — why is the
+combined scenario infeasible?
+
+**The conflict is not in any single year; it is accumulated across the rolling horizon.**
+
+The rolling-horizon optimizer has no foresight beyond the current period. When solving
+year 2025:
+
+- It places EP/RP/CP wherever it is cheapest to meet 30% GBF2 nationally.
+- The cheapest GBF2 restoration is concentrated in productive NSW/QLD/WA agricultural
+  zones — they are degraded (good for GBF2), economically accessible, and have existing
+  rural infrastructure.
+- NSW/QLD/WA are also the states with the largest renewable energy targets.
+- In 2025 this does not matter: the 2025 renewable targets are small and existing
+  installed capacity already covers most of them.
+
+After the fix these 2025 non-ag commitments are irreversible. In 2030 more are added
+(GBF2 target growing from 30% toward 50%), again concentrated in the same cheapest
+states. The pattern compounds:
+
+| Year | Cumulative locked non-ag in NSW/QLD/WA | Renewable gap still to fill |
+|---|---|---|
+| 2025 | small | small (mostly met by existing capacity) |
+| 2030 | grows | moderate |
+| 2035 | larger | large |
+| 2040 | **too large** | **~52 TWh NSW Solar + 47 TWh NSW Wind + 45 TWh WA Wind** |
+
+By 2040 the locked-in EP/RP/CP/BECCS has consumed enough renewable-eligible cells
+within specific states that state-level hard constraints become infeasible.
+
+**Why the pre-fix optimizer avoided this:** the eviction bug was in effect re-optimising
+the spatial assignment of GBF2 every year. As renewable targets grew in later years the
+optimizer could opportunistically shift non-ag out of prime renewable zones (NSW/WA) and
+into lower-renewable-pressure states (SA, NT, Tasmania), because eviction freed those
+cells. Post-fix it cannot undo 2025–2035 commitments.
+
+**Solver credit for locked-in RP is correct:** the GBF2 constraint LHS does include the
+Gurobi variable for each locked-in RP cell (lb = RP_PROPORTION, in `non_ag_lu2cells`
+and in `_add_GBF2_constraints`). Gurobi correctly counts the lb contribution — the
+remaining biodiversity shortfall the solver must close from other land is properly
+reduced. The infeasibility is not caused by missing biodiversity credit; it is caused by
+the loss of renewable-eligible ag cells within specific states.
+
+**Diagnostic next step:** compute the IIS on the saved MPS file to confirm which
+state-level renewable constraint is the binding one:
+
+```
+Run_G0001/output/2026_06_01__15_37_34_RF5_2020-2050/debug_model_2035_2040.mps
+```
+
+---
+
+### 6 — Verification: `GBF2_TARGET=medium` resolves infeasibility locally
+
+Two RF5 2010-2050 local runs were compared to confirm that lowering the GBF2 target
+from `high` to `medium` resolves the infeasibility:
+
+| Run | GBF2 target | 2020 | 2030 | 2040 | 2050 |
+|---|---|---|---|---|---|
+| `output/2026_06_02__09_43_00_RF5_2010-2050` | high (30%→50%) | Optimal | Optimal | **INFEASIBLE** | — |
+| `output/2026_06_02__10_53_36_RF5_2010-2050` | medium (30% flat) | Optimal | Optimal | Optimal | Optimal |
+
+Both runs share identical objectives at 2020 and 2030 (`1.190e+03`, `-7.044e+04`),
+confirming the GBF2 constraint is not binding until 2040 when the high target ramps
+from 30% toward 50%. The medium target (30% flat) removes this ramp and keeps the
+land budget feasible through 2050.
+
+The medium run that solved was configured with settings that are **more restrictive than
+REM_RES5** in some dimensions, giving confidence the fix will transfer:
+
+| Setting | Local medium (solved) | REM_RES5 |
+|---|---|---|
+| `GHG_EMISSIONS_LIMITS` | **high** | low (easier) |
+| `EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS` | True, 20% cut | False or True 25% cut |
+| `RENEWABLE_LAYERS` | step_change | step_change / accel. / ANU_T10 |
+| `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT` | 20 | 15 |
+
+Because the local run solved despite harder GHG constraints, the same GBF2 relaxation
+is expected to work for REM_RES5. Confidence by run:
+
+| REM_RES5 runs | Expected outcome with medium GBF2 |
+|---|---|
+| G0001, G0003 (no exclusion, step_change / accel.) | Very likely feasible — less spatially restricted than local run |
+| G0002, G0004 (exclusion 25%, step_change / accel.) | Likely feasible — exclusion active but GHG much easier |
+| G0005 (ANU_T10, no exclusion) | Probably feasible |
+| G0006 (ANU_T10, exclusion 25%) | Uncertain — both spatial restrictions active; most constrained case |
+
+`ANU_transmission_T10` restricts renewable placement to near-grid cells, making G0005/G0006
+the only cases where medium GBF2 may still be insufficient. Pending resubmission results.
+
+---
+
 ## 20260601 — Riparian Plantings area incorrectly reduced despite `NON_AG_LAND_USES_REVERSIBLE = False`
 
 ### Context

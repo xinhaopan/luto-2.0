@@ -504,8 +504,8 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
 RENEWABLES_OPTIONS = {
-    'Utility Solar PV': True,
-    'Onshore Wind': True,
+    'Utility Solar PV': False,
+    'Onshore Wind': False,
 }
 
 
@@ -846,7 +846,7 @@ INCLUDE_WATER_LICENSE_COSTS = 1
 # ------------------- Agricultural biodiversity parameters -------------------
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-GBF2_TARGET = 'high'            # 'off', 'low', 'medium', or 'high'
+GBF2_TARGET = 'medium'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
