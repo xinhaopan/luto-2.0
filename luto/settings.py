@@ -21,25 +21,12 @@
 
 """ LUTO model settings. """
 
-import os
-import pandas as pd
-
 
 # ---------------------------------------------------------------------------- #
 # LUTO model version.                                                          #
 # ---------------------------------------------------------------------------- #
 
 VERSION = '2.3'
-
-
-# ---------------------------------------------------------------------------- #
-# Spyder options                                                               #
-# ---------------------------------------------------------------------------- #
-
-pd.set_option('display.width', 470)
-pd.set_option('display.max_columns', 100)
-pd.set_option('display.max_rows', 100)
-pd.set_option('display.float_format', '{:,.4f}'.format)
 
 
 # ---------------------------------------------------------------------------- #
@@ -350,7 +337,7 @@ Set to 1 when debugging infeasibility to avoid ambiguous INF_OR_UNBD status.
 '''
 
 # Number of threads to use in parallel algorithms (e.g., barrier). PBS_NCPUS is the requested CPUs on GADI hpc.
-THREADS = min(32, int(os.environ.get("PBS_NCPUS", os.cpu_count())))
+THREADS = 32
 
 
 
