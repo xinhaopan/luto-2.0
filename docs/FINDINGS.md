@@ -5,6 +5,188 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260603 — Solver infeasibility root cause: degenerate vertices; iterative species removal and dual-simplex fallback as mitigations
+
+### Context
+
+Two parallel run batches — `NECMA_follow_runs_rm_swain` (13 runs, GBF4 species constraints)
+and `REM_RES5_dual_simplex` (6 runs, renewable energy targets) — were analysed to
+understand why Gurobi barrier (Method=2) repeatedly fails with infeasible or numerical
+status while dual simplex (Method=1) can rescue those same years. A shared root cause was
+identified across both run types, with different structural drivers.
+
+Detailed findings: `jinzhu_inspect_code/Check_NECMA_crash/FINDINGS.md` (NECMA),
+`jinzhu_inspect_code/Check_NECMA_crash/FINDINGS_REM.md` (REM),
+`jinzhu_inspect_code/Check_NECMA_crash/ANALYSIS.md` (combined root-cause analysis).
+
+---
+
+### 1 — Shared root cause: barrier fails at degenerate vertices
+
+Barrier follows the central path through the interior of the feasible region, converging
+toward the optimal face as µ → 0. At a **degenerate vertex** — where multiple constraints
+are simultaneously near-binding — the slack variables for those constraints approach zero.
+Barrier's KKT system requires dividing by these slacks; when they approach zero the system
+becomes numerically singular. This produces the observed symptoms:
+
+- Primal values diverging to `~e+33`
+- Gurobi reporting `Numerical trouble encountered` or `Infeasible model` after millions of
+  barrier iterations with no improvement
+- Runs correctly classified as infeasible even though the problem is feasible (confirmed by
+  Method=1 finding a solution)
+
+**Dual simplex (Method=1) is immune** because it operates on vertices and edges directly,
+using anti-degeneracy pivot rules (perturbation, Bland's rule) that step along the
+degenerate face without requiring slacks to remain positive. This is why adding Method=1
+as a fallback rescues years where barrier collapses.
+
+**Scaling does not fix this.** The existing `rescale_lhs_rhs_region_species` already
+performs per-row per-region geometric mean rescaling for every species constraint — this
+is equivalent to (and more sophisticated than) simple row normalisation because it
+symmetrically balances LHS/RHS in log space. The failure is the *geometry of the feasible
+region near the optimum*, not coefficient magnitudes. No uniform row-scaling changes the
+within-row coefficient ratio or the degeneracy of the optimal vertex.
+
+---
+
+### 2 — Species runs (NECMA): static near-infeasibility from sparse habitat
+
+GBF4 SNES/ECNES constraints impose per-species per-NRM-region targets:
+
+```
+sum(area_s_r × dvar_r  for r in NRM_region) >= target_s
+```
+
+For species whose habitat is confined to few cells within an NRM region, the maximum
+achievable area (`sum(area_s_r)`) is close to or below the target from the outset. The
+constraint row is a near-zero-slack slab every year from the first year the target binds.
+Barrier cannot navigate this; its dual variable for the tight constraint grows without
+bound. This is a **static** degeneracy driven purely by data.
+
+**Evidence — iterative Swain's tortoise removal:**
+
+| Batch | Change | Barrier failure year |
+|---|---|---|
+| `NECMA_follow_runs` | baseline (all species) | **2040** (all NRM-mode runs) |
+| `NECMA_follow_runs_rm_swain` | Swain's tortoise removed | **2050** (all NRM-mode runs) |
+
+Removing one species with near-infeasible NRM habitat pushed every affected run forward
+by exactly one 5-year time step — consistent with the species' constraint row becoming the
+binding degenerate constraint at yr 2040, and another species' row taking that role at
+yr 2050. G0011 (AUSTRALIA mode, which aggregates all NRM regions into one national target)
+completed successfully in both batches, confirming the per-NRM constraint granularity is
+the structural source.
+
+**Method=1 effect in the new batch:**
+
+Old batch used barrier + NumericFocus=3 only. New batch adds Method=1 as a third
+fallback. The solver change allowed runs to push one additional time step (2040 → 2050)
+even before species removal, by rescuing years where barrier returned non-optimal status
+rather than infeasible. The two effects (species removal + Method=1) are additive.
+
+**Status as of 2026-06-03 ~10:15:**
+
+| Run | Group | Key parameter | Old failure | New outcome |
+|---|---|---|---|---|
+| G0001 | CORE | baseline | yr 2040 | INFEASIBLE yr 2050 |
+| G0002 | GHG_SENS | high GHG | yr 2040 | INFEASIBLE yr 2050 |
+| G0003 | WATER_SENS | stress=0.5 | yr 2040 | INFEASIBLE yr 2050 |
+| G0004 | WATER_SENS | stress=0.7 | yr 2020 crash | STUCK yr 2010 (e+33, ~10.5h) |
+| G0005 | WATER_SENS | stress=0.8 | yr 2020 crash | INFEASIBLE yr 2010 |
+| G0006 | CLIMATE_SENS | SSP=126 | yr 2040 | INFEASIBLE yr 2050 |
+| G0007 | CLIMATE_SENS | SSP=370 | yr 2040 | INFEASIBLE yr 2050 |
+| G0008 | BIO_SENS | GBF2_cut=0 | yr 2040 | INFEASIBLE yr 2050 |
+| G0009 | BIO_SENS | GBF2_cut=10 | yr 2040 | STUCK yr 2050 (~7h) |
+| G0010 | BIO_SENS | GBF2_cut=20 | yr 2040 | STUCK yr 2050 (~7.5h) |
+| G0011 | BIO_SENS | AUSTRALIA mode | finished | WRITING OUTPUTS |
+| G0012 | SOCIAL_LIC | NonAg_cap=5 | yr 2025 | INFEASIBLE yr 2025 |
+| G0013 | SOCIAL_LIC | NonAg_cap=10 | yr 2030 | INFEASIBLE yr 2030 |
+
+---
+
+### 3 — REM runs: dynamic near-infeasibility from early-year lock-in
+
+The REM runs have no species targets. Their barrier degeneracy is constructed
+progressively across years by the interaction of three forces:
+
+1. **Non-reversible renewable installations**: solar/wind `dvar_r` cannot decrease once set
+2. **Non-ag lower bound fix** (PR `94971ea`): existing non-ag land is correctly pinned as
+   a lower bound, removing the artificial slack the pre-fix formulation provided
+3. **Escalating state-level renewable targets**: each year's target exceeds the last
+
+The mechanism: the solver installs renewables on the highest-yield cells in early years.
+By year 2030–2035, those cells are locked at their lb. The remaining flexible cells have
+progressively lower capacity factors. The renewable target constraint LHS
+(`sum(yield_r × dvar_r)`) approaches the RHS from above — the constraint becomes a
+near-zero-slack slab. The lb constraints on locked-in sites, adoption limits, and the
+renewable target simultaneously bind at the optimal vertex. Barrier's KKT system
+collapses.
+
+**The lb fix (PR `94971ea`) is correct.** Pre-fix runs were solving an artificially
+relaxed formulation where non-ag land could be freely reallocated each year. Post-fix
+runs reflect the true constraint tightness of the correctly-modelled problem. The
+increased difficulty is not a regression — it is the correct difficulty.
+
+**Per-year solve history (new batch):**
+
+Legend: `✓` barrier solved cleanly · `⚡→✓` barrier infeasible, rescued by Method=1 ·
+`⚡→⏳` barrier infeasible, Method=1 still running · `⚡→✗` barrier infeasible, Method=1 diverged
+
+| Run | 2020 | 2025 | 2030 | 2035 | 2040 | 2045 | 2050 | Outcome |
+|---|---|---|---|---|---|---|---|---|
+| RE0001 | ✓ | ✓ | ✓ | ⚡→⏳ | — | — | — | STUCK yr 2035 (Method=1, >20h) |
+| RE0002 | ✓ | ✓ | ✓ | ⚡→✓ | ⚡→✓ | ✓ | ✓ | **FINISHED ✓** |
+| RE0003 | ✓ | ✓ | ✓ | ⚡→✓ | ⚡→✓ | ⚡→✓ | ⚡→⏳ | STUCK yr 2050 (~35 min) |
+| RE0004 | ✓ | ✓ | ✓ | ⚡→✓ | ⚡→✓ | ⚡→✓ | ⚡→✓ | WRITING OUTPUTS |
+| RE0005 | ✓ | ✓ | ✓ | ✓ | ⚡→✓ | ⚡→✓ | ⚡→✓ | **FINISHED ✓** |
+| RE0006 | ✓ | ✓ | ✓ | ⚡→✓ | ⚡→✓ | ✓ | ⚡→✓ | **FINISHED ✓** |
+
+RE0002, RE0004, RE0005, and RE0006 all completed the full 2020–2050 horizon via Method=1
+rescue; RE0003 solved 2035–2045 via Method=1 and is working on yr 2050. RE0001 remains
+stuck at yr 2035 (>20h, dual infeasibility ~1e7 not converging). The exclusion flag
+explains the step_change/accelerated_transition splits: RE0002/RE0004
+(`Exclude=True`) completed while RE0001/RE0003 (`Exclude=False`) are the two stragglers.
+RE0005 (ANU_T10, no exclusion) completed because the transmission-proximity filter
+already narrows the installable cell pool, preventing the worst early-year lock-in.
+
+---
+
+### 4 — Plans
+
+**Species (NECMA) — short-term:**
+
+1. Wait for yr 2050 infeasible run to save `debug_model_XXXX_2050.mps`
+2. Run `find_infeasible_ecnes.submit_ecnes_checks()` on the MPS (one PBS job per ECNES
+   constraint, each maximises the LHS to check if the RHS target is achievable) — see
+   skill `docs/CLAUDE_SKILL/debug_ecnes_infeasibility.md`
+3. Identify communities whose NRM target exceeds `max_achievable_area`
+4. Remove and resubmit as `NECMA_follow_runs_rm_swain_rm_<community>`
+5. Repeat until all years solve; compile an explicit exclusion list
+
+**Species (NECMA) — long-term:**
+
+Pre-compute `max_achievable_area` per species per NRM region per year and flag any species
+where `target_yr > max_achievable_yr`. Replace hard constraints for these species with
+soft penalty terms in the objective — soft constraints bound the dual variable, preventing
+KKT blow-up even when the constraint is near-binding.
+
+**REM — short-term:**
+
+Accept Method=1 as the operational fallback. RE0002, RE0004, RE0005, and RE0006 all
+completed; RE0003 is working on yr 2050. RE0001 (step_change, no exclusion) is stuck at
+yr 2035 with dual infeasibility not converging — may need a kill and resubmit with
+`EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS=True`.
+
+**REM — medium-term:**
+
+- **Soft renewable targets**: convert `_add_renewable_energy_constraints()` hard `>=`
+  constraints to penalty terms in the objective. This bounds the renewable target dual
+  variable, preventing KKT blow-up when the constraint nears binding.
+- **Adoption rate smoothing**: limit per-period installation rate so early years do not
+  consume all high-yield sites, preserving flexible capacity for years 2035–2050.
+
+---
+
 ## 20260602 — RP fix (commit 94971ea) causes infeasibility in REM_RES5 and NECMA_follow_runs
 
 ### Context
