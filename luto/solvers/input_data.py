@@ -203,7 +203,12 @@ class SolverInputData:
 
     @cached_property
     def non_ag_lu2cells(self) -> dict[int, np.ndarray]:
-        return {k: np.where(self.non_ag_x_rk[:, k])[0] for k in range(self.n_non_ag_lus)}
+        # Include cells where UB > 0 (transition allowed) OR lb > 0 (existing
+        # irreversible allocation whose transition matrix entry is NaN/0 — e.g.
+        # partial RP whose dominant lumap blocks the T_MAT lookup).  solver.py
+        # lifts UB to lb for the second group so Gurobi sees a valid lb <= ub.
+        effective_ub = np.maximum(self.non_ag_x_rk, self.non_ag_lb_rk)
+        return {k: np.where(effective_ub[:, k])[0] for k in range(self.n_non_ag_lus)}
 
     @cached_property
     def cells2non_ag_lu(self) -> dict[int, list[int]]:
@@ -438,10 +443,7 @@ def get_ag_x_mrj(data: Data, base_year):
 
 def get_non_ag_x_rk(data: Data, base_year):
     print('Getting non-agricultural exclude matrices...', flush = True)
-    existing_dvars = data.non_ag_dvars.get(base_year) if base_year != data.YR_CAL_BASE else None
-    return non_ag_transition.get_to_non_ag_exclude_matrices(
-        data, data.lumaps[base_year], existing_dvars_rk=existing_dvars
-    )
+    return non_ag_transition.get_to_non_ag_exclude_matrices(data, data.lumaps[base_year])
 
 
 def get_ag_man_lb_mrj(data: Data, base_year):

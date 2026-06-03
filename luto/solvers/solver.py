@@ -235,9 +235,13 @@ class LutoSolver:
                     if NON_AG_LAND_USES_REVERSIBLE[k_name]
                     else self._input_data.non_ag_lb_rk[r, k]
                 )
+                # UB from transition matrix; lift to lb when an irreversible allocation
+                # already exists in a cell the transition matrix would otherwise block
+                # (e.g. partial RP whose dominant lumap gives T_MAT NaN → UB=0).
+                x_ub = max(float(self._input_data.non_ag_x_rk[r, k]), x_lb)
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                     lb=x_lb,
-                    ub=self._input_data.non_ag_x_rk[r, k],
+                    ub=x_ub,
                     name=f"X_non_ag_{k}_{r}".replace(" ", "_")
                 )
 
