@@ -339,12 +339,18 @@ Default sequence:
 '''
 
 
-BARHOMOGENOUS = 1                   
+BARHOMOGENOUS = 0
 '''
 Useful for recognizing infeasibility or unboundedness. At the default setting (-1),
-it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 
-1 = on. It is a bit slower than the default algorithm (3x slower in testing). 
+it is only used when barrier solves a node relaxation for a MIP model. 0 = off,
+1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 Set to 1 when debugging infeasibility to avoid ambiguous INF_OR_UNBD status.
+
+Set to 0: the homogeneous algorithm's tau parameter drifts toward zero in highly
+degenerate problems (many near-binding constraints), triggering false status 3 even
+with NumericFocus=3. IIS confirms the model is feasible — no real dual ray exists.
+With 0, the standard barrier will report NUMERIC (status 12) or SUBOPTIMAL (13)
+instead of INFEASIBLE (3) when it struggles, both of which the retry loop handles.
 '''
 
 # Number of threads to use in parallel algorithms (e.g., barrier). PBS_NCPUS is the requested CPUs on GADI hpc.

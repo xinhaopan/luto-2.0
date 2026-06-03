@@ -5,6 +5,183 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260603 — Barrier false infeasibility in LUF_S1_to_S4: BarHomogeneous tau-drift, lb/constraint scaling mismatch, and transition-matrix PR refactor
+
+### Context
+
+Runs at `Custom_runs/LUF_S1_to_S4/` (8 runs, RES5, 2020–2050) showed barrier (Method=2)
+falling back to dual simplex (Method=1) on multiple years starting from ~2030. The
+barrier reported status 3 (INFEASIBLE) or 12 (NUMERIC) while dual simplex always found
+an OPTIMAL solution. All false infeasibilities appeared after PR `94971ea` (the non-ag
+lock-in fix). A chain of four root causes was identified and addressed.
+
+---
+
+### 1 — False infeasibility pattern in logs
+
+```
+Non-optimal status 3 with NumericFocus=0, Method=2  ← 12 occurrences
+Non-optimal status 12 with NumericFocus=0, Method=2 ←  1 occurrence
+Non-optimal status 13 with NumericFocus=0, Method=2 ←  2 occurrences
+```
+
+For status 3 (the dominant case), the Gurobi log shows dual residuals **diverging** in
+the final barrier iterations — not converging:
+
+```
+iter 235: dual residual  2.92e+02,  compl  2.18e+01
+iter 236: dual residual  7.47e+02,  compl  4.14e+01
+iter 237: dual residual  2.82e+03,  compl  1.97e+02
+iter 238: dual residual  1.70e+04,  compl  1.37e+03
+→ "Infeasible model"
+```
+
+IIS computation on the same model confirmed the problem is **feasible** — no infeasible
+subsystem exists. NumericFocus=3 (Gurobi's maximum arithmetic precision) did not prevent
+the false infeasibility, ruling out a floating-point precision explanation.
+
+---
+
+### 2 — Root cause A: BarHomogeneous=1 generates false infeasibility certificates
+
+`BarHomogeneous=1` forces Gurobi's homogeneous self-dual embedding. This algorithm tracks
+an extra variable τ (tau). When τ → 0 while the dual objective diverges, the algorithm
+declares INFEASIBLE and emits a dual ray certificate. On highly degenerate LP problems
+(many simultaneously binding constraints), τ can drift toward zero along a numerical
+artefact direction — not a real dual ray. The homogeneous algorithm then falsely certifies
+infeasibility.
+
+**NumericFocus=3 does not fix this** because the tau drift is a tracking-logic failure,
+not an arithmetic precision failure. The two are orthogonal mechanisms.
+
+**IIS confirming feasibility** is the proof: `computeIIS()` runs on the same model object
+and finds no infeasible subsystem, which means the dual ray the homogeneous algorithm
+produced does not actually exist.
+
+**Fix**: set `BARHOMOGENOUS = 0` in settings.py. With the standard (non-homogeneous)
+barrier, the algorithm has no tau-tracking path. It can only exit with NUMERIC (status 12)
+or SUBOPTIMAL (status 13) when it struggles — both of which correctly describe the
+situation and are handled by the dual simplex fallback. The standard barrier may also
+converge successfully on cases the homogeneous algorithm was steering away from via the
+spurious tau direction.
+
+**Note on BarConvTol**: tightening from `1e-5` to `1e-8` does not help and would make
+things worse. `BarConvTol` controls when the barrier stops for *optimality* (the
+complementarity gap threshold). For status 3, the barrier is not trying to converge — it
+is actively diverging and declaring infeasibility via the tau path. Tighter `BarConvTol`
+would require the barrier to iterate more deeply into the ill-conditioned region,
+increasing divergence probability.
+
+---
+
+### 3 — Root cause B: lb_rk / constraint-matrix scaling mismatch
+
+The constraint matrix coefficients (`non_ag_obj_rk`, `non_ag_b_rk`, `non_ag_g_rk`, etc.)
+are rescaled to ~1e3 magnitude by `rescale_solver_input_data()`. The non-ag lower bounds
+(`non_ag_lb_rk`) are raw dvar proportions (0–1) passed directly to Gurobi as variable
+bounds — **not rescaled**.
+
+The barrier's KKT complementarity condition for a lower-bounded variable is:
+
+```
+dual_lb × (x − lb) = μ  →  must converge to 0
+```
+
+`dual_lb` balances the gradient, which includes the rescaled constraint coefficients:
+
+```
+dual_lb ≈ rescaled_obj_coeff + constraint_dual × rescaled_constraint_coeff  ≈ O(1e3)
+```
+
+For the barrier to satisfy the normalised convergence criterion (`BarConvTol = 1e-5`):
+
+```
+sum(dual_lb × (x − lb)) / |objective|  <  1e-5
+≈ (1e3 × (x − lb)) / 1e6              <  1e-5
+→  (x − lb)                           <  1e-8
+```
+
+With ~1000 locked-in irreversible non-ag cells (post PR `94971ea`), the barrier must
+simultaneously drive ~1000 variables to within `1e-8` of their lower bounds — approaching
+machine precision. This creates a near-singular Newton system. The result is the observed
+dual residual explosion and false infeasibility.
+
+**Dual simplex is immune**: it evaluates exact pivot operations at vertices. When a
+variable is at its lower bound it is exactly there, with no precision requirement.
+
+**The structural fix** would be a change-of-variables `y = x − lb` (shifting the lower
+bound to zero) before building the Gurobi model. This is what Gurobi's presolve does
+internally. The current code uses `Presolve=0` for barrier to avoid a separate class of
+numerical errors (presolve-transformed false infeasibility that predated this PR), so
+this transformation does not happen automatically. No code change was made for this issue;
+the dual simplex fallback is the correct mitigation.
+
+---
+
+### 4 — Root cause C: PR `94971ea` was conceptually wrong (UB/LB separation violated)
+
+PR `94971ea` fixed the RP eviction bug by injecting existing-dvar logic into
+`get_to_non_ag_exclude_matrices()` — a UB-only function — to prevent the downstream
+`min(lb, UB)` cap from zeroing the LB. This conflated two separate concerns:
+
+- **UB** (`get_to_non_ag_exclude_matrices`): "is this cell allowed to take on this non-ag LU?" — pure transition matrix + no-go exclusions
+- **LB** (`get_lower_bound_non_agricultural_matrices`): "what must be kept?" — pure lock-in from previous-period dvars
+
+The original PR fix also inflated UB to 1 for existing irreversible cells, when the
+correct UB for those cells is `max(t_rk_from_transition, lb)` = `lb` (locked at existing
+value, since the transition matrix says no new allocation is allowed).
+
+**Refactored fix** (applied in this session):
+
+| File | Change |
+|---|---|
+| `transitions.py` `get_to_non_ag_exclude_matrices` | Removed `existing_dvars_rk` parameter — pure transition matrix UB |
+| `transitions.py` `get_lower_bound_non_agricultural_matrices` | Removed UB cap against `non_ag_x_rk`; LB is only capped against `AG_MASK_PROPORTION_R` |
+| `input_data.py` `get_non_ag_x_rk` | Reverted to original — no existing dvars |
+| `solver.py` `_setup_non_ag_variables` | `x_ub = max(non_ag_x_rk[r,k], x_lb)` to reconcile UB=0 / lb>0 at variable creation |
+
+---
+
+### 5 — Critical bug in the refactored fix: `non_ag_lu2cells` excluded lock-in cells
+
+`non_ag_lu2cells` is built from `np.where(non_ag_x_rk[:, k] > 0)` — only cells where UB>0
+are included. For RP cells where the transition matrix gives UB=0 (the exact cells the fix
+targets), `non_ag_lu2cells[k]` never includes them. The variable creation loop in
+`solver.py` never reached those cells, so the `max(ub, lb)` line was dead code for the
+problem case. RP was still silently evicted.
+
+**Fix**: `non_ag_lu2cells` now uses `max(non_ag_x_rk, non_ag_lb_rk)` as the effective UB:
+
+```python
+@cached_property
+def non_ag_lu2cells(self) -> dict[int, np.ndarray]:
+    effective_ub = np.maximum(self.non_ag_x_rk, self.non_ag_lb_rk)
+    return {k: np.where(effective_ub[:, k])[0] for k in range(self.n_non_ag_lus)}
+```
+
+For RP cells: `effective_ub = max(0, 0.2) = 0.2` → cell included → variable created with
+`lb=0.2, ub=max(0, 0.2)=0.2` (fixed at existing value, cannot be evicted).
+
+Minor side-effect: for reversible LUs with non-zero previous dvars but blocked transitions
+(`non_ag_x_rk=0`), `non_ag_lb_rk > 0` causes those cells to enter `lu_cells`. The solver
+sets `x_lb=0` for reversible LUs, so `x_ub=max(0,0)=0` — a variable fixed at zero.
+Harmless extra variables.
+
+---
+
+### 6 — Summary of changes in this session
+
+| File | Change | Reason |
+|---|---|---|
+| `settings.py` | `BARHOMOGENOUS = 0` | Prevent tau-drift false infeasibility certificates |
+| `transitions.py` `get_to_non_ag_exclude_matrices` | Remove `existing_dvars_rk` parameter | Pure UB — no LB logic |
+| `transitions.py` `get_lower_bound_non_agricultural_matrices` | Remove UB cap; new docstring | Pure LB — no UB dependency |
+| `input_data.py` `get_non_ag_x_rk` | Revert to original | Pure UB from transition matrix |
+| `input_data.py` `non_ag_lu2cells` | Use `max(x_rk, lb_rk)` | Include locked-in cells with UB=0 |
+| `solver.py` `_setup_non_ag_variables` | `x_ub = max(x_rk[r,k], x_lb)` | Reconcile UB=0 / lb>0 at creation |
+
+---
+
 ## 20260603 — Solver infeasibility root cause: degenerate vertices; iterative species removal and dual-simplex fallback as mitigations
 
 ### Context
