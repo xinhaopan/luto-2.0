@@ -24,8 +24,6 @@
 import argparse, re, pathlib, os, sys
 import shutil
 import zipfile
-import luto.simulation as sim
-import luto.settings as settings
 
 # Force UTF-8 on Windows consoles (default cp1252 can't handle box-drawing chars).
 sys.stdout.reconfigure(encoding='utf-8')
@@ -43,12 +41,17 @@ def patch_input_dir(input_dir: str):
     settings_path.write_text(text, encoding='utf-8')
 
 
+# MUST parse args and patch settings BEFORE importing luto modules,
+# because parameters.py reads INPUT_DIR at module load time.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_dir', default=None, help='Override INPUT_DIR in luto/settings.py')
     args = parser.parse_args()
     if args.input_dir:
         patch_input_dir(args.input_dir)
+
+import luto.simulation as sim
+import luto.settings as settings
 
 # If a checkpoint exists, restore the original timestamp BEFORE load_data() so
 # sim.run() reuses the existing output directory. load_data() is skipped —
