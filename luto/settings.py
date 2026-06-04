@@ -302,7 +302,7 @@ that 1 tripled solve time, 3 led to numerical problems.
 '''
 
 RETRY_PARAMS = [
-    (0, 2, 0, 0 ),   # NF, Method, Crossover, Presolve
+    (0, 2, -1, 0 ),   # NF, Method, Crossover, Presolve
     (0, 1, 0, -1),
 ]
 '''
