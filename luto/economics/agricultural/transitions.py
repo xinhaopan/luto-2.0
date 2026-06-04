@@ -476,7 +476,13 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
 
 def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> dict[str, dict]:
     """
-    Gets the lower bound for the agricultural land use of the current years optimisation.
+    Returns per-am lower bounds (shape: NLMS × NCELLS × N_AG_LUS) for the next solve.
+
+    Each am_lb[am][m, r, j] is the floor-truncated min(am_dvar, ag_dvar).  The clamp
+    against ag_dvar corrects for FeasibilityTol: the solver enforces am ≤ ag as a linear
+    constraint (not a variable bound), so the reported am_dvar can exceed ag_dvar by up to
+    FeasibilityTol.  The correct "true" am value is min(am_dvar, ag_dvar) — equivalent to
+    what a variable upper-bound on ag_dvar would have enforced exactly.
     """
 
     if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
@@ -486,71 +492,25 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
             if settings.AG_MANAGEMENTS[am]
         }
 
-    # ag_man lb is derived from the previous year's decision variable, floor-truncated to
-    # ROUND_DECIMALS precision.  However the solver can return ag_man_dvar slightly above
-    # ag_dvar (because of the settings.FEASIBILITY_TOLERANCE), so the raw floor can produce
-    # a lb that exceeds the corresponding ag_dvar — making the next year structurally infeasible.
-    # Cap each am lb against the floor-truncated ag_dvar to guarantee lb <= ag_dvar.
-    #
-    # Additionally, feasibility tolerance also allows ag_dvar to slightly exceed AG_MASK_PROPORTION_R
-    # (the cell usage constraint RHS).  When that happens, ag_lb can itself be > cell_area, so the
-    # am_lb cap above is not enough.  Also cap ag_lb against the cell area so that any management lb
-    # derived from it is guaranteed to satisfy the hard cell usage equality constraint in the next period.
-    ag_lb = np.divide(
-        np.floor(data.ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
-        10 ** settings.ROUND_DECIMALS,
-    )  # shape: (NLMS, NCELLS, N_AG_LUS)
-
-    # AG_MASK_PROPORTION_R shape: (NCELLS,) → broadcast to (NLMS, NCELLS, N_AG_LUS)
-    cell_area_mrj = data.AG_MASK_PROPORTION_R[np.newaxis, :, np.newaxis]
-    ag_lb_before = ag_lb
-    ag_lb = np.minimum(ag_lb, cell_area_mrj)
-    cell_cap_updates = ag_lb < ag_lb_before
-    if cell_cap_updates.any():
-        gap = ag_lb_before[cell_cap_updates] - ag_lb[cell_cap_updates]
-        print(
-            f"  └── Ag lb capped against cell area: {cell_cap_updates.sum()} entries updated,"
-            f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
-        )
-
-    # Ensure sum of ag_lb across land uses ≤ cell_area for each (m, cell).
-    # FEASIBILITY_TOLERANCE relaxes the aggregate cell-usage equality: the solver
-    # accepts sum(dvars) = cell_area ± FEASIBILITY_TOLERANCE, so it can return
-    # beef≈cell_area AND sheep=ε with sum slightly above cell_area (within tolerance).
-    # After floor-truncation both become nonzero lbs, and their sum exceeds cell_area,
-    # making HIR am_lb constraints jointly infeasible even though each individual
-    # am_lb passes the per-LU cap above.  Proportionally scale any row that overflows.
-    ag_lb_sum_mr = ag_lb.sum(axis=2)  # (NLMS, NCELLS)
-    cell_area_mr = data.AG_MASK_PROPORTION_R[np.newaxis, :]  # (1, NCELLS)
-    overflow = ag_lb_sum_mr > cell_area_mr
-    if overflow.any():
-        # Guard divisor: np.where evaluates both branches, so zeros in ag_lb_sum_mr
-        # would emit a divide-by-zero RuntimeWarning even though those entries are
-        # discarded by the False mask. Replace zeros with 1.0 only for the division.
-        safe_sum = np.where(ag_lb_sum_mr > 0, ag_lb_sum_mr, 1.0)
-        scale = np.where(overflow, cell_area_mr / safe_sum, 1.0)  # (NLMS, NCELLS)
-        ag_lb = ag_lb * scale[:, :, np.newaxis]
-        print(
-            f"  └── Ag lb sum-overflow scaled: {overflow.sum()} (m,cell) entries rescaled"
-        )
+    ag_dvar = data.ag_dvars[base_year].astype(np.float32)  # (NLMS, NCELLS, N_AG_LUS)
 
     result = {}
     for am in settings.AG_MANAGEMENTS_TO_LAND_USES:
         if not settings.AG_MANAGEMENTS[am]:
             continue
-        am_lb_raw = np.divide(
-            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
+        am_dvar = data.ag_man_dvars[base_year][am].astype(np.float32)
+        am_dvar_true = np.minimum(am_dvar, ag_dvar)          # clamp: am cannot exceed its host ag
+        am_lb = np.divide(
+            np.floor(am_dvar_true * 10 ** settings.ROUND_DECIMALS),
             10 ** settings.ROUND_DECIMALS,
         )
-        am_lb_capped = np.minimum(am_lb_raw, ag_lb)
-        lb_update = am_lb_capped < am_lb_raw
-        if lb_update.any():
-            gap = am_lb_raw[lb_update] - am_lb_capped[lb_update]
+        clamped = am_dvar_true < am_dvar
+        if clamped.any():
+            gap = am_dvar[clamped] - am_dvar_true[clamped]
             print(
-                f"  └── Ag man lb capped [{am}]: {lb_update.sum()} cells updated,"
-                f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
+                f"  └── Ag man lb clamped [{am}]: {clamped.sum()} cells, max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
             )
-        result[am] = am_lb_capped
+        result[am] = am_lb
     return result
 
 

@@ -67,7 +67,7 @@ class SolverInputData:
     non_ag_g_rk: np.ndarray                                             # Non-agricultural greenhouse gas emissions matrix.
     non_ag_w_rk: np.ndarray                                             # Non-agricultural water yields matrix.
     non_ag_b_rk: np.ndarray                                             # Non-agricultural biodiversity matrix.
-    non_ag_x_rk: np.ndarray                                             # Non-agricultural exclude matrices.
+    non_ag_ub_rk: np.ndarray                                             # Non-agricultural exclude matrices.
     non_ag_q_crk: np.ndarray                                            # Non-agricultural yield matrix.
     non_ag_lb_rk: np.ndarray                                            # Non-agricultural lower bound matrices.
 
@@ -203,12 +203,7 @@ class SolverInputData:
 
     @cached_property
     def non_ag_lu2cells(self) -> dict[int, np.ndarray]:
-        # Include cells where UB > 0 (transition allowed) OR lb > 0 (existing
-        # irreversible allocation whose transition matrix entry is NaN/0 — e.g.
-        # partial RP whose dominant lumap blocks the T_MAT lookup).  solver.py
-        # lifts UB to lb for the second group so Gurobi sees a valid lb <= ub.
-        effective_ub = np.maximum(self.non_ag_x_rk, self.non_ag_lb_rk)
-        return {k: np.where(effective_ub[:, k])[0] for k in range(self.n_non_ag_lus)}
+        return {k: np.where(self.non_ag_ub_rk[:, k])[0] for k in range(self.n_non_ag_lus)}
 
     @cached_property
     def cells2non_ag_lu(self) -> dict[int, list[int]]:
@@ -441,9 +436,12 @@ def get_ag_x_mrj(data: Data, base_year):
     return output
 
 
-def get_non_ag_x_rk(data: Data, base_year):
+def get_non_ag_ub_rk(data: Data, base_year):
     print('Getting non-agricultural exclude matrices...', flush = True)
-    return non_ag_transition.get_to_non_ag_exclude_matrices(data, data.lumaps[base_year])
+    existing_dvars = data.non_ag_dvars.get(base_year) if base_year != data.YR_CAL_BASE else None
+    return non_ag_transition.get_non_ag_ub_matrices(
+        data, data.lumaps[base_year], existing_dvars_rk=existing_dvars
+    )
 
 
 def get_ag_man_lb_mrj(data: Data, base_year):
@@ -493,7 +491,7 @@ def get_region_NRM_names_r(data: Data):
 
 def get_non_ag_lb_rk(data: Data, base_year):
     print('Getting non-agricultural lower bound matrices...', flush = True)
-    output = non_ag_transition.get_lower_bound_non_agricultural_matrices(data, base_year)
+    output = non_ag_transition.get_non_ag_lb_matrices(data, base_year)
     return output
 
 
@@ -1021,7 +1019,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         else get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
     )
     non_ag_b_rk = get_non_ag_b_rk(data, ag_b_mrj, base_year)
-    non_ag_x_rk = get_non_ag_x_rk(data, base_year)
+    non_ag_ub_rk = get_non_ag_ub_rk(data, base_year)
     non_ag_q_crk = get_non_ag_q_crk(data, ag_q_mrp, base_year)
     non_ag_lb_rk = get_non_ag_lb_rk(data, base_year)
     
@@ -1202,7 +1200,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_g_rk,
         non_ag_w_rk,
         non_ag_b_rk,
-        non_ag_x_rk,
+        non_ag_ub_rk,
         non_ag_q_crk,
         non_ag_lb_rk,
 

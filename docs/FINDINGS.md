@@ -5,6 +5,166 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260604 — Non-ag UB/LB regression fix, ag-man lb simplification, thin-window collapse rule, and barrier singularity investigation
+
+### Context
+
+`REM_RES5_trans_fix` runs (6 runs, RESFACTOR=5) were used to investigate whether fixes to
+the non-ag UB/LB logic and agricultural management lower bounds could resolve the barrier
+NUMERIC trouble that appears consistently from year 2030 onwards. The investigation
+identified a regression introduced by commit `1339cf00`, a root cause for the barrier
+singularity (RP thin-window variables), and a partial fix. Dual simplex remains necessary
+for the structural residual singularity.
+
+---
+
+### 1 — Regression in commit `1339cf00`: non-ag monotonicity violated in WITH-fix runs
+
+`LUF_S1_to_S4_trans_fix` vs `LUF_S1_to_S4` (8 runs, RESFACTOR=5, 2020–2050) was used
+to verify the `1339cf00` fix. Non-ag land uses must be monotonically non-decreasing
+(irreversible), but the WITH-fix runs showed new violations:
+
+| Run | WITHOUT fix | WITH fix |
+|-----|-------------|----------|
+| G0002 | 0.003 ha (noise) | OK ✓ |
+| G0003 | 0.02 ha (noise) | **21.98 ha** ← new |
+| G0004 | 0.23 ha | OK ✓ |
+| G0006 | OK | **22.00 ha** ← new |
+| G0007 | OK | **22.00 ha** ← new |
+| G0008 | 86.91 ha | MISSING |
+
+The ~22 ha violations in G0003/G0006/G0007 are identical across runs (same cells), and
+show a dip–recovery pattern: area drops 22 ha in year Y, then recovers in year Y+1. This
+is the signature of a cell being released from `non_ag_lu2cells` in one period then
+re-allocated the next.
+
+**Root cause:** `1339cf00` removed `existing_dvars_rk` from `get_to_non_ag_exclude_matrices`
+(renamed `get_non_ag_ub_matrices` in this session). Without the override, a T_MAT block in
+year Y gives `ub=0` for a cell with existing irreversible allocation. Even though
+`non_ag_lu2cells` uses `max(ub, lb)` to include such cells, if the cell's prior dvar was 0
+(it was excluded in a prior step), `lb=0` and `effective_ub=0` → cell falls out entirely.
+The dip–recovery occurs because the cell gets blocked and re-opened as the lumap cycles.
+
+**Fix:** restore `existing_dvars_rk` parameter to `get_non_ag_ub_matrices` (UB function
+only). The LB function (`get_non_ag_lb_matrices`) correctly has no UB knowledge — that
+separation from `1339cf00` is kept.
+
+---
+
+### 2 — Why the `existing_dvars_rk` override must stay in the UB function
+
+For a T_MAT-blocked cell with an existing irreversible allocation:
+
+- Without override: `non_ag_ub_rk[r,k] = 0` → `effective_ub = max(0, lb)`. If lb=0 from a
+  prior exclusion, the cell never enters `non_ag_lu2cells`. No variable → implicit 0 → area drops.
+- With override: `non_ag_ub_rk[r,k] = 1` (for non-RP) → cell always in `non_ag_lu2cells` →
+  variable created with `lb=existing_dvar, ub=1` → area locked.
+
+The UB function's job is "what's the maximum?" — for existing irreversible cells the answer
+is 1 (they're allowed to stay and grow), not 0 (transition matrix gate is for new allocations only).
+
+---
+
+### 3 — Ag management LB simplification
+
+The old `get_lower_bound_agricultural_management_matrices` logic had three stacked caps:
+per-cell area cap, sum-overflow scaling, and `min(am_lb, ag_lb)` capping. This was replaced
+by a single `am_dvar_true = min(am_dvar, ag_dvar)` clamp before floor-truncation.
+
+**Why it didn't change the model:** violations were only `~6e-8`, smaller than the floor
+precision of `1/10^ROUND_DECIMALS = 1e-6`. After `floor(x × 1e6)/1e6`, both old and new
+produce identical values → same model fingerprint (`0x57918376`). The simplification is
+correct and cleaner but doesn't affect numerical behaviour.
+
+---
+
+### 4 — Barrier singularity: RP thin-window variables as root cause
+
+The non-ag UB/LB fix (restoring `existing_dvars_rk`) changed the model fingerprint
+`0x57918376 → 0x35ade78a` and dramatically altered the barrier trajectory — 889 RP cells
+changed from fixed variables (`lb=ub=existing_value`) to free variables (`lb=existing_value,
+ub=1`). These freed variables shortened the central path, causing the barrier to converge
+faster but hit the near-singular zone earlier (iter 53 vs iter 132).
+
+Tracing the 889 cells: for T_MAT-blocked RP cells at RESFACTOR=5, the existing dvar is the
+previous period's RP allocation, which fills almost all of `RP_PROPORTION`. After the override
+sets `t_rk=1`, the RP cap `no_go_x_rk[:, RP_j] *= RP_PROPORTION` applies, giving:
+
+```
+ub = RP_PROPORTION        (e.g. 0.3300001, float32)
+lb = floor(dvar × 1e6) / 1e6   (e.g. 0.330000)
+window width ≈ 1e-7
+```
+
+For 889 such cells, the barrier's complementarity condition `x × s = μ` (s = ub − x) has
+889 near-zero slacks simultaneously at the optimum. These appear as 889 near-zero diagonal
+entries in the normal equation matrix `AA'`, causing Cholesky factorisation to blow up.
+
+**The proof:** `get_non_ag_ub_matrices` was called with and without `existing_dvars_rk`
+to count exactly which cells differ:
+
+```
+Environmental Plantings:  31 cells changed (UB: 0 → 1)
+Riparian Plantings:      889 cells changed (UB: 0 → RP_PROPORTION)
+```
+
+EP cells go from `ub=0` to `ub=1` — a wide window, no singularity.
+RP cells go from `ub=0` (fixed at lb) to `ub=RP_PROPORTION ≈ lb` — near-degenerate.
+
+---
+
+### 5 — Thin-window collapse rule
+
+**Fix:** in `_setup_non_ag_vars` (solver.py), collapse near-degenerate windows before
+passing to Gurobi:
+
+```python
+if x_lb > 0 and (x_ub - x_lb) / x_lb < 0.01:
+    x_ub = x_lb
+```
+
+When `lb = ub`, Gurobi treats the variable as **fixed** and removes it from the barrier's
+interior-point complementarity system entirely — no near-zero slack, no singularity.
+
+**Effect:** barrier fingerprint changed again (`0x35ade78a → 0x23226366`), confirming the
+889 RP variables were removed from `AA'`. The barrier passed iter 53 (previous blow-up
+point) and continued to iter 92 before hitting a second structural singularity:
+
+| Run | Fingerprint | Blow-up iter | Time |
+|-----|------------|--------------|------|
+| No UB/LB fix | `0x57918376` | 132 | 549s |
+| UB/LB fix, no collapse | `0x35ade78a` | 53 | 183s |
+| UB/LB fix + collapse | `0x23226366` | 92 | 350s |
+
+The second singularity at iter 92 has the same signature (primal locked at `~−5.46e+04`,
+dual explodes in one step) and is structural — driven by the renewable energy state-level
+constraints + GHG + GBF2 simultaneously binding at the optimal vertex. Dual simplex
+fallback is still required.
+
+---
+
+### 6 — Renaming for clarity
+
+| Old name | New name |
+|----------|----------|
+| `get_to_non_ag_exclude_matrices` | `get_non_ag_ub_matrices` |
+| `get_lower_bound_non_agricultural_matrices` | `get_non_ag_lb_matrices` |
+| `non_ag_x_rk` (field + function) | `non_ag_ub_rk` / `get_non_ag_ub_rk` |
+
+---
+
+### 7 — Summary of code changes
+
+| File | Change |
+|------|--------|
+| `economics/agricultural/transitions.py` | Simplify ag-man lb: `min(am_dvar, ag_dvar)` clamp before floor |
+| `economics/non_agricultural/transitions.py` | Restore `existing_dvars_rk` to `get_non_ag_ub_matrices`; rename both functions; update docstrings |
+| `solvers/input_data.py` | Restore `existing_dvars_rk` pass in `get_non_ag_ub_rk`; rename field/function; simplify `non_ag_lu2cells` back to `np.where(non_ag_ub_rk[:, k])` |
+| `solvers/solver.py` | Add thin-window collapse rule; remove dead `max(ub, lb)` and `float()` wrapper; remove dead `max(x_rk, lb)` UB-lift |
+| `tools/write.py` | Update call site to `get_non_ag_ub_matrices` |
+
+---
+
 ## 20260603 — Barrier false infeasibility in LUF_S1_to_S4: BarHomogeneous tau-drift, lb/constraint scaling mismatch, and transition-matrix PR refactor
 
 ### Context

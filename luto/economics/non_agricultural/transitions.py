@@ -1083,23 +1083,25 @@ def get_non_ag_to_non_ag_transition_matrix(data: Data) -> np.ndarray:
 
 
 
-def get_to_non_ag_exclude_matrices(data: Data, lumap) -> np.ndarray:
+def get_non_ag_ub_matrices(data: Data, lumap, existing_dvars_rk=None) -> np.ndarray:
     """
-    Upper-bound gate for non-agricultural land uses (solver UB matrix).
+    Returns the upper-bound (UB) matrix for non-agricultural land uses,
+    shape (NCELLS, N_NON_AG_LUS).  Each entry is the maximum cell proportion
+    the solver may allocate to that non-ag LU.
 
-    Returns a (NCELLS, N_NON_AG_LUS) array where each entry is the maximum
-    proportion of the cell that the solver may allocate to that non-ag LU.
-    A value of 0 means the transition is not permitted for NEW allocation;
-    RP cells additionally cap at RP_PROPORTION (the stream-buffer fraction).
+    Two rules set the UB:
 
-    SCOPE — new allocations only:
-        This function answers "is this cell allowed to take on this non-ag LU?"
-        based purely on the transition matrix and no-go exclusion layers.  It
-        has no knowledge of existing dvars.  Cells that already hold an
-        irreversible non-ag allocation may have UB=0 here (e.g. partial Riparian
-        Plantings whose dominant lumap gives T_MAT NaN → 0), yet still carry a
-        positive lower bound from get_lower_bound_non_agricultural_matrices().
-        solver.py reconciles this with  ub = max(ub, lb)  at variable creation.
+    1. New allocations — transition matrix + no-go exclusion zones decide
+       whether a cell is allowed to take on a non-ag LU for the first time.
+       UB = 0 blocks the transition; UB = 1 (or RP_PROPORTION for Riparian
+       Plantings) allows it.
+
+    2. Existing irreversible allocations — when existing_dvars_rk is supplied,
+       any cell that already holds an irreversible non-ag LU is forced to UB = 1,
+       bypassing the transition-matrix check.  This guarantees the cell stays in
+       non_ag_lu2cells every solve so its lower bound (lock-in) remains active.
+       Without this override, a T_MAT block in year Y would give dvar = 0, which
+       propagates lb = 0 in year Y+1 and silently breaks irreversibility.
     """
 
     # Transition-matrix flag: 1 = allowed, 0 = not allowed (NaN in T_MAT)
@@ -1112,6 +1114,14 @@ def get_to_non_ag_exclude_matrices(data: Data, lumap) -> np.ndarray:
     t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(lumap[non_ag_cells]))
     t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(data.LUMAP[non_ag_cells]))
     t_rk = np.where(np.isnan(t_rk), 0, 1).astype(np.int8)
+
+    # Cells that already hold an irreversible non-ag allocation must not be evicted
+    # by the transition-matrix check — a T_MAT block in year Y would zero the dvar,
+    # giving lb=0 in year Y+1, which breaks the irreversibility guarantee.
+    if existing_dvars_rk is not None:
+        for k, k_name in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+            if not settings.NON_AG_LAND_USES_REVERSIBLE[k_name]:
+                t_rk[existing_dvars_rk[:, k] > 0, k] = 1
 
     # No-go exclusion zones
     no_go_x_rk = np.ones((data.NCELLS, data.N_NON_AG_LUS))
@@ -1129,23 +1139,20 @@ def get_to_non_ag_exclude_matrices(data: Data, lumap) -> np.ndarray:
     return no_go_x_rk
 
 
-def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarray:
+def get_non_ag_lb_matrices(data: Data, base_year) -> np.ndarray:
     """
-    Lower-bound lock-in for irreversible non-agricultural land uses (solver LB matrix).
+    Returns the lower-bound (LB) matrix for non-agricultural land uses,
+    shape (NCELLS, N_NON_AG_LUS).  Each entry is the minimum cell proportion
+    the solver must maintain — i.e. the lock-in floor for irreversible LUs.
 
-    Returns a (NCELLS, N_NON_AG_LUS) array where each entry is the minimum
-    proportion the solver must maintain.  At the base year this is all zeros.
-    For subsequent years, the previous period's dvar value is used as the LB
-    for any non-ag LU flagged as irreversible in NON_AG_LAND_USES_REVERSIBLE.
+    At the base year (or before any allocation exists) the matrix is all zeros.
+    For subsequent years, the LB for each irreversible LU is set to the
+    floor-truncated dvar value from the previous period, preventing the solver
+    from reducing already-committed irreversible land.
 
-    SCOPE — existing allocations only:
-        This function answers "what must be kept?" based on what was already
-        allocated in the previous period.  It does not consult the transition
-        matrix.  When an irreversible cell has lb > 0 but the transition matrix
-        gives UB=0 (e.g. partial RP whose dominant lumap blocks the T_MAT lookup),
-        the lb is returned as-is; solver.py lifts the UB to lb so Gurobi always
-        receives a valid lb <= ub, effectively fixing the variable at the existing
-        allocation rather than evicting it.
+    This function has no knowledge of the transition matrix or UB.  The pairing
+    with get_non_ag_ub_matrices (which forces UB=1 for existing irreversible
+    cells) ensures Gurobi always receives a valid lb <= ub.
     """
 
     if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
@@ -1165,7 +1172,7 @@ def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarr
     # make the cell-usage equality constraint structurally infeasible.
     lb_capped = np.minimum(lb_rk, data.AG_MASK_PROPORTION_R[:, np.newaxis]).astype(np.float32)
 
-    # Do NOT cap lb against the UB (non_ag_x_rk) here.  For irreversible non-ag LUs,
+    # Do NOT cap lb against the UB (non_ag_ub_rk) here.  For irreversible non-ag LUs,
     # cells with an existing allocation can have lb > 0 even when the transition matrix
     # gives UB=0 (e.g. partial Riparian Plantings whose dominant lumap is another LU).
     # The solver enforces ub = max(ub, lb) so Gurobi always sees a valid lb <= ub.

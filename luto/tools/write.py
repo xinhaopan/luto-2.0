@@ -1944,7 +1944,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         base_lumap = data.lumaps[yr_cal_sim_pre]
         l_rk = tools.lumap2non_ag_l_mk(base_lumap, data.N_NON_AG_LUS)
         l_rk_not = np.logical_not(l_rk)
-        x_rk = non_ag_transitions.get_to_non_ag_exclude_matrices(data, base_lumap)
+        x_rk = non_ag_transitions.get_non_ag_ub_matrices(data, base_lumap)
 
     # Get the non-agricultural decision variable
     ag_dvar_base = tools.ag_mrj_to_xr(data, (tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]))
