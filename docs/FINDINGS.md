@@ -5,6 +5,206 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260605 — Variable-bound crack analysis, am-crack snap fix, and barrier degeneracy root cause
+
+### Context
+
+`LUF_S1_to_S4_raw_trans_fix` (RESFACTOR=5, 2020–2050, renewables ON) was used to
+investigate whether near-degenerate variable bounds ("cracks") were the primary cause of
+barrier (Method=2) failing at years 2025 and 2030. A systematic crack analysis was
+performed from the `data_2030.lz4` checkpoint; a new snap fix was applied to the
+ag-management variable setup; and the true root cause of barrier failure was identified.
+
+Scripts: `jinzhu_inspect_code/Check_numeric_issues/step_2_check_cracks/crack_analysis.py`,
+`reconstruct_2025_solve.py`.
+
+---
+
+### 1 — What a "crack" is
+
+After each solved year, dvars are floor-truncated to `ROUND_DECIMALS=6` decimal places
+and stored as the next year's lower bound (LB) for irreversible land uses.  The upper
+bound (UB) is derived separately (transition matrix for non-ag; always 1.0 for am).
+
+When the previous dvar is very close to the UB (e.g. a nearly fully-allocated cell):
+
+```
+am_dvar  ≈ 0.9999997  →  am_lb = floor(0.9999997 × 1e6) / 1e6 = 0.999999
+UB = 1.0
+crack width = 1 - 0.999999 = 1e-6
+```
+
+Barrier must keep every variable strictly inside `(LB, UB)`.  When the window is
+`O(1e-6)` wide, the complementarity slack `(UB − x)` is near-zero at the optimum, making
+the normal-equation matrix `AA'` near-singular.
+
+---
+
+### 2 — Confirmed: saved dvars are raw Gurobi values (not pre-clamped)
+
+`data.ag_man_dvars[yr]` stores the raw floor-truncated Gurobi output.  The
+`min(am_dvar, ag_dvar)` clamping that prevents am from exceeding its host ag variable
+happens only at LB-derivation time inside
+`get_lower_bound_agricultural_management_matrices()`, not at save time.
+
+Evidence: after the 2020 barrier solve, 1,346 cells per AM have `am_dvar > ag_dvar` by up
+to `9.14e-3` (≤ `FEASIBILITY_TOLERANCE`).  After the 2025/2030 dual-simplex solves,
+fewer cells but larger mean gaps (up to `2.18e-3`).
+
+---
+
+### 3 — Non-ag crack distribution: existing fix handles everything
+
+After floor-truncation, 61–73% of active non-ag cells (those with LB > 0) have raw crack
+width < `1e-5`.  The existing snap rule in `_setup_non_ag_vars`:
+
+```python
+if x_lb > 0 and (x_ub - x_lb) / x_lb < 0.01:
+    x_ub = x_lb
+```
+
+eliminated **100% of non-ag cracks** in all years — zero remaining after the fix.  The
+gap distribution shows a hard jump from LB ∈ [0.99, 0.999] to LB ≥ 0.99999 with nothing
+in between; the 0.01 relative threshold correctly caught all legitimate near-fixed cells.
+
+Section 3 of the analysis confirms 94–96% of active non-ag cells return exactly at their
+LB after solving — both barrier and dual simplex pin them there.
+
+---
+
+### 4 — Ag-management crack cascade: the hidden multiplier effect
+
+In this run Solar PV and Onshore Wind are **enabled and non-reversible**.  Their LBs come
+from `min(am_dvar, ag_dvar)` floor-truncated.  No equivalent snap fix existed.
+
+Crack counts from the `data_2030.lz4` checkpoint:
+
+| base_year → target | Solar PV active/tiny | Wind active/tiny |
+|---|---|---|
+| 2020 → 2025 (barrier) | 2 / 0 | 6 / 3 |
+| 2025 → 2030 (simplex) | 3 / 0 | 29 / 20 |
+| 2030 → 2035 (simplex) | 29 / 16 | 256 / 164 |
+
+The raw cell counts look small, but each crack cell cascades through two constraint hops:
+
+1. `X_am[j,r] ≥ LB ≈ 1` and `X_am[j,r] ≤ X_ag[j,r]` forces `X_ag[j,r] ≈ 1`
+   (near its own UB).
+2. Cell-usage equality `Σ_j X_ag[m,j,r] + Σ_k X_non_ag[r,k] = AG_MASK` forces all
+   **other** variables at cell `r` toward 0 (near their LBs).
+
+Cascade footprint for the 2035 solve (base_year=2030):
+
+| Measure | Count |
+|---|---|
+| Am crack variables (direct) | 106 |
+| Paired ag vars forced near UB (`am ≤ ag`) | 106 |
+| Unique crack cells | 106 |
+| Other vars forced → 0 at those cells (cell-usage) | 1,306 |
+| **Total near-degenerate variables** | **1,518** |
+| Global-constraint `AA'` hits (× 29 constraints) | **44,022** |
+
+None of these 1,518 variables had any snap fix — they remained as tiny non-zero windows
+in the interior-point complementarity system.
+
+---
+
+### 5 — Fix: crack snap for non-reversible ag-management variables
+
+Applied the same snap logic to **both** code paths in `_setup_ag_management_variables`
+(renewable path and generic non-reversible path):
+
+```python
+# renewable (Solar PV / Wind):
+model_ub = model_lb if (model_lb > 0 and abs(1.0 - model_lb) < 10 ** (1 - settings.ROUND_DECIMALS)) else 1.0
+
+# generic non-reversible AMs:
+dry_x_ub = dry_x_lb if (dry_x_lb > 0 and abs(1.0 - dry_x_lb) < 10 ** (1 - settings.ROUND_DECIMALS)) else 1.0
+irr_x_ub = irr_x_lb if (irr_x_lb > 0 and abs(1.0 - irr_x_lb) < 10 ** (1 - settings.ROUND_DECIMALS)) else 1.0
+```
+
+**Threshold choice:** `10^(1 − ROUND_DECIMALS) = 1e-5` (10× the floor-truncation unit).
+This is an absolute crack-width test: snap only when the window is pure floating-point
+noise from truncation.  The am UB is always exactly `1.0` (Python float), so the absolute
+form `abs(1.0 − lb)` directly measures the crack width without normalisation.
+
+**Why not `0.01` (the old non-ag threshold):** The non-ag UB comes from `RP_PROPORTION`
+(float32 arithmetic), which can produce gaps up to `~1e-2` for legitimate physical reasons.
+Am UB is always exactly `1.0`; its only source of crack is floor truncation (max `1e-6`).
+Using `1e-5` preserves real variable freedom (e.g. a cell with LB = 0.99 that could still
+grow to 1.0) while snapping pure noise.
+
+The non-ag snap rule was also updated to the same absolute form for consistency:
+
+```python
+if x_lb > 0 and abs(x_ub - x_lb) < 10 ** (1 - settings.ROUND_DECIMALS):
+    x_ub = x_lb
+```
+
+---
+
+### 6 — Reconstruction test: crack fix alone does not rescue barrier
+
+`reconstruct_2025_solve.py` rebuilt the 2025 model from `data_2030.lz4` (base_year=2020)
+and ran only the barrier attempt (`Method=2, Crossover=-1, Presolve=0`).  Barrier still
+reported **NUMERIC** after the snap fix.
+
+The barrier log shows a **dual blow-up** at iteration 21 (dual jumps from `−1.94e+16` to
+`−4.57e+24`) — not a complementarity-slack near-zero failure.  This is an ill-conditioned
+normal-equation matrix from constraint-level degeneracy, not variable-bound degeneracy.
+
+---
+
+### 7 — Root cause: the optimal solution lives at a degenerate vertex
+
+The crack snap correctly removes fixed-variable noise from `AA'`.  But the optimal
+solution is structurally degenerate:
+
+| Degeneracy source | Snap fix removes it? | Barrier handles it? | Dual simplex handles it? |
+|---|---|---|---|
+| Fixed locked-in variables (crack LB ≈ UB) | ✓ yes | ✗ needs interior | ✓ trivially |
+| Multiple simultaneously binding constraints (GHG + demand) | ✗ no | ✗ dual blow-up | ✓ degenerate pivots |
+
+At the 2025 optimum, the GHG constraint and several demand constraints bind
+simultaneously.  Barrier's central path requires all constraint slacks strictly positive;
+as `µ → 0` these slacks → 0 simultaneously, making `AA'` near-singular regardless of
+variable bounds.
+
+Dual simplex operates on vertices and edges directly.  It uses anti-degeneracy pivot rules
+(perturbation, Bland's rule) that step along the degenerate face without requiring slacks
+to stay positive — exactly what this problem geometry demands.
+
+---
+
+### 8 — Anti-degeneracy techniques to help barrier
+
+Three approaches can split the degenerate vertex and let barrier succeed:
+
+1. **`BarHomogeneous=1`** — Gurobi's homogeneous self-dual embedding, designed for
+   near-degenerate problems.  Zero code change; already exposed as `settings.BARHOMOGENOUS`.
+   *Note*: this setting previously caused false infeasibility certificates via tau-drift in
+   some runs (see 20260603 entry) — use with caution.
+
+2. **Objective noise** — add `ε × U(0,1)` to each coefficient in `ag_obj_mrj`.  Breaks
+   symmetry between multiple co-optimal vertices; barrier finds one non-degenerate
+   solution.  Use the solution only as a warm-start basis, then re-solve with true
+   objective.
+
+3. **RHS relaxation + warm-start** — temporarily relax binding constraint RHSs by `~0.1%`,
+   solve with barrier (succeeds on the perturbed non-degenerate problem), re-tighten and
+   warm-start dual simplex.  Most principled; best for hard constraints.
+
+---
+
+### 9 — Summary of code changes
+
+| File | Change |
+|---|---|
+| `solvers/solver.py` `_setup_non_ag_vars` | Snap threshold changed from `(x_ub-x_lb)/x_lb < 0.01` to `abs(x_ub-x_lb) < 10^(1-ROUND_DECIMALS)` |
+| `solvers/solver.py` `_setup_ag_management_variables` (renewable path) | Add `model_ub = model_lb if abs(1-model_lb) < 1e-5 else 1.0` for non-reversible AMs |
+| `solvers/solver.py` `_setup_ag_management_variables` (generic path) | Add same snap for `dry_x_ub` and `irr_x_ub` |
+
+---
+
 ## 20260604 — Non-ag UB/LB regression fix, ag-man lb simplification, thin-window collapse rule, and barrier singularity investigation
 
 ### Context
