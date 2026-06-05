@@ -21,6 +21,8 @@
 
 """ LUTO model settings. """
 
+import math
+
 
 # ---------------------------------------------------------------------------- #
 # LUTO model version.                                                          #
@@ -279,9 +281,12 @@ AGGREGATE = 0    # Controls the aggregation level in presolve. The options are o
 # Print detailed output to screen
 VERBOSE = 1
 
-# Relax the tolerances for feasibility and optimality
-FEASIBILITY_TOLERANCE = 1e-2              
-''' Primal feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
+# Primal feasibility tolerance — defines the solver precision granule.
+# ROUND_DECIMALS is derived from this: floor-truncation keeps digits down to
+# this precision, so lb values are exact multiples of FEASIBILITY_TOLERANCE.
+# Snap threshold for near-zero bounds and near-degenerate windows = FEASIBILITY_TOLERANCE * 10.
+FEASIBILITY_TOLERANCE = 1e-6
+''' Primal feasibility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
 
 OPTIMALITY_TOLERANCE = 1e-2               
 ''' Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
@@ -302,7 +307,7 @@ that 1 tripled solve time, 3 led to numerical problems.
 '''
 
 RETRY_PARAMS = [
-    (0, 2, -1, 0 ),   # NF, Method, Crossover, Presolve
+    (0, 2, -1, 0),   # NF, Method, Crossover, Presolve
     (0, 1, 0, -1),
 ]
 '''
@@ -1219,8 +1224,10 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
 # Non-ag output coding. Non-agricultural land uses will appear on the land use map offset by this amount (e.g. land use 0 will appear as 100)
 NON_AGRICULTURAL_LU_BASE_CODE = 100
 
-# Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
-ROUND_DECIMALS = 6
+# Number of decimal places for lb/ub floor-truncation, derived from
+# FEASIBILITY_TOLERANCE: one floor unit = FT, so ROUND_DECIMALS = -log10(FT).
+# Change FT only — ROUND_DECIMALS updates automatically.
+ROUND_DECIMALS = int(-math.log10(FEASIBILITY_TOLERANCE))
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)

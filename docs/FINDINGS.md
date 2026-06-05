@@ -5,6 +5,193 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260605 — lb > ub bug, unified snap rule, and lock-in confirmed as barrier root cause
+
+### Context
+
+Continuation of the 20260605 crack analysis. The demand-only 2020→2025 reconstruction
+from `data_2030.lz4` was used to isolate barrier failure to its true root cause.
+Three questions were investigated: (1) whether a lb > ub bug exists, (2) whether
+tightening the snap rule to a 1% relative threshold fixes barrier, and (3) whether
+the non-ag lock-in LBs from the checkpoint are the true root cause.
+
+Scripts: `jinzhu_inspect_code/Check_numeric_issues/step_2_check_cracks/test_barrier_demand_only.py`,
+`test_barrier_no_lockin.py`, `check_lb_ub_validity.py`.
+
+---
+
+### 1 — Confirmed lb > ub bug for 1 RP cell
+
+`check_lb_ub_validity.py` found 1 Riparian Plantings cell where `lb > ub` after the
+`d84fbb77` change that removed the UB cap from `get_non_ag_lb_matrices`.
+
+**Mechanism:**
+
+```
+FEASIBILITY_TOLERANCE = 0.01 → Gurobi can return dvar up to RP_PROPORTION + 0.01
+Stored 2020 RP dvar     = RP_PROPORTION + 0.002202  (within tolerance)
+Floor-truncated lb       = 0.332202
+UB (RP_PROPORTION)       = 0.330000
+lb > ub by               = 0.002201
+```
+
+The snap threshold of `abs(ub−lb) < 1e-5` cannot catch a 0.002 gap → Gurobi
+receives lb > ub for this variable.
+
+**Before `d84fbb77`**: the LB function capped `lb = min(lb_rk, non_ag_x_rk)`.
+Since `non_ag_x_rk[RP] = RP_PROPORTION`, lb was always clamped to ≤ RP_PROPORTION.
+After `d84fbb77` removed this cap, tolerance-violated dvars produce lb > ub.
+
+---
+
+### 2 — Additional 30 near-capacity cells missed by abs-only snap
+
+Beyond the lb > ub cell, the check found:
+- **29 EP cells**: lb ≈ 0.991–0.999, ub = 1.0, gap = 0.001–0.009
+- **1 RP cell**: lb ≈ RP_PROPORTION × 0.998, gap ≈ 0.0005
+
+The old relative threshold `(ub−lb)/lb < 0.01` would have snapped these.
+The abs-only `< 1e-5` threshold missed them. These near-UB variables have
+complementarity slack `(ub−x) → 0` at the optimum — same near-singular AA' effect
+as near-LB variables.
+
+---
+
+### 3 — Fix: unified relative snap rule + lb > ub guard
+
+Applied to `solver.py` `_setup_non_ag_vars` and `_setup_ag_management_variables`:
+
+**Non-ag variables** (two guards):
+```python
+# Guard 1: prior dvar can exceed RP_PROPORTION within FEASIBILITY_TOLERANCE
+if x_lb > x_ub:
+    x_lb = x_ub
+# Guard 2: collapse near-degenerate windows (1% relative threshold)
+elif x_lb > 0 and (x_ub - x_lb) / x_lb < 0.01:
+    x_lb = x_ub
+```
+
+**AM variables** (renewable and generic paths):
+```python
+model_ub = model_lb if (model_lb > 0 and abs(1.0 - model_lb) / model_lb < 0.01) else 1.0
+```
+
+`abs()` is added for AM because ub is always 1.0 (no Guard 1 clamp); without abs,
+a hypothetical lb > 1.0 from float arithmetic would pass the `< 0.01` check silently.
+For non-ag Guard 2, `abs()` is not needed because Guard 1 guarantees x_lb ≤ x_ub.
+
+**Effect:** 1 lb > ub cell clamped; 30 additional near-capacity cells snapped.
+Total snapped variables increased by 31 vs. the abs-only rule.
+
+---
+
+### 4 — 1% snap rule does NOT rescue barrier
+
+`test_barrier_demand_only.py` (Crossover=0, demand-only, with 1% snap):
+
+```
+BarIter=42, Status=NUMERIC, Time=79s
+iter 33: dual = 4.06e+07   (converging)
+iter 34: dual = −6.30e+10  (begins diverging)
+iter 35: dual = −8.71e+17  (blow-up)
+iter 42: dual = −2.52e+39  (barrier gives up)
+```
+
+vs. before 1% snap fix (also NUMERIC, BarIter=40, ~69s). The dual blow-up pattern
+is identical — 2 extra iterations and ~10s longer, but no fundamental change.
+
+**Conclusion**: the 30 additional snapped cells reduced AA' near-singularity slightly
+but did not address the true cause. The snap fix is still correct (lb > ub bug fixed,
+30 more degenerate variables removed) but is insufficient alone.
+
+---
+
+### 5 — Three-way controlled experiment: isolating the root cause
+
+Three versions of the 2020→2025 demand-only model were run with Crossover=0:
+
+| Test | non-ag LB source | Nonzero LB cells | Barrier result |
+|------|-----------------|-----------------|----------------|
+| `test_barrier_demand_only` (current code, 1% snap) | full lock-in from `non_ag_dvars[2020]` | ~5,855 + RP cracks | **NUMERIC** 42 iters, 79s |
+| `test_barrier_prefixlock` (pre-94971ea1 exact eviction) | t_rk only, lb capped against old UB | 5,855 | **NUMERIC** 44 iters, 77s |
+| `test_barrier_no_lockin` (dvars removed entirely) | zeros | 0 | **OPTIMAL** 213 iters, 405s |
+
+**Pre-94971ea1 eviction counts** (from `test_barrier_prefixlock`):
+
+| LU | Evicted (lb→0) | Kept (lb>0) |
+|----|---------------|------------|
+| Environmental Plantings | 24 | 1,906 |
+| Riparian Plantings | 456 | 3,812 |
+| Sheep Agroforestry | 1 | 22 |
+| Beef/other Agroforestry | 0 | 14 |
+| Destocked | 0 | 101 |
+| **Total** | **481** | **5,855** |
+
+The pre-fix code only evicted RP cells whose dominant `lumap` was EP
+(`T_MAT[EP→RP] = NaN`). Cells where `lumap` allowed RP (beef/sheep
+pasture: `T_MAT[Beef→RP] ≠ NaN`) still retained their LBs. Similarly,
+EP cells where `lumap=EP` (self-transition valid) kept their LBs.
+
+**Barrier failure is not specifically caused by the 94971ea1/d84fbb77 fixes.**
+Even the exact pre-fix state — with 481 cells properly evicted and 5,855
+LBs remaining — still hits the same dual blow-up at iter 33–34. The
+current-code model adds only ~481 more nonzero-LB cells; both fail.
+
+**The reconstruction scenario itself is the root cause.** The data_2030.lz4
+checkpoint has `non_ag_dvars[2020]` populated from a run that solved with
+`GBF2_TARGET=high`, creating ~5,855 non-ag cells with LBs > 0. At the
+optimum, barrier must simultaneously drive `(x − lb) → 0` for all these.
+With rescaled constraint coefficients at O(1e³) and `BarConvTol=1e-5`,
+the KKT complementarity requires `x − lb < 1e-8` — approaching machine
+precision for thousands of variables at once → normal-equation AA' near-singular
+→ dual blow-up at iter 33–34.
+
+**Why the original run worked:** the real LUF_S1_to_S4_raw_trans_fix run
+solved 2020→2025 as its FIRST step. At that point `non_ag_dvars.get(2020) = None`
+(dvars not yet written). All non-ag LBs = 0 → no near-LB variables →
+barrier converged to OPTIMAL in 213 iterations (405s).
+
+**The reconstruction is a strictly harder problem** than the original first
+solve. It uses real 2020 dvars as LBs. Barrier fails on it regardless of
+which code version (pre-fix or post-fix) is used for the LB/UB computation,
+and regardless of snap tuning.
+
+---
+
+### 6 — Summary of code changes
+
+| File | Change |
+|------|--------|
+| `solvers/solver.py` `_setup_non_ag_vars` | Guard 1: clamp `x_lb = x_ub` when `lb > ub` (fixes tolerance-violation bug). Guard 2: unified relative snap `(x_ub−x_lb)/x_lb < 0.01` replacing abs-only threshold |
+| `solvers/solver.py` `_setup_ag_management_variables` (renewable path) | Snap changed to `abs(1.0−model_lb)/model_lb < 0.01` |
+| `solvers/solver.py` `_setup_ag_management_variables` (generic path) | Same: `abs(1.0−dry_x_lb)/dry_x_lb < 0.01` and `abs(1.0−irr_x_lb)/irr_x_lb < 0.01` |
+
+---
+
+### 7 — Implications
+
+The barrier failure for reconstructions from checkpoint is structural — it arises
+from the correct lock-in fix (94971ea1 + d84fbb77) creating near-LB variables that
+the barrier's KKT system cannot handle with Presolve=0.
+
+**Mitigation options (in priority order):**
+
+1. **Accept dual simplex (Method=1) for reconstructions.** RETRY_PARAMS second
+   entry `(0, 1, 0, -1)` handles this correctly. Dual simplex operates on vertices
+   and uses anti-degeneracy pivot rules that step through degenerate faces without
+   requiring complementarity slacks to stay positive.
+
+2. **Presolve=1 for barrier** would shift variables `y = x − lb` internally,
+   eliminating the near-zero complementarity slack issue. Avoided because
+   presolve-transformed false infeasibility was an earlier problem — revisit
+   with current code if dual simplex proves too slow.
+
+3. **Softening the lb for non-ag in the solver** (not in the data) by a small
+   epsilon to give barrier interior room — principled but complicates solution
+   extraction.
+
+---
+
 ## 20260605 — Variable-bound crack analysis, am-crack snap fix, and barrier degeneracy root cause
 
 ### Context

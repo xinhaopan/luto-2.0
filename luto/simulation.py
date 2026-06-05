@@ -255,12 +255,6 @@ def solve_timeseries(
         data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
         data.add_obj_vals(target_year, solution.obj_val)
 
-        # Floor-truncate dvars immediately so the next year's lb derivation uses
-        # consistent values (prevents raw float32 precision noise from making lb > ub).
-        _rd = 10 ** settings.ROUND_DECIMALS
-        data.ag_dvars[target_year]     = np.floor(data.ag_dvars[target_year]     * _rd) / _rd
-        data.non_ag_dvars[target_year] = np.floor(data.non_ag_dvars[target_year] * _rd) / _rd
-        data.ag_man_dvars[target_year] = {k: np.floor(v * _rd) / _rd for k, v in data.ag_man_dvars[target_year].items()}
 
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(target_year, data_type, prod_data)

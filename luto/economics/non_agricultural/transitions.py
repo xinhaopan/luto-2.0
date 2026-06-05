@@ -1115,13 +1115,12 @@ def get_non_ag_ub_matrices(data: Data, lumap, existing_dvars_rk=None) -> np.ndar
     t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(data.LUMAP[non_ag_cells]))
     t_rk = np.where(np.isnan(t_rk), 0, 1).astype(np.int8)
 
-    # Cells that already hold an irreversible non-ag allocation must not be evicted
-    # by the transition-matrix check — a T_MAT block in year Y would zero the dvar,
-    # giving lb=0 in year Y+1, which breaks the irreversibility guarantee.
+    # Cells that already hold an irreversible non-ag must be able to have UB.
     if existing_dvars_rk is not None:
         for k, k_name in enumerate(data.NON_AGRICULTURAL_LANDUSES):
             if not settings.NON_AG_LAND_USES_REVERSIBLE[k_name]:
-                t_rk[existing_dvars_rk[:, k] > 0, k] = 1
+                # Only the existing dvar > tolerance, then it are considered as valid rather than noise
+                t_rk[existing_dvars_rk[:, k] >= settings.FEASIBILITY_TOLERANCE, k] = 1
 
     # No-go exclusion zones
     no_go_x_rk = np.ones((data.NCELLS, data.N_NON_AG_LUS))
@@ -1165,20 +1164,10 @@ def get_non_ag_lb_matrices(data: Data, base_year) -> np.ndarray:
         10 ** settings.ROUND_DECIMALS,
     )
 
-    # Cap each lb against the cell capacity (AG_MASK_PROPORTION_R) — the same float32
-    # value used as the const_cell_usage RHS.  This prevents a float32 rounding
-    # artefact (e.g. float32(0.92) = 0.9200000169) from exceeding a cell capacity
-    # stored as a slightly different float32 value (e.g. 0.9199999571), which would
-    # make the cell-usage equality constraint structurally infeasible.
+    # NonAg can not exceed Ag in the beginning
     lb_capped = np.minimum(lb_rk, data.AG_MASK_PROPORTION_R[:, np.newaxis]).astype(np.float32)
 
-    # Do NOT cap lb against the UB (non_ag_ub_rk) here.  For irreversible non-ag LUs,
-    # cells with an existing allocation can have lb > 0 even when the transition matrix
-    # gives UB=0 (e.g. partial Riparian Plantings whose dominant lumap is another LU).
-    # The solver enforces ub = max(ub, lb) so Gurobi always sees a valid lb <= ub.
-
     lb_update = lb_capped < lb_rk
-
     if lb_update.any():
         gap = lb_rk[lb_update] - lb_capped[lb_update]
         print(

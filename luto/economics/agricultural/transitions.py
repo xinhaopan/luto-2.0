@@ -485,7 +485,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
     what a variable upper-bound on ag_dvar would have enforced exactly.
     """
 
-    if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
+    if base_year == data.YR_CAL_BASE or base_year not in data.ag_man_dvars:
         return {
             am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
             for am in settings.AG_MANAGEMENTS_TO_LAND_USES
