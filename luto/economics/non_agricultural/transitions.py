@@ -569,10 +569,14 @@ def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) ->
 
     if separate:
         return {'Transition cost (Non-Ag2Ag)':np.nan_to_num(np.einsum('mrj,mrj,r->mrj', base_ep_to_ag_t_mrj, l_mrj_not, data.REAL_AREA)), 
-                'Water license cost (Non-Ag2Ag)': np.nan_to_num(np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj_not, data.REAL_AREA))}
+                'Water license cost (Non-Ag2Ag)': np.nan_to_num(np.einsum('mrj,mrj->mrj', w_delta_mrj, l_mrj_not))}
         
-    # Add cost of water license and cost of installing/removing irrigation where relevant (pre-amortised)
-    ep_to_ag_t_mrj = (base_ep_to_ag_t_mrj + w_delta_mrj) * l_mrj_not * data.REAL_AREA[np.newaxis, :, np.newaxis]
+    # base_ep_to_ag_t_mrj is $/ha → convert to $/cell via REAL_AREA; w_delta_mrj is already
+    # $/cell (see tools.get_ag_to_ag_water_delta_matrix), so it must NOT be multiplied by
+    # REAL_AREA again. This mirrors the ag→ag path (agricultural/transitions.py:126,140-141).
+    ep_to_ag_t_mrj = (
+        base_ep_to_ag_t_mrj * data.REAL_AREA[np.newaxis, :, np.newaxis] + w_delta_mrj
+    ) * l_mrj_not
     return np.nan_to_num(ep_to_ag_t_mrj) 
 
 
@@ -1018,7 +1022,28 @@ def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.nd
     )
 
 
-def get_transition_matrix_nonag2ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
+def get_irreversible_non_ag_cell_mask(data: Data, base_year) -> np.ndarray | None:
+    """
+    Boolean (NCELLS,) mask of cells that already hold an irreversible non-ag LU.
+
+    A cell is flagged if any irreversible non-ag LU (NON_AG_LAND_USES_REVERSIBLE is
+    False) has a base-year dvar fraction >= FEASIBILITY_TOLERANCE. The same tolerance
+    and ordering are used by get_non_ag_ub_matrices so the lock-in stays consistent.
+
+    Returns None at the base year (or when no dvars exist), where no lock-in applies.
+    """
+    if base_year is None or base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
+        return None
+
+    dvars_rk = data.non_ag_dvars[base_year]
+    mask_r = np.zeros(data.NCELLS, dtype=bool)
+    for k, k_name in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+        if not settings.NON_AG_LAND_USES_REVERSIBLE[k_name]:
+            mask_r |= dvars_rk[:, k] >= settings.FEASIBILITY_TOLERANCE
+    return mask_r
+
+
+def get_transition_matrix_nonag2ag(data: Data, yr_idx, lumap, lmmap, separate=False, base_year=None) -> np.ndarray|dict:
     """
     Get the matrix containing transition costs from non-agricultural land uses to agricultural land uses.
 
@@ -1035,6 +1060,10 @@ def get_transition_matrix_nonag2ag(data: Data, yr_idx, lumap, lmmap, separate=Fa
     separate : bool, optional
         If True, returns a dictionary of transition matrices for each land use category.
         If False, returns a single aggregated transition matrix.
+    base_year : int, optional
+        The base year whose non-ag dvars define the irreversible lock-in. When supplied,
+        cells already holding an irreversible non-ag LU are excluded from the non-ag→ag
+        transition cost (see note below). Defaults to None (no exclusion).
 
     Returns
     -------
@@ -1059,6 +1088,20 @@ def get_transition_matrix_nonag2ag(data: Data, yr_idx, lumap, lmmap, separate=Fa
     non_ag_to_agr_t_matrices['Beef Carbon Plantings (Belt)'] = get_beef_carbon_plantings_belt_to_ag(data, yr_idx, lumap, lmmap, cp_belt_x_r, separate)
     non_ag_to_agr_t_matrices['BECCS'] = get_beccs_to_ag(data, yr_idx, lumap, lmmap, separate)
     non_ag_to_agr_t_matrices['Destocked - natural land'] = get_destocked_to_ag(data, yr_idx, lumap, lmmap, separate)
+
+    # Cells that already hold an irreversible non-ag LU cannot truly revert that locked
+    # fraction back to agriculture (irreversibility is enforced via the non-ag lb-lock).
+    # Because transition costs are integerised-lumap based, the model would otherwise
+    # charge a spurious non-ag→ag transition cost on the free fraction of these cells.
+    # Zero the cost there so the solver (and cost reporting) never see it.
+    irrev_mask_r = get_irreversible_non_ag_cell_mask(data, base_year)
+    if irrev_mask_r is not None and irrev_mask_r.any():
+        for mat in non_ag_to_agr_t_matrices.values():
+            if isinstance(mat, dict):
+                for src_arr in mat.values():
+                    src_arr[:, irrev_mask_r, :] = 0
+            else:
+                mat[:, irrev_mask_r, :] = 0
 
     if separate:
         # Note: The order of the keys in the dictionary must match the order of the non-agricultural land uses

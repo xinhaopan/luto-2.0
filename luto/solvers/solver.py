@@ -224,7 +224,7 @@ class LutoSolver:
         self.X_non_ag_vars_kr = np.zeros(
             (self._input_data.n_non_ag_lus, self._input_data.ncells), dtype=object
         )
-        _tol = settings.FEASIBILITY_TOLERANCE * 10
+        
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
@@ -236,16 +236,13 @@ class LutoSolver:
                     else self._input_data.non_ag_lb_rk[r, k]
                 )
                 x_ub = self._input_data.non_ag_ub_rk[r, k]
-
-                if x_lb > x_ub:
-                    x_lb = x_ub
-                elif x_ub < _tol:
-                    continue
-                elif x_lb < _tol:
-                    x_lb = 0
-                elif x_ub - x_lb < _tol:
-                    x_lb = x_ub
-
+                # Collapse near-degenerate windows to fixed variables.  When lb ≈ ub
+                # (e.g. RP cells whose existing allocation fills almost all of RP_PROPORTION),
+                # the barrier's complementarity slack (ub - x) approaches zero at the optimum,
+                # making AA' near-singular.  Fixing lb = ub tells Gurobi the variable is fixed
+                # and removes it from the interior-point complementarity system entirely.
+                if x_lb > 0 and (x_ub - x_lb) / x_lb < 0.01:
+                    x_ub = x_lb
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                     lb=x_lb,
                     ub=x_ub,
@@ -262,6 +259,7 @@ class LutoSolver:
             am: np.zeros((len(am_j_list), self._input_data.ncells), dtype=object)
             for am, am_j_list in self._input_data.am2j.items()
         }
+
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
@@ -292,18 +290,14 @@ class LutoSolver:
                         irr_lu_cells = np.setdiff1d(irr_lu_cells, gbf2_excl_idx)
                     for r in dry_lu_cells:
                         model_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
-                        model_lb = 0 if model_lb < settings.FEASIBILITY_TOLERANCE * 10 else model_lb
-                        model_ub = model_lb if abs(1.0 - model_lb) < settings.FEASIBILITY_TOLERANCE * 10 else 1.0
                         self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                            lb=model_lb, ub=model_ub,
+                            lb=model_lb, ub=1,
                             name=f"X_ag_man_dry_{am_name}_{j}_{r}".replace(" ", "_"),
                         )
                     for r in irr_lu_cells:
                         model_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][1, r, j]
-                        model_lb = 0 if model_lb < settings.FEASIBILITY_TOLERANCE * 10 else model_lb
-                        model_ub = model_lb if abs(1.0 - model_lb) < settings.FEASIBILITY_TOLERANCE * 10 else 1.0
                         self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                            lb=model_lb, ub=model_ub,
+                            lb=model_lb, ub=1,
                             name=f"X_ag_man_irr_{am_name}_{j}_{r}".replace(" ", "_"),
                         )
                     renewable_cells.update(dry_lu_cells)
@@ -350,10 +344,8 @@ class LutoSolver:
                         if AG_MANAGEMENTS_REVERSIBLE[am]
                         else self._input_data.ag_man_lb_mrj[am][0, r, j]
                     )
-                    dry_x_lb = 0 if dry_x_lb < settings.FEASIBILITY_TOLERANCE * 10 else dry_x_lb
-                    dry_x_ub = dry_x_lb if abs(1.0 - dry_x_lb) < settings.FEASIBILITY_TOLERANCE * 10 else 1.0
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        lb=dry_x_lb, ub=dry_x_ub,
+                        lb=dry_x_lb, ub=1,
                         name=f"X_ag_man_dry_{am_name}_{j}_{r}".replace(" ", "_"),
                     )
 
@@ -363,10 +355,8 @@ class LutoSolver:
                         if AG_MANAGEMENTS_REVERSIBLE[am]
                         else self._input_data.ag_man_lb_mrj[am][1, r, j]
                     )
-                    irr_x_lb = 0 if irr_x_lb < settings.FEASIBILITY_TOLERANCE * 10 else irr_x_lb
-                    irr_x_ub = irr_x_lb if abs(1.0 - irr_x_lb) < settings.FEASIBILITY_TOLERANCE * 10 else 1.0
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        lb=irr_x_lb, ub=irr_x_ub,
+                        lb=irr_x_lb, ub=1,
                         name=f"X_ag_man_irr_{am_name}_{j}_{r}".replace(" ", "_"),
                     )
 

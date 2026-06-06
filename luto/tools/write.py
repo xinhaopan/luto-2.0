@@ -1024,7 +1024,7 @@ def write_economics(data: Data, yr_cal, path):
         ag2ag_mrj   = ag_transitions.get_transition_matrices_ag2ag_from_base_year(
             data, yr_idx, yr_cal_sim_pre, separate=True)
         nonag2ag_mrj = non_ag_transitions.get_transition_matrix_nonag2ag(
-            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True)
+            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True, base_year=yr_cal_sim_pre)
     else:
         ag2ag_mrj    = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)}
         nonag2ag_mrj = {}
@@ -2246,7 +2246,8 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             yr_idx,
             data.lumaps[yr_cal_sim_pre],
             data.lmmaps[yr_cal_sim_pre],
-            separate=True
+            separate=True,
+            base_year=yr_cal_sim_pre,
         )
 
 
