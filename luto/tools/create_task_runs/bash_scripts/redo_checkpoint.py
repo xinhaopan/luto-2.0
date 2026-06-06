@@ -387,7 +387,7 @@ def main():
     parser.add_argument("--queue", default=None, help="[PBS] Override PBS queue")
     args = parser.parse_args()
 
-    root = HERE
+    root = Path.cwd()
     print(f"Root: {root}")
 
     if IS_WINDOWS:

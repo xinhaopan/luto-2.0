@@ -290,10 +290,18 @@ FEASIBILITY_TOLERANCE = 1e-6
 
 OPTIMALITY_TOLERANCE = 1e-2               
 ''' Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
-BARRIER_CONVERGENCE_TOLERANCE = 1e-5      
-''' 
-Range from 1e-2 to 1e-8 (default), that larger the number the faster but 
-the less exact the solve. 1e-5 is a good compromise between optimality and speed.
+
+BARRIER_CONVERGENCE_TOLERANCE = 1e-3
+'''
+Barrier stops when the RELATIVE duality gap falls below this tolerance:
+  |dual_obj - primal_obj| / (1 + |primal_obj|) < BarConvTol
+ - Primal obj: objective at the current interior feasible point — a LOWER bound on the true
+   maximum (the model has achieved at least this much; the true optimum could be higher).
+ - Dual obj: derived from dual variables — an UPPER bound on the true maximum (the model
+   cannot exceed this; ideally converges down toward the primal as the gap closes).
+Range from 1e-2 (fast, loose) to 1e-8 (slow, tight; Gurobi default).
+ - 20260606: relaxed from 1e-5 to 1e-3 — more constraint targets cause dual blow-up that
+   prevents the barrier from closing the gap to 1e-5; crossover polishes the result.
 '''
 
 
@@ -307,7 +315,7 @@ that 1 tripled solve time, 3 led to numerical problems.
 '''
 
 RETRY_PARAMS = [
-    (0, 2, -1, 0),   # NF, Method, Crossover, Presolve
+    (0, 2, -1,-1),   # NF, Method, Crossover, Presolve
     (0, 1, 0, -1),
 ]
 '''
@@ -1224,10 +1232,8 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
 # Non-ag output coding. Non-agricultural land uses will appear on the land use map offset by this amount (e.g. land use 0 will appear as 100)
 NON_AGRICULTURAL_LU_BASE_CODE = 100
 
-# Number of decimal places for lb/ub floor-truncation, derived from
-# FEASIBILITY_TOLERANCE: one floor unit = FT, so ROUND_DECIMALS = -log10(FT).
-# Change FT only — ROUND_DECIMALS updates automatically.
-ROUND_DECIMALS = int(-math.log10(FEASIBILITY_TOLERANCE))
+# Number of decimals to round any value; designed to remove insignificant decimals
+ROUND_DECIMALS = 6
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)

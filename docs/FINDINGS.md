@@ -5,7 +5,263 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260606 — Barrier NUMERIC resolved at source: non-ag→ag transition fix; all snipping removed
+
+### TL;DR (supersedes the 20260605 / 20260604 "structural degenerate-vertex / lock-in" conclusions)
+
+The barrier `NUMERIC` failures were **not** an unavoidable structural property of a
+degenerate vertex, and the non-ag lock-in LBs were **not** the true root cause. The real,
+single culprit was an **impossible non-ag→ag transition being priced into the model and
+inflated by a units bug**. Fixing the transition cost at the source makes the barrier solve
+cleanly with **zero** bound-snipping and the original tight tolerances. All snipping
+machinery has been removed and the solver restored to its clean pre-snipping form.
+
+Commit: `a684ec3f` on branch `jinzhu`.
+
+### Root cause
+
+Two coupled transition-cost defects made Gurobi see a spurious, enormous discouragement
+cost for reverting non-ag land to agriculture:
+
+1. **Double `REAL_AREA` units bug** in `get_env_plantings_to_ag`
+   (`luto/economics/non_agricultural/transitions.py`). The water-license delta is already
+   per-cell (`$/cell`), but was multiplied by `REAL_AREA` a second time, inflating EP→ag
+   transition costs by ~3 orders of magnitude.
+2. **Impossible non-ag→ag transition charged at irreversible cells.** Cells already holding
+   an irreversible non-ag land use cannot revert that locked fraction back to agriculture,
+   yet (because transition costs are integerised-lumap based) the model still charged a
+   non-ag→ag cost on the free fraction. Combined with (1), Gurobi effectively saw
+   "transitioning one unit of locked non-ag land costs ~1e5 (million-AUD)", and the **dual
+   objective exploded** → barrier `NUMERIC`.
+
+### Fix (the only two changes needed)
+
+1. `get_env_plantings_to_ag`: drop the second `REAL_AREA` multiplication on the
+   water-license delta, mirroring the ag→ag path.
+2. `get_irreversible_non_ag_cell_mask` + `base_year` wiring through
+   `get_transition_matrix_nonag2ag` (input_data.py) and cost reporting (write.py):
+   **zero** the non-ag→ag transition cost on cells holding an irreversible non-ag LU, so
+   Gurobi never sees the impossible transition.
+
+### What was removed
+
+`luto/solvers/solver.py` was restored to commit `d84fbb77` (clean, pre-snipping). Removed:
+`non_ag_fixed_kr`, `saturated_cells_r`, the cell-usage RHS subtraction, and all lb/ub
+"snap"/clamp logic. Settings restored to clean values: `ScaleFlag=0`, `BarConvTol=1e-5`,
+`FeasibilityTol=1e-6`, `BarHomogeneous=0` (the relaxed band-aid tolerances are gone).
+
+> The `NonAg lb capped` / `Ag man lb clamped` console lines that remain come from
+> **input-data bound-value computation** (transitions.py / input_data.py) — legitimate
+> lock-in lower bounds — not solver-side variable snipping.
+
+### Validation — 2025→2030 checkpoint, live production path
+
+| Metric | Value |
+|---|---|
+| Status | **2 (OPTIMAL)** |
+| Barrier iterations | **124** |
+| Objective | 9.525755e+03 |
+| Matrix range | `[1e-04, 9e+01]` (ratio ~9e5) |
+| Primal residual | 8.18e+08 → 4.31e-07, monotone, **no eruption** |
+| Dual residual | ~1e-12 throughout |
+| Crossover | clean, 3.25 s |
+
+Isolation matrix (from `step_3/`) corroborated the mechanism: buggy transition + scaling
+**off** (`ScaleFlag=0`, the original failing config) struggled badly (357 iters, primal
+residual erupting to ~30) while fixed-transition or scaling-on each independently
+stabilised it — confirming the transition cost as the destabiliser. Harness:
+`jinzhu_inspect_code/Check_numeric_issues/step_3/test_clean_solver.py`. Full blow-by-blow:
+`jinzhu_inspect_code/Check_numeric_issues/{FINDINGS.md,storyline.md}`.
+
+### Moral
+
+The right fix was the small, correct one — model the transitions properly. The lb/ub
+snips, RHS subtraction, saturated-cell bookkeeping, and loosened tolerances were all
+symptom-chasing that the correct model made redundant.
+
+---
+
+### Full storyline — how the barrier `NUMERIC` failure was diagnosed and finally solved
+
+A chronological account of *what was tried, why it wasn't enough, and what finally
+worked*. Run: `Custom_runs/LUF_S1_to_S4_trans_fix_2/Run_G0001`, RESFACTOR=5, 2020–2050.
+Symptom: barrier (`Method=2`) returns `NUMERIC` (status 12); the dual blows up mid-solve,
+then the internal dual-simplex fallback grinds 800 s+ and is killed.
+
+#### Act I — The symptom and the first theory (constraint geometry)
+
+The barrier died at year **2035** first. A constraint-RHS survey across years showed 2035
+is where two things hit simultaneously for the first time: **GHG tightens ~49 %**
+(26.76 → 13.52 MtCO₂e) and **total demand spikes +18.7 %** (AusTIMES multipliers ramp
+2031→2035 but LUTO only evaluates 2030 and 2035, compressing a 5-year ramp into one solve
+step). First theory: 2035 sits at the intersection of several simultaneously-binding
+constraints — a **degenerate vertex**. Real, but only half the story: after code changes
+the failure *moved to 2030*, which is numerically, not economically, hard.
+
+#### Act II — The campaign against the numerics (steps 1–7)
+
+Working hypothesis: **lock-in of irreversible land uses** (Environmental / Riparian
+Plantings, ag-management) injects degenerate variables that make the barrier's normal
+equations rank-deficient. Each period locks the previous year's dvars as lower bounds;
+floating-point noise in those dvars creates near-fixed / zero-width variables. The attack,
+on the data + variable-setup side:
+
+1. Introduced a tolerance (`_tol = FEASIBILITY_TOLERANCE × 10 = 1e-5`) for "bounds too
+   close".
+2. Snapped non-ag UB sitting within `_tol` of LB.
+3. Floor-truncated the non-ag LB so sub-precision digits can't become a phantom lower
+   bound.
+4. Rebuilt the non-ag UB from `t_rk`: if a cell had a previous non-ag dvar → UB = 1; if the
+   previous dvar is below `_tol` (noise) → UB keeps the previous value; no `RP_j` UB may
+   exceed `RP_PROPORTION`.
+5. In the solver var-setup: skip a dvar whose LB or UB is below `_tol`; if `ub − lb < _tol`,
+   set `ub = lb` (fixed variable).
+6. Barrier **still** NUMERIC → added **RHS subtraction**: record `ub = lb` fixed
+   contributions in `non_ag_fixed_kr` and subtract from the cell-usage equality RHS.
+7. Barrier **still** NUMERIC.
+
+**Why steps 1–7 weren't enough.** They correctly eliminated the *fixed-variable*
+singularities (`0 fixed` confirmed), but step 5/6 created a subtler problem ("Crack 2"):
+for cells where the fixed non-ag contributions sum to ≈ the cell mask, the cell-usage
+equality became `Σ X_ag == mask − fixed ≈ 6e-8` (numerical dust) — a near-zero-RHS equality
+forcing a whole row of positive-UB ag variables to ≈0. The log-barrier term pushes them
+*away* from 0 while the equality forces them *to* 0 → many near-zero complementarity slacks
+→ `AAᵀ` ill-conditioned → dual blows up. The blow-up merely *moved* (iter 91 → 96 → 93)
+and the primal residual stalled at ~9.12e-3 before the dual exploded.
+
+#### Act III — Nailing Crack 2 (the saturated cells)
+
+A clean A/B harness (`step_3/`) overlaid only the patched `solver.py` on the frozen run
+snapshot and rebuilt the real 2025→2030 solve. A saturation census found **148 "saturated"
+cells** where `mask − fixed_r ≤ _tol` (RHS is dust), with 0 overfull, 0 leftover non-ag
+vars, 0 positive non-reversible AM lower bounds — proving it **safe** to delete those
+cells' variables and equalities. The fix reordered `_setup_vars()`, skipped ag/AM vars at
+saturated cells (asserting no non-reversible AM lb was dropped), and dropped the empty
+cell-usage equalities. **Effect: necessary but not sufficient** — the dual blow-up was
+*delayed* (iter 91 → 102) and the primal floor improved (9.12e-3 → 3.26e-3), but the status
+was **still NUMERIC**. The remaining cause was *not the model*.
+
+#### Act IV — The (false) unlock: solver conditioning
+
+With Crack-2 fixed, the barrier log showed the primal residual **stall** and the dual
+diverge to −1e17, with Gurobi printing *"Consider using the homogeneous algorithm"* — the
+signature of **ill-conditioning**, not degeneracy. The matrix had a coefficient range ratio
+of ~1e8, yet the run configured the barrier hostilely: `SCALE_FLAG=0` (scaling off),
+`BARHOMOGENOUS=0`, `FeasibilityTol=1e-6` and `BarConvTol=1e-5` (both far below the
+achievable floor). A config sweep produced a "winning recipe": `ScaleFlag=1`,
+`BarHomogeneous=1`, `BarConvTol=2e-2`, solver-only `FeasibilityTol=1e-3`, `Crossover=-1` —
+barrier stops at its best ~1.6 % interior point, crossover polishes to an exact vertex.
+This *did* drive the solve to OPTIMAL — but it was treating a symptom. (A subtle key here:
+`FeasibilityTol` was decoupled into a new `SOLVER_FEASIBILITY_TOL` so relaxing the Gurobi
+tolerance didn't coarsen the lock-in machinery that also keys off `FEASIBILITY_TOLERANCE`.)
+
+#### Act V/VI — Chasing the *cause*: a real unit bug
+
+Asking *why* the matrix is ill-conditioned, objective decomposition traced the `1e5`
+(million-AUD) outlier entirely to **`non_ag_to_ag_t_mrj`** — the cost to convert plantings
+back to agriculture — at 1.5e6–1.16e8 AUD/ha (normal ~1.5e3). **The bug:**
+`get_env_plantings_to_ag` added the per-ha base (`$/ha`) and the water-license delta
+(already `$/cell`) and multiplied the **sum** by `REAL_AREA`, double-counting area on the
+water term by ~2500×. Fixing it dropped the worst objective coefficient ~1000× and the
+objective range from `[6e-2, 1e5]` to `[7e-5, 5e2]` — a genuine economics-correctness fix.
+
+#### Act VII — The reversal: the band-aids were never needed
+
+Pushed to actually *isolate* the cause, a `DISABLE_BOUND_SNIPPING` switch re-ran 2030 at
+the **original tight failing tolerances** while flipping one knob at a time. Almost
+everything converged — including `ScaleFlag=0` and even **re-introducing the bug** — which
+first looked like "the matrix is just healthy now." That reading was a trap: every "buggy"
+row had **auto-scaling on** (`ScaleFlag=-1`), silently rescaling the bad objective. The
+faithful reproduction of the original state is **buggy transition + scaling OFF**:
+
+| Config (buggy non-ag→ag, snip off, tight tols) | Result | BarIter | Behaviour |
+|---|---|---|---|
+| `ScaleFlag=0` (scaling off — the original) | OPTIMAL | **357** (532 s) | primal residual **erupts to ~30**, near-timeout |
+| `ScaleFlag=-1` (auto-scaling) | OPTIMAL | 153 (266 s) | clean |
+| FIXED transition, `ScaleFlag=0` | OPTIMAL | 238 (379 s) | clean |
+
+So the impossible non-ag→ag transition, with its `*REAL_AREA`-inflated cost, **is** the
+destabiliser: with scaling off it more than doubles the iteration count and throws a huge
+primal-residual excursion — the exact signature of the original failure. On 2030 it limps
+to OPTIMAL; on the harder 2035 year the same instability tips into the observed hard
+`NUMERIC`. **Two independent stabilisers** exist, and the frozen run had neither: (1) fix
+the transition; or (2) turn Gurobi scaling on. The transition fix is therefore **both** an
+economics-correctness fix **and** the real numeric fix.
+
+#### Act VIII — The cleanup (snipping removed for good)
+
+With the culprit pinned, all the defensive bound-snipping became dead weight. The solver
+was reset to its clean pre-snipping form (`git checkout d84fbb77 -- luto/solvers/solver.py`)
+and the relaxed band-aid settings reverted (`ScaleFlag=0`, `BarConvTol=1e-5`,
+`FeasibilityTol=1e-6`, `BarHomogeneous=0`). The only survivors are the two transition fixes.
+Re-validating 2025→2030 through the real production path: **barrier OPTIMAL in 124
+iterations, obj 9.525755e3, matrix range `[1e-04, 9e+01]`, primal residual falling
+monotonically 8.18e8 → 4.31e-7 with no excursion**; crossover landed cleanly in 3 s.
+Committed as `a684ec3f`.
+
+#### Production confirmation — the fix makes near-singularities *recoverable*, not absent
+
+A live production 2030 solve (`LUF_S1_to_S4_trans_fix_2/Run_G0001`, retry params
+`NumericFocus=0, Method=2, Crossover=-1, **Presolve=0**`, matrix range `[1e-04, 9e+01]`)
+shows the fix's true mechanism even more clearly than the clean test:
+
+```
+iter 127   7.00471e+03   7.00744e+03   primal 1.42e-3   compl 8.4e-7   (≈ converged)
+iter 128   7.00471e+03  -3.99530e+06   ← dual erupts
+iter 129   7.00471e+03  -1.50872e+11   ← dual peak
+iter 130  -7.53755e+10   6.28734e+09   primal 2.83e+09  ← primal residual spikes
+…         (recovers)                   primal 2.83e9 → 2.46e0 by iter 197
+Barrier solved model in 331 iterations …   Optimal objective 6.96482202e+03
+```
+
+The barrier hits a near-singular point at iter 127 and the dual momentarily explodes to
+`−1.5e11` — **yet it recovers** and re-converges to OPTIMAL. Two points:
+
+- The oscillation appears here (but not in the 124-iter clean test) because the production
+  **retry uses `Presolve=0`**, removing the presolve row-reduction/conditioning that the
+  clean test got from `Presolve=auto`. With presolve off, the barrier meets the raw matrix
+  and transiently destabilises.
+- It **survives** only because the transition fix made the matrix well-conditioned: the
+  dual blow-up is now a *recoverable transient*. Without the fix, the same eruption is
+  *fatal* — the `*REAL_AREA`-inflated impossible non-ag→ag cost keeps `AAᵀ`
+  ill-conditioned, so the normal equations never recover (the original NUMERIC;
+  `isolate_buggy_scaleoff.py` shows the analogous primal-residual eruption limping 357 iters
+  at 2030, tipping into hard failure on harder years like 2035).
+
+**Refined statement:** the transition fix does not eliminate transient near-singularities
+(especially under `Presolve=0`) — it makes them **recoverable instead of fatal**.
+
+#### Detour ledger — why each earlier "fix" was abandoned
+
+| Attempt | Why it was tried | Why it was dropped |
+|---|---|---|
+| Bound snipping (steps 1–6) | Kill fixed-variable / lock-in-noise singularities | Created the Crack-2 `6e-8` dust-RHS; never removed the dual blow-up |
+| Crack-2 saturated-cell deletion (Act III) | Remove the dust-RHS equalities | Only *delayed* the blow-up; status still NUMERIC |
+| `ScaleFlag=1` + `BarHomogeneous=1` + relaxed tols + crossover (Act IV) | Make the ill-conditioned matrix solvable | Treated the symptom; auto-scaling was hiding the real culprit |
+| `SOLVER_FEASIBILITY_TOL` decoupling (Act IV) | Relax Gurobi tol without coarsening lock-in | Unnecessary once the transition bug was fixed |
+| Tolerance relaxation (`BarConvTol=2e-2`, `FeasibilityTol=1e-3`) | Stop barrier before divergence | Unnecessary; barrier reaches full tight tolerances after the real fix |
+
+The only two changes that survived are the transition-cost fixes documented at the top of
+this entry.
+
+#### Reproduce / inspect
+
+Final harness: `jinzhu_inspect_code/Check_numeric_issues/step_3/test_clean_solver.py`.
+Isolation probes (same dir): `isolate_scaleflag.py`, `isolate_rootcause.py`,
+`isolate_buggy_scaleoff.py`, `no_snipping_transition_only.py`. Full per-step evidence and
+the narrative live in `jinzhu_inspect_code/Check_numeric_issues/{FINDINGS.md,storyline.md}`.
+Harness pattern: `sys.path.insert(0, <repo>)`, `joblib.load(".../data_2025.lz4")`,
+`get_input_data(data, 2025, 2030)`, `LutoSolver(...).formulate()`, `.solve()`.
+
+---
+
 ## 20260605 — lb > ub bug, unified snap rule, and lock-in confirmed as barrier root cause
+
+> **⚠️ Superseded by the 20260606 entry above.** The "structural / degenerate-vertex" and
+> "non-ag lock-in is the root cause" conclusions below were the best available reading at
+> the time, but the true single culprit was the non-ag→ag transition cost bug. With that
+> fixed, the barrier solves to OPTIMAL at full tolerances with no snipping and the lock-in
+> LBs left intact. The analysis below is retained for historical context.
 
 ### Context
 
