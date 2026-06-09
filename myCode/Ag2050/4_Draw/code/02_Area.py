@@ -63,6 +63,7 @@ LU_COLORS = {
     "Irrigated grazing (modified pastures)": "#c4669b",
     "Grazing (native vegetation)":           "#c4996b",
     "Unallocated land":                      "#e5d8a8",
+    "Non-agricultural land-use":             "#3A7F4A",
 }
 
 CROPLAND_LUS = {

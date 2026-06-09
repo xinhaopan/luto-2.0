@@ -6,8 +6,10 @@ Create a 2050-only synthesis heatmap for the four Ag2050 scenarios.
 from __future__ import annotations
 
 import importlib.util
+import io
 import os
 import sys
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +18,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.patches import Rectangle
 from matplotlib.transforms import Bbox
 import numpy as np
 import pandas as pd
@@ -32,7 +35,7 @@ if str(CODE_DIR) not in sys.path:
 import _path_setup  # noqa: F401
 
 from tools.parameters import EXCEL_DIR, OUTPUT_DIR, input_files
-from tools.two_row_figure import RENAME_NON_AG, load_report_source_csv
+from tools.data_helper import get_path, get_zip_info
 
 
 UNIT_DEJAVU_CHARS = {'₂', '⁻', '¹'}
@@ -153,49 +156,157 @@ def _prepare_overview_totals(filename: str) -> pd.Series:
     return total.astype(float)
 
 
+def _load_output_nc(scenario: str, year: int, filename: str):
+    import xarray as xr
+
+    info = get_zip_info(scenario)
+    if info is not None:
+        zip_path, prefix = info
+        internal_path = f"{prefix}/out_{year}/{filename}"
+        with zipfile.ZipFile(zip_path) as z:
+            if internal_path not in z.namelist():
+                return None
+            with z.open(internal_path) as f:
+                return xr.load_dataset(io.BytesIO(f.read()))
+
+    try:
+        base_path = Path(get_path(scenario))
+    except (FileNotFoundError, StopIteration):
+        return None
+
+    nc_path = base_path / f"out_{year}" / filename
+    if not nc_path.exists():
+        return None
+    return xr.open_dataset(nc_path)
+
+
+def _read_landuse_layer_frame(
+    scenario: str,
+    year: int,
+    filename: str,
+    domain: str,
+) -> pd.DataFrame:
+    import cf_xarray as cfxr
+
+    ds = _load_output_nc(scenario, year, filename)
+    if ds is None:
+        return pd.DataFrame(dtype=float)
+
+    try:
+        arr = cfxr.decode_compress_to_multi_index(ds, "layer")["data"]
+        if "layer" in arr.dims:
+            arr = arr.unstack("layer")
+        if arr.sizes.get("lu", 0) == 0:
+            return pd.DataFrame(index=arr["cell"].to_numpy(), dtype=float)
+
+        if "lm" in arr.dims:
+            arr = arr.sel(lm="ALL")
+        if "ALL" in set(arr["lu"].to_numpy()):
+            arr = arr.drop_sel(lu="ALL")
+        if arr.sizes.get("lu", 0) == 0:
+            return pd.DataFrame(index=arr["cell"].to_numpy(), dtype=float)
+
+        arr = arr.transpose("cell", "lu").fillna(0.0)
+        columns = [f"{domain}: {lu}" for lu in arr["lu"].to_numpy()]
+        return pd.DataFrame(
+            arr.to_numpy().astype(np.float64, copy=False),
+            index=arr["cell"].to_numpy(),
+            columns=columns,
+            dtype=float,
+        )
+    finally:
+        ds.close()
+
+
+def _read_landuse_dvar_frame(scenario: str, year: int) -> pd.DataFrame:
+    frames = [
+        _read_landuse_layer_frame(
+            scenario,
+            year,
+            f"xr_dvar_ag_{year}.nc",
+            "ag",
+        ),
+        _read_landuse_layer_frame(
+            scenario,
+            year,
+            f"xr_dvar_non_ag_{year}.nc",
+            "non_ag",
+        ),
+    ]
+    frames = [frame for frame in frames if not frame.empty]
+    if not frames:
+        return pd.DataFrame(dtype=float)
+    return pd.concat(frames, axis=1)
+
+
+def _read_landuse_area_frame(scenario: str, year: int) -> pd.DataFrame:
+    frames = [
+        _read_landuse_layer_frame(
+            scenario,
+            year,
+            f"xr_area_agricultural_landuse_{year}.nc",
+            "ag",
+        ),
+        _read_landuse_layer_frame(
+            scenario,
+            year,
+            f"xr_area_non_agricultural_landuse_{year}.nc",
+            "non_ag",
+        ),
+    ]
+    frames = [frame for frame in frames if not frame.empty]
+    if not frames:
+        return pd.DataFrame(dtype=float)
+    return pd.concat(frames, axis=1)
+
+
+def _infer_cell_area_from_dvars(dvar_frame: pd.DataFrame, area_frame: pd.DataFrame) -> pd.Series:
+    common_columns = dvar_frame.columns.intersection(area_frame.columns)
+    if len(common_columns) == 0:
+        return pd.Series(np.nan, index=dvar_frame.index, dtype=float)
+
+    dvar_sum = dvar_frame[common_columns].sum(axis=1)
+    area_sum = area_frame[common_columns].sum(axis=1)
+    cell_area = area_sum.divide(dvar_sum.where(dvar_sum > 1e-9))
+    return cell_area.replace([np.inf, -np.inf], np.nan)
+
+
 def _land_use_change_extent() -> pd.Series:
     values = {}
 
     for scenario in input_files:
-        frames = []
-
-        area_ag = load_report_source_csv(scenario, "area_agricultural_landuse")
-        if not area_ag.empty:
-            area_ag = area_ag.query('region == "AUSTRALIA" and Water_supply != "ALL"').copy()
-            area_ag = area_ag.groupby(["Year", "Land-use"], as_index=False)["Area (ha)"].sum()
-            area_ag["category"] = "Ag: " + area_ag["Land-use"].astype(str)
-            frames.append(
-                area_ag[["Year", "category", "Area (ha)"]].rename(columns={"Area (ha)": "value"})
-            )
-
-        area_non_ag = load_report_source_csv(scenario, "area_non_agricultural_landuse")
-        if not area_non_ag.empty:
-            area_non_ag = area_non_ag.query('region == "AUSTRALIA"').copy()
-            area_non_ag["Land-use"] = area_non_ag["Land-use"].replace(RENAME_NON_AG)
-            area_non_ag = area_non_ag.groupby(["Year", "Land-use"], as_index=False)["Area (ha)"].sum()
-            area_non_ag["category"] = "Non-ag: " + area_non_ag["Land-use"].astype(str)
-            frames.append(
-                area_non_ag[["Year", "category", "Area (ha)"]].rename(columns={"Area (ha)": "value"})
-            )
-
-        if not frames:
+        base_dvar = _read_landuse_dvar_frame(scenario, BASELINE_YEAR)
+        target_dvar = _read_landuse_dvar_frame(scenario, YEAR)
+        if base_dvar.empty or target_dvar.empty:
             values[scenario] = np.nan
             continue
 
-        combined = pd.concat(frames, ignore_index=True)
-        wide = combined.pivot_table(
-            index="category",
-            columns="Year",
-            values="value",
-            aggfunc="sum",
-            fill_value=0.0,
-        )
-        for year in (BASELINE_YEAR, YEAR):
-            if year not in wide.columns:
-                wide[year] = 0.0
+        base_area = _read_landuse_area_frame(scenario, BASELINE_YEAR)
+        target_area = _read_landuse_area_frame(scenario, YEAR)
+        base_cell_area = _infer_cell_area_from_dvars(base_dvar, base_area)
+        target_cell_area = _infer_cell_area_from_dvars(target_dvar, target_area)
+        cell_area = base_cell_area.combine_first(target_cell_area)
 
-        changed_area = 0.5 * (wide[YEAR] - wide[BASELINE_YEAR]).abs().sum()
-        values[scenario] = float(changed_area) / 1e6
+        cell_index = base_dvar.index.union(target_dvar.index).union(cell_area.index)
+        columns = base_dvar.columns.union(target_dvar.columns)
+        base_matrix = (
+            base_dvar.reindex(index=cell_index, columns=columns, fill_value=0.0)
+            .to_numpy(dtype=np.float64)
+        )
+        target_matrix = (
+            target_dvar.reindex(index=cell_index, columns=columns, fill_value=0.0)
+            .to_numpy(dtype=np.float64)
+        )
+        cell_area_arr = (
+            cell_area.reindex(cell_index)
+            .fillna(0.0)
+            .to_numpy(dtype=np.float64)
+        )
+
+        changed_area_ha = 0.5 * (
+            np.abs(target_matrix - base_matrix) * cell_area_arr[:, None]
+        ).sum()
+        values[scenario] = float(changed_area_ha) / 1e6
 
     return pd.Series(values, index=input_files, dtype=float)
 
@@ -432,6 +543,27 @@ def _place_text_pair_outward(
     occupied_bboxes.append(final_box.expanded(1.05, 1.08).padded(2.0))
 
 
+def _tangential_text_rotation(theta: float) -> float:
+    """Text rotation aligned with the arc (tangential direction, readable from outside)."""
+    rot = (-np.degrees(theta)) % 360.0
+    if 90.0 < rot <= 270.0:
+        rot -= 180.0
+    return rot
+
+
+def _radial_text_rotation(theta: float) -> float:
+    """Text rotation aligned with a polar bar's outward direction."""
+    rotation = (90.0 - np.degrees(theta)) % 360.0
+    if 90.0 < rotation <= 270.0:
+        rotation -= 180.0
+    return rotation
+
+
+def _polar_axis_text_rotation(theta: float) -> float:
+    """Text rotation in the exact outward polar-axis direction."""
+    return (90.0 - np.degrees(theta)) % 360.0
+
+
 def _sector_text_rotation(theta: float) -> float:
     """Text rotation aligned with the sector's radial direction.
 
@@ -644,10 +776,240 @@ def plot_circular_synthesis(raw_values: pd.DataFrame, score_values: pd.DataFrame
     return svg_path
 
 
+def plot_ring_bar_chart(raw_values: pd.DataFrame, score_values: pd.DataFrame) -> Path:
+    """Nature-style grouped radial bar chart for scenario trade-offs."""
+    output_dir = Path(OUTPUT_DIR).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    label_fontsize = 7.2
+    indicator_fontsize = 8.0
+    plt.rcParams.update({
+        "font.family": "Arial",
+        "font.sans-serif": ["Arial"],
+        "font.size": label_fontsize,
+        "axes.linewidth": 0.6,
+        "pdf.fonttype": 42,
+        "svg.fonttype": "none",
+    })
+
+    def _scale_by_indicator_abs_max(values: pd.Series) -> pd.Series:
+        values = values.astype(float)
+        out = pd.Series(np.nan, index=values.index, dtype=float)
+        valid = values.dropna()
+        if valid.empty:
+            return out
+
+        max_abs = float(valid.abs().max())
+        if np.isclose(max_abs, 0.0):
+            out.loc[valid.index] = 0.0
+            return out
+
+        out.loc[valid.index] = (valid.abs() / max_abs).clip(0.0, 1.0)
+        return out
+
+    radial_scores = pd.DataFrame(index=score_values.index, columns=score_values.columns, dtype=float)
+    for spec in INDICATORS:
+        radial_scores.loc[spec.key] = _scale_by_indicator_abs_max(raw_values.loc[spec.key]).values
+
+    N_IND = len(INDICATORS)
+    N_SCN = len(input_files)
+    gap = np.deg2rad(11.0)
+    sector_width = (2 * np.pi - N_IND * gap) / N_IND
+    bar_slot = sector_width / N_SCN
+    bar_width = bar_slot * 0.72
+
+    r_inner = 0.24
+    r_outer = 0.94
+    r_range = r_outer - r_inner
+    r_name = 1.075
+    r_unit = 1.025
+
+    c_pos = "#028A8B"
+    c_neg = "#FFB346"
+    scenario_names = {
+        scenario: SCENARIO_PANEL_LABELS.get(scenario, scenario)
+        for scenario in input_files
+    }
+    indicator_labels = {
+        "food_production": ("Agri-food production", "Mt yr⁻¹"),
+        "net_economic_return": ("Net economic returns", "B AU$ yr⁻¹"),
+        "net_ghg_emissions": ("Net GHG emissions", "Mt CO₂e yr⁻¹"),
+        "biodiversity": ("Biodiversity", "Mha yr⁻¹"),
+        "water_yield": ("Water yield decrease", "GL yr⁻¹"),
+        "land_use_change_extent": ("Land-use change", "Mha yr⁻¹"),
+    }
+
+    fig = plt.figure(figsize=(9.2, 9.2), facecolor="white")
+    ax = fig.add_subplot(111, projection="polar")
+    fig.subplots_adjust(left=0.04, right=0.96, top=0.96, bottom=0.04)
+
+    ax.set_theta_offset(np.pi / 2)
+    ax.set_theta_direction(-1)
+    ax.set_ylim(0, 1.18)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.grid(False)
+    ax.spines["polar"].set_visible(False)
+    ax.set_facecolor("white")
+
+    sectors: list[tuple[float, float]] = []
+    theta_cursor = 0.0
+    for _ in range(N_IND):
+        theta_start = theta_cursor + gap / 2
+        theta_end = theta_start + sector_width
+        sectors.append((theta_start, theta_end))
+        theta_cursor = theta_end + gap / 2
+
+    theta_full = np.linspace(0, 2 * np.pi, 721)
+    ax.fill(theta_full, np.full(theta_full.shape, r_inner), color="white", zorder=1, linewidth=0)
+
+    arc_pad = 0.028
+    for theta_start, theta_end in sectors:
+        theta_mid = (theta_start + theta_end) / 2
+        theta_arc = np.linspace(theta_start + arc_pad, theta_end - arc_pad, 220)
+
+        ax.bar(
+            theta_mid,
+            r_range,
+            width=sector_width - 2 * arc_pad,
+            bottom=r_inner,
+            color="white",
+            alpha=0.0,
+            edgecolor="none",
+            align="center",
+            zorder=0,
+        )
+        for frac, linewidth in [(0.25, 0.45), (0.50, 0.55), (0.75, 0.45), (1.00, 0.55)]:
+            ax.plot(
+                theta_arc,
+                np.full_like(theta_arc, r_inner + r_range * frac),
+                color="#d9d9d9",
+                linewidth=linewidth,
+                solid_capstyle="butt",
+                zorder=1,
+            )
+
+    for (t_s, t_e), spec in zip(sectors, INDICATORS):
+        t_c = (t_s + t_e) / 2
+
+        for j, scenario in enumerate(input_files):
+            theta_bar = t_s + (j + 0.5) * bar_slot
+            value = radial_scores.loc[spec.key, scenario]
+            if pd.isna(value):
+                continue
+            p = float(value)
+            raw = float(raw_values.loc[spec.key, scenario])
+            is_positive_outcome = raw >= 0 if spec.higher_is_better else raw <= 0
+            color = c_pos if is_positive_outcome else c_neg
+            bar_height = r_range * p
+            ax.bar(
+                theta_bar,
+                bar_height,
+                width=bar_width,
+                bottom=r_inner,
+                color=color,
+                edgecolor="white",
+                linewidth=0.55,
+                align="center",
+                zorder=4,
+            )
+
+            scenario_label_r = r_inner + 0.030
+            rotation = _polar_axis_text_rotation(theta_bar)
+            ax.text(
+                theta_bar,
+                scenario_label_r,
+                f"{scenario_names[scenario]} {_format_value(raw, spec.decimals)}",
+                ha="left",
+                va="center",
+                rotation=rotation,
+                rotation_mode="anchor",
+                fontsize=label_fontsize,
+                color="black",
+                family="Arial",
+                clip_on=False,
+                zorder=8,
+            )
+
+        indicator_name, indicator_unit = indicator_labels[spec.key]
+        name_rotation = _tangential_text_rotation(t_c)
+        if spec.key in ("net_economic_return", "biodiversity", "land_use_change_extent"):
+            name_rotation += 180.0
+        ax.text(
+            t_c,
+            r_name,
+            indicator_name,
+            ha="center",
+            va="center",
+            rotation=name_rotation,
+            rotation_mode="anchor",
+            fontsize=indicator_fontsize,
+            color="black",
+            family="Arial",
+            zorder=10,
+            multialignment="center",
+        )
+        ax.text(
+            t_c,
+            r_unit,
+            f"({indicator_unit})",
+            ha="center",
+            va="center",
+            rotation=name_rotation,
+            rotation_mode="anchor",
+            fontsize=label_fontsize,
+            color="black",
+            family="DejaVu Sans",
+            zorder=10,
+        )
+
+    legend_square = 0.018
+    legend_x = 0.462
+    legend_y_top = 0.520
+    legend_gap = 0.040
+    for y, color, text in [
+        (legend_y_top, c_pos, "Positive"),
+        (legend_y_top - legend_gap, c_neg, "Negative"),
+    ]:
+        ax.add_patch(
+            Rectangle(
+                (legend_x, y - legend_square / 2),
+                legend_square,
+                legend_square,
+                transform=ax.transAxes,
+                facecolor=color,
+                edgecolor="none",
+                clip_on=False,
+                zorder=20,
+            )
+        )
+        ax.text(
+            legend_x + legend_square + 0.012,
+            y,
+            text,
+            transform=ax.transAxes,
+            ha="left",
+            va="center",
+            fontsize=label_fontsize,
+            color="black",
+            family="Arial",
+            zorder=21,
+        )
+
+    out = output_dir / "05_scenario_ring_chart.svg"
+    out_png = output_dir / "05_scenario_ring_chart.png"
+    fig.savefig(out, dpi=600, bbox_inches="tight", pad_inches=0.04, facecolor="white")
+    fig.savefig(out_png, dpi=600, bbox_inches="tight", pad_inches=0.04, facecolor="white")
+    plt.close(fig)
+    print(f"Saved: {out}")
+    print(f"Saved: {out_png}")
+    return out
+
+
 def main():
     raw_values, score_values, long_df = build_summary_tables()
     table_path = save_summary_tables(raw_values, score_values, long_df)
-    svg_path = plot_circular_synthesis(raw_values, score_values)
+    svg_path = plot_ring_bar_chart(raw_values, score_values)
     print(f"Saved: {table_path}")
     print(f"Saved: {svg_path}")
 

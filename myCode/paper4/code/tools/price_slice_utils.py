@@ -165,7 +165,8 @@ def apply_compact_ticks(ax, x_nbins=8, y_nbins=5):
 
 
 def apply_carbon_price_ticks(ax, axis="x"):
-    locator = ticker.MultipleLocator(50)
+    # 0-360 range with step 20: MultipleLocator(60) gives 0,60,120,180,240,300,360
+    locator = ticker.MultipleLocator(60)
     if axis == "x":
         ax.xaxis.set_major_locator(locator)
     elif axis == "y":
