@@ -2,8 +2,18 @@ import os
 import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
+# ── Constant switch ───────────────────────────────────────────────────────────
+# constant=False → BAU productivity (yieldincreases_bau2022.csv, +~1%/yr)
+# constant=True  → CONSTANT productivity (all multipliers=1.0, no growth)
+#                  task name gets '_constant' suffix for easy comparison
+constant = False
+
+_task_name  = '20260529_paper4' + ('_constant' if constant else '')
+_prod_trend = 'CONSTANT' if constant else 'BAU'
+# ──────────────────────────────────────────────────────────────────────────────
+
 grid_search = {
-    'TASK_NAME': ['20260529_paper4'],
+    'TASK_NAME': [_task_name],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
@@ -12,6 +22,8 @@ grid_search = {
     'NCPUS': ['10'],
     'WRITE_THREADS': ['2'],
     'TIME': ['12:00:00'],
+
+    'PRODUCTIVITY_TREND': [_prod_trend],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
     'BIODIVERSITY_TARGET_GBF_2': ['off'],

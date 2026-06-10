@@ -72,7 +72,8 @@ FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 APPLY_DEMAND_MULTIPLIERS = False     # True or False. Whether to apply demand multipliers from AusTIME model.
 
 # Productivity trend;
-PRODUCTIVITY_TREND = 'BAU'           # 'BAU', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'
+PRODUCTIVITY_TREND = 'BAU'           # 'BAU', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH', 'CONSTANT'
+                                     # 'CONSTANT': all multipliers fixed at 1.0 (no productivity growth), used as constant run
 
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4

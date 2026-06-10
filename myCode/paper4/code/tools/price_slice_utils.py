@@ -164,6 +164,26 @@ def apply_compact_ticks(ax, x_nbins=8, y_nbins=5):
     ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=y_nbins))
 
 
+def set_sparse_index_price_ticks(ax, price_vals, max_ticks=8):
+    price_vals = list(price_vals)
+    if not price_vals:
+        ax.set_xticks([])
+        return []
+
+    x = np.arange(len(price_vals))
+    if len(price_vals) <= max_ticks:
+        tick_idx = x
+    else:
+        step = int(np.ceil((len(price_vals) - 1) / max(1, max_ticks - 1)))
+        tick_idx = np.arange(0, len(price_vals), step)
+        if tick_idx[-1] != len(price_vals) - 1:
+            tick_idx = np.append(tick_idx, len(price_vals) - 1)
+
+    ax.set_xticks(tick_idx)
+    ax.set_xticklabels([format_thousands(price_vals[int(idx)]) for idx in tick_idx])
+    return tick_idx
+
+
 def apply_carbon_price_ticks(ax, axis="x"):
     # 0-360 range with step 20: MultipleLocator(60) gives 0,60,120,180,240,300,360
     locator = ticker.MultipleLocator(60)

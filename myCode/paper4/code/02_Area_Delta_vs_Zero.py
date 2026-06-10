@@ -517,6 +517,21 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
     return visible_categories
 
 
+def sync_row_y_limits(axes):
+    for row_idx in range(axes.shape[0]):
+        row_limits = [axes[row_idx, col_idx].get_ylim() for col_idx in range(axes.shape[1])]
+        ymin = min(limit[0] for limit in row_limits)
+        ymax = max(limit[1] for limit in row_limits)
+        for col_idx in range(axes.shape[1]):
+            axes[row_idx, col_idx].set_ylim(ymin, ymax)
+
+
+def hide_redundant_y_ticks(axes):
+    for row_idx in range(axes.shape[0]):
+        for col_idx in range(1, axes.shape[1]):
+            axes[row_idx, col_idx].tick_params(axis="y", left=False, labelleft=False)
+
+
 df_long = load_cache()
 if df_long is None:
     df_long = collect_and_cache()
@@ -560,6 +575,8 @@ LEGEND_FS = {
     "Non-ag": FS - 1,
 }
 
+sync_row_y_limits(axes)
+hide_redundant_y_ticks(axes)
 fig.supylabel(r"Area difference relative to zero price (Mha)", fontsize=FS)
 plt.tight_layout()
 plt.subplots_adjust(hspace=0.35, wspace=0.12)

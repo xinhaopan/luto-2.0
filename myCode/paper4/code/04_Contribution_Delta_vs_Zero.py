@@ -1,7 +1,10 @@
 # ==============================================================================
 # Figure 04: contribution response by carbon price / biodiversity price
-#   Left column:  BioPrice = 0, carbon price varies
-#   Right column: CarbonPrice = 0, biodiversity price varies
+#   Columns:
+#     1. GHG abatement difference, BioPrice = 0 and carbon price varies
+#     2. GHG abatement difference, CarbonPrice = 0 and biodiversity price varies
+#     3. Biodiversity contribution difference, BioPrice = 0 and carbon price varies
+#     4. Biodiversity contribution difference, CarbonPrice = 0 and biodiversity price varies
 #   Rows: Agricultural land-use / Ag management / Non-ag
 #   Note: transition GHG is folded into the first row (Agricultural land-use)
 #         as a separate stacked segment labelled "Transition".
@@ -54,6 +57,15 @@ CACHE_PATH = DATA_DIR / f"04_Contribution_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
 
 FS = 11
 SUM_LINE_LABEL = "Sum"
+GHG_METRIC = "GHGAbatementChange_vs_ZeroPrice_MtCO2e"
+BIO_METRIC = "BiodiversityContributionChange_vs_ZeroPrice_MhaYr"
+EXPECTED_METRIC_TYPES = {GHG_METRIC, BIO_METRIC}
+EXPECTED_PRICE_METRIC_PAIRS = {
+    ("CarbonPrice", GHG_METRIC),
+    ("BioPrice", GHG_METRIC),
+    ("CarbonPrice", BIO_METRIC),
+    ("BioPrice", BIO_METRIC),
+}
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
 NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
@@ -323,20 +335,42 @@ def get_category_order(area_type, categories_seen):
     return ordered
 
 
-def collect_carbon_rows(run_map, cp_vals):
+def collect_metric_rows(run_map, price_vals, varying_key, metric_type):
     rows = []
     zero_zip_path = run_map.get((0.0, 0.0))
     if zero_zip_path is None:
         raise FileNotFoundError("Could not find zero-price run (CarbonPrice=0, BioPrice=0).")
-    baseline_2025 = get_ghg_summaries(zero_zip_path, YEAR)
 
-    print(f"\n--- Slice A: GHG abatement difference at {YEAR}; BioPrice=0 and carbon price varies ---")
-    for cp in cp_vals:
-        zip_path = run_map.get((cp, 0.0))
+    if metric_type == GHG_METRIC:
+        baseline_2025 = get_ghg_summaries(zero_zip_path, YEAR)
+        get_summaries = get_ghg_summaries
+        units = "Mt CO2e"
+        metric_label = "GHG abatement difference"
+    elif metric_type == BIO_METRIC:
+        baseline_2025 = get_bio_summaries(zero_zip_path, YEAR)
+        get_summaries = get_bio_summaries
+        units = "Mha yr^-1"
+        metric_label = "biodiversity contribution difference"
+    else:
+        raise ValueError(f"Unsupported metric_type: {metric_type}")
+
+    if varying_key == "cp":
+        price_type = "CarbonPrice"
+        fixed_label = "BioPrice=0 and carbon price varies"
+    elif varying_key == "bp":
+        price_type = "BioPrice"
+        fixed_label = "CarbonPrice=0 and biodiversity price varies"
+    else:
+        raise ValueError(f"Unsupported varying_key: {varying_key}")
+
+    print(f"\n--- {metric_label} at {YEAR}; {fixed_label} ---")
+    for price in price_vals:
+        key = (price, 0.0) if varying_key == "cp" else (0.0, price)
+        zip_path = run_map.get(key)
         if zip_path is None:
             continue
 
-        summary_2025 = get_ghg_summaries(zip_path, YEAR)
+        summary_2025 = get_summaries(zip_path, YEAR)
 
         for area_type in PANEL_CONFIG:
             categories = list(dict.fromkeys(
@@ -345,68 +379,30 @@ def collect_carbon_rows(run_map, cp_vals):
             ))
             category_order = get_category_order(area_type, categories)
 
-            total_mt = 0.0
+            total_value = 0.0
             for category in category_order:
-                contribution_mt = -(
+                raw_difference = (
                     summary_2025[area_type].get(category, 0.0) -
                     baseline_2025[area_type].get(category, 0.0)
-                ) / 1e6
-                total_mt += contribution_mt
+                )
+                if metric_type == GHG_METRIC:
+                    contribution_value = -raw_difference / 1e6
+                else:
+                    contribution_value = raw_difference / 1e6
+
+                total_value += contribution_value
                 rows.append({
-                    "PriceType": "CarbonPrice",
-                    "Price": cp,
+                    "PriceType": price_type,
+                    "Price": price,
                     "AreaType": area_type,
                     "Category": category,
-                    "MetricType": "GHGAbatementChange_vs_ZeroPrice_MtCO2e",
-                    "ContributionValue": contribution_mt,
-                })
-
-            print(f"  cp={format_thousands(cp)} | {area_type}: difference={total_mt:.2f} Mt CO2e")
-
-    return rows
-
-
-def collect_biodiversity_rows(run_map, bp_vals):
-    rows = []
-    zero_zip_path = run_map.get((0.0, 0.0))
-    if zero_zip_path is None:
-        raise FileNotFoundError("Could not find zero-price run (CarbonPrice=0, BioPrice=0).")
-    baseline_2025 = get_bio_summaries(zero_zip_path, YEAR)
-
-    print(f"\n--- Slice B: biodiversity contribution difference at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
-    for bp in bp_vals:
-        zip_path = run_map.get((0.0, bp))
-        if zip_path is None:
-            continue
-
-        summary_2025 = get_bio_summaries(zip_path, YEAR)
-
-        for area_type in PANEL_CONFIG:
-            categories = list(dict.fromkeys(
-                list(summary_2025[area_type]) +
-                list(baseline_2025[area_type])
-            ))
-            category_order = get_category_order(area_type, categories)
-
-            total_mha_yr = 0.0
-            for category in category_order:
-                contribution_mha_yr = (
-                    summary_2025[area_type].get(category, 0.0) -
-                    baseline_2025[area_type].get(category, 0.0)
-                ) / 1e6
-                total_mha_yr += contribution_mha_yr
-                rows.append({
-                    "PriceType": "BioPrice",
-                    "Price": bp,
-                    "AreaType": area_type,
-                    "Category": category,
-                    "MetricType": "BiodiversityContributionChange_vs_ZeroPrice_MhaYr",
-                    "ContributionValue": contribution_mha_yr,
+                    "MetricType": metric_type,
+                    "ContributionValue": contribution_value,
                 })
 
             print(
-                f"  bp={format_thousands(bp)} | {area_type}: "
-                f"difference={total_mha_yr:.2f} Mha yr^-1"
+                f"  {varying_key}={format_thousands(price)} | {area_type}: "
+                f"difference={total_value:.2f} {units}"
             )
 
     return rows
@@ -434,12 +430,12 @@ def load_cache():
     if not required_columns.issubset(df_long.columns):
         print("Cached contribution data schema is outdated; rebuilding.")
         return None
-    expected_metric_types = {
-        "GHGAbatementChange_vs_ZeroPrice_MtCO2e",
-        "BiodiversityContributionChange_vs_ZeroPrice_MhaYr",
-    }
-    if not set(df_long["MetricType"]).issubset(expected_metric_types):
-        print("Cached contribution data uses relative metrics; rebuilding.")
+    if set(df_long["MetricType"]) != EXPECTED_METRIC_TYPES:
+        print("Cached contribution data metric coverage is outdated; rebuilding.")
+        return None
+    cached_pairs = set(zip(df_long["PriceType"], df_long["MetricType"]))
+    if not EXPECTED_PRICE_METRIC_PAIRS.issubset(cached_pairs):
+        print("Cached contribution data does not include cross-price metrics; rebuilding.")
         return None
     if OLD_LIVESTOCK_LABEL in set(df_long["Category"]):
         print("Cached contribution data uses unsplit livestock categories; rebuilding.")
@@ -450,23 +446,38 @@ def load_cache():
 
 def collect_and_cache():
     run_map, cp_vals, bp_vals = build_run_map()
-    rows = collect_carbon_rows(run_map, cp_vals) + collect_biodiversity_rows(run_map, bp_vals)
+    rows = (
+        collect_metric_rows(run_map, cp_vals, "cp", GHG_METRIC) +
+        collect_metric_rows(run_map, bp_vals, "bp", GHG_METRIC) +
+        collect_metric_rows(run_map, cp_vals, "cp", BIO_METRIC) +
+        collect_metric_rows(run_map, bp_vals, "bp", BIO_METRIC)
+    )
 
     df_long = pd.DataFrame(rows)
-    df_long = df_long.sort_values(["PriceType", "AreaType", "Price", "Category"]).reset_index(drop=True)
+    df_long = df_long.sort_values(
+        ["MetricType", "PriceType", "AreaType", "Price", "Category"]
+    ).reset_index(drop=True)
 
     with pd.ExcelWriter(CACHE_PATH, engine="openpyxl") as writer:
         df_long.to_excel(writer, sheet_name="ContributionLong", index=False)
-        df_long[df_long["PriceType"] == "CarbonPrice"].to_excel(writer, sheet_name="CarbonPrice", index=False)
-        df_long[df_long["PriceType"] == "BioPrice"].to_excel(writer, sheet_name="BioPrice", index=False)
+        for price_type, metric_type in sorted(EXPECTED_PRICE_METRIC_PAIRS):
+            sheet_name = (
+                ("CP" if price_type == "CarbonPrice" else "BP") +
+                ("_GHG" if metric_type == GHG_METRIC else "_Bio")
+            )
+            df_long[
+                (df_long["PriceType"] == price_type) &
+                (df_long["MetricType"] == metric_type)
+            ].to_excel(writer, sheet_name=sheet_name, index=False)
 
     print(f"\nCache saved: {CACHE_PATH}")
     return df_long
 
 
-def build_pivot(df_long, price_type, area_type):
+def build_pivot(df_long, price_type, metric_type, area_type):
     df_subset = df_long[
         (df_long["PriceType"] == price_type) &
+        (df_long["MetricType"] == metric_type) &
         (df_long["AreaType"] == area_type)
     ]
     if area_type == "Agricultural land-use":
@@ -493,8 +504,11 @@ def map_total_category(area_type, category):
     return TOTAL_CATEGORY_MAP.get(area_type)
 
 
-def build_total_pivot(df_long, price_type):
-    df_subset = df_long[df_long["PriceType"] == price_type].copy()
+def build_total_pivot(df_long, price_type, metric_type):
+    df_subset = df_long[
+        (df_long["PriceType"] == price_type) &
+        (df_long["MetricType"] == metric_type)
+    ].copy()
     if df_subset.empty:
         return pd.DataFrame()
 
@@ -585,40 +599,125 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
     return visible_categories
 
 
+COLUMN_CONFIG = [
+    {
+        "price_type": "CarbonPrice",
+        "metric_type": GHG_METRIC,
+        "varying_key": "cp",
+        "metric_group": "ghg",
+    },
+    {
+        "price_type": "BioPrice",
+        "metric_type": GHG_METRIC,
+        "varying_key": "bp",
+        "metric_group": "ghg",
+    },
+    {
+        "price_type": "CarbonPrice",
+        "metric_type": BIO_METRIC,
+        "varying_key": "cp",
+        "metric_group": "bio",
+    },
+    {
+        "price_type": "BioPrice",
+        "metric_type": BIO_METRIC,
+        "varying_key": "bp",
+        "metric_group": "bio",
+    },
+]
+
+
+def sync_pair_y_limits(axes, col_pairs):
+    for row_idx in range(axes.shape[0]):
+        for col_a, col_b in col_pairs:
+            limits = [axes[row_idx, col_a].get_ylim(), axes[row_idx, col_b].get_ylim()]
+            ymin = min(limit[0] for limit in limits)
+            ymax = max(limit[1] for limit in limits)
+            axes[row_idx, col_a].set_ylim(ymin, ymax)
+            axes[row_idx, col_b].set_ylim(ymin, ymax)
+
+
+def apply_y_axis_visibility(axes):
+    for row_idx in range(axes.shape[0]):
+        axes[row_idx, 0].tick_params(axis="y", left=True, labelleft=True, right=False, labelright=False)
+        axes[row_idx, 1].tick_params(axis="y", left=False, labelleft=False, right=False, labelright=False)
+        axes[row_idx, 2].tick_params(axis="y", left=False, labelleft=False, right=False, labelright=False)
+        axes[row_idx, 3].yaxis.tick_right()
+        axes[row_idx, 3].tick_params(axis="y", left=False, labelleft=False, right=True, labelright=True)
+
+
+def add_column_group_title(fig, axes, columns, title):
+    left = axes[0, columns[0]].get_position().x0
+    right = axes[0, columns[-1]].get_position().x1
+    top = max(axes[0, col_idx].get_position().y1 for col_idx in columns)
+    fig.text(
+        (left + right) / 2,
+        top + 0.015,
+        title,
+        ha="center",
+        va="bottom",
+        fontsize=FS + 2,
+        fontweight="bold",
+    )
+
+
 df_long = load_cache()
 if df_long is None:
     df_long = collect_and_cache()
 
 
-fig, axes = plt.subplots(4, 2, figsize=(10, 16), sharex="col")
+fig, axes = plt.subplots(4, 4, figsize=(18, 16), sharex="col")
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
-total_pivot_cp = build_total_pivot(df_long, "CarbonPrice")
-total_pivot_bp = build_total_pivot(df_long, "BioPrice")
 
-total_cats_left = stacked_bar(axes[0, 0], total_pivot_cp, "Total", "cp", show_xlabel=False, color_map=TOTAL_COLOR_MAP, show_sum_line=True)
-total_cats_right = stacked_bar(axes[0, 1], total_pivot_bp, "Total", "bp", show_xlabel=False, color_map=TOTAL_COLOR_MAP, show_sum_line=True)
+total_cats_all = []
+for col_idx, col_cfg in enumerate(COLUMN_CONFIG):
+    total_pivot = build_total_pivot(
+        df_long,
+        col_cfg["price_type"],
+        col_cfg["metric_type"],
+    )
+    total_cats_all.extend(
+        stacked_bar(
+            axes[0, col_idx],
+            total_pivot,
+            "Total",
+            col_cfg["varying_key"],
+            show_xlabel=False,
+            color_map=TOTAL_COLOR_MAP,
+            show_sum_line=True,
+        )
+    )
 axes[0, 0].set_ylabel("Total")
 
-total_legend_categories = [category for category in TOTAL_ORDER if category in dict.fromkeys(total_cats_left + total_cats_right)]
+total_legend_categories = [category for category in TOTAL_ORDER if category in dict.fromkeys(total_cats_all)]
 total_handles = build_patch_handles(total_legend_categories, TOTAL_COLOR_MAP)
 if total_handles:
     total_handles = [build_total_line_handle()] + total_handles
 row_legends["_total"] = total_handles if total_handles else []
 
 for row_idx, area_type in enumerate(row_area_types):
-    ax_left = axes[row_idx + 1, 0]
-    ax_right = axes[row_idx + 1, 1]
+    row_cats_all = []
+    for col_idx, col_cfg in enumerate(COLUMN_CONFIG):
+        pivot = build_pivot(
+            df_long,
+            col_cfg["price_type"],
+            col_cfg["metric_type"],
+            area_type,
+        )
+        row_cats_all.extend(
+            stacked_bar(
+                axes[row_idx + 1, col_idx],
+                pivot,
+                area_type,
+                col_cfg["varying_key"],
+                show_xlabel=(row_idx == len(row_area_types) - 1),
+            )
+        )
 
-    pivot_cp = build_pivot(df_long, "CarbonPrice", area_type)
-    pivot_bp = build_pivot(df_long, "BioPrice", area_type)
+    axes[row_idx + 1, 0].set_ylabel(PANEL_CONFIG[area_type]["ylabel"])
 
-    cats_left = stacked_bar(ax_left, pivot_cp, area_type, "cp", show_xlabel=(row_idx == len(row_area_types) - 1))
-    cats_right = stacked_bar(ax_right, pivot_bp, area_type, "bp", show_xlabel=(row_idx == len(row_area_types) - 1))
-
-    ax_left.set_ylabel(PANEL_CONFIG[area_type]["ylabel"])
-
-    legend_categories = get_category_order(area_type, list(dict.fromkeys(cats_left + cats_right)))
+    legend_categories = get_category_order(area_type, list(dict.fromkeys(row_cats_all)))
     row_legends[area_type] = build_patch_handles(
         legend_categories,
         PANEL_CONFIG[area_type]["color_map"],
@@ -628,7 +727,7 @@ LEGEND_NCOL = {
     "_total": 5,
     "Agricultural land-use": 5,
     "Ag management": 3,
-    "Non-ag": 2,
+    "Non-ag": 4,
 }
 LEGEND_FS = {
     "_total": FS,
@@ -637,21 +736,23 @@ LEGEND_FS = {
     "Non-ag": FS - 1,
 }
 
-for r in range(4):
-    axes[r, 1].yaxis.tick_right()
+sync_pair_y_limits(axes, [(0, 1), (2, 3)])
+apply_y_axis_visibility(axes)
 plt.tight_layout()
-plt.subplots_adjust(hspace=0.35, wspace=0.28)
+plt.subplots_adjust(hspace=0.35, wspace=0.18, top=0.94)
+add_column_group_title(fig, axes, (0, 1), "GHG")
+add_column_group_title(fig, axes, (2, 3), "Biodiversity")
 fig.canvas.draw()
 renderer = fig.canvas.get_renderer()
 fig_w_px = fig.get_figwidth() * fig.dpi
 fig_h_px = fig.get_figheight() * fig.dpi
 
-bb_left = [axes[r, 0].get_tightbbox(renderer) for r in range(4)]
-bb_right = [axes[r, 1].get_tightbbox(renderer) for r in range(4)]
-y_mid_l = (max(b.y1 for b in bb_left) + min(b.y0 for b in bb_left)) / 2 / fig_h_px
-y_mid_r = (max(b.y1 for b in bb_right) + min(b.y0 for b in bb_right)) / 2 / fig_h_px
-x_l = min(b.x0 for b in bb_left) / fig_w_px - 0.02
-x_r = max(b.x1 for b in bb_right) / fig_w_px + 0.02
+bb_ghg = [axes[r, c].get_tightbbox(renderer) for r in range(4) for c in (0, 1)]
+bb_bio = [axes[r, c].get_tightbbox(renderer) for r in range(4) for c in (2, 3)]
+y_mid_l = (max(b.y1 for b in bb_ghg) + min(b.y0 for b in bb_ghg)) / 2 / fig_h_px
+y_mid_r = (max(b.y1 for b in bb_bio) + min(b.y0 for b in bb_bio)) / 2 / fig_h_px
+x_l = min(b.x0 for b in bb_ghg) / fig_w_px - 0.025
+x_r = max(b.x1 for b in bb_bio) / fig_w_px + 0.02
 fig.text(x_l, y_mid_l, r"Difference in GHG abatement relative to zero price (Mt CO$_2$e yr$^{-1}$)",
          rotation=90, va='center', ha='center', fontsize=FS)
 fig.text(x_r, y_mid_r, r"Difference in biodiversity contribution score relative to zero price (Mha yr$^{-1}$)",
@@ -663,11 +764,9 @@ for key, row_idx in all_rows:
     if not handles:
         continue
 
-    ax_l, ax_r = axes[row_idx, 0], axes[row_idx, 1]
-    bb_l = ax_l.get_tightbbox(renderer)
-    bb_r = ax_r.get_tightbbox(renderer)
-    x_center = (bb_l.x0 + bb_r.x1) / 2 / fig_w_px
-    y_anchor = min(bb_l.y0, bb_r.y0) / fig_h_px - 0.01
+    row_bboxes = [axes[row_idx, col_idx].get_tightbbox(renderer) for col_idx in range(4)]
+    x_center = (min(b.x0 for b in row_bboxes) + max(b.x1 for b in row_bboxes)) / 2 / fig_w_px
+    y_anchor = min(b.y0 for b in row_bboxes) / fig_h_px - 0.01
 
     fig.legend(
         handles=handles,

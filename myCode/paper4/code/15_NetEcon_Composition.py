@@ -44,6 +44,7 @@ from tools.price_slice_utils import (
     build_run_map,
     format_thousands,
     get_price_axis_label,
+    set_sparse_index_price_ticks,
     style_box_axis,
 )
 
@@ -558,9 +559,11 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
         totals = pivot_df.sum(axis=1).to_numpy()
         plot_sum_markers(ax, x, totals)
 
-    ax.set_xticks(x)
+    set_sparse_index_price_ticks(ax, price_vals, max_ticks=8)
     if show_xlabel:
-        ax.set_xticklabels([format_thousands(value) for value in price_vals], rotation=90, ha="center")
+        ax.tick_params(axis="x", labelrotation=90)
+        for label in ax.get_xticklabels():
+            label.set_ha("center")
         ax.set_xlabel(get_price_axis_label(varying_key))
     else:
         ax.tick_params(axis="x", labelbottom=False)

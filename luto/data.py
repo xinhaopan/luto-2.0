@@ -978,11 +978,15 @@ class Data:
         print("├── Loading productivity data", flush=True)
 
         # Yield increases.
-        if settings.PRODUCTIVITY_TREND == 'BAU':
+        if settings.PRODUCTIVITY_TREND in ('BAU', 'CONSTANT'):
             fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
             productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
             productivity_trend.index = productivity_trend.index + self.YR_CAL_BASE  # Adjust year to absolute year
             productivity_trend.index.name = 'Year'
+
+            # CONSTANT: zero out all growth — every year's multiplier is 1.0 (2010 baseline)
+            if settings.PRODUCTIVITY_TREND == 'CONSTANT':
+                productivity_trend[:] = 1.0
 
             # Convert to xarray for easier accessing.
             self.PRODUCTIVITY_MUL_xr = (
