@@ -3,7 +3,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260609_paper4_NCI'],
+    'TASK_NAME': ['20260611_paper4_NCI'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [2],
