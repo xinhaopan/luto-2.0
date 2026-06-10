@@ -231,12 +231,13 @@ def solve_timeseries(
         luto_solver = LutoSolver(input_data)
         luto_solver.formulate()
 
-        for nf, method, crossover, presolve in nf_attempts:
-            print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve} for year {target_year}...")
+        for nf, method, crossover, presolve, barhomogenous in nf_attempts:
+            print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...")
             luto_solver.gurobi_model.Params.NumericFocus    = nf
             luto_solver.gurobi_model.Params.Method          = method
             luto_solver.gurobi_model.Params.Crossover       = crossover
             luto_solver.gurobi_model.Params.Presolve        = presolve
+            luto_solver.gurobi_model.Params.BarHomogeneous  = barhomogenous
             solution = luto_solver.solve()
             status = luto_solver.gurobi_model.Status
 

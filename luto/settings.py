@@ -271,15 +271,11 @@ WRITE_SNES = 'off'                          # 'on' or 'off'. If write, will take
 # Gurobi parameters
 # ---------------------------------------------------------------------------- #
 
-# Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model. Default is automatic.
-SOLVE_METHOD = 2  # 'automatic: -1, primal simplex: 0, dual simplex: 0, barrier: 2, concurrent: 3, deterministic concurrent: 4, deterministic concurrent simplex: 5
-
-# Presolve parameters (switching both to 0 solves numerical problems)
-PRESOLVE = 0     # automatic (-1), off (0), conservative (1), or aggressive (2)
-AGGREGATE = 0    # Controls the aggregation level in presolve. The options are off (0), moderate (1), or aggressive (2). In rare instances, aggregation can lead to an accumulation of numerical errors. Turning it off can sometimes improve solution accuracy (it did not fix sub-optimal termination issue)
-
 # Print detailed output to screen
 VERBOSE = 1
+
+# Number of threads to use in parallel algorithms (e.g., barrier). PBS_NCPUS is the requested CPUs on GADI hpc.
+THREADS = 32
 
 # Primal feasibility tolerance — defines the solver precision granule.
 # ROUND_DECIMALS is derived from this: floor-truncation keeps digits down to
@@ -315,14 +311,12 @@ that 1 tripled solve time, 3 led to numerical problems.
 '''
 
 RETRY_PARAMS = [
-    (0, 2, -1,-1),   # NF, Method, Crossover, Presolve
-    (0, 1, 0, -1),
+    (0, 2, -1, -1, -1),   # NF, Method, Crossover, Presolve, BarHomogeneous
+    (0, 1,  0, -1, 0 ),
 ]
 '''
 List of solve attempts to try in order, per year. Each entry MUST be a
-(NumericFocus, Method, Crossover, Presolve) tuple. simulation.py loops this
-list and retries with the next entry whenever Gurobi returns a non-OPTIMAL
-status (e.g. NUMERIC, SUBOPTIMAL, or false-INFEASIBLE).
+(NumericFocus, Method, Crossover, Presolve, BarHomogeneous) tuple.
 
 NumericFocus:
     0 = automatic (slight preference for speed); 1-3 = increasingly careful.
@@ -344,30 +338,22 @@ Presolve:
     errors that cause the homogeneous barrier to declare false infeasibility.
     Safe to enable for simplex (Method=0 or 1).
 
+BarHomogeneous:
+    -1 = automatic, 0 = off, 1 = on.
+    Keep OFF (0): the homogeneous algorithm's tau parameter drifts toward zero
+    in highly degenerate problems, triggering false INFEASIBLE (status 3) even
+    with NumericFocus=3. With 0, the barrier reports NUMERIC (12) or SUBOPTIMAL
+    (13) instead — both handled by the retry loop. Set to 1 only when debugging
+    to avoid ambiguous INF_OR_UNBD status.
+
 Default sequence:
-  (0, 2, 0,  0)  barrier, no crossover, presolve off       — fast first pass
-  (0, 1, 0, -1)  dual simplex, presolve auto                — fallback; simplex
-                 walks the boundary so it cannot misdiagnose feasibility from
-                 an interior-point argument; presolve safe with simplex
+  (0, 2, -1, -1, -1) barrier, auto crossover, presolve off, homogeneous off  — fast first pass
+  (0, 1,  0, -1, 0)  dual simplex, presolve auto, homogeneous off            — fallback; simplex
+                     walks the boundary so it cannot misdiagnose feasibility
+                     from an interior-point argument; presolve safe with simplex
 '''
 
 
-BARHOMOGENOUS = 0
-'''
-Useful for recognizing infeasibility or unboundedness. At the default setting (-1),
-it is only used when barrier solves a node relaxation for a MIP model. 0 = off,
-1 = on. It is a bit slower than the default algorithm (3x slower in testing).
-Set to 1 when debugging infeasibility to avoid ambiguous INF_OR_UNBD status.
-
-Set to 0: the homogeneous algorithm's tau parameter drifts toward zero in highly
-degenerate problems (many near-binding constraints), triggering false status 3 even
-with NumericFocus=3. IIS confirms the model is feasible — no real dual ray exists.
-With 0, the standard barrier will report NUMERIC (status 12) or SUBOPTIMAL (13)
-instead of INFEASIBLE (3) when it struggles, both of which the retry loop handles.
-'''
-
-# Number of threads to use in parallel algorithms (e.g., barrier). PBS_NCPUS is the requested CPUs on GADI hpc.
-THREADS = 32
 
 
 
