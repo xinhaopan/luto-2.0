@@ -1101,7 +1101,14 @@ class LutoSolver:
                 print(f"│   │   │   ├── WARNING: SNES empty layer for {species} ({presence}) [{region}]")
                 continue
 
-            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} ({presence}) [{region}]")
+            avail = val_vector[ind].sum()
+            tightness = avail / lb_rescale if lb_rescale > 0 else float('inf')
+            print(
+                f"│   │   │   ├── target={lb_raw:>12,.0f}  n_cells={ind.size:>5}  "
+                f"avail={avail:>12,.0f}  tightness={tightness:.3f}  "
+                f"coeff=[{val_vector[ind].min():.3e},{val_vector[ind].max():.3e}]  "
+                f"{species} ({presence}) [{region}]"
+            )
             self.bio_GBF4_SNES_exprs[(region, species, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF4_SNES_constrs[(region, species, presence)] = self.gurobi_model.addConstr(
                 self.bio_GBF4_SNES_exprs[(region, species, presence)] >= lb_rescale,
@@ -1140,7 +1147,14 @@ class LutoSolver:
                 print(f"│   │   │   ├── WARNING: ECNES empty layer for {community} ({presence}) [{region}]")
                 continue
 
-            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {community} ({presence}) [{region}]")
+            avail = val_vector[ind].sum()
+            tightness = avail / lb_rescale if lb_rescale > 0 else float('inf')
+            print(
+                f"│   │   │   ├── target={lb_raw:>12,.0f}  n_cells={ind.size:>5}  "
+                f"avail={avail:>12,.0f}  tightness={tightness:.3f}  "
+                f"coeff=[{val_vector[ind].min():.3e},{val_vector[ind].max():.3e}]  "
+                f"{community} ({presence}) [{region}]"
+            )
             self.bio_GBF4_ECNES_exprs[(region, community, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF4_ECNES_constrs[(region, community, presence)] = self.gurobi_model.addConstr(
                 self.bio_GBF4_ECNES_exprs[(region, community, presence)] >= lb_rescale,

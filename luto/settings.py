@@ -1190,6 +1190,11 @@ GBF4_SNES_EXCLUDE_REGION_SPECIES = [
     ('North East', 'Lobelia gelida'),
     #   INSIDE_LUTO_ha = 24.7  (present but below 100 ha threshold)
     ('North East', 'Zieria citriodora'),
+
+    # INFEASIBLE in NECMA single-species debug (2026-06-10): n_cells=9, tightness=1.505,
+    # coeff_ratio=62.1 (range [10.2, 633.0]). Extreme within-row coefficient spread on
+    # very few cells causes NUMERIC in the full model before infeasibility can be proven.
+    ('North East', 'Pomaderris subplicata'),
 ]
 
 
