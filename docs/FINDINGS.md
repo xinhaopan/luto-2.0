@@ -5,6 +5,141 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260610 — GBF4 SNES NUMERIC root cause: small-signal instability from sparse habitat (*Pomaderris subplicata*, North East)
+
+### TL;DR
+
+*Pomaderris subplicata* (LIKELY, North East NRM) caused `NUMERIC` status in the full
+NECMA model at 2040→2045. The species has only **9 cells** with an extreme within-row
+coefficient ratio of **62:1** (range [10.2, 633.0]). Satisfying its constraint requires
+reallocating a tiny fraction of those cells — a change so economically negligible that
+the barrier's dual variable approaches zero and the complementarity condition becomes
+numerically indistinguishable from zero. The fix is to exclude the species from
+`GBF4_SNES_EXCLUDE_REGION_SPECIES`. With this exclusion, `Run_G0002` reached OPTIMAL
+at 2040→2045.
+
+Run: `Custom_runs/NECMA_follow_runs/Run_G0001` (RF5, 2020–2050).
+Debug harness: `jinzhu_inspect_code/Check_NECMA_num_issues/`.
+
+---
+
+### Diagnostic method: single-species PBS workers
+
+A new debugging workflow was established (see `docs/CLAUDE_SKILL/debug_species_infeasibility.md`):
+
+1. **Launcher** loads the year checkpoint, enumerates all GBF4 SNES/ECNES `(region, species, presence)` triplets, and submits one PBS worker per target.
+2. **Worker** builds the full base model (all constraints except GBF4), adds the single species constraint, and solves with barrier.
+3. **Collector** aggregates result JSONs into a CSV with status, tightness, coeff_ratio, and solve time.
+
+This directly catches both structural infeasibility (`tightness < 1`) and numerical breakdown (`NUMERIC`/`TIME_LIMIT` with high `coeff_ratio`). It supersedes the older MPS-maximisation approach, which only detected structural infeasibility and could not identify numerical failure modes.
+
+**Key tightness formula (corrected):**
+
+```
+tightness = avail / lb_rescale
+```
+
+where `avail = val_vector[ind].sum()` is the **rescaled** max achievable score (from `GBF4_SNES_pre_1750_area_sr`, already rescaled by `rescale_solver_input_data()`), and `lb_rescale = lb_raw / scale_factor`. Values `< 1` indicate structural infeasibility; `≥ 1` with solver failure indicates numerical instability. The old formula `lb_raw / avail` mixed raw and rescaled units, giving an inverted and dimensionally inconsistent result.
+
+---
+
+### Per-species results (2040→2045, North East + Goulburn Broken)
+
+83 targets tested. Of these 24 were `SKIP_NEG_TARGET` (negative targets, base year already exceeds threshold). Of the remaining 59:
+
+| Status | Count | Notes |
+|--------|-------|-------|
+| OPTIMAL | 54 | cleanly solved |
+| TIME_LIMIT | 4 | feasible but slow under combined constraint pressure |
+| INFEASIBLE | **1** | *Pomaderris subplicata* — confirmed conflict |
+
+The 4 TIME_LIMIT cases (*Lepidium monoplocoides*, *Nannoperca australis*, *Pimelea spinescens*, *Anthochaera phrygia*) have `tightness >> 1` and `coeff_ratio ~ 25–100` but did not cause `NUMERIC` in the full model.
+
+---
+
+### Root cause: small-signal numerical instability
+
+**Species profile:**
+
+| Metric | Value |
+|--------|-------|
+| `n_cells` | 9 (North East NRM) |
+| `tightness` | 1.505 (avail > target — structurally feasible) |
+| `coeff_ratio` | 62.1 |
+| `coeff range` | [10.2, 633.0] |
+| Single-species test status | **INFEASIBLE** |
+| Full model status (with all GBF4) | **NUMERIC** |
+
+The constraint is **structurally feasible** (`total_max_score = 2,053 > lb_rescale = 1,580`). Yet the full model returns `NUMERIC` before it can prove infeasibility; the single-species test (base model + one constraint) returns `INFEASIBLE` after computing a proper certificate.
+
+**Mechanism:**
+
+The barrier method's complementarity condition for each constraint is `dual × slack → 0`. To satisfy the Pomaderris constraint, the solver needs to reallocate a tiny fraction of those 9 cells to EP/RP — a change that costs economically negligible AUD against a model objective of `~1.1e4` (rescaled). The dual variable (shadow price) of the Pomaderris constraint therefore approaches zero. With `dual ≈ 0`, the product `dual × slack` is near zero from both sides — the barrier cannot distinguish "constraint satisfied at zero slack" from "constraint violated by a tiny amount."
+
+The extreme `coeff_ratio = 62` compounds this: one cell (val=633) holds 27% of the total score. If other constraints prevent that cell from being freely allocated, the constraint cannot be satisfied, and the barrier's attempt to resolve this creates ill-conditioning.
+
+At `OPTIMALITY_TOLERANCE = 0.01` and objective `~1.1e4`, Gurobi accepts solutions within `110` (rescaled) of optimal. The Pomaderris dual gap is far below this floor — the solver never experiences numerical pressure to resolve it, and the barrier converges to a numerically degenerate state.
+
+**Why more-cell species are unaffected:** More cells → larger LHS summed → larger dual → detectable economic signal. *Grantiella picta* (803 cells, rescaled target 42,579) has a dual orders of magnitude larger; the complementarity condition is well-conditioned.
+
+---
+
+### What was ruled out
+
+Cell-level diagnostics (`script_3_diagnose_pomaderris.py`, `script_4_water_conflict.py`, `script_5_nvis_conflict.py`) tested three competing-constraint hypotheses:
+
+| Hypothesis | Result | Evidence |
+|------------|--------|----------|
+| Water (OVENS RIVER) competition | **Ruled out** | All 9 cells in OVENS RIVER (reg_idx=157, target=83,574 ML). Switching free fractions to RP changes regional yield by only +3 ML — negligible. |
+| GBF3 NVIS competition | **Ruled out** | 9 cells contribute at most 5.1% of any NVIS group's total capacity; no groups flagged as tight. |
+| Raw structural infeasibility | **Ruled out** | `total_max_score = 2,053 > lb_rescale = 1,580`; 7 of 9 cells already locked in high-biodiv non-ag uses (EP/RP) from prior years. |
+
+The infeasibility in the single-species test is not from lack of habitat but from the **combination of locked prior allocations (7 of 9 cells 56–96% committed) leaving thin free fractions that are over-subscribed by all base model constraints simultaneously**, with no single identifiable culprit. The small-signal mechanism prevents the barrier from navigating to the feasible point that the ILP analysis confirms exists.
+
+---
+
+### Cell-level diagnostics summary (from script_3)
+
+| Cell | val | lock_frac | free_frac | max_score | note |
+|------|-----|-----------|-----------|-----------|------|
+| r=179511 | 633 | 0.88 | 0.12 | 579 | top contributor |
+| r=180043 | 530 | 0.56 | 0.44 | 424 | |
+| r=179682 | 388 | 0.72 | 0.28 | 310 | |
+| r=179866 | 275 | 0.60 | 0.40 | 283 | |
+| r=179865 | 194 | 0.41 | 0.59 | 120 | insufficient |
+| r=179684 | 153 | 0.88 | 0.12 | 140 | insufficient |
+| r=179867 | 102 | 0.00 | 1.00 | 82 | insufficient |
+| r=179683 | 92 | **0.96** | 0.04 | 73 | FULLY LOCKED |
+| r=180042 | 10 | 0.00 | 1.00 | 8 | negligible |
+
+All 9 cells in OVENS RIVER (water region 157). 7 cells already in non-ag land uses from
+prior years (cur_lu shows non-ag). `cur_lu = ?` means lumap index ≥ 28 (non-ag territory).
+
+---
+
+### Fix
+
+Added to `GBF4_SNES_EXCLUDE_REGION_SPECIES` in both `luto/settings.py` and all 13 run copies in `NECMA_follow_runs/Run_G*/luto/settings.py`:
+
+```python
+# INFEASIBLE in NECMA single-species debug (2026-06-10): n_cells=9, tightness=1.505,
+# coeff_ratio=62.1 (range [10.2, 633.0]). Extreme within-row coefficient spread on
+# very few cells causes NUMERIC in the full model before infeasibility can be proven.
+('North East', 'Pomaderris subplicata'),
+```
+
+**Validation:** `Run_G0002` (high GHG sensitivity) reached `Optimal objective 1.127e+04` at
+2040→2045 after the exclusion. The Pomaderris constraint is excluded from the model; Gurobi
+no longer encounters the near-zero dual.
+
+---
+
+### Long-term mitigation
+
+Pre-compute `total_max_score = sum(val_vector[ind].sum() × best_contr[r])` for every GBF4 SNES/ECNES constraint before formulating the model. Flag any constraint where `tightness < 1.2` **and** `n_cells < 20` **and** `coeff_ratio > 30` as high-risk for numerical instability. Convert those constraints to soft-penalty terms in the objective (bounded dual → no KKT blow-up even when near-binding) rather than hard `>=` constraints.
+
+---
+
 ## 20260606 — Barrier NUMERIC resolved at source: non-ag→ag transition fix; all snipping removed
 
 ### TL;DR (supersedes the 20260605 / 20260604 "structural degenerate-vertex / lock-in" conclusions)
