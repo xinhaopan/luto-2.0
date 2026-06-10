@@ -287,7 +287,7 @@ FEASIBILITY_TOLERANCE = 1e-6
 OPTIMALITY_TOLERANCE = 1e-2               
 ''' Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
 
-BARRIER_CONVERGENCE_TOLERANCE = 1e-3
+BARRIER_CONVERGENCE_TOLERANCE = 1e-5
 '''
 Barrier stops when the RELATIVE duality gap falls below this tolerance:
   |dual_obj - primal_obj| / (1 + |primal_obj|) < BarConvTol

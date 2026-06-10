@@ -1101,12 +1101,8 @@ class LutoSolver:
                 print(f"│   │   │   ├── WARNING: SNES empty layer for {species} ({presence}) [{region}]")
                 continue
 
-            avail = val_vector[ind].sum()
-            tightness = avail / lb_rescale if lb_rescale > 0 else float('inf')
             print(
                 f"│   │   │   ├── target={lb_raw:>12,.0f}  n_cells={ind.size:>5}  "
-                f"avail={avail:>12,.0f}  tightness={tightness:.3f}  "
-                f"coeff=[{val_vector[ind].min():.3e},{val_vector[ind].max():.3e}]  "
                 f"{species} ({presence}) [{region}]"
             )
             self.bio_GBF4_SNES_exprs[(region, species, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
