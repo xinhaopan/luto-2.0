@@ -1159,6 +1159,10 @@ GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES = [
     # data.py NRM mode drops this community automatically; listed here for explicitness.
     # Confirmed via check on 2026-05-02.
     ('North East', 'Buloke Woodlands of the Riverina and Murray-Darling Depression Bioregions'),
+
+    # Goulburn Broken — INFEASIBLE in 2045→2050 per-community test (2026-06-11).
+    # tightness=1.27, n_cells=118, coeff_ratio=150: available habitat cannot meet 2050 target.
+    ('Goulburn Broken', 'Buloke Woodlands of the Riverina and Murray-Darling Depression Bioregions'),
 ]
 GBF4_SNES_EXCLUDE_REGION_SPECIES = [
     # Burramys parvus has zero LUTO habitat in Goulburn Broken and the outside-LUTO
@@ -1174,27 +1178,37 @@ GBF4_SNES_EXCLUDE_REGION_SPECIES = [
     # data.py drops these in NRM mode (threshold = 100 ha) because the constraint LHS
     # is effectively zero and the target can never be met → ValueError at Data() init.
     # Confirmed via check_snes_nrm.py on 2026-05-02.
-    #   INSIDE_LUTO_ha = 0.0  (no LUTO-managed habitat in North East)
-    ('North East', 'Argyrotegium nitidulum'),
-    #   INSIDE_LUTO_ha = 0.0
-    ('North East', 'Burramys parvus'),
-    #   INSIDE_LUTO_ha = 0.0
-    ('North East', 'Euphrasia crassiuscula subsp. glandulifera'),
-    #   INSIDE_LUTO_ha = 82.6  (present but below 100 ha threshold)
-    ('North East', 'Euphrasia eichleri'),
-    #   INSIDE_LUTO_ha = 0.0
-    ('North East', 'Grevillea burrowa'),
-    #   INSIDE_LUTO_ha = 0.0
-    ('North East', 'Kelleria bogongensis'),
-    #   INSIDE_LUTO_ha = 0.0
-    ('North East', 'Lobelia gelida'),
-    #   INSIDE_LUTO_ha = 24.7  (present but below 100 ha threshold)
-    ('North East', 'Zieria citriodora'),
+    ('North East', 'Argyrotegium nitidulum'),                       # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Burramys parvus'),                              # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Euphrasia crassiuscula subsp. glandulifera'),   # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Euphrasia eichleri'),                           # INSIDE_LUTO_ha = 82.6 (below 100 ha threshold)
+    ('North East', 'Grevillea burrowa'),                            # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Kelleria bogongensis'),                         # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Lobelia gelida'),                               # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Zieria citriodora'),                            # INSIDE_LUTO_ha = 24.7 (below 100 ha threshold)
 
     # INFEASIBLE in NECMA single-species debug (2026-06-10): n_cells=9, tightness=1.505,
     # coeff_ratio=62.1 (range [10.2, 633.0]). Extreme within-row coefficient spread on
     # very few cells causes NUMERIC in the full model before infeasibility can be proven.
     ('North East', 'Pomaderris subplicata'),
+
+    # --- 2045→2050 exclusions (identified by Check_NECMA_2045_2050 per-species test, 2026-06-11) ---
+    # INFEASIBLE: structurally infeasible even in isolation — available area cannot meet 2050 target.
+    ('North East',      'Acacia phasmoides'),               # tightness=1.68, n_cells=10
+    ('North East',      'Litoria booroolongensis'),         # tightness=1.62, n_cells=36
+    ('North East',      'Caladenia concolor'),              # tightness=1.44, n_cells=149
+    ('Goulburn Broken', 'Calidris ferruginea'),             # tightness=1.41, n_cells=25
+    ('Goulburn Broken', 'Maccullochella macquariensis'),    # tightness=1.36, n_cells=115
+    
+    # TIME_LIMIT: individually borderline-feasible but cause full-model infeasibility when combined —
+    # cells shared across constraints cannot simultaneously satisfy all targets given 2045 lower bounds.
+    ('North East',      'Grevillea jephcottii'),            # tightness=1.93, n_cells=10
+    ('Goulburn Broken', 'Eucalyptus crenulata'),            # tightness=1.83, n_cells=2
+    ('Goulburn Broken', 'Callocephalon fimbriatum'),        # tightness=1.73, n_cells=453
+    ('Goulburn Broken', 'Amphibromus fluitans'),            # tightness=1.43, n_cells=607
+    ('Goulburn Broken', 'Delma impar'),                     # tightness=1.36, n_cells=256
+    ('Goulburn Broken', 'Dianella amoena'),                 # tightness=1.34, n_cells=126
+    ('Goulburn Broken', 'Litoria raniformis'),              # tightness=1.33, n_cells=196
 ]
 
 
