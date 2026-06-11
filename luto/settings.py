@@ -53,7 +53,7 @@ SCENARIO        = 'SSP' + SSP[0]     # SSP1, SSP2, SSP3, SSP4, SSP5
 DIET_DOM        = 'BAU'              # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
 DIET_GLOB       = 'BAU'              # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
 CONVERGENCE     = 2050               # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
-IMPORT_TREND    = 'Static'           # 'Static' (assumes 2010 shares of imports for each commodity) or 'Trend' (follows historical rate of change in shares of imports for each commodity)
+IMPORT_TREND    = 'Trend'            # 'Static' (assumes 2010 shares of imports for each commodity) or 'Trend' (follows historical rate of change in shares of imports for each commodity)
 WASTE           = 1                  # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'              # 'BAU' or 'High'
 
@@ -68,7 +68,7 @@ PRODUCTIVITY_TREND = 'BAU'           # 'BAU', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIG
 CO2_FERT = 'off'   # 'on' or 'off'
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
-CARBON_EFFECTS_WINDOW = 50 # 50, 60, 70, 80, or 90 
+CARBON_EFFECTS_WINDOW = 60 # 50, 60, 70, 80, or 90
 '''
 Available options are  50, 60, 70, 80, 90 years. This is the number of years over which to spread (average) 
 soil carbon accumulation. 
@@ -122,7 +122,7 @@ TRANSITION_COST_MULT = 1
 TECH_ADOPT_MULT = 1
 
 # Set whether to use demand elasticity when calculating commodity prices
-DYNAMIC_PRICE = False
+DYNAMIC_PRICE = True
 
 
 
@@ -134,7 +134,7 @@ DYNAMIC_PRICE = False
 RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2010, 2051, 10))
+SIM_YEARS =  list(range(2020, 2051, 5))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -659,8 +659,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
-    'HIR - Beef': True,
-    'HIR - Sheep': True,
+    'HIR - Beef': False,        # Can not abandon HIR - Beef once adopted (irreversible)
+    'HIR - Sheep': False,       # Can not abandon HIR - Sheep once adopted (irreversible)
     'Utility Solar PV': False,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
     'Onshore Wind': False,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
 }
@@ -689,7 +689,7 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 
 # HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
-HIR_CEILING_PERCENTAGE = 0.9
+HIR_CEILING_PERCENTAGE = 0.8
 
 # Maintainace cost for HIR
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
@@ -721,7 +721,7 @@ GHG_TARGETS_DICT = {
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
+GHG_EMISSIONS_LIMITS = 'low'         # 'off', 'low', 'medium', or 'high'
 '''
 `GHG_EMISSIONS_LIMITS` options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
@@ -849,7 +849,7 @@ INCLUDE_WATER_LICENSE_COSTS = 1
 # ------------------- Agricultural biodiversity parameters -------------------
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-GBF2_TARGET = 'medium'            # 'off', 'low', 'medium', or 'high'
+GBF2_TARGET = 'high'              # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -879,7 +879,7 @@ The constraint type for the biodiversity target.
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 15
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -955,19 +955,19 @@ to undisturbed natural land.
 
 
 # Biodiversity value under default late dry season savanna fire regime
-BIO_CONTRIBUTION_LDS = 0.8
+BIO_CONTRIBUTION_LDS = 0.75
 ''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value
     (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value (i.e., 1.0).
 '''
 
 # Non-agricultural biodiversity parameters 
-BIO_CONTRIBUTION_ENV_PLANTING = 0.8
-BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.1
-BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
-BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2
-BIO_CONTRIBUTION_AGROFORESTRY = 0.75       
+BIO_CONTRIBUTION_ENV_PLANTING = 0.7
+BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.12
+BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.12
+BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.0
+BIO_CONTRIBUTION_AGROFORESTRY = 0.7
 BIO_CONTRIBUTION_BECCS = 0
-BIO_CONTRIBUTION_DESTOCKING = 'GAP'  # If 'GAP', uses BIO_HABITAT_CONTRIBUTION_LOOK_UP difference; if set to a number (e.g. 0.75), overrides with a fixed scalar
+BIO_CONTRIBUTION_DESTOCKING = 0.75  # If 'GAP', uses BIO_HABITAT_CONTRIBUTION_LOOK_UP difference; if set to a number (e.g. 0.75), overrides with a fixed scalar
 '''
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
 For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
