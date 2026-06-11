@@ -38,8 +38,8 @@ DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 SHP_FILE = "../../paper4/Map/AUS_line1.shp"
-CACHE_NPZ = DATA_DIR / f"03_Spatial_Distribution_raw_data_{YEAR}.npz"
-CACHE_META = DATA_DIR / f"03_Spatial_Distribution_meta_{YEAR}.xlsx"
+CACHE_NPZ = DATA_DIR / f"02_Spatial_Distribution_raw_data_{YEAR}.npz"
+CACHE_META = DATA_DIR / f"02_Spatial_Distribution_meta_{YEAR}.xlsx"
 
 EXTENT = [113.0, 153.6, -43.64, -10.04]
 MAP_PAD = 0.8
@@ -121,6 +121,25 @@ AG_FULL_ORDER, AG_COLOR_MAP, _ = load_style_table("ag_group")
 AG_FULL_ORDER, AG_COLOR_MAP = split_livestock_style(AG_FULL_ORDER, AG_COLOR_MAP)
 AM_FULL_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = load_style_table("am")
 NON_AG_FULL_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = load_style_table("non_ag")
+
+# Apply Ag2050 naming convention: remap color-table desc_new -> Ag2050 display name
+_AG2050_DISPLAY = {
+    "Biochar":                                              "Biochar (soil amendment)",
+    "Human-Induced Regeneration (beef)":                    "Managed regeneration (beef)",
+    "Human-Induced Regeneration (sheep)":                   "Managed regeneration (sheep)",
+    "Environmental plantings (mixed local native species)": "Environmental plantings (mixed species)",
+    "BECCS (Bioenergy with carbon capture and storage)":    "BECCS (Bioenergy with Carbon Capture and Storage)",
+    "Destocked (natural land)":                             "Destocked - natural land",
+}
+
+def _apply_ag2050(order, color_map, label_map):
+    new_order = [_AG2050_DISPLAY.get(x, x) for x in order]
+    new_color = {_AG2050_DISPLAY.get(k, k): v for k, v in color_map.items()}
+    new_label = {k: _AG2050_DISPLAY.get(v, v) for k, v in label_map.items()}
+    return new_order, new_color, new_label
+
+AM_FULL_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = _apply_ag2050(AM_FULL_ORDER, AM_COLOR_MAP, AM_LABEL_MAP)
+NON_AG_FULL_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = _apply_ag2050(NON_AG_FULL_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP)
 
 AG_ACTIVE_ORDER = [label for label in AG_FULL_ORDER if label != "Other land"]
 AM_ACTIVE_ORDER = [
@@ -634,7 +653,7 @@ for row_idx, legend_handles in row_legend_handles.items():
     add_row_legend(active_handles[split_idx:], x_center, y_anchor - 0.018, row_key)
     add_row_legend(special_handles, x_center, y_anchor - 0.036, row_key)
 
-out_path = OUT_DIR / "03_Spatial_Distribution.png"
+out_path = OUT_DIR / "02_Spatial_Distribution.png"
 fig.savefig(out_path, dpi=200, bbox_inches="tight", facecolor="white")
 plt.close()
 print(f"Saved: {out_path}")

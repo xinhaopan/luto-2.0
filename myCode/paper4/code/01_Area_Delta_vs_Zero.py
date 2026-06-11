@@ -126,6 +126,25 @@ AG_ORDER, AG_COLOR_MAP, _ = load_style_table("ag_group")
 AG_ORDER, AG_COLOR_MAP = split_livestock_style(AG_ORDER, AG_COLOR_MAP)
 AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = load_style_table("am")
 NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = load_style_table("non_ag")
+
+# Apply Ag2050 naming convention: remap color-table desc_new -> Ag2050 display name
+_AG2050_DISPLAY = {
+    "Biochar":                                              "Biochar (soil amendment)",
+    "Human-Induced Regeneration (beef)":                    "Managed regeneration (beef)",
+    "Human-Induced Regeneration (sheep)":                   "Managed regeneration (sheep)",
+    "Environmental plantings (mixed local native species)": "Environmental plantings (mixed species)",
+    "BECCS (Bioenergy with carbon capture and storage)":    "BECCS (Bioenergy with Carbon Capture and Storage)",
+    "Destocked (natural land)":                             "Destocked - natural land",
+}
+
+def _apply_ag2050(order, color_map, label_map):
+    new_order = [_AG2050_DISPLAY.get(x, x) for x in order]
+    new_color = {_AG2050_DISPLAY.get(k, k): v for k, v in color_map.items()}
+    new_label = {k: _AG2050_DISPLAY.get(v, v) for k, v in label_map.items()}
+    return new_order, new_color, new_label
+
+AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = _apply_ag2050(AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP)
+NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = _apply_ag2050(NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP)
 LU_ORDER, LU_COLOR_MAP, LU_LABEL_MAP = load_style_table("lu")
 
 group_df = pd.read_excel(GROUP_FILE)
