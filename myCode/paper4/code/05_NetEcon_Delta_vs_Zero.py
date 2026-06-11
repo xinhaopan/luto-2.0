@@ -940,7 +940,7 @@ LEGEND_FS = {
 
 sync_row_y_limits(axes)
 hide_redundant_y_ticks(axes)
-fig.supylabel(r"Difference in net economic returns relative to zero price (Billion AU\$ yr$^{-1}$)", fontsize=FS)
+fig.supylabel(r"Difference in budget relative to zero price (Billion AU\$ yr$^{-1}$)", fontsize=FS)
 plt.tight_layout()
 plt.subplots_adjust(hspace=0.35, wspace=0.28)
 fig.canvas.draw()

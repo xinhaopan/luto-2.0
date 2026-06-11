@@ -624,7 +624,7 @@ LEGEND_FS = {
     "Non-ag": FS - 1,
 }
 
-fig.supylabel(r"Net economic returns (Billion AU\$ yr$^{-1}$)", fontsize=FS)
+fig.supylabel(r"Budget (Billion AU\$ yr$^{-1}$)", fontsize=FS)
 plt.tight_layout()
 plt.subplots_adjust(hspace=0.35, wspace=0.12)
 fig.canvas.draw()
