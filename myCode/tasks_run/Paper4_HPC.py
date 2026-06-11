@@ -23,7 +23,7 @@ grid_search = {
     'WRITE_THREADS': ['2'],
     'TIME': ['12:00:00'],
 
-    'PRODUCTIVITY_TREND': [_prod_trend],
+    'PRODUCTIVITY_TREND': ['CONSTANT'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
     'BIODIVERSITY_TARGET_GBF_2': ['off'],

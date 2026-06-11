@@ -12,6 +12,7 @@ grid_search = {
     'NCPUS': ['10'],
     'WRITE_THREADS': ['2'],
     'TIME': ['12:00:00'],
+    'PRODUCTIVITY_TREND': ['CONSTANT'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
     'BIODIVERSITY_TARGET_GBF_2': ['off'],
