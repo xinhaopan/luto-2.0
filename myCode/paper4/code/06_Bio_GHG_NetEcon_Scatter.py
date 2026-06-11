@@ -252,6 +252,15 @@ def _draw_4lines(ax, curves, xlim):
     return ax2, float(cp_bud.max())
 
 
+def sync_ylims(*axes_list):
+    """Set all axes to the same y-range and recompute ticks."""
+    y_min = min(ax.get_ylim()[0] for ax in axes_list)
+    y_max = max(ax.get_ylim()[1] for ax in axes_list)
+    for ax in axes_list:
+        ax.set_ylim(y_min, y_max)
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, steps=[1,2,5,10]))
+
+
 def add_zoom_connectors(fig, ax_zoom, ax_full, x_zoom_max, full_xlim):
     """
     Draw dashed lines from the right edge of ax_zoom to the
@@ -349,19 +358,16 @@ fig, axes = plt.subplots(3, 2, figsize=(14, 15),
                          gridspec_kw={"height_ratios": [1.0, 1.1, 1.1]})
 
 # ── Row 0 ──────────────────────────────────────────────────────────────────────
-_, x_zoom_max = _draw_4lines(axes[0, 0], curves, xlim=(0, x_max_cp))
+ax_zoom2, x_zoom_max = _draw_4lines(axes[0, 0], curves, xlim=(0, x_max_cp))
 axes[0, 0].set_title("Carbon budget range (zoom)", pad=7)
 
-_, _ = _draw_4lines(axes[0, 1], curves, xlim=(0, x_max_bp))
+ax_full2, _ = _draw_4lines(axes[0, 1], curves, xlim=(0, x_max_bp))
 axes[0, 1].set_title("Full budget range", pad=7)
 axes[0, 1].get_legend().remove()   # keep legend only on zoom panel
 
-# Draw zoom connectors after layout is finalised
-plt.tight_layout(rect=[0, 0.10, 1, 1])
-plt.subplots_adjust(hspace=0.48, wspace=0.40)
-
-add_zoom_connectors(fig, axes[0, 0], axes[0, 1],
-                    x_zoom_max, full_xlim=(0, x_max_bp))
+# Sync row 0: primary y (GHG left axis) and secondary y (Bio right axis)
+sync_ylims(axes[0, 0], axes[0, 1])
+sync_ylims(ax_zoom2, ax_full2)
 
 # ── Row 1: GHG by subcategory ──────────────────────────────────────────────────
 ghg_cats_cp = plot_stacked_sub(
@@ -374,6 +380,8 @@ ghg_cats_bp = plot_stacked_sub(
     ylabel=r"GHG abatement change (Mt CO$_2$e yr$^{-1}$)",
     title="Biodiversity price: GHG co-benefit by subcategory vs Budget",
 )
+# Sync row 1
+sync_ylims(axes[1, 0], axes[1, 1])
 
 # ── Row 2: Bio by subcategory ──────────────────────────────────────────────────
 bio_cats_cp = plot_stacked_sub(
@@ -386,6 +394,8 @@ bio_cats_bp = plot_stacked_sub(
     ylabel=r"Biodiversity contribution change (Mha yr$^{-1}$)",
     title="Biodiversity price: Bio by subcategory vs Budget",
 )
+# Sync row 2
+sync_ylims(axes[2, 0], axes[2, 1])
 
 # ── Shared legend ──────────────────────────────────────────────────────────────
 all_cats = list(dict.fromkeys(
