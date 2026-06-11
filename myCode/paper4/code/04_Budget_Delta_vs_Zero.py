@@ -60,8 +60,8 @@ BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
-CACHE_PATH = DATA_DIR / f"05_NetEcon_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
-NC_CACHE_DIR = DATA_DIR / f"05_NetEcon_nc_cache_{YEAR}"
+CACHE_PATH = DATA_DIR / f"04_Budget_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
+NC_CACHE_DIR = DATA_DIR / f"04_Budget_nc_cache_{YEAR}"
 
 FS = 11
 SUM_LINE_LABEL = "Sum"
@@ -974,7 +974,7 @@ for key, row_idx in all_rows:
         fontsize=LEGEND_FS.get(key, FS - 1),
     )
 
-out_path = OUT_DIR / "05_NetEcon_Delta_vs_Zero.png"
+out_path = OUT_DIR / "04_Budget_Delta_vs_Zero.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")

@@ -1,8 +1,10 @@
 # ==============================================================================
-# Figure 12: area composition across all price scenarios
+# Figure 02: area composition across all price scenarios
 #   Left column:  BioPrice = 0, carbon price varies
 #   Right column: CarbonPrice = 0, biodiversity price varies
 #   Rows: Agricultural land-use / Ag management / Non-ag
+#
+#   Values are differences from the zero-price run for YEAR.
 # ==============================================================================
 
 import io
@@ -27,10 +29,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tools.price_slice_utils import (
     DATA_DIR,
     OUT_DIR,
+    add_zero_line,
+    apply_compact_ticks,
     apply_paper4_color_overrides_to_style_df,
+    apply_price_formatter,
     build_run_map,
     format_thousands,
     get_price_axis_label,
+    stacked_area_pos_neg,
     style_box_axis,
 )
 
@@ -40,7 +46,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
-CACHE_PATH = DATA_DIR / f"02_Area_All_Scenarios_raw_data_{YEAR}.xlsx"
+CACHE_PATH = DATA_DIR / f"01_Area_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
 
 FS = 11
 SUM_LINE_LABEL = "Sum"
@@ -59,6 +65,9 @@ plt.rcParams.update({
     "ytick.labelsize": FS,
     "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
+    "axes.facecolor": "#EAEAF2",
+    "grid.color": "white",
+    "grid.linewidth": 1.0,
 })
 
 
@@ -272,7 +281,7 @@ def read_non_ag_area(zip_path, year):
     return result
 
 
-def collect_slice_rows(run_map, price_vals, varying_key):
+def collect_slice_rows(run_map, price_vals, varying_key, baseline_summaries):
     price_type = "CarbonPrice" if varying_key == "cp" else "BioPrice"
     rows = []
 
@@ -292,22 +301,28 @@ def collect_slice_rows(run_map, price_vals, varying_key):
 
         for area_type in AREA_CONFIG:
             summary_2025 = summaries_2025[area_type]
+            summary_zero = baseline_summaries[area_type]
             category_order = get_category_order(
                 area_type,
-                list(dict.fromkeys(list(summary_2025))),
+                list(dict.fromkeys(list(summary_2025) + list(summary_zero))),
             )
 
-            total_2025 = sum(summary_2025.values())
-            print(f"    {area_type}: 2025={total_2025:.2f} Mha")
+            total_delta = sum(summary_2025.values()) - sum(summary_zero.values())
+            print(f"    {area_type}: difference={total_delta:.2f} Mha")
 
             for category in category_order:
                 area_2025 = summary_2025.get(category, 0.0)
+                area_zero = summary_zero.get(category, 0.0)
+                area_delta = area_2025 - area_zero
                 rows.append({
+                    "AccountingMode": "DeltaVsZeroPrice",
                     "PriceType": price_type,
                     "Price": price,
                     "AreaType": area_type,
                     "Category": category,
                     "Area_2025_Mha": area_2025,
+                    "Area_ZeroPrice_2025_Mha": area_zero,
+                    "AreaChange_vs_ZeroPrice_Mha": area_delta,
                 })
 
     return rows
@@ -325,18 +340,20 @@ def load_cache():
         return None
 
     required_columns = {
+        "AccountingMode",
         "PriceType",
         "Price",
         "AreaType",
         "Category",
         "Area_2025_Mha",
+        "Area_ZeroPrice_2025_Mha",
+        "AreaChange_vs_ZeroPrice_Mha",
     }
     if not required_columns.issubset(df_long.columns):
         print("Cached area data schema is outdated; rebuilding.")
         return None
-    old_relative_columns = {"Area_ZeroPrice_Mha", "AreaChange_vs_ZeroPrice_Mha"}
-    if old_relative_columns.intersection(df_long.columns):
-        print("Cached area data includes relative columns; rebuilding.")
+    if set(df_long["AccountingMode"]) != {"DeltaVsZeroPrice"}:
+        print("Cached area data uses a different accounting mode; rebuilding.")
         return None
     if OLD_LIVESTOCK_LABEL in set(df_long["Category"]):
         print("Cached area data uses unsplit livestock categories; rebuilding.")
@@ -347,12 +364,21 @@ def load_cache():
 
 def collect_and_cache():
     run_map, cp_vals, bp_vals = build_run_map()
+    zero_zip_path = run_map.get((0.0, 0.0))
+    if zero_zip_path is None:
+        raise FileNotFoundError("Could not find zero-price run (CarbonPrice=0, BioPrice=0).")
 
-    print(f"\n--- Slice A: area at {YEAR}, BioPrice=0 and carbon price varies ---")
-    rows_cp = collect_slice_rows(run_map, cp_vals, "cp")
+    baseline_summaries = {
+        "Agricultural land-use": read_agricultural_area(zero_zip_path, YEAR),
+        "Ag management": read_ag_management_area(zero_zip_path, YEAR),
+        "Non-ag": read_non_ag_area(zero_zip_path, YEAR),
+    }
 
-    print(f"\n--- Slice B: area at {YEAR}, CarbonPrice=0 and biodiversity price varies ---")
-    rows_bp = collect_slice_rows(run_map, bp_vals, "bp")
+    print(f"\n--- Slice A: area difference at {YEAR}, BioPrice=0 and carbon price varies ---")
+    rows_cp = collect_slice_rows(run_map, cp_vals, "cp", baseline_summaries)
+
+    print(f"\n--- Slice B: area difference at {YEAR}, CarbonPrice=0 and biodiversity price varies ---")
+    rows_bp = collect_slice_rows(run_map, bp_vals, "bp", baseline_summaries)
 
     df_long = pd.DataFrame(rows_cp + rows_bp)
     df_long = df_long.sort_values(["PriceType", "AreaType", "Price", "Category"]).reset_index(drop=True)
@@ -385,7 +411,7 @@ def build_area_pivot(df_long, price_type, area_type):
     pivot = df_subset.pivot_table(
         index="Price",
         columns="Category",
-        values="Area_2025_Mha",
+        values="AreaChange_vs_ZeroPrice_Mha",
         aggfunc="sum",
         fill_value=0.0,
     ).sort_index()
@@ -405,7 +431,7 @@ def build_total_area_pivot(df_long, price_type):
     pivot = df_subset.pivot_table(
         index="Price",
         columns="Category",
-        values="Area_2025_Mha",
+        values="AreaChange_vs_ZeroPrice_Mha",
         aggfunc="sum",
         fill_value=0.0,
     ).sort_index()
@@ -469,57 +495,41 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
         return []
 
     color_map = AREA_CONFIG[area_type]["color_map"] if color_map is None else color_map
-    price_vals = pivot_df.index.to_list()
-    x = np.arange(len(price_vals))
-    positive_bottoms = np.zeros(len(price_vals))
-    negative_bottoms = np.zeros(len(price_vals))
-
-    visible_categories = []
-    for category in pivot_df.columns:
-        heights = pivot_df[category].to_numpy()
-        if np.isclose(np.abs(heights).sum(), 0.0):
-            continue
-
-        positive = np.clip(heights, 0.0, None)
-        negative = np.clip(heights, None, 0.0)
-
-        if not np.isclose(positive.sum(), 0.0):
-            ax.bar(
-                x,
-                positive,
-                0.75,
-                bottom=positive_bottoms,
-                color=color_map.get(category, "#888888"),
-                label=category,
-            )
-            positive_bottoms += positive
-
-        if not np.isclose(np.abs(negative).sum(), 0.0):
-            ax.bar(
-                x,
-                negative,
-                0.75,
-                bottom=negative_bottoms,
-                color=color_map.get(category, "#888888"),
-                label=category,
-            )
-            negative_bottoms += negative
-
-        visible_categories.append(category)
+    visible_categories = stacked_area_pos_neg(ax, pivot_df, color_map)
 
     if show_sum_line:
         totals = pivot_df.sum(axis=1).to_numpy()
-        plot_sum_markers(ax, x, totals)
+        plot_sum_markers(ax, pivot_df.index.to_numpy(dtype=float), totals)
 
-    ax.set_xticks(x)
+    add_zero_line(ax)
     if show_xlabel:
-        ax.set_xticklabels([format_thousands(value) for value in price_vals], rotation=90, ha="center")
         ax.set_xlabel(get_price_axis_label(varying_key))
     else:
         ax.tick_params(axis="x", labelbottom=False)
 
+    apply_price_formatter(ax, axis="x")
+    apply_compact_ticks(ax, x_nbins=8, y_nbins=5)
+    if show_xlabel:
+        for label in ax.get_xticklabels():
+            label.set_rotation(45)
+            label.set_ha("right")
     style_box_axis(ax, linewidth=0.8)
     return visible_categories
+
+
+def sync_row_y_limits(axes):
+    for row_idx in range(axes.shape[0]):
+        row_limits = [axes[row_idx, col_idx].get_ylim() for col_idx in range(axes.shape[1])]
+        ymin = min(limit[0] for limit in row_limits)
+        ymax = max(limit[1] for limit in row_limits)
+        for col_idx in range(axes.shape[1]):
+            axes[row_idx, col_idx].set_ylim(ymin, ymax)
+
+
+def hide_redundant_y_ticks(axes):
+    for row_idx in range(axes.shape[0]):
+        for col_idx in range(1, axes.shape[1]):
+            axes[row_idx, col_idx].tick_params(axis="y", left=False, labelleft=False)
 
 
 df_long = load_cache()
@@ -536,7 +546,6 @@ fig, axes = plt.subplots(
 
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
-
 for row_idx, area_type in enumerate(row_area_types):
     ax_left = axes[row_idx, 0]
     ax_right = axes[row_idx, 1]
@@ -566,7 +575,9 @@ LEGEND_FS = {
     "Non-ag": FS - 1,
 }
 
-fig.supylabel(r"Area (Mha)", fontsize=FS)
+sync_row_y_limits(axes)
+hide_redundant_y_ticks(axes)
+fig.supylabel(r"Area difference relative to zero price (Mha)", fontsize=FS)
 plt.tight_layout()
 plt.subplots_adjust(hspace=0.35, wspace=0.12)
 fig.canvas.draw()
@@ -599,7 +610,7 @@ for row_idx, area_type in enumerate(row_area_types):
         fontsize=LEGEND_FS.get(area_type, FS - 1),
     )
 
-out_path = OUT_DIR / "12_Area_All_Scenarios.png"
+out_path = OUT_DIR / "01_Area_Delta_vs_Zero.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")

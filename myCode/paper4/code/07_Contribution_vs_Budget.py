@@ -23,6 +23,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
@@ -38,6 +39,8 @@ from tools.price_slice_utils import (
     format_thousands,
     get_price_axis_label,
     set_sparse_index_price_ticks,
+    apply_compact_ticks,
+    stacked_area_pos_neg,
     style_box_axis,
 )
 
@@ -47,7 +50,26 @@ BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
-CACHE_PATH = DATA_DIR / f"04_Contribution_vs_Price_raw_data_{YEAR}.xlsx"
+CACHE_PATH = DATA_DIR / f"07_Contribution_vs_Budget_raw_data_{YEAR}.xlsx"
+
+
+def load_budget_lookup():
+    """Map (PriceType, Price) -> Budget_BAud = price x delta_quantity / 1000."""
+    delta_cache = DATA_DIR / f"03_Contribution_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
+    if not delta_cache.is_file():
+        return {}
+    df = pd.read_excel(delta_cache, sheet_name="ContributionLong")
+    totals = df.groupby(["PriceType","Price","MetricType"])["ContributionValue"].sum().reset_index()
+    GHG_D = "GHGAbatementChange_vs_ZeroPrice_MtCO2e"
+    BIO_D  = "BiodiversityContributionChange_vs_ZeroPrice_MhaYr"
+    lookup = {("CarbonPrice", 0.0): 0.0, ("BioPrice", 0.0): 0.0}
+    for _, r in totals[(totals.PriceType=="CarbonPrice")&(totals.MetricType==GHG_D)].iterrows():
+        lookup[("CarbonPrice", float(r.Price))] = float(r.Price)*float(r.ContributionValue)/1000
+    for _, r in totals[(totals.PriceType=="BioPrice")&(totals.MetricType==BIO_D)].iterrows():
+        lookup[("BioPrice", float(r.Price))] = float(r.Price)*float(r.ContributionValue)/1000
+    return lookup
+
+BUDGET_LOOKUP = load_budget_lookup()
 
 FS = 11
 SUM_LINE_LABEL = "Sum"
@@ -125,6 +147,26 @@ AG_ORDER, AG_COLOR_MAP = split_livestock_style(AG_ORDER, AG_COLOR_MAP)
 AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = load_style_table("am")
 NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = load_style_table("non_ag")
 LU_ORDER, LU_COLOR_MAP, LU_LABEL_MAP = load_style_table("lu")
+# Apply Ag2050 naming convention: remap color-table desc_new -> Ag2050 display name
+# (keeps order / color_map / label_map consistent so colours still resolve)
+_AG2050_DISPLAY = {
+    "Biochar":                                              "Biochar (soil amendment)",
+    "Human-Induced Regeneration (beef)":                    "Managed regeneration (beef)",
+    "Human-Induced Regeneration (sheep)":                   "Managed regeneration (sheep)",
+    "Environmental plantings (mixed local native species)": "Environmental plantings (mixed species)",
+    "BECCS (Bioenergy with carbon capture and storage)":    "BECCS (Bioenergy with Carbon Capture and Storage)",
+    "Destocked (natural land)":                             "Destocked - natural land",
+}
+
+def _apply_ag2050(order, color_map, label_map):
+    new_order = [_AG2050_DISPLAY.get(x, x) for x in order]
+    new_color = {_AG2050_DISPLAY.get(k, k): v for k, v in color_map.items()}
+    new_label = {k: _AG2050_DISPLAY.get(v, v) for k, v in label_map.items()}
+    return new_order, new_color, new_label
+
+AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = _apply_ag2050(AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP)
+NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = _apply_ag2050(NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP)
+
 TRANSITION_LABEL = LU_LABEL_MAP.get(normalize_name("Transition"), "Transition")
 
 group_df = pd.read_excel(GROUP_FILE)
@@ -317,72 +359,54 @@ def get_category_order(area_type, categories_seen):
     return ordered
 
 
+def _append_rows(rows, price_type, price, area_type, metric_type, summary, scale, negate):
+    for category, value in summary.get(area_type, {}).items():
+        v = (-value / scale) if negate else (value / scale)
+        rows.append({
+            "PriceType": price_type,
+            "Price": price,
+            "AreaType": area_type,
+            "Category": category,
+            "MetricType": metric_type,
+            "ContributionValue": v,
+        })
+
+
 def collect_carbon_rows(run_map, cp_vals):
     rows = []
-
-    print(f"\n--- Slice A: absolute GHG emissions at {YEAR}; BioPrice=0 and carbon price varies ---")
+    print(f"\n--- Slice A: GHG + bio co-benefit at {YEAR}; BioPrice=0 ---")
     for cp in cp_vals:
         zip_path = run_map.get((cp, 0.0))
         if zip_path is None:
             continue
-
-        summary_2025 = get_ghg_summaries(zip_path, YEAR)
-
+        ghg = get_ghg_summaries(zip_path, YEAR)
+        bio = get_bio_summaries(zip_path, YEAR)
         for area_type in PANEL_CONFIG:
-            categories = list(dict.fromkeys(list(summary_2025[area_type])))
-            category_order = get_category_order(area_type, categories)
-
-            total_mt = 0.0
-            for category in category_order:
-                contribution_mt = -summary_2025[area_type].get(category, 0.0) / 1e6
-                total_mt += contribution_mt
-                rows.append({
-                    "PriceType": "CarbonPrice",
-                    "Price": cp,
-                    "AreaType": area_type,
-                    "Category": category,
-                    "MetricType": "GHGAbatement_2025_MtCO2e",
-                    "ContributionValue": contribution_mt,
-                })
-
-            print(f"  cp={format_thousands(cp)} | {area_type}: {total_mt:.2f} Mt CO2e")
-
+            _append_rows(rows, "CarbonPrice", cp, area_type,
+                         "GHGAbatement_2025_MtCO2e", ghg, 1e6, negate=True)
+            _append_rows(rows, "CarbonPrice", cp, area_type,
+                         "BiodiversityContribution_2025_MhaYr", bio, 1e6, negate=False)
+        total = sum(-ghg[a].get(c, 0)/1e6 for a in PANEL_CONFIG for c in ghg[a])
+        print(f"  cp={format_thousands(cp)}: GHG={total:.2f} Mt CO2e")
     return rows
 
 
 def collect_biodiversity_rows(run_map, bp_vals):
     rows = []
-
-    print(f"\n--- Slice B: absolute biodiversity contribution at {YEAR}; CarbonPrice=0 and biodiversity price varies ---")
+    print(f"\n--- Slice B: bio + GHG co-benefit at {YEAR}; CarbonPrice=0 ---")
     for bp in bp_vals:
         zip_path = run_map.get((0.0, bp))
         if zip_path is None:
             continue
-
-        summary_2025 = get_bio_summaries(zip_path, YEAR)
-
+        bio = get_bio_summaries(zip_path, YEAR)
+        ghg = get_ghg_summaries(zip_path, YEAR)
         for area_type in PANEL_CONFIG:
-            categories = list(dict.fromkeys(list(summary_2025[area_type])))
-            category_order = get_category_order(area_type, categories)
-
-            total_mha_yr = 0.0
-            for category in category_order:
-                contribution_mha_yr = summary_2025[area_type].get(category, 0.0) / 1e6
-                total_mha_yr += contribution_mha_yr
-                rows.append({
-                    "PriceType": "BioPrice",
-                    "Price": bp,
-                    "AreaType": area_type,
-                    "Category": category,
-                    "MetricType": "BiodiversityContribution_2025_MhaYr",
-                    "ContributionValue": contribution_mha_yr,
-                })
-
-            print(
-                f"  bp={format_thousands(bp)} | {area_type}: "
-                f"{total_mha_yr:.2f} Mha yr^-1"
-            )
-
+            _append_rows(rows, "BioPrice", bp, area_type,
+                         "BiodiversityContribution_2025_MhaYr", bio, 1e6, negate=False)
+            _append_rows(rows, "BioPrice", bp, area_type,
+                         "GHGAbatement_2025_MtCO2e", ghg, 1e6, negate=True)
+        total = sum(bio[a].get(c, 0)/1e6 for a in PANEL_CONFIG for c in bio[a])
+        print(f"  bp={format_thousands(bp)}: Bio={total:.2f} Mha yr^-1")
     return rows
 
 
@@ -428,6 +452,9 @@ def collect_and_cache():
 
     df_long = pd.DataFrame(rows)
     df_long = df_long.sort_values(["PriceType", "AreaType", "Price", "Category"]).reset_index(drop=True)
+    df_long["Budget_BAud"] = df_long.apply(
+        lambda r: BUDGET_LOOKUP.get((r["PriceType"], float(r["Price"])), 0.0), axis=1
+    )
 
     with pd.ExcelWriter(CACHE_PATH, engine="openpyxl") as writer:
         df_long.to_excel(writer, sheet_name="ContributionLong", index=False)
@@ -438,11 +465,13 @@ def collect_and_cache():
     return df_long
 
 
-def build_pivot(df_long, price_type, area_type):
+def build_pivot(df_long, price_type, area_type, metric_type=None):
     df_subset = df_long[
         (df_long["PriceType"] == price_type) &
         (df_long["AreaType"] == area_type)
     ]
+    if metric_type is not None:
+        df_subset = df_subset[df_subset["MetricType"] == metric_type]
     if area_type == "Agricultural land-use":
         df_subset = df_subset[df_subset["Category"] != TRANSITION_LABEL]
 
@@ -450,7 +479,7 @@ def build_pivot(df_long, price_type, area_type):
         return pd.DataFrame()
 
     pivot = df_subset.pivot_table(
-        index="Price",
+        index="Budget_BAud",
         columns="Category",
         values="ContributionValue",
         aggfunc="sum",
@@ -467,8 +496,10 @@ def map_total_category(area_type, category):
     return TOTAL_CATEGORY_MAP.get(area_type)
 
 
-def build_total_pivot(df_long, price_type):
+def build_total_pivot(df_long, price_type, metric_type=None):
     df_subset = df_long[df_long["PriceType"] == price_type].copy()
+    if metric_type is not None:
+        df_subset = df_subset[df_subset["MetricType"] == metric_type]
     if df_subset.empty:
         return pd.DataFrame()
 
@@ -479,7 +510,7 @@ def build_total_pivot(df_long, price_type):
     df_subset = df_subset.dropna(subset=["Category"])
 
     pivot = df_subset.pivot_table(
-        index="Price",
+        index="Budget_BAud",
         columns="Category",
         values="ContributionValue",
         aggfunc="sum",
@@ -545,52 +576,20 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
         return []
 
     color_map = PANEL_CONFIG[area_type]["color_map"] if color_map is None else color_map
-    price_vals = pivot_df.index.to_list()
-    x = np.arange(len(price_vals))
-    positive_bottoms = np.zeros(len(price_vals))
-    negative_bottoms = np.zeros(len(price_vals))
+    x = pivot_df.index.to_numpy(dtype=float)
 
-    visible_categories = []
-    for category in pivot_df.columns:
-        heights = pivot_df[category].to_numpy()
-        if np.isclose(np.abs(heights).sum(), 0.0):
-            continue
-
-        positive = np.clip(heights, 0.0, None)
-        negative = np.clip(heights, None, 0.0)
-
-        if not np.isclose(positive.sum(), 0.0):
-            ax.bar(
-                x,
-                positive,
-                0.75,
-                bottom=positive_bottoms,
-                color=color_map.get(category, "#888888"),
-            )
-            positive_bottoms += positive
-
-        if not np.isclose(np.abs(negative).sum(), 0.0):
-            ax.bar(
-                x,
-                negative,
-                0.75,
-                bottom=negative_bottoms,
-                color=color_map.get(category, "#888888"),
-            )
-            negative_bottoms += negative
-
-        visible_categories.append(category)
+    # Continuous budget x-axis -> stacked area (not bars)
+    visible_categories = stacked_area_pos_neg(ax, pivot_df, color_map, alpha=0.85)
 
     if show_sum_line:
         totals = pivot_df.sum(axis=1).to_numpy()
-        plot_sum_markers(ax, x, totals)
+        ax.plot(x, totals, color="black", lw=1.6, marker="o", ms=4,
+                markeredgewidth=0, zorder=30)
 
-    set_sparse_index_price_ticks(ax, price_vals, max_ticks=8)
+    ax.xaxis.set_major_formatter(ticker.StrMethodFormatter("{x:,.0f}"))
+    apply_compact_ticks(ax, x_nbins=6, y_nbins=5)
     if show_xlabel:
-        ax.tick_params(axis="x", labelrotation=90)
-        for label in ax.get_xticklabels():
-            label.set_ha("center")
-        ax.set_xlabel(get_price_axis_label(varying_key))
+        ax.set_xlabel(r"Budget (Billion AU\$ yr$^{-1}$)")
     else:
         ax.tick_params(axis="x", labelbottom=False)
 
@@ -607,28 +606,61 @@ fig, axes = plt.subplots(4, 2, figsize=(10, 16), sharex="col")
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
 
-total_pivot_cp = build_total_pivot(df_long, "CarbonPrice")
-total_pivot_bp = build_total_pivot(df_long, "BioPrice")
+GHG_MT   = "GHGAbatement_2025_MtCO2e"
+BIO_MHA  = "BiodiversityContribution_2025_MhaYr"
+COBENEFIT_COLOR = "#c0392b"   # crimson — co-benefit line (high contrast vs area fills)
+
+def add_cobenefit_line(ax, pivot, ylabel_right):
+    """Draw total co-benefit sum as a dashed crimson line on a twinx axis."""
+    if pivot.empty:
+        return
+    ax2 = ax.twinx()
+    bud = pivot.index.to_numpy(float)
+    total = pivot.sum(axis=1).to_numpy(float)
+    ax2.plot(bud, total, color=COBENEFIT_COLOR, ls="--", lw=1.6, marker="^",
+             ms=4, markeredgewidth=0, zorder=10)
+    ax2.set_ylabel(ylabel_right, color=COBENEFIT_COLOR, fontsize=FS - 1)
+    ax2.tick_params(axis="y", labelcolor=COBENEFIT_COLOR, labelsize=FS - 1)
+    ax2.spines["right"].set_visible(True)
+    ax2.spines["right"].set_color(COBENEFIT_COLOR)
+
+# Primary metric stacked bars: CarbonPrice→GHG, BioPrice→Bio
+total_pivot_cp = build_total_pivot(df_long, "CarbonPrice", metric_type=GHG_MT)
+total_pivot_bp = build_total_pivot(df_long, "BioPrice",    metric_type=BIO_MHA)
 
 total_cats_left = stacked_bar(axes[0, 0], total_pivot_cp, "Total", "cp", show_xlabel=False, color_map=TOTAL_COLOR_MAP, show_sum_line=True)
 total_cats_right = stacked_bar(axes[0, 1], total_pivot_bp, "Total", "bp", show_xlabel=False, color_map=TOTAL_COLOR_MAP, show_sum_line=True)
 axes[0, 0].set_ylabel("Total")
 
+# Co-benefit lines: CarbonPrice→Bio (secondary), BioPrice→GHG (secondary)
+add_cobenefit_line(axes[0, 0], build_total_pivot(df_long, "CarbonPrice", metric_type=BIO_MHA),
+                   r"Bio co-benefit (Mha yr$^{-1}$)")
+add_cobenefit_line(axes[0, 1], build_total_pivot(df_long, "BioPrice", metric_type=GHG_MT),
+                   r"GHG co-benefit (Mt CO$_2$e yr$^{-1}$)")
+
 total_legend_categories = [category for category in TOTAL_ORDER if category in dict.fromkeys(total_cats_left + total_cats_right)]
 total_handles = build_patch_handles(total_legend_categories, TOTAL_COLOR_MAP)
+cobenefit_handle = Line2D([0], [0], color=COBENEFIT_COLOR, ls="--", lw=1.6,
+                          marker="^", ms=4, label="Co-benefit (other metric)")
 if total_handles:
-    total_handles = [build_total_line_handle()] + total_handles
+    total_handles = [build_total_line_handle(), cobenefit_handle] + total_handles
 row_legends["_total"] = total_handles if total_handles else []
 
 for row_idx, area_type in enumerate(row_area_types):
     ax_left = axes[row_idx + 1, 0]
     ax_right = axes[row_idx + 1, 1]
 
-    pivot_cp = build_pivot(df_long, "CarbonPrice", area_type)
-    pivot_bp = build_pivot(df_long, "BioPrice", area_type)
+    pivot_cp  = build_pivot(df_long, "CarbonPrice", area_type, metric_type=GHG_MT)
+    pivot_bp  = build_pivot(df_long, "BioPrice",    area_type, metric_type=BIO_MHA)
 
-    cats_left = stacked_bar(ax_left, pivot_cp, area_type, "cp", show_xlabel=(row_idx == len(row_area_types) - 1))
+    cats_left  = stacked_bar(ax_left,  pivot_cp, area_type, "cp", show_xlabel=(row_idx == len(row_area_types) - 1))
     cats_right = stacked_bar(ax_right, pivot_bp, area_type, "bp", show_xlabel=(row_idx == len(row_area_types) - 1))
+
+    # Co-benefit lines (secondary y-axis)
+    add_cobenefit_line(ax_left,  build_pivot(df_long, "CarbonPrice", area_type, BIO_MHA),
+                       r"Bio (Mha yr$^{-1}$)")
+    add_cobenefit_line(ax_right, build_pivot(df_long, "BioPrice",    area_type, GHG_MT),
+                       r"GHG (Mt CO$_2$e yr$^{-1}$)")
 
     ax_left.set_ylabel(PANEL_CONFIG[area_type]["ylabel"])
 
@@ -697,7 +729,7 @@ for key, row_idx in all_rows:
         fontsize=LEGEND_FS.get(key, FS - 1),
     )
 
-out_path = OUT_DIR / "14_Contribution_vs_Price.png"
+out_path = OUT_DIR / "07_Contribution_vs_Budget.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")
