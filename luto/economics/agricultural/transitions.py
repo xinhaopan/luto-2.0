@@ -28,6 +28,7 @@ import luto.tools as tools
 import luto.data as Data
 import luto.economics.agricultural.ghg as ag_ghg
 
+from joblib import Parallel, delayed
 from luto import settings
 from typing import Dict
 from luto.data import Data
@@ -81,7 +82,7 @@ def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
 
     return (x_mrj * t_rj * no_go_x_mrj).astype(np.int8)
 
-def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarray, base_lmmap: np.ndarray, separate=False):
+def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarray, base_lmmap: np.ndarray, separate=False, w_mrj=None, t_ij=None):
     """
     Calculate the transition matrices for land-use and land management transitions.
     Args:
@@ -91,6 +92,10 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarra
         base_lmmap (np.ndarray): Land management map of the base year for the transitions.
         separate (bool, optional): Whether to return separate cost matrices for each cost component.
                                    Defaults to False.
+        w_mrj (np.ndarray, optional): Precomputed water requirement matrices, to avoid recomputation
+                                   when this function is called repeatedly for the same yr_idx.
+        t_ij (np.ndarray, optional): Precomputed lexicographical transition-cost matrix, to avoid
+                                   recomputation when this function is called repeatedly for the same yr_idx.
     Returns:
             numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
                                If `separate` is False, returns a numpy array representing the total costs.
@@ -115,7 +120,8 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarra
     # -------------------------------------------------------------- #
 
     # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
-    t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
+    if t_ij is None:
+        t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
 
     # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
     # Only consider for cells currently being used for agriculture.
@@ -136,7 +142,8 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarra
     # Water license cost (upfront, amortised to annual, per cell).   #
     # -------------------------------------------------------------- #
 
-    w_mrj = get_wreq_matrices(data, yr_idx)                                                     # <unit: ML/cell>
+    if w_mrj is None:
+        w_mrj = get_wreq_matrices(data, yr_idx)                                                 # <unit: ML/cell>
     w_delta_mrj = tools.get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
     w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not).astype(np.float32)
 
@@ -192,8 +199,63 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
     """
     lumap = data.lumaps[base_year]
     lmmap = data.lmmaps[base_year]
-    return get_transition_matrices_ag2ag(data, yr_idx, lumap, lmmap, separate)
-    
+    if not settings.BLENDED_AG_TRANSITION_COSTS:
+        return get_transition_matrices_ag2ag(data, yr_idx, lumap, lmmap, separate)
+
+    else:
+        yr_cal = data.YR_CAL_BASE + yr_idx
+        ag_X_mrj = data.ag_dvars[base_year]
+
+        # Hoist invariants that are shared across all (m, j) combos
+        w_mrj = get_wreq_matrices(data, yr_idx)
+        t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
+
+        combos = [(m, j) for m in range(data.NLMS) for j in range(data.N_AG_LUS)]
+
+        def _compute(m, j):
+            all_m_lumap = np.ones(data.NCELLS, dtype=np.int8) * m
+            all_j_lumap = np.ones(data.NCELLS, dtype=np.int8) * j
+
+            current_lus_X_r = ag_X_mrj[m, :, j]
+            # repeat current (m, j) land use array to get weights for ag_t_mrj contributiom
+            lus_weight_mrj = np.swapaxes(np.tile(current_lus_X_r, (2, data.N_AG_LUS, 1)), 1, 2)
+
+            from_current_lus_t_mrj = get_transition_matrices_ag2ag(
+                data, yr_idx, all_j_lumap, all_m_lumap, separate, w_mrj=w_mrj, t_ij=t_ij
+            )
+            if separate:
+                return {key: lus_weight_mrj * array for key, array in from_current_lus_t_mrj.items()}
+            else:
+                return lus_weight_mrj * from_current_lus_t_mrj
+
+        ag_t_mrj: dict | np.ndarray = (
+            {} if separate
+            else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+        )
+
+        # Process (m, j) combos in batches of N_JOBS, summing each batch into the
+        # running total immediately to bound peak memory (at most N_JOBS full
+        # (m, r, j) result arrays live at once instead of all NLMS * N_AG_LUS).
+        n_jobs = settings.BLENDED_AG_TRANSITION_COSTS_N_JOBS
+        for i in range(0, len(combos), n_jobs):
+            batch = combos[i:i + n_jobs]
+            batch_results = Parallel(n_jobs=n_jobs, backend="threading")(
+                delayed(_compute)(m, j) for m, j in batch
+            )
+
+            if separate:
+                for result in batch_results:
+                    for key, array in result.items():
+                        if key not in ag_t_mrj:
+                            ag_t_mrj[key] = array
+                        else:
+                            ag_t_mrj[key] += array
+            else:
+                for result in batch_results:
+                    ag_t_mrj += result
+
+        return ag_t_mrj
+
 
 def get_asparagopsis_effect_t_mrj(data: Data):
     """
