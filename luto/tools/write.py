@@ -131,6 +131,21 @@ MIN_P, MAX_P = 0.005, 0.995
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 
+def get_year_gap(data: Data, yr_cal: int) -> int:
+    """Number of years between yr_cal and the previous simulated year.
+
+    Used to annualise period-aggregate metrics (Production, Economics, GHG,
+    Water, Transition area) so report outputs are independent of the
+    simulation year-gap. The base year has no previous year and is treated
+    as a single annual snapshot (gap = 1).
+    """
+    simulated_year_list = sorted(data.lumaps.keys())
+    yr_idx_sim = simulated_year_list.index(yr_cal)
+    if yr_idx_sim == 0:
+        return 1
+    return yr_cal - simulated_year_list[yr_idx_sim - 1]
+
+
 def add_all(da, dims):
     """Prepend an ALL-aggregate slice along dim."""
     for dim in dims:
@@ -543,6 +558,8 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
 # ── DVAR ─────────────────────────────────────────────────────────────────────
 
 def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
+    """No annualisation needed: decision variables are a point-in-time snapshot (stock),
+    not a flow accumulated over the period since the previous simulated year."""
 
     ag_map = chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]))
     non_ag_map = chunk_unify_size(tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]))
@@ -644,6 +661,8 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
     return f"Mosaic maps written for year {yr_cal}"
 
 def write_dvar_area(data: Data, yr_cal, path):
+    """No annualisation needed: land-use area is a point-in-time snapshot (stock),
+    not a flow accumulated over the period since the previous simulated year."""
 
     ag_dvar_mrj = chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
         ).assign_coords({'region_state': ('cell', data.REGION_STATE_NAME), 'region_NRM': ('cell', data.REGION_NRM_NAME)})
@@ -822,7 +841,11 @@ def write_dvar_area(data: Data, yr_cal, path):
 # ── Quantity ─────────────────────────────────────────────────────────────────
 
 def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
-    """Write commodity production quantities for a specific year.
+    """No annualisation needed: `get_actual_production_lyr()` returns an annual
+    production rate (tonnes/KL per year) for `yr_cal`, independent of the gap
+    to the previous simulated year — dividing by `gap` would double-annualise it.
+
+    Write commodity production quantities for a specific year.
 
     Covers: quantity comparison summary CSV, and per-category spatial NetCDF/CSV outputs.
     'yr_cal' is calendar year. Includes impacts of land-use change, productivity
@@ -998,7 +1021,13 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
 # ── Economics ────────────────────────────────────────────────────────────────
 
 def write_economics(data: Data, yr_cal, path):
+    """Mixed annualisation: revenue/cost matrices (`get_rev_matrices`, `get_cost_matrices`,
+    existing-capacity OPEX/revenue) are already annual rates and are NOT divided by `gap`.
+    Transition-related terms (`ag2ag_mrj` establishment cost, existing-capacity CAPEX delta,
+    `nonag2nonag_mat`, `ag2nonag_mat`) represent a one-off cost incurred over the period since
+    the previous simulated year and ARE divided by `gap` to annualise."""
     yr_idx = yr_cal - data.YR_CAL_BASE
+    gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
 
     if yr_idx == 0:
         yr_cal_sim_pre = None; yr_idx_pre = None
@@ -1029,6 +1058,7 @@ def write_economics(data: Data, yr_cal, path):
         ag2ag_mrj    = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)}
         nonag2ag_mrj = {}
     del nonag2ag_mrj  # intentionally unused in economics — see below
+    ag2ag_mrj = {k: v / gap for k, v in ag2ag_mrj.items()}
 
     # ── profit_ag: sum over source from DataFrames (never builds 4D array) ──
     rev_sum_df  = ag_rev_df.T.groupby(level=['lu', 'lm']).sum().T.astype(np.float32)
@@ -1262,8 +1292,8 @@ def write_economics(data: Data, yr_cal, path):
         # causing apparent OPEX to decrease in years with few new installations.
         solar_exist_opex  = solar_cells_now['opex_r'].values
         wind_exist_opex   = wind_cells_now['opex_r'].values
-        solar_exist_capex = solar_cells_now['capex_r'].values - solar_capex_pre
-        wind_exist_capex  = wind_cells_now['capex_r'].values  - wind_capex_pre
+        solar_exist_capex = (solar_cells_now['capex_r'].values - solar_capex_pre) / gap
+        wind_exist_capex  = (wind_cells_now['capex_r'].values  - wind_capex_pre) / gap
 
         def _make_exist_cost_da(solar_vals, wind_vals):
             return xr.DataArray(
@@ -1360,14 +1390,14 @@ def write_economics(data: Data, yr_cal, path):
 
     non_ag_rev_mat  = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_rev_mrj, data.lumaps[yr_cal]))
     non_ag_cost_mat = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, data.lumaps[yr_cal], yr_cal))
-    nonag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_non_ag_to_non_ag_transition_matrix(data))
+    nonag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_non_ag_to_non_ag_transition_matrix(data)) / gap
 
     if yr_cal_sim_pre is None:
         ag2nonag_mat = xr.DataArray(np.zeros((data.NCELLS, len(data.NON_AGRICULTURAL_LANDUSES)), dtype=np.float32),
             dims=['cell', 'lu'], coords={'cell': range(data.NCELLS), 'lu': data.NON_AGRICULTURAL_LANDUSES})
     else:
         ag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_transition_matrix_ag2nonag(
-            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]).astype(np.float32))
+            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]).astype(np.float32)) / gap
 
     non_ag_profit_mat = non_ag_rev_mat - (non_ag_cost_mat + nonag2nonag_mat + ag2nonag_mat)
     raw_profit_nonag = (non_ag_dvar * non_ag_profit_mat).drop_vars(['region_state', 'region_NRM'], errors='ignore')
@@ -1496,7 +1526,10 @@ def write_economics(data: Data, yr_cal, path):
 # ── Renewable energy ────────────────────────────────────────────────────────────────
 
 def write_renewable_production(data: Data, yr_cal, path):
-    
+    """No annualisation needed: `get_quantity_renewable()` and `get_exist_renewable_capacity()`
+    both return MWh/year (the `x 8760 hours` factor is baked in), independent of the gap
+    to the previous simulated year — dividing by `gap` would double-annualise it."""
+
     yr_idx = yr_cal - data.YR_CAL_BASE
     re_types = list(settings.RENEWABLES_OPTIONS.keys())
 
@@ -1620,17 +1653,20 @@ def write_renewable_production(data: Data, yr_cal, path):
 # ── Transitions ──────────────────────────────────────────────────────────────
 
 def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
-    """Calculate transition cost."""
+    """Annualised by `gap`: transition area/cost/GHG/water matrices represent a one-off
+    change incurred over the period since the previous simulated year, so are divided
+    by `gap` to express as an annual rate."""
 
     # Set up
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
     chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
+    gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
 
     # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
     yr_idx_sim = simulated_year_list.index(yr_cal)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
-    
+
     if yr_cal == data.YR_CAL_BASE:
         base_lumap = base_lmmap = l_mrj = l_mrj_not = x_mrj = None
     else:
@@ -1683,6 +1719,8 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             }
         )
         
+    ag_trans_mat = ag_trans_mat / gap
+
     xr_ag_trans_area = ag_dvar_mrj_base * ag_dvar_mrj_target * ag_trans_mat
 
     xr_ag_trans_area = add_all(xr_ag_trans_area, dims=['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply'])
@@ -1739,6 +1777,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             'To-land-use': data.AGRICULTURAL_LANDUSES
         }
     )
+    ag_transitions_cost_mat = ag_transitions_cost_mat / gap
 
     # Use xr.dot() to contract To-water-supply without broadcasting:
     #   Plain `*` would first expand ag_dvar_mrj_target × ag_transitions_cost_mat into a full
@@ -1809,6 +1848,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             'To-land-use': data.AGRICULTURAL_LANDUSES
         }
     )
+    ghg_t_smrj = ghg_t_smrj / gap
 
     # Calculate GHG emissions for transition penalties (collapse water dims via xr.dot, same rationale as cost)
     xr_ghg_transition = (
@@ -1870,7 +1910,9 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                 'To-land-use': data.AGRICULTURAL_LANDUSES
             }
         )
-        
+
+    w_delta_mrj = w_delta_mrj / gap
+
     # Calculate water requirement changes for transition penalties
     xr_water_transition = (
         ag_dvar_mrj_base
@@ -1927,17 +1969,20 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
 
 def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
-    """Calculate transition cost."""
+    """Annualised by `gap`: transition area/cost/GHG/water matrices represent a one-off
+    change incurred over the period since the previous simulated year, so are divided
+    by `gap` to express as an annual rate."""
 
     # Set up
     chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
+    gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
 
     # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
     yr_idx_sim = simulated_year_list.index(yr_cal)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
-    
+
     if yr_cal == data.YR_CAL_BASE:
         base_lumap = l_rk = l_rk_not = x_rk = None
     else:
@@ -1975,7 +2020,9 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                 'To-land-use': data.NON_AGRICULTURAL_LANDUSES
             }
         )
-    
+
+    non_ag_transitions_area_mat = non_ag_transitions_area_mat / gap
+
     # Calculate transition area; expand To-water-supply='dry' (area only, not cost/GHG)
     non_ag_transitions_area = ag_dvar_base * non_ag_transitions_area_mat * non_ag_dvar_target.expand_dims({'To-water-supply': ['dry']})
     non_ag_transitions_area = add_all(non_ag_transitions_area, ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use'])
@@ -2036,6 +2083,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             'cell': range(data.NCELLS),
         }
     )
+    non_ag_transitions_flat = non_ag_transitions_flat / gap
 
     # Compute in chunks and aggregate to DataFrame; This is to reduce memory usage
     cost_xr = (
@@ -2095,6 +2143,8 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
         )
 
+    g_rk = g_rk / gap
+
     xr_ghg_transition = (
         ag_dvar_base.sum(dim='From-water-supply')
         * non_ag_dvar_target
@@ -2144,6 +2194,8 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
         )
 
+    w_rk = w_rk / gap
+
     xr_water_transition = (
         ag_dvar_base.sum(dim='From-water-supply')
         * non_ag_dvar_target
@@ -2184,11 +2236,14 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
 
 def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
-    """Calculate transition cost."""
+    """Annualised by `gap`: transition cost matrix represents a one-off change incurred
+    over the period since the previous simulated year, so is divided by `gap` to
+    express as an annual rate."""
 
     # Set up
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
+    gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
 
     # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
     yr_idx_sim = simulated_year_list.index(yr_cal)
@@ -2267,7 +2322,9 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             'To-land-use': data.AGRICULTURAL_LANDUSES
         }
     ).unstack('lu_source').chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-    
+
+    non_ag_transitions_flat = non_ag_transitions_flat / gap
+
     # Compute transition cost
     cost_xr = xr.dot(ag_dvar, nonag_dvar, dim=['To-water-supply']) * non_ag_transitions_flat 
     
@@ -2320,6 +2377,8 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
 
 def write_area_transition_start_end(data: Data, path, yr_cal_end):
+    """No annualisation: this is a cumulative area transition over the whole simulation
+    horizon (YR_CAL_BASE to `yr_cal_end`), not a per-period flow, so `gap` does not apply."""
 
     yr_cal_start = data.YR_CAL_BASE
     real_area_r = xr.DataArray(data.REAL_AREA.astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
@@ -2506,7 +2565,10 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
 
 def write_crosstab(data: Data, yr_cal, path):
-    """Write out land-use and production data"""
+    """No annualisation needed: this is a land-use crosstab between two point-in-time
+    lumap snapshots (stock-to-stock), not a flow accumulated over `gap` years.
+
+    Write out land-use and production data"""
 
     if yr_cal == data.YR_CAL_BASE:
         return "Skip land-use transition calculation for the base year."
@@ -2565,13 +2627,21 @@ def write_crosstab(data: Data, yr_cal, path):
 # ── GHG ──────────────────────────────────────────────────────────────────────
 
 def write_ghg(data: Data, yr_cal: int, path: str):
-    """Write all GHG emissions outputs to NetCDF and CSV files.
+    """Mixed annualisation: ag/non-ag/ag-man GHG matrices (`ag_g_rsmj`, `non_ag_g_rk`,
+    `ag_man_g_mrj` from `get_ghg_matrices`/`get_agricultural_management_ghg_matrices`)
+    are already annual emission rates and are NOT divided by `gap`. 
+    
+    The transition penalty matrix (`ghg_t_smrj`) represents a one-off emission incurred 
+    over the period since the previous simulated year and IS divided by `gap`.
+
+    Write all GHG emissions outputs to NetCDF and CSV files.
 
     Covers: total/limit summary, off-land commodity, agricultural land-use,
     non-agricultural land-use, agricultural management, land-use transition
     penalties, and cross-category sum.
     """
     yr_idx = yr_cal - data.YR_CAL_BASE
+    gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
 
     # ==================== Total / Limit Summary ====================
 
@@ -2698,6 +2768,7 @@ def write_ghg(data: Data, yr_cal: int, path: str):
                 'lu': data.AGRICULTURAL_LANDUSES
             }
         )
+        ghg_t_smrj = ghg_t_smrj / gap
 
         xr_ghg_transition = ghg_t_smrj * ag_dvar_mrj
         xr_ghg_transition = add_all(xr_ghg_transition, ['lm', 'Type'])
@@ -2770,7 +2841,11 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 # ── Water ────────────────────────────────────────────────────────────────────
 
 def write_water(data: Data, yr_cal, path):
-    """ Water yield is written to disk no matter if `WATER_LIMITS` is on or off. """
+    """No annualisation needed: `get_water_net_yield_matrices()` and the non-ag/ag-man
+    water matrices are already annual yield rates (ML/year) for `yr_cal`, independent
+    of the gap to the previous simulated year — dividing by `gap` would double-annualise.
+
+    Water yield is written to disk no matter if `WATER_LIMITS` is on or off. """
 
     yr_idx = yr_cal - data.YR_CAL_BASE
     region2code = {v: k for k, v in data.WATER_REGION_NAMES.items()}
@@ -3041,7 +3116,10 @@ def write_water(data: Data, yr_cal, path):
 # ── Biodiversity ─────────────────────────────────────────────────────────────
 
 def write_biodiversity_quality_scores(data: Data, yr_cal, path):
-    ''' Biodiversity overall quality scores — computed for every BIO_QUALITY_LAYER backend. '''
+    ''' No annualisation needed: biodiversity quality scores are a point-in-time
+    snapshot (stock) derived from the `yr_cal` lumap, not a flow over `gap` years.
+
+    Biodiversity overall quality scores — computed for every BIO_QUALITY_LAYER backend. '''
 
     # Invariant setup
     yr_idx_previous = sorted(data.lumaps.keys()).index(yr_cal) - 1
@@ -3278,7 +3356,10 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
 
 
 def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
-    ''' Biodiversity GBF2 only being written to disk when `GBF2_TARGET` is not 'off' '''
+    ''' No annualisation needed: GBF2 scores are a point-in-time snapshot (stock)
+    derived from the `yr_cal` lumap, not a flow over `gap` years.
+
+    Biodiversity GBF2 only being written to disk when `GBF2_TARGET` is not 'off' '''
 
     # Do nothing if biodiversity limits are off and no need to report
     if settings.GBF2_TARGET == 'off':
@@ -3541,7 +3622,10 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
 
 def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
-    ''' Biodiversity GBF3 (NVIS) scores are always written regardless of GBF3_NVIS_TARGET. '''
+    ''' No annualisation needed: GBF3 NVIS scores are a point-in-time snapshot (stock)
+    derived from the `yr_cal` lumap, not a flow over `gap` years.
+
+    Biodiversity GBF3 (NVIS) scores are always written regardless of GBF3_NVIS_TARGET. '''
 
     # All region-group pairs — used for baseline ALL_HA table.
     nvis_all_targets_df = (
@@ -3938,7 +4022,10 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
 
 
 def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
-    ''' Biodiversity GBF4 SNES only being written to disk when `GBF4_TARGET_SNES` is not 'off' '''
+    ''' No annualisation needed: GBF4 SNES scores are a point-in-time snapshot (stock)
+    derived from the `yr_cal` lumap, not a flow over `gap` years.
+
+    Biodiversity GBF4 SNES only being written to disk when `GBF4_TARGET_SNES` is not 'off' '''
     
     if settings.WRITE_SNES == 'off':
         return f"Skipping Biodiversity GBF4 SNES scores for year {yr_cal} as `WRITE_SNES` is set to 'off'"
@@ -4393,7 +4480,10 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
 
 
 def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
-    ''' Biodiversity GBF4 ECNES only being written to disk regardless of `GBF4_TARGET_SNES` setting'''
+    ''' No annualisation needed: GBF4 ECNES scores are a point-in-time snapshot (stock)
+    derived from the `yr_cal` lumap, not a flow over `gap` years.
+
+    Biodiversity GBF4 ECNES only being written to disk regardless of `GBF4_TARGET_SNES` setting'''
 
     # 1. Load all community target df and get species list.
     ecnes_all_targets_df = data.get_ECNES_targets_df(include_all=True)
@@ -4743,7 +4833,10 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
 
 
 def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
-    ''' Biodiversity GBF8 groups only being written to disk when `GBF8_TARGET` is 'on' '''
+    ''' No annualisation needed: GBF8 group scores are a point-in-time snapshot (stock)
+    derived from the `yr_cal` lumap, not a flow over `gap` years.
+
+    Biodiversity GBF8 groups only being written to disk when `GBF8_TARGET` is 'on' '''
     
     # Do nothing if biodiversity limits are off and no need to report
     if not settings.GBF8_TARGET == 'on':
@@ -4928,7 +5021,10 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
 
 
 def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
-    ''' Biodiversity GBF8 species only being written to disk when `GBF8_TARGET` is 'on' and selected species are provided '''
+    ''' No annualisation needed: GBF8 species scores are a point-in-time snapshot (stock)
+    derived from the `yr_cal` lumap, not a flow over `gap` years.
+
+    Biodiversity GBF8 species only being written to disk when `GBF8_TARGET` is 'on' and selected species are provided '''
 
     if settings.GBF8_TARGET != 'on':
         return "Skipped: Biodiversity GBF8 species scores not written as `GBF8_TARGET` is set to 'off'"

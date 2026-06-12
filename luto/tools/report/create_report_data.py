@@ -71,15 +71,56 @@ def format_with_suffix(x):
     return f"{formatted} {suffixes[magnitude]}"
 
 
+def annualise_points(years, values, sim_years=None) -> list:
+    """Linearly interpolate `values` to every integer year between min and max of `sim_years`.
+
+    `sim_years` is the full set of years actually simulated (e.g. [2020, 2025, ..., 2050]).
+    `years`/`values` may be missing some `sim_years` (e.g. a land-use with zero area in 2020
+    is dropped from that year's CSV) -- those years are treated as a real value of 0 before
+    interpolating, so the series ramps from 0 rather than appearing abruptly. If `sim_years`
+    is not given, it defaults to the unique values of `years`.
+
+    Returns a list of {x, y[, opacity]} points (Highcharts series.data format). Years not
+    present in `sim_years` are flagged with `opacity: 0.5` so the report can render
+    interpolated (5-year-gap-filled) points at reduced opacity without affecting the
+    underlying 'x' (year) values.
+    """
+    years = np.asarray(years)
+    values = np.asarray(values, dtype=float)
+
+    if sim_years is None:
+        sim_years = np.unique(years)
+    else:
+        sim_years = np.asarray(sim_years)
+
+    sim_values = pd.Series(values, index=years).groupby(level=0).sum().reindex(sim_years, fill_value=0.0).to_numpy()
+
+    full_years = np.arange(sim_years.min(), sim_years.max() + 1)
+    full_values = np.interp(full_years, sim_years, sim_values)
+    is_interp = ~np.isin(full_years, sim_years)
+
+    return [
+        {'x': int(yr), 'y': val} if not interp else {'x': int(yr), 'y': val, 'opacity': 0.5}
+        for yr, val, interp in zip(full_years.tolist(), full_values.tolist(), is_interp.tolist())
+    ]
+
+
 def groupby_to_records(df: pd.DataFrame, group_cols, out_cols, value_cols=('Year', 'Value (%)')):
-    """Group `df` by `group_cols`, collect `value_cols` rows as lists into a `data` column.
+    """Group `df` by `group_cols`, collect `value_cols` rows into a `data` column of
+    annualised {x, y[, opacity]} points (see `annualise_points`).
+
     Returns a DataFrame with columns = `out_cols` (the last entry conventionally 'data').
     Robust to empty `df`: pandas 2.x returns a 2D DataFrame from `.apply` on empty
     groupby with a column subset, which breaks the usual `df_wide.columns = [...]` rename.
     """
     if df.empty:
         return pd.DataFrame(columns=list(out_cols))
-    s = df.groupby(list(group_cols))[list(value_cols)].apply(lambda x: x.values.tolist())
+
+    year_col, val_col = value_cols
+    sim_years = np.sort(df[year_col].unique())
+    s = df.groupby(list(group_cols))[list(value_cols)].apply(
+        lambda x: annualise_points(x[year_col], x[val_col], sim_years)
+    )
     wide = s.reset_index()
     wide.columns = list(out_cols)
     return wide
@@ -2438,8 +2479,9 @@ def process_water_data(files, SAVE_DIR):
         .assign(**{'Water Supply': 'ALL'})
     water_ag = pd.concat([water_ag, water_ag_all_water], ignore_index=True)
 
+    water_ag_sim_years = np.sort(water_ag['Year'].unique())
     df_region_wide = water_ag.groupby(['region_level', 'region', 'Water Supply', 'Landuse'])[['Year','Value (ML)']]\
-        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
+        .apply(lambda x: annualise_points(x['Year'], x['Value (ML)'], water_ag_sim_years))\
         .reset_index()
   
     df_region_wide.columns = ['region_level', 'region', 'water', 'name',  'data']
@@ -2493,8 +2535,9 @@ def process_water_data(files, SAVE_DIR):
         .assign(**{'Water Supply': 'ALL'})
     water_am = pd.concat([water_am, water_am_all_water], ignore_index=True)
 
+    water_am_sim_years = np.sort(water_am['Year'].unique())
     df_region_wide = water_am.groupby(['region_level', 'region', 'Water Supply', 'Landuse', 'Agricultural Management'])[['Year','Value (ML)']]\
-        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
+        .apply(lambda x: annualise_points(x['Year'], x['Value (ML)'], water_am_sim_years))\
         .reset_index()
     df_region_wide.columns = ['region_level', 'region', 'water', 'landuse', 'name',  'data']
     df_region_wide['type'] = 'column'
@@ -2538,8 +2581,9 @@ def process_water_data(files, SAVE_DIR):
 
     water_nonag = pd.concat([water_nonag_AUS, water_nonag_NRM], ignore_index=True)
 
+    water_nonag_sim_years = np.sort(water_nonag['Year'].unique())
     df_region_wide = water_nonag.groupby(['region_level', 'region', 'Landuse'])[['Year','Value (ML)']]\
-        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
+        .apply(lambda x: annualise_points(x['Year'], x['Value (ML)'], water_nonag_sim_years))\
         .reset_index()
     df_region_wide.columns = ['region_level', 'region', 'name', 'data']
     df_region_wide['type'] = 'column'

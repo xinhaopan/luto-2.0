@@ -5,6 +5,94 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260612 — "Annualise write" double-division bug: annual-rate metrics were divided by `gap` a second time
+
+### TL;DR
+
+`luto/tools/write.py` introduced `get_year_gap(data, yr_cal)` to annualise
+**period-aggregate** outputs (one-off transition costs/changes incurred since the previous
+simulated year) by dividing by `gap`. But the same `/gap` division was incorrectly also
+applied to several metrics that are **already annual rates** (revenue, cost, quantity,
+water net yield, renewable MWh, and most GHG matrices) — double-annualising them. For
+multi-year-gap runs (e.g. RESFACTOR=5, `SIM_YEARS = range(2020, 2051, 5)`, gap=5), this
+under-reported these metrics by roughly an extra factor of `gap` (~80% low for gap=5,
+matching `(gap-1)/gap`).
+
+Found via a 5-year-gap vs 1-year-gap run comparison
+(`jinzhu_inspect_code/Check_annualise_write/compare_annualise.py`). Fixed by removing the
+incorrect `/gap` from annual-rate quantities while preserving it on genuine
+period-transition matrices, and re-validated by re-running `write_data` for the 5-year-gap
+run (the systematic ≈-80% errors on Revenue/Cost/Quantity/Water Net Yield dropped to
+single-digit %).
+
+---
+
+### Which metrics ARE divided by `gap` (period-aggregate, one-off transition values)
+
+| Function | Variable(s) | What it represents |
+|---|---|---|
+| `write_economics` | `ag2ag_mrj` | Ag→Ag establishment cost incurred over the period since the previous simulated year |
+| `write_economics` | existing-capacity solar/wind **CAPEX delta** | One-off installation capital cost incurred over the period |
+| `write_economics` | `nonag2nonag_mat` | Non-ag→Non-ag transition cost over the period |
+| `write_economics` | `ag2nonag_mat` | Ag→Non-ag transition cost over the period |
+| `write_ghg` | `ghg_t_smrj` | GHG transition penalty incurred over the period |
+| `write_transition_ag2ag` | `ag_trans_mat`, `ag_transitions_cost_mat`, `ghg_t_smrj`, `w_delta_mrj` | Area/cost/GHG/water deltas from ag-to-ag transitions over the period |
+| `write_transition_ag2nonag` | `non_ag_transitions_area_mat`, `non_ag_transitions_flat`, `g_rk`, `w_rk` | Area/cost/GHG/water deltas from ag-to-non-ag transitions over the period |
+| `write_transition_nonag2ag` | (mirror of ag2nonag) | Area/cost/GHG/water deltas from non-ag-to-ag transitions over the period |
+
+### Which metrics are NOT divided by `gap` (already annual rates, or point-in-time stocks)
+
+| Function | Variable(s) | Why no `/gap` |
+|---|---|---|
+| `write_quantity` | `ag_q_mrc`, `non_ag_p_rc`, `am_p_amrc` | `get_actual_production_lyr()` returns tonnes/KL **per year** for `yr_cal` |
+| `write_economics` | `ag_rev_df`/`ag_cost_df` and `_mrj` variants (`get_rev_matrices`, `get_cost_matrices`) | Already annual revenue/cost rates ($/yr) |
+| `write_economics` | existing-capacity solar/wind **OPEX** and **revenue** | Annual operating cost / revenue rates, not one-off |
+| `write_renewable_production` | `renewable_energy` (`get_quantity_renewable`, `get_exist_renewable_capacity`) | Already MWh/year (`×8760` baked in) |
+| `write_ghg` | `ag_g_rsmj`, `non_ag_g_rk`, `ag_man_g_mrj` (`get_ghg_matrices`, `get_agricultural_management_ghg_matrices`) | Already annual emission rates (t CO2e/yr) |
+| `write_water` | `ag_w_mrj`, `non_ag_w_rk`, `ag_man_w_mrj` (`get_water_net_yield_matrices` + non-ag/ag-man) | Already annual yield rates (ML/yr) |
+| `write_dvar_and_mosaic_map`, `write_dvar_area`, `write_area_transition_start_end`, `write_crosstab` | dvars / areas | Point-in-time stocks/snapshots, not flows |
+| `write_biodiversity_quality_scores`, `write_biodiversity_GBF2_scores`, `write_biodiversity_GBF3_NVIS_scores`, `write_biodiversity_GBF4_SNES_scores`, `write_biodiversity_GBF4_ECNES_scores`, `write_biodiversity_GBF8_scores_groups`, `write_biodiversity_GBF8_scores_species` | biodiversity scores | Point-in-time stocks/snapshots, not flows |
+
+---
+
+### Reasons for the remaining (large) mismatches after the fix
+
+**2020 anomaly (expected, not a regression):** at 2020 the fixed Run01 now reports the
+*undivided* annual rate, while Run02 (not re-run) still reports the *old* value divided by
+`gap=10`. This produces an apparent **+900%** diff for Revenue/Cost/Water/Quantity at 2020
+— exactly `(gap-1) × 100% = 900%`, i.e. `Run01 / Run02 = 10`. This is an artefact of only
+Run01 being re-run with the fix and is **not** a new bug; it would disappear if Run02 were
+also re-run with the patched `write.py`. GHG and Area at 2020 are unaffected (0%) because
+neither was changed by the fix at `gap=10` in a way that breaks the prior cancellation.
+
+**GHG remains noisy post-fix — but for a reason unrelated to `write.py` entirely.**
+`GHG_EMISSIONS_TCO2e` in `GHG_emissions_{yr}.csv` is **not** computed in `write_ghg()` —
+it is read directly from `data.prod_data[yr_cal]['GHG']` (write.py:2650), which is
+populated by the **solver** at solve time (`solver.py:1387`,
+`self.ghg_expr.getValue() * scale_factors['GHG']`). This value never passes through any
+`/gap` division in `write.py`, in either the old or fixed code — so the annualise-write
+fix has **zero effect** on this number, before or after.
+
+The large relative diffs are a genuine **optimisation-trajectory divergence** between the
+5-year-step and 1-year-step runs, amplified by a **near-zero-crossing**:
+
+- Total GHG = ongoing ag/non-ag emissions (positive) minus carbon sequestration from
+  environmental/riparian plantings (negative, ramping up over decades per the
+  age-based S-curve, `CARBON_EFFECTS_WINDOW`).
+- Both runs cross from net-positive to net-negative (carbon sink) around 2035-2040, but
+  at different rates — e.g. 2040: Run01 = -37.0M vs Run02 = -17.6M t CO2e. The absolute
+  gap (~19M t) is modest relative to gross emissions (~50-70M t), but huge relative to a
+  small net value near zero.
+- *When* plantings are established differs because the optimizer makes different
+  sequencing decisions at coarse (5-yr) vs fine (1-yr) time resolution, and sequestration
+  realised in any given year depends on planting age — i.e. on history, which diverges
+  between the two runs.
+
+This is **not** evidence of a remaining `/gap` bug — the metric was never touched by
+`write.py`'s annualisation logic in the first place.
+
+---
+
 ## 20260610 — GBF4 SNES NUMERIC root cause: small-signal instability from sparse habitat (*Pomaderris subplicata*, North East)
 
 ### TL;DR
