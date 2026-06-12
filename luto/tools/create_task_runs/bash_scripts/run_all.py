@@ -19,9 +19,11 @@ Common arguments:
     --dry-run        Classify runs and print what would happen; launch/submit nothing.
     --runs   <...>   Specific run names (default: all Run_G*).
 
+--input_dir <p>  Override INPUT_DIR in every target run's luto/settings.py before
+                 launching (NT) / submitting (PBS).
+
 NT (Windows) only:
     --max    <n>     Max concurrent runs (default: 2).
-    --input_dir <p>  Override INPUT_DIR in every run's luto/settings.py.
 
 PBS (Linux) only — apply to checkpoint (resume) submissions:
     --mem   <val>    Override PBS memory    (default: inherit from task_param.py).
@@ -35,7 +37,7 @@ Usage:
     python run_all.py --max 1                              # NT: sequential
     python run_all.py Run_G0001 Run_G0003                  # specific runs only
     python run_all.py --dry-run                            # preview only
-    python run_all.py --input_dir /path/to/input           # NT only: override INPUT_DIR
+    python run_all.py --input_dir /path/to/input           # override INPUT_DIR in every target run before launching/submitting
     python run_all.py --time 24:00:00 --mem 380gb          # PBS: override resources for checkpoint resumes
 """
 
@@ -143,6 +145,15 @@ def print_classification(runs: dict[str, list[Path]]) -> None:
             lz4s = get_checkpoint_lz4(d)
             yr   = int(lz4s[-1].stem.split("_")[1]) if lz4s else "?"
             print(f"  {d.name}: resume from year {yr}  ({lz4s[-1].name if lz4s else '—'})")
+
+
+def patch_input_dir(run_dir: Path, input_dir: str) -> None:
+    """Override INPUT_DIR in run_dir/luto/settings.py."""
+    settings_path = run_dir / "luto" / "settings.py"
+    new_dir = Path(input_dir).as_posix()
+    text = settings_path.read_text(encoding="utf-8")
+    text = re.sub(r'^INPUT_DIR\s*=.*$', f'INPUT_DIR="{new_dir}"', text, flags=re.MULTILINE)
+    settings_path.write_text(text, encoding="utf-8")
 
 
 def filter_multi_output(dirs: list[Path], dry_run: bool) -> list[Path]:
@@ -365,6 +376,14 @@ def main_pbs(args: argparse.Namespace, root: Path) -> None:
         print("\nNothing to submit.")
         return
 
+    if args.input_dir:
+        for run_dir in fresh + checkpoint:
+            if args.dry_run:
+                print(f"  [dry-run] {run_dir.name}: would set INPUT_DIR={args.input_dir}")
+            else:
+                patch_input_dir(run_dir, args.input_dir)
+                print(f"  {run_dir.name}: INPUT_DIR -> {args.input_dir}")
+
     if fresh:
         print(f"\nSubmitting {len(fresh)} fresh run(s) …\n")
         for run_dir in fresh:
@@ -387,9 +406,9 @@ def main():
     # Common
     parser.add_argument("runs", nargs="*", help="Specific run dirs (default: all Run_G*)")
     parser.add_argument("--dry-run", action="store_true", help="Preview only — launch/submit nothing")
+    parser.add_argument("--input_dir", default=None,        help="Override INPUT_DIR in every target run's luto/settings.py before launching/submitting")
     # NT only
     parser.add_argument("--max",       type=int, default=2, help="[NT] Max concurrent runs (default: 2)")
-    parser.add_argument("--input_dir", default=None,        help="[NT] Override INPUT_DIR in every run's settings.py")
     # PBS only (checkpoint resumes)
     parser.add_argument("--mem",   default=None, help="[PBS] Override PBS memory for checkpoint resumes")
     parser.add_argument("--ncpus", default=None, help="[PBS] Override PBS CPU count for checkpoint resumes")
