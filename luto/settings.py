@@ -1173,6 +1173,16 @@ GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES = [
     # Goulburn Broken — INFEASIBLE in 2045→2050 per-community test (2026-06-11).
     # tightness=1.27, n_cells=118, coeff_ratio=150: available habitat cannot meet 2050 target.
     ('Goulburn Broken', 'Buloke Woodlands of the Riverina and Murray-Darling Depression Bioregions'),
+
+    # --- 2040→2045 exclusions (Check_NECMA_G0001_2040_2045 per-community test, 2026-06-12) ---
+    # TIME_LIMIT / INFEASIBLE in isolation for the 2040→2045 transition (Run_G0001).
+    ('Goulburn Broken', 'Grey Box (Eucalyptus microcarpa) Grassy Woodlands and Derived Native Grasslands of South-eastern Australia'),  # TIME_LIMIT, tightness=1.60, n_cells=434
+    ('North East',      'Grey Box (Eucalyptus microcarpa) Grassy Woodlands and Derived Native Grasslands of South-eastern Australia'),  # INFEASIBLE, tightness=1.55, n_cells=116
+
+    # --- 2045→2050 exclusions (Check_NECMA_G0001_2045_2050 per-community test, 2026-06-13) ---
+    # INFEASIBLE in isolation for the 2045→2050 transition (Run_G0001).
+    ('Goulburn Broken', 'Natural Grasslands of the Murray Valley Plains'),                                    # INFEASIBLE, tightness=1.50, n_cells=10
+    ('Goulburn Broken', 'Seasonal Herbaceous Wetlands (Freshwater) of the Temperate Lowland Plains'),         # INFEASIBLE, tightness=1.42, n_cells=141
 ]
 GBF4_SNES_EXCLUDE_REGION_SPECIES = [
     # Burramys parvus has zero LUTO habitat in Goulburn Broken and the outside-LUTO
@@ -1219,6 +1229,51 @@ GBF4_SNES_EXCLUDE_REGION_SPECIES = [
     ('Goulburn Broken', 'Delma impar'),                     # tightness=1.36, n_cells=256
     ('Goulburn Broken', 'Dianella amoena'),                 # tightness=1.34, n_cells=126
     ('Goulburn Broken', 'Litoria raniformis'),              # tightness=1.33, n_cells=196
+
+    # --- 2040→2045 exclusions (Check_NECMA_G0001_2040_2045 per-species test, 2026-06-12) ---
+    # INFEASIBLE: structurally infeasible even in isolation — available area cannot meet 2045 target.
+    ('Goulburn Broken', 'Senecio behrianus'),                       # INFEASIBLE, tightness=1.74, n_cells=3
+    ('Goulburn Broken', 'Eucalyptus alligatrix subsp. limaensis'),  # INFEASIBLE, tightness=1.65, n_cells=16
+    ('North East',      'Lathamus discolor'),                       # INFEASIBLE, tightness=1.58, n_cells=218
+    ('Goulburn Broken', 'Caladenia concolor'),                      # INFEASIBLE, tightness=1.56, n_cells=91
+    ('Goulburn Broken', 'Pimelea spinescens subsp. spinescens'),    # INFEASIBLE, tightness=1.53, n_cells=135
+
+    # TIME_LIMIT: individually borderline-feasible but cause full-model infeasibility when combined.
+    ('North East',      'Anthochaera phrygia'),             # TIME_LIMIT, tightness=2.26, n_cells=436
+    ('North East',      'Maccullochella peelii'),           # TIME_LIMIT, tightness=1.70, n_cells=174
+    ('Goulburn Broken', 'Grantiella picta'),                # TIME_LIMIT, tightness=1.59, n_cells=803
+    ('Goulburn Broken', 'Maccullochella peelii'),           # TIME_LIMIT, tightness=1.57, n_cells=262
+    ('Goulburn Broken', 'Rostratula australis'),            # TIME_LIMIT, tightness=1.57, n_cells=772
+    ('North East',      'Crinia sloanei'),                  # TIME_LIMIT, tightness=1.55, n_cells=143
+
+    # --- 2045→2050 exclusions (Check_NECMA_G0001_2045_2050 per-species test, 2026-06-13) ---
+    # INFEASIBLE: structurally infeasible even in isolation — available area cannot meet 2050 target.
+    ('Goulburn Broken', 'Calochilus richiae'),                              # INFEASIBLE, tightness=1.95, n_cells=14
+    ('North East',      'Maccullochella macquariensis'),                   # INFEASIBLE, tightness=1.75, n_cells=111
+    ('North East',      'Eucalyptus cadens'),                              # INFEASIBLE, tightness=1.61, n_cells=54
+    ('Goulburn Broken', 'Lepidium monoplocoides'),                          # INFEASIBLE, tightness=1.50, n_cells=136
+    ('Goulburn Broken', 'Anthochaera phrygia'),                             # INFEASIBLE, tightness=1.48, n_cells=632
+    ('Goulburn Broken', 'Macquaria australasica'),                          # INFEASIBLE, tightness=1.46, n_cells=60
+    ('North East',      'Rostratula australis'),                            # INFEASIBLE, tightness=1.45, n_cells=217
+    ('North East',      'Synemon plana'),                                   # INFEASIBLE, tightness=1.44, n_cells=6
+    ('Goulburn Broken', 'Falco hypoleucos'),                                 # INFEASIBLE, tightness=1.44, n_cells=711
+    ('Goulburn Broken', 'Swainsona murrayana'),                             # INFEASIBLE, tightness=1.44, n_cells=207
+    ('Goulburn Broken', 'Crinia sloanei'),                                   # INFEASIBLE, tightness=1.44, n_cells=156
+    ('Goulburn Broken', 'Bidyanus bidyanus'),                                # INFEASIBLE, tightness=1.43, n_cells=130
+    ('Goulburn Broken', 'Nannoperca australis Murray-Darling Basin lineage'),# INFEASIBLE, tightness=1.43, n_cells=108
+    ('Goulburn Broken', 'Polytelis swainsonii'),                             # INFEASIBLE, tightness=1.42, n_cells=378
+    ('Goulburn Broken', 'Hibbertia humifusa subsp. erigens'),                # INFEASIBLE, tightness=1.41, n_cells=77
+    ('Goulburn Broken', 'Synemon plana'),                                    # INFEASIBLE, tightness=1.41, n_cells=209
+
+    # TIME_LIMIT: individually borderline-feasible but cause full-model infeasibility when combined.
+    ('Goulburn Broken', 'Galaxias rostratus'),               # TIME_LIMIT, tightness=1.54, n_cells=451
+    ('Goulburn Broken', 'Brachyscome muelleroides'),         # TIME_LIMIT, tightness=1.52, n_cells=61
+    ('Goulburn Broken', 'Glycine latrobeana'),               # TIME_LIMIT, tightness=1.45, n_cells=400
+    ('Goulburn Broken', 'Myriophyllum porcatum'),            # TIME_LIMIT, tightness=1.43, n_cells=471
+    ('Goulburn Broken', 'Sclerolaena napiformis'),           # TIME_LIMIT, tightness=1.42, n_cells=176
+    ('Goulburn Broken', 'Lathamus discolor'),                # TIME_LIMIT, tightness=1.41, n_cells=655
+    ('Goulburn Broken', 'Pteropus poliocephalus'),           # TIME_LIMIT, tightness=1.41, n_cells=275
+    ('Goulburn Broken', 'Botaurus poiciloptilus'),           # TIME_LIMIT, tightness=1.41, n_cells=411
 ]
 
 
