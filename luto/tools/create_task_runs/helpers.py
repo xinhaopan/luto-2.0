@@ -17,13 +17,14 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os, re, json
+import os, re, json, time
 import shutil, itertools, subprocess, zipfile
 import pandas as pd
 import matplotlib.pyplot as plt
 
 from tqdm.auto import tqdm
 from typing import Literal
+from pathlib import Path
 from joblib import delayed, Parallel
 from matplotlib import patches
 
@@ -98,12 +99,13 @@ def update_settings(settings_dict:dict, job_name:str):
     '''
     settings_dict['JOB_NAME'] = job_name
     # Resolve INPUT_DIR and RAW_DATA relative to LUTO_ROOT (not cwd) so that
-    # create_task_runs can be called from any working directory.
+    # create_task_runs can be called from any working directory. Stored as
+    # POSIX paths (forward slashes) so settings.py is portable to Linux.
     for key in ('INPUT_DIR', 'RAW_DATA'):
-        p = settings_dict[key]
-        if not os.path.isabs(p):
-            p = os.path.join(LUTO_ROOT, p)
-        settings_dict[key] = os.path.normpath(p).replace('\\', '/')
+        p = Path(settings_dict[key])
+        if not p.is_absolute():
+            p = Path(LUTO_ROOT) / p
+        settings_dict[key] = p.resolve().as_posix()
     settings_dict['THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
@@ -158,20 +160,15 @@ def create_run_folders(task_root_dir:str, col:str, n_workers:int):
     
 def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cluster', max_concurrent_tasks:int=300):
     _bash_scripts = os.path.join(LUTO_ROOT, 'luto/tools/create_task_runs/bash_scripts')
+
+    # Deposit the run scripts; needed regardless of mode or platform (Windows/Linux)
+    shutil.copyfile(os.path.join(_bash_scripts, 'python_script.py'), f'{task_root_dir}/{col}/python_script.py')
+    shutil.copyfile(os.path.join(_bash_scripts, 'cmd.sh'),           f'{task_root_dir}/{col}/cmd.sh')
+
     if mode == 'single':
-        # Deposit the run script; user executes each run manually
-        shutil.copyfile(
-            os.path.join(_bash_scripts, 'python_script.py'),
-            f'{task_root_dir}/{col}/python_script.py',
-        )
+        # User executes each run manually
         return
 
-    # cluster mode — copy PBS helper scripts
-    shutil.copyfile(os.path.join(_bash_scripts, 'task_cmd.sh'),      f'{task_root_dir}/{col}/task_cmd.sh')
-    shutil.copyfile(os.path.join(_bash_scripts, 'redo_cmd.sh'),      f'{task_root_dir}/{col}/redo_cmd.sh')
-    shutil.copyfile(os.path.join(_bash_scripts, 'python_script.py'), f'{task_root_dir}/{col}/python_script.py')
-
-    import time
     # Wait until the number of running jobs is less than max_concurrent_tasks.
     # Cap the total wait at 24 h to avoid silent infinite hangs.
     _wait_deadline = time.time() + 86400
@@ -196,7 +193,7 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cl
          open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
         try:
             subprocess.run(
-                ['bash', 'task_cmd.sh'],
+                ['bash', 'cmd.sh'],
                 cwd=f'{task_root_dir}/{col}',
                 stdout=std_file, stderr=err_file,
                 check=True,
@@ -204,7 +201,7 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cl
             )
         except subprocess.TimeoutExpired:
             raise TimeoutError(
-                f"task_cmd.sh for '{col}' did not finish within {TASK_CMD_TIMEOUT} s. "
+                f"cmd.sh for '{col}' did not finish within {TASK_CMD_TIMEOUT} s. "
                 f"Check {task_root_dir}/{col}/run_err.log for details."
             )
 
@@ -235,14 +232,17 @@ def write_settings(task_dir:str, settings_dict:dict):
         
                 
 def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
-    with open(f'{task_dir}/task_param.py', 'w') as bash_file:
-        for key, value in settings_dict.items():
-            if key not in SERVER_PARAMS:
-                continue
-            if isinstance(value, str):
-                bash_file.write(f'export {key}="{value}"\n')
-            else:
-                bash_file.write(f'export {key}={value}\n')
+    lines = []
+    for key, value in settings_dict.items():
+        if key not in SERVER_PARAMS:
+            continue
+        if isinstance(value, str):
+            lines.append(f'export {key}="{value}"\n')
+        else:
+            lines.append(f'export {key}={value}\n')
+    # newline='\n' avoids Windows CRLF translation — task_param.py is sourced
+    # by bash (cmd.sh) on Linux, where a stray '\r' would corrupt exported values.
+    Path(f'{task_dir}/task_param.py').write_text(''.join(lines), newline='\n')
         
 
 
@@ -267,9 +267,7 @@ def create_task_runs(
         raise ValueError('Mode must be either "single" or "cluster"!')
 
     _bash_scripts = os.path.join(LUTO_ROOT, 'luto/tools/create_task_runs/bash_scripts')
-    shutil.copyfile(os.path.join(_bash_scripts, 'run_all.py'),         os.path.join(task_root_dir, 'run_all.py'))
-    shutil.copyfile(os.path.join(_bash_scripts, 'redo_checkpoint.py'), os.path.join(task_root_dir, 'redo_checkpoint.py'))
-    shutil.copyfile(os.path.join(_bash_scripts, 'redo_cmd.sh'),        os.path.join(task_root_dir, 'redo_cmd.sh'))
+    shutil.copyfile(os.path.join(_bash_scripts, 'run_all.py'), os.path.join(task_root_dir, 'run_all.py'))
 
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)

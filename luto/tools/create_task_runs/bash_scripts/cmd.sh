@@ -1,7 +1,13 @@
 #!/bin/bash
 
-# Read the settings_bash file ==> JOB_NAME, QUEUE, NCPUS, MEM, TIME
+# Read task_param.py ==> JOB_NAME, QUEUE, NCPUS, MEM, TIME
 source task_param.py
+
+# If redo_param.py exists (resubmission of a checkpoint run, possibly with
+# overridden resources/job name), source it to override the values above.
+if [ -f redo_param.py ]; then
+    source redo_param.py
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

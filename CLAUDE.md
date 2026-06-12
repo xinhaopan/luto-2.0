@@ -84,7 +84,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - [create_task_runs.md](docs/CLAUDE_SKILL/create_task_runs.md): Create and submit multi-scenario task runs — write create_tasks.py with lean BASE_GRID (intentional overrides only), RUN_OVERRIDES, generate CSVs, and submit to cluster
 - [patch_existing_renewable_capacity.md](docs/CLAUDE_SKILL/patch_existing_renewable_capacity.md): Inject real-world existing renewable capacity as `lu='Existing Capacity'` into output xarrays before `add_all` — covers write_dvar_and_mosaic_map, write_dvar_area, write_economics, and write_renewable_production
 - [submit_task_runs_windows.md](docs/CLAUDE_SKILL/submit_task_runs_windows.md): Launch LUTO2 task runs locally on Windows via `run_all.py` — concurrency control, log monitoring, result verification, and failure recovery
-- [retry_task_runs.md](docs/CLAUDE_SKILL/retry_task_runs.md): Retry runs with non-optimal solver status (false-INFEASIBLE, NUMERIC) — unzip archives, patch RETRY_PARAMS, resubmit via redo_checkpoint.py; covers when checkpoint-based retry fixes the infeasible year vs when a full re-run is needed
+- [retry_task_runs.md](docs/CLAUDE_SKILL/retry_task_runs.md): Retry runs with non-optimal solver status (false-INFEASIBLE, NUMERIC) — unzip archives, patch RETRY_PARAMS, resubmit via run_all.py; covers when checkpoint-based retry fixes the infeasible year vs when a full re-run is needed
 
 ## Diagnostic Tools (`luto/tests/`)
 

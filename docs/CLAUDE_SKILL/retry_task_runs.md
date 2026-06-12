@@ -3,7 +3,7 @@
 This skill retries a batch of task runs where one or more years returned a non-optimal
 solver status (INFEASIBLE, NUMERIC, SUBOPTIMAL). It unzips the original `Run_Archive.zip`
 into a new task directory, overlays fresh source + patched settings, and resubmits via
-`redo_checkpoint.py`.
+`run_all.py` (which auto-detects checkpoint runs and resumes them).
 
 ---
 
@@ -126,7 +126,7 @@ def main():
     print("Writing updated settings ...\n")
     create_task_runs(str(TASK_DIR), template, mode="cluster", n_workers=4, overwrite=True)
 
-    print(f"\nDone. To submit:\n  cd {TASK_DIR}\n  python redo_checkpoint.py")
+    print(f"\nDone. To submit:\n  cd {TASK_DIR}\n  python run_all.py")
 ```
 
 ---
@@ -148,17 +148,18 @@ done
 
 ---
 
-## Step 5: Submit via `redo_checkpoint.py`
+## Step 5: Submit via `run_all.py`
 
 ```bash
 cd /g/data/jk53/jinzhu/LUTO/Custom_runs/<ITER>_retry
-python redo_checkpoint.py --dry-run   # preview — shows checkpoint year per run
-python redo_checkpoint.py             # submit
+python run_all.py --dry-run   # preview — shows checkpoint year per run
+python run_all.py             # submit
 ```
 
-`redo_checkpoint.py` classifies run dirs and only submits those with a checkpoint lz4
-and no `Run_Archive.zip`. It inherits `MEM`, `NCPUS`, `TIME`, `QUEUE` from each run's
-`task_param.py`; override with `--mem`, `--ncpus`, `--time`, `--queue` if needed.
+`run_all.py` classifies run dirs and resumes those with a checkpoint lz4 and no
+`Run_Archive.zip` (runs that are `finished` are skipped). It inherits `MEM`, `NCPUS`,
+`TIME`, `QUEUE` from each run's `task_param.py`; override with `--mem`, `--ncpus`,
+`--time`, `--queue` if needed.
 
 ---
 
@@ -173,7 +174,7 @@ Loop step 0:  base=2030, target=2035 → solve 2035
   → OPTIMAL:  save data_2035.lz4, delete data_2030.lz4
   → FAIL:     do NOT save → data_2030.lz4 survives, loop breaks
 
-redo_checkpoint loads data_2030.lz4
+run_all.py (resume) loads data_2030.lz4
   → years_to_run = [2030, 2035, 2040, ...]
   → step 0: base=2030, target=2035  ← re-solves the failed year ✓
 ```
@@ -181,7 +182,7 @@ redo_checkpoint loads data_2030.lz4
 Edge case — fails on the very first target year (e.g. 2020 on a fresh run):
 - Pre-loop saves `data_2010.lz4` (base year, before any solve)
 - 2020 fails → `data_2010.lz4` survives
-- `redo_checkpoint` resumes from 2010 → re-solves 2020 ✓
+- `run_all.py` resumes from 2010 → re-solves 2020 ✓
 
 ---
 
@@ -192,4 +193,4 @@ Edge case — fails on the very first target year (e.g. 2020 on a fresh run):
 | "Cannot compute IIS on a feasible model" in IIS `.err` | False infeasibility — model is feasible with default tolerances | Use `RETRY_PARAMS` with dual simplex `(3, 1, 0)` |
 | Retry still shows infeasible year in results | Archive created by old code — contains infeasible year's checkpoint, not prior year | Full re-run from scratch with new `RETRY_PARAMS` |
 | No checkpoint found after unzip | Archive only contains `Data_RES*.lz4` (final state), not `data_YEAR.lz4` | Run was created with very old code; full re-run needed |
-| `redo_checkpoint` classifies run as `finished` | `Run_Archive.zip` present in the unzipped dir | Old archive created a zip-inside-zip; remove `Run_Archive.zip` from `TASK_DIR/Run_G*` |
+| `run_all.py` classifies run as `finished` | `Run_Archive.zip` present in the unzipped dir | Old archive created a zip-inside-zip; remove `Run_Archive.zip` from `TASK_DIR/Run_G*` |
