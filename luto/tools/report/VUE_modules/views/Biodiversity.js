@@ -38,9 +38,9 @@ window.BiodiversityView = {
     };
     const METRIC_TO_SETTING = {
       'quality': null, 'GBF2': 'GBF2_TARGET',
-      'GBF3_NVIS': null,
-      'GBF4_SNES': 'WRITE_SNES',
-      'GBF4_ECNES': null,
+      'GBF3_NVIS': 'WRITE_GBF3_NVIS',
+      'GBF4_SNES': 'WRITE_GBF4_SNES',
+      'GBF4_ECNES': 'WRITE_GBF4_ECNES',
       'GBF8_GROUP': 'GBF8_TARGET',
       'GBF8_SPECIES': 'GBF8_TARGET',
     };

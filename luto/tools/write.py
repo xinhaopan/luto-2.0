@@ -3625,7 +3625,10 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     ''' No annualisation needed: GBF3 NVIS scores are a point-in-time snapshot (stock)
     derived from the `yr_cal` lumap, not a flow over `gap` years.
 
-    Biodiversity GBF3 (NVIS) scores are always written regardless of GBF3_NVIS_TARGET. '''
+    Biodiversity GBF3 (NVIS) scores are written regardless of GBF3_NVIS_TARGET, but only when `WRITE_GBF3_NVIS` is not 'off'. '''
+
+    if settings.WRITE_GBF3_NVIS == 'off':
+        return f"Skipping Biodiversity GBF3 NVIS scores for year {yr_cal} as `WRITE_GBF3_NVIS` is set to 'off'"
 
     # All region-group pairs — used for baseline ALL_HA table.
     nvis_all_targets_df = (
@@ -4027,8 +4030,8 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
 
     Biodiversity GBF4 SNES only being written to disk when `GBF4_TARGET_SNES` is not 'off' '''
     
-    if settings.WRITE_SNES == 'off':
-        return f"Skipping Biodiversity GBF4 SNES scores for year {yr_cal} as `WRITE_SNES` is set to 'off'"
+    if settings.WRITE_GBF4_SNES == 'off':
+        return f"Skipping Biodiversity GBF4 SNES scores for year {yr_cal} as `WRITE_GBF4_SNES` is set to 'off'"
 
     # 1. Load all species target df and get species list.
     snes_all_targets_df = data.get_SNES_targets_df(include_all=True)
@@ -4483,7 +4486,10 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     ''' No annualisation needed: GBF4 ECNES scores are a point-in-time snapshot (stock)
     derived from the `yr_cal` lumap, not a flow over `gap` years.
 
-    Biodiversity GBF4 ECNES only being written to disk regardless of `GBF4_TARGET_SNES` setting'''
+    Biodiversity GBF4 ECNES is written regardless of `GBF4_TARGET_SNES`, but only when `WRITE_GBF4_ECNES` is not 'off'. '''
+
+    if settings.WRITE_GBF4_ECNES == 'off':
+        return f"Skipping Biodiversity GBF4 ECNES scores for year {yr_cal} as `WRITE_GBF4_ECNES` is set to 'off'"
 
     # 1. Load all community target df and get species list.
     ecnes_all_targets_df = data.get_ECNES_targets_df(include_all=True)

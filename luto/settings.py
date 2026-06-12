@@ -273,7 +273,9 @@ WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk 
                                             #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
                                             #   This makes memory usage to be ~1/200 of the original size.
 
-WRITE_SNES = 'off'                          # 'on' or 'off'. If write, will take ~5 hours to finish.
+WRITE_GBF3_NVIS  = 'off'                    # 'on' or 'off'. Controls writing of Biodiversity GBF3 NVIS scores and map layers.
+WRITE_GBF4_SNES  = 'off'                    # 'on' or 'off'. If write, will take ~5 hours to finish.
+WRITE_GBF4_ECNES = 'off'                    # 'on' or 'off'. Controls writing of Biodiversity GBF4 ECNES scores and map layers.
 
 
 # ---------------------------------------------------------------------------- #
@@ -308,7 +310,6 @@ Range from 1e-2 (fast, loose) to 1e-8 (slow, tight; Gurobi default).
  - 20260606: relaxed from 1e-5 to 1e-3 — more constraint targets cause dual blow-up that
    prevents the barrier from closing the gap to 1e-5; crossover polishes the result.
 '''
-
 
 SCALE_FLAG = 0                      
 ''' 
