@@ -142,6 +142,106 @@ done
 
 ---
 
+## Iterative multi-year workflow
+
+When validating a full simulation across multiple year transitions (e.g.
+2010→2050 in 5-year steps), species exclusions discovered for one transition
+often do **not** carry over cleanly to the next — GBF4 targets escalate each
+period, so a species that is feasible at 2045 may become infeasible by 2050.
+Repeat the scan/exclude/retest loop **per transition**, chaining checkpoints
+forward:
+
+1. **Per-transition test directory**: create `Check_<scenario>_<base>_<target>/`
+   mirroring the layout in [Setup](#setup) (`data/`, `log/`, scan scripts,
+   `script_2_fullsolve.py`).
+2. **Checkpoint input**: copy `data_<base>.lz4` from the previous transition's
+   test directory (or generate one — see "Generating a missing checkpoint"
+   below).
+3. **Run the scan** using the Windows-local variant —
+   `script_1_launch.py` / `script_1_worker.py` / `script_1_run_workers.py` /
+   `script_1_collect.py` — same logic as `launch.py` / `worker.py` /
+   `collect.py` above, but `script_1_run_workers.py` drives a
+   `subprocess.Popen` pool with `N_WORK` parallel local workers (each given a
+   `PBS_ARRAY_INDEX` env var) instead of submitting `qsub` jobs. Resume support:
+   workers skip targets whose `result_{idx:03d}.json` already exists.
+4. **Cross-reference before adding exclusions**: from
+   `region_species_test_results_<target>.csv`, collect the non-optimal
+   `(region, name)` tuples (`status_str not in (OPTIMAL, SKIP_NEG_TARGET,
+   SKIP_EMPTY)`), then diff against the exclusion lists already present in
+   `settings.py`. Only append tuples that are genuinely new — many will already
+   be excluded from earlier transitions, since the same species often re-fails
+   at later years too.
+5. **Apply new exclusions to both**:
+   - the master `luto/settings.py` (production settings), and
+   - this test directory's `data/settings.py`
+
+   Append with a dated comment block identifying the transition and test
+   directory, e.g.
+   `# --- 2045→2050 exclusions (Check_..._2045_2050 per-species test, <date>) ---`,
+   and annotate each tuple with its `status_str`, `tightness`, and `n_cells`
+   from the scan for future reference.
+6. **Re-run `script_2_fullsolve.py`** with the combined exclusion set. If it
+   reaches `OPTIMAL`, it saves `data_<target>.lz4` (see checkpoint pattern
+   below) — use this as the input checkpoint for the **next** transition's test
+   directory.
+7. **If still non-OPTIMAL** after adding all newly-identified species, repeat
+   from step 3 with a fresh scan (consider a `_v2` test directory) — the
+   combined exclusion set can shift which species become tight or infeasible.
+8. Treat **both `INFEASIBLE` and `TIME_LIMIT`** results as exclusion
+   candidates — `TIME_LIMIT` in isolation often indicates a species that only
+   becomes infeasible when combined with all the others in the full model.
+
+### Generating a missing checkpoint
+
+If no `data_<base>.lz4` checkpoint exists for the transition you need (e.g. the
+production archive only saved every other year), generate one from
+`script_2_fullsolve.py` for the *prior* transition by capturing the
+`SolverSolution` and writing the checkpoint — mirroring the production pattern
+in `simulation.py`'s `solve_timeseries()`:
+
+```python
+from luto.simulation import save_data_to_disk
+
+solution = solver.solve()   # NOT model.optimize() — solve() returns SolverSolution
+
+if solution is not None and model.Status == GRB.OPTIMAL:
+    data.add_lumap(target_year, solution.lumap)
+    data.add_lmmap(target_year, solution.lmmap)
+    data.add_ammaps(target_year, solution.ammaps)
+    data.add_ag_dvars(target_year, solution.ag_X_mrj)
+    data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
+    data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
+    data.add_obj_vals(target_year, solution.obj_val)
+    for data_type, prod_data in solution.prod_data.items():
+        data.add_production_data(target_year, data_type, prod_data)
+    data.last_year = target_year
+    save_data_to_disk(data, os.path.join(DATA_DIR, f"data_{target_year}.lz4"))
+```
+
+### RETRY_PARAMS unpacking (5-tuples)
+
+`script_2_fullsolve.py` retries with `settings.RETRY_PARAMS` — a list of
+5-tuples `(NumericFocus, Method, Crossover, Presolve, BarHomogeneous)`, iterated
+directly with **no** special "first attempt" prepended:
+
+```python
+retry_params = getattr(settings, "RETRY_PARAMS", [])
+for attempt, (numeric_focus, method, crossover, presolve, bar_homogeneous) in enumerate(retry_params):
+    model.Params.Method         = method
+    model.Params.NumericFocus   = numeric_focus
+    model.Params.Crossover      = crossover
+    model.Params.Presolve       = presolve
+    model.Params.BarHomogeneous = bar_homogeneous
+
+    solution = solver.solve()
+    if model.Status == GRB.OPTIMAL:
+        break
+    elif model.Status in (GRB.INFEASIBLE, GRB.INF_OR_UNBD):
+        break  # don't burn remaining retries on a proven infeasibility
+```
+
+---
+
 ## Script: `submit_launch.sh`
 
 ```bash
@@ -508,6 +608,11 @@ Worker logs only appear after the job finishes. To get live logs for the launche
 redirect inside the PBS script body with `exec >> log 2>&1` and set
 `#PBS -o /dev/null -j oe` (as done in `submit_launch.sh` above).
 
+### Windows-local execution (no PBS)
+
+See the [Windows-local variant](#windows-local-variant-no-pbs) section below for
+the full script set and run commands.
+
 ### NUMERIC vs INFEASIBLE distinction
 
 - `NUMERIC`: the barrier blew up before proving anything — the problem may be infeasible
@@ -516,3 +621,236 @@ redirect inside the PBS script body with `exec >> log 2>&1` and set
 - `INFEASIBLE`: Gurobi produced an infeasibility certificate — a definitive mathematical
   result. Check whether this is from a different constraint (compound effect) before
   concluding the excluded species was the sole cause.
+
+---
+
+## Windows-local variant (no PBS)
+
+Drop-in replacement for the `submit_launch.sh` / `launch.py` / `worker.py` /
+`collect.py` PBS scripts when running on a local Windows machine (no NCI
+access). Same diagnostic logic — only the job-submission mechanism changes
+(`subprocess.Popen` pool instead of `qsub`).
+
+### Directory layout
+
+```
+Check_<scenario>_<base>_<target>/
+    data/
+        data_<BASE>.lz4      ← checkpoint from the previous transition
+        settings.py          ← settings file copied from the run under test
+        results/             ← auto-created; one result_NNN.json per worker
+        species_list.json    ← auto-created by script_1_launch.py
+    log/                      ← auto-created; launcher + worker + run_workers logs
+    script_1_launch.py
+    script_1_worker.py
+    script_1_run_workers.py
+    script_1_collect.py
+    script_2_fullsolve.py    ← full re-solve with exclusions (see Step 6)
+```
+
+Edit the `# -- CONFIG --` / hardcoded constants at the top of each script:
+- `LUTO_DIR`: path to the luto-2.0 source tree (e.g. `"F:/Users/jinzhu/Documents/luto-2.0"`)
+- `BASE_YEAR` / `TARGET_YEAR`: the transition under test (e.g. `2045` / `2050`),
+  reflected in the checkpoint filename `data_<BASE_YEAR>.lz4` and in
+  `OUT_CSV = "region_species_test_results_<TARGET_YEAR>.csv"` in
+  `script_1_collect.py`
+- `N_WORK` in `script_1_run_workers.py`: number of parallel local workers
+  (6 was used for a 32-thread workstation; each worker formulates a full
+  Gurobi model, so don't oversubscribe memory/threads)
+
+### Running it
+
+All commands wrap `conda run -n luto` inside `powershell -Command "..."` —
+`conda` is not directly recognized by the PowerShell tool otherwise. Redirect
+output with `*> log\<name>.out` on the *outer* call so it captures stdout from
+the inner `conda run`.
+
+```bash
+# 1. Enumerate targets -> data/species_list.json
+powershell -Command "conda run -n luto python -u script_1_launch.py" *> log/launch.out
+
+# 2. Run all workers locally, N_WORK in parallel, with resume support
+powershell -Command "conda run -n luto python -u script_1_run_workers.py" *> log/run_workers.out
+
+# 3. Collect results -> data/region_species_test_results_<TARGET_YEAR>.csv
+powershell -Command "conda run -n luto python -u script_1_collect.py" *> log/collect.out
+
+# 4. After updating exclusions in settings.py, full re-solve
+powershell -Command "conda run -n luto python -u script_2_fullsolve.py" *> log/fullsolve.out
+```
+
+Steps 2–4 are long-running (minutes to hours) — launch with `run_in_background`
+and poll the `.out` log rather than waiting synchronously. `.out` log files
+written by PowerShell redirection (`*>`) are UTF-16 encoded; read them with a
+tool that handles encoding (the `Read` tool works, raw `cat`/`type` shows
+spaced-out characters).
+
+### Script: `script_1_launch.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Launcher: enumerate exact region-species targets for BASE_YEAR->TARGET_YEAR,
+save species_list.json. Windows-local version of the Gadi PBS launch.py.
+"""
+
+import sys, os, json, importlib.util, joblib
+
+# -- CONFIG --------------------------------------------------------------------
+LUTO_DIR    = "F:/Users/jinzhu/Documents/luto-2.0"
+BASE_YEAR   = 2045
+TARGET_YEAR = 2050
+# --------------------------------------------------------------------------------
+
+SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR    = os.path.join(SCRIPT_DIR, "data")
+LOG_DIR     = os.path.join(SCRIPT_DIR, "log")
+RESULTS_DIR = os.path.join(DATA_DIR, "results")
+os.makedirs(RESULTS_DIR, exist_ok=True)
+os.makedirs(LOG_DIR, exist_ok=True)
+
+sys.path.insert(0, LUTO_DIR)
+import luto.settings as settings
+
+spec = importlib.util.spec_from_file_location("run_settings", os.path.join(DATA_DIR, "settings.py"))
+run_settings = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(run_settings)
+for attr in dir(run_settings):
+    if not attr.startswith("_"):
+        setattr(settings, attr, getattr(run_settings, attr))
+
+from luto.solvers.input_data import get_input_data
+
+print(f"Loading data_{BASE_YEAR}.lz4 ...", flush=True)
+data = joblib.load(os.path.join(DATA_DIR, f"data_{BASE_YEAR}.lz4"))
+
+print(f"Building input_data for {BASE_YEAR}->{TARGET_YEAR} ...", flush=True)
+input_data = get_input_data(data, BASE_YEAR, TARGET_YEAR)
+
+all_targets = []
+for region, species, presence in input_data.GBF4_SNES_region_species:
+    lb_raw = input_data.limits["GBF4_SNES"].sel(dict(layer=(region, species, presence))).item()
+    all_targets.append({"idx": len(all_targets), "type": "SNES",  "region": region, "name": species,   "presence": presence, "lb_raw": lb_raw})
+for region, community, presence in input_data.GBF4_ECNES_region_species:
+    lb_raw = input_data.limits["GBF4_ECNES"].sel(dict(layer=(region, community, presence))).item()
+    all_targets.append({"idx": len(all_targets), "type": "ECNES", "region": region, "name": community, "presence": presence, "lb_raw": lb_raw})
+
+N = len(all_targets)
+print(f"\nExact target count: {N}  (SNES: {sum(1 for t in all_targets if t['type']=='SNES')}, "
+      f"ECNES: {sum(1 for t in all_targets if t['type']=='ECNES')})", flush=True)
+
+with open(os.path.join(DATA_DIR, "species_list.json"), "w") as f:
+    json.dump(all_targets, f, indent=2)
+print(f"Species list saved: {os.path.join(DATA_DIR, 'species_list.json')}", flush=True)
+
+print("\nNow run the workers locally with:", flush=True)
+print(f"  conda run -n luto python {os.path.join(SCRIPT_DIR, 'script_1_run_workers.py')}", flush=True)
+print("After all finish, collect results with:", flush=True)
+print(f"  conda run -n luto python {os.path.join(SCRIPT_DIR, 'script_1_collect.py')}", flush=True)
+```
+
+### Script: `script_1_run_workers.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Run script_1_worker.py for every target in species_list.json, locally, in
+parallel batches of N_WORK processes (Windows replacement for PBS array
+submission).
+
+Usage:
+  conda run -n luto python script_1_run_workers.py
+"""
+
+import os, sys, json, subprocess, time
+
+SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR    = os.path.join(SCRIPT_DIR, "data")
+LOG_DIR     = os.path.join(SCRIPT_DIR, "log")
+RESULTS_DIR = os.path.join(DATA_DIR, "results")
+WORKER      = os.path.join(SCRIPT_DIR, "script_1_worker.py")
+
+N_WORK = 6
+
+with open(os.path.join(DATA_DIR, "species_list.json")) as f:
+    all_targets = json.load(f)
+
+# Skip targets that already have a result on disk (resume support)
+todo = []
+for t in all_targets:
+    idx = t["idx"]
+    out_file = os.path.join(RESULTS_DIR, f"result_{idx:03d}.json")
+    if os.path.exists(out_file):
+        print(f"  [idx={idx}] result exists, skipping")
+        continue
+    todo.append(idx)
+
+print(f"\n{len(todo)} / {len(all_targets)} targets to run, N_WORK={N_WORK}\n", flush=True)
+
+python_exe = sys.executable
+running = {}  # idx -> (Popen, out_fh, err_fh)
+
+i = 0
+while i < len(todo) or running:
+    while len(running) < N_WORK and i < len(todo):
+        idx = todo[i]
+        i += 1
+        env = os.environ.copy()
+        env["PBS_ARRAY_INDEX"] = str(idx)
+        out_fh = open(os.path.join(LOG_DIR, f"worker_{idx}.out"), "w")
+        err_fh = open(os.path.join(LOG_DIR, f"worker_{idx}.err"), "w")
+        print(f"  [idx={idx}] launching ...", flush=True)
+        proc = subprocess.Popen(
+            [python_exe, "-u", WORKER],
+            cwd=SCRIPT_DIR, env=env, stdout=out_fh, stderr=err_fh,
+        )
+        running[idx] = (proc, out_fh, err_fh)
+
+    done = []
+    for idx, (proc, out_fh, err_fh) in running.items():
+        ret = proc.poll()
+        if ret is not None:
+            out_fh.close()
+            err_fh.close()
+            print(f"  [idx={idx}] finished, returncode={ret}", flush=True)
+            done.append(idx)
+    for idx in done:
+        del running[idx]
+
+    if running:
+        time.sleep(2)
+
+print("\nAll workers finished.", flush=True)
+print(f"Collect results with:\n  conda run -n luto python {os.path.join(SCRIPT_DIR, 'script_1_collect.py')}", flush=True)
+```
+
+### Script: `script_1_worker.py`
+
+Identical diagnostic logic to `worker.py` above (same constraint construction,
+tightness/coeff_ratio calculation, and result JSON schema), with two
+differences:
+
+1. `BASE_YEAR`/`TARGET_YEAR` are hardcoded constants matching the launcher.
+2. `idx` comes from the `PBS_ARRAY_INDEX` env var set by
+   `script_1_run_workers.py` (same mechanism as the PBS variant — no code
+   change needed):
+
+```python
+idx = int(os.environ.get("PBS_ARRAY_INDEX", sys.argv[1] if len(sys.argv) > 1 else "0"))
+```
+
+Copy `worker.py`, rename to `script_1_worker.py`, and replace the
+`CHECKPOINT`/`BASE_YEAR`/`TARGET_YEAR` config constants with this
+transition's values (e.g. `data_2045.lz4`, `2045`, `2050`). Everything else —
+model formulation, `_build_biodiv_contr_expr`, status mapping, JSON output —
+is unchanged.
+
+### Script: `script_1_collect.py`
+
+Identical to `collect.py` above, except `OUT_CSV` is suffixed with
+`TARGET_YEAR` so results from successive transitions don't overwrite each
+other:
+
+```python
+OUT_CSV = os.path.join(SCRIPT_DIR, "data", f"region_species_test_results_{TARGET_YEAR}.csv")
+```
