@@ -1253,11 +1253,11 @@ def write_economics(data: Data, yr_cal, path):
 
         solar_potential = xr.concat([
             (solar_dvar_now * solar_opex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Operating Cost']),
-            (solar_dvar_delta * solar_capex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Capital expenditure']),
+            (solar_dvar_delta * solar_capex_xr / gap).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Capital expenditure']),
         ], dim='Cost_type')
         wind_potential = xr.concat([
             (wind_dvar_now * wind_opex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Operating Cost']),
-            (wind_dvar_delta * wind_capex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Capital expenditure']),
+            (wind_dvar_delta * wind_capex_xr / gap).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Capital expenditure']),
         ], dim='Cost_type')
 
         re_reindexed = xr.concat([solar_potential, wind_potential], dim='am').reindex(am=xr_cost_am.am.values, lu=xr_cost_am.lu.values, fill_value=0.0)

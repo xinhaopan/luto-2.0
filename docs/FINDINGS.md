@@ -33,6 +33,7 @@ single-digit %).
 |---|---|---|
 | `write_economics` | `ag2ag_mrj` | Ag→Ag establishment cost incurred over the period since the previous simulated year |
 | `write_economics` | existing-capacity solar/wind **CAPEX delta** | One-off installation capital cost incurred over the period |
+| `write_economics` | `solar_potential`/`wind_potential` **CAPEX** (`dvar_delta * capex_xr`) | One-off installation capital cost for newly-allocated renewable AgMgt cells this period (added 20260613 — was previously missed because the `Annualise_write` validation runs had `RENEWABLES_OPTIONS` all `False`, so this code path was never exercised) |
 | `write_economics` | `nonag2nonag_mat` | Non-ag→Non-ag transition cost over the period |
 | `write_economics` | `ag2nonag_mat` | Ag→Non-ag transition cost over the period |
 | `write_ghg` | `ghg_t_smrj` | GHG transition penalty incurred over the period |
