@@ -79,17 +79,8 @@ def get_checkpoint_lz4(run_dir: Path) -> list[Path]:
 
 
 def is_finished(run_dir: Path) -> bool:
-    """Finished = Run_Archive.zip exists OR Data_RES*.lz4 exists in output/*/."""
-    if (run_dir / "Run_Archive.zip").exists():
-        return True
-    output_dir = run_dir / "output"
-    if not output_dir.is_dir():
-        return False
-    return any(
-        re.match(r"Data_RES\d+\.lz4", f.name)
-        for d in output_dir.iterdir() if d.is_dir()
-        for f in d.iterdir()
-    )
+    """Finished = Run_Archive.zip exists."""
+    return (run_dir / "Run_Archive.zip").exists()
 
 
 def classify_runs(

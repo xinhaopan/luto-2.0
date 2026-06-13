@@ -148,6 +148,9 @@ def run(
                 active_data = joblib.load(str(checkpoint_file))
                 active_data.timestamp = read_timestamp()
                 active_data.path = save_dir
+                # load_data_from_disk()'s set_path() normally pre-creates out_<yr> dirs
+                # for write_outputs; checkpoint resume bypasses that, so do it here too.
+                set_path()
                 print(f"Resuming from checkpoint (year {resume_from_year}): {checkpoint_file}")
             elif data is None:
                 raise ValueError(
