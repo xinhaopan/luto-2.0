@@ -236,7 +236,7 @@ class LutoSolver:
                 # the barrier's complementarity slack (ub - x) approaches zero at the optimum,
                 # making AA' near-singular.  Fixing lb = ub tells Gurobi the variable is fixed
                 # and removes it from the interior-point complementarity system entirely.
-                if x_lb > 0 and (x_ub - x_lb) / x_lb < 0.01:
+                if x_lb > 0 and abs(x_ub - x_lb) / x_lb < 0.01:
                     x_ub = x_lb
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                     lb=x_lb,
@@ -922,7 +922,6 @@ class LutoSolver:
         print("│   ├── Adding constraints for biodiversity...")
         self._add_GBF2_constraints()
         self._add_GBF3_NVIS_constraints()
-        self._add_GBF3_IBRA_constraints()
         self._add_GBF4_SNES_constraints()
         self._add_GBF4_ECNES_constraints()
         self._add_GBF8_constraints()
@@ -1064,9 +1063,7 @@ class LutoSolver:
             )
 
 
-    def _add_GBF3_IBRA_constraints(self) -> None:
-        # IBRA constraints now flow through _add_GBF3_NVIS_constraints (GBF3_NVIS_NRM_REGION_MODE='IBRA')
-        return
+
 
 
     def _add_GBF4_SNES_constraints(self) -> None:
