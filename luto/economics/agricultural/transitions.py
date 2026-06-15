@@ -197,10 +197,9 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
         If `separate` is True, returns a dictionary with separate cost matrices for
         establishment costs, Water license cost, and carbon releasing costs.
     """
-    lumap = data.lumaps[base_year]
-    lmmap = data.lmmaps[base_year]
+
     if not settings.BLENDED_AG_TRANSITION_COSTS:
-        return get_transition_matrices_ag2ag(data, yr_idx, lumap, lmmap, separate)
+        return get_transition_matrices_ag2ag(data, yr_idx, data.lumaps[base_year], data.lmmaps[base_year], separate)
 
     else:
         yr_cal = data.YR_CAL_BASE + yr_idx
@@ -218,7 +217,7 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
 
             current_lus_X_r = ag_X_mrj[m, :, j]
             # repeat current (m, j) land use array to get weights for ag_t_mrj contributiom
-            lus_weight_mrj = np.swapaxes(np.tile(current_lus_X_r, (2, data.N_AG_LUS, 1)), 1, 2)
+            lus_weight_mrj = np.swapaxes(np.tile(current_lus_X_r, (data.NLMS, data.N_AG_LUS, 1)), 1, 2)
 
             from_current_lus_t_mrj = get_transition_matrices_ag2ag(
                 data, yr_idx, all_j_lumap, all_m_lumap, separate, w_mrj=w_mrj, t_ij=t_ij
