@@ -1274,6 +1274,13 @@ GBF4_SNES_EXCLUDE_REGION_SPECIES = [
     ('Goulburn Broken', 'Lathamus discolor'),                # TIME_LIMIT, tightness=1.41, n_cells=655
     ('Goulburn Broken', 'Pteropus poliocephalus'),           # TIME_LIMIT, tightness=1.41, n_cells=275
     ('Goulburn Broken', 'Botaurus poiciloptilus'),           # TIME_LIMIT, tightness=1.41, n_cells=411
+
+    # --- EP-fill driver (Check_GB_filled_EP analysis, 2026-06-15) ---
+    # 2030->2050 USER_DEFINED target (50%->70%) is EXACTLY binding every year 2020-2050
+    # (total/target ratio = 1.000, 755 cells, 83.2% spatial overlap with 2050 EP dvar area).
+    # This constraint is the primary driver of near-total Environmental Plantings
+    # saturation across Goulburn Broken in Run_G0001. Excluded to break the EP-fill loop.
+    ('Goulburn Broken', 'Hirundapus caudacutus'),
 ]
 
 
