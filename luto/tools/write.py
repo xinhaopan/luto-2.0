@@ -1048,9 +1048,15 @@ def write_economics(data: Data, yr_cal, path):
     )
 
     # Delta dvar: only net increases in allocation pay transition costs.
-    # Using the full dvar over-counts: cells already at the target LU pay again,
-    # and heterogeneous base-year cells (RESFACTOR>1) accumulate phantom cross-LU costs.
-    if yr_cal_sim_pre is not None:
+    # When BLENDED_AG_TRANSITION_COSTS=True, use the solver's D vars directly — they are
+    # exactly max(0, X_new - x_old) at optimality and match what entered the objective.
+    # Otherwise fall back to clipping the dvar difference.
+    if settings.BLENDED_AG_TRANSITION_COSTS and data.ag_delta_dvars.get(yr_cal) is not None:
+        ag_dvar_mrj_delta = chunk_unify_size(
+            tools.ag_mrj_to_xr(data, data.ag_delta_dvars[yr_cal])
+        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME),
+                        region_NRM=('cell', data.REGION_NRM_NAME))
+    elif yr_cal_sim_pre is not None:
         ag_dvar_mrj_delta = chunk_unify_size(
             tools.ag_mrj_to_xr(
                 data,
@@ -1712,10 +1718,16 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).chunk({'cell': chunk_size})
 
     # Delta dvars: only pay transition cost for INCREASES in allocation.
-    # Using dvar_new directly over-counts: cells already at the target LU pay again,
-    # and LUs whose fraction is shrinking accumulate a phantom reverse-direction cost.
-    # clip(min=0) zeroes out decreasing LUs so only genuine transitions are charged.
-    if yr_cal != data.YR_CAL_BASE:
+    # When BLENDED_AG_TRANSITION_COSTS=True, use solver D vars directly — they are
+    # exactly max(0, X_new - x_old) at optimality and match what entered the objective.
+    # Otherwise fall back to clipping the dvar difference.
+    if settings.BLENDED_AG_TRANSITION_COSTS and data.ag_delta_dvars.get(yr_cal) is not None:
+        ag_dvar_mrj_delta = tools.ag_mrj_to_xr(
+            data, data.ag_delta_dvars[yr_cal]
+        ).rename({'lm': 'To-water-supply', 'lu': 'To-land-use'}
+        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
+        ).chunk({'cell': chunk_size})
+    elif yr_cal != data.YR_CAL_BASE:
         ag_dvar_mrj_old = tools.ag_mrj_to_xr(
             data, data.ag_dvars[yr_cal_sim_pre]
         ).rename({'lm': 'To-water-supply', 'lu': 'To-land-use'}

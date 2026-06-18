@@ -255,6 +255,7 @@ def solve_timeseries(
         data.add_lmmap(target_year, solution.lmmap)
         data.add_ammaps(target_year, solution.ammaps)
         data.add_ag_dvars(target_year, solution.ag_X_mrj)
+        data.add_ag_delta_dvars(target_year, solution.ag_D_mrj)
         data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
         data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
         data.add_obj_vals(target_year, solution.obj_val)

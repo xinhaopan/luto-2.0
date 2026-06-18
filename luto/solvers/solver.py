@@ -60,6 +60,7 @@ class SolverSolution:
     ag_X_mrj: np.ndarray
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
+    ag_D_mrj: np.ndarray | None                                          # Delta dvars D=max(0,X_new-x_old); None when BLENDED_AG_TRANSITION_COSTS=False
     prod_data: dict[str, Any]
     obj_val: dict[str, float]
 
@@ -150,6 +151,7 @@ class LutoSolver:
         self._setup_non_ag_vars()
         self._setup_ag_management_variables()
         self._setup_deviation_penalties()
+        self._setup_ag_delta_vars()
 
     def _setup_constraints(self):
         print("├── Adding the constraints...")
@@ -160,8 +162,9 @@ class LutoSolver:
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_constraints()
         self._add_regional_adoption_constraints()
-        self._add_water_usage_limit_constraints() 
+        self._add_water_usage_limit_constraints()
         self._add_renewable_energy_constraints()
+        self._add_ag_transition_delta_constraints()
         
     def _setup_objective(self):
         """
@@ -375,7 +378,67 @@ class LutoSolver:
             num_regions = len(self._input_data.limits["water"].keys())
             self.W = self.gurobi_model.addMVar(num_regions, name="W")
 
+    def _setup_ag_delta_vars(self):
+        """Add non-negative delta variables D[m,j,r] for blended ag2ag transition costs.
+
+        D[m,j,r] = max(0, X_new[m,j,r] - x_old[m,j,r]) at optimality, enforced by
+        _add_ag_transition_delta_constraints. Only created for (m,j,r) triples
+        where the rescaled transition cost coefficient meets SOLVER_COEFF_MIN.
+        """
+        if not settings.BLENDED_AG_TRANSITION_COSTS:
+            return
         
+        print("│   └── setting up delta variables for blended ag transition costs...")
+        t_mat  = self._input_data.ag_t_mrj
+        n_lus  = self._input_data.n_ag_lus
+        ncells = self._input_data.ncells
+
+        self.D_ag_dry_vars_jr = np.zeros((n_lus, ncells), dtype=object)
+        self.D_ag_irr_vars_jr = np.zeros((n_lus, ncells), dtype=object)
+
+        for j in range(n_lus):
+            for r in self._input_data.ag_lu2cells[0, j]:
+                if abs(t_mat[0, r, j]) >= settings.SOLVER_COEFF_MIN:
+                    self.D_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
+                        lb=0, ub=1, name=f"D_dry_{j}_{r}"
+                    )
+            for r in self._input_data.ag_lu2cells[1, j]:
+                if abs(t_mat[1, r, j]) >= settings.SOLVER_COEFF_MIN:
+                    self.D_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
+                        lb=0, ub=1, name=f"D_irr_{j}_{r}"
+                    )
+
+
+    def _add_ag_transition_delta_constraints(self):
+        """Link delta vars to ag decision vars: D[m,j,r] >= X_new[m,j,r] - x_old[m,j,r].
+
+        Combined with the negative sign on D in the maximisation objective (or positive
+        in mincost), the solver naturally drives D = max(0, X_new - x_old), so transition
+        costs are charged only on net land-use increases.
+        """
+        if not settings.BLENDED_AG_TRANSITION_COSTS:
+            return
+        
+        print("│   └── adding delta linking constraints for blended ag transition costs...")
+        x_old = self._input_data.ag_dvars_base  # shape (NLMS, NCELLS, N_AG_LUS)
+
+        for j in range(self._input_data.n_ag_lus):
+            for r in self._input_data.ag_lu2cells[0, j]:
+                if not isinstance(self.D_ag_dry_vars_jr[j, r], gp.Var):
+                    continue
+                self.gurobi_model.addConstr(
+                    self.D_ag_dry_vars_jr[j, r] >= self.X_ag_dry_vars_jr[j, r] - x_old[0, r, j],
+                    name=f"delta_dry_{j}_{r}"
+                )
+
+            for r in self._input_data.ag_lu2cells[1, j]:
+                if not isinstance(self.D_ag_irr_vars_jr[j, r], gp.Var):
+                    continue
+                self.gurobi_model.addConstr(
+                    self.D_ag_irr_vars_jr[j, r] >= self.X_ag_irr_vars_jr[j, r] - x_old[1, r, j],
+                    name=f"delta_irr_{j}_{r}"
+                )
+
     def _setup_economy_objective(self):
         print("    ├── setting up objective for economy...")
         
@@ -415,12 +478,28 @@ class LutoSolver:
         self.economy_ag_contr = gp.quicksum(ag_exprs)
         self.economy_ag_man_contr = gp.quicksum(ag_mam_exprs)
         self.economy_non_ag_contr = gp.quicksum(non_ag_exprs)
-        
+
+        # Blended ag2ag transition costs: applied to delta vars D = max(0, X_new - x_old).
+        if settings.BLENDED_AG_TRANSITION_COSTS:
+            t_mat = self._input_data.ag_t_mrj
+            t_sign = -1 if settings.OBJECTIVE == "maxprofit" else 1
+            blend_t_exprs = []
+            for j in range(self._input_data.n_ag_lus):
+                dry_cells = self._input_data.ag_lu2cells[0, j]
+                irr_cells = self._input_data.ag_lu2cells[1, j]
+                blend_t_exprs.append(
+                    _qsum(t_sign * t_mat[0, dry_cells, j], self.D_ag_dry_vars_jr[j, dry_cells])
+                    + _qsum(t_sign * t_mat[1, irr_cells, j], self.D_ag_irr_vars_jr[j, irr_cells])
+                )
+            self.economy_trans_ag2ag_contr = gp.quicksum(blend_t_exprs)
+        else:
+            self.economy_trans_ag2ag_contr = 0
+
         return (
-            (self.economy_ag_contr + self.economy_ag_man_contr + self.economy_non_ag_contr) 
-            * self._input_data.scale_factors['Economy'] 
-            / 1e6 # Convert to million AUD
-        )  
+            (self.economy_ag_contr + self.economy_ag_man_contr + self.economy_non_ag_contr + self.economy_trans_ag2ag_contr)
+            * self._input_data.scale_factors['Economy']
+            / 1e6  # Convert to million AUD
+        )
     
     
     def _setup_penalty_objectives(self):
@@ -1328,6 +1407,22 @@ class LutoSolver:
 
         # Stack dryland and irrigated decision variables — fractional values preserved as-is
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
+
+        # Extract D var solutions: D[m,j,r] = max(0, X_new - x_old) at optimality
+        if settings.BLENDED_AG_TRANSITION_COSTS:
+            D_dry_sol_rj = np.zeros((self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32)
+            D_irr_sol_rj = np.zeros((self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32)
+            for j in range(self._input_data.n_ag_lus):
+                for r in self._input_data.ag_lu2cells[0, j]:
+                    if isinstance(self.D_ag_dry_vars_jr[j, r], gp.Var):
+                        D_dry_sol_rj[r, j] = self.D_ag_dry_vars_jr[j, r].X
+                for r in self._input_data.ag_lu2cells[1, j]:
+                    if isinstance(self.D_ag_irr_vars_jr[j, r], gp.Var):
+                        D_irr_sol_rj[r, j] = self.D_ag_irr_vars_jr[j, r].X
+            ag_D_mrj = np.stack((D_dry_sol_rj, D_irr_sol_rj))
+        else:
+            ag_D_mrj = None
+
         ag_man_X_mrj = {
             am: np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
             for am in self._input_data.am2j
@@ -1435,6 +1530,7 @@ class LutoSolver:
             ag_X_mrj=ag_X_mrj,
             non_ag_X_rk=non_ag_X_sol_rk,
             ag_man_X_mrj=ag_man_X_mrj,
+            ag_D_mrj=ag_D_mrj,
             prod_data=prod_data,
             obj_val={
                 "ObjVal":(

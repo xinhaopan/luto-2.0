@@ -115,6 +115,7 @@ class Data:
         self.lmmaps = {}
         self.ammaps = {}
         self.ag_dvars = {}
+        self.ag_delta_dvars = {}
         self.non_ag_dvars = {}
         self.ag_man_dvars = {}
         self.prod_data = {}
@@ -1842,6 +1843,13 @@ class Data:
         Safely adds agricultural decision variables' values to the Data object.
         """
         self.ag_dvars[yr] = ag_dvars
+
+    def add_ag_delta_dvars(self, yr: int, ag_D_mrj: np.ndarray | None):
+        """
+        Saves solver delta dvar solution D=max(0,X_new-x_old) for blended ag transition costs.
+        None when BLENDED_AG_TRANSITION_COSTS=False.
+        """
+        self.ag_delta_dvars[yr] = ag_D_mrj
 
     def add_non_ag_dvars(self, yr: int, non_ag_dvars: np.ndarray):
         """

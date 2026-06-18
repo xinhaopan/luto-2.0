@@ -62,12 +62,14 @@ class SolverInputData:
     ag_b_mrj: np.ndarray                                                # Agricultural biodiversity matrices based on bio-quality layer.
     ag_x_mrj: np.ndarray                                                # Agricultural exclude matrices.
     ag_q_mrp: np.ndarray                                                # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
+    ag_t_mrj: np.ndarray                                                # Agricultural transition cost matrices.
+    ag_dvars_base: np.ndarray                                           # Agricultural base year decision variable values.
     ag_ghg_t_mrj: np.ndarray                                            # GHG emissions released during transitions between agricultural land uses.
 
     non_ag_g_rk: np.ndarray                                             # Non-agricultural greenhouse gas emissions matrix.
     non_ag_w_rk: np.ndarray                                             # Non-agricultural water yields matrix.
     non_ag_b_rk: np.ndarray                                             # Non-agricultural biodiversity matrix.
-    non_ag_ub_rk: np.ndarray                                             # Non-agricultural exclude matrices.
+    non_ag_ub_rk: np.ndarray                                            # Non-agricultural exclude matrices.
     non_ag_q_crk: np.ndarray                                            # Non-agricultural yield matrix.
     non_ag_lb_rk: np.ndarray                                            # Non-agricultural lower bound matrices.
 
@@ -127,7 +129,7 @@ class SolverInputData:
     desc2aglu: dict                                                     # Map of agricultural land use descriptions to codes.
     real_area: np.ndarray                                               # Area of each cell, indexed by cell (r)
     ag_mask_proportion_r: np.ndarray                                    # Initial (2010) total agricultural land proportion per cell (r).
-                
+
     @property
     def ncms(self):
         return len(self.commodity_names)
@@ -560,7 +562,13 @@ def get_economic_mrj(
     ) -> dict[str, np.ndarray|dict[str, np.ndarray]]:
     
     print('Getting base year economic matrix...', flush = True)
-    
+
+    if settings.BLENDED_AG_TRANSITION_COSTS:
+        # under blended transition costs, the `ag_t_mrj` will be handled in the solver, 
+        # which only applies to the delta variables (i.e., true transitions from the base year)
+        # so here we set it to 0 to avoid double counting.
+        ag_t_mrj = np.zeros_like(ag_t_mrj)
+
     if settings.OBJECTIVE == "maxprofit":
         # Pre-calculate profit (revenue minus cost) for each land use
         ag_obj_mrj = ag_r_mrj - (ag_c_mrj + ag_t_mrj + non_ag_to_ag_t_mrj)
@@ -568,7 +576,7 @@ def get_economic_mrj(
 
         # Get effects of alternative agr. management options (stored in a dict)
         ag_man_objs = {
-            am: ag_man_r_mrj[am] - (ag_man_c_mrj[am] + ag_man_t_mrj[am]) 
+            am: ag_man_r_mrj[am] - (ag_man_c_mrj[am] + ag_man_t_mrj[am])
             for am in settings.AG_MANAGEMENTS_TO_LAND_USES
         }
 
@@ -579,7 +587,7 @@ def get_economic_mrj(
 
         # Store calculations for each agricultural management option in a dict
         ag_man_objs = {
-            am: (ag_man_c_mrj[am] + ag_man_t_mrj[am])      
+            am: (ag_man_c_mrj[am] + ag_man_t_mrj[am])
             for am in settings.AG_MANAGEMENTS_TO_LAND_USES
         }
 
@@ -1068,8 +1076,11 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     # Fetch all raw limit targets once — reused in both rescaling and get_limits below.
     limits = get_limits(data, target_year)
 
+    # Cull unprofitable land uses before rescaling (needs unscaled c/t/r matrices).
+    ag_x_mrj = land_use_culling.apply_agricultural_land_use_culling(ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj)
+
     # Rescale solver input data
-    [ag_obj_mrj, non_ag_obj_rk, ag_man_objs], economy_scale = rescale_lhs([ag_obj_mrj, non_ag_obj_rk, ag_man_objs])
+    [ag_obj_mrj, non_ag_obj_rk, ag_man_objs, ag_t_mrj], economy_scale = rescale_lhs([ag_obj_mrj, non_ag_obj_rk, ag_man_objs, ag_t_mrj])
     [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],   demand_scale  = rescale_lhs_rhs(
         [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],
         limits['demand'],
@@ -1185,18 +1196,22 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     desc2aglu=data.DESC2AGLU
     real_area=data.REAL_AREA
     ag_mask_proportion_r=data.AG_MASK_PROPORTION_R
+    
+    # Base year dvars
+    ag_dvars_base = data.ag_dvars[base_year]
+    
 
-    ag_x_mrj = land_use_culling.apply_agricultural_land_use_culling(ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj)
- 
     return SolverInputData(
         base_year,
         target_year,
-        
+
         ag_g_mrj,
         ag_w_mrj,
         ag_b_mrj,
         ag_x_mrj,
         ag_q_mrp,
+        ag_t_mrj,
+        ag_dvars_base,
         ag_ghg_t_mrj,
         
         non_ag_g_rk,
@@ -1263,3 +1278,4 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         real_area,
         ag_mask_proportion_r
     )
+
