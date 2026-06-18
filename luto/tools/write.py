@@ -475,10 +475,12 @@ def write_data(data: Data):
             groups[n] = []
         groups[n].append(task)
 
+    # Windows WaitForMultipleObjects limit: 63 handles total; loky uses ~2 internally, so cap at 61.
+    max_workers = min(os.cpu_count(), 61) if os.name == 'nt' else os.cpu_count()
     # Run tiers from most memory-constrained (n_jobs=1) to least (n_jobs=max_workers)
     for n_workers in sorted(groups.keys()):
         tasks = groups[n_workers]
-        valid_workers = min(n_workers, len(tasks), os.cpu_count())
+        valid_workers = min(n_workers, len(tasks), max_workers)
         for result in Parallel(n_jobs=valid_workers, return_as='generator_unordered')(tasks):
             process_write_task(result)
 
@@ -1045,6 +1047,20 @@ def write_economics(data: Data, yr_cal, path):
                        region_NRM=('cell', data.REGION_NRM_NAME))
     )
 
+    # Delta dvar: only net increases in allocation pay transition costs.
+    # Using the full dvar over-counts: cells already at the target LU pay again,
+    # and heterogeneous base-year cells (RESFACTOR>1) accumulate phantom cross-LU costs.
+    if yr_cal_sim_pre is not None:
+        ag_dvar_mrj_delta = chunk_unify_size(
+            tools.ag_mrj_to_xr(
+                data,
+                np.clip(data.ag_dvars[yr_cal] - data.ag_dvars[yr_cal_sim_pre], 0, None)
+            )
+        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME),
+                        region_NRM=('cell', data.REGION_NRM_NAME))
+    else:
+        ag_dvar_mrj_delta = ag_dvar_mrj  # base year: ag2ag_mrj is zeros, so value is immaterial
+
     ag_rev_df = ag_revenue.get_rev_matrices(data, yr_idx, aggregate=False)
     ag_cost_df = ag_cost.get_cost_matrices(data, yr_idx, aggregate=False)
     ag_rev_df.columns.names = ag_cost_df.columns.names = ['lu', 'lm', 'source']
@@ -1086,15 +1102,13 @@ def write_economics(data: Data, yr_cal, path):
     # The original write_economics() always used np.zeros() for nonag2ag_smrj
     # (the actual values from nonag2ag_mrj were never filled in). These costs are
     # handled separately by write_transition_nonag2ag(). Matching that behaviour.
-    profit_ag = rev_sum_xr - cost_sum_xr - ag2ag_sum_xr
+    # Transition cost is charged on the delta dvar (net increases only) so heterogeneous
+    # base-year cells at RESFACTOR>1 do not accumulate phantom cross-LU transition costs.
+    xr_profit_ag = ag_dvar_mrj * (rev_sum_xr - cost_sum_xr) - ag_dvar_mrj_delta * ag2ag_sum_xr
     del rev_sum_xr, cost_sum_xr, ag2ag_sum_xr
 
     # raw_profit_ag for Sum Profit (computed now so ag_dvar_mrj can be freed)
-    raw_profit_ag = (ag_dvar_mrj * profit_ag).drop_vars(
-        ['region_state', 'region_NRM'], errors='ignore')
-
-    xr_profit_ag = ag_dvar_mrj * profit_ag
-    del profit_ag
+    raw_profit_ag = xr_profit_ag.drop_vars(['region_state', 'region_NRM'], errors='ignore')
 
     # ── per-source products via loop (never builds full 4D unstack) ──────────
     parts = []
@@ -1129,7 +1143,7 @@ def write_economics(data: Data, yr_cal, path):
             coords={'lm': data.LANDMANS, 'cell': range(data.NCELLS),
                     'lu': data.AGRICULTURAL_LANDUSES}
         ))
-        ag2ag_parts.append((ag_dvar_mrj * src_xr).expand_dims({'source': [src_name]}).compute())
+        ag2ag_parts.append((ag_dvar_mrj_delta * src_xr).expand_dims({'source': [src_name]}).compute())
         del src_xr
     xr_ag2ag_cost = xr.concat(ag2ag_parts, dim='source')
     del ag2ag_parts, ag2ag_mrj
@@ -1157,7 +1171,7 @@ def write_economics(data: Data, yr_cal, path):
                 'layer': valid_nonag2ag_cost_layers},
     )
 
-    del ag_dvar_mrj
+    del ag_dvar_mrj, ag_dvar_mrj_delta
     gc.collect()
 
     # ── add_all, aggregate, save ──────────────────────────────────────────────
@@ -1397,7 +1411,9 @@ def write_economics(data: Data, yr_cal, path):
             dims=['cell', 'lu'], coords={'cell': range(data.NCELLS), 'lu': data.NON_AGRICULTURAL_LANDUSES})
     else:
         ag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_transition_matrix_ag2nonag(
-            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]).astype(np.float32)) / gap
+            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre],
+            base_year=yr_cal_sim_pre,
+            ).astype(np.float32)) / gap
 
     non_ag_profit_mat = non_ag_rev_mat - (non_ag_cost_mat + nonag2nonag_mat + ag2nonag_mat)
     raw_profit_nonag = (non_ag_dvar * non_ag_profit_mat).drop_vars(['region_state', 'region_NRM'], errors='ignore')
@@ -1694,8 +1710,22 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     ag_dvar_mrj_base = ag_dvar_mrj_base.rename({'lm': 'From-water-supply', 'lu': 'From-land-use'}
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': chunk_size})
-        
-        
+
+    # Delta dvars: only pay transition cost for INCREASES in allocation.
+    # Using dvar_new directly over-counts: cells already at the target LU pay again,
+    # and LUs whose fraction is shrinking accumulate a phantom reverse-direction cost.
+    # clip(min=0) zeroes out decreasing LUs so only genuine transitions are charged.
+    if yr_cal != data.YR_CAL_BASE:
+        ag_dvar_mrj_old = tools.ag_mrj_to_xr(
+            data, data.ag_dvars[yr_cal_sim_pre]
+        ).rename({'lm': 'To-water-supply', 'lu': 'To-land-use'}
+        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
+        ).chunk({'cell': chunk_size})
+        ag_dvar_mrj_delta = (ag_dvar_mrj_target - ag_dvar_mrj_old).clip(min=0)
+    else:
+        ag_dvar_mrj_delta = ag_dvar_mrj_target
+
+
     # ==================== Transitions - Area ====================
 
     if yr_idx == 0:
@@ -1788,7 +1818,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     #   the operand size small.
     cost_xr = (
         ag_dvar_mrj_base.sum(dim='From-water-supply')
-        * xr.dot(ag_dvar_mrj_target, ag_transitions_cost_mat, dims=['To-water-supply'])
+        * xr.dot(ag_dvar_mrj_delta, ag_transitions_cost_mat, dims=['To-water-supply'])
     )
 
     cost_xr = add_all(cost_xr, ['From-land-use', 'To-land-use', 'Cost-type'])
@@ -2001,7 +2031,19 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).rename({'lu': 'To-land-use'}
         ).chunk({'cell': chunk_size})
 
-    
+    # Delta dvars: only pay transition cost for INCREASES in non-ag allocation.
+    # Same rationale as ag2ag: using the full dvar_new charges cells already at the
+    # target non-ag LU and adds phantom reverse-direction costs for shrinking LUs.
+    if yr_cal != data.YR_CAL_BASE:
+        non_ag_dvar_old = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal_sim_pre])
+            ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
+            ).rename({'lu': 'To-land-use'}
+            ).chunk({'cell': chunk_size})
+        non_ag_dvar_delta = (non_ag_dvar_target - non_ag_dvar_old).clip(min=0)
+    else:
+        non_ag_dvar_delta = non_ag_dvar_target
+
+
     
     # ==================== Transitions - Area ====================
     if yr_idx == 0:
@@ -2068,7 +2110,9 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         }
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
-            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
+            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre],
+            base_year=yr_cal_sim_pre,
+            separate=True,
         )
 
     non_ag_transitions_flat = {}
@@ -2088,8 +2132,8 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # Compute in chunks and aggregate to DataFrame; This is to reduce memory usage
     cost_xr = (
         ag_dvar_base.sum(dim='From-water-supply')       # Colapse water supply dimension to reduce mem
-        * non_ag_transitions_flat.unstack('lu_source') 
-        * non_ag_dvar_target
+        * non_ag_transitions_flat.unstack('lu_source')
+        * non_ag_dvar_delta
     )
     
     cost_xr = add_all(cost_xr, ['From-land-use', 'To-land-use', 'Cost-type'])

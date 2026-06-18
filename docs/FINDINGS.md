@@ -5,6 +5,175 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260617 — Blended ag2ag transition weights normalization bug: un-normalised weights under-charge mixed-use cells
+
+### TL;DR
+
+`get_transition_matrices_ag2ag_from_base_year` in
+`luto/economics/agricultural/transitions.py` (the `BLENDED_AG_TRANSITION_COSTS = True`
+path) accumulated a weighted sum of per-source transition costs using raw ag dvar fractions
+as weights:
+
+```python
+ag_t_mrj += ag_X_mrj[m, :, j][None, :, None] * from_current_lus_t_mrj
+```
+
+For a pure-agricultural cell, `Σ_{m,j} ag_X_mrj[m,r,j] = 1` — weights sum to 1 and the
+blended cost is a proper weighted average.  For a cell with any non-agricultural fraction
+(EP, RP, destocked land, etc.), the same sum equals `ag_frac_r < 1`, so the resulting
+blended cost is `ag_frac_r × (weighted-average cost)` — **under-charged by the
+non-agricultural fraction**.
+
+The solver uses these matrices as whole-cell cost coefficients; the actual allocation
+fractions are handled by the solver's own decision variables.  Under-charging the per-cell
+coefficient means the solver sees a falsely cheap transition cost for every mixed-use cell.
+
+**Fix**: divide the accumulated result by `ag_frac_r_safe` (zero-guarded per-cell sum)
+after the parallel loop.  The algebraic equivalence `t_mrj_norm = t_mrj_unnorm / ag_frac_r`
+follows because `ag_frac_r[r]` is a constant scalar for every `(m, j)` in the outer sum
+and factors out of the linear combination — no re-run of the 56 parallel tasks is required.
+
+Fix committed on branch `jinzhu`.
+Inspect scripts: `jinzhu_inspect_code/Normalise_blend_ag2ag_weights/`.
+
+---
+
+### Quantitative impact (RESFACTOR=5, 2045→2050, NCELLS=186,648)
+
+| Metric | Value |
+|--------|-------|
+| Cells with `ag_frac_r < 0.99` (affected) | 57,010 / 186,648  (**30.5%**) |
+| Cells with `ag_frac_r < 0.50` (strongly affected) | 25,990  (**13.9%**) |
+| Correction factor `1/ag_frac_r` — p95 | **2.78×** |
+| Correction factor — max | ~9.0× |
+| Max absolute cost difference (per cell, over all `(m, j_to)`) | ~$177M |
+| Beef - modified land dryland, unnorm mean cost | $54M/cell |
+| Beef - modified land irrigated, unnorm mean cost | $33M/cell |
+| Beef - natural land dryland, unnorm mean cost | $18M/cell |
+
+P95 correction factor of 2.78× means 5% of cells were under-charged by at least 2.78×
+in every blended transition cost column.  Cells concentrated along vegetation-change
+boundaries (EP/RP / dryland mixed zones) are most affected — precisely the cells the model
+most wants to transition.
+
+---
+
+### Algebraic proof of the fix
+
+Let `f(m,j,m_to,r,j_to)` be the per-cell transition cost contribution from source `(m,j)`
+to target `(m_to, j_to)` at cell `r` (what `get_transition_matrices_ag2ag` returns).
+
+**Current (un-normalised):**
+```
+ag_t_mrj[m_to, r, j_to] = Σ_{m,j}  ag_X_mrj[m,r,j]         × f(m,j,m_to,r,j_to)
+                         = ag_frac_r[r] × Σ_{m,j} w(m,r,j)  × f(m,j,m_to,r,j_to)
+  where w(m,r,j) = ag_X_mrj[m,r,j] / ag_frac_r[r]  (normalised weight, sums to 1)
+```
+
+**Correct (normalised):**
+```
+ag_t_mrj_norm = t_mrj_unnorm / ag_frac_r[r]
+              = Σ_{m,j} w(m,r,j) × f(m,j,m_to,r,j_to)   ← proper weighted average
+```
+
+Since `ag_frac_r[r]` is identical for all `(m,j)` at a given cell, dividing the
+accumulated result is exactly equivalent to normalising the weights before the sum.
+
+---
+
+### Fix applied to `transitions.py`
+
+Two additions to the `else` branch of `get_transition_matrices_ag2ag_from_base_year`:
+
+**Before the parallel loop** — compute the normalisation denominator:
+```python
+ag_frac_r = ag_X_mrj.sum(axis=(0, 2))                                         # (NCELLS,)
+ag_frac_r_safe = np.where(ag_frac_r > 10 ** (-settings.ROUND_DECIMALS), ag_frac_r, 1.0)
+```
+
+`10 ** (-settings.ROUND_DECIMALS)` replaces the former hard-coded `1e-6`, tying the
+threshold to `settings.ROUND_DECIMALS = 6`.  Cells with no agricultural fraction
+accumulate 0 anyway, so the safe-divisor of 1.0 is harmless.
+
+**After the accumulation loop** — normalise in-place:
+```python
+if separate:
+    for key in ag_t_mrj:
+        ag_t_mrj[key] /= ag_frac_r_safe[np.newaxis, :, np.newaxis]
+else:
+    ag_t_mrj /= ag_frac_r_safe[np.newaxis, :, np.newaxis]
+```
+
+Both the `separate=True` (dict of named arrays) and `separate=False` (single float32
+array) branches are covered.
+
+---
+
+### Inspect scripts
+
+| Script | Purpose | Key outputs |
+|--------|---------|-------------|
+| `step_1_check_ag_frac_sum.py` | Verify `ag_frac_r < 1` distribution and correction-factor magnitude | Spatial map of `ag_frac_r` (RdYlGn), correction-factor map (YlOrRd), histogram |
+| `step_2_compare_unnorm_vs_norm.py` | Derive `t_mrj_norm = t_mrj_unnorm / ag_frac_r_safe`; quantify discrepancy | Unnorm/norm/diff/ratio maps, ratio histogram, stats table |
+| `step_3_beef_unnorm_vs_norm.py` | Per-(beef LU × land mgmt) 2×2 panel comparison | 3 panels saved (modified-land dry/irr, natural-land dry); "Beef-natural-land irrigated" has 0 cells, skipped with guard |
+| `step_4_grouped_vs_parallel.py` | Prototype serial grouped alternative; compare correctness and speed | Per-LU active-j table, speed ratio, correctness stats |
+
+Data: `jinzhu_inspect_code/Normalise_blend_ag2ag_weights/data/Data_RES5.lz4`
+(copied from `Custom_runs/Annualise_write/Run_G0001/output/.../Data_RES5.lz4`,
+RESFACTOR=5, ag_dvars years 2010–2050).
+
+---
+
+### Grouped serial alternative: correct but 6× slower (step 4)
+
+A serial grouped approach was prototyped as a potential replacement for the 56-task
+parallel loop (`blended_ag2ag_grouped()` in `step_4_grouped_vs_parallel.py`).
+
+**Algorithm:**
+
+1. Partition cells by unique value in `data.lumaps[base_year]`.
+2. For each `(lu_code, r_idx)` group, slice `ag_X_mrj[:, r_idx, :]`.
+3. For each `m_src`, find active `j*` columns (`max(ag_X_slice[m_src], axis=0) > threshold`).
+4. For each `(m_src, j_col)` in `j*`, build a sub-lumap with only `r_star` cells set to
+   `j_col` (background = non-ag fill), call `get_transition_matrices_ag2ag`, and accumulate.
+5. After all groups: `result /= ag_frac_r_safe[...]`.
+
+**Critical finding — non-ag lumap groups must be included:**
+
+Cells whose `lumaps[base_year]` value is a non-ag code (EP, Riparian Plantings, etc.) can
+still have nonzero `ag_X_mrj` from the previous solver's fractional allocations.  The
+initial implementation iterated only over ag land-use codes and missed those cells,
+producing a max absolute error of **1.44e8** (catastrophic).  After fixing the loop to
+`for lu_code in np.unique(lumap)` (all unique values, not just ag LU codes):
+
+| Metric | Value |
+|--------|-------|
+| Max absolute difference vs parallel | 416 (float32 accumulation-order noise) |
+| Mean relative difference (nonzero cells) | 0.55% |
+| `np.allclose(atol=1e-2, rtol=1e-2)` | True |
+| Total `get_transition_matrices_ag2ag` calls | 127 (vs 56 for parallel) |
+| Speed vs parallel | **0.16× (6× slower)** |
+| Non-ag lumap groups with nonzero j_active | EP: 17 j*, Riparian: 18 j* |
+
+**Why the grouped approach is slower:**
+
+`get_transition_matrices_ag2ag` always allocates and operates on full-NCELLS arrays
+internally (EXCLUDE mask, T_MAT, REAL_AREA, `w_mrj`).  Even though only `r_star` cells
+contribute nonzero entries to the result, the function's per-call overhead (full-array
+allocation × 127 calls) dominates.  The 6× slowdown arises because joblib threading
+overhead is small (shared memory) while the per-call fixed cost is large.
+
+**To realize the speedup**, `get_transition_matrices_ag2ag` would need an optional
+`cell_idx` parameter that slices `EXCLUDE`, `T_MAT`, `REAL_AREA`, and `w_mrj` to the
+`r_star` subset before any inner array construction.  This refactoring is not implemented;
+the parallel approach remains the production code.
+
+The 0.55% mean relative difference is a float32 accumulation-order artefact — both
+implementations are mathematically identical; they differ only in the order they sum
+`float32` partials across the parallel vs. serial call sequence.
+
+---
+
 ## 20260612 — "Annualise write" double-division bug: annual-rate metrics were divided by `gap` a second time
 
 ### TL;DR

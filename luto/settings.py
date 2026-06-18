@@ -1114,12 +1114,12 @@ and manage human-wildlife interactions
 GBF4_TARGET_SNES  = 'off'           # 'off', 'USER_DEFINED', or 'dict'
 GBF4_TARGET_ECNES = 'off'           # 'off', 'USER_DEFINED', or 'dict'
 '''
-'off'          — GBF4 SNES/ECNES constraints disabled.
-'USER_DEFINED' — read targets from input CSV file.
-'dict'         — overwrite all TARGET_LEVEL columns with values from GBF4_{SNES,ECNES}_TARGETS_DICT.
+'off'               — GBF4 SNES/ECNES constraints disabled.
+'USER_DEFINED'      — read targets from input CSV file.
+'dict'              — still selecte sepecies as "USER_DEFINED", but overwrite targets by the values in GBF4_{SNES,ECNES}_TARGETS_DICT.
 '''
 
-GBF4_SNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
+GBF4_SNES_PRESENCE_CLASS  = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 GBF4_ECNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 
 GBF4_SNES_TARGETS_DICT  = {2030: 30, 2050: 50, 2100: 50}

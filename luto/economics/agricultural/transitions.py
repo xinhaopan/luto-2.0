@@ -205,6 +205,15 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
         yr_cal = data.YR_CAL_BASE + yr_idx
         ag_X_mrj = data.ag_dvars[base_year]
 
+        # Normalisation denominator: sum of ag dvars over (m, j) per cell.
+        # For pure-ag cells this equals 1; for mixed cells it is < 1, so the
+        # raw weighted sum underestimates the whole-cell transition cost.
+        # Dividing by this factor after accumulation restores the correct
+        # interpretation: t_mrj represents the cost if the WHOLE CELL were
+        # transitioned, and the solver's own decision variables handle fractions.
+        ag_frac_r = ag_X_mrj.sum(axis=(0, 2))                           # (NCELLS,)
+        ag_frac_r_safe = np.where(ag_frac_r > 10 ** (-settings.ROUND_DECIMALS), ag_frac_r, 1.0)  # avoid /0; zero-ag cells accumulate 0 anyway
+
         # Hoist invariants that are shared across all (m, j) combos
         w_mrj = get_wreq_matrices(data, yr_idx)
         t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
@@ -215,17 +224,13 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
             all_m_lumap = np.ones(data.NCELLS, dtype=np.int8) * m
             all_j_lumap = np.ones(data.NCELLS, dtype=np.int8) * j
 
-            current_lus_X_r = ag_X_mrj[m, :, j]
-            # repeat current (m, j) land use array to get weights for ag_t_mrj contributiom
-            lus_weight_mrj = np.swapaxes(np.tile(current_lus_X_r, (data.NLMS, data.N_AG_LUS, 1)), 1, 2)
-
             from_current_lus_t_mrj = get_transition_matrices_ag2ag(
                 data, yr_idx, all_j_lumap, all_m_lumap, separate, w_mrj=w_mrj, t_ij=t_ij
             )
             if separate:
-                return {key: lus_weight_mrj * array for key, array in from_current_lus_t_mrj.items()}
+                return {key: ag_X_mrj[m, :, j][None, :, None] * array for key, array in from_current_lus_t_mrj.items()}
             else:
-                return lus_weight_mrj * from_current_lus_t_mrj
+                return ag_X_mrj[m, :, j][None, :, None] * from_current_lus_t_mrj
 
         ag_t_mrj: dict | np.ndarray = (
             {} if separate
@@ -238,9 +243,7 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
         n_jobs = settings.BLENDED_AG_TRANSITION_COSTS_N_JOBS
         for i in range(0, len(combos), n_jobs):
             batch = combos[i:i + n_jobs]
-            batch_results = Parallel(n_jobs=n_jobs, backend="threading")(
-                delayed(_compute)(m, j) for m, j in batch
-            )
+            batch_results = Parallel(n_jobs=n_jobs, backend="threading")(delayed(_compute)(m, j) for m, j in batch)
 
             if separate:
                 for result in batch_results:
@@ -252,6 +255,15 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
             else:
                 for result in batch_results:
                     ag_t_mrj += result
+
+        # Normalise: divide each cell by its total ag fraction so that the
+        # accumulated weighted sum becomes a proper weighted average (weights
+        # sum to 1), giving a whole-cell cost coefficient for the solver.
+        if separate:
+            for key in ag_t_mrj:
+                ag_t_mrj[key] /= ag_frac_r_safe[np.newaxis, :, np.newaxis]
+        else:
+            ag_t_mrj /= ag_frac_r_safe[np.newaxis, :, np.newaxis]
 
         return ag_t_mrj
 

@@ -1113,7 +1113,7 @@ class LutoSolver:
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 ECNES...')
             return
 
-        region_comm_pres = self._input_data.GBF4_ECNES_region_species      # list[(region, community, presence)]
+        region_comm_pres = self._input_data.GBF4_ECNES_region_species       # list[(region, community, presence)]
         v_limits         = self._input_data.limits["GBF4_ECNES"]            # xr.DataArray[layer=(region,species,presence)]
         scale_factors    = self._input_data.scale_factors['GBF4_ECNES']     # xr.DataArray[layer=(region,species,presence)]
         val_matrix       = self._input_data.GBF4_ECNES_pre_1750_area_sr     # xr.DataArray[layer=(species,presence), cell]

@@ -401,11 +401,12 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
 
 def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, ag_t_mrj):
     print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
-    non_ag_t_mrj = non_ag_transition.get_transition_matrix_ag2nonag( 
-        data, 
-        target_index, 
-        data.lumaps[base_year], 
-        data.lmmaps[base_year]
+    non_ag_t_mrj = non_ag_transition.get_transition_matrix_ag2nonag(
+        data,
+        target_index,
+        data.lumaps[base_year],
+        data.lmmaps[base_year],
+        base_year=base_year,
     ).astype(np.float32)
     # Transition costs occures if the base year is not the target year
     return non_ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_t_mrj).astype(np.float32)
