@@ -507,8 +507,7 @@ def get_ag_man_c_mrj(data: Data, ag_c_mrj: np.ndarray, target_year):
 
 def get_ag_man_g_mrj(data: Data, target_index):
     print('Getting agricultural management options\' GHG emission effects...', flush = True)
-    output = ag_ghg.get_agricultural_management_ghg_matrices(data, target_index)
-    return output
+    return ag_ghg.get_agricultural_management_ghg_matrices(data, target_index)
 
 
 def get_ag_man_q_mrj(data: Data, target_index, ag_q_mrp: np.ndarray):

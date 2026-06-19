@@ -952,11 +952,11 @@ class LutoSolver:
             ghg_non_ag_exprs.append(
                 _qsum(self._input_data.non_ag_g_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
             )
-            
+
         self.ghg_ag_contr = gp.quicksum(ghg_ag_exprs)
         self.ghg_ag_man_contr = gp.quicksum(ghg_ag_man_exprs)
-        self.ghg_non_ag_contr = gp.quicksum(ghg_non_ag_exprs)    
-        
+        self.ghg_non_ag_contr = gp.quicksum(ghg_non_ag_exprs)
+
         return self.ghg_ag_contr + self.ghg_ag_man_contr + self.ghg_non_ag_contr + self._input_data.offland_ghg
 
     def _add_ghg_emissions_limit_constraints(self):

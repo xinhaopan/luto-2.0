@@ -734,13 +734,13 @@ GHG_TARGETS_DICT = {
 GHG_EMISSIONS_LIMITS = 'low'         # 'off', 'low', 'medium', or 'high'
 '''
 `GHG_EMISSIONS_LIMITS` options include: 
-- Assuming agriculture is responsible to sequester 100% of the carbon emissions
+- (deprecated) Assuming agriculture is responsible to sequester 100% of the carbon emissions
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
-- Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
+- (deprecated) Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
     - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
-- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types)
+- (deprecated) Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types)
     - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
-- When turning off the 'Carbon Planttings', including block/belt, use the following options:
+- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types):
     - '1.5C 50%', '1.8C 67%'
 '''
   	  	  
@@ -760,10 +760,34 @@ Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
 '''
 
 
-USE_GHG_SCOPE_1 = True  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
+USE_GHG_SCOPE_1 = True
 '''
-Basic GHG types are the direct emissions from the land-use and livestock types, excluding
-indirect emissions such as fertiliser, irrigation, land management, etc.
+Controls whether the solver uses only scope 1 (direct, on-farm) GHG emissions — as defined
+by the Australian NGGI (National Greenhouse Gas Inventory) — or the full profile that also
+includes scope 2 electricity and scope 3 indirect emissions (fertiliser/pesticide production).
+
+Rationale (Sanson, van Schoten et al., 2025):
+  AusTIMES agriculture sector scope 1 baseline (2022, excl. off-land): ~81.3 MtCO2e
+  LUTO2 on-land ag baseline (2022, full profile):                       ~95.1 MtCO2e
+  LUTO2 on-land ag baseline (2022, after all scope 1 exclusions):       ~70-73 MtCO2e
+
+  Because AusTIMES already models energy-system decarbonisation externally, including
+  scope 2/3 emissions in LUTO2's solve causes double-counting of those reductions.
+  The ~70-73 Mt revised LUTO2 baseline aligns with the NGGI scope 1 column used in
+  the AusTIMES pathway targets (1.5C 50% excl. avoided emissions).
+
+When True, the solver excludes:
+  Crops     — energy-related CO2 from: chemical application (non-liming), crop management,
+              cultivation, fodder production, harvesting, irrigation, pasture seed production,
+              and sowing; plus fertiliser production and pesticide production.
+              Only CROP_GHG_SCOPE_1 sources (soil N2O) enter the constraint.
+  Livestock — electricity use (CO2E_KG_HEAD_ELEC), fuel use (CO2E_KG_HEAD_FUEL),
+              fodder production (CO2E_KG_HEAD_FODDER), and seed (CO2E_KG_HEAD_SEED).
+              Only LVSTK_GHG_SCOPE_1 sources (enteric, dung/urine, manure, leach/runoff)
+              enter the constraint.
+
+Note: BECCS should also be disabled when using AusTIMES pathway targets to maintain
+inter-model consistency (energy-related CO2 displacement is handled by AusTIMES).
 '''
 
 CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']
