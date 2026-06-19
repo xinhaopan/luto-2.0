@@ -5,6 +5,176 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260619 — AgMgt GHG abatement exceeds Ag emissions: scope-1 filter missing + Biochar exogenous soil carbon
+
+### TL;DR
+
+Agricultural management (Am) GHG abatement incorrectly exceeded the associated Ag scope-1
+emissions for 17 land uses at 2050. Winter Cereals was the most extreme case: Ag scope-1
+emissions = 1.89 Mt, but PA + AgTech EI + Biochar abated 4.15 Mt (2.20×). Two root causes:
+
+1. **Scope-1 filter not applied to AgMgt functions** — PA, AgTech EI, and Biochar were
+   reducing scope-3 emission sources (chemical application, irrigation, pesticide) that
+   are absent from the Ag baseline.
+2. **Biochar's `IMPACTS_soil_carbon` is exogenous carbon** — it adds new soil organic
+   carbon from the biochar material itself and is not bounded by existing Ag soil emissions.
+
+After both fixes: zero land uses with Am > Ag (overall ratio 0.67×, down from 1.80×).
+
+Inspect scripts: `jinzhu_inspect_code/Check_GHG_agman_gt_ag/scripts/07_full_story_summary.py`.
+Log: `jinzhu_inspect_code/Check_GHG_agman_gt_ag/logs/07_full_story_summary.txt`.
+
+---
+
+### Background: Scope-1 baseline switch (Feb 2025)
+
+Since Feb 2025, LUTO uses the 'AusTIMES agriculture sector scope 1 baseline'. Scope 1
+includes only direct soil/enteric emissions:
+
+- **Crops**: only `CO2E_KG_HA_SOIL` (direct soil emissions)
+- **Livestock**: only enteric fermentation, dung/urine, manure, leachate/runoff
+
+Scope-3 sources (chemical application, irrigation, pest management, fuel, fodder, seed)
+were removed from the Ag baseline. But the AgMgt functions continued to report reductions
+in ALL sources including the scope-3 ones — creating a mismatch where Am abatement
+exceeded the Ag base that Am was notionally reducing.
+
+---
+
+### Root cause 1 — Scope-1 filter missing in Am GHG functions
+
+`get_precision_agriculture_effect_g_mrj` and `get_agtech_ei_effect_g_mrj` in `ghg.py`
+iterated over all four crop emission types:
+
+```python
+for co2e_type in ['CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT',
+                  'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_SOIL']:
+    # no scope-1 guard — all sources reduced regardless
+```
+
+For Winter Cereals at 2050:
+- PA reduced 1.90 Mt total (1.90 Mt scope-3 + scope-1 combined)
+- After scope-1 filter: PA reduces only 0.96 Mt (soil emissions only)
+- AgTech EI reduced 1.42 Mt → 0.33 Mt after filter
+
+**Fix**: added a scope-1 guard inside the inner loop of each Am function:
+
+```python
+if settings.USE_GHG_SCOPE_1 and co2e_type not in settings.CROP_GHG_SCOPE_1:
+    continue
+```
+
+Applied to `get_precision_agriculture_effect_g_mrj`, `get_agtech_ei_effect_g_mrj`
+(crop loop and irrigation block), and `get_biochar_effect_g_mrj_crop`.
+
+---
+
+### Root cause 2 — Biochar IMPACTS_soil_carbon is exogenous carbon
+
+`get_biochar_effect_g_mrj` contained two logically distinct sequestration mechanisms:
+
+- **Crop emission reductions** (`CO2E_KG_HA_CROP_MGT`, `CO2E_KG_HA_SOIL`): reductions
+  in existing Ag emission sources — bounded by the Ag emissions baseline
+- **Soil carbon sequestration** (`IMPACTS_soil_carbon`): biochar material sequesters
+  new soil organic carbon. This is **exogenous** — not a reduction of existing Ag
+  emissions and therefore not bounded by the Ag scope-1 pool
+
+For Winter Cereals at 2050, after the scope-1 fix, Biochar still contributed ~0.83 Mt
+(0.08 Mt crop + 0.75 Mt soil carbon). The 0.75 Mt exogenous soil carbon was responsible
+for the remaining 1.12× Am/Ag ratio.
+
+---
+
+### Biochar function split
+
+`get_biochar_effect_g_mrj` was split into three functions:
+
+```python
+def get_biochar_effect_g_mrj_crop(data, yr_idx):
+    """Crop emission reductions (CO2E_KG_HA_CROP_MGT, CO2E_KG_HA_SOIL).
+    Scope-1 filtered. Bounded by Ag emissions."""
+    ...
+
+def get_biochar_effect_g_mrj_soil(data, yr_idx):
+    """Exogenous soil carbon sequestration (IMPACTS_soil_carbon).
+    Not bounded by Ag emissions."""
+    ...
+
+def get_biochar_effect_g_mrj(data, yr_idx):
+    """Wrapper: full effect = crop reductions + soil carbon."""
+    return get_biochar_effect_g_mrj_crop(data, yr_idx) + get_biochar_effect_g_mrj_soil(data, yr_idx)
+```
+
+The solver still uses the full wrapper (`get_agricultural_management_ghg_matrices` calls
+`get_biochar_effect_g_mrj`). Biochar soil carbon legitimately contributes to total GHG
+balance — it just should not be compared against the Ag scope-1 pool as a bounded
+emission reduction. The write-side proportional cap in `write.py` handles output
+representation when total Am abatement would push a land use's net GHG below zero.
+
+---
+
+### Three-stage quantitative analysis (RF5, 2050, using archived dvars)
+
+Diagnostic script `07_full_story_summary.py` compared Am abatement vs Ag scope-1
+emissions across three stages using saved dvars from 2050:
+
+| Stage | Description | Overall Am/Ag | LUs with Am > Ag |
+|---|---|---|---|
+| 1 — Original | Scope-3 in Am, scope-1 in Ag | 1.80× | **17** |
+| 2 — Scope-1 fix | Am restricted to scope-1 sources | 0.95× | **7** |
+| 3 — Scope-1 fix + no Biochar soil C in comparison | Exogenous soil C excluded | 0.67× | **0** |
+
+#### Winter Cereals breakdown (Ag scope-1 = 1.89 Mt):
+
+| Stage | PA (Mt) | AgTech EI (Mt) | Biochar (Mt) | Total Am (Mt) | Ratio |
+|---|---|---|---|---|---|
+| 1 — Original | −1.90 | −1.42 | −0.83 | −4.15 | **2.20×** |
+| 2 — Scope-1 fix | −0.96 | −0.33 | −0.83 | −2.11 | **1.12×** |
+| 3 — Scope-1 fix + no soil C | −0.96 | −0.33 | −0.08 | −1.36 | **0.72×** |
+
+The most extreme cases in the original (Stage 1):
+
+| Land use | Ag scope-1 (Mt) | Am abatement (Mt) | Ratio |
+|---|---|---|---|
+| Winter legumes | 0.0046 | −0.2496 | 54.5× |
+| Summer legumes | 0.0022 | −0.0107 | 4.9× |
+| Summer oilseeds | 0.0014 | −0.0065 | 4.7× |
+| Winter oilseeds | 0.1014 | −0.3626 | 3.6× |
+| Winter cereals | 1.8856 | −4.1528 | 2.2× |
+
+Legumes and oilseeds had extreme ratios because their scope-1 soil emissions are tiny
+(little direct soil emission) while Am was reducing all scope-3 agrochemical sources.
+
+---
+
+### Solver-side cap: decided against
+
+A solver-side `_add_am_ghg_cap_constraints()` constraint was prototyped that would
+prevent Am abatement from exceeding Ag emissions per cell via slack variables. This was
+removed because:
+1. The scope-1 fix (Stage 2) already brought the overall ratio to 0.95× (below 1.0)
+2. Biochar soil C is exogenous and legitimate — capping it in the solver would
+   incorrectly penalise a valid sequestration pathway
+3. The constraint added 56 slack variables and significant complexity without improving
+   correctness
+
+The write-side proportional cap in `write.py` remains (scales Am down in output when
+`ag_ghg_base + am_total < 0`). This is a reporting-only correction and does not affect
+solver optimisation.
+
+---
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `luto/economics/agricultural/ghg.py` | Added scope-1 guard to `get_precision_agriculture_effect_g_mrj` and `get_agtech_ei_effect_g_mrj` (crop loop + irrigation block). Split `get_biochar_effect_g_mrj` into `_crop`, `_soil`, and wrapper. |
+| `luto/solvers/solver.py` | No change (solver-side cap was not adopted). |
+| `luto/solvers/input_data.py` | No change (extra fields for cap were prototyped then removed). |
+| `luto/tools/write.py` | Write-side proportional cap retained as-is using full `am_total`. |
+
+---
+
 ## 20260617 — Blended ag2ag transition weights normalization bug: un-normalised weights under-charge mixed-use cells
 
 ### TL;DR
