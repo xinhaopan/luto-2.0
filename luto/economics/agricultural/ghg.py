@@ -461,9 +461,6 @@ def get_precision_agriculture_effect_g_mrj(data:Data, yr_idx):
                 'CO2E_KG_HA_PEST_PROD',
                 'CO2E_KG_HA_SOIL',
             ]:
-                if settings.USE_GHG_SCOPE_1 and co2e_type not in settings.CROP_GHG_SCOPE_1:
-                    continue
-
                 # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
                     continue
@@ -600,10 +597,7 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
                 'CO2E_KG_HA_CROP_MGT',
                 'CO2E_KG_HA_PEST_PROD',
                 'CO2E_KG_HA_SOIL'
-            ]:
-                if settings.USE_GHG_SCOPE_1 and co2e_type not in settings.CROP_GHG_SCOPE_1:
-                    continue
-
+            ]:    
                 # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
                     continue
@@ -612,7 +606,7 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
 
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0)
+                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0) 
                         * reduction_perc
                         / 1000            # convert to tonnes
                         * data.REAL_AREA  # adjust for resfactor
@@ -620,7 +614,7 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
                     new_g_mrj[m, :, lu_idx] -= reduction_amnt
 
             # Subtract extra 'CO2e_KG_HA_IRRIG' carbon for irrigated land uses
-            if m == 1 and not settings.USE_GHG_SCOPE_1:
+            if m == 1:
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
                     continue
 
@@ -643,60 +637,63 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
     return new_g_mrj
 
 
-def get_biochar_effect_g_mrj_crop(data: Data, yr_idx):
-    """Biochar effect on AGGHG crop emission sources (CO2E_KG_HA_CROP_MGT, CO2E_KG_HA_SOIL).
-    Bounded by existing Ag emissions — used in the solver Am GHG target and cap constraint."""
+def get_biochar_effect_g_mrj(data:Data, yr_idx):
+    """
+    Applies the effects of using Biochar to the GHG data
+    for all relevant agr. land uses.
+
+    Parameters
+    - data: The input data containing the necessary information.
+    - yr_idx: The index of the year to calculate the effects for.
+
+    Returns
+    - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data after applying the Biochar effects.
+    """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar']
     yr_cal = data.YR_CAL_BASE + yr_idx
-    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+
+    # Set up the effects matrix
+    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     if not settings.AG_MANAGEMENTS['Biochar']:
         return new_g_mrj
 
+    # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
         lu_data = data.BIOCHAR_DATA[settings.LU2TYPE[lu]]
+
         for lm in data.LANDMANS:
             m = 0 if lm == 'dry' else 1
-            for co2e_type in ['CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_SOIL']:
-                if settings.USE_GHG_SCOPE_1 and co2e_type not in settings.CROP_GHG_SCOPE_1:
-                    continue
+            for co2e_type in [
+                'CO2E_KG_HA_CROP_MGT',
+                'CO2E_KG_HA_SOIL',
+            ]:
+                # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
                     continue
+
                 reduction_perc = 1 - lu_data.loc[yr_cal, co2e_type]
+
                 if reduction_perc != 0:
-                    new_g_mrj[m, :, lu_idx] -= (
-                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0)
-                        * reduction_perc / 1000 * data.REAL_AREA
+                    reduction_amnt = (
+                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0) 
+                        * reduction_perc
+                        / 1000            # convert to tonnes
+                        * data.REAL_AREA  # adjust for resfactor
                     )
-    return new_g_mrj
+                    new_g_mrj[m, :, lu_idx] -= reduction_amnt
 
-
-def get_biochar_effect_g_mrj_soil(data: Data, yr_idx):
-    """Biochar IMPACTS_soil_carbon sequestration — exogenous carbon not bounded by Ag emissions.
-    Added to the GHG expression separately so it is never subject to the Am abatement cap."""
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar']
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
-
-    if not settings.AG_MANAGEMENTS['Biochar']:
-        return new_g_mrj
-
-    for lu_idx, lu in enumerate(land_uses):
-        lu_data = data.BIOCHAR_DATA[settings.LU2TYPE[lu]]
-        for lm in data.LANDMANS:
-            m = 0 if lm == 'dry' else 1
+            # Subtract soil carbon benefit
             soil_multiplier = lu_data.loc[yr_cal, 'IMPACTS_soil_carbon'] - 1
             if soil_multiplier != 0:
-                new_g_mrj[m, :, lu_idx] -= (
-                    data.SOIL_CARBON_AVG_T_CO2_HA_PER_YR * soil_multiplier * data.REAL_AREA
+                soil_reduction_amnt = (
+                    data.SOIL_CARBON_AVG_T_CO2_HA_PER_YR
+                    * soil_multiplier
+                    * data.REAL_AREA
                 )
+                new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
+
     return new_g_mrj
-
-
-def get_biochar_effect_g_mrj(data: Data, yr_idx):
-    """Wrapper: full biochar GHG effect = crop emission reductions + soil carbon sequestration.
-    Use get_biochar_effect_g_mrj_crop / _soil for split access."""
-    return get_biochar_effect_g_mrj_crop(data, yr_idx) + get_biochar_effect_g_mrj_soil(data, yr_idx)
 
 
 def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
@@ -789,7 +786,6 @@ def get_onshore_wind_effect_g_mrj(data:Data) -> np.ndarray:
     # Return zeros - no direct emissions impact from wind installation
     return new_g_mrj
 
-@lru_cache(maxsize=1) # Cached becasue get_agricultural_management_ghg_matrices_cap calls it later.
 def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.ndarray]:
     """
     Calculate the greenhouse gas (GHG) matrices for different agricultural management practices.
@@ -826,5 +822,3 @@ def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.
         'Utility Solar PV': utility_solar_ghg_impact,
         'Onshore Wind': onshore_wind_ghg_impact
     }
-
-

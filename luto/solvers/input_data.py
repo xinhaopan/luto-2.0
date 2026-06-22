@@ -98,18 +98,18 @@ class SolverInputData:
     
     GBF2_mask_area_r: np.ndarray                                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
     GBF3_NVIS_pre_1750_area_vr: np.ndarray                              # Raw areas (GBF3) from NVIS vegetation - indexed by group (v) and cell (r)
-    GBF3_NVIS_region_group: dict[int, str]                                     # GBF3 NVIS vegetation group names - indexed by group (v).
+    GBF3_NVIS_region_group: dict[int, str]                              # GBF3 NVIS vegetation group names - indexed by group (v).
     GBF4_SNES_pre_1750_area_sr: xr.DataArray                            # Areas (GBF4) SNES - xr.DataArray[layer, cell], layer coord is MultiIndex(species, presence). No region dim — region masking applied in solver.
     GBF4_SNES_region_species: list                                      # GBF4 SNES constraint triplets - list[(region, species, presence)].
-    GBF4_ECNES_pre_1750_area_sr: xr.DataArray                          # Areas (GBF4) ECNES - xr.DataArray[layer, cell], layer coord is MultiIndex(species, presence). No region dim — region masking applied in solver.
+    GBF4_ECNES_pre_1750_area_sr: xr.DataArray                           # Areas (GBF4) ECNES - xr.DataArray[layer, cell], layer coord is MultiIndex(species, presence). No region dim — region masking applied in solver.
     GBF4_ECNES_region_species: list                                     # GBF4 ECNES constraint triplets - list[(region, community, presence)].
     GBF8_pre_1750_area_sr: xr.DataArray                                 # Areas (GBF8) - xr.DataArray[species, cell], species coord = species name strings.
     GBF8_region_species: list                                           # GBF8 constraint pairs - list[(region, species)].
 
     savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
     GBF2_mask_idx: np.ndarray                                           # Index of the mask of priority degraded areas.
-    renewable_GBF2_mask_solar_idx: np.ndarray                            # Index of GBF2 mask for solar renewable exclusion.
-    renewable_GBF2_mask_wind_idx: np.ndarray                             # Index of GBF2 mask for wind renewable exclusion.
+    renewable_GBF2_mask_solar_idx: np.ndarray                           # Index of GBF2 mask for solar renewable exclusion.
+    renewable_GBF2_mask_wind_idx: np.ndarray                            # Index of GBF2 mask for wind renewable exclusion.
     renewable_MNES_mask_solar_idx: np.ndarray                           # Index of EPBC MNES mask for solar renewable exclusion.
     renewable_MNES_mask_wind_idx: np.ndarray                            # Index of EPBC MNES mask for wind renewable exclusion.
 
