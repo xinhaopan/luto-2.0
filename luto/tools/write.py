@@ -437,8 +437,11 @@ def write_data(data: Data):
     paths = [f"{data.path}/out_{yr}" for yr in years]
     write_settings(data.path)
 
+    # Windows WaitForMultipleObjects limit: 63 handles total;
+    max_workers = min(os.cpu_count(), 61) if os.name == 'nt' else os.cpu_count()
+
     def get_n_jobs(peak_mb):
-        return max(1, settings.WRITE_REPORT_MAX_MEM_MB // max(peak_mb, 1))
+        return min(max_workers, max(1, settings.WRITE_REPORT_MAX_MEM_MB // max(peak_mb, 1)))
 
     # DVars must be written first as other outputs depend on them
     dvar_jobs = [delayed(write_dvar_and_mosaic_map)(data, yr, path_yr) for yr, path_yr in zip(years, paths)]
@@ -475,8 +478,6 @@ def write_data(data: Data):
             groups[n] = []
         groups[n].append(task)
 
-    # Windows WaitForMultipleObjects limit: 63 handles total; loky uses ~2 internally, so cap at 61.
-    max_workers = min(os.cpu_count(), 61) if os.name == 'nt' else os.cpu_count()
     # Run tiers from most memory-constrained (n_jobs=1) to least (n_jobs=max_workers)
     for n_workers in sorted(groups.keys()):
         tasks = groups[n_workers]
