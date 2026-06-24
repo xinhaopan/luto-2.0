@@ -129,9 +129,7 @@ def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
 
     # get all agricultural and non agricultural cells
     non_agricultural_cells = np.nonzero(lumap >= non_ag_base)[0]
-    agricultural_cells = np.nonzero(
-        ~np.isin(all_cells, non_agricultural_cells)
-    )[0]
+    agricultural_cells = np.nonzero(~np.isin(all_cells, non_agricultural_cells))[0]
 
     return agricultural_cells, non_agricultural_cells
 
@@ -600,9 +598,12 @@ class _TeeIO:
 
     def flush(self):
         self._file.flush()
+        self._orig.flush()
 
 
 class LogToFile:
+    _active: set = set()  # paths currently being logged; prevents double-open on nested calls
+
     def __init__(self, log_path, mode: str = 'a'):
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
@@ -613,17 +614,23 @@ class LogToFile:
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            with (
-                open(self.log_path_stdout, self.mode, encoding='utf-8') as f_out,
-                open(self.log_path_stderr, self.mode, encoding='utf-8') as f_err,
-                redirect_stdout(_TeeIO(sys.stdout, f_out)),
-                redirect_stderr(_TeeIO(sys.stderr, f_err)),
-            ):
-                try:
-                    return func(*args, **kwargs)
-                except Exception:
-                    sys.stderr.write(traceback.format_exc() + '\n')
-                    raise
+            if self.log_path_stdout in LogToFile._active:
+                return func(*args, **kwargs)
+            LogToFile._active.add(self.log_path_stdout)
+            try:
+                with (
+                    open(self.log_path_stdout, self.mode, encoding='utf-8') as f_out,
+                    open(self.log_path_stderr, self.mode, encoding='utf-8') as f_err,
+                    redirect_stdout(_TeeIO(sys.stdout, f_out)),
+                    redirect_stderr(_TeeIO(sys.stderr, f_err)),
+                ):
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception:
+                        sys.stderr.write(traceback.format_exc() + '\n')
+                        raise
+            finally:
+                LogToFile._active.discard(self.log_path_stdout)
         return wrapper
             
             

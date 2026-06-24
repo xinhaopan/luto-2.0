@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import os
+import shutil
 import json
 import pandas as pd
 import numpy as np
@@ -269,6 +270,13 @@ def save_report_data(raw_data_dir:str):
     # Create the directory if it does not exist
     if not os.path.exists(SAVE_DIR):
         os.makedirs(SAVE_DIR)
+
+    # Move the GBF2 mask GeoJSON written by write_data into the report geo dir
+    gbf2_src = os.path.join(raw_data_dir, 'biodiversity_GBF2_mask.js')
+    gbf2_dst = os.path.join(SAVE_DIR, 'geo', 'biodiversity_GBF2_mask.js')
+    if os.path.exists(gbf2_src) and not os.path.exists(gbf2_dst):
+        os.makedirs(os.path.dirname(gbf2_dst), exist_ok=True)
+        shutil.move(gbf2_src, gbf2_dst)
 
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir).reset_index(drop=True)

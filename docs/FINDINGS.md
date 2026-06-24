@@ -5,6 +5,300 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260623 — blend non-ag UB: three runtime bugs fixed (ordering, RF5 edge cells, INFEASIBLE)
+
+### TL;DR
+
+Three consecutive runtime errors when running `BLENDED_TRANSITION_COSTS=True` at RF5
+were traced to `get_non_ag_ub_matrices` in `luto/economics/non_agricultural/transitions.py`.
+
+1. **`UnboundLocalError`** — irreversibility override block placed before `no_go_x_rk` was
+   initialised (refactor scrambled block order).
+2. **`GurobiError: Invalid value for Model.addConstr`** — 5 RF5 edge cells had Destocked
+   UB=0 AND no ag vars, so the cell-usage expression was a bare integer `0`, not a Gurobi
+   linear expression.
+3. **Instant INFEASIBLE (presolve, 0 iterations)** — the narrow fallback in fix 2 only
+   fired when `eligible_frac_r < FEASIBILITY_TOLERANCE`. For cells where `eligible_frac_r`
+   was small-but-positive (e.g. 0.01) yet still less than `AG_MASK_PROPORTION_R` (e.g. 0.04),
+   Destocked UB < what the cell-usage constraint requires → presolve detects contradiction.
+
+---
+
+### Fix 1 — block ordering in `get_non_ag_ub_matrices`
+
+The irreversibility `for k` loop that sets `no_go_x_rk[..., k] = 1` must run AFTER
+`no_go_x_rk = (t_rk * no_go_x_rk).astype(np.float32)` is computed. A prior refactor had
+swapped the two blocks. Fix: restored correct ordering.
+
+---
+
+### Fix 2 → 3 — Destocked UB floor for livestock-natural cells
+
+**Root cause (both fixes):** At RF5, `get_resfactored_lumap` assigns each coarsened cell to
+one plurality LU via quota-fill + nearest-neighbour. Some edge cells end up with
+`LUMAP = Beef-natural (j=2)` while `AG_L_MRJ` shows `Unallocated-natural (j=23)` with
+fraction 0.04. The Destocked cap uses `AG_L_MRJ[:,:,LU_LVSTK_NATURAL].sum()` as the
+eligible fraction. For these cells the sum = 0 (or very small), capping Destocked UB below
+`AG_MASK_PROPORTION_R`. When Destocked is the only available LU (no ag vars, no other
+non-ag LU allowed by T_MAT), the cell-usage constraint becomes unsatisfiable.
+
+**Fix 2 (too narrow):**
+```python
+eligible_frac_r = np.where(
+    lumap_is_lvstk_nat & (eligible_frac_r < settings.FEASIBILITY_TOLERANCE),
+    data.AG_MASK_PROPORTION_R,
+    eligible_frac_r,
+)
+```
+Resolved the 5 worst cells (eligible_frac_r == 0) but left cells with
+0 < eligible_frac_r < AG_MASK_PROPORTION_R still producing INFEASIBLE.
+
+**Fix 3 (current, general):**
+```python
+lumap_is_lvstk_nat = np.isin(lumap, data.LU_LVSTK_NATURAL)
+eligible_frac_r = np.maximum(
+    eligible_frac_r,
+    data.AG_MASK_PROPORTION_R * lumap_is_lvstk_nat.astype(np.float32),
+)
+```
+For every livestock-natural cell (LUMAP ∈ LU_LVSTK_NATURAL), Destocked UB is floored at
+`AG_MASK_PROPORTION_R` — the minimum needed to satisfy the cell-usage constraint. For
+non-livestock-natural cells the floor is 0 (no change). This replaces the narrow
+`< FEASIBILITY_TOLERANCE` check entirely.
+
+The RP cap is also moved to the very end of the function (after Destocked cap) so it is
+unconditionally the last cap applied regardless of BLENDED mode.
+
+---
+
+## 20260623 — ag2ag blend transition denominator fix: per-target eligible-source fraction
+
+### TL;DR
+
+`get_transition_matrices_ag2ag_from_base_year` (blend path) previously normalised the
+accumulated weighted transition cost by `ag_frac_r` — the total ag fraction per cell,
+broadcast identically over all target LUs. This inflated the denominator for any target
+where some source LUs have `NaN` T_MAT entries (disallowed transitions), creating an
+unintended per-unit cost discount analogous to the Destocked bug fixed earlier today.
+
+**Fix**: replace the scalar-per-cell denominator with a per-(cell × target) eligible
+fraction computed as a single matrix multiply.
+
+File changed: `luto/economics/agricultural/transitions.py`.
+
+---
+
+### Root cause
+
+Inside the blend loop, `get_transition_matrices_ag2ag` calls `nan_to_num` (line 139),
+converting `NaN` T_MAT entries to `0` before accumulation. So for target `j_to`:
+
+- Source LUs where `T_MAT[source, j_to]` is `NaN` → contribute **0** to numerator
+- Source LUs where `T_MAT[source, j_to] = $0` (diagonal, self-transition) → also **0**
+- Both still contributed their full `frac_j` to the old `ag_frac_r` denominator
+
+The discount factor for a given target = `eligible_frac / total_ag_frac` where
+`eligible_frac` = sum of source fractions with non-NaN T_MAT to that target.
+
+Two types of zero-numerator contributor:
+
+| Type | T_MAT value | Discount intended? |
+|---|---|---|
+| Self-transition (`j = j_to`) | `$0` (not NaN) | **Yes** — head-start discount: a cell already partly holding the target pays less |
+| Disallowed transition | `NaN → 0` | **No** — analogous to the Destocked bug |
+
+Because self-transitions are `$0` (not `NaN`), they remain in the new per-target
+denominator, so the head-start discount is fully preserved.
+
+---
+
+### Fix
+
+**Before** — one denominator per cell, broadcast over all targets:
+```python
+ag_frac_r      = ag_X_mrj.sum(axis=(0, 2))                      # (NCELLS,)
+ag_frac_r_safe = np.where(ag_frac_r > threshold, ag_frac_r, 1.0)
+...
+ag_t_mrj /= ag_frac_r_safe[np.newaxis, :, np.newaxis]           # same denom for every j_to
+```
+
+**After** — per (cell × target), excludes NaN sources:
+```python
+valid_mask       = ~np.isnan(t_ij)                               # (N_AG_LUS, N_AG_LUS)
+ag_frac_per_lu   = ag_X_mrj.sum(axis=0)                         # (NCELLS, N_AG_LUS)
+eligible_rj      = ag_frac_per_lu @ valid_mask                  # (NCELLS, N_AG_LUS) — matmul
+eligible_rj_safe = np.where(eligible_rj > threshold, eligible_rj, 1.0)
+...
+ag_t_mrj /= eligible_rj_safe[np.newaxis, :, :]                  # per-target denom
+```
+
+`t_ij` is already computed before the parallel loop (hoisted invariant), so `valid_mask`
+is free. The matmul is `(NCELLS × N_AG_LUS) @ (N_AG_LUS × N_AG_LUS)` — negligible cost.
+
+---
+
+### Practical impact
+
+The magnitude depends on how many NaN off-diagonal entries exist in the ag→ag T_MAT.
+Because most ag→ag transitions are permitted, NaN entries are sparse — the effect is
+smaller than the Destocked fix (where the majority of fractions were ineligible). The
+dominant remaining discounting in ag2ag is the intentional self-transition head-start,
+which is unchanged.
+
+---
+
+## 20260623 — BLENDED_TRANSITION_COSTS: Citrus/Cotton/Summer-cereals +200-300%, Destocked +8714%; eligibility-discount bug fixed
+
+### TL;DR
+
+Comparing two RF=5 runs identical except for `BLENDED_TRANSITION_COSTS` (True=Blend,
+False=Crisp) at `Custom_runs/Compare_Blend_with_solver_delta` revealed:
+
+- Citrus +264%, Cotton +212%, Summer cereals +190% in Blend — lower unit cost due to
+  fractional initial state preserved by the blend formula
+- Destocked - natural land +8714% in Blend — eligibility expansion (correct) plus a
+  per-unit cost discount (bug, now fixed)
+
+The Destocked discount bug was fixed: `get_destocked_from_ag_blended` now normalises by
+`eligible_frac_r` (lv-nat fraction only) instead of `ag_frac_r` (total ag fraction).
+
+Inspect scripts: `jinzhu_inspect_code/Compare_with_without_blend_trans/`.
+
+---
+
+### Root cause 1 — Citrus / Cotton / Summer cereals: fractional initial state is cheaper
+
+At RF=5, `AG_L_MRJ` (the base-year dvar) is set by `get_exact_resfactored_lumap_mrj()`,
+which stores the *fraction* of each LU in each 5×5 coarsened cell (e.g. cell 13998 = 68%
+Citrus + 32% Sugar in 2010).
+
+`get_resfactored_lumap()` (used by the Crisp run) instead assigns each cell to ONE land use
+via a quota-fill algorithm (rare LUs fill their quota first, using `ceil(count/RESMULT)`
+cells). This loses fractional information — cell 13998 gets assigned to
+"Unallocated-natural land" because it is the dominant LU at the coarsened scale.
+
+**Blend 2010→2020 transition cost to Citrus for cell 13998:**
+```
+= 0.68 × T_MAT[Citrus→Citrus]      + 0.32 × T_MAT[Sugar→Citrus]
+= 0.68 × $0                         + 0.32 × $45,000
+= ~$14,400/ha   ← affordable
+```
+
+**Crisp 2010→2020 transition cost to Citrus for cell 13998:**
+```
+= T_MAT[Unallocated-natural→Citrus] = $58,210/ha   ← too expensive
+```
+
+The Blend solver assigns cell 13998 to Citrus in 2020 at $14k/ha. By 2025 it is already
+100% Citrus (self-transition = $0). The Crisp cell remains Unallocated-natural indefinitely.
+The cost gap compounds: each successive year Blend pays $0 while Crisp still faces $58k.
+
+Citrus, Cotton, and Summer cereals all share the same mechanism: they are minority LUs in
+many RF=5 cells (T_MAT diagonal = $0, so any existing fraction dramatically reduces blend
+cost), while their Crisp lumap assignment erases that fraction and defaults to the
+plurality LU which has a high transition cost.
+
+---
+
+### Root cause 2 — Destocked - natural land: eligibility expansion + per-unit discount
+
+**Crisp `get_destocked_from_ag` (line 802):**
+```python
+cells = np.isin(lumap, data.LU_LVSTK_NATURAL)
+trans_cost_r[~cells] = 0.0   # non-lv-nat cells forbidden
+```
+At RF=5, many cells with partial livestock-natural fractions are assigned to "Beef-modified"
+by the quota fill → their Destocked transition cost is zeroed → effectively hard-excluded
+from ever becoming Destocked-natural.
+
+**Blend `get_destocked_from_ag_blended` (before fix):**
+```python
+for j in AGRICULTURAL_LANDUSES:
+    if np.isnan(T_MAT[j, 'Destocked']): continue
+    t_destock_r += T_cost[j] * frac_j
+trans_cost_r = t_destock_r / ag_frac_r_safe   # denominator = TOTAL ag fraction
+```
+Any cell with any livestock-natural dvar fraction gets a non-zero Destocked cost and
+becomes eligible. For a mixed cell (40% Beef-natural + 60% Beef-modified):
+
+```
+unit_cost = (0.40 × T_cost) / 1.0 = 0.40 × T_cost   ← 60% discount vs pure lv-nat cell
+```
+
+The discount arises because the non-eligible ag fractions (Beef-modified, crops) inflate
+the denominator without contributing to the numerator. Discount factor =
+`eligible_frac / total_ag_frac`.
+
+This is two separate effects:
+1. **Eligibility restored** (physically correct): cells that genuinely contain
+   natural-grazing land CAN transition to Destocked. The crisp run was incorrectly
+   excluding them based on the plurality-LU assignment.
+2. **Per-unit discount** (bug): each eligible cell pays less than a pure lv-nat cell,
+   attracting the solver to large volumes of cheap Destocked transitions across rangelands.
+
+The +8714% is driven by both effects combined — a vast population of newly-eligible mixed
+rangeland cells, each at a discounted price. Citrus/Cotton only experienced the cost
+effect (same eligibility); Destocked experienced both, explaining the far more extreme ratio.
+
+---
+
+### Fix — normalise by eligible fraction, not total ag fraction
+
+`get_destocked_from_ag_blended` in `luto/economics/non_agricultural/transitions.py`:
+
+**Before** (denominator = all ag LUs):
+```python
+ag_frac_r      = dvar_base.sum(['lm', 'lu']).values
+ag_frac_r_safe = np.where(ag_frac_r > threshold, ag_frac_r, 1.0)
+trans_cost_r   = amortise((t_destock_r / ag_frac_r_safe) * REAL_AREA)
+removal_cost_r = amortise((hcas_cost_r / ag_frac_r_safe) * EP_EST_COST_HA * REAL_AREA)
+```
+
+**After** (denominator = lv-nat eligible LUs only, accumulated in the same loop):
+```python
+eligible_frac_r = np.zeros(data.NCELLS, dtype=np.float32)
+for j_idx, j_name in enumerate(data.AGRICULTURAL_LANDUSES):
+    trans_cost = data.T_MAT.sel(from_lu=j_name, to_lu='Destocked - natural land').item()
+    if np.isnan(trans_cost):
+        continue
+    frac_j = dvars[:, :, j_idx].sum(axis=0)
+    t_destock_r     += trans_cost * frac_j
+    eligible_frac_r += frac_j              # only lv-nat fractions reach here
+    ...
+eligible_frac_r_safe = np.where(eligible_frac_r > threshold, eligible_frac_r, 1.0)
+trans_cost_r   = amortise((t_destock_r / eligible_frac_r_safe) * REAL_AREA)
+removal_cost_r = amortise((hcas_cost_r / eligible_frac_r_safe) * EP_EST_COST_HA * REAL_AREA)
+```
+
+For a 40% Beef-natural + 60% Beef-modified cell:
+- Before: unit_cost = 0.40 × T_cost (60% discount)
+- After: unit_cost = (0.40 × T_cost) / 0.40 = T_cost (same as pure lv-nat cell)
+
+Cells with zero lv-nat fraction: `t_destock_r = 0` and `eligible_frac_r_safe = 1.0`
+→ unit_cost = 0 (still ineligible, naturally).
+
+`irr_frac_r` (water infrastructure removal cost) is left unchanged — it uses total ag
+irrigation, which is unrelated to Destocked eligibility.
+
+Note: this fix removes the per-unit discount but does not add a hard solver-side cap
+preventing the Destocked dvar from exceeding the eligible fraction. That would require
+a cell-level upper-bound constraint and is left for future work.
+
+---
+
+### Inspect scripts
+
+| Script | Purpose | Key outputs |
+|--------|---------|-------------|
+| `script_1_compare_area.py` | Compare area CSVs from both run archives across all years | `*_comparison.csv`, `*_diff_pct_australia.csv` |
+| `script_2_trace_transition_cost.py` | Compute blend vs crisp unit T_MAT cost for top cells per target LU at 2030 | `transition_cost_comparison.csv`, per-cell breakdown in log |
+| `script_3_root_cause.py` | Three-layer root cause (state mismatch → unit cost → realised cost × delta) for Citrus/Cotton/Summer-cereals | `root_cause_cells.csv`, detailed log per cell |
+
+Data: `Custom_runs/Compare_Blend_with_solver_delta/Run_G0001` (Crisp),
+`Custom_runs/Compare_Blend_with_solver_delta/Run_G0002` (Blend).
+
+---
+
 ## 20260619 — AgMgt GHG abatement exceeds Ag emissions: scope-1 filter missing + Biochar exogenous soil carbon
 
 ### TL;DR
@@ -180,7 +474,7 @@ solver optimisation.
 ### TL;DR
 
 `get_transition_matrices_ag2ag_from_base_year` in
-`luto/economics/agricultural/transitions.py` (the `BLENDED_AG_TRANSITION_COSTS = True`
+`luto/economics/agricultural/transitions.py` (the `BLENDED_TRANSITION_COSTS = True`
 path) accumulated a weighted sum of per-source transition costs using raw ag dvar fractions
 as weights:
 

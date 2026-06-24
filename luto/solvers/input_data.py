@@ -62,8 +62,6 @@ class SolverInputData:
     ag_b_mrj: np.ndarray                                                # Agricultural biodiversity matrices based on bio-quality layer.
     ag_x_mrj: np.ndarray                                                # Agricultural exclude matrices.
     ag_q_mrp: np.ndarray                                                # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_t_mrj: np.ndarray                                                # Agricultural transition cost matrices.
-    ag_dvars_base: np.ndarray                                           # Agricultural base year decision variable values.
     ag_ghg_t_mrj: np.ndarray                                            # GHG emissions released during transitions between agricultural land uses.
 
     non_ag_g_rk: np.ndarray                                             # Non-agricultural greenhouse gas emissions matrix.
@@ -79,7 +77,12 @@ class SolverInputData:
     ag_man_q_mrp: dict                                                  # Agricultural Management options' quantity effects.
     ag_man_limits: dict                                                 # Agricultural Management options' adoption limits.
     ag_man_lb_mrj: dict                                                 # Agricultural Management options' lower bounds.
-    
+
+    trans_ag2ag_mrj: np.ndarray                                         # Ag→ag transition cost matrix; economy-rescaled.
+    trans_ag2nonag_rk: np.ndarray                                       # Ag→non-ag transition cost matrix (NCELLS, N_NON_AG_LUS); economy-rescaled.
+    dvar_base_ag_mrj: np.ndarray                                        # Agricultural base year decision variable values.
+    dvar_base_non_ag_rk: np.ndarray                                     # Non-agricultural base year decision variable values.
+
     renewable_solar_r: np.ndarray                                       # Renewable energy - solar yield matrix.
     renewable_wind_r: np.ndarray                                        # Renewable energy - wind yield matrix.
     exist_renewable_solar_r: np.ndarray                                 # Existing solar capacity converted to annual MWh per cell.
@@ -391,17 +394,14 @@ def get_ag_ghg_t_mrj(data: Data, base_year):
 def get_ag_t_mrj(data: Data, target_index, base_year):
     print('Getting agricultural transition cost matrices...', flush = True)
     
-    ag_t_mrj = ag_transition.get_transition_matrices_ag2ag_from_base_year(
-        data, 
-        target_index, 
+    return ag_transition.get_transition_matrices_ag2ag_from_base_year(
+        data,
+        target_index,
         base_year
     ).astype(np.float32)
-    
-    # Transition costs occures if the base year is not the target year
-    return ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(ag_t_mrj).astype(np.float32)
 
 
-def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, ag_t_mrj):
+def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, trans_ag2ag_mrj):
     print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
     non_ag_t_mrj = non_ag_transition.get_transition_matrix_ag2nonag(
         data,
@@ -442,9 +442,15 @@ def get_ag_x_mrj(data: Data, base_year):
 
 def get_non_ag_ub_rk(data: Data, base_year):
     print('Getting non-agricultural exclude matrices...', flush = True)
-    existing_dvars = data.non_ag_dvars[base_year] if base_year != data.YR_CAL_BASE else None
+    base_dvar_nonag = (
+        data.non_ag_dvars[base_year] if base_year != data.YR_CAL_BASE
+        else np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32)
+    )
     return non_ag_transition.get_non_ag_ub_matrices(
-        data, data.lumaps[base_year], existing_dvars_rk=existing_dvars
+        data, 
+        data.lumaps[base_year],
+        base_dvar_nonag_rk=base_dvar_nonag,
+        base_dvar_ag_mrj=data.ag_dvars[base_year],
     )
 
 
@@ -549,8 +555,8 @@ def get_ag_man_limits(data: Data, target_index):
 def get_economic_mrj(
     ag_c_mrj: np.ndarray,
     ag_r_mrj: np.ndarray,
-    ag_t_mrj: np.ndarray,
-    ag_to_non_ag_t_rk: np.ndarray,
+    trans_ag2ag_mrj: np.ndarray,
+    trans_ag2nonag_rk: np.ndarray,
     non_ag_c_rk: np.ndarray,
     non_ag_r_rk: np.ndarray,
     non_ag_t_rk: np.ndarray,
@@ -559,19 +565,20 @@ def get_economic_mrj(
     ag_man_r_mrj: dict[str, np.ndarray],
     ag_man_t_mrj: dict[str, np.ndarray],
     ) -> dict[str, np.ndarray|dict[str, np.ndarray]]:
-    
+
     print('Getting base year economic matrix...', flush = True)
 
-    if settings.BLENDED_AG_TRANSITION_COSTS:
-        # under blended transition costs, the `ag_t_mrj` will be handled in the solver, 
-        # which only applies to the delta variables (i.e., true transitions from the base year)
-        # so here we set it to 0 to avoid double counting.
-        ag_t_mrj = np.zeros_like(ag_t_mrj)
+    if settings.BLENDED_TRANSITION_COSTS:
+        # Transition costs are applied to solver delta vars (D = max(0, X_new - x_old)).
+        # Otherwise, the LUs stay the same will be charged transition costs
+        # (E.g., Apples -> Apples will incur transition costs even if no change occurs).
+        trans_ag2ag_mrj = np.zeros_like(trans_ag2ag_mrj)
+        trans_ag2nonag_rk = np.zeros_like(trans_ag2nonag_rk)
 
     if settings.OBJECTIVE == "maxprofit":
         # Pre-calculate profit (revenue minus cost) for each land use
-        ag_obj_mrj = ag_r_mrj - (ag_c_mrj + ag_t_mrj + non_ag_to_ag_t_mrj)
-        non_ag_obj_rk = non_ag_r_rk - (non_ag_c_rk + non_ag_t_rk + ag_to_non_ag_t_rk)
+        ag_obj_mrj = ag_r_mrj - (ag_c_mrj + trans_ag2ag_mrj + non_ag_to_ag_t_mrj)
+        non_ag_obj_rk = non_ag_r_rk - (non_ag_c_rk + non_ag_t_rk + trans_ag2nonag_rk)
 
         # Get effects of alternative agr. management options (stored in a dict)
         ag_man_objs = {
@@ -581,8 +588,8 @@ def get_economic_mrj(
 
     elif settings.OBJECTIVE == "mincost":
         # Pre-calculate sum of production and transition costs
-        ag_obj_mrj = ag_c_mrj + ag_t_mrj + non_ag_to_ag_t_mrj
-        non_ag_obj_rk = non_ag_c_rk + non_ag_t_rk + ag_to_non_ag_t_rk
+        ag_obj_mrj = ag_c_mrj + trans_ag2ag_mrj + non_ag_to_ag_t_mrj
+        non_ag_obj_rk = non_ag_c_rk + non_ag_t_rk + trans_ag2nonag_rk
 
         # Store calculations for each agricultural management option in a dict
         ag_man_objs = {
@@ -982,25 +989,25 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
     target_index = target_year - data.YR_CAL_BASE
     
-    ag_c_mrj = get_ag_c_mrj(data, target_index)
-    ag_r_mrj = get_ag_r_mrj(data, target_index)
-    ag_t_mrj = get_ag_t_mrj(data, target_index, base_year)
-    ag_to_non_ag_t_rk = get_ag_to_non_ag_t_rk(data, target_index, base_year, ag_t_mrj)
-    
-    non_ag_c_rk = get_non_ag_c_rk(data, ag_c_mrj, data.lumaps[base_year], target_year)
-    non_ag_r_rk = get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year)
-    non_ag_t_rk = get_non_ag_t_rk(data, base_year)
-    non_ag_to_ag_t_mrj = get_non_ag_to_ag_t_mrj(data, base_year, target_index)
-    
-    ag_man_c_mrj = get_ag_man_c_mrj(data, ag_c_mrj, target_year)
-    ag_man_r_mrj = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
-    ag_man_t_mrj = get_ag_man_t_mrj(data, target_index)
+    ag_c_mrj                        = get_ag_c_mrj(data, target_index)
+    ag_r_mrj                        = get_ag_r_mrj(data, target_index)
+    trans_ag2ag_mrj                 = get_ag_t_mrj(data, target_index, base_year)
+    trans_ag2nonag_rk               = get_ag_to_non_ag_t_rk(data, target_index, base_year, trans_ag2ag_mrj)
+
+    non_ag_c_rk                     = get_non_ag_c_rk(data, ag_c_mrj, data.lumaps[base_year], target_year)
+    non_ag_r_rk                     = get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year)
+    non_ag_t_rk                     = get_non_ag_t_rk(data, base_year)
+    non_ag_to_ag_t_mrj              = get_non_ag_to_ag_t_mrj(data, base_year, target_index)
+
+    ag_man_c_mrj                    = get_ag_man_c_mrj(data, ag_c_mrj, target_year)
+    ag_man_r_mrj                    = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
+    ag_man_t_mrj                    = get_ag_man_t_mrj(data, target_index)
     
     ag_obj_mrj, non_ag_obj_rk,  ag_man_objs = get_economic_mrj(
         ag_c_mrj,
         ag_r_mrj,
-        ag_t_mrj,
-        ag_to_non_ag_t_rk,
+        trans_ag2ag_mrj,
+        trans_ag2nonag_rk,
         non_ag_c_rk,
         non_ag_r_rk,
         non_ag_t_rk,
@@ -1011,171 +1018,170 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     )
     
 
-    ag_g_mrj = get_ag_g_mrj(data, target_index)
-    ag_w_mrj = (
+    ag_g_mrj                        = get_ag_g_mrj(data, target_index)
+    ag_w_mrj                        = (
         get_ag_w_mrj(data, target_index) if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on' 
         else get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
     )
-    ag_b_mrj = get_ag_b_mrj(data)
-    ag_x_mrj = get_ag_x_mrj(data, base_year)
-    ag_q_mrp = get_ag_q_mrp(data, target_index)
-    ag_ghg_t_mrj = get_ag_ghg_t_mrj(data, base_year)
+    ag_b_mrj                        = get_ag_b_mrj(data)
+    ag_x_mrj                        = get_ag_x_mrj(data, base_year)
+    ag_q_mrp                        = get_ag_q_mrp(data, target_index)
+    ag_ghg_t_mrj                    = get_ag_ghg_t_mrj(data, base_year)
 
-    non_ag_g_rk = get_non_ag_g_rk(data, ag_g_mrj, base_year)
-    non_ag_w_rk = (
+    non_ag_g_rk                     = get_non_ag_g_rk(data, ag_g_mrj, base_year)
+    non_ag_w_rk                     = (
         get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year)   
         if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on' 
         else get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
     )
-    non_ag_b_rk = get_non_ag_b_rk(data, ag_b_mrj, base_year)
-    non_ag_ub_rk = get_non_ag_ub_rk(data, base_year)
-    non_ag_q_crk = get_non_ag_q_crk(data, ag_q_mrp, base_year)
-    non_ag_lb_rk = get_non_ag_lb_rk(data, base_year)
+    non_ag_b_rk                     = get_non_ag_b_rk(data, ag_b_mrj, base_year)
+    non_ag_ub_rk                    = get_non_ag_ub_rk(data, base_year)
+    non_ag_q_crk                    = get_non_ag_q_crk(data, ag_q_mrp, base_year)
+    non_ag_lb_rk                    = get_non_ag_lb_rk(data, base_year)
     
-    ag_man_g_mrj=get_ag_man_g_mrj(data, target_index)
-    ag_man_w_mrj=get_ag_man_w_mrj(data, target_index)
-    ag_man_b_mrj=get_ag_man_b_mrj(data, target_index, ag_b_mrj)
-    ag_man_q_mrp=get_ag_man_q_mrj(data, target_index, ag_q_mrp)
-    ag_man_limits=get_ag_man_limits(data, target_index)                            
-    ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year)
+    ag_man_g_mrj                    = get_ag_man_g_mrj(data, target_index)
+    ag_man_w_mrj                    = get_ag_man_w_mrj(data, target_index)
+    ag_man_b_mrj                    = get_ag_man_b_mrj(data, target_index, ag_b_mrj)
+    ag_man_q_mrp                    = get_ag_man_q_mrj(data, target_index, ag_q_mrp)
+    ag_man_limits                   = get_ag_man_limits(data, target_index)                            
+    ag_man_lb_mrj                   = get_ag_man_lb_mrj(data, base_year)
     
-    renewable_solar_r=get_potential_renewable_solar_r(data, target_index)
-    renewable_wind_r=get_potential_renewable_wind_r(data, target_index)
-    exist_renewable_solar_r=get_exist_renewable_fraction_solar_r(data, target_year)
-    exist_renewable_wind_r=get_exist_renewable_fraction_wind_r(data, target_year)
+    renewable_solar_r               = get_potential_renewable_solar_r(data, target_index)
+    renewable_wind_r                = get_potential_renewable_wind_r(data, target_index)
+    exist_renewable_solar_r         = get_exist_renewable_fraction_solar_r(data, target_year)
+    exist_renewable_wind_r          = get_exist_renewable_fraction_wind_r(data, target_year)
 
-    region_state_r = get_region_state_r(data)
-    region_state_name2idx = get_region_state_name2idx(data)
-    region_NRM_names_r=get_region_NRM_names_r(data)
+    region_state_r                  = get_region_state_r(data)
+    region_state_name2idx           = get_region_state_name2idx(data)
+    region_NRM_names_r              = get_region_NRM_names_r(data)
     
-    water_region_indices=get_w_region_indices(data)
-    water_region_names=get_w_region_names(data)
+    water_region_indices            = get_w_region_indices(data)
+    water_region_names              = get_w_region_names(data)
     
-    biodiv_contr_ag_j=get_ag_biodiv_contr_j(data)
-    biodiv_contr_non_ag_k=get_non_ag_biodiv_impact_k(data)
-    biodiv_contr_ag_man=get_ag_man_biodiv_impacts(data, target_year)
+    biodiv_contr_ag_j               = get_ag_biodiv_contr_j(data)
+    biodiv_contr_non_ag_k           = get_non_ag_biodiv_impact_k(data)
+    biodiv_contr_ag_man             = get_ag_man_biodiv_impacts(data, target_year)
 
-    GBF2_mask_area_r = get_GBF2_mask_area_r(data)
-    GBF3_NVIS_pre_1750_area_vr=get_GBF3_NVIS_pre_1750_area_vr(data)
-    GBF3_NVIS_region_group=get_GBF3_NVIS_region_group(data)
-    GBF4_SNES_pre_1750_area_sr=get_GBF4_SNES_pre_1750_area_sr(data)
-    GBF4_SNES_region_species=get_GBF4_SNES_region_species(data)
-    GBF4_ECNES_pre_1750_area_sr=get_GBF4_ECNES_pre_1750_area_sr(data)
-    GBF4_ECNES_region_species=get_GBF4_ECNES_region_species(data)
-    GBF8_pre_1750_area_sr=get_GBF8_pre_1750_area_sr(data, target_year)
-    GBF8_region_species=get_GBF8_region_species(data)
+    GBF2_mask_area_r                = get_GBF2_mask_area_r(data)
+    GBF3_NVIS_pre_1750_area_vr      = get_GBF3_NVIS_pre_1750_area_vr(data)
+    GBF3_NVIS_region_group          = get_GBF3_NVIS_region_group(data)
+    GBF4_SNES_pre_1750_area_sr      = get_GBF4_SNES_pre_1750_area_sr(data)
+    GBF4_SNES_region_species        = get_GBF4_SNES_region_species(data)
+    GBF4_ECNES_pre_1750_area_sr     = get_GBF4_ECNES_pre_1750_area_sr(data)
+    GBF4_ECNES_region_species       = get_GBF4_ECNES_region_species(data)
+    GBF8_pre_1750_area_sr           = get_GBF8_pre_1750_area_sr(data, target_year)
+    GBF8_region_species             = get_GBF8_region_species(data)
 
-    savanna_eligible_r=get_savanna_eligible_r(data)
-    GBF2_mask_idx=get_GBF2_mask_idx(data)
-    renewable_GBF2_mask_solar_idx=get_renewable_GBF2_mask_solar_idx(data)
-    renewable_GBF2_mask_wind_idx=get_renewable_GBF2_mask_wind_idx(data)
-    renewable_MNES_mask_solar_idx=get_renewable_MNES_mask_solar_idx(data)
-    renewable_MNES_mask_wind_idx=get_renewable_MNES_mask_wind_idx(data)
+    savanna_eligible_r              = get_savanna_eligible_r(data)
+    GBF2_mask_idx                   = get_GBF2_mask_idx(data)
+    renewable_GBF2_mask_solar_idx   = get_renewable_GBF2_mask_solar_idx(data)
+    renewable_GBF2_mask_wind_idx    = get_renewable_GBF2_mask_wind_idx(data)
+    renewable_MNES_mask_solar_idx   = get_renewable_MNES_mask_solar_idx(data)
+    renewable_MNES_mask_wind_idx    = get_renewable_MNES_mask_wind_idx(data)
 
     # Fetch all raw limit targets once — reused in both rescaling and get_limits below.
     limits = get_limits(data, target_year)
 
     # Cull unprofitable land uses before rescaling (needs unscaled c/t/r matrices).
-    ag_x_mrj = land_use_culling.apply_agricultural_land_use_culling(ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj)
+    ag_x_mrj = land_use_culling.apply_agricultural_land_use_culling(ag_x_mrj, ag_c_mrj, trans_ag2ag_mrj, ag_r_mrj)
 
     # Rescale solver input data
-    [ag_obj_mrj, non_ag_obj_rk, ag_man_objs, ag_t_mrj], economy_scale = rescale_lhs([ag_obj_mrj, non_ag_obj_rk, ag_man_objs, ag_t_mrj])
-    [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],   demand_scale  = rescale_lhs_rhs(
-        [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],
-        limits['demand'],
+    [ag_obj_mrj, non_ag_obj_rk, ag_man_objs, trans_ag2ag_mrj, trans_ag2nonag_rk], economy_scale = rescale_lhs([ag_obj_mrj, non_ag_obj_rk, ag_man_objs, trans_ag2ag_mrj, trans_ag2nonag_rk])
+    [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],   demand_scale = rescale_lhs_rhs([ag_q_mrp, non_ag_q_crk, ag_man_q_mrp], limits['demand'])
+    [ag_b_mrj, non_ag_b_rk, ag_man_b_mrj],    biodiv_scale = rescale_lhs([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj])
+
+    [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], ghg_scale = (
+        rescale_lhs_rhs([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], limits['ghg'])
+        if settings.GHG_EMISSIONS_LIMITS != 'off' else
+        ([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], 1.0)
     )
-    [ag_b_mrj, non_ag_b_rk, ag_man_b_mrj],    biodiv_scale  = rescale_lhs([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj])
-
-    # Get the scale factors
-    if settings.GHG_EMISSIONS_LIMITS != 'off':
-        [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], ghg_scale = rescale_lhs_rhs(
-            [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj],
-            limits['ghg'],
-        )
-    else:
-        ghg_scale = 1.0
-
-    if any(settings.RENEWABLES_OPTIONS.values()):
-        [renewable_solar_r], renewable_solar_scale = rescale_lhs_rhs([renewable_solar_r], limits['renewable_Utility Solar PV'])
-        [renewable_wind_r],  renewable_wind_scale  = rescale_lhs_rhs([renewable_wind_r],  limits['renewable_Onshore Wind'])
-    else:
-        renewable_solar_scale = 1.0
-        renewable_wind_scale  = 1.0
-
-    if settings.WATER_LIMITS == 'on':
-        [ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], water_scale = rescale_lhs_rhs(
-            [ag_w_mrj, non_ag_w_rk, ag_man_w_mrj],
-            limits['water'],
-        )
-    else:
-        water_scale = 1.0
-
-    if settings.GBF2_TARGET != "off":
-        [GBF2_mask_area_r], gbf2_scale = rescale_lhs_rhs(
-            [GBF2_mask_area_r],
-            limits['GBF2'],
-        )
-    else:
-        gbf2_scale = 1.0
-
-    if settings.GBF3_NVIS_TARGET != "off":
-        GBF3_NVIS_pre_1750_area_vr, gbf3_nvis_scale = rescale_lhs_rhs_region_species(
+    
+    [renewable_solar_r], renewable_solar_scale = (
+        rescale_lhs_rhs([renewable_solar_r], limits['renewable_Utility Solar PV'])
+        if any(settings.RENEWABLES_OPTIONS.values()) else
+        ([renewable_solar_r], 1.0)
+    )
+    
+    [renewable_wind_r], renewable_wind_scale = (
+        rescale_lhs_rhs([renewable_wind_r], limits['renewable_Onshore Wind'])
+        if any(settings.RENEWABLES_OPTIONS.values()) else
+        ([renewable_wind_r], 1.0)
+    )
+    
+    [ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], water_scale = (
+        rescale_lhs_rhs([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], limits['water'])
+        if settings.WATER_LIMITS == 'on' else
+        ([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], 1.0)
+    )
+    
+    [GBF2_mask_area_r], gbf2_scale = (
+        rescale_lhs_rhs([GBF2_mask_area_r], limits['GBF2'])
+        if settings.GBF2_TARGET != "off" else
+        ([GBF2_mask_area_r], 1.0)
+    )
+    
+    GBF3_NVIS_pre_1750_area_vr, gbf3_nvis_scale = (
+        rescale_lhs_rhs_region_species(
             GBF3_NVIS_pre_1750_area_vr, GBF3_NVIS_region_group, region_NRM_names_r,
             targets=limits['GBF3_NVIS'],
         )
-    else:
-        gbf3_nvis_scale = 1.0
-
-    if settings.GBF4_TARGET_SNES != 'off':
-        GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = rescale_lhs_rhs_region_species(
+        if settings.GBF3_NVIS_TARGET != "off" else
+        (GBF3_NVIS_pre_1750_area_vr, 1.0)
+    )
+    
+    GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = (
+        rescale_lhs_rhs_region_species(
             GBF4_SNES_pre_1750_area_sr, GBF4_SNES_region_species, region_NRM_names_r,
             targets=limits['GBF4_SNES'],
             layer_coord_names=('region', 'species', 'presence'),
             matrix_key_fn=lambda t: (t[1], t[2]),
         )
-    else:
-        gbf4_snes_scale = 1.0
-
-    if settings.GBF4_TARGET_ECNES != 'off':
-        GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = rescale_lhs_rhs_region_species(
+        if settings.GBF4_TARGET_SNES != 'off' else
+        (GBF4_SNES_pre_1750_area_sr, 1.0)
+    )
+    
+    GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = (
+        rescale_lhs_rhs_region_species(
             GBF4_ECNES_pre_1750_area_sr, GBF4_ECNES_region_species, region_NRM_names_r,
             targets=limits['GBF4_ECNES'],
             layer_coord_names=('region', 'species', 'presence'),
             matrix_key_fn=lambda t: (t[1], t[2]),
         )
-    else:
-        gbf4_ecnes_scale = 1.0
-
-    if settings.GBF8_TARGET == "on":
-        GBF8_pre_1750_area_sr, gbf8_scale = rescale_lhs_rhs_region_species(
+        if settings.GBF4_TARGET_ECNES != 'off' else
+        (GBF4_ECNES_pre_1750_area_sr, 1.0)
+    )
+    
+    GBF8_pre_1750_area_sr, gbf8_scale = (
+        rescale_lhs_rhs_region_species(
             GBF8_pre_1750_area_sr, GBF8_region_species, region_NRM_names_r,
             targets=limits['GBF8'],
         )
-    else:
-        gbf8_scale = 1.0
+        if settings.GBF8_TARGET == "on" else
+        (GBF8_pre_1750_area_sr, 1.0)
+    )
 
     scale_factors = {
-        "Economy":          economy_scale,
-        "Demand":           demand_scale,
-        "Biodiversity":     biodiv_scale,
-        "GHG":              ghg_scale,
-        "Water":            water_scale,
-        "GBF2":             gbf2_scale,
-        "GBF3_NVIS":        gbf3_nvis_scale,
-        "GBF4_SNES":        gbf4_snes_scale,
-        "GBF4_ECNES":       gbf4_ecnes_scale,
-        "GBF8":             gbf8_scale,
-        "Utility Solar PV": renewable_solar_scale,
-        "Onshore Wind":     renewable_wind_scale,
+        "Economy":                      economy_scale,
+        "Demand":                       demand_scale,
+        "Biodiversity":                 biodiv_scale,
+        "GHG":                          ghg_scale,
+        "Water":                        water_scale,
+        "GBF2":                         gbf2_scale,
+        "GBF3_NVIS":                    gbf3_nvis_scale,
+        "GBF4_SNES":                    gbf4_snes_scale,
+        "GBF4_ECNES":                   gbf4_ecnes_scale,
+        "GBF8":                         gbf8_scale,
+        "Utility Solar PV":             renewable_solar_scale,
+        "Onshore Wind":                 renewable_wind_scale,
     }
 
     base_yr_prod = {
-        "BASE_YR Economy(AUD)":        get_BASE_YR_economic_value(data),
-        "BASE_YR Production (t)":      get_BASE_YR_production_t(data),
-        "BASE_YR GHG (tCO2e)":         get_BASE_YR_GHG_t(data),
-        "BASE_YR Water (ML)":          get_BASE_YR_water_ML(data),
-        "BASE_YR Bio quality (score)": get_BASE_YR_bio_quality_value(data),
-        "BASE_YR GBF_2 (score)":       get_BASE_YR_GBF2_score(data),
+        "BASE_YR Economy(AUD)":         get_BASE_YR_economic_value(data),
+        "BASE_YR Production (t)":       get_BASE_YR_production_t(data),
+        "BASE_YR GHG (tCO2e)":          get_BASE_YR_GHG_t(data),
+        "BASE_YR Water (ML)":           get_BASE_YR_water_ML(data),
+        "BASE_YR Bio quality (score)":  get_BASE_YR_bio_quality_value(data),
+        "BASE_YR GBF_2 (score)":        get_BASE_YR_GBF2_score(data),
     }
 
     commodity_names = data.COMMODITIES
@@ -1197,7 +1203,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_mask_proportion_r=data.AG_MASK_PROPORTION_R
     
     # Base year dvars
-    ag_dvars_base = data.ag_dvars[base_year]
+    dvar_base_ag_mrj = data.ag_dvars[base_year]
+    dvar_base_non_ag_rk = data.non_ag_dvars[base_year]
     
 
     return SolverInputData(
@@ -1209,10 +1216,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_b_mrj,
         ag_x_mrj,
         ag_q_mrp,
-        ag_t_mrj,
-        ag_dvars_base,
         ag_ghg_t_mrj,
-        
+
         non_ag_g_rk,
         non_ag_w_rk,
         non_ag_b_rk,
@@ -1226,6 +1231,11 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_q_mrp,
         ag_man_limits,
         ag_man_lb_mrj,
+
+        trans_ag2ag_mrj,
+        trans_ag2nonag_rk,
+        dvar_base_ag_mrj,
+        dvar_base_non_ag_rk,
         
         renewable_solar_r,
         renewable_wind_r,

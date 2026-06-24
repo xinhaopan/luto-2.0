@@ -446,7 +446,7 @@ def write_data(data: Data):
     # DVars must be written first as other outputs depend on them
     dvar_jobs = [delayed(write_dvar_and_mosaic_map)(data, yr, path_yr) for yr, path_yr in zip(years, paths)]
     for result in Parallel(n_jobs=get_n_jobs(WRITE_FUNC_PEAK_MB['write_dvar_and_mosaic_map']), return_as="generator")(dvar_jobs):
-        print(result)
+        print(result, flush=True)
 
     # Collect all annotated tasks: (delayed_obj, peak_delta_mb)
     annotated_tasks = [(
@@ -466,9 +466,9 @@ def write_data(data: Data):
                 else:
                     for sub_key, vals in sub.items():
                         target[sub_key].extend(vals)
-            print(msg)
+            print(msg, flush=True)
         else:
-            print(result)
+            print(result, flush=True)
 
     # Dynamic scheduling: tasks that fit multiple times within budget run in parallel; heaviest run one at a time.
     groups = {}
@@ -511,14 +511,14 @@ def create_report(data: Data):
 
     @tools.LogToFile(f"{out_dir}/LUTO_RUN_", mode='a')
     def _create_report():
-        print('Creating report...')
-        print('├── Copying report template...')
+        print('Creating report...', flush=True)
+        print('├── Copying report template...', flush=True)
         shutil.copytree('luto/tools/report/VUE_modules', f"{data.path}/DATA_REPORT", dirs_exist_ok=True)
-        print('├── Creating chart data...')
+        print('├── Creating chart data...', flush=True)
         save_report_data(data.path)
-        print('├── Creating map data...')
+        print('├── Creating map data...', flush=True)
         save_report_layer(data.path)
-        print('└── Report created successfully!')
+        print('└── Report created successfully!', flush=True)
 
     return _create_report()
 
@@ -1049,10 +1049,10 @@ def write_economics(data: Data, yr_cal, path):
     )
 
     # Delta dvar: only net increases in allocation pay transition costs.
-    # When BLENDED_AG_TRANSITION_COSTS=True, use the solver's D vars directly — they are
+    # When BLENDED_TRANSITION_COSTS=True, use the solver's D vars directly — they are
     # exactly max(0, X_new - x_old) at optimality and match what entered the objective.
     # Otherwise fall back to clipping the dvar difference.
-    if settings.BLENDED_AG_TRANSITION_COSTS and data.ag_delta_dvars.get(yr_cal) is not None:
+    if settings.BLENDED_TRANSITION_COSTS and data.ag_delta_dvars.get(yr_cal) is not None:
         ag_dvar_mrj_delta = chunk_unify_size(
             tools.ag_mrj_to_xr(data, data.ag_delta_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME),
@@ -1719,10 +1719,10 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).chunk({'cell': chunk_size})
 
     # Delta dvars: only pay transition cost for INCREASES in allocation.
-    # When BLENDED_AG_TRANSITION_COSTS=True, use solver D vars directly — they are
+    # When BLENDED_TRANSITION_COSTS=True, use solver D vars directly — they are
     # exactly max(0, X_new - x_old) at optimality and match what entered the objective.
     # Otherwise fall back to clipping the dvar difference.
-    if settings.BLENDED_AG_TRANSITION_COSTS and data.ag_delta_dvars.get(yr_cal) is not None:
+    if settings.BLENDED_TRANSITION_COSTS and data.ag_delta_dvars.get(yr_cal) is not None:
         ag_dvar_mrj_delta = tools.ag_mrj_to_xr(
             data, data.ag_delta_dvars[yr_cal]
         ).rename({'lm': 'To-water-supply', 'lu': 'To-land-use'}
@@ -2027,12 +2027,9 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
     if yr_cal == data.YR_CAL_BASE:
-        base_lumap = l_rk = l_rk_not = x_rk = None
+        base_lumap = None
     else:
         base_lumap = data.lumaps[yr_cal_sim_pre]
-        l_rk = tools.lumap2non_ag_l_mk(base_lumap, data.N_NON_AG_LUS)
-        l_rk_not = np.logical_not(l_rk)
-        x_rk = non_ag_transitions.get_non_ag_ub_matrices(data, base_lumap)
 
     # Get the non-agricultural decision variable
     ag_dvar_base = tools.ag_mrj_to_xr(data, (tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]))
@@ -2044,42 +2041,41 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).rename({'lu': 'To-land-use'}
         ).chunk({'cell': chunk_size})
 
-    # Delta dvars: only pay transition cost for INCREASES in non-ag allocation.
-    # Same rationale as ag2ag: using the full dvar_new charges cells already at the
-    # target non-ag LU and adds phantom reverse-direction costs for shrinking LUs.
-    if yr_cal != data.YR_CAL_BASE:
+    # Delta dvars: actual net increases from the solver (D = max(0, X_new - x_old)).
+    # In blend mode these come from solver D_nonag vars; in crisp mode compute post-hoc.
+    if yr_cal == data.YR_CAL_BASE:
+        non_ag_dvar_delta = non_ag_dvar_target
+    elif settings.BLENDED_TRANSITION_COSTS and data.non_ag_delta_dvars.get(yr_cal) is not None:
+        non_ag_dvar_delta = tools.non_ag_rk_to_xr(data, data.non_ag_delta_dvars[yr_cal]
+            ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
+            ).rename({'lu': 'To-land-use'}
+            ).chunk({'cell': chunk_size})
+    else:
         non_ag_dvar_old = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal_sim_pre])
             ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
             ).rename({'lu': 'To-land-use'}
             ).chunk({'cell': chunk_size})
         non_ag_dvar_delta = (non_ag_dvar_target - non_ag_dvar_old).clip(min=0)
-    else:
-        non_ag_dvar_delta = non_ag_dvar_target
 
 
     
     # ==================== Transitions - Area ====================
-    if yr_idx == 0:
-        non_ag_transitions_area_mat = xr.DataArray(
+    # Use the solver delta dvar directly: area that newly transitioned to each non-ag LU.
+    # non_ag_dvar_delta is D = max(0, X_new - x_old) — the actual net increase per cell per LU.
+    non_ag_transitions_area_mat = (
+        xr.DataArray(
+            (data.REAL_AREA[:, np.newaxis] * non_ag_dvar_delta.values).astype(np.float32),
+            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES},
+        ) / gap
+        if yr_idx > 0
+        else xr.DataArray(
             np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32),
-            coords={
-                'cell': range(data.NCELLS),
-                'To-land-use': data.NON_AGRICULTURAL_LANDUSES
-            }
+            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES},
         )
-    else:
-        non_ag_transitions_area_mat = xr.DataArray(
-            np.einsum('r,rk,rk->rk', data.REAL_AREA, l_rk_not, x_rk).astype(np.float32),
-            coords={
-                'cell': range(data.NCELLS),
-                'To-land-use': data.NON_AGRICULTURAL_LANDUSES
-            }
-        )
+    )
 
-    non_ag_transitions_area_mat = non_ag_transitions_area_mat / gap
-
-    # Calculate transition area; expand To-water-supply='dry' (area only, not cost/GHG)
-    non_ag_transitions_area = ag_dvar_base * non_ag_transitions_area_mat * non_ag_dvar_target.expand_dims({'To-water-supply': ['dry']})
+    # Apportion transition area across source ag LUs proportional to base-year dvar composition
+    non_ag_transitions_area = ag_dvar_base * non_ag_transitions_area_mat.expand_dims({'To-water-supply': ['dry']})
     non_ag_transitions_area = add_all(non_ag_transitions_area, ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use'])
     
     # Get transition area by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
@@ -2194,7 +2190,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     else:
         ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
         g_rk_raw = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal_sim_pre]).astype(np.float32)
-        g_rk_eligible = np.einsum('rk,rk,rk->rk', g_rk_raw, l_rk_not, x_rk).astype(np.float32)
+        g_rk_eligible = (g_rk_raw * non_ag_dvar_delta.values).astype(np.float32)
         g_rk = xr.DataArray(
             g_rk_eligible,
             coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
@@ -2245,7 +2241,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     else:
         ag_w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
         w_rk_raw = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal_sim_pre], yr_idx).astype(np.float32)
-        w_rk_eligible = np.einsum('rk,rk,rk->rk', w_rk_raw, l_rk_not, x_rk).astype(np.float32)
+        w_rk_eligible = (w_rk_raw * non_ag_dvar_delta.values).astype(np.float32)
         w_rk = xr.DataArray(
             w_rk_eligible,
             coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
@@ -3577,9 +3573,9 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
 
     # ------------------------- Vectorize GBF2 mask to GeoJSON -------------------------
-    
-    geojson_js_path = f'{data.path}/DATA_REPORT/data/geo/biodiversity_GBF2_mask.js'
-    os.makedirs(os.path.dirname(geojson_js_path), exist_ok=True)
+    # Written to data.path (not DATA_REPORT) so write_data never pre-creates DATA_REPORT.
+    # save_report_data moves it into DATA_REPORT/data/geo/ after the Vue copy.
+    geojson_js_path = f'{data.path}/biodiversity_GBF2_mask.js'
     if not os.path.exists(geojson_js_path):
         mask_2d_da = arr_to_xr(data, data.BIO_GBF2_MASK)
         mask_2d_np = np.where(np.isnan(mask_2d_da.values), 0, mask_2d_da.values).astype(np.uint8)

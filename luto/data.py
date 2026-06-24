@@ -117,6 +117,7 @@ class Data:
         self.ag_dvars = {}
         self.ag_delta_dvars = {}
         self.non_ag_dvars = {}
+        self.non_ag_delta_dvars = {}
         self.ag_man_dvars = {}
         self.prod_data = {}
         self.obj_vals = {}
@@ -447,7 +448,7 @@ class Data:
         #   then, the sum(ag + non_ag) in the following years should be <= 0.2.
         #   This is used as a constraint in the solver to prevent the model 
         #   from allocating more agricultural land than the initial proportion.
-        self.AG_MASK_PROPORTION_R =  self.AG_L_MRJ.sum(0).sum(1)
+        self.AG_MASK_PROPORTION_R = self.AG_L_MRJ.sum(0).sum(1)
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
         self.LU_RESFACTOR_CELLS = pd.DataFrame({
@@ -1844,18 +1845,25 @@ class Data:
         """
         self.ag_dvars[yr] = ag_dvars
 
-    def add_ag_delta_dvars(self, yr: int, ag_D_mrj: np.ndarray | None):
+    def add_ag_delta_dvars(self, yr: int, ag2ag_D_mrj: np.ndarray | None):
         """
-        Saves solver delta dvar solution D=max(0,X_new-x_old) for blended ag transition costs.
-        None when BLENDED_AG_TRANSITION_COSTS=False.
+        Saves solver delta dvar solution D=max(0,X_new-x_old) for blended ag2ag transition costs.
+        None when BLENDED_TRANSITION_COSTS=False.
         """
-        self.ag_delta_dvars[yr] = ag_D_mrj
+        self.ag_delta_dvars[yr] = ag2ag_D_mrj
 
     def add_non_ag_dvars(self, yr: int, non_ag_dvars: np.ndarray):
         """
         Safely adds non-agricultural decision variables' values to the Data object.
         """
         self.non_ag_dvars[yr] = non_ag_dvars
+
+    def add_non_ag_delta_dvars(self, yr: int, ag2nonag_D_rk: np.ndarray | None):
+        """
+        Saves solver delta dvar D=max(0,X_new-x_old) for blended ag->nonag transition costs.
+        None when BLENDED_TRANSITION_COSTS=False.
+        """
+        self.non_ag_delta_dvars[yr] = ag2nonag_D_rk
 
     def add_ag_man_dvars(self, yr: int, ag_man_dvars: dict[str, np.ndarray]):
         """

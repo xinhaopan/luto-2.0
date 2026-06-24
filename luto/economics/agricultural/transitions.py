@@ -198,25 +198,28 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
         establishment costs, Water license cost, and carbon releasing costs.
     """
 
-    if not settings.BLENDED_AG_TRANSITION_COSTS:
+    if not settings.BLENDED_TRANSITION_COSTS:
         return get_transition_matrices_ag2ag(data, yr_idx, data.lumaps[base_year], data.lmmaps[base_year], separate)
 
     else:
         yr_cal = data.YR_CAL_BASE + yr_idx
         ag_X_mrj = data.ag_dvars[base_year]
 
-        # Normalisation denominator: sum of ag dvars over (m, j) per cell.
-        # For pure-ag cells this equals 1; for mixed cells it is < 1, so the
-        # raw weighted sum underestimates the whole-cell transition cost.
-        # Dividing by this factor after accumulation restores the correct
-        # interpretation: t_mrj represents the cost if the WHOLE CELL were
-        # transitioned, and the solver's own decision variables handle fractions.
-        ag_frac_r = ag_X_mrj.sum(axis=(0, 2))                           # (NCELLS,)
-        ag_frac_r_safe = np.where(ag_frac_r > 10 ** (-settings.ROUND_DECIMALS), ag_frac_r, 1.0)  # avoid /0; zero-ag cells accumulate 0 anyway
-
         # Hoist invariants that are shared across all (m, j) combos
         w_mrj = get_wreq_matrices(data, yr_idx)
         t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
+
+        # Normalisation denominator: per (cell × target), sum only source LUs where
+        # T_MAT[source, target] is not NaN.  NaN sources contribute 0 to the numerator
+        # (via nan_to_num inside get_transition_matrices_ag2ag) but would inflate the
+        # denominator and create an unintended per-unit discount if included.
+        # Self-transitions (diagonal = $0) are NOT NaN so they stay in the denominator,
+        # preserving the intended head-start discount for cells already holding some
+        # fraction of the target LU.
+        valid_mask       = ~np.isnan(t_ij)                              # (N_AG_LUS, N_AG_LUS)
+        ag_frac_per_lu   = ag_X_mrj.sum(axis=0)                         # (NCELLS, N_AG_LUS) — sum over lm
+        eligible_rj      = ag_frac_per_lu @ valid_mask                  # (NCELLS, N_AG_LUS)
+        eligible_rj_safe = np.where(eligible_rj > 10 ** (-settings.ROUND_DECIMALS), eligible_rj, 1.0)
 
         combos = [(m, j) for m in range(data.NLMS) for j in range(data.N_AG_LUS)]
 
@@ -240,7 +243,7 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
         # Process (m, j) combos in batches of N_JOBS, summing each batch into the
         # running total immediately to bound peak memory (at most N_JOBS full
         # (m, r, j) result arrays live at once instead of all NLMS * N_AG_LUS).
-        n_jobs = settings.BLENDED_AG_TRANSITION_COSTS_N_JOBS
+        n_jobs = settings.BLENDED_TRANSITION_COSTS_N_JOBS
         for i in range(0, len(combos), n_jobs):
             batch = combos[i:i + n_jobs]
             batch_results = Parallel(n_jobs=n_jobs, backend="threading")(delayed(_compute)(m, j) for m, j in batch)
@@ -256,14 +259,13 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
                 for result in batch_results:
                     ag_t_mrj += result
 
-        # Normalise: divide each cell by its total ag fraction so that the
-        # accumulated weighted sum becomes a proper weighted average (weights
-        # sum to 1), giving a whole-cell cost coefficient for the solver.
+        # Normalise: divide by eligible_rj_safe so the weighted sum becomes a proper
+        # average over only the source LUs that can transition to each target.
         if separate:
             for key in ag_t_mrj:
-                ag_t_mrj[key] /= ag_frac_r_safe[np.newaxis, :, np.newaxis]
+                ag_t_mrj[key] /= eligible_rj_safe[np.newaxis, :, :]
         else:
-            ag_t_mrj /= ag_frac_r_safe[np.newaxis, :, np.newaxis]
+            ag_t_mrj /= eligible_rj_safe[np.newaxis, :, :]
 
         return ag_t_mrj
 

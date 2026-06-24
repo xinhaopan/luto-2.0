@@ -109,7 +109,7 @@ def get_env_plant_transitions_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
     """Dispatcher: blended (RESFACTOR>1 mixed cells) or crisp-lumap EP transition costs."""
-    if settings.BLENDED_AG_TRANSITION_COSTS:
+    if settings.BLENDED_TRANSITION_COSTS:
         return get_env_plant_transitions_from_ag_blended(data, yr_idx, base_year, separate)
     else:
         return get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
@@ -211,7 +211,7 @@ def get_rip_plant_transitions_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
     """Dispatcher: blended or crisp-lumap RP transition costs."""
-    if settings.BLENDED_AG_TRANSITION_COSTS:
+    if settings.BLENDED_TRANSITION_COSTS:
         return get_rip_plant_transitions_from_ag_blended(data, yr_idx, base_year, separate)
     else:
         return get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
@@ -333,7 +333,7 @@ def get_sheep_agroforestry_transitions_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
     """Dispatcher: blended or crisp-lumap Sheep AF transition costs."""
-    if settings.BLENDED_AG_TRANSITION_COSTS:
+    if settings.BLENDED_TRANSITION_COSTS:
         return get_sheep_agroforestry_transitions_from_ag_blended(data, yr_idx, base_year, separate)
     else:
         return get_sheep_agroforestry_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
@@ -455,7 +455,7 @@ def get_beef_agroforestry_transitions_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
     """Dispatcher: blended or crisp-lumap Beef AF transition costs."""
-    if settings.BLENDED_AG_TRANSITION_COSTS:
+    if settings.BLENDED_TRANSITION_COSTS:
         return get_beef_agroforestry_transitions_from_ag_blended(data, yr_idx, base_year, separate)
     else:
         return get_beef_agroforestry_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
@@ -538,7 +538,7 @@ def get_carbon_plantings_block_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
     """Dispatcher: blended or crisp-lumap CP Block transition costs."""
-    if settings.BLENDED_AG_TRANSITION_COSTS:
+    if settings.BLENDED_TRANSITION_COSTS:
         return get_carbon_plantings_block_from_ag_blended(data, yr_idx, base_year, separate)
     else:
         return get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap, separate)
@@ -659,7 +659,7 @@ def get_sheep_carbon_plantings_belt_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
     """Dispatcher: blended or crisp-lumap Sheep CP Belt transition costs."""
-    if settings.BLENDED_AG_TRANSITION_COSTS:
+    if settings.BLENDED_TRANSITION_COSTS:
         return get_sheep_carbon_plantings_belt_from_ag_blended(data, yr_idx, base_year, separate)
     else:
         return get_sheep_carbon_plantings_belt_from_ag(data, yr_idx, lumap, lmmap, separate)
@@ -780,7 +780,7 @@ def get_beef_carbon_plantings_belt_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
     """Dispatcher: blended or crisp-lumap Beef CP Belt transition costs."""
-    if settings.BLENDED_AG_TRANSITION_COSTS:
+    if settings.BLENDED_TRANSITION_COSTS:
         return get_beef_carbon_plantings_belt_from_ag_blended(data, yr_idx, base_year, separate)
     else:
         return get_beef_carbon_plantings_belt_from_ag(data, yr_idx, lumap, lmmap, separate)
@@ -859,27 +859,30 @@ def get_destocked_from_ag_blended(data: Data, yr_idx, base_year, separate=False)
     dvars     = data.ag_dvars[base_year]
     dvar_base = tools.ag_mrj_to_xr(data, dvars, threshold=0)
 
-    threshold      = 10 ** (-settings.ROUND_DECIMALS)
-    ag_frac_r      = dvar_base.sum(['lm', 'lu']).values
-    ag_frac_r_safe = np.where(ag_frac_r > threshold, ag_frac_r, 1.0)
-    irr_frac_r     = dvar_base.sel(lm='irr').sum('lu').values
+    threshold  = 10 ** (-settings.ROUND_DECIMALS)
+    irr_frac_r = dvar_base.sel(lm='irr').sum('lu').values
 
     HCAS_benefit_mult = {lu: 1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu] for lu in data.LU_LVSTK_NATURAL}
 
-    # T_MAT and HCAS removal — both only accumulate for j in LU_LVSTK_NATURAL (others are NaN in T_MAT)
-    t_destock_r  = np.zeros(data.NCELLS, dtype=np.float32)
-    hcas_cost_r  = np.zeros(data.NCELLS, dtype=np.float32)
+    # T_MAT and HCAS removal — only accumulate for j in LU_LVSTK_NATURAL (others are NaN in T_MAT).
+    # Normalise by eligible_frac_r (lv-nat only) so the per-unit cost equals a pure lv-nat cell
+    # regardless of how much non-eligible ag land is co-located in the same cell.
+    t_destock_r     = np.zeros(data.NCELLS, dtype=np.float32)
+    hcas_cost_r     = np.zeros(data.NCELLS, dtype=np.float32)
+    eligible_frac_r = np.zeros(data.NCELLS, dtype=np.float32)
     for j_idx, j_name in enumerate(data.AGRICULTURAL_LANDUSES):
         trans_cost = data.T_MAT.sel(from_lu=j_name, to_lu='Destocked - natural land').item()
         if np.isnan(trans_cost):
             continue
         frac_j = dvars[:, :, j_idx].sum(axis=0)   # sum over lm
-        t_destock_r += trans_cost * frac_j
+        t_destock_r     += trans_cost * frac_j
+        eligible_frac_r += frac_j
         hcas_mult = HCAS_benefit_mult.get(j_name, 0.0)
         hcas_cost_r += hcas_mult * frac_j
 
-    trans_cost_r = tools.amortise((t_destock_r / ag_frac_r_safe) * data.REAL_AREA).astype(np.float32)
-    removal_cost_r = tools.amortise((hcas_cost_r / ag_frac_r_safe) * data.EP_EST_COST_HA * data.REAL_AREA).astype(np.float32)
+    eligible_frac_r_safe = np.where(eligible_frac_r > threshold, eligible_frac_r, 1.0)
+    trans_cost_r   = tools.amortise((t_destock_r / eligible_frac_r_safe) * data.REAL_AREA).astype(np.float32)
+    removal_cost_r = tools.amortise((hcas_cost_r / eligible_frac_r_safe) * data.EP_EST_COST_HA * data.REAL_AREA).astype(np.float32)
     est_costs_r = removal_cost_r + trans_cost_r
 
     # WATER — expected irrigated fraction among the ag pool
@@ -898,7 +901,7 @@ def get_destocked_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
     """Dispatcher: blended or crisp-lumap Destocked transition costs."""
-    if settings.BLENDED_AG_TRANSITION_COSTS:
+    if settings.BLENDED_TRANSITION_COSTS:
         return get_destocked_from_ag_blended(data, yr_idx, base_year, separate)
     else:
         return get_destocked_from_ag(data, yr_idx, lumap, lmmap, separate)
@@ -1561,7 +1564,8 @@ def get_non_ag_to_non_ag_transition_matrix(data: Data) -> np.ndarray:
 
 
 
-def get_non_ag_ub_matrices(data: Data, lumap, existing_dvars_rk=None) -> np.ndarray:
+
+def get_non_ag_ub_matrices(data: Data, lumap, base_dvar_nonag_rk, base_dvar_ag_mrj) -> np.ndarray:
     """
     Returns the upper-bound (UB) matrix for non-agricultural land uses,
     shape (NCELLS, N_NON_AG_LUS).  Each entry is the maximum cell proportion
@@ -1569,20 +1573,35 @@ def get_non_ag_ub_matrices(data: Data, lumap, existing_dvars_rk=None) -> np.ndar
 
     Two rules set the UB:
 
-    1. New allocations — transition matrix + no-go exclusion zones decide
-       whether a cell is allowed to take on a non-ag LU for the first time.
-       UB = 0 blocks the transition; UB = 1 (or RP_PROPORTION for Riparian
-       Plantings) allows it.
+    1. New allocations — transition matrix decide whether a cell is allowed to take 
+       on a non-ag LU for the first time. UB = 0 blocks the transition; UB = 1.
+       
+    2. No-go zones for non-ag→ag transitions — when EXCLUDE_NO_GO_LU is True, specified 
+       no-go LU columns are set to UB=0 for all cells in the specified no-go regions. 
+       This is applied after the above rules so it can only further restrict UB.
 
-    2. Existing irreversible allocations — when existing_dvars_rk is supplied,
+    3. Existing irreversible allocations — when base_dvar_nonag_rk is supplied,
        any cell that already holds an irreversible non-ag LU is forced to UB = 1,
        bypassing the transition-matrix check.  This guarantees the cell stays in
        non_ag_lu2cells every solve so its lower bound (lock-in) remains active.
        Without this override, a T_MAT block in year Y would give dvar = 0, which
        propagates lb = 0 in year Y+1 and silently breaks irreversibility.
+
+    4. Blended Destocked cap (base_dvar_ag_mrj supplied + BLENDED_TRANSITION_COSTS) —
+       the Destocked column is capped at (livestock-natural ag fraction + existing destocked
+       fraction).  Existing destocked area can always remain destocked regardless of
+       reversibility; reversibility only governs the lower bound (0 vs existing_dvar).
+       
+    
+       
+    5. RP_PROPORTION cap — the Riparian Plantings column is capped at the stream-buffer 
+       fraction of each cell. This is applied last so it is the hard ceiling regardless 
+       of what earlier steps set. Existing RP dvar ≤ RP_PROPORTION by construction, so 
+       lb ≤ UB is always satisfied.
     """
 
-    # Transition-matrix flag: 1 = allowed, 0 = not allowed (NaN in T_MAT)
+    # 1. Existing T_MAT block gives initial UB=0/1 for new allocations based on from/to LU.  
+    # This applies to all cells regardless of existing dvar.
     t_ik = data.T_MAT.sel(to_lu=data.NON_AGRICULTURAL_LANDUSES).copy()
     lumap2desc = np.vectorize(data.ALLLU2DESC.get, otypes=[str])
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
@@ -1591,29 +1610,44 @@ def get_non_ag_ub_matrices(data: Data, lumap, existing_dvars_rk=None) -> np.ndar
     t_rk[ag_cells, :]     = t_ik[lumap[ag_cells]]
     t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(lumap[non_ag_cells]))
     t_rk[non_ag_cells, :] *= t_ik.sel(from_lu=lumap2desc(data.LUMAP[non_ag_cells]))
-    t_rk = np.where(np.isnan(t_rk), 0, 1).astype(np.int8)
+    t_rk = np.where(np.isnan(t_rk), 0, 1).astype(np.float32)
 
-    # Cells that already hold an irreversible non-ag must be able to have UB.
-    if existing_dvars_rk is not None:
-        for k, k_name in enumerate(data.NON_AGRICULTURAL_LANDUSES):
-            if not settings.NON_AG_LAND_USES_REVERSIBLE[k_name]:
-                # Only the existing dvar > tolerance, then it are considered as valid rather than noise
-                t_rk[existing_dvars_rk[:, k] >= settings.FEASIBILITY_TOLERANCE, k] = 1
-
-    # No-go exclusion zones
+    # 2. No-go zones for non-ag→ag transitions set UB=0 for the affected non-ag LUs in those cells.  
+    # This is applied to all cells regardless of existing dvar, but only affects the specified no-go LU columns.
     no_go_x_rk = np.ones((data.NCELLS, data.N_NON_AG_LUS))
     if settings.EXCLUDE_NO_GO_LU:
         for no_go_x_r, no_go_desc in zip(data.NO_GO_REGION_NON_AG, data.NO_GO_LANDUSE_NON_AG):
             no_go_j = data.NON_AGRICULTURAL_LANDUSES.index(no_go_desc)
             no_go_x_rk[:, no_go_j] = no_go_x_r
+    t_rk = (t_rk * no_go_x_rk).astype(np.float32)
 
-    no_go_x_rk = (t_rk * no_go_x_rk).astype(np.float32)
+    # 3. Existing irreversible non-ag allocations override the above rules to ensure lock-in is 
+    # never silently broken by a T_MAT block or no-go zone.
+    for k, k_name in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+        if not settings.NON_AG_LAND_USES_REVERSIBLE[k_name]:
+            t_rk[base_dvar_nonag_rk[:, k] >= settings.FEASIBILITY_TOLERANCE, k] = 1
 
-    # Riparian Plantings cannot exceed its stream-buffer proportion of the cell
+    # 4. Blended Destocked cap: UB ≤ livestock-natural fraction + already-destocked fraction.
+    #    Values below FEASIBILITY_TOLERANCE are rounding noise from prior solves and are
+    #    zeroed to avoid creating near-degenerate destock variables.
+    if settings.BLENDED_TRANSITION_COSTS:
+        destock_k = data.NON_AGRICULTURAL_LANDUSES.index('Destocked - natural land')
+        eligible_frac_r = (
+            base_dvar_ag_mrj[:, :, data.LU_LVSTK_NATURAL].sum(axis=(0, 2))
+            + base_dvar_nonag_rk[:, destock_k]
+        ).astype(np.float32)
+        # Exclude rounding-noise values so cells with no real livestock-natural or
+        # destocked area are treated as ineligible (same threshold as step 3 lb override).
+        eligible_frac_r[eligible_frac_r < settings.FEASIBILITY_TOLERANCE] = 0.0
+        t_rk[:, destock_k] *= eligible_frac_r
+
+    # 5. Riparian Plantings is physically bounded by the stream-buffer fraction of each cell.
+    # Applied last so it is the hard ceiling regardless of what earlier steps set.
+    # Existing RP dvar <= RP_PROPORTION by construction, so lb <= UB is always satisfied.
     RP_j = data.NON_AGRICULTURAL_LANDUSES.index('Riparian Plantings')
-    no_go_x_rk[:, RP_j] *= data.RP_PROPORTION
+    t_rk[:, RP_j] *= data.RP_PROPORTION
 
-    return no_go_x_rk
+    return t_rk
 
 
 def get_non_ag_lb_matrices(data: Data, base_year) -> np.ndarray:
@@ -1635,14 +1669,17 @@ def get_non_ag_lb_matrices(data: Data, base_year) -> np.ndarray:
     if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
         return np.zeros((data.NCELLS, len(settings.NON_AG_LAND_USES))).astype(np.float32)
 
-    # Floor-truncate to ROUND_DECIMALS precision (prevents float32 upward rounding
-    # from inflating the lb above the stored dvar value).
-    lb_rk = np.divide(
-        np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
-        10 ** settings.ROUND_DECIMALS,
-    )
+    prev_dvars = data.non_ag_dvars[base_year].astype(np.float32)
+    scale = 10 ** settings.ROUND_DECIMALS
 
-    # NonAg can not exceed Ag in the beginning
+    # Only lock in non-reversible LUs; reversible LUs keep lb = 0.
+    lb_rk = np.zeros_like(prev_dvars)
+    for k, k_name in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+        if not settings.NON_AG_LAND_USES_REVERSIBLE[k_name]:
+            # Floor-truncate to prevent float32 upward rounding from inflating lb
+            lb_rk[:, k] = np.floor(prev_dvars[:, k] * scale) / scale
+
+    # NonAg lb can not exceed the available ag-mask proportion of the cell
     lb_capped = np.minimum(lb_rk, data.AG_MASK_PROPORTION_R[:, np.newaxis]).astype(np.float32)
 
     lb_update = lb_capped < lb_rk

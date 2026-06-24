@@ -60,7 +60,8 @@ class SolverSolution:
     ag_X_mrj: np.ndarray
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
-    ag_D_mrj: np.ndarray | None                                          # Delta dvars D=max(0,X_new-x_old); None when BLENDED_AG_TRANSITION_COSTS=False
+    ag2ag_D_mrj: np.ndarray | None                                        # Ag->ag delta dvars D=max(0,X_new-x_old); None when BLENDED_TRANSITION_COSTS=False
+    ag2nonag_D_rk: np.ndarray | None                                      # Ag->nonag delta dvars; None when BLENDED_TRANSITION_COSTS=False
     prod_data: dict[str, Any]
     obj_val: dict[str, float]
 
@@ -151,7 +152,8 @@ class LutoSolver:
         self._setup_non_ag_vars()
         self._setup_ag_management_variables()
         self._setup_deviation_penalties()
-        self._setup_ag_delta_vars()
+        self._setup_delta_vars_ag2ag()
+        self._setup_delta_vars_ag2nonag()
 
     def _setup_constraints(self):
         print("├── Adding the constraints...")
@@ -164,7 +166,8 @@ class LutoSolver:
         self._add_regional_adoption_constraints()
         self._add_water_usage_limit_constraints()
         self._add_renewable_energy_constraints()
-        self._add_ag_transition_delta_constraints()
+        self._add_transition_delta_constraints_ag2ag()
+        self._add_transition_delta_constraints_ag2nonag()
         
     def _setup_objective(self):
         """
@@ -378,18 +381,18 @@ class LutoSolver:
             num_regions = len(self._input_data.limits["water"].keys())
             self.W = self.gurobi_model.addMVar(num_regions, name="W")
 
-    def _setup_ag_delta_vars(self):
+    def _setup_delta_vars_ag2ag(self):
         """Add non-negative delta variables D[m,j,r] for blended ag2ag transition costs.
 
         D[m,j,r] = max(0, X_new[m,j,r] - x_old[m,j,r]) at optimality, enforced by
-        _add_ag_transition_delta_constraints. Only created for (m,j,r) triples
+        _add_transition_delta_constraints_ag2ag. Only created for (m,j,r) triples
         where the rescaled transition cost coefficient meets SOLVER_COEFF_MIN.
         """
-        if not settings.BLENDED_AG_TRANSITION_COSTS:
+        if not settings.BLENDED_TRANSITION_COSTS:
             return
         
         print("│   └── setting up delta variables for blended ag transition costs...")
-        t_mat  = self._input_data.ag_t_mrj
+        t_mat  = self._input_data.trans_ag2ag_mrj
         n_lus  = self._input_data.n_ag_lus
         ncells = self._input_data.ncells
 
@@ -409,18 +412,18 @@ class LutoSolver:
                     )
 
 
-    def _add_ag_transition_delta_constraints(self):
+    def _add_transition_delta_constraints_ag2ag(self):
         """Link delta vars to ag decision vars: D[m,j,r] >= X_new[m,j,r] - x_old[m,j,r].
 
         Combined with the negative sign on D in the maximisation objective (or positive
         in mincost), the solver naturally drives D = max(0, X_new - x_old), so transition
         costs are charged only on net land-use increases.
         """
-        if not settings.BLENDED_AG_TRANSITION_COSTS:
+        if not settings.BLENDED_TRANSITION_COSTS:
             return
         
         print("│   └── adding delta linking constraints for blended ag transition costs...")
-        x_old = self._input_data.ag_dvars_base  # shape (NLMS, NCELLS, N_AG_LUS)
+        x_old = self._input_data.dvar_base_ag_mrj  # shape (NLMS, NCELLS, N_AG_LUS)
 
         for j in range(self._input_data.n_ag_lus):
             for r in self._input_data.ag_lu2cells[0, j]:
@@ -437,6 +440,51 @@ class LutoSolver:
                 self.gurobi_model.addConstr(
                     self.D_ag_irr_vars_jr[j, r] >= self.X_ag_irr_vars_jr[j, r] - x_old[1, r, j],
                     name=f"delta_irr_{j}_{r}"
+                )
+
+    def _setup_delta_vars_ag2nonag(self):
+        """Add non-negative delta variables D_nonag[r,k] for blended ag->nonag transition costs.
+
+        D_nonag[r,k] = max(0, X_nonag_new[r,k] - x_nonag_old[r,k]) at optimality, enforced by
+        _add_transition_delta_constraints_ag2nonag. Only created for (r,k) pairs where the
+        rescaled transition cost coefficient meets SOLVER_COEFF_MIN.
+        """
+        if not settings.BLENDED_TRANSITION_COSTS:
+            return
+
+        print("│   └── setting up delta variables for blended ag->nonag transition costs...")
+        t_rk   = self._input_data.trans_ag2nonag_rk   # (NCELLS, N_NON_AG_LUS), already rescaled
+        ncells = self._input_data.ncells
+        n_k    = self._input_data.n_non_ag_lus
+
+        self.D_nonag_vars_rk = np.zeros((ncells, n_k), dtype=object)
+        for k in range(n_k):
+            non_ag_cells = self._input_data.non_ag_lu2cells[k]
+            for r in non_ag_cells:
+                if abs(t_rk[r, k]) >= settings.SOLVER_COEFF_MIN:
+                    self.D_nonag_vars_rk[r, k] = self.gurobi_model.addVar(
+                        lb=0, ub=1, name=f"D_nonag_{r}_{k}"
+                    )
+
+    def _add_transition_delta_constraints_ag2nonag(self):
+        """Link D_nonag[r,k] >= X_nonag_new[r,k] - x_nonag_old[r,k].
+
+        Combined with the cost sign in the objective, the solver drives
+        D_nonag = max(0, X_nonag_new - x_nonag_old) at optimality.
+        """
+        if not settings.BLENDED_TRANSITION_COSTS:
+            return
+
+        print("│   └── adding delta linking constraints for blended ag->nonag transition costs...")
+        x_old = self._input_data.dvar_base_non_ag_rk   # (NCELLS, N_NON_AG_LUS)
+
+        for k in range(self._input_data.n_non_ag_lus):
+            for r in self._input_data.non_ag_lu2cells[k]:
+                if not isinstance(self.D_nonag_vars_rk[r, k], gp.Var):
+                    continue
+                self.gurobi_model.addConstr(
+                    self.D_nonag_vars_rk[r, k] >= self.X_non_ag_vars_kr[k, r] - x_old[r, k],
+                    name=f"delta_nonag_{r}_{k}"
                 )
 
     def _setup_economy_objective(self):
@@ -480,8 +528,8 @@ class LutoSolver:
         self.economy_non_ag_contr = gp.quicksum(non_ag_exprs)
 
         # Blended ag2ag transition costs: applied to delta vars D = max(0, X_new - x_old).
-        if settings.BLENDED_AG_TRANSITION_COSTS:
-            t_mat = self._input_data.ag_t_mrj
+        if settings.BLENDED_TRANSITION_COSTS:
+            t_mat  = self._input_data.trans_ag2ag_mrj
             t_sign = -1 if settings.OBJECTIVE == "maxprofit" else 1
             blend_t_exprs = []
             for j in range(self._input_data.n_ag_lus):
@@ -492,11 +540,28 @@ class LutoSolver:
                     + _qsum(t_sign * t_mat[1, irr_cells, j], self.D_ag_irr_vars_jr[j, irr_cells])
                 )
             self.economy_trans_ag2ag_contr = gp.quicksum(blend_t_exprs)
+
+            # Blended ag->nonag transition costs: same pattern, applied to D_nonag[r,k].
+            t_rk = self._input_data.trans_ag2nonag_rk
+            blend_nonag_t_exprs = []
+            for k in range(self._input_data.n_non_ag_lus):
+                non_ag_cells = self._input_data.non_ag_lu2cells[k]
+                blend_nonag_t_exprs.append(
+                    _qsum(t_sign * t_rk[non_ag_cells, k], self.D_nonag_vars_rk[non_ag_cells, k])
+                )
+            self.economy_trans_ag2nonag_contr = gp.quicksum(blend_nonag_t_exprs)
         else:
             self.economy_trans_ag2ag_contr = 0
+            self.economy_trans_ag2nonag_contr = 0
 
         return (
-            (self.economy_ag_contr + self.economy_ag_man_contr + self.economy_non_ag_contr + self.economy_trans_ag2ag_contr)
+            (
+                self.economy_ag_contr 
+                + self.economy_ag_man_contr 
+                + self.economy_non_ag_contr
+                + self.economy_trans_ag2ag_contr 
+                + self.economy_trans_ag2nonag_contr
+            )   
             * self._input_data.scale_factors['Economy']
             / 1e6  # Convert to million AUD
         )
@@ -563,20 +628,42 @@ class LutoSolver:
         x_ag_irr_vars = self.X_ag_irr_vars_jr[:, cells]
         x_non_ag_vars = self.X_non_ag_vars_kr[:, cells]
 
-        # Constrain total (ag + non-ag) land per cell to equal the initial (2010) agricultural proportion. 
-        #   E.g., under resfactoring, a cell may only be 25% agricultural in the base year, 
+        # Constrain total (ag + non-ag) land per cell to equal the initial (2010) agricultural proportion.
+        #   E.g., under resfactoring, a cell may only be 25% agricultural in the base year,
         #   so total allocation must equal that fraction.
         ag_mask = self._input_data.ag_mask_proportion_r
+
+        # Precompute max feasible allocation per cell.
+        # Ag vars each have ub=1; cells with any ag var can always cover ag_mask (<=1).
+        # Cells with no ag vars are limited by the sum of their non-ag UBs.
+        has_any_ag_r = (
+            (self._input_data.ag_x_mrj[0] > 0).any(axis=1) |
+            (self._input_data.ag_x_mrj[1] > 0).any(axis=1)
+        )
+        max_nonag_r = self._input_data.non_ag_ub_rk.sum(axis=1)
+        max_alloc_r  = np.where(has_any_ag_r, 1.0, max_nonag_r)
+        # Cells where max_alloc < ag_mask cannot satisfy the equality and must be skipped.
+        # This covers: (a) cells with no variables at all (max=0), and (b) cells whose only
+        # non-ag option has a capped UB below ag_mask (e.g. destock cap < cell ag fraction).
+        skip_r = max_alloc_r < ag_mask - 1e-6
+
         X_sum_r = (
             x_ag_dry_vars.sum(axis=0)
             + x_ag_irr_vars.sum(axis=0)
             + x_non_ag_vars.sum(axis=0)
         )
+        n_skipped = 0
         for r, expr, ub in zip(cells, X_sum_r, ag_mask[cells]):
+            if skip_r[r]:
+                n_skipped += 1
+                continue
             self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(
                 expr == ub,
                 name=f"const_cell_usage_{r}"
             )
+        if n_skipped:
+            print(f"│   │   WARNING: skipped cell-usage constraint for {n_skipped} cells "
+                  f"(max feasible allocation < ag_mask).")
 
 
     def _add_agricultural_management_constraints(
@@ -1409,7 +1496,7 @@ class LutoSolver:
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
 
         # Extract D var solutions: D[m,j,r] = max(0, X_new - x_old) at optimality
-        if settings.BLENDED_AG_TRANSITION_COSTS:
+        if settings.BLENDED_TRANSITION_COSTS:
             D_dry_sol_rj = np.zeros((self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32)
             D_irr_sol_rj = np.zeros((self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32)
             for j in range(self._input_data.n_ag_lus):
@@ -1419,9 +1506,20 @@ class LutoSolver:
                 for r in self._input_data.ag_lu2cells[1, j]:
                     if isinstance(self.D_ag_irr_vars_jr[j, r], gp.Var):
                         D_irr_sol_rj[r, j] = self.D_ag_irr_vars_jr[j, r].X
-            ag_D_mrj = np.stack((D_dry_sol_rj, D_irr_sol_rj))
+            ag2ag_D_mrj = np.stack((D_dry_sol_rj, D_irr_sol_rj))
+
+            # Extract D_nonag[r,k] = max(0, X_nonag_new - x_nonag_old) at optimality
+            non_ag_D_sol_rk = np.zeros(
+                (self._input_data.ncells, self._input_data.n_non_ag_lus), dtype=np.float32
+            )
+            for k in range(self._input_data.n_non_ag_lus):
+                for r in self._input_data.non_ag_lu2cells[k]:
+                    if isinstance(self.D_nonag_vars_rk[r, k], gp.Var):
+                        non_ag_D_sol_rk[r, k] = self.D_nonag_vars_rk[r, k].X
+            ag2nonag_D_rk = non_ag_D_sol_rk
         else:
-            ag_D_mrj = None
+            ag2ag_D_mrj = None
+            ag2nonag_D_rk = None
 
         ag_man_X_mrj = {
             am: np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
@@ -1530,7 +1628,8 @@ class LutoSolver:
             ag_X_mrj=ag_X_mrj,
             non_ag_X_rk=non_ag_X_sol_rk,
             ag_man_X_mrj=ag_man_X_mrj,
-            ag_D_mrj=ag_D_mrj,
+            ag2ag_D_mrj=ag2ag_D_mrj,
+            ag2nonag_D_rk=ag2nonag_D_rk,
             prod_data=prod_data,
             obj_val={
                 "ObjVal":(
