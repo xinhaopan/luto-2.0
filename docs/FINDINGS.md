@@ -136,6 +136,165 @@ Full design detail: `jinzhu_inspect_code/Refactor_exact_trans_cost/FINDINGS.md`.
 
 ---
 
+## 20260625 — ag→ag exact transition costs: per-(from_m, from_j) cell arrays; two bugs fixed
+
+### TL;DR
+
+Added `TRANSITION_MODE = 'exact'` for ag→ag transitions in
+`luto/economics/agricultural/transitions.py` and `ghg.py`.  In exact mode, transition costs
+are computed as `dict[(from_m, from_j)] → ndarray(NLMS, len(cell_idx), N_AG_LUS)` rather than
+collapsing the base year to a single lumap (crisp) or a weighted average (blend).  This
+preserves full source-LU identity for later per-slice solver delta variables.
+
+Two bugs were found and fixed during implementation:
+
+1. **`get_ag_to_ag_water_delta_matrix`** — irrigation infrastructure cost applied only to
+   the source LU column (`from_j`), not broadcast across all target LUs.
+2. **`get_ghg_lvstk_natural_to_modified_exact`** — `result_arr` allocated with shape
+   `(N_AG_MANS, …)` instead of `(NLMS, …)`, causing a shape mismatch at the caller.
+
+Also renamed `BLENDED_TRANSITION_COSTS` (bool) → `TRANSITION_MODE` (str: `'crisp'` /
+`'blend'` / `'exact'`) throughout settings, solver, input_data, and write modules.
+
+---
+
+### Motivation for exact mode
+
+Both `crisp` and `blend` lose information about which source `(m, j)` a cell's fraction
+came from.  `crisp` collapses to a single dominant LU; `blend` collapses to a weighted
+average across all source LUs.  In `exact` mode every `(from_m, from_j)` slice of the
+base-year dvar is kept separate, so the solver can create a **per-slice delta variable**
+and multiply it by the cost computed for precisely that source slice — no averaging, no
+dominant-LU approximation.
+
+---
+
+### Cell-index map helper
+
+`get_base_dvar_mj_cell_map(data, base_year)` → `{(from_m, from_j): cell_idx}` omits empty
+combos (no cells with that `(m, j)` allocation in base year above threshold).
+
+- Decorated `@lru_cache(maxsize=1)` — solver and cost function call this for the same
+  `(data, base_year)` pair in one solve step; the second call is free.
+- Shared by both ag→ag and ag→nonag exact functions — nobody re-derives `cell_idx` independently.
+
+---
+
+### Return type of `get_transition_matrices_ag2ag_exact`
+
+```python
+# separate=False (default):
+result: dict[(from_m, from_j)] → ndarray (NLMS, len(cell_idx), N_AG_LUS)   # $/cell/yr
+
+# separate=True (keys match get_ghg_transition_emissions(separate=True)):
+result: dict[(from_m, from_j)] → {
+    'Establishment cost':                       ndarray (NLMS, len(cell_idx), N_AG_LUS),
+    'Water license cost':                       ndarray (NLMS, len(cell_idx), N_AG_LUS),
+    'Livestock natural to unallocated natural': ndarray (NLMS, len(cell_idx), N_AG_LUS),  # zeros
+    'Unallocated natural to livestock natural': ndarray (NLMS, len(cell_idx), N_AG_LUS),
+    'Livestock natural to modified':            ndarray (NLMS, len(cell_idx), N_AG_LUS),
+    'Unallocated natural to modified':          ndarray (NLMS, len(cell_idx), N_AG_LUS),
+}
+```
+
+`cell_idx` is not embedded in the value — callers retrieve it from `mj_cell_map` directly.
+
+---
+
+### Cost components (ag→ag exact)
+
+| Component | Source | Notes |
+|-----------|--------|-------|
+| Establishment | `T_MAT[from_j, to_j] × TRANS_COST_MULTS × REAL_AREA` | NaN→0; excluded transitions cost 0, solver enforce via exclude matrix |
+| Water licence | `(w_target − w_base) × WATER_LICENCE_PRICE × mults` | Both from target-yr `w_req_mrj`; base = `w_req[from_m, cell_idx, from_j]` |
+| New irrigation | `NEW_IRRIG_COST × mults × REAL_AREA` into `cost[1]` | Only when `from_m == 0` (was dryland) |
+| De-irrigation | `REMOVE_IRRIG_COST × mults × REAL_AREA` into `cost[0]` | Only when `from_m == 1` (was irrigated) |
+| GHG | sum of three exact GHG functions × carbon_price | Each returns zeros when `from_j` is not the relevant source LU |
+
+---
+
+### GHG exact functions
+
+All three GHG transition types follow a consistent three-variant + dispatch structure:
+
+| Transition type | exact function | dispatch raises |
+|---|---|---|
+| unall-natural → lvstk-natural | `get_ghg_unall_natural_to_lvstk_natural_exact(data, base_year, from_m, from_j)` | ValueError in `get_ghg_unall_natural_to_lvstk_natural` |
+| lvstk-natural → modified | `get_ghg_lvstk_natural_to_modified_exact(data, base_year, from_m, from_j)` | ValueError in `get_ghg_lvstk_natural_to_modified` |
+| unall-natural → modified | `get_ghg_unall_natural_to_modified_exact(data, base_year, from_m, from_j)` | ValueError in `get_ghg_unall_natural_to_modified` |
+
+Each exact function returns `(NLMS, len(cell_idx), N_AG_LUS)` in t/cell, or zeros immediately
+if `from_j` is not the relevant source LU type.  The three are summed in
+`get_transition_matrices_ag2ag_exact` before applying `amortise × carbon_price`.
+
+---
+
+### Bug fixed: `get_ag_to_ag_water_delta_matrix` irrigation cost column broadcast
+
+The original crisp implementation applied the irrigation infrastructure cost only to the
+**source LU column** (`from_j`), leaving all other target LU columns unaffected:
+
+```python
+# BEFORE (bug): l_mrj[0] is True only at j=from_j for a synthetic lumap
+w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + new_irrig,    w_delta_mrj[1])
+w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + remove_irrig, w_delta_mrj[0])
+```
+
+A cell switching from dryland wheat to **irrigated rice** paid no irrigation setup cost;
+switching from dryland wheat to **irrigated wheat** did — an incorrect LU-dependent result
+for an infrastructure cost that is LU-independent.
+
+**Fix** (`tools/__init__.py`): collapse the `j` dimension first to get a per-cell boolean,
+then broadcast across all target LUs:
+
+```python
+# AFTER (fixed): True for any dryland/irrigated cell regardless of from_j
+dryland_r   = l_mrj[0].any(axis=1, keepdims=True)   # (NCELLS, 1)
+irrigated_r = l_mrj[1].any(axis=1, keepdims=True)   # (NCELLS, 1)
+w_delta_mrj[1] = np.where(dryland_r,   w_delta_mrj[1] + new_irrig,    w_delta_mrj[1])
+w_delta_mrj[0] = np.where(irrigated_r, w_delta_mrj[0] + remove_irrig, w_delta_mrj[0])
+```
+
+Verified by `step_1_compare_ag2ag_exact_crisp_trans_cost.py`: water license cost matches
+100% across all 49 combos after the fix (previously 34–97%).  The fix applies equally to
+crisp and blend (blend calls the same function internally).
+
+---
+
+### Bug fixed: `get_ghg_lvstk_natural_to_modified_exact` wrong array shape
+
+`result_arr` was allocated with shape `(data.N_AG_MANS, …)` (number of ag-management
+options, ~10) instead of `(data.NLMS, …)` (= 2).  The function fills `result_arr[to_m, ...]`
+for `to_m ∈ {0, 1}`, and callers expect `(NLMS, len(cell_idx), N_AG_LUS)`.  Fixed by
+changing the allocation to `(data.NLMS, …)`.
+
+---
+
+### Validation
+
+Script: `jinzhu_inspect_code/Refactor_exact_trans_cost/step_1_compare_ag2ag_exact_crisp_trans_cost.py`
+
+Validates `get_transition_matrices_ag2ag_exact` against `get_transition_matrices_ag2ag_crisp`
+for all 49 `(from_m, from_j)` combos. Strategy: build synthetic all-`from_j` lumap /
+all-`from_m` lmmap, call crisp(separate=True), slice at `cell_idx`, compare component-by-
+component. Result: **100% match** for all components after the two bug fixes above.
+
+---
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `luto/economics/agricultural/transitions.py` | Added `get_base_dvar_mj_cell_map`; added `get_transition_matrices_ag2ag_exact`; updated dispatcher |
+| `luto/economics/agricultural/ghg.py` | Added `_exact` variants for all three GHG transition types; dispatch raises `ValueError` for exact |
+| `luto/tools/__init__.py` | Fixed irrigation infrastructure cost broadcast in `get_ag_to_ag_water_delta_matrix`; added `.astype(np.float32)` return |
+| `luto/settings.py` | `BLENDED_TRANSITION_COSTS` (bool) → `TRANSITION_MODE` (str); `BLENDED_TRANSITION_COSTS_N_JOBS` → `TRANSITION_MODE_N_JOBS` |
+| `luto/solvers/solver.py`, `input_data.py`, `tools/write.py`, `data.py` | Updated all `BLENDED_TRANSITION_COSTS` references to `TRANSITION_MODE != 'crisp'` |
+
+Full design detail: `jinzhu_inspect_code/Refactor_exact_trans_cost/FINDINGS.md`.
+
+---
+
 ## 20260623 — blend non-ag UB: three runtime bugs fixed (ordering, RF5 edge cells, INFEASIBLE)
 
 ### TL;DR
