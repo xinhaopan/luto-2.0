@@ -32,7 +32,7 @@ from luto import tools
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 
 
-def get_wreq_matrices(data, yr_idx):
+def get_wreq_matrices(data, yr_idx) -> np.ndarray:
     """
     Return water requirement (water use by irrigation and livestock drinking water) matrices
     by land management, cell, and land-use type.
@@ -55,7 +55,6 @@ def get_wreq_matrices(data, yr_idx):
             w_req_mrj[0, :, j] = w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)  # Water reqs depend on current stocking rate for drinking water
             w_req_mrj[1, :, j] = w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)       # Water reqs depend on initial stocking rate for irrigation
 
-    # Convert to ML per cell via REAL_AREA
     w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
 
     return w_req_mrj

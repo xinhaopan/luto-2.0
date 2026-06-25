@@ -253,95 +253,202 @@ def get_ghg_matrices(data:Data, yr_idx, aggregate=True):
         return ghg_df
 
 
-def get_ghg_unall_natural_to_lvstk_natural(data:Data, base_lumap) -> np.ndarray:
-    """
-    Gets the one-off greenhouse gas penalties for transitioning unallocated natural land to livestock natural land.
-    
-    Parameters
-        data (object): The data object containing relevant information.
-        base_lumap (1D array): The base_lumap object containing land use mapping.
+# ---------------------------------------------------------------------------
+# GHG transition: unallocated natural → livestock natural
+# ---------------------------------------------------------------------------
 
-    Returns
-        np.ndarray, <unit : t/cell>.
-    """
-    
-    ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
-    ghg_unall_natural_to_lvstk_natural_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
+def get_ghg_unall_natural_to_lvstk_natural_crisp(data: Data, base_lumap) -> np.ndarray:
+    """GHG penalties for unall-natural→lvstk-natural using dominant lumap cell assignment."""
+    ghg_rj = np.zeros((data.NCELLS, data.N_AG_LUS), dtype=np.float32)
     un_allow_code = data.DESC2AGLU["Unallocated - natural land"]
+    cells = base_lumap == un_allow_code
 
     for to_lu in data.LU_LVSTK_NATURAL:
-
-        ghg_unall_natural_to_lvstk_natural_r = (
-            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[base_lumap == un_allow_code] 
+        ghg_rj[cells, to_lu] = (
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[cells]
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
-            * data.REAL_AREA[base_lumap == un_allow_code]
-        ) 
-        
-        ghg_unall_natural_to_lvstk_natural_rj[base_lumap == un_allow_code, to_lu] = ghg_unall_natural_to_lvstk_natural_r
-            
-    return np.stack([ghg_unall_natural_to_lvstk_natural_rj] * 2)
+            * data.REAL_AREA[cells]
+        )
+
+    return np.stack([ghg_rj] * data.NLMS)
 
 
-def get_ghg_lvstk_natural_to_modified(data:Data, base_lumap) -> np.ndarray:
-    """
-    Gets the one-off greenhouse gas penalties for transitioning livestock natural land to modified land.
-    
-    Parameters
-        data (object): The data object containing relevant information.
-        base_lumap (1D array): The base_lumap object containing land use mapping.
-
-    Returns
-        np.ndarray, <unit : t/cell>.
-    """
-    
-    ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
-    ghg_lvstk_natural_to_modified_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
-    
-    for from_lu in data.LU_LVSTK_NATURAL:
-        for to_lu in data.LU_MODIFIED_LAND:
-            # Get GHG penalties from current land use to future land use
-            ghg_lvstk_natural_to_modified_r = (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[base_lumap == from_lu] 
-                * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
-                * data.REAL_AREA[base_lumap == from_lu]
-            ) 
-            
-            # Assign the penalties to the transition matrices
-            ghg_lvstk_natural_to_modified_rj[base_lumap == from_lu, to_lu] = ghg_lvstk_natural_to_modified_r
-        
-    return np.stack([ghg_lvstk_natural_to_modified_rj] * 2)
-
-
-def get_ghg_unall_natural_to_modified(data:Data, base_lumap) -> np.ndarray:
-    """
-    Gets the one-off greenhouse gas penalties for transitioning unallocated natural land to modified land.
-
-    Parameters
-        data (object): The data object containing relevant information.
-        base_lumap (1D array): The base_lumap object containing land use mapping.
-
-    Returns
-        np.ndarray, <unit : t/cell>.
-    """
-    ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
-    ghg_unall_natural_to_modified_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
+def get_ghg_unall_natural_to_lvstk_natural_blend(data: Data, ag_X_mrj: np.ndarray) -> np.ndarray:
+    """GHG penalties for unall-natural→lvstk-natural weighted by fractional dvar composition."""
+    threshold = 10 ** (-settings.ROUND_DECIMALS)
     un_allow_code = data.DESC2AGLU["Unallocated - natural land"]
+    all_from_lumap = np.full(data.NCELLS, un_allow_code, dtype=np.int8)
+    penalty_mrj = get_ghg_unall_natural_to_lvstk_natural_crisp(data, all_from_lumap)
+
+    frac_r = ag_X_mrj[:, :, un_allow_code].sum(axis=0)
+    frac_r[frac_r < settings.FEASIBILITY_TOLERANCE] = 0.0
+    frac_r_safe = np.where(frac_r > threshold, frac_r, 1.0)
+
+    return penalty_mrj * frac_r[np.newaxis, :, np.newaxis] / frac_r_safe[np.newaxis, :, np.newaxis]
+
+
+def get_ghg_unall_natural_to_lvstk_natural_exact(data: Data, base_year: int, from_m: int, from_j: int) -> np.ndarray:
+    """GHG penalties for unall-natural→lvstk-natural using exact cell selection per (from_m, from_j)."""
+    threshold = 10 ** (-settings.ROUND_DECIMALS)
+    cell_idx = np.where(data.ag_dvars[base_year][from_m, :, from_j] > threshold)[0]
+    result_arr = np.zeros((data.NLMS, len(cell_idx), data.N_AG_LUS), dtype=np.float32)
+
+    if from_j != data.DESC2AGLU["Unallocated - natural land"]:
+        return result_arr
+
+    for to_j in data.LU_LVSTK_NATURAL:
+        penalty = (
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[cell_idx]
+            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_j])
+            * data.REAL_AREA[cell_idx]
+        )
+        result_arr[:, :, to_j] = penalty[np.newaxis, :]
+
+    return result_arr
+
+
+def get_ghg_unall_natural_to_lvstk_natural(data: Data, base_lumap, ag_X_mrj=None) -> np.ndarray:
+    """Dispatch to _crisp or _blend based on TRANSITION_MODE (exact must be called directly)."""
+    if settings.TRANSITION_MODE == 'crisp' or ag_X_mrj is None:
+        return get_ghg_unall_natural_to_lvstk_natural_crisp(data, base_lumap)
+    elif settings.TRANSITION_MODE == 'blend':
+        return get_ghg_unall_natural_to_lvstk_natural_blend(data, ag_X_mrj)
+    elif settings.TRANSITION_MODE == 'exact':
+        raise ValueError('exact mode: call get_ghg_unall_natural_to_lvstk_natural_exact directly from get_transition_matrices_ag2ag_exact')
+
+
+# ---------------------------------------------------------------------------
+# GHG transition: livestock natural → modified
+# ---------------------------------------------------------------------------
+
+def get_ghg_lvstk_natural_to_modified_crisp(data: Data, base_lumap) -> np.ndarray:
+    """GHG penalties for lvstk-natural→modified transitions using the dominant lumap cell assignment."""
+    ghg_rj = np.zeros((data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+
+    for from_lu, to_lu in itertools.product(data.LU_LVSTK_NATURAL, data.LU_MODIFIED_LAND):
+        cells = base_lumap == from_lu
+        ghg_rj[cells, to_lu] = (
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[cells]
+            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
+            * data.REAL_AREA[cells]
+        )
+
+    return np.stack([ghg_rj] * data.NLMS)
+
+
+def get_ghg_lvstk_natural_to_modified_blend(data: Data, ag_X_mrj: np.ndarray) -> np.ndarray:
+    """GHG penalties for lvstk-natural→modified transitions weighted by fractional dvar composition."""
+    threshold = 10 ** (-settings.ROUND_DECIMALS)
+    result_mrj    = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+    total_frac_r  = np.zeros(data.NCELLS, dtype=np.float32)
+
+    for from_lu in data.LU_LVSTK_NATURAL:
+        all_from_lumap = np.full(data.NCELLS, from_lu, dtype=np.int8)
+        penalty_mrj = get_ghg_lvstk_natural_to_modified_crisp(data, all_from_lumap)
+
+        frac_r = ag_X_mrj[:, :, from_lu].sum(axis=0)
+        frac_r[frac_r < settings.FEASIBILITY_TOLERANCE] = 0.0
+
+        result_mrj   += penalty_mrj * frac_r[np.newaxis, :, np.newaxis]
+        total_frac_r += frac_r
+
+    total_frac_r_safe = np.where(total_frac_r > threshold, total_frac_r, 1.0)
+    return result_mrj / total_frac_r_safe[np.newaxis, :, np.newaxis]
+
+
+def get_ghg_lvstk_natural_to_modified_exact(data: Data, base_year: int, from_m: int, from_j: int) -> np.ndarray:
+    """GHG penalties for lvstk-natural→modified using exact cell selection per (from_m, from_j)."""
+    threshold = 10 ** (-settings.ROUND_DECIMALS)
+    cell_idx = np.where(data.ag_dvars[base_year][from_m, :, from_j] > threshold)[0]
+    result_arr = np.zeros((data.NLMS, len(cell_idx), data.N_AG_LUS), dtype=np.float32)
+
+    if from_j not in data.LU_LVSTK_NATURAL:
+        return result_arr
+
+    for to_j in data.LU_MODIFIED_LAND:
+        result_arr[:, :, to_j] = (
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[cell_idx]
+            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_j])
+            * data.REAL_AREA[cell_idx]
+        )[np.newaxis, :]
+
+    return result_arr
+
+
+def get_ghg_lvstk_natural_to_modified(data: Data, base_lumap, ag_X_mrj=None) -> np.ndarray:
+    """Dispatch to _crisp or _blend based on TRANSITION_MODE (exact must be called directly)."""
+    if settings.TRANSITION_MODE == 'crisp' or ag_X_mrj is None:
+        return get_ghg_lvstk_natural_to_modified_crisp(data, base_lumap)
+    elif settings.TRANSITION_MODE == 'blend':
+        return get_ghg_lvstk_natural_to_modified_blend(data, ag_X_mrj)
+    elif settings.TRANSITION_MODE == 'exact':
+        raise ValueError('exact mode: call get_ghg_lvstk_natural_to_modified_exact directly from get_transition_matrices_ag2ag_exact')
+
+
+# ---------------------------------------------------------------------------
+# GHG transition: unallocated natural → modified
+# ---------------------------------------------------------------------------
+
+def get_ghg_unall_natural_to_modified_crisp(data: Data, base_lumap) -> np.ndarray:
+    """GHG penalties for unall-natural→modified using dominant lumap cell assignment."""
+    ghg_rj = np.zeros((data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+    un_allow_code = data.DESC2AGLU["Unallocated - natural land"]
+    cells = base_lumap == un_allow_code
 
     for to_lu in data.LU_MODIFIED_LAND:
-        # Get GHG penalties from current land use to future land use
-        ghg_unall_natural_to_modified_r = (
-            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[base_lumap == un_allow_code] 
+        ghg_rj[cells, to_lu] = (
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[cells]
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
-            * data.REAL_AREA[base_lumap == un_allow_code]
-        ) 
-        
-        # Assign the penalties to the transition matrices
-        ghg_unall_natural_to_modified_rj[base_lumap == un_allow_code, to_lu] = ghg_unall_natural_to_modified_r
+            * data.REAL_AREA[cells]
+        )
 
-    return np.stack([ghg_unall_natural_to_modified_rj] * 2)
+    return np.stack([ghg_rj] * data.NLMS)
 
 
-def get_ghg_transition_emissions(data:Data, base_lumap, separate=False) -> np.ndarray:
+def get_ghg_unall_natural_to_modified_blend(data: Data, ag_X_mrj: np.ndarray) -> np.ndarray:
+    """GHG penalties for unall-natural→modified weighted by fractional dvar composition."""
+    threshold = 10 ** (-settings.ROUND_DECIMALS)
+    un_allow_code = data.DESC2AGLU["Unallocated - natural land"]
+    all_from_lumap = np.full(data.NCELLS, un_allow_code, dtype=np.int8)
+    penalty_mrj = get_ghg_unall_natural_to_modified_crisp(data, all_from_lumap)
+
+    frac_r = ag_X_mrj[:, :, un_allow_code].sum(axis=0)
+    frac_r[frac_r < settings.FEASIBILITY_TOLERANCE] = 0.0
+    frac_r_safe = np.where(frac_r > threshold, frac_r, 1.0)
+
+    return penalty_mrj * frac_r[np.newaxis, :, np.newaxis] / frac_r_safe[np.newaxis, :, np.newaxis]
+
+
+def get_ghg_unall_natural_to_modified_exact(data: Data, base_year: int, from_m: int, from_j: int) -> np.ndarray:
+    """GHG penalties for unall-natural→modified using exact cell selection per (from_m, from_j)."""
+    threshold = 10 ** (-settings.ROUND_DECIMALS)
+    cell_idx = np.where(data.ag_dvars[base_year][from_m, :, from_j] > threshold)[0]
+    result_arr = np.zeros((data.NLMS, len(cell_idx), data.N_AG_LUS), dtype=np.float32)
+
+    if from_j != data.DESC2AGLU["Unallocated - natural land"]:
+        return result_arr
+
+    for to_j in data.LU_MODIFIED_LAND:
+        result_arr[:, :, to_j] = (
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[cell_idx]
+            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_j])
+            * data.REAL_AREA[cell_idx]
+        )[np.newaxis, :]
+
+    return result_arr
+
+
+def get_ghg_unall_natural_to_modified(data: Data, base_lumap, ag_X_mrj=None) -> np.ndarray:
+    """Dispatch to _crisp or _blend based on TRANSITION_MODE (exact must be called directly)."""
+    if settings.TRANSITION_MODE == 'crisp' or ag_X_mrj is None:
+        return get_ghg_unall_natural_to_modified_crisp(data, base_lumap)
+    elif settings.TRANSITION_MODE == 'blend':
+        return get_ghg_unall_natural_to_modified_blend(data, ag_X_mrj)
+    elif settings.TRANSITION_MODE == 'exact':
+        raise ValueError('exact mode: call get_ghg_unall_natural_to_modified_exact directly from get_transition_matrices_ag2ag_exact')
+
+
+def get_ghg_transition_emissions(data:Data, base_lumap, separate=False, cells=None, ag_X_mrj=None) -> np.ndarray:
     """
     Get the one-off greenhouse gas penalties for transitioning between land uses.
 
@@ -350,16 +457,19 @@ def get_ghg_transition_emissions(data:Data, base_lumap, separate=False) -> np.nd
       data (object): The data object containing relevant information.
       base_lumap (np.ndarray): The base_lumap object containing land use mapping.
       separate (bool): Whether to return the penalties for each transition separately.
+      cells (np.ndarray, optional): The cells for which to calculate penalties.
+      ag_X_mrj (np.ndarray, optional): Fractional ag dvar array (nlms, ncells, n_ag_lus);
+          required when TRANSITION_MODE != 'crisp'.
 
     Returns
     -------
       GHG penalties (dict[np.ndarray]|np.ndarray): The greenhouse gas transition penalties.
     """
-   
+
     ghg_lvstck_natural_to_unall_natural = np.zeros_like(data.AG_L_MRJ, dtype=np.float32)   # No land can transited to unall-natural, here use a full zero array for consistency
-    ghg_lvstck_natural_to_modified = get_ghg_lvstk_natural_to_modified(data, base_lumap)
-    ghg_unall_natural_to_lvstck_natural = get_ghg_unall_natural_to_lvstk_natural(data, base_lumap)
-    ghg_unall_natural_to_modified = get_ghg_unall_natural_to_modified(data, base_lumap)
+    ghg_lvstck_natural_to_modified = get_ghg_lvstk_natural_to_modified(data, base_lumap, ag_X_mrj)
+    ghg_unall_natural_to_lvstck_natural = get_ghg_unall_natural_to_lvstk_natural(data, base_lumap, ag_X_mrj)
+    ghg_unall_natural_to_modified = get_ghg_unall_natural_to_modified(data, base_lumap, ag_X_mrj)
     
     if separate:
         ghg_trainsition_penalties = {

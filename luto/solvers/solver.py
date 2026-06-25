@@ -60,8 +60,8 @@ class SolverSolution:
     ag_X_mrj: np.ndarray
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
-    ag2ag_D_mrj: np.ndarray | None                                        # Ag->ag delta dvars D=max(0,X_new-x_old); None when BLENDED_TRANSITION_COSTS=False
-    ag2nonag_D_rk: np.ndarray | None                                      # Ag->nonag delta dvars; None when BLENDED_TRANSITION_COSTS=False
+    ag2ag_D_mrj: np.ndarray | None                                        # Ag->ag delta dvars D=max(0,X_new-x_old); None when TRANSITION_MODE='crisp'
+    ag2nonag_D_rk: np.ndarray | None                                      # Ag->nonag delta dvars; None when TRANSITION_MODE='crisp'
     prod_data: dict[str, Any]
     obj_val: dict[str, float]
 
@@ -388,7 +388,7 @@ class LutoSolver:
         _add_transition_delta_constraints_ag2ag. Only created for (m,j,r) triples
         where the rescaled transition cost coefficient meets SOLVER_COEFF_MIN.
         """
-        if not settings.BLENDED_TRANSITION_COSTS:
+        if settings.TRANSITION_MODE == 'crisp':
             return
         
         print("│   └── setting up delta variables for blended ag transition costs...")
@@ -419,7 +419,7 @@ class LutoSolver:
         in mincost), the solver naturally drives D = max(0, X_new - x_old), so transition
         costs are charged only on net land-use increases.
         """
-        if not settings.BLENDED_TRANSITION_COSTS:
+        if settings.TRANSITION_MODE == 'crisp':
             return
         
         print("│   └── adding delta linking constraints for blended ag transition costs...")
@@ -449,7 +449,7 @@ class LutoSolver:
         _add_transition_delta_constraints_ag2nonag. Only created for (r,k) pairs where the
         rescaled transition cost coefficient meets SOLVER_COEFF_MIN.
         """
-        if not settings.BLENDED_TRANSITION_COSTS:
+        if settings.TRANSITION_MODE == 'crisp':
             return
 
         print("│   └── setting up delta variables for blended ag->nonag transition costs...")
@@ -472,7 +472,7 @@ class LutoSolver:
         Combined with the cost sign in the objective, the solver drives
         D_nonag = max(0, X_nonag_new - x_nonag_old) at optimality.
         """
-        if not settings.BLENDED_TRANSITION_COSTS:
+        if settings.TRANSITION_MODE == 'crisp':
             return
 
         print("│   └── adding delta linking constraints for blended ag->nonag transition costs...")
@@ -528,7 +528,7 @@ class LutoSolver:
         self.economy_non_ag_contr = gp.quicksum(non_ag_exprs)
 
         # Blended ag2ag transition costs: applied to delta vars D = max(0, X_new - x_old).
-        if settings.BLENDED_TRANSITION_COSTS:
+        if settings.TRANSITION_MODE != 'crisp':
             t_mat  = self._input_data.trans_ag2ag_mrj
             t_sign = -1 if settings.OBJECTIVE == "maxprofit" else 1
             blend_t_exprs = []
@@ -1496,7 +1496,7 @@ class LutoSolver:
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
 
         # Extract D var solutions: D[m,j,r] = max(0, X_new - x_old) at optimality
-        if settings.BLENDED_TRANSITION_COSTS:
+        if settings.TRANSITION_MODE != 'crisp':
             D_dry_sol_rj = np.zeros((self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32)
             D_irr_sol_rj = np.zeros((self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32)
             for j in range(self._input_data.n_ag_lus):

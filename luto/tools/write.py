@@ -1049,10 +1049,10 @@ def write_economics(data: Data, yr_cal, path):
     )
 
     # Delta dvar: only net increases in allocation pay transition costs.
-    # When BLENDED_TRANSITION_COSTS=True, use the solver's D vars directly — they are
+    # When TRANSITION_MODE != 'crisp', use the solver's D vars directly — they are
     # exactly max(0, X_new - x_old) at optimality and match what entered the objective.
     # Otherwise fall back to clipping the dvar difference.
-    if settings.BLENDED_TRANSITION_COSTS and data.ag_delta_dvars.get(yr_cal) is not None:
+    if settings.TRANSITION_MODE != 'crisp' and data.ag_delta_dvars.get(yr_cal) is not None:
         ag_dvar_mrj_delta = chunk_unify_size(
             tools.ag_mrj_to_xr(data, data.ag_delta_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME),
@@ -1719,10 +1719,10 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).chunk({'cell': chunk_size})
 
     # Delta dvars: only pay transition cost for INCREASES in allocation.
-    # When BLENDED_TRANSITION_COSTS=True, use solver D vars directly — they are
+    # When TRANSITION_MODE != 'crisp', use solver D vars directly — they are
     # exactly max(0, X_new - x_old) at optimality and match what entered the objective.
     # Otherwise fall back to clipping the dvar difference.
-    if settings.BLENDED_TRANSITION_COSTS and data.ag_delta_dvars.get(yr_cal) is not None:
+    if settings.TRANSITION_MODE != 'crisp' and data.ag_delta_dvars.get(yr_cal) is not None:
         ag_dvar_mrj_delta = tools.ag_mrj_to_xr(
             data, data.ag_delta_dvars[yr_cal]
         ).rename({'lm': 'To-water-supply', 'lu': 'To-land-use'}
@@ -2042,10 +2042,10 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).chunk({'cell': chunk_size})
 
     # Delta dvars: actual net increases from the solver (D = max(0, X_new - x_old)).
-    # In blend mode these come from solver D_nonag vars; in crisp mode compute post-hoc.
+    # In blend/exact mode these come from solver D_nonag vars; in crisp mode compute post-hoc.
     if yr_cal == data.YR_CAL_BASE:
         non_ag_dvar_delta = non_ag_dvar_target
-    elif settings.BLENDED_TRANSITION_COSTS and data.non_ag_delta_dvars.get(yr_cal) is not None:
+    elif settings.TRANSITION_MODE != 'crisp' and data.non_ag_delta_dvars.get(yr_cal) is not None:
         non_ag_dvar_delta = tools.non_ag_rk_to_xr(data, data.non_ag_delta_dvars[yr_cal]
             ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
             ).rename({'lu': 'To-land-use'}

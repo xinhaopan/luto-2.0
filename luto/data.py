@@ -1032,7 +1032,7 @@ class Data:
         self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, [self.AGLU2DESC[i] for i in self.LU_NATURAL]] = np.nan       # non-ag2natural is not allowed
         self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, 'Unallocated - modified land'] = tmat_costs                  # Clearing non-ag land requires such cost
         self.T_MAT.loc['Destocked - natural land', self.LU_LVSTK_NATURAL_DESC] = self.T_MAT.loc['Unallocated - natural land', self.LU_LVSTK_NATURAL_DESC]   # Destocked-natural transits to LVSTK-natural has the same cost as unallocated-natural to LVSTK-natural
-
+        self.T_MAT = self.T_MAT.astype(np.float32)
 
         # tools.plot_t_mat(self.T_MAT)
         
@@ -1848,7 +1848,7 @@ class Data:
     def add_ag_delta_dvars(self, yr: int, ag2ag_D_mrj: np.ndarray | None):
         """
         Saves solver delta dvar solution D=max(0,X_new-x_old) for blended ag2ag transition costs.
-        None when BLENDED_TRANSITION_COSTS=False.
+        None when TRANSITION_MODE='crisp'.
         """
         self.ag_delta_dvars[yr] = ag2ag_D_mrj
 
@@ -1861,7 +1861,7 @@ class Data:
     def add_non_ag_delta_dvars(self, yr: int, ag2nonag_D_rk: np.ndarray | None):
         """
         Saves solver delta dvar D=max(0,X_new-x_old) for blended ag->nonag transition costs.
-        None when BLENDED_TRANSITION_COSTS=False.
+        None when TRANSITION_MODE='crisp'.
         """
         self.non_ag_delta_dvars[yr] = ag2nonag_D_rk
 

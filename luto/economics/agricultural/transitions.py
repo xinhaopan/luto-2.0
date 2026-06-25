@@ -28,6 +28,7 @@ import luto.tools as tools
 import luto.data as Data
 import luto.economics.agricultural.ghg as ag_ghg
 
+from functools import lru_cache
 from joblib import Parallel, delayed
 from luto import settings
 from typing import Dict
@@ -82,7 +83,7 @@ def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
 
     return (x_mrj * t_rj * no_go_x_mrj).astype(np.int8)
 
-def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarray, base_lmmap: np.ndarray, separate=False, w_mrj=None, t_ij=None):
+def get_transition_matrices_ag2ag_crisp(data: Data, yr_idx: int, base_lumap: np.ndarray, base_lmmap: np.ndarray, separate=False, w_mrj=None, t_ij=None):
     """
     Calculate the transition matrices for land-use and land management transitions.
     Args:
@@ -116,7 +117,7 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarra
     n_ag_lms, ncells, n_ag_lus = data.AG_L_MRJ.shape
 
     # -------------------------------------------------------------- #
-    # Transition costs (upfront, amortised to annual, per cell).  #
+    # Transition costs (upfront, amortised to annual, per cell).     #
     # -------------------------------------------------------------- #
 
     # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
@@ -129,7 +130,7 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarra
     e_rj[ag_cells, :] = t_ij[base_lumap[ag_cells]]
 
     # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
-    e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
+    e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, None]
 
     # Repeat the transition costs into dryland and irrigated land management types
     e_mrj = np.stack([e_rj, e_rj], axis=0)
@@ -182,92 +183,180 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarra
         return t_mrj
 
 
-def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, separate=False):
+def get_transition_matrices_ag2ag_blend(data: Data, yr_idx: int, base_year: int, separate=False):
+    """Weight ag2ag transition costs by the fractional dvar composition of the base year.
+
+    A cell that is 60% natural beef and 40% rice pays a blend of the costs from each
+    source LU to each target LU, rather than a single cost from the dominant LU.
     """
-    Calculate the transition matrices for land-use and land management transitions.
-    Args:
-        data (Data object): The data object containing the necessary input data.
-        yr_idx (int): The index of the current year.
-        base_year (int): The base year for the transition calculations.
-        separate (bool, optional): Whether to return separate cost matrices for each cost component.
-                                   Defaults to False.
-    Returns:
-        numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
-        If `separate` is False, returns a numpy array representing the total costs.
-        If `separate` is True, returns a dictionary with separate cost matrices for
-        establishment costs, Water license cost, and carbon releasing costs.
-    """
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    ag_X_mrj = data.ag_dvars[base_year]
 
-    if not settings.BLENDED_TRANSITION_COSTS:
-        return get_transition_matrices_ag2ag(data, yr_idx, data.lumaps[base_year], data.lmmaps[base_year], separate)
+    # Hoist invariants shared across all (m, j) combos
+    w_mrj = get_wreq_matrices(data, yr_idx)
+    t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
 
-    else:
-        yr_cal = data.YR_CAL_BASE + yr_idx
-        ag_X_mrj = data.ag_dvars[base_year]
+    # Normalisation denominator: sum only source LUs where T_MAT[source, target] is not NaN.
+    # NaN sources contribute 0 to the numerator (via nan_to_num in _crisp) but would inflate
+    # the denominator and create an unintended per-unit discount if included.
+    # Self-transitions (diagonal = $0) are NOT NaN so they stay in the denominator,
+    # preserving the head-start discount for cells already holding some fraction of the target LU.
+    valid_mask       = ~np.isnan(t_ij)                              # (N_AG_LUS, N_AG_LUS)
+    ag_frac_per_lu   = ag_X_mrj.sum(axis=0)                         # (NCELLS, N_AG_LUS) — sum over lm
+    eligible_rj      = ag_frac_per_lu @ valid_mask                  # (NCELLS, N_AG_LUS)
+    eligible_rj_safe = np.where(eligible_rj > 10 ** (-settings.ROUND_DECIMALS), eligible_rj, 1.0)
 
-        # Hoist invariants that are shared across all (m, j) combos
-        w_mrj = get_wreq_matrices(data, yr_idx)
-        t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
+    combos = [(m, j) for m in range(data.NLMS) for j in range(data.N_AG_LUS)]
 
-        # Normalisation denominator: per (cell × target), sum only source LUs where
-        # T_MAT[source, target] is not NaN.  NaN sources contribute 0 to the numerator
-        # (via nan_to_num inside get_transition_matrices_ag2ag) but would inflate the
-        # denominator and create an unintended per-unit discount if included.
-        # Self-transitions (diagonal = $0) are NOT NaN so they stay in the denominator,
-        # preserving the intended head-start discount for cells already holding some
-        # fraction of the target LU.
-        valid_mask       = ~np.isnan(t_ij)                              # (N_AG_LUS, N_AG_LUS)
-        ag_frac_per_lu   = ag_X_mrj.sum(axis=0)                         # (NCELLS, N_AG_LUS) — sum over lm
-        eligible_rj      = ag_frac_per_lu @ valid_mask                  # (NCELLS, N_AG_LUS)
-        eligible_rj_safe = np.where(eligible_rj > 10 ** (-settings.ROUND_DECIMALS), eligible_rj, 1.0)
-
-        combos = [(m, j) for m in range(data.NLMS) for j in range(data.N_AG_LUS)]
-
-        def _compute(m, j):
-            all_m_lumap = np.ones(data.NCELLS, dtype=np.int8) * m
-            all_j_lumap = np.ones(data.NCELLS, dtype=np.int8) * j
-
-            from_current_lus_t_mrj = get_transition_matrices_ag2ag(
-                data, yr_idx, all_j_lumap, all_m_lumap, separate, w_mrj=w_mrj, t_ij=t_ij
-            )
-            if separate:
-                return {key: ag_X_mrj[m, :, j][None, :, None] * array for key, array in from_current_lus_t_mrj.items()}
-            else:
-                return ag_X_mrj[m, :, j][None, :, None] * from_current_lus_t_mrj
-
-        ag_t_mrj: dict | np.ndarray = (
-            {} if separate
-            else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+    def _compute(m, j):
+        all_m_lumap = np.ones(data.NCELLS, dtype=np.int8) * m
+        all_j_lumap = np.ones(data.NCELLS, dtype=np.int8) * j
+        from_current_lus_t_mrj = get_transition_matrices_ag2ag_crisp(
+            data, yr_idx, all_j_lumap, all_m_lumap, separate, w_mrj=w_mrj, t_ij=t_ij
         )
-
-        # Process (m, j) combos in batches of N_JOBS, summing each batch into the
-        # running total immediately to bound peak memory (at most N_JOBS full
-        # (m, r, j) result arrays live at once instead of all NLMS * N_AG_LUS).
-        n_jobs = settings.BLENDED_TRANSITION_COSTS_N_JOBS
-        for i in range(0, len(combos), n_jobs):
-            batch = combos[i:i + n_jobs]
-            batch_results = Parallel(n_jobs=n_jobs, backend="threading")(delayed(_compute)(m, j) for m, j in batch)
-
-            if separate:
-                for result in batch_results:
-                    for key, array in result.items():
-                        if key not in ag_t_mrj:
-                            ag_t_mrj[key] = array
-                        else:
-                            ag_t_mrj[key] += array
-            else:
-                for result in batch_results:
-                    ag_t_mrj += result
-
-        # Normalise: divide by eligible_rj_safe so the weighted sum becomes a proper
-        # average over only the source LUs that can transition to each target.
         if separate:
-            for key in ag_t_mrj:
-                ag_t_mrj[key] /= eligible_rj_safe[np.newaxis, :, :]
+            return {key: ag_X_mrj[m, :, j][None, :, None] * array for key, array in from_current_lus_t_mrj.items()}
         else:
-            ag_t_mrj /= eligible_rj_safe[np.newaxis, :, :]
+            return ag_X_mrj[m, :, j][None, :, None] * from_current_lus_t_mrj
 
-        return ag_t_mrj
+    ag_t_mrj: dict | np.ndarray = (
+        {} if separate
+        else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+    )
+
+    # Process combos in batches of N_JOBS, summing each batch immediately to bound peak memory.
+    n_jobs = settings.TRANSITION_MODE_N_JOBS
+    for i in range(0, len(combos), n_jobs):
+        batch = combos[i:i + n_jobs]
+        batch_results = Parallel(n_jobs=n_jobs, backend="threading")(delayed(_compute)(m, j) for m, j in batch)
+
+        if separate:
+            for result in batch_results:
+                for key, array in result.items():
+                    if key not in ag_t_mrj:
+                        ag_t_mrj[key] = array
+                    else:
+                        ag_t_mrj[key] += array
+        else:
+            for result in batch_results:
+                ag_t_mrj += result
+
+    # Normalise: divide by eligible_rj_safe so the weighted sum is a proper average.
+    if separate:
+        for key in ag_t_mrj:
+            ag_t_mrj[key] /= eligible_rj_safe[None, :, :]
+    else:
+        ag_t_mrj /= eligible_rj_safe[None, :, :]
+
+    return ag_t_mrj
+
+
+@lru_cache(maxsize=1) # this function will be called multiple times with the same arguments, so cache the result to avoid recomputation
+def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
+    """Return {(from_m, from_j): cell_idx} for every combo with at least one valid cell.
+
+    Cached (maxsize=1): the solver and the transition cost function both call this for the
+    same (data, base_year) pair within one solve step, so the second call is free.
+    """
+    threshold = 10 ** (-settings.ROUND_DECIMALS)
+    base_dvar_mrj = data.ag_dvars[base_year]
+    return {
+        (m, j): np.where(base_dvar_mrj[m, :, j] > threshold)[0]
+        for m in range(data.NLMS)
+        for j in range(data.N_AG_LUS)
+        if (base_dvar_mrj[m, :, j] > threshold).any()
+    }
+
+
+def get_transition_matrices_ag2ag_exact(data: Data, base_year: int, target_year: int, mj_cell_map: dict, separate=False):
+    """
+    Create exact transition matrices for every (from_m, from_j) combo in mj_cell_map.
+
+    Cost components (all $/cell/yr, amortised):
+      - Establishment cost   — T_MAT lookup × area
+      - Water licence delta  — (target – base water need) × price
+      - GHG penalty          — lvstk-natural → modified only
+
+    Parameters
+    ----------
+    mj_cell_map : dict returned by get_exact_mj_cell_map(data, base_year)
+
+    Returns
+    -------
+    dict[(from_m, from_j)] → ndarray (NLMS, len(cell_idx), N_AG_LUS) in $/cell/yr
+    OR, if separate=True:
+    dict[(from_m, from_j)] → {'Establishment cost', 'Water license cost',
+                               'Livestock natural to modified'}  each same shape
+    """
+    yr_idx = target_year - data.YR_CAL_BASE
+
+    # Hoist invariants outside the per-(from_m, from_j) loop
+    #   (N_AG_LUS, N_AG_LUS); NaN = prohibited transition
+    t_ij = (
+        data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values
+        * data.TRANS_COST_MULTS[target_year]
+    )
+    # Single target-year water matrix — mirrors crisp: w_r = (w_mrj * l_mrj).sum() uses
+    # target-year req at the base-year LU, so exact does the same via w_mrj[from_m, cell_idx, from_j]
+    w_req_mrj = get_wreq_matrices(data, yr_idx)  # (NLMS, NCELLS, N_AG_LUS), ML/cell
+
+    result = {}
+
+    for (from_m, from_j), cell_idx in mj_cell_map.items():
+
+        # --- Establishment cost: $/cell/yr ---
+        # NaN in t_ij = prohibited transition → 0 cost (exclude enforced in solver)
+        t_row = np.nan_to_num(t_ij[from_j]).astype(np.float32)                        # (N_AG_LUS,)
+        t_rj  = tools.amortise(np.tile(t_row, (len(cell_idx), 1))) * data.REAL_AREA[cell_idx, None]
+        t_mrj = np.stack([t_rj, t_rj], axis=0).astype(np.float32)                    # (NLMS, ncells*, N_AG_LUS)
+
+        # --- Water licence delta cost: $/cell/yr ---
+        # w_base: target-yr req at from_LU — matches crisp's w_r = (w_mrj * l_mrj).sum()
+        w_target  = w_req_mrj[:, cell_idx, :] * settings.INCLUDE_WATER_LICENSE_COSTS
+        w_base    = w_req_mrj[from_m, cell_idx, from_j]                              # (ncells*,)
+        w_cost    = (w_target - w_base[None, :, None]) * data.WATER_LICENCE_PRICE[cell_idx, None] * data.WATER_LICENSE_COST_MULTS[target_year]
+        irrig_cell = settings.NEW_IRRIG_COST    * data.IRRIG_COST_MULTS[target_year] * data.REAL_AREA[cell_idx, None]
+        deirr_cell = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year] * data.REAL_AREA[cell_idx, None]
+        if from_m == 0:    # was dryland → setup cost when switching to irrigated (m=1)
+            w_cost[1] += irrig_cell
+        else:              # was irrigated → teardown cost when switching to dryland (m=0)
+            w_cost[0] += deirr_cell
+        w_cost_mrj = tools.amortise(w_cost).astype(np.float32)                       # (NLMS, ncells*, N_AG_LUS)
+
+        # --- GHG transition cost: $/cell/yr (all three source-type penalties) ---
+        carbon_price    = data.get_carbon_price_by_yr_idx(yr_idx)
+        ghg_lvstk_mod   = tools.amortise(ag_ghg.get_ghg_lvstk_natural_to_modified_exact(data, base_year, from_m, from_j)      * carbon_price).astype(np.float32)
+        ghg_unall_lvstk = tools.amortise(ag_ghg.get_ghg_unall_natural_to_lvstk_natural_exact(data, base_year, from_m, from_j) * carbon_price).astype(np.float32)
+        ghg_unall_mod   = tools.amortise(ag_ghg.get_ghg_unall_natural_to_modified_exact(data, base_year, from_m, from_j)      * carbon_price).astype(np.float32)
+
+        if separate:
+            result[(from_m, from_j)] = {
+                'Establishment cost':                       t_mrj,
+                'Water license cost':                       w_cost_mrj,
+                'Livestock natural to unallocated natural': np.zeros_like(ghg_lvstk_mod),
+                'Unallocated natural to livestock natural': ghg_unall_lvstk,
+                'Livestock natural to modified':            ghg_lvstk_mod,
+                'Unallocated natural to modified':          ghg_unall_mod,
+            }
+        else:
+            result[(from_m, from_j)] = t_mrj + w_cost_mrj + ghg_lvstk_mod + ghg_unall_lvstk + ghg_unall_mod
+
+    return result
+
+
+
+def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, separate=False):
+    """Dispatch to the appropriate ag2ag transition cost function based on TRANSITION_MODE."""
+    if settings.TRANSITION_MODE == 'crisp':
+        return get_transition_matrices_ag2ag_crisp(data, yr_idx, data.lumaps[base_year], data.lmmaps[base_year], separate)
+    elif settings.TRANSITION_MODE == 'blend':
+        return get_transition_matrices_ag2ag_blend(data, yr_idx, base_year, separate)
+    elif settings.TRANSITION_MODE == 'exact':
+        yr_cal = data.YR_CAL_BASE + yr_idx
+        mj_cell_map = get_base_dvar_mj_cell_map(data, base_year)
+        return get_transition_matrices_ag2ag_exact(data, base_year, yr_cal, mj_cell_map, separate)
+    else:
+        raise ValueError(f"Unknown TRANSITION_MODE: {settings.TRANSITION_MODE}")
 
 
 def get_asparagopsis_effect_t_mrj(data: Data):
@@ -281,7 +370,7 @@ def get_asparagopsis_effect_t_mrj(data: Data):
 
 def get_precision_agriculture_effect_t_mrj(data: Data):
     """
-    Gets the effects on transition costs of asparagopsis taxiformis, which are none.
+    Gets the effects on transition costs of precision agriculture, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']

@@ -387,7 +387,8 @@ def get_non_ag_q_crk(data: Data, ag_q_mrp: np.ndarray, base_year: int):
 
 def get_ag_ghg_t_mrj(data: Data, base_year):
     print('Getting agricultural transitions GHG emissions...', flush = True)
-    output = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[base_year])
+    ag_X_mrj = data.ag_dvars[base_year] if settings.TRANSITION_MODE != 'crisp' else None
+    output = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[base_year], ag_X_mrj=ag_X_mrj)
     return output.astype(np.float32)
 
 
@@ -568,7 +569,7 @@ def get_economic_mrj(
 
     print('Getting base year economic matrix...', flush = True)
 
-    if settings.BLENDED_TRANSITION_COSTS:
+    if settings.TRANSITION_MODE != 'crisp':
         # Transition costs are applied to solver delta vars (D = max(0, X_new - x_old)).
         # Otherwise, the LUs stay the same will be charged transition costs
         # (E.g., Apples -> Apples will incur transition costs even if no change occurs).

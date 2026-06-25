@@ -106,15 +106,17 @@ Mean FIRE_RISK cell values (%)
 # Amortise upfront (i.e., establishment and transitions) costs
 AMORTISE_UPFRONT_COSTS = False
 
-# Use weighted transition costs based on current land use composition (i.e., a cell
-# that is 60% natural beef and 40% rice will have transition costs reflecting both
-# proportions), instead of treating cells as fully assigned to their dominant land use.
-BLENDED_TRANSITION_COSTS = True
+# Transition cost mode:
+#   'crisp'  — treat each cell as fully assigned to its dominant land use (cheapest, legacy)
+#   'blend'  — weight costs by the current fractional dvar composition; delta vars D = max(0, X_new - x_old)
+#              charge only net increases, avoiding spurious same-LU costs
+#   'exact'  — like 'blend' but with exact per-cell transition accounting (reserved for future use)
+TRANSITION_MODE = 'blend'
 
 # Number of joblib "threading" workers used to compute the (m, j) combos for
-# BLENDED_TRANSITION_COSTS, processed in batches of this size. n_jobs=4 was
+# TRANSITION_MODE='blend'/'exact', processed in batches of this size. n_jobs=4 was
 # found to give the best runtime/memory tradeoff (~42s, +2.4GB peak at RESFACTOR=5).
-BLENDED_TRANSITION_COSTS_N_JOBS = 4
+TRANSITION_MODE_N_JOBS = 4
 
 # Discount rate for amortisation
 DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
