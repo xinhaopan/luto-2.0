@@ -39,6 +39,7 @@ from tools.price_slice_utils import (
     add_zero_line,
     apply_compact_ticks,
     apply_paper4_color_overrides_to_style_df,
+    standardize_display_label,
     apply_price_formatter,
     build_run_map,
     format_thousands,
@@ -55,7 +56,7 @@ COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 CACHE_PATH = DATA_DIR / f"03_Contribution_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
 
-FS = 11
+FS = 20
 SUM_LINE_LABEL = "Sum"
 GHG_METRIC = "GHGAbatementChange_vs_ZeroPrice_MtCO2e"
 BIO_METRIC = "BiodiversityContributionChange_vs_ZeroPrice_MhaYr"
@@ -67,20 +68,22 @@ EXPECTED_PRICE_METRIC_PAIRS = {
     ("BioPrice", BIO_METRIC),
 }
 OLD_LIVESTOCK_LABEL = "Livestock"
-MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
-NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
+MODIFIED_LIVESTOCK_LABEL = "Livestock (modified land)"
+NATURAL_LIVESTOCK_LABEL = "Livestock (natural land)"
 MODIFIED_LIVESTOCK_COLOR = "#762500"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
     "font.sans-serif": ["Arial"],
     "font.size": FS,
-    "axes.titlesize": FS,
-    "axes.labelsize": FS,
+    "axes.titlesize": FS + 2,
+    "axes.labelsize": FS + 1,
     "xtick.labelsize": FS,
     "ytick.labelsize": FS,
     "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
+    "axes.titleweight": "bold",
+    "axes.labelweight": "bold",
     "axes.facecolor": "#EAEAF2",
     "grid.color": "white",
     "grid.linewidth": 1.0,
@@ -100,7 +103,7 @@ def load_style_table(sheet_name):
     color_map = {}
     label_map = {}
     for _, row in df.iterrows():
-        label = row[label_col]
+        label = standardize_display_label(row[label_col])
         order.append(label)
         color_map[label] = row["color"]
         label_map[normalize_name(row["desc"])] = label
@@ -135,7 +138,7 @@ def map_ag_group(row):
             return MODIFIED_LIVESTOCK_LABEL
         if "naturalland" in desc_key:
             return NATURAL_LIVESTOCK_LABEL
-    return group
+    return standardize_display_label(group)
 
 
 AG_ORDER, AG_COLOR_MAP, _ = load_style_table("ag_group")
@@ -151,7 +154,7 @@ _AG2050_DISPLAY = {
     "Human-Induced Regeneration (sheep)":                   "Managed regeneration (sheep)",
     "Environmental plantings (mixed local native species)": "Environmental plantings (mixed species)",
     "BECCS (Bioenergy with carbon capture and storage)":    "BECCS (Bioenergy with Carbon Capture and Storage)",
-    "Destocked (natural land)":                             "Destocked - natural land",
+    "Destocked (natural land)":                             "Destocked (natural land)",
 }
 
 def _apply_ag2050(order, color_map, label_map):
@@ -435,6 +438,7 @@ def load_cache():
     try:
         print(f"Loading cached data from {CACHE_PATH}")
         df_long = pd.read_excel(CACHE_PATH, sheet_name="ContributionLong")
+        df_long["Category"] = df_long["Category"].map(standardize_display_label)
     except ValueError:
         print("Cached contribution workbook uses an older layout; rebuilding.")
         return None
@@ -590,7 +594,9 @@ def plot_sum_markers(ax, x, y):
     )
 
 
-def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=None, show_sum_line=False):
+def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, show_xticks=None, color_map=None, show_sum_line=False):
+    if show_xticks is None:
+        show_xticks = show_xlabel
     if pivot_df.empty:
         ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
         style_box_axis(ax, linewidth=0.8)
@@ -605,13 +611,15 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
 
     add_zero_line(ax)
     if show_xlabel:
-        ax.set_xlabel(get_price_axis_label(varying_key))
-    else:
+        raw_label = get_price_axis_label(varying_key)
+        ax.set_xlabel(raw_label.replace(" (", "\n("))
+        ax.xaxis.label.set_fontsize(FS - 3)
+    elif not show_xticks:
         ax.tick_params(axis="x", labelbottom=False)
 
     apply_price_formatter(ax, axis="x")
     apply_compact_ticks(ax, x_nbins=8, y_nbins=5)
-    if show_xlabel:
+    if show_xticks:
         for label in ax.get_xticklabels():
             label.set_rotation(45)
             label.set_ha("right")
@@ -686,7 +694,7 @@ if df_long is None:
     df_long = collect_and_cache()
 
 
-fig, axes = plt.subplots(4, 4, figsize=(18, 16), sharex="col")
+fig, axes = plt.subplots(4, 4, figsize=(18, 22), sharex="col")
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
 
@@ -732,6 +740,7 @@ for row_idx, area_type in enumerate(row_area_types):
                 area_type,
                 col_cfg["varying_key"],
                 show_xlabel=(row_idx == len(row_area_types) - 1),
+                show_xticks=(row_idx == len(row_area_types) - 1),
             )
         )
 
@@ -745,21 +754,23 @@ for row_idx, area_type in enumerate(row_area_types):
 
 LEGEND_NCOL = {
     "_total": 5,
-    "Agricultural land-use": 5,
+    "Agricultural land-use": 3,
     "Ag management": 3,
-    "Non-ag": 4,
+    "Non-ag": 3,
 }
 LEGEND_FS = {
     "_total": FS,
     "Agricultural land-use": FS,
     "Ag management": FS,
-    "Non-ag": FS - 1,
+    "Non-ag": FS,
 }
 
 sync_pair_y_limits(axes, [(0, 1), (2, 3)])
 apply_y_axis_visibility(axes)
 plt.tight_layout()
 plt.subplots_adjust(hspace=0.35, wspace=0.18, top=0.94)
+for ax in axes[-1, :]:
+    ax.xaxis.set_label_coords(0.5, -0.24)
 add_column_group_title(fig, axes, (0, 1), "GHG")
 add_column_group_title(fig, axes, (2, 3), "Biodiversity")
 fig.canvas.draw()
@@ -773,10 +784,10 @@ y_mid_l = (max(b.y1 for b in bb_ghg) + min(b.y0 for b in bb_ghg)) / 2 / fig_h_px
 y_mid_r = (max(b.y1 for b in bb_bio) + min(b.y0 for b in bb_bio)) / 2 / fig_h_px
 x_l = min(b.x0 for b in bb_ghg) / fig_w_px - 0.025
 x_r = max(b.x1 for b in bb_bio) / fig_w_px + 0.02
-fig.text(x_l, y_mid_l, r"Difference in GHG abatement relative to zero price (Mt CO$_2$e yr$^{-1}$)",
-         rotation=90, va='center', ha='center', fontsize=FS)
-fig.text(x_r, y_mid_r, r"Difference in biodiversity contribution score relative to zero price (Mha yr$^{-1}$)",
-         rotation=270, va='center', ha='center', fontsize=FS)
+fig.text(x_l, y_mid_l, r"GHG abatement difference (Mt CO$_2$e yr$^{-1}$)",
+         rotation=90, va='center', ha='center', fontsize=FS + 1, fontweight="bold")
+fig.text(x_r, y_mid_r, r"Biodiversity contribution difference (Mha yr$^{-1}$)",
+         rotation=270, va='center', ha='center', fontsize=FS + 1, fontweight="bold")
 
 all_rows = [("_total", 0)] + [(area_type, i + 1) for i, area_type in enumerate(row_area_types)]
 for key, row_idx in all_rows:
@@ -786,7 +797,9 @@ for key, row_idx in all_rows:
 
     row_bboxes = [axes[row_idx, col_idx].get_tightbbox(renderer) for col_idx in range(4)]
     x_center = (min(b.x0 for b in row_bboxes) + max(b.x1 for b in row_bboxes)) / 2 / fig_w_px
-    y_anchor = min(b.y0 for b in row_bboxes) / fig_h_px - 0.01
+    # Last row has xlabel; keep the legend below it without adding a large gap.
+    y_offset = 0.085 if row_idx == len(all_rows) - 1 else 0.01
+    y_anchor = min(axes[row_idx, c].get_position().y0 for c in range(4)) - y_offset
 
     fig.legend(
         handles=handles,

@@ -46,6 +46,7 @@ from tools.price_slice_utils import (
     add_zero_line,
     apply_compact_ticks,
     apply_paper4_color_overrides_to_style_df,
+    standardize_display_label,
     apply_price_formatter,
     build_run_map,
     format_thousands,
@@ -63,23 +64,25 @@ GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 CACHE_PATH = DATA_DIR / f"04_Budget_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
 NC_CACHE_DIR = DATA_DIR / f"04_Budget_nc_cache_{YEAR}"
 
-FS = 11
+FS = 20
 SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
-MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
-NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
+MODIFIED_LIVESTOCK_LABEL = "Livestock (modified land)"
+NATURAL_LIVESTOCK_LABEL = "Livestock (natural land)"
 MODIFIED_LIVESTOCK_COLOR = "#762500"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
     "font.sans-serif": ["Arial"],
     "font.size": FS,
-    "axes.titlesize": FS,
-    "axes.labelsize": FS,
+    "axes.titlesize": FS + 2,
+    "axes.labelsize": FS + 1,
     "xtick.labelsize": FS,
     "ytick.labelsize": FS,
     "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
+    "axes.titleweight": "bold",
+    "axes.labelweight": "bold",
     "axes.facecolor": "#EAEAF2",
     "grid.color": "white",
     "grid.linewidth": 1.0,
@@ -106,7 +109,7 @@ def load_style_table(sheet_name):
     color_map = {}
     label_map = {}
     for _, row in df.iterrows():
-        label = row[label_col]
+        label = standardize_display_label(row[label_col])
         order.append(label)
         color_map[label] = row["color"]
         label_map[normalize_name(row["desc"])] = label
@@ -141,7 +144,7 @@ def map_ag_group(row):
             return MODIFIED_LIVESTOCK_LABEL
         if "naturalland" in desc_key:
             return NATURAL_LIVESTOCK_LABEL
-    return group
+    return standardize_display_label(group)
 
 
 AG_ORDER, AG_COLOR_MAP, _ = load_style_table("ag_group")
@@ -156,7 +159,7 @@ _AG2050_DISPLAY = {
     "Human-Induced Regeneration (sheep)":                   "Managed regeneration (sheep)",
     "Environmental plantings (mixed local native species)": "Environmental plantings (mixed species)",
     "BECCS (Bioenergy with carbon capture and storage)":    "BECCS (Bioenergy with Carbon Capture and Storage)",
-    "Destocked (natural land)":                             "Destocked - natural land",
+    "Destocked (natural land)":                             "Destocked (natural land)",
 }
 
 def _apply_ag2050(order, color_map, label_map):
@@ -727,6 +730,7 @@ def load_cache():
     try:
         print(f"Loading cached data from {CACHE_PATH}")
         df_long = pd.read_excel(CACHE_PATH, sheet_name="NetEconLong")
+        df_long["Category"] = df_long["Category"].map(standardize_display_label)
     except ValueError:
         print("Cached net economic workbook uses an older layout; rebuilding.")
         return None
@@ -877,6 +881,7 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
     add_zero_line(ax)
     if show_xlabel:
         ax.set_xlabel(get_price_axis_label(varying_key))
+        ax.xaxis.set_label_coords(0.5, -0.22)
     else:
         ax.tick_params(axis="x", labelbottom=False)
 
@@ -911,7 +916,7 @@ if df_long is None:
     df_long = collect_and_cache()
 
 
-fig, axes = plt.subplots(4, 2, figsize=(10, 17), sharex="col")
+fig, axes = plt.subplots(4, 2, figsize=(14, 23), sharex="col")
 row_area_types = ["Agricultural land-use", "Ag management", "Non-ag"]
 row_legends = {}
 total_pivot_cp = build_total_pivot(df_long, "CarbonPrice")
@@ -945,23 +950,28 @@ for row_idx, area_type in enumerate(row_area_types):
     )
 
 LEGEND_NCOL = {
-    "_total": 5,
-    "Agricultural land-use": 5,
-    "Ag management": 3,
+    "_total": 2,
+    "Agricultural land-use": 2,
+    "Ag management": 2,
     "Non-ag": 2,
 }
 LEGEND_FS = {
     "_total": FS,
     "Agricultural land-use": FS,
     "Ag management": FS,
-    "Non-ag": FS - 1,
+    "Non-ag": FS,
 }
 
 sync_row_y_limits(axes)
 hide_redundant_y_ticks(axes)
-fig.supylabel(r"Difference in budget relative to zero price (Billion AU\$ yr$^{-1}$)", fontsize=FS)
-plt.tight_layout()
-plt.subplots_adjust(hspace=0.35, wspace=0.28)
+fig.supylabel(r"Budget difference relative to zero price (AU\$ billion yr$^{-1}$)",
+              x=0.065, y=0.5, fontsize=FS + 1, fontweight="bold")
+plt.tight_layout(rect=[0.075, 0, 1, 1])
+plt.subplots_adjust(hspace=0.44, wspace=0.28)
+NON_AG_ROW_SHIFT = 0.055
+for ax in axes[-1, :]:
+    pos = ax.get_position()
+    ax.set_position([pos.x0, pos.y0 - NON_AG_ROW_SHIFT, pos.width, pos.height])
 fig.canvas.draw()
 renderer = fig.canvas.get_renderer()
 fig_w_px = fig.get_figwidth() * fig.dpi

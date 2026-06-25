@@ -36,6 +36,7 @@ from tools.price_slice_utils import (
     OUT_DIR,
     apply_compact_ticks,
     apply_paper4_color_overrides_to_style_df,
+    standardize_display_label,
     stacked_area_pos_neg,
     style_box_axis,
 )
@@ -55,9 +56,13 @@ BIO_METRIC  = "BiodiversityContributionChange_vs_ZeroPrice_MhaYr"
 COLOR_GHG = "#1d52a1"
 COLOR_BIO = "#2ca25f"
 COLOR_CON = "#888888"
+GHG_DIFF_LABEL = r"GHG abatement difference" + "\n" + r"(Mt CO$_2$e yr$^{-1}$)"
+BIO_DIFF_LABEL = r"Biodiversity contribution difference" + "\n" + r"(Mha yr$^{-1}$)"
 
-FS = 11
+FS = 14
 TOP_N_CATS = None
+Y_LABEL_ROTATION = 90
+Y_LABEL_VERTICAL_ALIGNMENT = "bottom"
 
 LEGEND_LABELS = {
     # AM — Ag2050 naming
@@ -71,10 +76,10 @@ LEGEND_LABELS = {
     "Managed regeneration (sheep)":                         "Managed regeneration (sheep)",
     # Ag land-use groups
     "Crops":                                                "Crops",
-    "Modified livestock":                                   "Modified livestock",
-    "Natural Livestock":                                    "Natural livestock",
-    "Unallocated - modified land":                          "Unallocated modified",
-    "Unallocated - natural land":                           "Unallocated natural",
+    "Livestock (modified land)":                            "Livestock (modified land)",
+    "Livestock (natural land)":                             "Livestock (natural land)",
+    "Unallocated (modified land)":                          "Unallocated (modified land)",
+    "Unallocated (natural land)":                           "Unallocated (natural land)",
     # Non-ag — Ag2050 naming
     "Environmental plantings (mixed species)":              "Environmental plantings",
     "Riparian buffer restoration (mixed species)":          "Riparian restoration",
@@ -84,14 +89,15 @@ LEGEND_LABELS = {
     "Farm forestry (hardwood timber + sheep)":              "Farm forestry sheep",
     "Farm forestry (hardwood timber + beef)":               "Farm forestry beef",
     "BECCS (Bioenergy with Carbon Capture and Storage)":    "BECCS",
-    "Destocked - natural land":                             "Destocked natural",
+    "Destocked (natural land)":                             "Destocked (natural land)",
 }
 
 plt.rcParams.update({
     "font.family": "sans-serif", "font.sans-serif": ["Arial"],
-    "font.size": FS, "axes.titlesize": FS, "axes.labelsize": FS,
+    "font.size": FS, "axes.titlesize": FS + 2, "axes.labelsize": FS + 1,
     "xtick.labelsize": FS, "ytick.labelsize": FS, "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
+    "axes.titleweight": "bold", "axes.labelweight": "bold",
     "axes.facecolor": "#EAEAF2", "grid.color": "white", "grid.linewidth": 1.0,
 })
 
@@ -105,7 +111,7 @@ _AG2050_DISPLAY = {
     "Human-Induced Regeneration (sheep)":                   "Managed regeneration (sheep)",
     "Environmental plantings (mixed local native species)": "Environmental plantings (mixed species)",
     "BECCS (Bioenergy with carbon capture and storage)":    "BECCS (Bioenergy with Carbon Capture and Storage)",
-    "Destocked (natural land)":                             "Destocked - natural land",
+    "Destocked (natural land)":                             "Destocked (natural land)",
 }
 
 
@@ -115,7 +121,7 @@ def _load_style(sheet):
     col = "desc_new" if "desc_new" in df.columns else "desc"
     order, cmap = [], {}
     for _, row in df.iterrows():
-        label = _AG2050_DISPLAY.get(row[col], row[col])
+        label = standardize_display_label(_AG2050_DISPLAY.get(row[col], row[col]))
         order.append(label)
         cmap[label] = row["color"]
     return order, cmap
@@ -126,7 +132,7 @@ def _split_livestock_style(order, cmap):
     new_order = []
     for cat in order:
         if cat == "Livestock":
-            new_order.extend(["Modified livestock", "Natural Livestock"])
+            new_order.extend(["Livestock (modified land)", "Livestock (natural land)"])
         else:
             new_order.append(cat)
 
@@ -135,8 +141,8 @@ def _split_livestock_style(order, cmap):
         for cat, color in cmap.items()
         if cat != "Livestock"
     }
-    new_cmap["Modified livestock"] = "#762500"
-    new_cmap["Natural Livestock"] = livestock_color
+    new_cmap["Livestock (modified land)"] = "#762500"
+    new_cmap["Livestock (natural land)"] = livestock_color
     return new_order, new_cmap
 
 
@@ -198,6 +204,7 @@ def load_data():
             "Run 04_Contribution_Delta_vs_Zero.py first."
         )
     df = pd.read_excel(CONTRIB_CACHE, sheet_name="ContributionLong")
+    df["Category"] = df["Category"].map(standardize_display_label)
 
     totals = (
         df.groupby(["PriceType", "Price", "MetricType"])["ContributionValue"]
@@ -323,8 +330,8 @@ def _draw_drive_lines(ax, curves, drive, xlim):
     ax.set_xlim(*xlim)
     ax2.set_xlim(*xlim)
     ax.set_xlabel("")
-    ax.set_ylabel(r"GHG abatement difference (Mt CO$_2$e yr$^{-1}$)", color="black")
-    ax2.set_ylabel(r"Biodiversity contribution difference (Mha yr$^{-1}$)", color="black")
+    ax.set_ylabel(GHG_DIFF_LABEL)
+    ax2.set_ylabel(BIO_DIFF_LABEL)
     ax.tick_params(axis="y", colors="black", labelcolor="black")
     ax2.tick_params(axis="y", colors="black", labelcolor="black")
     ax.yaxis.label.set_color("black")
@@ -464,22 +471,22 @@ with pd.ExcelWriter(RAW_OUT, engine="openpyxl") as writer:
     df.to_excel(writer, sheet_name="ContribWithBudget", index=False)
 print(f"Raw data saved: {RAW_OUT}")
 
-fig, axes = plt.subplots(3, 2, figsize=(10, 14.8),
+fig, axes = plt.subplots(3, 2, figsize=(12.2, 17.4),
                          gridspec_kw={"height_ratios": [0.95, 1.0, 1.0]})
 
 # ── Row 0 ──────────────────────────────────────────────────────────────────────
 ax_left2 = _draw_drive_lines(axes[0, 0], curves, drive="carbon", xlim=(0, x_max_cp))
-axes[0, 0].set_title("Carbon Price Drive", pad=7)
+axes[0, 0].set_title("Carbon-price scan", pad=7)
 
 ax_right2 = _draw_drive_lines(axes[0, 1], curves, drive="biodiversity", xlim=(0, x_max_bp))
-axes[0, 1].set_title("Biodiversity Price Drive", pad=7)
+axes[0, 1].set_title("Biodiversity-price scan", pad=7)
 
 # Sync row 0: primary y (GHG left axis) and secondary y (Bio right axis)
 sync_ylims(axes[0, 0], axes[0, 1])
 sync_ylims(ax_left2, ax_right2)
-axes[0, 0].yaxis.label.set_rotation(270)
-axes[0, 0].yaxis.label.set_va("bottom")
-axes[0, 0].yaxis.set_label_coords(-0.12, 0.5)
+axes[0, 0].yaxis.label.set_rotation(Y_LABEL_ROTATION)
+axes[0, 0].yaxis.label.set_va(Y_LABEL_VERTICAL_ALIGNMENT)
+axes[0, 0].yaxis.set_label_coords(-0.13, 0.5)
 
 # Keep only the outer y-axes in the first row:
 # left outer axis for GHG and right outer axis for biodiversity.
@@ -489,16 +496,19 @@ ax_left2.spines["right"].set_visible(False)
 axes[0, 1].set_ylabel("")
 axes[0, 1].tick_params(axis="y", left=False, labelleft=False)
 axes[0, 1].spines["left"].set_visible(False)
+ax_right2.yaxis.set_label_coords(1.24, 0.5)
+ax_right2.yaxis.label.set_rotation(270)
+ax_right2.yaxis.label.set_va("top")
 
 # ── Row 1: GHG by subcategory ──────────────────────────────────────────────────
 ghg_cats_cp = plot_stacked_sub(
     axes[1, 0], df, "CarbonPrice", GHG_METRIC, "Budget_BAud",
-    ylabel=r"GHG abatement difference (Mt CO$_2$e yr$^{-1}$)",
+    ylabel=GHG_DIFF_LABEL,
     title="GHG Contribution",
 )
 ghg_cats_bp = plot_stacked_sub(
     axes[1, 1], df, "BioPrice", GHG_METRIC, "Budget_BAud",
-    ylabel=r"GHG abatement difference (Mt CO$_2$e yr$^{-1}$)",
+    ylabel=GHG_DIFF_LABEL,
     title="GHG Co-benefit",
 )
 # Sync row 1
@@ -509,18 +519,24 @@ axes[1, 1].tick_params(axis="y", left=False, labelleft=False)
 # ── Row 2: Bio by subcategory ──────────────────────────────────────────────────
 bio_cats_cp = plot_stacked_sub(
     axes[2, 0], df, "CarbonPrice", BIO_METRIC, "Budget_BAud",
-    ylabel=r"Biodiversity contribution difference (Mha yr$^{-1}$)",
+    ylabel=BIO_DIFF_LABEL,
     title="Biodiversity Co-benefit",
 )
 bio_cats_bp = plot_stacked_sub(
     axes[2, 1], df, "BioPrice", BIO_METRIC, "Budget_BAud",
-    ylabel=r"Biodiversity contribution difference (Mha yr$^{-1}$)",
+    ylabel=BIO_DIFF_LABEL,
     title="Biodiversity Contribution",
 )
 # Sync row 2
 sync_ylims(axes[2, 0], axes[2, 1])
 axes[2, 1].set_ylabel("")
 axes[2, 1].tick_params(axis="y", left=False, labelleft=False)
+
+LEFT_YLABEL_X = -0.13
+for ax in axes[:, 0]:
+    ax.yaxis.label.set_rotation(Y_LABEL_ROTATION)
+    ax.yaxis.label.set_va(Y_LABEL_VERTICAL_ALIGNMENT)
+    ax.yaxis.set_label_coords(LEFT_YLABEL_X, 0.5)
 
 # Shared x-axis treatment by column.
 for row_idx in range(3):
@@ -560,15 +576,19 @@ def _group_visible_cats(group_name):
 
 
 def _draw_grouped_legend():
-    legend_ax = fig.add_axes([0.04, 0.035, 0.92, 0.18])
+    legend_ax = fig.add_axes([0.035, 0.045, 0.94, 0.25])
     legend_ax.set_axis_off()
     legend_ax.set_xlim(0, 1)
     legend_ax.set_ylim(0, 1)
 
-    col_x = [0.26, 0.52, 0.76]
-    y_rows = [0.91, 0.79, 0.65, 0.53, 0.39, 0.27, 0.15]
-    marker_size = 66
+    col_x = [0.15, 0.43, 0.70]
+    y_cursor = 0.96
+    header_gap = 0.07
+    row_gap = 0.075
+    group_gap = 0.045
+    marker_size = 76
     text_dx = 0.014
+    header_x = col_x[0] - 0.015
 
     group_labels = {
         "Ag": "Agricultural land-use",
@@ -576,43 +596,47 @@ def _draw_grouped_legend():
         "Non-ag": "Non-agricultural land-use",
     }
 
-    row_idx = 0
     for group_name in ["Ag", "AM", "Non-ag"]:
         cats = _group_visible_cats(group_name)
-        chunks = [cats[i:i + len(col_x)] for i in range(0, len(cats), len(col_x))]
-        if row_idx >= len(y_rows):
-            break
-        group_ys = y_rows[row_idx:row_idx + len(chunks)]
+        if not cats:
+            continue
+
         legend_ax.text(
-            0.19, float(np.mean(group_ys)), group_labels[group_name],
-            ha="right", va="center", fontsize=FS,
+            header_x, y_cursor, group_labels[group_name],
+            ha="left", va="center", fontsize=FS,
+            fontweight="bold",
             color="black",
             transform=legend_ax.transAxes,
         )
+
+        y_cursor -= header_gap
+        chunks = [cats[i:i + len(col_x)] for i in range(0, len(cats), len(col_x))]
         for chunk in chunks:
-            if row_idx >= len(y_rows):
+            if y_cursor < 0.02:
                 break
-            y = y_rows[row_idx]
             for x, cat in zip(col_x, chunk):
                 legend_ax.scatter(
-                    [x], [y], s=marker_size, marker="s",
+                    [x], [y_cursor], s=marker_size, marker="s",
                     color=CAT_COLORS.get(cat, "#888888"),
                     edgecolors="none",
                     transform=legend_ax.transAxes,
                     clip_on=False,
                 )
                 legend_ax.text(
-                    x + text_dx, y, LEGEND_LABELS.get(cat, cat),
+                    x + text_dx, y_cursor, LEGEND_LABELS.get(cat, cat),
                     ha="left", va="center", fontsize=FS,
                     color="black", transform=legend_ax.transAxes,
                 )
-            row_idx += 1
+            y_cursor -= row_gap
+
+        y_cursor -= group_gap
 
 
-fig.supxlabel(r"Budget (Billion AU\$ yr$^{-1}$)", y=0.212, fontsize=FS)
+fig.supxlabel(r"Budget (AU\$ billion yr$^{-1}$)", y=0.310,
+              fontsize=FS + 1, fontweight="bold")
 
-plt.tight_layout(rect=[0, 0.20, 1, 1])
-plt.subplots_adjust(hspace=0.16, wspace=0.10)
+plt.tight_layout(rect=[0.105, 0.30, 0.955, 1])
+plt.subplots_adjust(hspace=0.28, wspace=0.12)
 _draw_grouped_legend()
 
 out_path = OUT_DIR / "05_Bio_GHG_Budget.png"

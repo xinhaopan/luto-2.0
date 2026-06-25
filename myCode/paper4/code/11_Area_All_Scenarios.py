@@ -17,7 +17,6 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
@@ -29,11 +28,11 @@ from tools.price_slice_utils import (
     DATA_DIR,
     OUT_DIR,
     apply_paper4_color_overrides_to_style_df,
+    standardize_display_label,
     build_run_map,
     format_thousands,
     get_price_axis_label,
-    apply_compact_ticks,
-    stacked_area_pos_neg,
+    set_sparse_index_price_ticks,
     style_box_axis,
 )
 
@@ -43,44 +42,27 @@ BASE_DIR = Path(__file__).resolve().parent
 DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
-CACHE_PATH = DATA_DIR / f"06_Area_All_Scenarios_raw_data_{YEAR}.xlsx"
+CACHE_PATH = DATA_DIR / f"11_Area_All_Scenarios_raw_data_{YEAR}.xlsx"
 
-
-def load_budget_lookup():
-    """Map (PriceType, Price) -> Budget_BAud = price x delta_quantity / 1000."""
-    delta_cache = DATA_DIR / f"03_Contribution_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
-    if not delta_cache.is_file():
-        return {}
-    df = pd.read_excel(delta_cache, sheet_name="ContributionLong")
-    totals = df.groupby(["PriceType","Price","MetricType"])["ContributionValue"].sum().reset_index()
-    GHG_D = "GHGAbatementChange_vs_ZeroPrice_MtCO2e"
-    BIO_D  = "BiodiversityContributionChange_vs_ZeroPrice_MhaYr"
-    lookup = {("CarbonPrice", 0.0): 0.0, ("BioPrice", 0.0): 0.0}
-    for _, r in totals[(totals.PriceType=="CarbonPrice")&(totals.MetricType==GHG_D)].iterrows():
-        lookup[("CarbonPrice", float(r.Price))] = float(r.Price)*float(r.ContributionValue)/1000
-    for _, r in totals[(totals.PriceType=="BioPrice")&(totals.MetricType==BIO_D)].iterrows():
-        lookup[("BioPrice", float(r.Price))] = float(r.Price)*float(r.ContributionValue)/1000
-    return lookup
-
-BUDGET_LOOKUP = load_budget_lookup()
-
-FS = 11
+FS = 18
 SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
-MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
-NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
+MODIFIED_LIVESTOCK_LABEL = "Livestock (modified land)"
+NATURAL_LIVESTOCK_LABEL = "Livestock (natural land)"
 MODIFIED_LIVESTOCK_COLOR = "#762500"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
     "font.sans-serif": ["Arial"],
     "font.size": FS,
-    "axes.titlesize": FS,
-    "axes.labelsize": FS,
+    "axes.titlesize": FS + 2,
+    "axes.labelsize": FS + 1,
     "xtick.labelsize": FS,
     "ytick.labelsize": FS,
     "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
+    "axes.titleweight": "bold",
+    "axes.labelweight": "bold",
 })
 
 
@@ -97,7 +79,7 @@ def load_style_table(sheet_name):
     color_map = {}
     label_map = {}
     for _, row in df.iterrows():
-        label = row[label_col]
+        label = standardize_display_label(row[label_col])
         order.append(label)
         color_map[label] = row["color"]
         label_map[normalize_name(row["desc"])] = label
@@ -132,23 +114,22 @@ def map_ag_group(row):
             return MODIFIED_LIVESTOCK_LABEL
         if "naturalland" in desc_key:
             return NATURAL_LIVESTOCK_LABEL
-    return group
+    return standardize_display_label(group)
 
 
 AG_ORDER, AG_COLOR_MAP, _ = load_style_table("ag_group")
 AG_ORDER, AG_COLOR_MAP = split_livestock_style(AG_ORDER, AG_COLOR_MAP)
 AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = load_style_table("am")
 NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = load_style_table("non_ag")
-LU_ORDER, LU_COLOR_MAP, LU_LABEL_MAP = load_style_table("lu")
+
 # Apply Ag2050 naming convention: remap color-table desc_new -> Ag2050 display name
-# (keeps order / color_map / label_map consistent so colours still resolve)
 _AG2050_DISPLAY = {
     "Biochar":                                              "Biochar (soil amendment)",
     "Human-Induced Regeneration (beef)":                    "Managed regeneration (beef)",
     "Human-Induced Regeneration (sheep)":                   "Managed regeneration (sheep)",
     "Environmental plantings (mixed local native species)": "Environmental plantings (mixed species)",
     "BECCS (Bioenergy with carbon capture and storage)":    "BECCS (Bioenergy with Carbon Capture and Storage)",
-    "Destocked (natural land)":                             "Destocked - natural land",
+    "Destocked (natural land)":                             "Destocked (natural land)",
 }
 
 def _apply_ag2050(order, color_map, label_map):
@@ -159,7 +140,7 @@ def _apply_ag2050(order, color_map, label_map):
 
 AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP = _apply_ag2050(AM_ORDER, AM_COLOR_MAP, AM_LABEL_MAP)
 NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP = _apply_ag2050(NON_AG_ORDER, NON_AG_COLOR_MAP, NON_AG_LABEL_MAP)
-
+LU_ORDER, LU_COLOR_MAP, LU_LABEL_MAP = load_style_table("lu")
 
 group_df = pd.read_excel(GROUP_FILE)
 LU_TO_AG_GROUP = {
@@ -362,6 +343,7 @@ def load_cache():
     try:
         print(f"Loading cached data from {CACHE_PATH}")
         df_long = pd.read_excel(CACHE_PATH, sheet_name="AreaLong")
+        df_long["Category"] = df_long["Category"].map(standardize_display_label)
     except ValueError:
         print("Cached area workbook uses an older layout; rebuilding.")
         return None
@@ -398,9 +380,6 @@ def collect_and_cache():
 
     df_long = pd.DataFrame(rows_cp + rows_bp)
     df_long = df_long.sort_values(["PriceType", "AreaType", "Price", "Category"]).reset_index(drop=True)
-    df_long["Budget_BAud"] = df_long.apply(
-        lambda r: BUDGET_LOOKUP.get((r["PriceType"], float(r["Price"])), 0.0), axis=1
-    )
 
     with pd.ExcelWriter(CACHE_PATH, engine="openpyxl") as writer:
         df_long.to_excel(writer, sheet_name="AreaLong", index=False)
@@ -428,7 +407,7 @@ def build_area_pivot(df_long, price_type, area_type):
         return pd.DataFrame()
 
     pivot = df_subset.pivot_table(
-        index="Budget_BAud",
+        index="Price",
         columns="Category",
         values="Area_2025_Mha",
         aggfunc="sum",
@@ -448,7 +427,7 @@ def build_total_area_pivot(df_long, price_type):
     df_subset = df_subset.dropna(subset=["Category"])
 
     pivot = df_subset.pivot_table(
-        index="Budget_BAud",
+        index="Price",
         columns="Category",
         values="Area_2025_Mha",
         aggfunc="sum",
@@ -514,20 +493,55 @@ def stacked_bar(ax, pivot_df, area_type, varying_key, show_xlabel, color_map=Non
         return []
 
     color_map = AREA_CONFIG[area_type]["color_map"] if color_map is None else color_map
-    x = pivot_df.index.to_numpy(dtype=float)
+    price_vals = pivot_df.index.to_list()
+    x = np.arange(len(price_vals))
+    positive_bottoms = np.zeros(len(price_vals))
+    negative_bottoms = np.zeros(len(price_vals))
 
-    # Continuous budget x-axis -> stacked area (not bars)
-    visible_categories = stacked_area_pos_neg(ax, pivot_df, color_map, alpha=0.85)
+    visible_categories = []
+    for category in pivot_df.columns:
+        heights = pivot_df[category].to_numpy()
+        if np.isclose(np.abs(heights).sum(), 0.0):
+            continue
+
+        positive = np.clip(heights, 0.0, None)
+        negative = np.clip(heights, None, 0.0)
+
+        if not np.isclose(positive.sum(), 0.0):
+            ax.bar(
+                x,
+                positive,
+                0.75,
+                bottom=positive_bottoms,
+                color=color_map.get(category, "#888888"),
+                label=category,
+            )
+            positive_bottoms += positive
+
+        if not np.isclose(np.abs(negative).sum(), 0.0):
+            ax.bar(
+                x,
+                negative,
+                0.75,
+                bottom=negative_bottoms,
+                color=color_map.get(category, "#888888"),
+                label=category,
+            )
+            negative_bottoms += negative
+
+        visible_categories.append(category)
 
     if show_sum_line:
         totals = pivot_df.sum(axis=1).to_numpy()
-        ax.plot(x, totals, color="black", lw=1.6, marker="o", ms=4,
-                markeredgewidth=0, zorder=30)
+        plot_sum_markers(ax, x, totals)
 
-    ax.xaxis.set_major_formatter(ticker.StrMethodFormatter("{x:,.0f}"))
-    apply_compact_ticks(ax, x_nbins=6, y_nbins=5)
+    set_sparse_index_price_ticks(ax, price_vals, max_ticks=8)
     if show_xlabel:
-        ax.set_xlabel(r"Budget (Billion AU\$ yr$^{-1}$)")
+        ax.tick_params(axis="x", labelrotation=90)
+        for label in ax.get_xticklabels():
+            label.set_ha("center")
+        ax.set_xlabel(get_price_axis_label(varying_key))
+        ax.xaxis.set_label_coords(0.5, -0.25)
     else:
         ax.tick_params(axis="x", labelbottom=False)
 
@@ -543,7 +557,7 @@ if df_long is None:
 fig, axes = plt.subplots(
     3,
     2,
-    figsize=(10, 13),
+    figsize=(14, 19),
     sharex="col",
 )
 
@@ -569,19 +583,19 @@ for row_idx, area_type in enumerate(row_area_types):
     )
 
 LEGEND_NCOL = {
-    "Agricultural land-use": 5,
-    "Ag management": 3,
+    "Agricultural land-use": 2,
+    "Ag management": 2,
     "Non-ag": 2,
 }
 LEGEND_FS = {
     "Agricultural land-use": FS,
     "Ag management": FS,
-    "Non-ag": FS - 1,
+    "Non-ag": FS,
 }
 
-fig.supylabel(r"Area (Mha)", fontsize=FS)
-plt.tight_layout()
-plt.subplots_adjust(hspace=0.35, wspace=0.12)
+fig.supylabel(r"Area (Mha)", x=0.065, y=0.5, fontsize=FS + 1, fontweight="bold")
+plt.tight_layout(rect=[0.075, 0, 1, 1])
+plt.subplots_adjust(hspace=0.44, wspace=0.28)
 fig.canvas.draw()
 renderer = fig.canvas.get_renderer()
 fig_w_px = fig.get_figwidth() * fig.dpi
@@ -612,7 +626,7 @@ for row_idx, area_type in enumerate(row_area_types):
         fontsize=LEGEND_FS.get(area_type, FS - 1),
     )
 
-out_path = OUT_DIR / "06_Area_All_Scenarios.png"
+out_path = OUT_DIR / "11_Area_All_Scenarios.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight")
 plt.close()
 print(f"Saved: {out_path}")

@@ -26,6 +26,15 @@ PAPER4_COLOR_OVERRIDES = {
     "unallocatednaturalland": "#e6d8a8",
 }
 
+DISPLAY_LABEL_REPLACEMENTS = {
+    "Modified livestock": "Livestock (modified land)",
+    "Natural Livestock": "Livestock (natural land)",
+    "Natural livestock": "Livestock (natural land)",
+    "Unallocated - modified land": "Unallocated (modified land)",
+    "Unallocated - natural land": "Unallocated (natural land)",
+    "Destocked - natural land": "Destocked (natural land)",
+}
+
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -36,6 +45,12 @@ def get_paper4_paths():
 
 def normalize_style_key(value):
     return re.sub(r"[\s\-]+", "", str(value).strip().lower())
+
+
+def standardize_display_label(value):
+    if pd.isna(value):
+        return value
+    return DISPLAY_LABEL_REPLACEMENTS.get(str(value), str(value))
 
 
 def apply_paper4_color_overrides(color_map):
@@ -64,6 +79,10 @@ def apply_paper4_color_overrides_to_style_df(df):
 
         if override is not None:
             df.at[idx, "color"] = override
+
+    for column in ("desc_new", "desc", "ag_group"):
+        if column in df.columns:
+            df[column] = df[column].map(standardize_display_label)
 
     return df
 
@@ -116,9 +135,9 @@ def get_price_column(varying_key):
 
 def get_price_axis_label(varying_key):
     if varying_key == "cp":
-        return r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)"
+        return r"Carbon price (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)"
     if varying_key == "bp":
-        return r"Biodiversity price (AU\$/ha yr$^{-1}$)"
+        return r"Biodiversity price (AU\$ ha$^{-1}$ yr$^{-1}$)"
     raise ValueError(f"Unsupported varying_key: {varying_key}")
 
 

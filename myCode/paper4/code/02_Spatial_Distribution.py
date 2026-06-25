@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from tools.price_slice_utils import (
     apply_paper4_color_overrides_to_style_df,
+    standardize_display_label,
     build_run_map,
     DATA_DIR,
     format_thousands,
@@ -46,21 +47,23 @@ MAP_PAD = 0.8
 XLIM = (EXTENT[0] - MAP_PAD, EXTENT[1] + MAP_PAD)
 YLIM = (EXTENT[2] - MAP_PAD, EXTENT[3] + MAP_PAD)
 
-FS = 10
+FS = 20
 OLD_LIVESTOCK_LABEL = "Livestock"
-MODIFIED_LIVESTOCK_LABEL = "Modified livestock"
-NATURAL_LIVESTOCK_LABEL = "Natural Livestock"
+MODIFIED_LIVESTOCK_LABEL = "Livestock (modified land)"
+NATURAL_LIVESTOCK_LABEL = "Livestock (natural land)"
 MODIFIED_LIVESTOCK_COLOR = "#762500"
 plt.rcParams.update({
     "font.family": "sans-serif",
     "font.sans-serif": ["Arial"],
     "font.size": FS,
-    "axes.titlesize": FS,
-    "axes.labelsize": FS,
+    "axes.titlesize": FS + 2,
+    "axes.labelsize": FS + 1,
     "xtick.labelsize": FS,
     "ytick.labelsize": FS,
     "legend.fontsize": FS,
     "mathtext.fontset": "stixsans",
+    "axes.titleweight": "bold",
+    "axes.labelweight": "bold",
 })
 
 OUTSIDE_CODE = -2
@@ -79,7 +82,7 @@ def load_style_table(sheet_name):
     color_map = {}
     label_map = {}
     for _, row in df.iterrows():
-        label = row[label_col]
+        label = standardize_display_label(row[label_col])
         order.append(label)
         color_map[label] = row["color"]
         label_map[normalize_name(row["desc"])] = label
@@ -114,7 +117,7 @@ def map_ag_group(row):
             return MODIFIED_LIVESTOCK_LABEL
         if "naturalland" in desc_key:
             return NATURAL_LIVESTOCK_LABEL
-    return group
+    return standardize_display_label(group)
 
 
 AG_FULL_ORDER, AG_COLOR_MAP, _ = load_style_table("ag_group")
@@ -129,7 +132,7 @@ _AG2050_DISPLAY = {
     "Human-Induced Regeneration (sheep)":                   "Managed regeneration (sheep)",
     "Environmental plantings (mixed local native species)": "Environmental plantings (mixed species)",
     "BECCS (Bioenergy with carbon capture and storage)":    "BECCS (Bioenergy with Carbon Capture and Storage)",
-    "Destocked (natural land)":                             "Destocked - natural land",
+    "Destocked (natural land)":                             "Destocked (natural land)",
 }
 
 def _apply_ag2050(order, color_map, label_map):
@@ -441,6 +444,30 @@ def style_map_ax(ax):
         spine.set_visible(False)
 
 
+def compute_map_view_limits(maps):
+    valid_mask = None
+    for cat_map in maps.values():
+        current = cat_map != OUTSIDE_CODE
+        valid_mask = current if valid_mask is None else (valid_mask | current)
+
+    if valid_mask is None or not valid_mask.any():
+        return XLIM, YLIM
+
+    rows, cols = np.where(valid_mask)
+    nrows, ncols = valid_mask.shape
+    xres = (EXTENT[1] - EXTENT[0]) / ncols
+    yres = (EXTENT[3] - EXTENT[2]) / nrows
+
+    xmin = EXTENT[0] + cols.min() * xres
+    xmax = EXTENT[0] + (cols.max() + 1) * xres
+    ymax = EXTENT[3] - rows.min() * yres
+    ymin = EXTENT[3] - (rows.max() + 1) * yres
+
+    pad_x = (xmax - xmin) * 0.015
+    pad_y = (ymax - ymin) * 0.015
+    return (xmin - pad_x, xmax + pad_x), (ymin - pad_y, ymax + pad_y)
+
+
 def load_cache():
     if not CACHE_NPZ.is_file() or not CACHE_META.is_file():
         return None
@@ -547,22 +574,23 @@ if cached is None:
 else:
     MAPS, MAX_CP, MAX_BP = cached
 
+XLIM, YLIM = compute_map_view_limits(MAPS)
 
 gdf_states = load_states()
 
-fig, axes = plt.subplots(3, 3, figsize=(14, 13), facecolor="white")
+fig, axes = plt.subplots(3, 3, figsize=(15.5, 17.2), facecolor="white")
 
 axes[0, 0].set_title(
     "Zero price",
-    pad=4,
+    pad=6,
 )
 axes[0, 1].set_title(
-    rf"Carbon price: {format_thousands(MAX_CP)} AU\$/tCO$_2$e yr$^{{-1}}$",
-    pad=4,
+    f"Carbon price: {format_thousands(MAX_CP)}\n" + r"AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$",
+    pad=6,
 )
 axes[0, 2].set_title(
-    rf"Biodiversity price: {format_thousands(MAX_BP)} AU\$/ha yr$^{{-1}}$",
-    pad=4,
+    f"Biodiversity price: {format_thousands(MAX_BP)}\n" + r"AU\$ ha$^{-1}$ yr$^{-1}$",
+    pad=6,
 )
 
 row_specs = [
@@ -597,12 +625,12 @@ for row_idx, (area_key, area_label, map_keys) in enumerate(row_specs):
 ROW_KEYS = ["Agricultural land-use", "Ag management", "Non-ag"]
 LEGEND_FS = {
     "Agricultural land-use": FS,
-    "Ag management": FS - 1,
-    "Non-ag": FS - 1,
+    "Ag management": FS,
+    "Non-ag": FS,
 }
 
-plt.tight_layout()
-plt.subplots_adjust(hspace=0.25, wspace=0.03)
+plt.tight_layout(pad=0.02)
+plt.subplots_adjust(hspace=0.26, wspace=0.01)
 fig.canvas.draw()
 renderer = fig.canvas.get_renderer()
 fig_w_px = fig.get_figwidth() * fig.dpi
@@ -618,14 +646,29 @@ def add_row_legend(handles, x_center, y_anchor, row_key):
         loc="upper center",
         bbox_to_anchor=(x_center, y_anchor),
         bbox_transform=fig.transFigure,
-        ncol=len(handles),
+        ncol=min(len(handles), 4),
         frameon=False,
         borderaxespad=0.0,
         handlelength=1.0,
         handleheight=1.0,
-        columnspacing=1.0,
+        columnspacing=0.75,
+        labelspacing=0.35,
         fontsize=LEGEND_FS.get(row_key, FS - 1),
     )
+
+
+def add_split_row_legend(handles, x_center, y_anchor, row_key, n_rows, row_gap=0.026):
+    if not handles:
+        return
+
+    n_rows = max(1, min(n_rows, len(handles)))
+    for row_offset, row_handles in enumerate(np.array_split(handles, n_rows)):
+        add_row_legend(
+            list(row_handles),
+            x_center,
+            y_anchor - row_offset * row_gap,
+            row_key,
+        )
 
 for row_idx, legend_handles in row_legend_handles.items():
     if not legend_handles:
@@ -635,7 +678,7 @@ for row_idx, legend_handles in row_legend_handles.items():
     bb_l = ax_l.get_tightbbox(renderer)
     bb_r = ax_r.get_tightbbox(renderer)
     x_center = (bb_l.x0 + bb_r.x1) / 2 / fig_w_px
-    y_anchor = min(bb_l.y0, bb_r.y0) / fig_h_px - 0.01
+    y_anchor = min(bb_l.y0, bb_r.y0) / fig_h_px - 0.008
 
     row_key = ROW_KEYS[row_idx] if row_idx < len(ROW_KEYS) else "Non-ag"
     handles = list(legend_handles)
@@ -644,16 +687,30 @@ for row_idx, legend_handles in row_legend_handles.items():
     active_handles = handles[:-2] if special_handles else handles
 
     if row_key == "Agricultural land-use":
-        add_row_legend(active_handles, x_center, y_anchor, row_key)
-        add_row_legend(special_handles, x_center, y_anchor - 0.018, row_key)
+        # All 7 handles: 5 active + 2 special; split 3+3+1
+        all_ag = active_handles + special_handles
+        add_row_legend(all_ag[:3], x_center, y_anchor, row_key)
+        add_row_legend(all_ag[3:6], x_center, y_anchor - 0.025, row_key)
+        add_row_legend(all_ag[6:], x_center, y_anchor - 0.050, row_key)
+        continue
+
+    if row_key == "Non-ag":
+        # 9 handles: split 2+2+2+2+1
+        for legend_row, start in enumerate(range(0, len(handles), 2)):
+            add_row_legend(
+                handles[start:start + 2],
+                x_center,
+                y_anchor - legend_row * 0.025,
+                row_key,
+            )
         continue
 
     split_idx = int(np.ceil(len(active_handles) / 2))
     add_row_legend(active_handles[:split_idx], x_center, y_anchor, row_key)
-    add_row_legend(active_handles[split_idx:], x_center, y_anchor - 0.018, row_key)
-    add_row_legend(special_handles, x_center, y_anchor - 0.036, row_key)
+    add_row_legend(active_handles[split_idx:], x_center, y_anchor - 0.025, row_key)
+    add_row_legend(special_handles, x_center, y_anchor - 0.050, row_key)
 
 out_path = OUT_DIR / "02_Spatial_Distribution.png"
-fig.savefig(out_path, dpi=200, bbox_inches="tight", facecolor="white")
+fig.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0.02, facecolor="white")
 plt.close()
 print(f"Saved: {out_path}")
