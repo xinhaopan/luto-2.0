@@ -27,7 +27,7 @@ import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.transitions as ag_transitions
 
 
-def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
+def get_env_plant_transitions_from_ag_crisp(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
     """
     Calculate the transition costs for transitioning from agricultural land to environmental plantings.
 
@@ -49,7 +49,7 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     est_costs_r[~cells] = 0.0
     
     # Water costs; Assume EP is dryland
-    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
+    w_rm_irrig_cost_r = (np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA).astype(np.float32)
     w_rm_irrig_cost_r[~cells] = 0.0
     
     # Transition costs
@@ -69,7 +69,7 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
         return est_costs_r + ag_to_ep_t_r + w_rm_irrig_cost_r
 
 
-def get_env_plant_transitions_from_ag_blended(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
+def get_env_plant_transitions_from_ag_blend(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
     """Blended EP transition costs: weighted-average T_MAT over source LUs, normalised to whole-cell cost."""
     yr_cal    = data.YR_CAL_BASE + yr_idx
     dvars     = data.ag_dvars[base_year]
@@ -105,17 +105,65 @@ def get_env_plant_transitions_from_ag_blended(data: Data, yr_idx, base_year, sep
         return est_costs_r + ag_to_ep_t_r + w_rm_irrig_cost_r
 
 
+def get_env_plant_transitions_from_ag_exact(
+    data: Data, yr_idx: int, mj_cell_map: dict, separate=False
+) -> dict:
+    """Exact EP transition costs per-(from_m, from_j) combo over cells with ag dvar > threshold.
+
+    Parameters
+    ----------
+    mj_cell_map : dict returned by ag_transitions.get_base_dvar_mj_cell_map(data, base_year)
+
+    Returns
+    -------
+    dict[(from_m, from_j)] → ndarray (len(cell_idx),) in $/cell/yr
+    OR, if separate=True:
+    dict[(from_m, from_j)] → {'Establishment cost (Ag2Non-Ag)', 'Transition cost (Ag2Non-Ag)',
+                               'Remove irrigation cost (Ag2Non-Ag)'} each ndarray (len(cell_idx),)
+    """
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Hoist invariants outside the per-combo loop
+    t_j        = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Environmental Plantings').values  # (N_AG_LUS,), NaN = prohibited
+    est_mults  = data.EST_COST_MULTS[yr_cal]   # scalar
+    irr_scalar = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal]   # scalar
+
+    result = {}
+    for (from_m, from_j), cell_idx in mj_cell_map.items():
+        est_costs  = tools.amortise(data.EP_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]).astype(np.float32)
+        t_cost     = tools.amortise(np.nan_to_num(t_j[from_j]) * data.REAL_AREA[cell_idx]).astype(np.float32)
+        w_rm_irrig = (
+            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            if from_m == 1
+            else np.zeros(len(cell_idx), dtype=np.float32)
+        )
+
+        if separate:
+            result[(from_m, from_j)] = {
+                'Establishment cost (Ag2Non-Ag)':     est_costs,
+                'Transition cost (Ag2Non-Ag)':        t_cost,
+                'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig,
+            }
+        else:
+            result[(from_m, from_j)] = est_costs + t_cost + w_rm_irrig
+
+    return result
+
+
 def get_env_plant_transitions_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
-    """Dispatcher: blended (RESFACTOR>1 mixed cells) or crisp-lumap EP transition costs."""
-    if settings.BLENDED_TRANSITION_COSTS:
-        return get_env_plant_transitions_from_ag_blended(data, yr_idx, base_year, separate)
+    """Dispatcher: exact, blended or crisp-lumap EP transition costs."""
+    if settings.TRANSITION_MODE == 'exact':
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, base_year)
+        return get_env_plant_transitions_from_ag_exact(data, yr_idx, mj_cell_map, separate)
+    elif settings.TRANSITION_MODE != 'crisp':
+        return get_env_plant_transitions_from_ag_blend(data, yr_idx, base_year, separate)
     else:
-        return get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
+        return get_env_plant_transitions_from_ag_crisp(data, yr_idx, lumap, lmmap, separate)
 
 
-def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
+def get_rip_plant_transitions_from_ag_crisp(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
     """
     Get transition costs from agricultural land uses to riparian plantings for each cell.
 
@@ -142,7 +190,7 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     
     
     # Water costs; Assume riparian plantings are dryland
-    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
+    w_rm_irrig_cost_r = (np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA).astype(np.float32)
     w_rm_irrig_cost_r[~cells] = 0.0
 
     # Fencing costs
@@ -167,7 +215,7 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
         return est_costs_r + ag_to_ep_t_r + w_rm_irrig_cost_r + fencing_cost_r
 
 
-def get_rip_plant_transitions_from_ag_blended(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
+def get_rip_plant_transitions_from_ag_blend(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
     """Blended RP transition costs: weighted-average T_MAT over source LUs, normalised to whole-cell cost."""
     yr_cal    = data.YR_CAL_BASE + yr_idx
     dvars     = data.ag_dvars[base_year]
@@ -207,17 +255,52 @@ def get_rip_plant_transitions_from_ag_blended(data: Data, yr_idx, base_year, sep
         return est_costs_r + ag_to_ep_t_r + w_rm_irrig_cost_r + fencing_cost_r
 
 
+def get_rip_plant_transitions_from_ag_exact(
+    data: Data, yr_idx: int, mj_cell_map: dict, separate=False
+) -> dict:
+    """Exact RP transition costs per-(from_m, from_j) combo."""
+    yr_cal     = data.YR_CAL_BASE + yr_idx
+    t_j        = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Riparian Plantings').values
+    est_mults  = data.EST_COST_MULTS[yr_cal]
+    irr_scalar = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal]
+    fence_scalar = settings.FENCING_COST_PER_M * data.FENCE_COST_MULTS[yr_cal]
+
+    result = {}
+    for (from_m, from_j), cell_idx in mj_cell_map.items():
+        est_costs    = tools.amortise(data.RP_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]).astype(np.float32)
+        t_cost       = tools.amortise(np.nan_to_num(t_j[from_j]) * data.REAL_AREA[cell_idx]).astype(np.float32)
+        w_rm_irrig   = (
+            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
+        )
+        fencing_cost = (data.RP_FENCING_LENGTH[cell_idx] * fence_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+
+        if separate:
+            result[(from_m, from_j)] = {
+                'Establishment cost (Ag2Non-Ag)':     est_costs,
+                'Transition cost (Ag2Non-Ag)':        t_cost,
+                'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig,
+                'Fencing cost (Ag2Non-Ag)':           fencing_cost,
+            }
+        else:
+            result[(from_m, from_j)] = est_costs + t_cost + w_rm_irrig + fencing_cost
+    return result
+
+
 def get_rip_plant_transitions_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
-    """Dispatcher: blended or crisp-lumap RP transition costs."""
-    if settings.BLENDED_TRANSITION_COSTS:
-        return get_rip_plant_transitions_from_ag_blended(data, yr_idx, base_year, separate)
+    """Dispatcher: exact, blended or crisp-lumap RP transition costs."""
+    if settings.TRANSITION_MODE == 'exact':
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, base_year)
+        return get_rip_plant_transitions_from_ag_exact(data, yr_idx, mj_cell_map, separate)
+    elif settings.TRANSITION_MODE != 'crisp':
+        return get_rip_plant_transitions_from_ag_blend(data, yr_idx, base_year, separate)
     else:
-        return get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
+        return get_rip_plant_transitions_from_ag_crisp(data, yr_idx, lumap, lmmap, separate)
 
 
-def get_sheep_agroforestry_transitions_from_ag(
+def get_sheep_agroforestry_transitions_from_ag_crisp(
     data: Data, yr_idx, lumap, lmmap, separate=False
 ):
     """
@@ -255,7 +338,7 @@ def get_sheep_agroforestry_transitions_from_ag(
     ag_to_sheep_t_r *= (1 - settings.AF_PROPORTION)
     
     # Water costs; Assume AF is dryland so no need to multiply by AF_PROPORTION here
-    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
+    w_rm_irrig_cost_r = (np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA).astype(np.float32)
     w_rm_irrig_cost_r[~cells] = 0.0
 
     # Fencing costs
@@ -279,7 +362,7 @@ def get_sheep_agroforestry_transitions_from_ag(
         return est_costs_r + ag_to_agroforestry_t_r + ag_to_sheep_t_r + w_rm_irrig_cost_r + fencing_cost_r
 
 
-def get_sheep_agroforestry_transitions_from_ag_blended(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
+def get_sheep_agroforestry_transitions_from_ag_blend(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
     """Blended Sheep AF transition costs: normalised weighted-average T_MAT, whole-cell EST/FENCING."""
     yr_cal    = data.YR_CAL_BASE + yr_idx
     dvars     = data.ag_dvars[base_year]
@@ -329,17 +412,55 @@ def get_sheep_agroforestry_transitions_from_ag_blended(data: Data, yr_idx, base_
         return est_costs_r + ag_to_agroforestry_t_r + ag_to_sheep_t_r + w_rm_irrig_cost_r + fencing_cost_r
 
 
+def get_sheep_agroforestry_transitions_from_ag_exact(
+    data: Data, yr_idx: int, mj_cell_map: dict, separate=False
+) -> dict:
+    """Exact Sheep AF transition costs per-(from_m, from_j) combo."""
+    yr_cal       = data.YR_CAL_BASE + yr_idx
+    t_af_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep Agroforestry').values
+    t_sheep_j    = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep - modified land').values
+    est_mults    = data.EST_COST_MULTS[yr_cal]
+    irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal]
+    fence_scalar = settings.AF_FENCING_LENGTH_HA * settings.FENCING_COST_PER_M * data.FENCE_COST_MULTS[yr_cal]
+
+    result = {}
+    for (from_m, from_j), cell_idx in mj_cell_map.items():
+        est_costs           = (tools.amortise(data.AF_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]) * settings.AF_PROPORTION).astype(np.float32)
+        ag_to_af_t          = (tools.amortise(np.nan_to_num(t_af_j[from_j]) * data.REAL_AREA[cell_idx]) * settings.AF_PROPORTION).astype(np.float32)
+        ag_to_sheep_t       = (tools.amortise(np.nan_to_num(t_sheep_j[from_j]) * data.REAL_AREA[cell_idx]) * (1 - settings.AF_PROPORTION)).astype(np.float32)
+        w_rm_irrig          = (
+            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
+        )
+        fencing_cost        = (fence_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+
+        if separate:
+            result[(from_m, from_j)] = {
+                'Establishment cost (Ag2Non-Ag)':     est_costs,
+                'Transition cost (Ag2Non-Ag)':        ag_to_af_t,
+                'Transition cost (Ag2AF-Sheep)':      ag_to_sheep_t,
+                'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig,
+                'Fencing cost (Ag2Non-Ag)':           fencing_cost,
+            }
+        else:
+            result[(from_m, from_j)] = est_costs + ag_to_af_t + ag_to_sheep_t + w_rm_irrig + fencing_cost
+    return result
+
+
 def get_sheep_agroforestry_transitions_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
-    """Dispatcher: blended or crisp-lumap Sheep AF transition costs."""
-    if settings.BLENDED_TRANSITION_COSTS:
-        return get_sheep_agroforestry_transitions_from_ag_blended(data, yr_idx, base_year, separate)
+    """Dispatcher: exact, blended or crisp-lumap Sheep AF transition costs."""
+    if settings.TRANSITION_MODE == 'exact':
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, base_year)
+        return get_sheep_agroforestry_transitions_from_ag_exact(data, yr_idx, mj_cell_map, separate)
+    elif settings.TRANSITION_MODE != 'crisp':
+        return get_sheep_agroforestry_transitions_from_ag_blend(data, yr_idx, base_year, separate)
     else:
-        return get_sheep_agroforestry_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
+        return get_sheep_agroforestry_transitions_from_ag_crisp(data, yr_idx, lumap, lmmap, separate)
 
 
-def get_beef_agroforestry_transitions_from_ag(
+def get_beef_agroforestry_transitions_from_ag_crisp(
     data: Data, yr_idx, lumap, lmmap, separate=False
 ):
     """
@@ -377,7 +498,7 @@ def get_beef_agroforestry_transitions_from_ag(
     ag_to_beef_t_r *= (1 - settings.AF_PROPORTION)
     
     # Water costs; Assume AF is dryland so no need to multiply by AF_PROPORTION here
-    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
+    w_rm_irrig_cost_r = (np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA).astype(np.float32)
     w_rm_irrig_cost_r[~cells] = 0.0
     
     # Fencing costs
@@ -401,7 +522,7 @@ def get_beef_agroforestry_transitions_from_ag(
         return est_costs_r + ag_to_agroforestry_t_r + ag_to_beef_t_r + w_rm_irrig_cost_r + fencing_cost_r
 
 
-def get_beef_agroforestry_transitions_from_ag_blended(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
+def get_beef_agroforestry_transitions_from_ag_blend(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
     """Blended Beef AF transition costs: normalised weighted-average T_MAT, whole-cell EST/FENCING."""
     yr_cal    = data.YR_CAL_BASE + yr_idx
     dvars     = data.ag_dvars[base_year]
@@ -451,17 +572,55 @@ def get_beef_agroforestry_transitions_from_ag_blended(data: Data, yr_idx, base_y
         return est_costs_r + ag_to_agroforestry_t_r + ag_to_beef_t_r + w_rm_irrig_cost_r + fencing_cost_r
 
 
+def get_beef_agroforestry_transitions_from_ag_exact(
+    data: Data, yr_idx: int, mj_cell_map: dict, separate=False
+) -> dict:
+    """Exact Beef AF transition costs per-(from_m, from_j) combo."""
+    yr_cal       = data.YR_CAL_BASE + yr_idx
+    t_af_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef Agroforestry').values
+    t_beef_j     = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef - modified land').values
+    est_mults    = data.EST_COST_MULTS[yr_cal]
+    irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal]
+    fence_scalar = settings.AF_FENCING_LENGTH_HA * settings.FENCING_COST_PER_M * data.FENCE_COST_MULTS[yr_cal]
+
+    result = {}
+    for (from_m, from_j), cell_idx in mj_cell_map.items():
+        est_costs    = (tools.amortise(data.AF_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]) * settings.AF_PROPORTION).astype(np.float32)
+        ag_to_af_t   = (tools.amortise(np.nan_to_num(t_af_j[from_j]) * data.REAL_AREA[cell_idx]) * settings.AF_PROPORTION).astype(np.float32)
+        ag_to_beef_t = (tools.amortise(np.nan_to_num(t_beef_j[from_j]) * data.REAL_AREA[cell_idx]) * (1 - settings.AF_PROPORTION)).astype(np.float32)
+        w_rm_irrig   = (
+            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
+        )
+        fencing_cost = (fence_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+
+        if separate:
+            result[(from_m, from_j)] = {
+                'Establishment cost (Ag2Non-Ag)':     est_costs,
+                'Transition cost (Ag2Non-Ag)':        ag_to_af_t,
+                'Transition cost (Ag2AF-Beef)':       ag_to_beef_t,
+                'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig,
+                'Fencing cost (Ag2Non-Ag)':           fencing_cost,
+            }
+        else:
+            result[(from_m, from_j)] = est_costs + ag_to_af_t + ag_to_beef_t + w_rm_irrig + fencing_cost
+    return result
+
+
 def get_beef_agroforestry_transitions_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
-    """Dispatcher: blended or crisp-lumap Beef AF transition costs."""
-    if settings.BLENDED_TRANSITION_COSTS:
-        return get_beef_agroforestry_transitions_from_ag_blended(data, yr_idx, base_year, separate)
+    """Dispatcher: exact, blended or crisp-lumap Beef AF transition costs."""
+    if settings.TRANSITION_MODE == 'exact':
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, base_year)
+        return get_beef_agroforestry_transitions_from_ag_exact(data, yr_idx, mj_cell_map, separate)
+    elif settings.TRANSITION_MODE != 'crisp':
+        return get_beef_agroforestry_transitions_from_ag_blend(data, yr_idx, base_year, separate)
     else:
-        return get_beef_agroforestry_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
+        return get_beef_agroforestry_transitions_from_ag_crisp(data, yr_idx, lumap, lmmap, separate)
 
 
-def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
+def get_carbon_plantings_block_from_ag_crisp(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
     """
     Get transition costs from agricultural land uses to carbon plantings (block) for each cell.
 
@@ -485,7 +644,7 @@ def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, lmmap, separat
     ag_to_cp_t_r[~cells] = 0.0
 
     # Water costs; Assume CP is dryland
-    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
+    w_rm_irrig_cost_r = (np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA).astype(np.float32)
     w_rm_irrig_cost_r[~cells] = 0.0
 
     if separate:
@@ -498,7 +657,7 @@ def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, lmmap, separat
         return est_costs_CP_r + ag_to_cp_t_r + w_rm_irrig_cost_r
 
 
-def get_carbon_plantings_block_from_ag_blended(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
+def get_carbon_plantings_block_from_ag_blend(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
     """Blended CP Block transition costs: normalised weighted-average T_MAT, whole-cell EST."""
     yr_cal    = data.YR_CAL_BASE + yr_idx
     dvars     = data.ag_dvars[base_year]
@@ -534,17 +693,49 @@ def get_carbon_plantings_block_from_ag_blended(data: Data, yr_idx, base_year, se
         return est_costs_CP_r + ag_to_cp_t_r + w_rm_irrig_cost_r
 
 
+def get_carbon_plantings_block_from_ag_exact(
+    data: Data, yr_idx: int, mj_cell_map: dict, separate=False
+) -> dict:
+    """Exact CP Block transition costs per-(from_m, from_j) combo."""
+    yr_cal     = data.YR_CAL_BASE + yr_idx
+    t_j        = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Carbon Plantings (Block)').values
+    est_mults  = data.EST_COST_MULTS[yr_cal]
+    irr_scalar = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal]
+
+    result = {}
+    for (from_m, from_j), cell_idx in mj_cell_map.items():
+        est_costs  = tools.amortise(data.CP_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]).astype(np.float32)
+        t_cost     = tools.amortise(np.nan_to_num(t_j[from_j]) * data.REAL_AREA[cell_idx]).astype(np.float32)
+        w_rm_irrig = (
+            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
+        )
+
+        if separate:
+            result[(from_m, from_j)] = {
+                'Establishment cost (Ag2Non-Ag)':     est_costs,
+                'Transition cost (Ag2Non-Ag)':        t_cost,
+                'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig,
+            }
+        else:
+            result[(from_m, from_j)] = est_costs + t_cost + w_rm_irrig
+    return result
+
+
 def get_carbon_plantings_block_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
-    """Dispatcher: blended or crisp-lumap CP Block transition costs."""
-    if settings.BLENDED_TRANSITION_COSTS:
-        return get_carbon_plantings_block_from_ag_blended(data, yr_idx, base_year, separate)
+    """Dispatcher: exact, blended or crisp-lumap CP Block transition costs."""
+    if settings.TRANSITION_MODE == 'exact':
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, base_year)
+        return get_carbon_plantings_block_from_ag_exact(data, yr_idx, mj_cell_map, separate)
+    elif settings.TRANSITION_MODE != 'crisp':
+        return get_carbon_plantings_block_from_ag_blend(data, yr_idx, base_year, separate)
     else:
-        return get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap, separate)
+        return get_carbon_plantings_block_from_ag_crisp(data, yr_idx, lumap, lmmap, separate)
 
 
-def get_sheep_carbon_plantings_belt_from_ag(
+def get_sheep_carbon_plantings_belt_from_ag_crisp(
     data: Data, yr_idx, lumap, lmmap, separate=False
 ):
     """
@@ -582,7 +773,7 @@ def get_sheep_carbon_plantings_belt_from_ag(
     ag_to_sheep_t_r *= (1 - settings.CP_BELT_PROPORTION)  
     
     # Water costs; Assume CP is dryland
-    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
+    w_rm_irrig_cost_r = (np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA).astype(np.float32)
     w_rm_irrig_cost_r[~cells] = 0.0
 
     fencing_cost_r = (
@@ -605,7 +796,7 @@ def get_sheep_carbon_plantings_belt_from_ag(
         return est_costs_CP_r + ag_to_cp_t_r + ag_to_sheep_t_r + w_rm_irrig_cost_r + fencing_cost_r
 
 
-def get_sheep_carbon_plantings_belt_from_ag_blended(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
+def get_sheep_carbon_plantings_belt_from_ag_blend(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
     """Blended Sheep CP Belt transition costs: normalised weighted-average T_MAT, whole-cell EST/FENCING."""
     yr_cal    = data.YR_CAL_BASE + yr_idx
     dvars     = data.ag_dvars[base_year]
@@ -655,17 +846,55 @@ def get_sheep_carbon_plantings_belt_from_ag_blended(data: Data, yr_idx, base_yea
         return est_costs_CP_r + ag_to_cp_t_r + ag_to_sheep_t_r + w_rm_irrig_cost_r + fencing_cost_r
 
 
+def get_sheep_carbon_plantings_belt_from_ag_exact(
+    data: Data, yr_idx: int, mj_cell_map: dict, separate=False
+) -> dict:
+    """Exact Sheep CP Belt transition costs per-(from_m, from_j) combo."""
+    yr_cal       = data.YR_CAL_BASE + yr_idx
+    t_cp_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep Carbon Plantings (Belt)').values
+    t_sheep_j    = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep - modified land').values
+    est_mults    = data.EST_COST_MULTS[yr_cal]
+    irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal]
+    fence_scalar = settings.CP_BELT_FENCING_LENGTH * settings.FENCING_COST_PER_M * data.FENCE_COST_MULTS[yr_cal]
+
+    result = {}
+    for (from_m, from_j), cell_idx in mj_cell_map.items():
+        est_costs     = (tools.amortise(data.CP_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]) * settings.CP_BELT_PROPORTION).astype(np.float32)
+        ag_to_cp_t    = (tools.amortise(np.nan_to_num(t_cp_j[from_j]) * data.REAL_AREA[cell_idx]) * settings.CP_BELT_PROPORTION).astype(np.float32)
+        ag_to_sheep_t = (tools.amortise(np.nan_to_num(t_sheep_j[from_j]) * data.REAL_AREA[cell_idx]) * (1 - settings.CP_BELT_PROPORTION)).astype(np.float32)
+        w_rm_irrig    = (
+            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
+        )
+        fencing_cost  = (fence_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+
+        if separate:
+            result[(from_m, from_j)] = {
+                'Establishment cost (Ag2Non-Ag)':     est_costs,
+                'Transition cost (Ag2Non-Ag)':        ag_to_cp_t,
+                'Transition cost (Ag2CP-Sheep)':      ag_to_sheep_t,
+                'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig,
+                'Fencing cost (Ag2Non-Ag)':           fencing_cost,
+            }
+        else:
+            result[(from_m, from_j)] = est_costs + ag_to_cp_t + ag_to_sheep_t + w_rm_irrig + fencing_cost
+    return result
+
+
 def get_sheep_carbon_plantings_belt_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
-    """Dispatcher: blended or crisp-lumap Sheep CP Belt transition costs."""
-    if settings.BLENDED_TRANSITION_COSTS:
-        return get_sheep_carbon_plantings_belt_from_ag_blended(data, yr_idx, base_year, separate)
+    """Dispatcher: exact, blended or crisp-lumap Sheep CP Belt transition costs."""
+    if settings.TRANSITION_MODE == 'exact':
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, base_year)
+        return get_sheep_carbon_plantings_belt_from_ag_exact(data, yr_idx, mj_cell_map, separate)
+    elif settings.TRANSITION_MODE != 'crisp':
+        return get_sheep_carbon_plantings_belt_from_ag_blend(data, yr_idx, base_year, separate)
     else:
-        return get_sheep_carbon_plantings_belt_from_ag(data, yr_idx, lumap, lmmap, separate)
+        return get_sheep_carbon_plantings_belt_from_ag_crisp(data, yr_idx, lumap, lmmap, separate)
 
 
-def get_beef_carbon_plantings_belt_from_ag(
+def get_beef_carbon_plantings_belt_from_ag_crisp(
     data: Data,  yr_idx, lumap, lmmap, separate=False
 ):
     """
@@ -703,7 +932,7 @@ def get_beef_carbon_plantings_belt_from_ag(
     ag_to_sheep_t_r *= (1 - settings.CP_BELT_PROPORTION)  
     
     # Water costs; Assume CP is dryland
-    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
+    w_rm_irrig_cost_r = (np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA).astype(np.float32)
     w_rm_irrig_cost_r[~cells] = 0.0
 
     fencing_cost_r = (
@@ -726,7 +955,7 @@ def get_beef_carbon_plantings_belt_from_ag(
         return est_costs_CP_r + ag_to_cp_t_r + ag_to_sheep_t_r + w_rm_irrig_cost_r + fencing_cost_r
 
 
-def get_beef_carbon_plantings_belt_from_ag_blended(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
+def get_beef_carbon_plantings_belt_from_ag_blend(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
     """Blended Beef CP Belt transition costs: normalised weighted-average T_MAT, whole-cell EST/FENCING."""
     yr_cal    = data.YR_CAL_BASE + yr_idx
     dvars     = data.ag_dvars[base_year]
@@ -776,14 +1005,52 @@ def get_beef_carbon_plantings_belt_from_ag_blended(data: Data, yr_idx, base_year
         return est_costs_CP_r + ag_to_cp_t_r + ag_to_beef_t_r + w_rm_irrig_cost_r + fencing_cost_r
 
 
+def get_beef_carbon_plantings_belt_from_ag_exact(
+    data: Data, yr_idx: int, mj_cell_map: dict, separate=False
+) -> dict:
+    """Exact Beef CP Belt transition costs per-(from_m, from_j) combo."""
+    yr_cal       = data.YR_CAL_BASE + yr_idx
+    t_cp_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef Carbon Plantings (Belt)').values
+    t_beef_j     = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef - modified land').values
+    est_mults    = data.EST_COST_MULTS[yr_cal]
+    irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal]
+    fence_scalar = settings.CP_BELT_FENCING_LENGTH * settings.FENCING_COST_PER_M * data.FENCE_COST_MULTS[yr_cal]
+
+    result = {}
+    for (from_m, from_j), cell_idx in mj_cell_map.items():
+        est_costs    = (tools.amortise(data.CP_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]) * settings.CP_BELT_PROPORTION).astype(np.float32)
+        ag_to_cp_t   = (tools.amortise(np.nan_to_num(t_cp_j[from_j]) * data.REAL_AREA[cell_idx]) * settings.CP_BELT_PROPORTION).astype(np.float32)
+        ag_to_beef_t = (tools.amortise(np.nan_to_num(t_beef_j[from_j]) * data.REAL_AREA[cell_idx]) * (1 - settings.CP_BELT_PROPORTION)).astype(np.float32)
+        w_rm_irrig   = (
+            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
+        )
+        fencing_cost = (fence_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+
+        if separate:
+            result[(from_m, from_j)] = {
+                'Establishment cost (Ag2Non-Ag)':     est_costs,
+                'Transition cost (Ag2Non-Ag)':        ag_to_cp_t,
+                'Transition cost (Ag2CP-Beef)':       ag_to_beef_t,
+                'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig,
+                'Fencing cost (Ag2Non-Ag)':           fencing_cost,
+            }
+        else:
+            result[(from_m, from_j)] = est_costs + ag_to_cp_t + ag_to_beef_t + w_rm_irrig + fencing_cost
+    return result
+
+
 def get_beef_carbon_plantings_belt_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
-    """Dispatcher: blended or crisp-lumap Beef CP Belt transition costs."""
-    if settings.BLENDED_TRANSITION_COSTS:
-        return get_beef_carbon_plantings_belt_from_ag_blended(data, yr_idx, base_year, separate)
+    """Dispatcher: exact, blended or crisp-lumap Beef CP Belt transition costs."""
+    if settings.TRANSITION_MODE == 'exact':
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, base_year)
+        return get_beef_carbon_plantings_belt_from_ag_exact(data, yr_idx, mj_cell_map, separate)
+    elif settings.TRANSITION_MODE != 'crisp':
+        return get_beef_carbon_plantings_belt_from_ag_blend(data, yr_idx, base_year, separate)
     else:
-        return get_beef_carbon_plantings_belt_from_ag(data, yr_idx, lumap, lmmap, separate)
+        return get_beef_carbon_plantings_belt_from_ag_crisp(data, yr_idx, lumap, lmmap, separate)
 
 
 def get_beccs_from_ag(data, yr_idx, base_year, lumap, lmmap, separate=False) -> np.ndarray|dict:
@@ -799,7 +1066,7 @@ def get_beccs_from_ag(data, yr_idx, base_year, lumap, lmmap, separate=False) -> 
     return get_env_plant_transitions_from_ag_from_base_year(data, yr_idx, base_year, lumap, lmmap, separate)
 
 
-def get_destocked_from_ag(
+def get_destocked_from_ag_crisp(
     data: Data, yr_idx, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
     """
@@ -841,7 +1108,7 @@ def get_destocked_from_ag(
     est_costs_r = removal_cost_r + trans_cost_r
         
     # Water costs; Assume destocked land is dryland
-    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
+    w_rm_irrig_cost_r = (np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA).astype(np.float32)
     w_rm_irrig_cost_r[~cells] = 0.0
     
     if separate:
@@ -853,7 +1120,7 @@ def get_destocked_from_ag(
         return est_costs_r + w_rm_irrig_cost_r
 
 
-def get_destocked_from_ag_blended(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
+def get_destocked_from_ag_blend(data: Data, yr_idx, base_year, separate=False) -> np.ndarray | dict:
     """Blended Destocked transition costs: normalised weighted-average T_MAT and HCAS removal, whole-cell rates."""
     yr_cal    = data.YR_CAL_BASE + yr_idx
     dvars     = data.ag_dvars[base_year]
@@ -897,14 +1164,50 @@ def get_destocked_from_ag_blended(data: Data, yr_idx, base_year, separate=False)
         return est_costs_r + w_rm_irrig_cost_r
 
 
+def get_destocked_from_ag_exact(
+    data: Data, yr_idx: int, mj_cell_map: dict, separate=False
+) -> dict:
+    """Exact Destocked transition costs per-(from_m, from_j) combo."""
+    yr_cal       = data.YR_CAL_BASE + yr_idx
+    t_j_raw      = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Destocked - natural land').values
+    irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal]
+    HCAS_benefit_mult = {lu: 1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu] for lu in data.LU_LVSTK_NATURAL}
+
+    result = {}
+    for (from_m, from_j), cell_idx in mj_cell_map.items():
+        is_eligible  = not np.isnan(t_j_raw[from_j])   # NaN means non-lvstk-natural, zero cost
+        hcas_mult    = HCAS_benefit_mult.get(from_j, 0.0)  # LU_LVSTK_NATURAL contains int codes
+
+        t_cost       = tools.amortise(np.nan_to_num(t_j_raw[from_j]) * data.REAL_AREA[cell_idx]).astype(np.float32)
+        removal_cost = tools.amortise(hcas_mult * data.EP_EST_COST_HA[cell_idx] * data.REAL_AREA[cell_idx]).astype(np.float32)
+        est_costs    = t_cost + removal_cost
+
+        w_rm_irrig   = (
+            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            if (from_m == 1 and is_eligible) else np.zeros(len(cell_idx), dtype=np.float32)
+        )
+
+        if separate:
+            result[(from_m, from_j)] = {
+                'Establishment cost (Ag2Non-Ag)':     est_costs,
+                'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig,
+            }
+        else:
+            result[(from_m, from_j)] = est_costs + w_rm_irrig
+    return result
+
+
 def get_destocked_from_ag_from_base_year(
     data: Data, yr_idx, base_year, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
-    """Dispatcher: blended or crisp-lumap Destocked transition costs."""
-    if settings.BLENDED_TRANSITION_COSTS:
-        return get_destocked_from_ag_blended(data, yr_idx, base_year, separate)
+    """Dispatcher: exact, blended or crisp-lumap Destocked transition costs."""
+    if settings.TRANSITION_MODE == 'exact':
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, base_year)
+        return get_destocked_from_ag_exact(data, yr_idx, mj_cell_map, separate)
+    elif settings.TRANSITION_MODE != 'crisp':
+        return get_destocked_from_ag_blend(data, yr_idx, base_year, separate)
     else:
-        return get_destocked_from_ag(data, yr_idx, lumap, lmmap, separate)
+        return get_destocked_from_ag_crisp(data, yr_idx, lumap, lmmap, separate)
 
 
 def get_transition_matrix_ag2nonag(
@@ -1587,7 +1890,7 @@ def get_non_ag_ub_matrices(data: Data, lumap, base_dvar_nonag_rk, base_dvar_ag_m
        Without this override, a T_MAT block in year Y would give dvar = 0, which
        propagates lb = 0 in year Y+1 and silently breaks irreversibility.
 
-    4. Blended Destocked cap (base_dvar_ag_mrj supplied + BLENDED_TRANSITION_COSTS) —
+    4. Blended Destocked cap (base_dvar_ag_mrj supplied + TRANSITION_MODE != 'crisp') —
        the Destocked column is capped at (livestock-natural ag fraction + existing destocked
        fraction).  Existing destocked area can always remain destocked regardless of
        reversibility; reversibility only governs the lower bound (0 vs existing_dvar).
@@ -1630,7 +1933,7 @@ def get_non_ag_ub_matrices(data: Data, lumap, base_dvar_nonag_rk, base_dvar_ag_m
     # 4. Blended Destocked cap: UB ≤ livestock-natural fraction + already-destocked fraction.
     #    Values below FEASIBILITY_TOLERANCE are rounding noise from prior solves and are
     #    zeroed to avoid creating near-degenerate destock variables.
-    if settings.BLENDED_TRANSITION_COSTS:
+    if settings.TRANSITION_MODE != 'crisp':
         destock_k = data.NON_AGRICULTURAL_LANDUSES.index('Destocked - natural land')
         eligible_frac_r = (
             base_dvar_ag_mrj[:, :, data.LU_LVSTK_NATURAL].sum(axis=(0, 2))

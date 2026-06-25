@@ -255,7 +255,7 @@ def get_non_ag_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap >= settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
 
 
-def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
+def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx) -> np.ndarray:
     """
     Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
@@ -286,7 +286,8 @@ def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
         * data.IRRIG_COST_MULTS[yr_cal]
         * data.REAL_AREA[:, np.newaxis]  # <unit:$/cell>
     )
-    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + new_irrig, w_delta_mrj[1])
+    dryland_r = l_mrj[0].any(axis=1, keepdims=True)   # (NCELLS, 1) — cell was dryland
+    w_delta_mrj[1] = np.where(dryland_r, w_delta_mrj[1] + new_irrig, w_delta_mrj[1])
 
     # When land-use changes from irrigated to dryland add <settings.REMOVE_IRRIG_COST> per hectare for removing irrigation infrastructure
     remove_irrig = (
@@ -294,12 +295,13 @@ def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
         * data.IRRIG_COST_MULTS[yr_cal]
         * data.REAL_AREA[:, np.newaxis]  # <unit:$/cell>
     )
-    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + remove_irrig, w_delta_mrj[0])
+    irrigated_r = l_mrj[1].any(axis=1, keepdims=True)  # (NCELLS, 1) — cell was irrigated
+    w_delta_mrj[0] = np.where(irrigated_r, w_delta_mrj[0] + remove_irrig, w_delta_mrj[0])
     
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
     
-    return w_delta_mrj  # <unit:$/cell>
+    return w_delta_mrj.astype(np.float32)  # <unit:$/cell>
 
 def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.ndarray, np.ndarray]:
     """
