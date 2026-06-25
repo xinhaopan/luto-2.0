@@ -5,6 +5,137 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260625 — ag→nonag exact transition costs: all 8 non-ag LU types refactored and validated
+
+### TL;DR
+
+Extended `TRANSITION_MODE = 'exact'` to all ag→non-ag transition cost functions in
+`luto/economics/non_agricultural/transitions.py`.  Each of the 8 non-ag LU types
+(EP, RP, Sheep AF, Beef AF, CP Block, Sheep CP Belt, Beef CP Belt, Destocked) now has a
+`_exact` variant returning `dict[(from_m, from_j)] → ndarray(len(cell_idx),)` and its
+`_from_base_year` dispatcher routes to it when `TRANSITION_MODE == 'exact'`.  BECCS
+delegates to the EP dispatcher and inherits exact mode automatically.
+
+All exact functions validated at **100% match** vs crisp across all 49 `(from_m, from_j)`
+combos per LU type (`step_3_compare_ag2nonag_exact_crisp_trans_cost.py`).
+
+A bug in `get_destocked_from_ag_exact` was found and fixed: the HCAS benefit lookup used
+the LU description string as key, but `BIO_HABITAT_CONTRIBUTION_LOOK_UP` is keyed by
+integer LU codes — causing zero HCAS removal cost for all lvstk-natural combos.
+
+---
+
+### Function naming pattern
+
+Each non-ag LU type now has three variants plus a dispatcher:
+
+```
+get_{lu}_transitions_from_ag_crisp(data, yr_idx, lumap, lmmap, separate)   # lumap-based
+get_{lu}_transitions_from_ag_blend(data, yr_idx, base_year, separate)       # dvar-weighted avg
+get_{lu}_transitions_from_ag_exact(data, yr_idx, mj_cell_map, separate)     # per-combo cell arrays
+get_{lu}_transitions_from_ag_from_base_year(...)                             # dispatcher
+```
+
+`_blended` → `_blend` suffix normalised at the same time; `_crisp` suffix added to
+previously-unnamed lumap variants to make the three modes explicit.
+
+---
+
+### Return type of exact functions (ag→nonag)
+
+```python
+# separate=False:
+result: dict[(from_m, from_j)] → ndarray(len(cell_idx),)   # 1-D, $/cell/yr
+
+# separate=True:
+result: dict[(from_m, from_j)] → dict[component_name → ndarray(len(cell_idx),)]
+```
+
+This differs from ag→ag exact (`(NLMS, len(cell_idx), N_AG_LUS)` per combo) — for
+ag→nonag the target LU is fixed per function so there is no `to_j` dimension.
+
+---
+
+### Cost components per non-ag LU type
+
+| Non-ag LU | Cost components |
+|-----------|----------------|
+| Environmental Plantings | est (EP_EST_COST_HA[cell]), t_cost (T_MAT), w_rm_irrig |
+| Riparian Plantings | est (RP_EST_COST_HA[cell]), t_cost, w_rm_irrig, fencing (RP_FENCING_LENGTH[cell]) |
+| Sheep Agroforestry | est×AF_PROP, t_af×AF_PROP, t_sheep×(1−AF_PROP), w_rm_irrig, fencing (scalar) |
+| Beef Agroforestry | same as Sheep AF with 'Beef - modified land' |
+| CP Block | est (CP_EST_COST_HA[cell]), t_cost, w_rm_irrig |
+| Sheep CP Belt | est×CP_BELT_PROP, t_cp×CP_BELT_PROP, t_sheep×(1−CP_BELT_PROP), w_rm_irrig, fencing (scalar) |
+| Beef CP Belt | same as Sheep CP Belt with 'Beef - modified land' |
+| Destocked | t_cost + HCAS_removal (both amortised), w_rm_irrig (gated on is_eligible) |
+| BECCS | delegates to EP |
+
+`est` and `t_cost` are amortised via `tools.amortise()`.  Fencing and `w_rm_irrig` are not
+amortised.  All arrays are cast to `float32`.
+
+---
+
+### Key design decisions
+
+- **Shared cell map**: all exact functions receive `mj_cell_map` from
+  `ag_transitions.get_base_dvar_mj_cell_map(data, base_year)` — the same `@lru_cache`
+  helper used by ag→ag exact.  Each dispatcher calls it once and passes the result in.
+- **Per-cell arrays indexed inside the loop**: `EP_EST_COST_HA`, `RP_EST_COST_HA`,
+  `AF_EST_COST_HA`, `CP_EST_COST_HA`, `REAL_AREA`, and `RP_FENCING_LENGTH` are per-cell
+  arrays indexed as `data.XXX[cell_idx]` inside the combo loop.
+- **No TRANS_COST_MULTS on T_MAT**: ag→nonag T_MAT lookups do not apply
+  `data.TRANS_COST_MULTS`, matching existing crisp/blend behaviour.
+- **Destocked eligibility gate**: `is_eligible = not np.isnan(t_j_raw[from_j])`.
+  T_MAT is NaN for non-lvstk-natural LUs; water removal cost is zeroed for ineligible
+  `from_j` regardless of `from_m`.
+
+---
+
+### Bug fixed: `get_destocked_from_ag_exact` HCAS integer-key lookup
+
+`data.LU_LVSTK_NATURAL = [2, 6, 15]` (integer codes) and
+`data.BIO_HABITAT_CONTRIBUTION_LOOK_UP` is keyed by integer codes.  The initial
+implementation looked up HCAS by LU description string:
+
+```python
+from_j_name = data.AGRICULTURAL_LANDUSES[from_j]
+hcas_mult = HCAS_benefit_mult.get(from_j_name, 0.0)  # always 0.0 — string key not found
+```
+
+Fix: use the integer code directly.
+
+```python
+hcas_mult = HCAS_benefit_mult.get(from_j, 0.0)
+```
+
+Note: `get_destocked_from_ag_blend` has the same latent bug (`HCAS_benefit_mult.get(j_name, 0.0)`
+where keys are integers) — HCAS removal cost is silently zero in blend mode.  Not fixed here
+as it is pre-existing blend behaviour outside the scope of this refactor.
+
+---
+
+### Validation
+
+Script: `jinzhu_inspect_code/Refactor_exact_trans_cost/step_3_compare_ag2nonag_exact_crisp_trans_cost.py`
+
+Strategy per combo: build synthetic all-`from_j` lumap / all-`from_m` lmmap, call
+`crisp(separate=True)`, slice at `cell_idx`, compare component-by-component vs exact.
+
+Result: **100% match (max_diff = 0.0000)** across all 8 LU types and all 49 combos.
+
+---
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `luto/economics/non_agricultural/transitions.py` | Added `_crisp`/`_blend` suffixes; added 8 exact functions; updated all 8 dispatchers; fixed `w_rm_irrig` float32 cast; fixed destocked HCAS int-key lookup |
+| `luto/tools/__init__.py` | `get_ag_to_ag_water_delta_matrix` returns `.astype(np.float32)` for consistency |
+
+Full design detail: `jinzhu_inspect_code/Refactor_exact_trans_cost/FINDINGS.md`.
+
+---
+
 ## 20260623 — blend non-ag UB: three runtime bugs fixed (ordering, RF5 edge cells, INFEASIBLE)
 
 ### TL;DR
