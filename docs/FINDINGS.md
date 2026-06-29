@@ -5,6 +5,94 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260629 — nonag→ag: crisp refactoring correctness audit (step_12)
+
+### TL;DR
+
+`step_12_compare_crisp_vs_old_nonag2ag.py` compares the current crisp nonag→ag
+implementation against the old implementation (commit `a684ec3f`) inlined directly.
+**All 8 tests pass.** The new implementation is more correct on all axes; costs are
+directionally higher but not order-of-magnitude different from the old version.
+
+---
+
+### Test results
+
+| Test | What it checks | Result |
+|------|---------------|--------|
+| 1  | EP lm=1 diff at nonag cells == amortised `NEW_IRRIG_COST` | PASS |
+| 1b | EP lm=0 nonag diff negligible (<1 AUD) | PASS |
+| 2  | NEW sheep AF livestock component zero at non-sheep-AF nonag cells | PASS |
+| 2b | OLD sheep AF livestock component non-zero at non-sheep-AF cells (confirms old bug) | PASS |
+| 3a | OLD beef AF livestock component zero outside beef-AF cells | PASS |
+| 3b | NEW beef AF livestock component zero outside beef-AF cells | PASS |
+| 4  | Destocked NEW == OLD (regression; max_diff = 0.0) | PASS |
+| 5  | Both OLD and NEW produce non-zero aggregate | PASS |
+
+---
+
+### Key structural differences (old crisp → new crisp)
+
+**(A) EP/RP/CP-Block/BECCS → Ag: missing irrigation cost**
+
+OLD `get_env_plantings_to_ag` computed water delta via `get_ag_to_ag_water_delta_matrix`
+but did **not** add `NEW_IRRIG_COST` for irrigated targets at nonag cells.  NEW
+`get_env_plantings_to_ag_crisp` explicitly adds:
+
+```python
+amortise(settings.NEW_IRRIG_COST * data.IRRIG_COST_MULTS[target_year] * data.REAL_AREA)
+```
+
+to lm=1 at nonag cells.  Effect: lm=1 transition costs are ~10.6% higher in NEW.
+
+**(B) Sheep AF / CP-Belt → Ag: cell scope bug**
+
+OLD `get_sheep_to_ag_base` applied sheep livestock costs to **all** nonag cells — it never
+restricted to cells identified as sheep-AF in the lumap.  NEW uses `cell_mask` from
+`tools.get_sheep_agroforestry_cells(lumap)` to zero the livestock component everywhere
+else.  OLD had 391,967 cells with spurious livestock cost; NEW has zero.
+
+**(C) Sheep → Ag: establishment cost silently dropped**
+
+OLD used `np.einsum('rj,r->rj', e_rj, (all_sheep_lumap == 0))` where `all_sheep_lumap`
+is always `sheep_j ≠ 0`, so the mask was always False and `e_rj_dry = 0`.  Sheep
+establishment costs were silently zero everywhere.  NEW delegates to
+`get_transition_matrices_ag2ag_crisp` which includes establishment correctly.
+
+**(D) Beef AF → Ag: already correct**
+
+OLD `get_beef_to_ag_base` already restricted beef livestock costs to beef-AF cells and
+used `np.stack([e_rj, e_rj])` (no dry/irr split bug).  NEW agrees at beef-AF cells;
+regression confirmed by Test 3a/3b.
+
+**(E) Destocked → Ag: identical**
+
+Both call `get_transition_matrices_ag2ag_crisp` with an all-unallocated lumap.  max_diff = 0.0.
+
+---
+
+### Per-LU cost comparison (RESFACTOR=5, BASE_YEAR=2045, TARGET_YEAR=2050)
+
+| LU | OLD sum (AUD) | NEW sum (AUD) | rel diff |
+|----|--------------|--------------|---------|
+| EP / RP / CP-Block / BECCS | 39.8 T | 45.4 T | +10.6% |
+| Sheep Agroforestry | 13.3 T | 15.1 T | +42.6% |
+| Beef Agroforestry | 13.3 T | 15.1 T | +53.9% |
+| Sheep CP Belt | 13.3 T | 15.1 T | +42.6% |
+| Beef CP Belt | 13.3 T | 15.1 T | +58.7% |
+| Destocked | 754 B | 754 B | 0.0% |
+
+EP-family uplift is entirely from the missing irrigation cost.  AF/CP-Belt uplift is
+primarily the establishment cost fix (C); cell-scope fix (B) also contributes.
+
+---
+
+### Validation script
+
+`jinzhu_inspect_code/Refactor_exact_trans_cost/step_12_compare_crisp_vs_old_nonag2ag.py`
+
+---
+
 ## 20260629 — ag→nonag: `get_transition_matrix_ag2nonag` validation and profiling (step_10)
 
 ### TL;DR
