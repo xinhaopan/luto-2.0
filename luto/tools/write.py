@@ -1076,7 +1076,7 @@ def write_economics(data: Data, yr_cal, path):
         ag2ag_mrj   = ag_transitions.get_transition_matrices_ag2ag_from_base_year(
             data, yr_idx, yr_cal_sim_pre, separate=True)
         nonag2ag_mrj = non_ag_transitions.get_transition_matrix_nonag2ag(
-            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True, base_year=yr_cal_sim_pre)
+            data, yr_cal_sim_pre, data.YR_CAL_BASE + yr_idx, separate=True)
     else:
         ag2ag_mrj    = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)}
         nonag2ag_mrj = {}
@@ -1411,15 +1411,14 @@ def write_economics(data: Data, yr_cal, path):
 
     non_ag_rev_mat  = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_rev_mrj, data.lumaps[yr_cal]))
     non_ag_cost_mat = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, data.lumaps[yr_cal], yr_cal))
-    nonag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_non_ag_to_non_ag_transition_matrix(data)) / gap
+    nonag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_nonag2nonag_transition_matrix(data)) / gap
 
     if yr_cal_sim_pre is None:
         ag2nonag_mat = xr.DataArray(np.zeros((data.NCELLS, len(data.NON_AGRICULTURAL_LANDUSES)), dtype=np.float32),
             dims=['cell', 'lu'], coords={'cell': range(data.NCELLS), 'lu': data.NON_AGRICULTURAL_LANDUSES})
     else:
         ag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_transition_matrix_ag2nonag(
-            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre],
-            base_year=yr_cal_sim_pre,
+            data, yr_cal_sim_pre, yr_cal,
             ).astype(np.float32)) / gap
 
     non_ag_profit_mat = non_ag_rev_mat - (non_ag_cost_mat + nonag2nonag_mat + ag2nonag_mat)
@@ -2119,9 +2118,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         }
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
-            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre],
-            base_year=yr_cal_sim_pre,
-            separate=True,
+            data, yr_cal_sim_pre, yr_cal, separate=True,
         )
 
     non_ag_transitions_flat = {}
@@ -2351,11 +2348,9 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_nonag2ag(
             data,
-            yr_idx,
-            data.lumaps[yr_cal_sim_pre],
-            data.lmmaps[yr_cal_sim_pre],
+            yr_cal_sim_pre,
+            data.YR_CAL_BASE + yr_idx,
             separate=True,
-            base_year=yr_cal_sim_pre,
         )
 
 

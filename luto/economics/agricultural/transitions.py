@@ -36,6 +36,23 @@ from luto.data import Data
 from luto.economics.agricultural.water import get_wreq_matrices
 
 
+
+@lru_cache(maxsize=1) # this function will be called multiple times with the same arguments, so cache the result to avoid recomputation
+def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
+    """Return {(from_m, from_j): cell_idx} for every combo with at least one valid cell.
+
+    Cached (maxsize=1): the solver and the transition cost function both call this for the
+    same (data, base_year) pair within one solve step, so the second call is free.
+    """
+    threshold = 10 ** (-settings.ROUND_DECIMALS)
+    base_dvar_mrj = data.ag_dvars[base_year]
+    return {
+        (m, j): np.where(base_dvar_mrj[m, :, j] > threshold)[0]
+        for m in range(data.NLMS)
+        for j in range(data.N_AG_LUS)
+        if (base_dvar_mrj[m, :, j] > threshold).any()
+    }
+
 def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
     """Return x_mrj exclude matrices.
 
@@ -83,6 +100,8 @@ def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
 
     return (x_mrj * t_rj * no_go_x_mrj).astype(np.int8)
 
+# Even been used multiple times for getting sheep/beef agroforestry, this function is not cacheable
+# because using np.array as input (np.array is not hashable, and hashable is required for caching).
 def get_transition_matrices_ag2ag_crisp(data: Data, yr_idx: int, base_lumap: np.ndarray, base_lmmap: np.ndarray, separate=False, w_mrj=None, t_ij=None):
     """
     Calculate the transition matrices for land-use and land management transitions.
@@ -249,23 +268,6 @@ def get_transition_matrices_ag2ag_blend(data: Data, yr_idx: int, base_year: int,
         ag_t_mrj /= eligible_rj_safe[None, :, :]
 
     return ag_t_mrj
-
-
-@lru_cache(maxsize=1) # this function will be called multiple times with the same arguments, so cache the result to avoid recomputation
-def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
-    """Return {(from_m, from_j): cell_idx} for every combo with at least one valid cell.
-
-    Cached (maxsize=1): the solver and the transition cost function both call this for the
-    same (data, base_year) pair within one solve step, so the second call is free.
-    """
-    threshold = 10 ** (-settings.ROUND_DECIMALS)
-    base_dvar_mrj = data.ag_dvars[base_year]
-    return {
-        (m, j): np.where(base_dvar_mrj[m, :, j] > threshold)[0]
-        for m in range(data.NLMS)
-        for j in range(data.N_AG_LUS)
-        if (base_dvar_mrj[m, :, j] > threshold).any()
-    }
 
 
 def get_transition_matrices_ag2ag_exact(data: Data, base_year: int, target_year: int, mj_cell_map: dict, separate=False):

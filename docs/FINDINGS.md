@@ -5,6 +5,270 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260629 — ag→nonag: `get_transition_matrix_ag2nonag` validation and profiling (step_10)
+
+### TL;DR
+
+`step_10_validate_ag2nonag.py` validates all three transition modes of the top-level
+`get_transition_matrix_ag2nonag` function.  **All 13 tests pass**, with max_diff=0.0 for
+every exact-vs-crisp cell comparison.  Profiling shows that the ag→nonag direction is
+already cheap in crisp mode (0.7s / +12 MB) — the dominant cost is blend (2.3s / +121 MB)
+and exact per-LU calls are essentially free (~0 MB each).
+
+---
+
+### Validation results
+
+| Test | What it checks | Result |
+|------|---------------|--------|
+| 1 | `crisp separate=True` sums to `separate=False` per LU column | PASS |
+| 2 | Crisp costs zero at all nonag cells | PASS |
+| 3 | BECCS column == EP column in crisp_mat (BECCS is EP passthrough) | PASS |
+| 4 | `blend separate=True` sums to `separate=False` | PASS |
+| 5 | Blend vs crisp totals (informational) | PASS — blend_sum/crisp_sum = 1.017; expected difference |
+| 6 | EP exact cells == crisp | PASS — max_diff=0.0, 49 combos, 141,494 cells |
+| 7 | RP exact cells == crisp | PASS — max_diff=0.0 |
+| 8 | Sheep AF exact cells == crisp | PASS — max_diff=0.0 |
+| 9 | Beef AF exact cells == crisp | PASS — max_diff=0.0 |
+| 10 | CP Block exact cells == crisp | PASS — max_diff=0.0 |
+| 11 | Sheep CPB exact cells == crisp | PASS — max_diff=0.0 |
+| 12 | Beef CPB exact cells == crisp | PASS — max_diff=0.0 |
+| 13 | Destocked exact cells == crisp | PASS — max_diff=0.0 |
+
+No float32 rounding differences at all — the ag→nonag exact functions are cleaner than
+nonag→ag because the return shape is 1D `(n_cells,)` per `(m,j)` combo (no 3D
+scatter-fill), so no ULP accumulation.
+
+---
+
+### Return type summary
+
+| Mode | `separate=False` | `separate=True` |
+|------|-----------------|-----------------|
+| crisp / blend | `ndarray(NCELLS, N_NON_AG_LUS)` | `{lu_name: {component: ndarray(NCELLS,)}}` |
+| exact (top-level) | **FAILS** — `np.array` on list of dicts | `{lu_name: {(m,j): ndarray(n_cells,)}}` |
+| exact (sub-function) | `{(m,j): ndarray(n_cells,)}` | `{(m,j): {component: ndarray(n_cells,)}}` |
+
+`mj_cell_map` (`get_base_dvar_mj_cell_map`) is keyed by `(from_m, from_j)` tuples and is
+LRU-cached — 49 active combos at 2045, covering 141,494 dvar-active cells.
+
+---
+
+### Profiling (BASE_YEAR=2045, TARGET_YEAR=2050, RESFACTOR=5, NCELLS=186,648)
+
+| Call | Time | Peak RAM delta |
+|------|------|----------------|
+| `crisp separate=False` | 0.7s | **+12 MB** |
+| `crisp separate=True`  | 0.7s | **+21 MB** |
+| `blend separate=False` | 2.3s | **+121 MB** |
+| `blend separate=True`  | 2.2s | **+125 MB** |
+| `mj_cell_map` build    | 0.2s | ~0 MB (LRU-cached after first call) |
+| Any exact sub-function | ~0.2s | **~0 MB** |
+| Any crisp sub-function (comparison call) | ~0.2s | +3 MB |
+
+---
+
+### Key observations
+
+1. **Ag→nonag crisp is already cheap**: 0.7s / +12 MB for all 9 LUs — far cheaper than
+   nonag→ag crisp (8.7s / +841 MB).  The result is a 2D `(NCELLS, N_NON_AG_LUS)` float32
+   array (~6 MB) vs the nonag→ag 3D `(NLMS, NCELLS, N_AG_LUS)`.
+
+2. **Exact allocates ~0 MB per LU**: each sub-function returns a dict of tiny per-combo
+   arrays (141,494 cells × 49 combos) with no full-NCELLS intermediates.  The `(m,j)` loop
+   avoids any broadcasting over NCELLS.
+
+3. **Blend is the bottleneck at 2.3s / +121 MB**: the T_MAT weighted average loops over
+   28 ag LUs and accumulates into a full-NCELLS array.  This is 3× slower than crisp and
+   6× more RAM.
+
+4. **BECCS is a pure EP passthrough**: `get_beccs_from_ag` delegates directly to
+   `get_env_plant_transitions_from_ag_from_base_year` — identical result in all modes.
+   Confirmed by column-equality test (Test 3).
+
+5. **No conflict cells**: the 49 active (m,j) combos at 2045 have no overlapping cells
+   (each cell has at most one dominant `(m,j)` in the base dvars), so exact-vs-crisp
+   comparison is clean for all 141,494 dvar-active cells.
+
+---
+
+### Validation script
+
+`jinzhu_inspect_code/Refactor_exact_trans_cost/step_10_validate_ag2nonag.py`
+
+---
+
+## 20260629 — nonag→ag: `get_transition_matrix_nonag2ag` validation and profiling (step_9)
+
+### TL;DR
+
+`step_9_validate_nonag2ag.py` validates all three transition modes of the top-level
+`get_transition_matrix_nonag2ag` function.  **All 10 tests pass.**  Profiling reveals that
+exact mode reduces EP-family peak RAM by ~94% (48 MB vs 840 MB) with a 22× speedup (0.4s
+vs 8.7s) relative to the full crisp call.
+
+---
+
+### Validation results
+
+| Test | What it checks | Result |
+|------|---------------|--------|
+| 1 | `crisp separate=True` sums to `separate=False` | PASS |
+| 2 | Crisp costs are zero at all ag cells | PASS |
+| 3 | `blend separate=True` sums to `separate=False` | PASS |
+| 4 | Blend vs crisp totals (informational) | PASS — blend_sum/crisp_sum = 0.73; expected difference since crisp uses `lumaps[base_year]` while blend uses `non_ag_dvars[base_year]` |
+| 5 | EP-family exact cells == crisp at same cells | PASS — max_diff=0.0 for all 8 active k's |
+| 6 | Sheep AF exact cells == crisp | PASS — max_diff=0.0 |
+| 7 | Beef AF exact cells == crisp | PASS — max_diff=0.0 |
+| 8 | Sheep CPB exact cells == crisp | PASS — max_diff=4.0 (float32 ULP, within tol=556) |
+| 9 | Beef CPB exact cells == crisp | PASS — max_diff=4.0 (float32 ULP, within tol=898) |
+| 10 | Destocked exact cells == crisp | PASS — max_diff=0.0 |
+
+Test 4 is intentionally informational: blend identifies cells via fractional dvars while
+crisp uses integer lumap dominance, so a ~27% total difference is expected and correct.
+
+---
+
+### Profiling (BASE_YEAR=2045, TARGET_YEAR=2050, RESFACTOR=5, NCELLS=186,648)
+
+**Full top-level call (all 9 non-ag LUs, full NCELLS):**
+
+| Mode | Time | Peak RAM delta |
+|------|------|----------------|
+| `crisp separate=False` | 8.7s | +841 MB |
+| `crisp separate=True`  | 9.2s | +1,289 MB |
+| `blend separate=False` | 9.1s | +833 MB |
+| `blend separate=True`  | 10.0s | +1,290 MB |
+
+**Exact mode per individual LU (sparse active cells only):**
+
+| LU | exact time | exact RAM | crisp RAM | active cells |
+|----|-----------|-----------|-----------|--------------|
+| EP-family (5 LUs via `ep_to_ag`) | **0.4s** | **+48 MB** | ~841 MB (full call) | 3,919 |
+| Sheep Agroforestry | 1.7s | +322 MB | +372 MB | 1 |
+| Beef Agroforestry  | 1.7s | +334 MB | +380 MB | 5 |
+| Sheep CPB (Belt)   | 1.7s | +314 MB | +385 MB | 1 |
+| Beef CPB (Belt)    | 1.7s | +314 MB | +380 MB | 5 |
+| Destocked          | 1.4s | +595 MB | +595 MB | 4,167 |
+
+---
+
+### Key observations
+
+1. **EP-family exact is the dominant win**: 0.4s / +48 MB vs 8.7s / +841 MB for the
+   combined top-level call.  All five EP-type LUs share a single `ep_to_ag` object and
+   only allocate arrays for the 3,919 active cells, giving a 94% RAM reduction and 22×
+   speedup.
+
+2. **AF/CPB exact saves ~10% RAM vs crisp per LU** (e.g. 322 MB vs 372 MB for Sheep AF)
+   but wall-time is identical because the sub-function still builds full-NCELLS intermediate
+   arrays before scattering results.
+
+3. **Destocked exact = crisp in performance**: no sparse optimisation exists internally;
+   the function allocates full-NCELLS regardless.  The 4,167 active cells make destocked
+   the second-largest contributor by cell count after EP (3,919).
+
+4. **Blend≈crisp design difference**: blend/crisp totals differ by ~27% because they
+   identify cells differently.  This is correct — blend is intended for the solver's
+   fractional dvar world; crisp is the current lumap integer approximation.
+
+---
+
+### Validation script
+
+`jinzhu_inspect_code/Refactor_exact_trans_cost/step_9_validate_nonag2ag.py`
+
+---
+
+## 20260626 — nonag→ag: GHG exact mode, blend reformatting, `get_destocked_to_ag` refactor, `irrev_mask_r` guard
+
+### TL;DR
+
+Extended the nonag→ag exact transition cost work in
+`luto/economics/non_agricultural/transitions.py`:
+
+1. **GHG exact mode** added to `get_sheep_to_ag_base` and `get_beef_to_ag_base` — when
+   `TRANSITION_MODE == 'exact'`, calls the three exact GHG helpers and scatters into a
+   full `(NLMS, NCELLS, N_AG_LUS)` zero array.
+2. **Synthetic-lumap comment** propagated to `get_sheep_carbon_plantings_belt_to_ag_exact`
+   and `get_beef_carbon_plantings_belt_to_ag_exact`.
+3. **Blend functions reformatted** — `get_sheep/beef_agroforestry_to_ag_blend` and
+   `get_sheep/beef_carbon_plantings_belt_to_ag_blend` now use consistent five-section
+   comments (fetch fraction → normalise → synthetic lumap → fetch costs → scale).
+4. **`get_destocked_to_ag` refactored** into `_crisp`, `_blend`, `_exact` variants plus a
+   dispatcher, following the same pattern as all other nonag→ag functions.
+5. **`irrev_mask_r` zeroing restricted to crisp mode** — in blend/exact the solver
+   multiplies costs by a delta-increment Gurobi variable; the lb-lock on the non-ag dvar
+   already handles the irreversible fraction, so no additional zeroing is needed.
+
+All changes verified by `step_8_verify_destocked_and_ghg_exact.py` — **11/11 PASS**.
+
+---
+
+### GHG exact mode in `get_sheep_to_ag_base` / `get_beef_to_ag_base`
+
+When `TRANSITION_MODE == 'exact'`, instead of calling `get_ghg_transition_emissions` with
+a synthetic lumap, the functions now call the three exact GHG helpers directly:
+
+```python
+cell_idx  = np.where(data.ag_dvars[base_year][0, :, sheep_j] > threshold)[0]
+ghg_exact = (
+    ag_ghg.get_ghg_lvstk_natural_to_modified_exact(data, base_year, 0, sheep_j)
+    + ag_ghg.get_ghg_unall_natural_to_lvstk_natural_exact(data, base_year, 0, sheep_j)
+    + ag_ghg.get_ghg_unall_natural_to_modified_exact(data, base_year, 0, sheep_j)
+)
+ghg_t_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+ghg_t_mrj[:, cell_idx, :] = ghg_exact
+```
+
+Both functions gained a `base_year=None` keyword.  The eight exact-mode callers were
+updated to forward `base_year=base_year`.
+
+---
+
+### `get_destocked_to_ag` three variants + dispatcher
+
+| Variant | Cell identity | Returns |
+|---------|---------------|---------|
+| `_crisp(data, yr_idx, lumap, lmmap, separate)` | `tools.get_destocked_land_cells(lumap)` | `ndarray(NLMS, NCELLS, N_AG_LUS)` |
+| `_blend(data, yr_idx, base_year, separate)` | normalised `non_ag_dvars[base_year][:, destocked_k]` | `ndarray(NLMS, NCELLS, N_AG_LUS)` |
+| `_exact(data, yr_idx, base_year, separate)` | `where(non_ag_dvars[base_year][:, destocked_k] > threshold)` | `{destocked_k: ndarray(NLMS, n_cells, N_AG_LUS)}` |
+
+All three derive costs from an all-unallocated-natural lumap, then restrict to cells
+identified by the respective mode.
+
+---
+
+### `irrev_mask_r` guard
+
+Zeroing of irreversible nonag cells in `get_transition_matrix_nonag2ag` is now gated on
+`settings.TRANSITION_MODE == 'crisp'`.  In blend/exact the solver uses a delta-increment
+Gurobi variable whose LB is constrained by the irreversible non-ag dvar lb-lock —
+no extra zeroing needed.  In crisp the integerised lumap can assign a spurious cost to
+the free fraction of an irreversible cell, so zeroing remains correct there.
+
+---
+
+### Verification
+
+`jinzhu_inspect_code/Refactor_exact_trans_cost/step_8_verify_destocked_and_ghg_exact.py`
+— 11/11 PASS on `data_2050.lz4`.  Section A (tests 1–8): destocked crisp/blend/exact.
+Section B (tests 9–11): sheep/beef GHG exact — zero in both modes at 2050 because
+`sheep_j`/`beef_j` are not in `LU_LVSTK_NATURAL` at that checkpoint (correct behaviour).
+
+---
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `luto/economics/non_agricultural/transitions.py` | GHG exact mode in `get_sheep/beef_to_ag_base`; blend reformatting; `get_destocked_to_ag` three-variant refactor; `irrev_mask_r` crisp-only guard; synthetic-lumap comment in CP Belt exact functions |
+| `jinzhu_inspect_code/Refactor_exact_trans_cost/step_8_verify_destocked_and_ghg_exact.py` | New verification script (11 tests) |
+
+Full design detail: `jinzhu_inspect_code/Refactor_exact_trans_cost/FINDINGS.md`.
+
+---
+
 ## 20260625 — ag→nonag exact transition costs: all 8 non-ag LU types refactored and validated
 
 ### TL;DR
@@ -1185,7 +1449,7 @@ cost for reverting non-ag land to agriculture:
 
 1. `get_env_plantings_to_ag`: drop the second `REAL_AREA` multiplication on the
    water-license delta, mirroring the ag→ag path.
-2. `get_irreversible_non_ag_cell_mask` + `base_year` wiring through
+2. `get_crisp_irreversible_nonag_cell_mask` + `base_year` wiring through
    `get_transition_matrix_nonag2ag` (input_data.py) and cost reporting (write.py):
    **zero** the non-ag→ag transition cost on cells holding an irreversible non-ag LU, so
    Gurobi never sees the impossible transition.
