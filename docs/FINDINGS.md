@@ -5,6 +5,63 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260701 — pre-solver transition-cost validation (L0–L6): 4 bugs fixed, 1 reported
+
+### TL;DR
+
+Before wiring the flow-based solver (Phase 3), the transition-cost data layer was validated
+bottom-up in 7 layers (`jinzhu_inspect_code/Build_exact_trans_solver/validate_1..7_*.py`,
+plan in `validate.md`) across all three modes (crisp/blend/exact) on `data_2050.lz4`
+(RESFACTOR=5, base_year=2030, target_year=2035). **All layers green; all six solver-gate checks
+pass (1.3, 1.4, 2.2, 3.3, 4.4, 5.5).** Four production bugs were found and fixed (F1–F4); one
+exact-mode GHG-account bug (F5) is reported but out of transition-cost scope.
+
+### Bugs fixed
+
+**F1 — exact GHG cell-slice threshold mismatch** (`agricultural/ghg.py`, `agricultural/transitions.py`).
+`get_ghg_{lvstk_natural_to_modified, unall_natural_to_lvstk_natural, unall_natural_to_modified}_exact`
+sliced cells at `10**(-ROUND_DECIMALS)` = 1e-6 while `get_base_dvar_mj_cell_map` used
+`EXACT_REACHABILITY_MIN_FRACTION` = 0.01. Any exact source with a dvar sliver in (1e-6, 0.01]
+produced a shape mismatch → crash in `get_transition_matrices_ag2ag_exact` (e.g. (0,1) Beef-modified:
+20931 vs 20935). **Fix:** all three use `EXACT_REACHABILITY_MIN_FRACTION`; the `threshold` param was
+removed from `get_base_dvar_mj_cell_map` so there is a single value.
+
+**F2 — Destocked→ag charged $0 + uncharged carbon** (`non_agricultural/transitions.py`). Destocked→ag
+was modelled as ag2ag-from-Unallocated-natural. But `T_MAT[Destocked→Unalloc-modified]=10390` (allowed)
+while `T_MAT[Unalloc-natural→Unalloc-modified]=NaN` (prohibited), so the proxy's transition-exclude
+zeroed the ENTIRE column (establishment + water + carbon) → `Destocked→Unalloc-modified` cost **$0** on
+3684–4111 cells despite 3378/3684 holding carbon stock (mean 3.0, max 74.8 tCO₂/ha/yr). Since Destocked
+is the only reversible non-ag source, this was a live free exit dodging both the $10390/ha transition
+and the carbon penalty. **Fix:** new shared `get_destocked_to_ag_base` uses Destocked's OWN
+`T_MAT[Destocked→to_j]` + water license + UNMASKED carbon release; crisp/blend/exact are thin wrappers.
+
+**F3 — Destocked exact threshold** (`non_agricultural/transitions.py`). `get_destocked_to_ag_exact`
+sliced at 1e-6 not θ (same class as F1); folded into the F2 rewrite (exact wrapper uses
+`EXACT_REACHABILITY_MIN_FRACTION`).
+
+**F4 — `get_ag_t_mrj` crash** (`solvers/input_data.py`). Called `.astype(np.float32)` on the now-dict
+flow-cost return → crashed `get_input_data` for *every* mode. **Fix:** removed the stale `.astype`
+(dict leaves are cast to float32 during the economy rescale).
+
+### Reported, not fixed
+
+**F5 — exact-mode GHG-account bug** (`solvers/input_data.py:get_ag_ghg_t_mrj`). Passes `ag_X_mrj` to
+`ag_ghg.get_ghg_transition_emissions`, which raises in exact mode → blocks the real `get_input_data`
+end-to-end in exact (independent of transition cost). Validation dodged it by calling the view-builders
+directly. **Must be fixed before exact mode can produce solver input** (exact GHG-account workstream).
+
+### Confirmed properties (not bugs)
+
+- `economy_scale = 292269`, mode-independent; post-rescale flow_cost band all < 1e3 (nonag2ag ≈968 closest).
+- Base-year dvar negatives are benign float32 barrier round-off (|·| ≤ 6e-8, all < θ).
+- ag→planting `T_MAT` is two-tier: 1500 (broadacre) / 3680 (horticulture); natural-land sources NaN.
+- Cross-mode: crisp collapse-back == flat base bit-for-bit; exact == crisp on shared cells; exact ≈ blend
+  at pure cells. blend ag2nonag ≡ crisp holds exactly only on dryland single-`(m,j)`-source ag-dominant
+  cells (diverges on irrigated / multi-source / tier-straddle / non-ag-dominant cells — all by construction).
+- `ag_source_cells`/`nonag_source_cells` are exact-only; crisp/blend anchor flow vars on the cost dict's cells.
+
+---
+
 ## 20260629 — nonag→ag: crisp refactoring correctness audit (step_12)
 
 ### TL;DR

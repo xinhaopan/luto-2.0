@@ -1696,7 +1696,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         base_lmmap = data.lmmaps[yr_cal_sim_pre]
         l_mrj = tools.lumap2ag_l_mrj(base_lumap, base_lmmap)
         l_mrj_not = np.logical_not(l_mrj)
-        x_mrj = ag_transitions.get_to_ag_exclude_matrices(data, base_lumap)
+        x_mrj = ag_transitions.get_to_ag_exclude_matrices_crisp(data, base_lumap)
 
     # Get the decision variables for agricultural land-use
     ag_dvar_mrj_target = tools.ag_mrj_to_xr(

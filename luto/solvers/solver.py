@@ -207,13 +207,13 @@ class LutoSolver:
             (self._input_data.n_ag_lus, self._input_data.ncells), dtype=object
         )
         for j in range(self._input_data.n_ag_lus):
-            dry_lu_cells = self._input_data.ag_lu2cells[0, j]
+            dry_lu_cells = self._input_data.feasible_ag_cells_mrj[0, j]
             for r in dry_lu_cells:
                 self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
                     ub=1, name=f"X_ag_dry_{j}_{r}".replace(" ", "_")
                 )
 
-            irr_lu_cells = self._input_data.ag_lu2cells[1, j]
+            irr_lu_cells = self._input_data.feasible_ag_cells_mrj[1, j]
             for r in irr_lu_cells:
                 self.X_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
                     ub=1, name=f"X_ag_irr_{j}_{r}".replace(" ", "_")
@@ -229,14 +229,14 @@ class LutoSolver:
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-            lu_cells = self._input_data.non_ag_lu2cells[k]
+            lu_cells = self._input_data.feasible_non_ag_cells[k]
             for r in lu_cells:
                 x_lb = (
                     0
                     if NON_AG_LAND_USES_REVERSIBLE[k_name]
-                    else self._input_data.non_ag_lb_rk[r, k]
+                    else self._input_data.dvar_lb_nonag[r, k]
                 )
-                x_ub = self._input_data.non_ag_ub_rk[r, k]
+                x_ub = self._input_data.dvar_ub_nonag[r, k]
                 # Collapse near-degenerate windows to fixed variables.  When lb ≈ ub
                 # (e.g. RP cells whose existing allocation fills almost all of RP_PROPORTION),
                 # the barrier's complementarity slack (ub - x) approaches zero at the optimum,
@@ -283,8 +283,8 @@ class LutoSolver:
                 )
                 renewable_cells = set()
                 for j_idx, j in enumerate(am_j_list):
-                    dry_lu_cells = self._input_data.ag_lu2cells[0, j]
-                    irr_lu_cells = self._input_data.ag_lu2cells[1, j]
+                    dry_lu_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                    irr_lu_cells = self._input_data.feasible_ag_cells_mrj[1, j]
                     # Hard-exclude GBF2 priority cells (no variable created → effective ub = 0)
                     if gbf2_excl_idx.size:
                         dry_lu_cells = np.setdiff1d(dry_lu_cells, gbf2_excl_idx)
@@ -330,8 +330,8 @@ class LutoSolver:
 
             # Generic loop: all other AM options use transition-based lower bounds.
             for j_idx, j in enumerate(am_j_list):
-                dry_lu_cells = self._input_data.ag_lu2cells[0, j]
-                irr_lu_cells = self._input_data.ag_lu2cells[1, j]
+                dry_lu_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_lu_cells = self._input_data.feasible_ag_cells_mrj[1, j]
 
                 # For savanna burning, remove extra ineligible cells
                 if am_name == "savanna_burning":
@@ -400,12 +400,12 @@ class LutoSolver:
         self.D_ag_irr_vars_jr = np.zeros((n_lus, ncells), dtype=object)
 
         for j in range(n_lus):
-            for r in self._input_data.ag_lu2cells[0, j]:
+            for r in self._input_data.feasible_ag_cells_mrj[0, j]:
                 if abs(t_mat[0, r, j]) >= settings.SOLVER_COEFF_MIN:
                     self.D_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
                         lb=0, ub=1, name=f"D_dry_{j}_{r}"
                     )
-            for r in self._input_data.ag_lu2cells[1, j]:
+            for r in self._input_data.feasible_ag_cells_mrj[1, j]:
                 if abs(t_mat[1, r, j]) >= settings.SOLVER_COEFF_MIN:
                     self.D_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
                         lb=0, ub=1, name=f"D_irr_{j}_{r}"
@@ -426,7 +426,7 @@ class LutoSolver:
         x_old = self._input_data.dvar_base_ag_mrj  # shape (NLMS, NCELLS, N_AG_LUS)
 
         for j in range(self._input_data.n_ag_lus):
-            for r in self._input_data.ag_lu2cells[0, j]:
+            for r in self._input_data.feasible_ag_cells_mrj[0, j]:
                 if not isinstance(self.D_ag_dry_vars_jr[j, r], gp.Var):
                     continue
                 self.gurobi_model.addConstr(
@@ -434,7 +434,7 @@ class LutoSolver:
                     name=f"delta_dry_{j}_{r}"
                 )
 
-            for r in self._input_data.ag_lu2cells[1, j]:
+            for r in self._input_data.feasible_ag_cells_mrj[1, j]:
                 if not isinstance(self.D_ag_irr_vars_jr[j, r], gp.Var):
                     continue
                 self.gurobi_model.addConstr(
@@ -459,7 +459,7 @@ class LutoSolver:
 
         self.D_nonag_vars_rk = np.zeros((ncells, n_k), dtype=object)
         for k in range(n_k):
-            non_ag_cells = self._input_data.non_ag_lu2cells[k]
+            non_ag_cells = self._input_data.feasible_non_ag_cells[k]
             for r in non_ag_cells:
                 if abs(t_rk[r, k]) >= settings.SOLVER_COEFF_MIN:
                     self.D_nonag_vars_rk[r, k] = self.gurobi_model.addVar(
@@ -479,7 +479,7 @@ class LutoSolver:
         x_old = self._input_data.dvar_base_non_ag_rk   # (NCELLS, N_NON_AG_LUS)
 
         for k in range(self._input_data.n_non_ag_lus):
-            for r in self._input_data.non_ag_lu2cells[k]:
+            for r in self._input_data.feasible_non_ag_cells[k]:
                 if not isinstance(self.D_nonag_vars_rk[r, k], gp.Var):
                     continue
                 self.gurobi_model.addConstr(
@@ -495,8 +495,8 @@ class LutoSolver:
 
         ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.ag_lu2cells[0, j]
-            irr_cells = self._input_data.ag_lu2cells[1, j]
+            dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+            irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
             ag_exprs.append(
                 _qsum(ag_obj_mrj[0, dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
                 + _qsum(ag_obj_mrj[1, irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
@@ -507,8 +507,8 @@ class LutoSolver:
             if not AG_MANAGEMENTS[am]:
                 continue
             for j_idx, j in enumerate(am_j_list):
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
+                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
                 ag_mam_exprs.append(
                     _qsum(ag_man_objs[am][0, dry_cells, j_idx], self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells])
                     + _qsum(ag_man_objs[am][1, irr_cells, j_idx], self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells])
@@ -518,7 +518,7 @@ class LutoSolver:
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-            non_ag_cells = self._input_data.non_ag_lu2cells[k]
+            non_ag_cells = self._input_data.feasible_non_ag_cells[k]
             non_ag_exprs.append(
                 _qsum(non_ag_obj_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
             )
@@ -533,8 +533,8 @@ class LutoSolver:
             t_sign = -1 if settings.OBJECTIVE == "maxprofit" else 1
             blend_t_exprs = []
             for j in range(self._input_data.n_ag_lus):
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
+                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
                 blend_t_exprs.append(
                     _qsum(t_sign * t_mat[0, dry_cells, j], self.D_ag_dry_vars_jr[j, dry_cells])
                     + _qsum(t_sign * t_mat[1, irr_cells, j], self.D_ag_irr_vars_jr[j, irr_cells])
@@ -545,7 +545,7 @@ class LutoSolver:
             t_rk = self._input_data.trans_ag2nonag_rk
             blend_nonag_t_exprs = []
             for k in range(self._input_data.n_non_ag_lus):
-                non_ag_cells = self._input_data.non_ag_lu2cells[k]
+                non_ag_cells = self._input_data.feasible_non_ag_cells[k]
                 blend_nonag_t_exprs.append(
                     _qsum(t_sign * t_rk[non_ag_cells, k], self.D_nonag_vars_rk[non_ag_cells, k])
                 )
@@ -640,7 +640,7 @@ class LutoSolver:
             (self._input_data.ag_x_mrj[0] > 0).any(axis=1) |
             (self._input_data.ag_x_mrj[1] > 0).any(axis=1)
         )
-        max_nonag_r = self._input_data.non_ag_ub_rk.sum(axis=1)
+        max_nonag_r = self._input_data.dvar_ub_nonag.sum(axis=1)
         max_alloc_r  = np.where(has_any_ag_r, 1.0, max_nonag_r)
         # Cells where max_alloc < ag_mask cannot satisfy the equality and must be skipped.
         # This covers: (a) cells with no variables at all (max=0), and (b) cells whose only
@@ -685,8 +685,8 @@ class LutoSolver:
                         r for r in cells if self._input_data.ag_x_mrj[1, r, j]
                     ]
                 else:
-                    lm_dry_r_vals = self._input_data.ag_lu2cells[0, j]
-                    lm_irr_r_vals = self._input_data.ag_lu2cells[1, j]
+                    lm_dry_r_vals = self._input_data.feasible_ag_cells_mrj[0, j]
+                    lm_irr_r_vals = self._input_data.feasible_ag_cells_mrj[1, j]
 
                 for r in lm_dry_r_vals:
                     constr = self.gurobi_model.addConstr(
@@ -713,8 +713,8 @@ class LutoSolver:
             for j_idx, j in enumerate(am_j_list):
                 adoption_limit = self._input_data.ag_man_limits[am][j]
 
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
+                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
 
                 # Sum of all usage of the AM option must be less than the limit
                 ag_man_vars_sum = (
@@ -745,8 +745,8 @@ class LutoSolver:
         # Shape per j: (ncms, len(dry_cells)) — built once, reused in quicksum.
         self.ag_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.ag_lu2cells[0, j]
-            irr_cells = self._input_data.ag_lu2cells[1, j]
+            dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+            irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
             X_ag_dry_r = self.X_ag_dry_vars_jr[j, dry_cells]
             X_ag_irr_r = self.X_ag_irr_vars_jr[j, irr_cells]
 
@@ -775,8 +775,8 @@ class LutoSolver:
                 continue
 
             for j_idx, j in enumerate(am_j_list):
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
+                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
                 X_ag_mam_dry_r = self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells]
                 X_ag_mam_irr_r = self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells]
 
@@ -799,7 +799,7 @@ class LutoSolver:
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-            non_ag_cells = self._input_data.non_ag_lu2cells[k]
+            non_ag_cells = self._input_data.feasible_non_ag_cells[k]
             for c in range(self._input_data.ncms):
                 self.non_ag_q_c[c] += _qsum(
                     self._input_data.non_ag_q_crk[c, non_ag_cells, k],
@@ -979,7 +979,7 @@ class LutoSolver:
                 am_exprs = []
                 for j_idx, j in enumerate(self._input_data.am2j[am]):
 
-                    j_cells         = np.union1d(self._input_data.ag_lu2cells[0, j], self._input_data.ag_lu2cells[1, j])
+                    j_cells         = np.union1d(self._input_data.feasible_ag_cells_mrj[0, j], self._input_data.feasible_ag_cells_mrj[1, j])
                     reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)                      # Get cells that are both in the region and in the agricultural land use
 
                     if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS == True:
@@ -1012,8 +1012,8 @@ class LutoSolver:
 
         ghg_ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.ag_lu2cells[0, j]
-            irr_cells = self._input_data.ag_lu2cells[1, j]
+            dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+            irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
             ghg_ag_exprs.append(
                 _qsum(g_dry_coeff[dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
                 + _qsum(g_irr_coeff[irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
@@ -1024,8 +1024,8 @@ class LutoSolver:
             if not AG_MANAGEMENTS[am]:
                 continue
             for j_idx, j in enumerate(am_j_list):
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
+                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
                 ghg_ag_man_exprs.append(
                     _qsum(self._input_data.ag_man_g_mrj[am][0, dry_cells, j_idx], self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells])
                     + _qsum(self._input_data.ag_man_g_mrj[am][1, irr_cells, j_idx], self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells])
@@ -1035,7 +1035,7 @@ class LutoSolver:
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-            non_ag_cells = self._input_data.non_ag_lu2cells[k]
+            non_ag_cells = self._input_data.feasible_non_ag_cells[k]
             ghg_non_ag_exprs.append(
                 _qsum(self._input_data.non_ag_g_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
             )
@@ -1107,8 +1107,8 @@ class LutoSolver:
             c_ag = self._input_data.biodiv_contr_ag_j[j]
             if c_ag == 0:
                 continue
-            ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.GBF2_mask_idx)
-            ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.GBF2_mask_idx)
+            ind_dry = np.intersect1d(self._input_data.feasible_ag_cells_mrj[0, j], self._input_data.GBF2_mask_idx)
+            ind_irr = np.intersect1d(self._input_data.feasible_ag_cells_mrj[1, j], self._input_data.GBF2_mask_idx)
             bio_ag_exprs.append(
                 _qsum(self._input_data.GBF2_mask_area_r[ind_dry] * c_ag, self.X_ag_dry_vars_jr[j, ind_dry])
                 + _qsum(self._input_data.GBF2_mask_area_r[ind_irr] * c_ag, self.X_ag_irr_vars_jr[j, ind_irr])
@@ -1117,8 +1117,8 @@ class LutoSolver:
             if not AG_MANAGEMENTS[am]:
                 continue
             for j_idx, j in enumerate(am_j_list):
-                ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.GBF2_mask_idx)
-                ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.GBF2_mask_idx)
+                ind_dry = np.intersect1d(self._input_data.feasible_ag_cells_mrj[0, j], self._input_data.GBF2_mask_idx)
+                ind_irr = np.intersect1d(self._input_data.feasible_ag_cells_mrj[1, j], self._input_data.GBF2_mask_idx)
                 bio_ag_man_exprs.append(
                     _qsum(self._input_data.GBF2_mask_area_r[ind_dry] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_dry], self.X_ag_man_dry_vars_jr[am][j_idx, ind_dry])
                     + _qsum(self._input_data.GBF2_mask_area_r[ind_irr] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_irr], self.X_ag_man_irr_vars_jr[am][j_idx, ind_irr])
@@ -1127,7 +1127,7 @@ class LutoSolver:
             c_non_ag = self._input_data.biodiv_contr_non_ag_k[k]
             if c_non_ag == 0:
                 continue
-            ind = np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.GBF2_mask_idx)
+            ind = np.intersect1d(self._input_data.feasible_non_ag_cells[k], self._input_data.GBF2_mask_idx)
             bio_non_ag_exprs.append(
                 _qsum(self._input_data.GBF2_mask_area_r[ind] * c_non_ag, self.X_non_ag_vars_kr[k, ind])
             )
@@ -1445,9 +1445,9 @@ class LutoSolver:
 
         # Get agricultural results
         for j in range(self._input_data.n_ag_lus):
-            for r in self._input_data.ag_lu2cells[0, j]:
+            for r in self._input_data.feasible_ag_cells_mrj[0, j]:
                 X_dry_sol_rj[r, j] = self.X_ag_dry_vars_jr[j, r].X
-            for r in self._input_data.ag_lu2cells[1, j]:
+            for r in self._input_data.feasible_ag_cells_mrj[1, j]:
                 X_irr_sol_rj[r, j] = self.X_ag_irr_vars_jr[j, r].X
 
         # Get non-agricultural results
@@ -1456,14 +1456,14 @@ class LutoSolver:
                 non_ag_X_sol_rk[:, k] = np.zeros(self._input_data.ncells)
                 continue
 
-            for r in self._input_data.non_ag_lu2cells[k]:
+            for r in self._input_data.feasible_non_ag_cells[k]:
                 non_ag_X_sol_rk[r, k] = self.X_non_ag_vars_kr[k, r].X
 
         # Get agricultural management results
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
-                eligible_dry_cells = self._input_data.ag_lu2cells[0, j]
-                eligible_irr_cells = self._input_data.ag_lu2cells[1, j]
+                eligible_dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                eligible_irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
 
                 if am == "Savanna Burning":
                     eligible_dry_cells = np.intersect1d(
@@ -1500,10 +1500,10 @@ class LutoSolver:
             D_dry_sol_rj = np.zeros((self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32)
             D_irr_sol_rj = np.zeros((self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32)
             for j in range(self._input_data.n_ag_lus):
-                for r in self._input_data.ag_lu2cells[0, j]:
+                for r in self._input_data.feasible_ag_cells_mrj[0, j]:
                     if isinstance(self.D_ag_dry_vars_jr[j, r], gp.Var):
                         D_dry_sol_rj[r, j] = self.D_ag_dry_vars_jr[j, r].X
-                for r in self._input_data.ag_lu2cells[1, j]:
+                for r in self._input_data.feasible_ag_cells_mrj[1, j]:
                     if isinstance(self.D_ag_irr_vars_jr[j, r], gp.Var):
                         D_irr_sol_rj[r, j] = self.D_ag_irr_vars_jr[j, r].X
             ag2ag_D_mrj = np.stack((D_dry_sol_rj, D_irr_sol_rj))
@@ -1513,7 +1513,7 @@ class LutoSolver:
                 (self._input_data.ncells, self._input_data.n_non_ag_lus), dtype=np.float32
             )
             for k in range(self._input_data.n_non_ag_lus):
-                for r in self._input_data.non_ag_lu2cells[k]:
+                for r in self._input_data.feasible_non_ag_cells[k]:
                     if isinstance(self.D_nonag_vars_rk[r, k], gp.Var):
                         non_ag_D_sol_rk[r, k] = self.D_nonag_vars_rk[r, k].X
             ag2nonag_D_rk = non_ag_D_sol_rk

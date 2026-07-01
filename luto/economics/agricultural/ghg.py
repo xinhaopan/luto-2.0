@@ -289,7 +289,7 @@ def get_ghg_unall_natural_to_lvstk_natural_blend(data: Data, ag_X_mrj: np.ndarra
 
 def get_ghg_unall_natural_to_lvstk_natural_exact(data: Data, base_year: int, from_m: int, from_j: int) -> np.ndarray:
     """GHG penalties for unall-natural→lvstk-natural using exact cell selection per (from_m, from_j)."""
-    threshold = 10 ** (-settings.ROUND_DECIMALS)
+    threshold = settings.EXACT_REACHABILITY_MIN_FRACTION  # MUST match get_base_dvar_mj_cell_map
     cell_idx = np.where(data.ag_dvars[base_year][from_m, :, from_j] > threshold)[0]
     result_arr = np.zeros((data.NLMS, len(cell_idx), data.N_AG_LUS), dtype=np.float32)
 
@@ -358,7 +358,7 @@ def get_ghg_lvstk_natural_to_modified_blend(data: Data, ag_X_mrj: np.ndarray) ->
 
 def get_ghg_lvstk_natural_to_modified_exact(data: Data, base_year: int, from_m: int, from_j: int) -> np.ndarray:
     """GHG penalties for lvstk-natural→modified using exact cell selection per (from_m, from_j)."""
-    threshold = 10 ** (-settings.ROUND_DECIMALS)
+    threshold = settings.EXACT_REACHABILITY_MIN_FRACTION  # MUST match get_base_dvar_mj_cell_map
     cell_idx = np.where(data.ag_dvars[base_year][from_m, :, from_j] > threshold)[0]
     result_arr = np.zeros((data.NLMS, len(cell_idx), data.N_AG_LUS), dtype=np.float32)
 
@@ -421,7 +421,7 @@ def get_ghg_unall_natural_to_modified_blend(data: Data, ag_X_mrj: np.ndarray) ->
 
 def get_ghg_unall_natural_to_modified_exact(data: Data, base_year: int, from_m: int, from_j: int) -> np.ndarray:
     """GHG penalties for unall-natural→modified using exact cell selection per (from_m, from_j)."""
-    threshold = 10 ** (-settings.ROUND_DECIMALS)
+    threshold = settings.EXACT_REACHABILITY_MIN_FRACTION  # MUST match get_base_dvar_mj_cell_map
     cell_idx = np.where(data.ag_dvars[base_year][from_m, :, from_j] > threshold)[0]
     result_arr = np.zeros((data.NLMS, len(cell_idx), data.N_AG_LUS), dtype=np.float32)
 
