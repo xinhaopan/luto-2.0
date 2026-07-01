@@ -424,9 +424,7 @@ def get_transition_matrices_ag2ag_blend(data: Data, yr_idx: int, base_year: int,
         cells       = np.where(ag_X_mrj[m, :, j] > threshold)[0]
         all_j_lumap = np.full(data.NCELLS, j, dtype=np.int64)
         all_m_lumap = np.full(data.NCELLS, m, dtype=np.int64)
-        base = get_transition_matrices_ag2ag_base(
-            data, yr_idx, all_j_lumap, all_m_lumap, separate, w_mrj=w_mrj, t_ij=t_ij
-        )
+        base = get_transition_matrices_ag2ag_base(data, yr_idx, all_j_lumap, all_m_lumap, separate, w_mrj=w_mrj, t_ij=t_ij)
         # per-source factor[r, to_j] = frac[m,r,j] / eligible[r, to_j]  (broadcast over to_m)
         factor = ag_X_mrj[m, cells, j][:, None] / eligible_rj_safe[cells, :]
         if separate:

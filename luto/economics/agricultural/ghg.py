@@ -308,13 +308,15 @@ def get_ghg_unall_natural_to_lvstk_natural_exact(data: Data, base_year: int, fro
 
 
 def get_ghg_unall_natural_to_lvstk_natural(data: Data, base_lumap, ag_X_mrj=None) -> np.ndarray:
-    """Dispatch to _crisp or _blend based on TRANSITION_MODE (exact must be called directly)."""
+    """Dispatch to _crisp (crisp / no dvar) or _blend (blend & exact GHG account).
+
+    The transition-GHG ACCOUNT is target-indexed (added to the ongoing GHG and applied to X_new in the
+    GHG constraint), so blend AND exact both use the base-year-composition frac-weighting. exact's
+    per-source GHG is carried by the transition COST (get_ghg_*_exact via get_transition_matrices_ag2ag_exact).
+    """
     if settings.TRANSITION_MODE == 'crisp' or ag_X_mrj is None:
         return get_ghg_unall_natural_to_lvstk_natural_crisp(data, base_lumap)
-    elif settings.TRANSITION_MODE == 'blend':
-        return get_ghg_unall_natural_to_lvstk_natural_blend(data, ag_X_mrj)
-    elif settings.TRANSITION_MODE == 'exact':
-        raise ValueError('exact mode: call get_ghg_unall_natural_to_lvstk_natural_exact directly from get_transition_matrices_ag2ag_exact')
+    return get_ghg_unall_natural_to_lvstk_natural_blend(data, ag_X_mrj)
 
 
 # ---------------------------------------------------------------------------
@@ -376,13 +378,11 @@ def get_ghg_lvstk_natural_to_modified_exact(data: Data, base_year: int, from_m: 
 
 
 def get_ghg_lvstk_natural_to_modified(data: Data, base_lumap, ag_X_mrj=None) -> np.ndarray:
-    """Dispatch to _crisp or _blend based on TRANSITION_MODE (exact must be called directly)."""
+    """Dispatch to _crisp (crisp / no dvar) or _blend (blend & exact GHG account). See
+    get_ghg_unall_natural_to_lvstk_natural for why exact shares the blend (frac-weighted) account."""
     if settings.TRANSITION_MODE == 'crisp' or ag_X_mrj is None:
         return get_ghg_lvstk_natural_to_modified_crisp(data, base_lumap)
-    elif settings.TRANSITION_MODE == 'blend':
-        return get_ghg_lvstk_natural_to_modified_blend(data, ag_X_mrj)
-    elif settings.TRANSITION_MODE == 'exact':
-        raise ValueError('exact mode: call get_ghg_lvstk_natural_to_modified_exact directly from get_transition_matrices_ag2ag_exact')
+    return get_ghg_lvstk_natural_to_modified_blend(data, ag_X_mrj)
 
 
 # ---------------------------------------------------------------------------
@@ -439,13 +439,11 @@ def get_ghg_unall_natural_to_modified_exact(data: Data, base_year: int, from_m: 
 
 
 def get_ghg_unall_natural_to_modified(data: Data, base_lumap, ag_X_mrj=None) -> np.ndarray:
-    """Dispatch to _crisp or _blend based on TRANSITION_MODE (exact must be called directly)."""
+    """Dispatch to _crisp (crisp / no dvar) or _blend (blend & exact GHG account). See
+    get_ghg_unall_natural_to_lvstk_natural for why exact shares the blend (frac-weighted) account."""
     if settings.TRANSITION_MODE == 'crisp' or ag_X_mrj is None:
         return get_ghg_unall_natural_to_modified_crisp(data, base_lumap)
-    elif settings.TRANSITION_MODE == 'blend':
-        return get_ghg_unall_natural_to_modified_blend(data, ag_X_mrj)
-    elif settings.TRANSITION_MODE == 'exact':
-        raise ValueError('exact mode: call get_ghg_unall_natural_to_modified_exact directly from get_transition_matrices_ag2ag_exact')
+    return get_ghg_unall_natural_to_modified_blend(data, ag_X_mrj)
 
 
 def get_ghg_transition_emissions(data:Data, base_lumap, separate=False, cells=None, ag_X_mrj=None) -> np.ndarray:
@@ -487,6 +485,87 @@ def get_ghg_transition_emissions(data:Data, base_lumap, separate=False, cells=No
     return ghg_trainsition_penalties
     
     
+
+
+def get_ghg_transition_emissions_from_base_year(data: Data, base_year: int) -> dict:
+    """Source-keyed ag2ag transition GHG EMISSIONS (t CO2/cell): dict[(from_m, from_j)] -> arr[to_m, cells, to_j].
+
+    The physical-emissions parallel of get_transition_matrices_ag2ag_from_base_year (the $ transition
+    COST). It uses the SAME per-mode source-keying and weighting as the cost, so the two share the flow
+    var F in Phase 3: the GHG constraint will sum `Σ flow_ghg·F` (replacing the target-based
+    ag_ghg_t_mrj / get_ag_ghg_t_mrj) exactly as the objective sums `Σ flow_cost·F`. Emissions are RAW
+    t CO2 — no carbon price, no amortise (that priced+amortised version is the GHG component of the
+    transition cost). Built alongside flow_cost; NOT yet consumed by the solver (wired in Phase 3).
+
+    Modes (mirroring the cost):
+      crisp — slice the dominant-source flat emissions by (from_m, from_j).
+      blend — per present source: uniform-source emissions weighted by frac_s / eligible_rj (the SAME
+              factor as the blend transition cost, so cost and GHG share the flow var consistently).
+      exact — sum the three per-source get_ghg_*_exact components on the source's θ cells.
+    """
+    if settings.TRANSITION_MODE == 'crisp':
+        return ghg_transition_emissions_ag2ag_crisp(data, base_year)
+    elif settings.TRANSITION_MODE == 'blend':
+        return ghg_transition_emissions_ag2ag_blend(data, base_year)
+    elif settings.TRANSITION_MODE == 'exact':
+        return ghg_transition_emissions_ag2ag_exact(data, base_year)
+    raise ValueError(f"Unknown TRANSITION_MODE {settings.TRANSITION_MODE!r}")
+
+
+def ghg_transition_emissions_ag2ag_crisp(data: Data, base_year: int) -> dict:
+    """Crisp: slice the dominant-source flat emissions (each ag cell has one dominant source)."""
+    lumap = data.lumaps[base_year]
+    lmmap = data.lmmaps[base_year]
+    flat = get_ghg_transition_emissions(data, lumap)                    # (NLMS, NCELLS, N_AG_LUS) raw t CO2
+    result = {}
+    for fm in range(data.NLMS):
+        for fj in range(data.N_AG_LUS):
+            cells = np.where((lmmap == fm) & (lumap == fj))[0]
+            if cells.size:
+                result[(fm, fj)] = flat[:, cells, :].astype(np.float32)
+    return result
+
+
+def ghg_transition_emissions_ag2ag_exact(data: Data, base_year: int) -> dict:
+    """Exact: per-source physical emissions (the three components), sliced to the source's θ cells.
+    Same cell set as get_base_dvar_mj_cell_map / the exact transition cost (all use
+    EXACT_REACHABILITY_MIN_FRACTION)."""
+    threshold = settings.EXACT_REACHABILITY_MIN_FRACTION
+    ag_X = data.ag_dvars[base_year]
+    result = {}
+    for fm in range(data.NLMS):
+        for fj in range(data.N_AG_LUS):
+            cells = np.where(ag_X[fm, :, fj] > threshold)[0]
+            if cells.size == 0:
+                continue
+            result[(fm, fj)] = (
+                get_ghg_lvstk_natural_to_modified_exact(data, base_year, fm, fj)
+                + get_ghg_unall_natural_to_lvstk_natural_exact(data, base_year, fm, fj)
+                + get_ghg_unall_natural_to_modified_exact(data, base_year, fm, fj)
+            ).astype(np.float32)
+    return result
+
+
+def ghg_transition_emissions_ag2ag_blend(data: Data, base_year: int) -> dict:
+    """Blend: per present source, the uniform-source emissions weighted by frac_s / eligible_rj —
+    the SAME eligible-target normaliser as the blend transition cost, so GHG and cost share one factor."""
+    ag_X = data.ag_dvars[base_year]
+    thr = 10 ** (-settings.ROUND_DECIMALS)
+    t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values
+    valid = ~np.isnan(t_ij)                                             # (N_AG_LUS_from, N_AG_LUS_to)
+    eligible_rj = ag_X.sum(axis=0) @ valid                             # (NCELLS, N_AG_LUS)
+    eligible_safe = np.where(eligible_rj > thr, eligible_rj, 1.0)
+    result = {}
+    for fm in range(data.NLMS):
+        for fj in range(data.N_AG_LUS):
+            cells = np.where(ag_X[fm, :, fj] > thr)[0]
+            if cells.size == 0:
+                continue
+            uniform_lumap = np.full(data.NCELLS, fj, dtype=np.int64)   # emissions from an all-fj source
+            base_ghg = get_ghg_transition_emissions(data, uniform_lumap)   # ag_X_mrj=None -> _crisp path
+            factor = ag_X[fm, cells, fj][:, None] / eligible_safe[cells, :]
+            result[(fm, fj)] = (base_ghg[:, cells, :] * factor[np.newaxis, :, :]).astype(np.float32)
+    return result
 
 
 def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):

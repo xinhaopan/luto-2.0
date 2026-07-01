@@ -5,16 +5,16 @@ Entries are in **descending date order** (newest first).
 
 ---
 
-## 20260701 — pre-solver transition-cost validation (L0–L6): 4 bugs fixed, 1 reported
+## 20260701 — pre-solver transition-cost validation (L0–L6): 5 bugs fixed + source-keyed flow_ghg
 
 ### TL;DR
 
 Before wiring the flow-based solver (Phase 3), the transition-cost data layer was validated
-bottom-up in 7 layers (`jinzhu_inspect_code/Build_exact_trans_solver/validate_1..7_*.py`,
-plan in `validate.md`) across all three modes (crisp/blend/exact) on `data_2050.lz4`
+bottom-up in 7 layers across all three modes (crisp/blend/exact) on `data_2050.lz4`
 (RESFACTOR=5, base_year=2030, target_year=2035). **All layers green; all six solver-gate checks
-pass (1.3, 1.4, 2.2, 3.3, 4.4, 5.5).** Four production bugs were found and fixed (F1–F4); one
-exact-mode GHG-account bug (F5) is reported but out of transition-cost scope.
+pass (1.3, 1.4, 2.2, 3.3, 4.4, 5.5).** Five production bugs were found and fixed (F1–F5) — with F5
+fixed, `get_input_data` now completes in exact mode. Also built the source-keyed **`flow_ghg_ag2ag`**
+transition-GHG-emissions dict (the physical parallel of `flow_cost_ag2ag`).
 
 ### Bugs fixed
 
@@ -43,12 +43,27 @@ sliced at 1e-6 not θ (same class as F1); folded into the F2 rewrite (exact wrap
 flow-cost return → crashed `get_input_data` for *every* mode. **Fix:** removed the stale `.astype`
 (dict leaves are cast to float32 during the economy rescale).
 
-### Reported, not fixed
+**F5 — exact-mode GHG-account bug** (`agricultural/ghg.py`). `get_ag_ghg_t_mrj` passes the fractional
+`ag_X_mrj` to `ag_ghg.get_ghg_transition_emissions`, whose three transition-GHG dispatchers RAISED in
+exact mode → blocked the real `get_input_data` end-to-end in exact. The transition-GHG **account** is
+target-indexed (added to the ongoing GHG and applied to `X_new` in the GHG constraint), so exact shares
+the same base-year frac-weighted computation as blend — exact's per-source GHG is carried by the
+transition COST, not the account. **Fix:** the three dispatchers now route blend AND exact to the
+`_blend` variants (crisp / no-dvar → `_crisp`). Verified: `get_input_data` completes in exact mode.
 
-**F5 — exact-mode GHG-account bug** (`solvers/input_data.py:get_ag_ghg_t_mrj`). Passes `ag_X_mrj` to
-`ag_ghg.get_ghg_transition_emissions`, which raises in exact mode → blocks the real `get_input_data`
-end-to-end in exact (independent of transition cost). Validation dodged it by calling the view-builders
-directly. **Must be fixed before exact mode can produce solver input** (exact GHG-account workstream).
+### Follow-up: source-keyed `flow_ghg_ag2ag` (physical parallel of `flow_cost`)
+
+The F5 reroute is an interim bridge for the **current target-based** GHG constraint
+(`ag_ghg_t_mrj · X_new`, solver.py:1010). The transition GHG is source-dependent (natural land
+releases stock; modified doesn't), so — exactly like the transition cost — it belongs in the flow.
+Added `ag_ghg.get_ghg_transition_emissions_from_base_year(data, base_year)` →
+`dict[(from_m,from_j)] → arr[to_m, cells, to_j]` (raw t CO2), mirroring `flow_cost_ag2ag`'s per-mode
+source-keying/weighting (crisp dominant-slice; blend `frac_s/eligible_rj` — same factor as the blend
+cost; exact sum of the three `get_ghg_*_exact`). Wired into `input_data`/`SolverInputData` as
+`flow_ghg_ag2ag` (GHG-rescaled, **not yet consumed** — Phase 3 will sum `Σ flow_ghg·F` in the GHG
+constraint and drop the target-based `ag_ghg_t_mrj` + the F5 reroute). Validated: crisp collapse-back
+to `get_ag_ghg_t_mrj` bit-for-bit; `amortise(flow_ghg × carbon_price) == flow_cost's GHG components`
+(all three modes) — i.e. it is the raw-emissions twin of the already-validated cost dict.
 
 ### Confirmed properties (not bugs)
 
@@ -144,12 +159,6 @@ primarily the establishment cost fix (C); cell-scope fix (B) also contributes.
 
 ---
 
-### Validation script
-
-`jinzhu_inspect_code/Refactor_exact_trans_cost/step_12_compare_crisp_vs_old_nonag2ag.py`
-
----
-
 ## 20260629 — ag→nonag: `get_transition_matrix_ag2nonag` validation and profiling (step_10)
 
 ### TL;DR
@@ -237,11 +246,6 @@ LRU-cached — 49 active combos at 2045, covering 141,494 dvar-active cells.
 
 ---
 
-### Validation script
-
-`jinzhu_inspect_code/Refactor_exact_trans_cost/step_10_validate_ag2nonag.py`
-
----
 
 ## 20260629 — nonag→ag: `get_transition_matrix_nonag2ag` validation and profiling (step_9)
 
@@ -319,11 +323,6 @@ crisp uses integer lumap dominance, so a ~27% total difference is expected and c
 
 ---
 
-### Validation script
-
-`jinzhu_inspect_code/Refactor_exact_trans_cost/step_9_validate_nonag2ag.py`
-
----
 
 ## 20260626 — nonag→ag: GHG exact mode, blend reformatting, `get_destocked_to_ag` refactor, `irrev_mask_r` guard
 
@@ -396,10 +395,10 @@ the free fraction of an irreversible cell, so zeroing remains correct there.
 
 ### Verification
 
-`jinzhu_inspect_code/Refactor_exact_trans_cost/step_8_verify_destocked_and_ghg_exact.py`
-— 11/11 PASS on `data_2050.lz4`.  Section A (tests 1–8): destocked crisp/blend/exact.
-Section B (tests 9–11): sheep/beef GHG exact — zero in both modes at 2050 because
-`sheep_j`/`beef_j` are not in `LU_LVSTK_NATURAL` at that checkpoint (correct behaviour).
+A verification harness (11 tests) passed 11/11 on `data_2050.lz4`.  Section A (tests 1–8):
+destocked crisp/blend/exact.  Section B (tests 9–11): sheep/beef GHG exact — zero in both
+modes at 2050 because `sheep_j`/`beef_j` are not in `LU_LVSTK_NATURAL` at that checkpoint
+(correct behaviour).
 
 ---
 
@@ -408,9 +407,6 @@ Section B (tests 9–11): sheep/beef GHG exact — zero in both modes at 2050 be
 | File | Change |
 |------|--------|
 | `luto/economics/non_agricultural/transitions.py` | GHG exact mode in `get_sheep/beef_to_ag_base`; blend reformatting; `get_destocked_to_ag` three-variant refactor; `irrev_mask_r` crisp-only guard; synthetic-lumap comment in CP Belt exact functions |
-| `jinzhu_inspect_code/Refactor_exact_trans_cost/step_8_verify_destocked_and_ghg_exact.py` | New verification script (11 tests) |
-
-Full design detail: `jinzhu_inspect_code/Refactor_exact_trans_cost/FINDINGS.md`.
 
 ---
 
@@ -525,8 +521,6 @@ as it is pre-existing blend behaviour outside the scope of this refactor.
 
 ### Validation
 
-Script: `jinzhu_inspect_code/Refactor_exact_trans_cost/step_3_compare_ag2nonag_exact_crisp_trans_cost.py`
-
 Strategy per combo: build synthetic all-`from_j` lumap / all-`from_m` lmmap, call
 `crisp(separate=True)`, slice at `cell_idx`, compare component-by-component vs exact.
 
@@ -540,8 +534,6 @@ Result: **100% match (max_diff = 0.0000)** across all 8 LU types and all 49 comb
 |------|--------|
 | `luto/economics/non_agricultural/transitions.py` | Added `_crisp`/`_blend` suffixes; added 8 exact functions; updated all 8 dispatchers; fixed `w_rm_irrig` float32 cast; fixed destocked HCAS int-key lookup |
 | `luto/tools/__init__.py` | `get_ag_to_ag_water_delta_matrix` returns `.astype(np.float32)` for consistency |
-
-Full design detail: `jinzhu_inspect_code/Refactor_exact_trans_cost/FINDINGS.md`.
 
 ---
 
@@ -681,8 +673,6 @@ changing the allocation to `(data.NLMS, …)`.
 
 ### Validation
 
-Script: `jinzhu_inspect_code/Refactor_exact_trans_cost/step_1_compare_ag2ag_exact_crisp_trans_cost.py`
-
 Validates `get_transition_matrices_ag2ag_exact` against `get_transition_matrices_ag2ag_crisp`
 for all 49 `(from_m, from_j)` combos. Strategy: build synthetic all-`from_j` lumap /
 all-`from_m` lmmap, call crisp(separate=True), slice at `cell_idx`, compare component-by-
@@ -699,8 +689,6 @@ component. Result: **100% match** for all components after the two bug fixes abo
 | `luto/tools/__init__.py` | Fixed irrigation infrastructure cost broadcast in `get_ag_to_ag_water_delta_matrix`; added `.astype(np.float32)` return |
 | `luto/settings.py` | `BLENDED_TRANSITION_COSTS` (bool) → `TRANSITION_MODE` (str); `BLENDED_TRANSITION_COSTS_N_JOBS` → `TRANSITION_MODE_N_JOBS` |
 | `luto/solvers/solver.py`, `input_data.py`, `tools/write.py`, `data.py` | Updated all `BLENDED_TRANSITION_COSTS` references to `TRANSITION_MODE != 'crisp'` |
-
-Full design detail: `jinzhu_inspect_code/Refactor_exact_trans_cost/FINDINGS.md`.
 
 ---
 
@@ -861,8 +849,6 @@ False=Crisp) at `Custom_runs/Compare_Blend_with_solver_delta` revealed:
 The Destocked discount bug was fixed: `get_destocked_from_ag_blended` now normalises by
 `eligible_frac_r` (lv-nat fraction only) instead of `ag_frac_r` (total ag fraction).
 
-Inspect scripts: `jinzhu_inspect_code/Compare_with_without_blend_trans/`.
-
 ---
 
 ### Root cause 1 — Citrus / Cotton / Summer cereals: fractional initial state is cheaper
@@ -1013,9 +999,6 @@ emissions = 1.89 Mt, but PA + AgTech EI + Biochar abated 4.15 Mt (2.20×). Two r
    carbon from the biochar material itself and is not bounded by existing Ag soil emissions.
 
 After both fixes: zero land uses with Am > Ag (overall ratio 0.67×, down from 1.80×).
-
-Inspect scripts: `jinzhu_inspect_code/Check_GHG_agman_gt_ag/scripts/07_full_story_summary.py`.
-Log: `jinzhu_inspect_code/Check_GHG_agman_gt_ag/logs/07_full_story_summary.txt`.
 
 ---
 
@@ -1197,7 +1180,6 @@ follows because `ag_frac_r[r]` is a constant scalar for every `(m, j)` in the ou
 and factors out of the linear combination — no re-run of the 56 parallel tasks is required.
 
 Fix committed on branch `jinzhu`.
-Inspect scripts: `jinzhu_inspect_code/Normalise_blend_ag2ag_weights/`.
 
 ---
 
@@ -1272,21 +1254,6 @@ array) branches are covered.
 
 ---
 
-### Inspect scripts
-
-| Script | Purpose | Key outputs |
-|--------|---------|-------------|
-| `step_1_check_ag_frac_sum.py` | Verify `ag_frac_r < 1` distribution and correction-factor magnitude | Spatial map of `ag_frac_r` (RdYlGn), correction-factor map (YlOrRd), histogram |
-| `step_2_compare_unnorm_vs_norm.py` | Derive `t_mrj_norm = t_mrj_unnorm / ag_frac_r_safe`; quantify discrepancy | Unnorm/norm/diff/ratio maps, ratio histogram, stats table |
-| `step_3_beef_unnorm_vs_norm.py` | Per-(beef LU × land mgmt) 2×2 panel comparison | 3 panels saved (modified-land dry/irr, natural-land dry); "Beef-natural-land irrigated" has 0 cells, skipped with guard |
-| `step_4_grouped_vs_parallel.py` | Prototype serial grouped alternative; compare correctness and speed | Per-LU active-j table, speed ratio, correctness stats |
-
-Data: `jinzhu_inspect_code/Normalise_blend_ag2ag_weights/data/Data_RES5.lz4`
-(copied from `Custom_runs/Annualise_write/Run_G0001/output/.../Data_RES5.lz4`,
-RESFACTOR=5, ag_dvars years 2010–2050).
-
----
-
 ### Grouped serial alternative: correct but 6× slower (step 4)
 
 A serial grouped approach was prototyped as a potential replacement for the 56-task
@@ -1350,8 +1317,7 @@ multi-year-gap runs (e.g. RESFACTOR=5, `SIM_YEARS = range(2020, 2051, 5)`, gap=5
 under-reported these metrics by roughly an extra factor of `gap` (~80% low for gap=5,
 matching `(gap-1)/gap`).
 
-Found via a 5-year-gap vs 1-year-gap run comparison
-(`jinzhu_inspect_code/Check_annualise_write/compare_annualise.py`). Fixed by removing the
+Found via a 5-year-gap vs 1-year-gap run comparison. Fixed by removing the
 incorrect `/gap` from annual-rate quantities while preserving it on genuine
 period-transition matrices, and re-validated by re-running `write_data` for the 5-year-gap
 run (the systematic ≈-80% errors on Revenue/Cost/Quantity/Water Net Yield dropped to
@@ -1440,7 +1406,6 @@ numerically indistinguishable from zero. The fix is to exclude the species from
 at 2040→2045.
 
 Run: `Custom_runs/NECMA_follow_runs/Run_G0001` (RF5, 2020–2050).
-Debug harness: `jinzhu_inspect_code/Check_NECMA_num_issues/`.
 
 ---
 
@@ -1622,12 +1587,10 @@ cost for reverting non-ag land to agriculture:
 | Dual residual | ~1e-12 throughout |
 | Crossover | clean, 3.25 s |
 
-Isolation matrix (from `step_3/`) corroborated the mechanism: buggy transition + scaling
+Isolation matrix corroborated the mechanism: buggy transition + scaling
 **off** (`ScaleFlag=0`, the original failing config) struggled badly (357 iters, primal
 residual erupting to ~30) while fixed-transition or scaling-on each independently
-stabilised it — confirming the transition cost as the destabiliser. Harness:
-`jinzhu_inspect_code/Check_numeric_issues/step_3/test_clean_solver.py`. Full blow-by-blow:
-`jinzhu_inspect_code/Check_numeric_issues/{FINDINGS.md,storyline.md}`.
+stabilised it — confirming the transition cost as the destabiliser.
 
 ### Moral
 
@@ -1780,9 +1743,9 @@ The barrier hits a near-singular point at iter 127 and the dual momentarily expl
 - It **survives** only because the transition fix made the matrix well-conditioned: the
   dual blow-up is now a *recoverable transient*. Without the fix, the same eruption is
   *fatal* — the `*REAL_AREA`-inflated impossible non-ag→ag cost keeps `AAᵀ`
-  ill-conditioned, so the normal equations never recover (the original NUMERIC;
-  `isolate_buggy_scaleoff.py` shows the analogous primal-residual eruption limping 357 iters
-  at 2030, tipping into hard failure on harder years like 2035).
+  ill-conditioned, so the normal equations never recover (the original NUMERIC; the
+  buggy-transition + scaling-off config shows the analogous primal-residual eruption
+  limping 357 iters at 2030, tipping into hard failure on harder years like 2035).
 
 **Refined statement:** the transition fix does not eliminate transient near-singularities
 (especially under `Presolve=0`) — it makes them **recoverable instead of fatal**.
@@ -1802,10 +1765,6 @@ this entry.
 
 #### Reproduce / inspect
 
-Final harness: `jinzhu_inspect_code/Check_numeric_issues/step_3/test_clean_solver.py`.
-Isolation probes (same dir): `isolate_scaleflag.py`, `isolate_rootcause.py`,
-`isolate_buggy_scaleoff.py`, `no_snipping_transition_only.py`. Full per-step evidence and
-the narrative live in `jinzhu_inspect_code/Check_numeric_issues/{FINDINGS.md,storyline.md}`.
 Harness pattern: `sys.path.insert(0, <repo>)`, `joblib.load(".../data_2025.lz4")`,
 `get_input_data(data, 2025, 2030)`, `LutoSolver(...).formulate()`, `.solve()`.
 
@@ -1827,14 +1786,11 @@ Three questions were investigated: (1) whether a lb > ub bug exists, (2) whether
 tightening the snap rule to a 1% relative threshold fixes barrier, and (3) whether
 the non-ag lock-in LBs from the checkpoint are the true root cause.
 
-Scripts: `jinzhu_inspect_code/Check_numeric_issues/step_2_check_cracks/test_barrier_demand_only.py`,
-`test_barrier_no_lockin.py`, `check_lb_ub_validity.py`.
-
 ---
 
 ### 1 — Confirmed lb > ub bug for 1 RP cell
 
-`check_lb_ub_validity.py` found 1 Riparian Plantings cell where `lb > ub` after the
+A lb/ub validity check found 1 Riparian Plantings cell where `lb > ub` after the
 `d84fbb77` change that removed the UB cap from `get_non_ag_lb_matrices`.
 
 **Mechanism:**
@@ -1899,7 +1855,7 @@ Total snapped variables increased by 31 vs. the abs-only rule.
 
 ### 4 — 1% snap rule does NOT rescue barrier
 
-`test_barrier_demand_only.py` (Crossover=0, demand-only, with 1% snap):
+Demand-only model (Crossover=0, with 1% snap):
 
 ```
 BarIter=42, Status=NUMERIC, Time=79s
@@ -1924,11 +1880,11 @@ Three versions of the 2020→2025 demand-only model were run with Crossover=0:
 
 | Test | non-ag LB source | Nonzero LB cells | Barrier result |
 |------|-----------------|-----------------|----------------|
-| `test_barrier_demand_only` (current code, 1% snap) | full lock-in from `non_ag_dvars[2020]` | ~5,855 + RP cracks | **NUMERIC** 42 iters, 79s |
-| `test_barrier_prefixlock` (pre-94971ea1 exact eviction) | t_rk only, lb capped against old UB | 5,855 | **NUMERIC** 44 iters, 77s |
-| `test_barrier_no_lockin` (dvars removed entirely) | zeros | 0 | **OPTIMAL** 213 iters, 405s |
+| Current code (1% snap) | full lock-in from `non_ag_dvars[2020]` | ~5,855 + RP cracks | **NUMERIC** 42 iters, 79s |
+| Pre-94971ea1 exact eviction | t_rk only, lb capped against old UB | 5,855 | **NUMERIC** 44 iters, 77s |
+| Lock-in removed (dvars removed entirely) | zeros | 0 | **OPTIMAL** 213 iters, 405s |
 
-**Pre-94971ea1 eviction counts** (from `test_barrier_prefixlock`):
+**Pre-94971ea1 eviction counts** (t_rk only, lb capped against old UB):
 
 | LU | Evicted (lb→0) | Kept (lb>0) |
 |----|---------------|------------|
@@ -2013,9 +1969,6 @@ investigate whether near-degenerate variable bounds ("cracks") were the primary 
 barrier (Method=2) failing at years 2025 and 2030. A systematic crack analysis was
 performed from the `data_2030.lz4` checkpoint; a new snap fix was applied to the
 ag-management variable setup; and the true root cause of barrier failure was identified.
-
-Scripts: `jinzhu_inspect_code/Check_numeric_issues/step_2_check_cracks/crack_analysis.py`,
-`reconstruct_2025_solve.py`.
 
 ---
 
@@ -2143,7 +2096,7 @@ if x_lb > 0 and abs(x_ub - x_lb) < 10 ** (1 - settings.ROUND_DECIMALS):
 
 ### 6 — Reconstruction test: crack fix alone does not rescue barrier
 
-`reconstruct_2025_solve.py` rebuilt the 2025 model from `data_2030.lz4` (base_year=2020)
+A reconstruction test rebuilt the 2025 model from `data_2030.lz4` (base_year=2020)
 and ran only the barrier attempt (`Method=2, Crossover=-1, Presolve=0`).  Barrier still
 reported **NUMERIC** after the snap fix.
 
@@ -2550,10 +2503,6 @@ and `REM_RES5_dual_simplex` (6 runs, renewable energy targets) — were analysed
 understand why Gurobi barrier (Method=2) repeatedly fails with infeasible or numerical
 status while dual simplex (Method=1) can rescue those same years. A shared root cause was
 identified across both run types, with different structural drivers.
-
-Detailed findings: `jinzhu_inspect_code/Check_NECMA_crash/FINDINGS.md` (NECMA),
-`jinzhu_inspect_code/Check_NECMA_crash/FINDINGS_REM.md` (REM),
-`jinzhu_inspect_code/Check_NECMA_crash/ANALYSIS.md` (combined root-cause analysis).
 
 ---
 
@@ -2977,8 +2926,6 @@ than the 1e-2 `FEASIBILITY_TOLERANCE` that the existing capping code was designe
 Total RP dvar peaked at 112.48 (2045) and fell to 99.44 (2050); earlier periods showed
 similar erosion.
 
-Inspection script: `jinzhu_inspect_code/Check_RP_reduce/check_rp_reduce.py`
-
 ---
 
 ### 1 — Root cause: transition matrix evicts existing RP from EP-dominated cells
@@ -3118,8 +3065,6 @@ area losses (transition-matrix eviction only):
 RP is 57× worse because `RP_PROPORTION` max = 0.39 means RP can **never** be the
 dominant land use — its `lumap` is always another LU, so the transition matrix always
 blocks it.
-
-Inspection scripts: `jinzhu_inspect_code/Check_RP_reduce/`
 
 ---
 
@@ -3526,7 +3471,7 @@ files now classify as `xarray_layer` (parent dir name matches `xr_` prefix) with
 The large biodiversity score CSVs (SNES: 135 MB/year × 5 years = 675 MB total; NVIS: 16 MB;
 ECNES: 11 MB) were loaded via `pd.read_csv` — the slowest path for large files.
 
-**Benchmark** (`jinzhu_inspect_code/Speed_up_SNES_csv/benchmark.py`, 5 SNES files, 3 runs):
+**Benchmark** (5 SNES files, 3 runs):
 
 | Approach | min(s) | Speedup | Peak RAM |
 |---|---:|---:|---:|
@@ -3574,8 +3519,8 @@ Two compounding problems:
 2. **N small `to_dict` calls**: calling `to_dict(orient='records')` on a tiny sub-DataFrame
    4,300 × 2 = 8,600 times has severe Python overhead. This dominates the remaining time.
 
-**Benchmark** (`jinzhu_inspect_code/Speed_up_SNES_csv/benchmark_am_loop.py`, 50-species
-sample, N=3 runs, extrapolated to full 1,937 species via ×39 scale factor):
+**Benchmark** (50-species sample, N=3 runs, extrapolated to full 1,937 species via ×39
+scale factor):
 
 | Approach | min(s) | Speedup | Extrapolated full run |
 |---|---:|---:|---:|
@@ -3843,11 +3788,7 @@ The `peak_mb_RES5` table in `luto/tools/write.py` controls write-stage paralleli
 n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb)
 ```
 
-NVIS and ECNES were re-profiled at RF5 using:
-
-```text
-jinzhu_inspect_code/Profile_write_RES5/profile_write_RES5_bio_nvis_snes_ecnes.py
-```
+NVIS and ECNES were re-profiled at RF5.
 
 The profiling data object was:
 
@@ -3951,9 +3892,6 @@ The regional aggregation kernel itself is now tiny.
 ---
 
 ### Sparse aggregation benchmark: `np.add.at` beats pandas groupby
-
-Benchmark script:
-`jinzhu_inspect_code/Profile_write_RES5/benchmark_snes_sparse_groupby.py`
 
 100-species sparse batch:
 
@@ -4635,8 +4573,6 @@ The binary split cut peak RAM by 57% but was 2.5× slower — all 8 high-mem fun
 × 5 years = 40 tasks ran sequentially. The tier scheduler recovers most of that speed
 while keeping peak RAM 39% lower than all-parallel.
 
-Artefacts: `jinzhu_inspect_code/Profile_write_RES5/`
-
 ---
 
 ### New RF5 benchmark profile (yr_cal = 2050)
@@ -4778,8 +4714,6 @@ A full write-phase profile was run on run `2026_05_18__16_11_02_RF5_2010-2050_ha
 to identify where time and memory are spent. Each write function was profiled individually
 for `yr_cal=2050` using `trace_mem_usage`.
 
-Artefacts: `jinzhu_inspect_code/Profile_write_mem_and_time/`
-
 ### Per-function profile (yr_cal = 2050)
 
 | Function | Time | Peak Memory |
@@ -4846,9 +4780,6 @@ all 8 call sites (`write_transition_ag2ag` × 4, `write_transition_ag2nonag` × 
 without modification.
 
 ### Isolated benchmark: `process_chunks_numpy` (area array only)
-
-Script: `jinzhu_inspect_code/Profile_write_mem_and_time/test_numpy_chunks.py`  
-Artefacts: `jinzhu_inspect_code/Profile_write_mem_and_time/numpy_chunk_results/`
 
 | Method | Time (s) | Peak Memory (MB) | Correctness |
 |---|---|---|---|

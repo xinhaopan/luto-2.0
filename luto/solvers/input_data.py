@@ -135,6 +135,7 @@ class SolverInputData:
     flow_cost_ag2ag: dict                                               # dict[(from_m,from_j)] → ndarray(NLMS, ncells_src, N_AG_LUS).
     flow_cost_ag2nonag: dict                                            # dict[(from_m,from_j)] → dict[k → ndarray(ncells_src,)].
     flow_cost_nonag2ag: dict                                            # dict[k] → ndarray(NLMS, ncells_k, N_AG_LUS).
+    flow_ghg_ag2ag: dict                                                # dict[(from_m,from_j)] → ndarray(NLMS, ncells_src, N_AG_LUS) raw t CO2, GHG-rescaled. Physical parallel of flow_cost_ag2ag; Phase-3 GHG constraint sums Σ flow_ghg·F (replaces target-based ag_ghg_t_mrj). NOT yet consumed.
 
     # ── TO-view ag target bounds (which ag (to_m,to_j) a cell may become, and its lb..ub) ──
     dvar_ub_ag: np.ndarray                                              # Ag target upper bound (NLMS, NCELLS, N_AG_LUS): ag2ag + nonag2ag reachable share (crisp 0/1, exact fractional).
@@ -1004,6 +1005,11 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     # ag→ag: dict[(from_m, from_j)] → ndarray(NLMS, ncells, N_AG_LUS)
     flow_cost_ag2ag = get_ag_t_mrj(data, target_index, base_year)
 
+    # ag→ag transition GHG EMISSIONS (raw t CO2), source-keyed — the physical parallel of
+    # flow_cost_ag2ag. Phase 3: the GHG constraint sums Σ flow_ghg·F (replaces target-based
+    # ag_ghg_t_mrj). GHG-rescaled below; not yet consumed by the solver.
+    flow_ghg_ag2ag = ag_ghg.get_ghg_transition_emissions_from_base_year(data, base_year)
+
     # ag→nonag: dispatcher gives dict[lu_name → dict[(fm,fj)]]; transpose to dict[(fm,fj) → dict[k]]
     # so the solver loops ag sources first.
     flow_cost_ag2nonag = {}
@@ -1146,7 +1152,9 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         if settings.GHG_EMISSIONS_LIMITS != 'off' else
         ([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], 1.0)
     )
-    
+    # Put the source-keyed transition-GHG dict on the same band as the (target-based) ag_ghg_t_mrj.
+    flow_ghg_ag2ag = {s: (v / ghg_scale).astype(np.float32) for s, v in flow_ghg_ag2ag.items()}
+
     [renewable_solar_r], renewable_solar_scale = (
         rescale_lhs_rhs([renewable_solar_r], limits['renewable_Utility Solar PV'])
         if any(settings.RENEWABLES_OPTIONS.values()) else
@@ -1340,6 +1348,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         flow_cost_ag2ag,
         flow_cost_ag2nonag,
         flow_cost_nonag2ag,
+        flow_ghg_ag2ag,
 
         # TO-view ag target bounds + eligibility.
         dvar_ub_ag,
