@@ -5,6 +5,101 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260702 — flow transition model finalised + write.py reporting rebuilt on the deltas
+
+### TL;DR
+
+Completed the migration to the **per-source delta / min-cost-flow** transition model and rebuilt all
+transition reporting in `write.py` on top of the solved delta variables. `TRANSITION_MODE` is gone —
+the model is unconditionally exact per-source; ~60 orphaned crisp/blend/lumap functions were deleted
+or consolidated; the solver, input_data, and write.py now speak one 3-step mental model:
+**(1)** slice each base-year source `(from_m,from_j)` / `k` to its `dvar>θ` cells;
+**(2)** build per-source `{source: array over those cells}` cost / GHG / feasibility dicts;
+**(3)** the solver creates one delta var `D≥0` per `(source, cell, target)`, charges `Σ flow_cost·D`,
+and ties `D` to `X` via source cap (`Σ out ≤ base`) + node balance (`X = base + Σin − Σout`).
+Write.py then reports every transition quantity as `Σ leaf·D` — the exact quantity the solver priced.
+
+Validated end-to-end: solver builds identical & solves OPTIMAL; all rebuilt writes reconcile with the
+solver at ~1e-7; `write_data` runs the full task list (104 files). See the working folders
+`jinzhu_inspect_code/Build_exact_trans_solver/` (solver) and `.../Fix_flow_trans_write/` (write) for
+the per-step progress logs.
+
+### Solver / input_data consolidation
+
+- **`TRANSITION_MODE` removed** from `settings.py`; all cost/GHG/bound dispatchers are unconditional
+  exact. Deleted the target-based GHG account (`get_ghg_transition_emissions_by_lumap` + the per-lever
+  `_crisp`/`_blend` builders), the `_crisp` bound/exclude builders, and `ag_ghg_t_mrj`. The GHG
+  constraint now sums ongoing `ag_g_mrj·X` + `Σ flow_ghg_ag2ag·D`.
+- **APIs unified on `(base_year, target_year)` / source cell-maps.** `get_transition_matrices_ag2ag`
+  is the single ag2ag primitive (dropped the `w_mrj`/`t_ij` hoist args; `get_wreq_matrices` is now
+  `@lru_cache(maxsize=1)` so per-source calls are free). The 8 ag→nonag and 6 non-ag→ag levers each
+  collapsed to one function; the assemblers own the shared cell map.
+- **nonag→ag lumap-cost BUGFIX.** The AF/CP-belt `_to_ag` levers had combined the *lumap-based*
+  `get_env_plantings_to_ag_base` (zeros cells by the dominant lumap) with the per-source livestock
+  cost — dropping the plantings-cost portion on ag-dominant cells that held an AF/CP dvar sliver. Now
+  both portions are per-source over the same `k_cell_map` cells; threshold unified to
+  `EXACT_REACHABILITY_MIN_FRACTION`.
+- **Per-source feasibility dicts** (`get_feasible_ag2ag_mrj` / `_nonag2ag_mrj` / `_ag2nonag_rk`) —
+  keyed/shaped like the flow_cost dicts, `= (target ub>0) ∧ (source T_MAT row) ∧ (¬diagonal)`. The
+  solver's `_setup_flow_vars` is now pure materialisation (the opaque dense `ag_exists` rebuild is
+  gone). Culling is decommissioned (incompatible with per-source flow; module kept for reference,
+  nothing imports it).
+- **Solution now carries source-keyed delta dicts**: `dvar_D_ag2ag_mrj` / `_ag2nonag_rk` /
+  `_nonag2ag_mrj`, extracted from the SOLVED `F_*` vars (not `max(0,X_new−x_old)` — an X-diff can
+  neither split ag2ag from nonag2ag inflows nor attribute a flow to its source). Stored per year on
+  `data.delta_dvars_ag2ag` / `_ag2nonag` / `_nonag2ag`. `nonag2ag` covers reversible Destocked→ag.
+
+### write.py Phase-4 rebuild (5 functions + the start→end matrix)
+
+All transition blocks rebuilt as `Σ_src leaf[src]·D[src]`, scattered to global cells via the base-year
+source maps; schemas (filenames, CSV columns, NetCDF layer dims) preserved so the Vue report is
+unaffected. Functions: `write_transition_ag2ag`, `write_transition_ag2nonag`,
+`write_transition_nonag2ag` (incl. the previously-placeholder Destocked→ag area),
+`write_economics` (ag2ag + ag2nonag transition cost), `write_ghg` (transition-GHG account).
+Each validated against an independent `Σ leaf·D/gap` recomputation at ~1e-7, with cross-function
+agreement (economics ag2ag total ≡ transition_ag2ag_cost total).
+
+- **`write_area_transition_start_end` rebuilt as a per-cell Markov chain** over land pools. The old
+  `dvar_start × dvar_end` composition cross-product assumed independence; the new code forward-
+  propagates an attribution matrix `A[cell, start_pool, current_pool]` period-by-period from the delta
+  dicts (all 3 directions), so multi-hop paths resolve to true start→end pairs (e.g. Beef→Sheep→EP →
+  a single **Beef→EP** row, zero intermediates). Validated: synthetic 2-hop exact; real single-hop
+  mass-conserves (rel 5e-8) and moved-area ≡ ΣD×area (rel 5e-8).
+- **ag2nonag double-weighting bug fixed** in the old `write_transition_ag2nonag` (it multiplied
+  per-unit × delta AND × target dvar).
+- **Water semantic fix**: `transition_ag2ag_water` reported a $-valued licence-cost delta under the
+  "ML" label; now the true ML requirement change (`wreq[to] − wreq[from]`).
+
+### Why true transition cost ≪ the old lumap approximation
+
+On ONE solved solution reported both ways (same per-source cost data), the true flow cost is
+**~16%** of the composition cross-product (`true/lumap ≈ 0.16` for both cost and area). The cross-
+product over-counts because for a fully-ag cell it evaluates to `1 − Σ_j base_j·target_j` — the cell's
+**Gini–Simpson diversity**, not its change. A mixed cell that *stays put* (base=target=`p_j`) is still
+charged `1 − Σ p_j²` (≈ 1−1/N ≈ 0.83 for an N≈6-way cell at RF5) while the true flow `D`=0. So the
+error is `(actual churn) / (compositional diversity)` and scales with RESFACTOR (near-zero at RF1,
+large at RF5). The transition-cost drop seen against the old baseline is therefore substantially a
+**reporting-correctness** effect (removing phantom transitions), not the solver moving less land.
+
+### Model size / solve time (RF5, 2010→2020 step: flow vs old target-based baseline)
+
+| | target-based baseline | per-source flow | Δ |
+|---|---|---|---|
+| rows | 2,226,970 | 4,653,753 | +109% |
+| columns | 3,125,985 | 7,308,928 | +134% (+3.70M delta vars) |
+| nonzeros | 16,665,749 | 32,987,886 | +98% |
+| presolve | 8.1s | 26.9s | 3.3× |
+| barrier | 115.7s (98 it) | 579.3s (188 it) | 5.0× |
+| total solve | 121.0s | 589.9s | **≈4.9×** |
+
+Slowdown is transition-magnitude dependent (2010→2020 is the largest reallocation, 3.7M delta vars;
+a mid-horizon 2030→2035 step was ~1.7×). The trade is deliberate: a heavier solve buys exact,
+auditable transition accounting and a write side that reads flows instead of re-modelling them.
+(Raw solver objective is the internal rescaled value — not comparable across formulations; the
+economic comparison lives in the output CSVs.)
+
+---
+
 ## 20260701 — pre-solver transition-cost validation (L0–L6): 5 bugs fixed + source-keyed flow_ghg
 
 ### TL;DR
