@@ -42,6 +42,19 @@ from luto.tools.report.data_tools.parameters import (
 
 
 # Helper functions
+def _read_concat(paths, ignore_index=True):
+    """Read every CSV in `paths` and concat, skipping empty files. If ALL are empty, return a
+    single empty frame carrying the first path's columns (schema) so downstream .assign/.replace/
+    column ops do not crash. Replaces the fragile `pd.concat([... if not df.empty])` idiom, which
+    raised "No objects to concatenate" when a category was empty in every year (e.g. a scenario
+    with zero non-ag revenue)."""
+    frames = [df for _p in paths if not (df := pd.read_csv(_p, engine='pyarrow')).empty]
+    if frames:
+        return pd.concat(frames, ignore_index=ignore_index)
+    paths = list(paths)
+    return pd.read_csv(paths[0], engine='pyarrow') if paths else pd.DataFrame()
+
+
 def get_rank_color(x):
     """Get rank color based on value."""
     if x in [None, np.nan, 'N.A.']:
@@ -318,14 +331,14 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
     ag_dvar_area['Area (ha)'] = ag_dvar_area['Area (ha)'].round(2)
 
     non_ag_dvar_dfs = area_dvar_paths.query('base_name == "area_non_agricultural_landuse"').reset_index(drop=True)
-    non_ag_dvar_area = pd.concat([df for path in non_ag_dvar_dfs['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    non_ag_dvar_area = _read_concat(non_ag_dvar_dfs['path'])
     non_ag_dvar_area['Land-use'] = non_ag_dvar_area['Land-use'].replace(RENAME_NON_AG).infer_objects(copy=False)
     non_ag_dvar_area['Category'] = non_ag_dvar_area['Land-use'].map(lu_group_map)
     non_ag_dvar_area['Source'] = 'Non-Agricultural Land-use'
     non_ag_dvar_area['Area (ha)'] = non_ag_dvar_area['Area (ha)'].round(2)
 
     am_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_management"').reset_index(drop=True)
-    am_dvar_area = pd.concat([df for path in am_dvar_dfs['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    am_dvar_area = _read_concat(am_dvar_dfs['path'])
     am_dvar_area = am_dvar_area.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
     am_dvar_area['Source'] = 'Agricultural Management'
     am_dvar_area['Area (ha)'] = am_dvar_area['Area (ha)'].round(2)
@@ -511,35 +524,35 @@ def process_economics_data(files, SAVE_DIR):
     cost_ag_df['Value ($)'] = cost_ag_df['Value ($)'] * -1          # Convert cost to negative value
 
     revenue_am_df = files.query('base_name == "economics_am_revenue"').reset_index(drop=True)
-    revenue_am_df = pd.concat([df for path in revenue_am_df['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    revenue_am_df = _read_concat(revenue_am_df['path'])
     revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Management (revenue)')
 
     cost_am_df = files.query('base_name == "economics_am_cost"').reset_index(drop=True)
-    cost_am_df = pd.concat([df for path in cost_am_df['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    cost_am_df = _read_concat(cost_am_df['path'])
     cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Management (cost)')
     cost_am_df['Value ($)'] = cost_am_df['Value ($)'] * -1          # Convert cost to negative value
 
     revenue_non_ag_df = files.query('base_name == "economics_non_ag_revenue"').reset_index(drop=True)
-    revenue_non_ag_df = pd.concat([df for path in revenue_non_ag_df['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    revenue_non_ag_df = _read_concat(revenue_non_ag_df['path'])
     revenue_non_ag_df = revenue_non_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Non-Agricultural Land-use (revenue)')
 
     cost_non_ag_df = files.query('base_name == "economics_non_ag_cost"').reset_index(drop=True)
-    cost_non_ag_df = pd.concat([df for path in cost_non_ag_df['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    cost_non_ag_df = _read_concat(cost_non_ag_df['path'])
     cost_non_ag_df = cost_non_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Non-Agricultural Land-use (cost)')
     cost_non_ag_df['Value ($)'] = cost_non_ag_df['Value ($)'] * -1  # Convert cost to negative value
 
     cost_transition_ag2ag_df = files.query('base_name == "transition_ag2ag_cost"').reset_index(drop=True)
-    cost_transition_ag2ag_df = pd.concat([df for path in cost_transition_ag2ag_df['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    cost_transition_ag2ag_df = _read_concat(cost_transition_ag2ag_df['path'])
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
 
     cost_transition_ag2non_ag_df = files.query('base_name == "transition_ag2nonag_cost"').reset_index(drop=True)
-    cost_transition_ag2non_ag_df = pd.concat([df for path in cost_transition_ag2non_ag_df['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    cost_transition_ag2non_ag_df = _read_concat(cost_transition_ag2non_ag_df['path'])
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
 
     cost_transition_non_ag2ag_df = files.query('base_name == "transition_nonag2ag_cost"').reset_index(drop=True)
-    cost_transition_non_ag2ag_df = pd.concat([df for path in cost_transition_non_ag2ag_df['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    cost_transition_non_ag2ag_df = _read_concat(cost_transition_non_ag2ag_df['path'])
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
 
@@ -1741,7 +1754,7 @@ def process_renewable_data(files, SAVE_DIR, years):
 
     # Targets (state-level only → tagged as region_state)
     re_targets_files = files.query('base_name.str.contains("renewable_energy_targets")').reset_index(drop=True)
-    re_targets_df = pd.concat([df for path in re_targets_files['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    re_targets_df = _read_concat(re_targets_files['path'])
     re_targets_df['region_level'] = 'region_state'
     re_targets_df_wide = groupby_to_records(re_targets_df, ['region_level', 'region', 'am', 'lm'], ['region_level', 'region', 'am', 'lm', 'data'], value_cols=('Year', 'Value (MWh)'))
     re_targets_df_wide['type'] = 'line'
@@ -1782,15 +1795,15 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     GHG_ag = GHG_ag.replace(GHG_NAMES).infer_objects(copy=False).round({'Value (t CO2e)': 2})
 
     GHG_non_ag = GHG_files.query('base_name.str.contains("no_ag_reduction")').reset_index(drop=True)
-    GHG_non_ag = pd.concat([df for path in GHG_non_ag['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    GHG_non_ag = _read_concat(GHG_non_ag['path'])
     GHG_non_ag = GHG_non_ag.replace(RENAME_AM_NON_AG).infer_objects(copy=False).round({'Value (t CO2e)': 2})
     
     GHG_ag_man = GHG_files.query('base_name.str.contains("agricultural_management")').reset_index(drop=True)
-    GHG_ag_man = pd.concat([df for path in GHG_ag_man['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    GHG_ag_man = _read_concat(GHG_ag_man['path'])
     GHG_ag_man = GHG_ag_man.replace(RENAME_AM_NON_AG).infer_objects(copy=False).round({'Value (t CO2e)': 2})
 
     GHG_transition = GHG_files.query('base_name.str.contains("transition_penalty")').reset_index(drop=True)
-    GHG_transition = pd.concat([df for path in GHG_transition['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+    GHG_transition = _read_concat(GHG_transition['path'])
     GHG_transition = GHG_transition.replace(RENAME_AM_NON_AG).infer_objects(copy=False).round({'Value (t CO2e)': 2})
     GHG_transition = GHG_transition.query('Type != "ALL" and Water_supply != "ALL"').reset_index(drop=True)
 
@@ -2757,7 +2770,7 @@ def process_transition_data(files, SAVE_DIR):
     )
 
     trans_area_df = (
-        pd.concat([df for path in trans_area_files['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+        _read_concat(trans_area_files['path'])
         .replace(RENAME_AM_NON_AG)
         .infer_objects(copy=False)
         .round({'Transition Area (ha)': 2})
@@ -2841,7 +2854,7 @@ def process_transition_data(files, SAVE_DIR):
     )
 
     trans_area_ag2nonag_df = (
-        pd.concat([df for path in trans_area_ag2nonag_files['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+        _read_concat(trans_area_ag2nonag_files['path'])
         .replace(RENAME_AM_NON_AG)
         .infer_objects(copy=False)
         .round({'Transition Area (ha)': 2})
@@ -2919,7 +2932,7 @@ def process_transition_data(files, SAVE_DIR):
 
     if not trans_cost_ag2ag_files.empty:
         trans_cost_ag2ag_df = (
-            pd.concat([df for path in trans_cost_ag2ag_files['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+            _read_concat(trans_cost_ag2ag_files['path'])
             .replace(RENAME_AM_NON_AG)
             .infer_objects(copy=False)
             .round({'Cost ($)': 2})
@@ -2983,7 +2996,7 @@ def process_transition_data(files, SAVE_DIR):
 
     if not trans_cost_ag2nonag_files.empty:
         trans_cost_ag2nonag_df = (
-            pd.concat([df for path in trans_cost_ag2nonag_files['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)
+            _read_concat(trans_cost_ag2nonag_files['path'])
             .replace(RENAME_AM_NON_AG)
             .infer_objects(copy=False)
             .round({'Cost ($)': 2})
@@ -3062,7 +3075,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     '''.strip().replace('\n','')
     
     bio_paths = files.query(filter_str).reset_index(drop=True)
-    bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty], ignore_index=True)\
+    bio_df = _read_concat(bio_paths['path'])\
         .replace(RENAME_AM_NON_AG)\
         .infer_objects(copy=False)\
         .rename(columns={'Contribution Relative to Base Year Level (%)': 'Value (%)'})\
@@ -3405,7 +3418,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
-        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty])
+        bio_df = _read_concat(bio_paths['path'], ignore_index=False)
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
@@ -3602,7 +3615,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         '''.strip().replace('\n', '')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
-        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty])
+        bio_df = _read_concat(bio_paths['path'], ignore_index=False)
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
@@ -3753,7 +3766,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     if settings.WRITE_GBF4_ECNES != 'off':
         #---------------- (GBF4 ECNES) ----------------
         bio_paths = files.query('base_name.str.contains("biodiversity_GBF4_ECNES_scores")')
-        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty])
+        bio_df = _read_concat(bio_paths['path'], ignore_index=False)
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={
@@ -3946,7 +3959,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
-        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty])
+        bio_df = _read_concat(bio_paths['path'], ignore_index=False)
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Species':'species'})\
@@ -4075,7 +4088,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     
         # ---------------- (GBF8 GROUP)  ----------------
         bio_paths = files.query('base_name.str.contains("biodiversity_GBF8_groups_scores")')
-        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path, engine='pyarrow')).empty])
+        bio_df = _read_concat(bio_paths['path'], ignore_index=False)
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Group':'species'})\
