@@ -405,6 +405,25 @@ def process_chunks(trans_xr, data, yr_cal, chunk_size, groupby_cols, value_col, 
     return pd.concat(level_frames, ignore_index=True)
 
 
+def save_flow_layers(layer_builder, valid_mi, dims, ncells, save_path):
+    """Materialise the valid transition-flow layers and save as a stacked (cell, layer) NetCDF.
+
+    `layer_builder(keys)` → {key_tuple: (NCELLS,) float32}; keys may contain 'ALL' entries.
+    If no layer passed the report threshold (e.g. the base year), a single all-'ALL' zero layer
+    is written so the output schema stays alive.
+    """
+    if len(valid_mi) == 0:
+        valid_mi = pd.MultiIndex.from_tuples([tuple(['ALL'] * len(dims))], names=dims)
+    keys = list(valid_mi)
+    arrays = layer_builder(keys)
+    stacked = xr.DataArray(
+        np.stack([arrays[k] for k in keys], axis=1).astype(np.float32),
+        dims=['cell', 'layer'],
+        coords={'cell': range(ncells)},
+    ).assign_coords(xr.Coordinates.from_pandas_multiindex(valid_mi, 'layer'))
+    save2nc(stacked, save_path)
+
+
 # ── Config / Orchestration ────────────────────────────────────────────────────
 
 def write_outputs(data: Data):
@@ -1026,9 +1045,15 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
 def write_economics(data: Data, yr_cal, path):
     """Mixed annualisation: revenue/cost matrices (`get_rev_matrices`, `get_cost_matrices`,
     existing-capacity OPEX/revenue) are already annual rates and are NOT divided by `gap`.
-    Transition-related terms (`ag2ag_mrj` establishment cost, existing-capacity CAPEX delta,
-    `nonag2nonag_mat`, `ag2nonag_mat`) represent a one-off cost incurred over the period since
-    the previous simulated year and ARE divided by `gap` to annualise."""
+    Transition-related terms (ag2ag / ag2nonag paid costs, existing-capacity CAPEX delta,
+    `nonag2nonag_mat`) represent a one-off cost incurred over the period since the previous
+    simulated year and ARE divided by `gap` to annualise.
+
+    Transition costs are the TRUE per-source flow costs `Σ_src cost[src]·D[src]` — the exact
+    quantities the solver charged — computed from the solved delta dicts
+    (`data.delta_dvars_ag2ag[yr_cal]` / `data.delta_dvars_ag2nonag[yr_cal]`, source-keyed with leaves
+    over each source's dvar>θ cells at the previous simulated year). They are absolute $ paid,
+    so they are NOT multiplied by any dvar downstream."""
     yr_idx = yr_cal - data.YR_CAL_BASE
     gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
 
@@ -1048,40 +1073,29 @@ def write_economics(data: Data, yr_cal, path):
                        region_NRM=('cell', data.REGION_NRM_NAME))
     )
 
-    # Delta dvar: only net increases in allocation pay transition costs.
-    # When TRANSITION_MODE != 'crisp', use the solver's D vars directly — they are
-    # exactly max(0, X_new - x_old) at optimality and match what entered the objective.
-    # Otherwise fall back to clipping the dvar difference.
-    if settings.TRANSITION_MODE != 'crisp' and data.ag_delta_dvars.get(yr_cal) is not None:
-        ag_dvar_mrj_delta = chunk_unify_size(
-            tools.ag_mrj_to_xr(data, data.ag_delta_dvars[yr_cal])
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME),
-                        region_NRM=('cell', data.REGION_NRM_NAME))
-    elif yr_cal_sim_pre is not None:
-        ag_dvar_mrj_delta = chunk_unify_size(
-            tools.ag_mrj_to_xr(
-                data,
-                np.clip(data.ag_dvars[yr_cal] - data.ag_dvars[yr_cal_sim_pre], 0, None)
-            )
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME),
-                        region_NRM=('cell', data.REGION_NRM_NAME))
-    else:
-        ag_dvar_mrj_delta = ag_dvar_mrj  # base year: ag2ag_mrj is zeros, so value is immaterial
-
     ag_rev_df = ag_revenue.get_rev_matrices(data, yr_idx, aggregate=False)
     ag_cost_df = ag_cost.get_cost_matrices(data, yr_idx, aggregate=False)
     ag_rev_df.columns.names = ag_cost_df.columns.names = ['lu', 'lm', 'source']
 
+    # TRUE ag→ag transition cost paid: Σ_src cost[src]·D[src] per cost component, scattered to
+    # global cells. Both dicts share the (from_m, from_j) keys and each source's dvar>θ cell axis
+    # (get_base_dvar_mj_cell_map at the previous simulated year), so the product is exact.
     if yr_cal_sim_pre is not None:
-        ag2ag_mrj   = ag_transitions.get_transition_matrices_ag2ag_from_base_year(
-            data, yr_idx, yr_cal_sim_pre, separate=True)
-        nonag2ag_mrj = non_ag_transitions.get_transition_matrix_nonag2ag(
-            data, yr_cal_sim_pre, data.YR_CAL_BASE + yr_idx, separate=True)
+        ag2ag_paid   = {}   # {cost_type: dense (NLMS, NCELLS, N_AG_LUS) of $ paid on [to_m, r, to_j]}
+        mj_cell_map  = ag_transitions.get_base_dvar_mj_cell_map(data, yr_cal_sim_pre)
+        dvar_D_ag2ag = data.delta_dvars_ag2ag[yr_cal]   # always present for a solved year
+        for (from_m, from_j), cell_idx in mj_cell_map.items():
+            cost_leaves = ag_transitions.get_transition_matrices_ag2ag(
+                data, yr_idx, from_m, from_j, cell_idx, separate=True)
+            D = dvar_D_ag2ag[(from_m, from_j)]                                  # (NLMS, ncells_src, N_AG_LUS)
+            for cost_type, cost_arr in cost_leaves.items():
+                paid = ag2ag_paid.setdefault(
+                    cost_type, np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32))
+                paid[:, cell_idx, :] += cost_arr * D
     else:
-        ag2ag_mrj    = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)}
-        nonag2ag_mrj = {}
-    del nonag2ag_mrj  # intentionally unused in economics — see below
-    ag2ag_mrj = {k: v / gap for k, v in ag2ag_mrj.items()}
+        # Base year (no previous simulated year → no transitions): zero placeholder keeps the schema alive.
+        ag2ag_paid = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)}
+    ag2ag_paid = {k: v / gap for k, v in ag2ag_paid.items()}
 
     # ── profit_ag: sum over source from DataFrames (never builds 4D array) ──
     rev_sum_df  = ag_rev_df.T.groupby(level=['lu', 'lm']).sum().T.astype(np.float32)
@@ -1097,7 +1111,7 @@ def write_economics(data: Data, yr_cal, path):
         coords={'cell': range(data.NCELLS), 'layer': cost_sum_df.columns}
     ).unstack('layer'))
 
-    ag2ag_sum_arr = np.sum(np.stack(list(ag2ag_mrj.values())), axis=0)  # (NLMS, NCELLS, N_AG_LUS)
+    ag2ag_sum_arr = np.sum(np.stack(list(ag2ag_paid.values())), axis=0)  # (NLMS, NCELLS, N_AG_LUS), $ paid
     ag2ag_sum_xr  = chunk_unify_size(xr.DataArray(
         ag2ag_sum_arr,
         dims=['lm', 'cell', 'lu'],
@@ -1105,13 +1119,10 @@ def write_economics(data: Data, yr_cal, path):
     ))
     del ag2ag_sum_arr
 
-    # NonAg→Ag transition costs are intentionally excluded from profit_ag here.
-    # The original write_economics() always used np.zeros() for nonag2ag_smrj
-    # (the actual values from nonag2ag_mrj were never filled in). These costs are
-    # handled separately by write_transition_nonag2ag(). Matching that behaviour.
-    # Transition cost is charged on the delta dvar (net increases only) so heterogeneous
-    # base-year cells at RESFACTOR>1 do not accumulate phantom cross-LU transition costs.
-    xr_profit_ag = ag_dvar_mrj * (rev_sum_xr - cost_sum_xr) - ag_dvar_mrj_delta * ag2ag_sum_xr
+    # NonAg→Ag transition costs are intentionally excluded from profit_ag here — they are
+    # handled separately by write_transition_nonag2ag(). ag2ag_sum_xr is already the absolute
+    # $ paid (Σ cost·D), so it is subtracted directly — no dvar multiplication.
+    xr_profit_ag = ag_dvar_mrj * (rev_sum_xr - cost_sum_xr) - ag2ag_sum_xr
     del rev_sum_xr, cost_sum_xr, ag2ag_sum_xr
 
     # raw_profit_ag for Sum Profit (computed now so ag_dvar_mrj can be freed)
@@ -1142,24 +1153,22 @@ def write_economics(data: Data, yr_cal, path):
     xr_ag_cost = xr.concat(parts, dim='source')
     del parts
 
-    # ag2ag: loop over transition types (small, but keeps same pattern)
+    # ag2ag: loop over cost components — values are already $ paid (Σ cost·D), no dvar multiplication.
     ag2ag_parts = []
-    for src_name, src_arr in ag2ag_mrj.items():
+    for src_name, src_arr in ag2ag_paid.items():
         src_xr = chunk_unify_size(xr.DataArray(
             src_arr, dims=['lm', 'cell', 'lu'],
             coords={'lm': data.LANDMANS, 'cell': range(data.NCELLS),
                     'lu': data.AGRICULTURAL_LANDUSES}
         ))
-        ag2ag_parts.append((ag_dvar_mrj_delta * src_xr).expand_dims({'source': [src_name]}).compute())
+        ag2ag_parts.append(src_xr.expand_dims({'source': [src_name]}).compute())
         del src_xr
     xr_ag2ag_cost = xr.concat(ag2ag_parts, dim='source')
-    del ag2ag_parts, ag2ag_mrj
+    del ag2ag_parts, ag2ag_paid
 
     # ── nonag2ag: output zeros, matching original write_economics() design ────
-    # nonag2ag_mrj contains real cost arrays but they represent potential costs
-    # for cells CURRENTLY under NonAg land use. write_economics() has always
-    # excluded these from the Ag profit calculation (nonag2ag_smrj = np.zeros()
-    # in the original). The actual transition outputs live in write_transition_nonag2ag().
+    # NonAg→Ag transition costs are excluded from the Ag economics here by design; the actual
+    # per-source outputs (Σ cost·D from data.delta_dvars_nonag2ag) live in write_transition_nonag2ag().
     # Because we set valid_nonag2ag_cost_layers directly (never via to_region_and_aus_df),
     # the original `if len(valid_nonag2ag_cost_layers) == 0` sentinel guard is not needed
     # here. If this zero-bypass is ever removed, restore that guard.
@@ -1178,7 +1187,7 @@ def write_economics(data: Data, yr_cal, path):
                 'layer': valid_nonag2ag_cost_layers},
     )
 
-    del ag_dvar_mrj, ag_dvar_mrj_delta
+    del ag_dvar_mrj
     gc.collect()
 
     # ── add_all, aggregate, save ──────────────────────────────────────────────
@@ -1413,24 +1422,36 @@ def write_economics(data: Data, yr_cal, path):
     non_ag_cost_mat = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, data.lumaps[yr_cal], yr_cal))
     nonag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_nonag2nonag_transition_matrix(data)) / gap
 
-    if yr_cal_sim_pre is None:
-        ag2nonag_mat = xr.DataArray(np.zeros((data.NCELLS, len(data.NON_AGRICULTURAL_LANDUSES)), dtype=np.float32),
-            dims=['cell', 'lu'], coords={'cell': range(data.NCELLS), 'lu': data.NON_AGRICULTURAL_LANDUSES})
-    else:
-        ag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_transition_matrix_ag2nonag(
-            data, yr_cal_sim_pre, yr_cal,
-            ).astype(np.float32)) / gap
+    # TRUE ag→nonag transition cost paid: Σ_src cost[src]·D[src] per target k, scattered to global
+    # cells. cost is {lu_name: {(from_m, from_j): (ncells_src,)}} (per-cell $ to convert to that
+    # target k); D is {(from_m, from_j): (ncells_src, N_NON_AG_LUS)} — same keys, same cell axis.
+    ag2nonag_paid_rk = np.zeros((data.NCELLS, len(data.NON_AGRICULTURAL_LANDUSES)), dtype=np.float32)
+    if yr_cal_sim_pre is not None:
+        mj_cell_map       = ag_transitions.get_base_dvar_mj_cell_map(data, yr_cal_sim_pre)
+        dvar_D_ag2nonag   = data.delta_dvars_ag2nonag[yr_cal]   # always present for a solved year
+        ag2nonag_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(data, yr_cal_sim_pre, yr_cal)
+        for lu_name, per_src in ag2nonag_cost_mat.items():
+            k = data.NON_AGRICULTURAL_LANDUSES.index(lu_name)
+            for (from_m, from_j), cost_r in per_src.items():
+                cells = mj_cell_map[(from_m, from_j)]
+                ag2nonag_paid_rk[cells, k] += cost_r * dvar_D_ag2nonag[(from_m, from_j)][:, k]
+        del ag2nonag_cost_mat
+    xr_ag2nonag_paid = tools.non_ag_rk_to_xr(data, ag2nonag_paid_rk / gap
+        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME),
+                        region_NRM=('cell', data.REGION_NRM_NAME))
 
-    non_ag_profit_mat = non_ag_rev_mat - (non_ag_cost_mat + nonag2nonag_mat + ag2nonag_mat)
-    raw_profit_nonag = (non_ag_dvar * non_ag_profit_mat).drop_vars(['region_state', 'region_NRM'], errors='ignore')
+    # nonag2nonag stays per-unit (currently a ZERO matrix — non-ag↛non-ag is disallowed).
+    non_ag_profit_mat = non_ag_rev_mat - (non_ag_cost_mat + nonag2nonag_mat)
+    raw_profit_nonag = (non_ag_dvar * non_ag_profit_mat - xr_ag2nonag_paid
+                        ).drop_vars(['region_state', 'region_NRM'], errors='ignore')
 
     xr_revenue_non_ag = non_ag_dvar * non_ag_rev_mat
     xr_cost_non_ag    = non_ag_dvar * non_ag_cost_mat
     xr_nonag2nonag    = non_ag_dvar * nonag2nonag_mat
-    xr_ag2nonag       = non_ag_dvar * ag2nonag_mat
-    xr_non_ag_profit  = non_ag_dvar * non_ag_profit_mat
+    xr_ag2nonag       = xr_ag2nonag_paid   # already $ paid — no dvar multiplication
+    xr_non_ag_profit  = non_ag_dvar * non_ag_profit_mat - xr_ag2nonag_paid
 
-    del non_ag_rev_mat, non_ag_cost_mat, nonag2nonag_mat, ag2nonag_mat, non_ag_profit_mat, non_ag_dvar
+    del non_ag_rev_mat, non_ag_cost_mat, nonag2nonag_mat, non_ag_profit_mat, non_ag_dvar, xr_ag2nonag_paid
     del ag_rev_mrj, ag_cost_mrj
     gc.collect()
 
@@ -1675,614 +1696,449 @@ def write_renewable_production(data: Data, yr_cal, path):
 # ── Transitions ──────────────────────────────────────────────────────────────
 
 def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
-    """Annualised by `gap`: transition area/cost/GHG/water matrices represent a one-off
-    change incurred over the period since the previous simulated year, so are divided
-    by `gap` to express as an annual rate."""
+    """Ag→ag transition reporting from the solved per-source flow deltas.
 
-    # Set up
-    simulated_year_list = sorted(list(data.lumaps.keys()))
+    Every quantity is the TRUE flow `Σ_src leaf[src]·D[src]` over the solved delta dict
+    `data.delta_dvars_ag2ag[yr_cal]` ({(from_m, from_j): [to_m, local_r, to_j]} over each source's
+    dvar>θ cells at the previous simulated year) — the exact per-source from→to attribution the
+    solver priced, replacing the old `dvar_base × dvar_target × per-unit-matrix` compositional
+    approximation:
+      - Area  : D × REAL_AREA                          ha moved from → to
+      - Cost  : per-source transition-cost leaves × D  $ paid, per Cost-type
+      - GHG   : per-source transition emissions × D    t CO2e, per GHG-type
+      - Water : (target wreq − source wreq) × D        ML requirement change (TRUE ML; previously
+                the $-valued licence-cost delta was reported under the ML label)
+    All annualised by `gap` (one-off change over the period since the previous simulated year).
+    At the base year there are no transitions: CSVs are header-only and each NetCDF carries a single
+    all-'ALL' zero layer to keep the schema alive.
+    """
+    from itertools import combinations
+
     yr_idx = yr_cal - data.YR_CAL_BASE
-    chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
     gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
 
-    # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
+    simulated_year_list = sorted(data.lumaps.keys())
     yr_idx_sim = simulated_year_list.index(yr_cal)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
+    lm_names = list(data.LANDMANS)
+    ag_names = list(data.AGRICULTURAL_LANDUSES)
+
     if yr_cal == data.YR_CAL_BASE:
-        base_lumap = base_lmmap = l_mrj = l_mrj_not = x_mrj = None
+        mj_cell_map, dvar_D, w_mrj_full = {}, {}, None
     else:
-        base_lumap = data.lumaps[yr_cal_sim_pre]
-        base_lmmap = data.lmmaps[yr_cal_sim_pre]
-        l_mrj = tools.lumap2ag_l_mrj(base_lumap, base_lmmap)
-        l_mrj_not = np.logical_not(l_mrj)
-        x_mrj = ag_transitions.get_to_ag_exclude_matrices_crisp(data, base_lumap)
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, yr_cal_sim_pre)
+        dvar_D      = data.delta_dvars_ag2ag[yr_cal]     # always present for a solved year
+        w_mrj_full  = ag_water.get_wreq_matrices(data, yr_idx)
 
-    # Get the decision variables for agricultural land-use
-    ag_dvar_mrj_target = tools.ag_mrj_to_xr(
-        data, 
-        data.ag_dvars[yr_cal]
-    ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
-    
-    ag_dvar_mrj_base = tools.ag_mrj_to_xr(
-        data, 
-        (tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]))
-    )
+    # Region groupings (sorted unique names + integer codes, matching process_chunks).
+    reg_info = []
+    for level, labels in (('region_state', data.REGION_STATE_NAME), ('region_NRM', data.REGION_NRM_NAME)):
+        uniq, codes = np.unique(labels, return_inverse=True)
+        reg_info.append((level, codes, uniq))
 
-    ag_dvar_mrj_target = ag_dvar_mrj_target.rename({'lm': 'To-water-supply', 'lu': 'To-land-use'}
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': chunk_size})
+    def _flow_report(leaf_fn, type_dim, dims, value_col):
+        """Aggregate `leaf × D / gap` over all sources.
 
-    ag_dvar_mrj_base = ag_dvar_mrj_base.rename({'lm': 'From-water-supply', 'lu': 'From-land-use'}
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': chunk_size})
+        leaf_fn(fm, fj, cells) → {type_name (or None): (NLMS, n, N_AG_LUS) per-unit quantity}.
+        Returns (region_df, layer_builder):
+          - region_df: long df with the full ALL-lattice (like add_all → process_chunks), columns
+            [*dims, region, value_col, Year, region_level], |value| > 1 filtered.
+          - layer_builder(valid_keys) → {key: (NCELLS,) float32} dense cell arrays, where keys may
+            contain 'ALL' entries (summed over the matching sources/targets).
+        """
+        keep_ws = 'To-water-supply' in dims
+        rows = []
+        for (fm, fj), cells in mj_cell_map.items():
+            D = dvar_D[(fm, fj)]
+            for tname, leaf in leaf_fn(fm, fj, cells).items():
+                q = (leaf * D) / gap                                            # (NLMS, n, N_AG_LUS)
+                key_from = {'From-water-supply': lm_names[fm], 'From-land-use': ag_names[fj]}
+                if type_dim:
+                    key_from[type_dim] = tname
+                for level, codes, uniq in reg_info:
+                    if keep_ws:
+                        for to_m in range(data.NLMS):
+                            sums = np.zeros((len(uniq), data.N_AG_LUS))
+                            np.add.at(sums, codes[cells], q[to_m])
+                            for ri, tj in np.argwhere(np.abs(sums) > 0):
+                                rows.append({**key_from, 'To-water-supply': lm_names[to_m],
+                                             'To-land-use': ag_names[tj], 'region_level': level,
+                                             'region': uniq[ri], value_col: float(sums[ri, tj])})
+                    else:
+                        sums = np.zeros((len(uniq), data.N_AG_LUS))
+                        np.add.at(sums, codes[cells], q.sum(axis=0))            # collapse To-ws
+                        for ri, tj in np.argwhere(np.abs(sums) > 0):
+                            rows.append({**key_from, 'To-land-use': ag_names[tj], 'region_level': level,
+                                         'region': uniq[ri], value_col: float(sums[ri, tj])})
 
-    # Delta dvars: only pay transition cost for INCREASES in allocation.
-    # When TRANSITION_MODE != 'crisp', use solver D vars directly — they are
-    # exactly max(0, X_new - x_old) at optimality and match what entered the objective.
-    # Otherwise fall back to clipping the dvar difference.
-    if settings.TRANSITION_MODE != 'crisp' and data.ag_delta_dvars.get(yr_cal) is not None:
-        ag_dvar_mrj_delta = tools.ag_mrj_to_xr(
-            data, data.ag_delta_dvars[yr_cal]
-        ).rename({'lm': 'To-water-supply', 'lu': 'To-land-use'}
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': chunk_size})
-    elif yr_cal != data.YR_CAL_BASE:
-        ag_dvar_mrj_old = tools.ag_mrj_to_xr(
-            data, data.ag_dvars[yr_cal_sim_pre]
-        ).rename({'lm': 'To-water-supply', 'lu': 'To-land-use'}
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': chunk_size})
-        ag_dvar_mrj_delta = (ag_dvar_mrj_target - ag_dvar_mrj_old).clip(min=0)
-    else:
-        ag_dvar_mrj_delta = ag_dvar_mrj_target
+        col_order = dims + ['region', value_col, 'Year', 'region_level']
+        if not rows:
+            region_df = pd.DataFrame(columns=col_order)
+        else:
+            leaf_df = pd.DataFrame(rows)
+            # Full ALL-lattice over the layer dims (same result as add_all before aggregation).
+            frames = []
+            for k in range(len(dims) + 1):
+                for combo in combinations(dims, k):
+                    g = leaf_df.copy()
+                    for c in combo:
+                        g[c] = 'ALL'
+                    frames.append(g.groupby(['region_level', 'region'] + dims, as_index=False)[value_col].sum())
+            region_df = pd.concat(frames, ignore_index=True)
+            region_df = region_df[np.abs(region_df[value_col]) > 1]             # match process_chunks filter
+            region_df = region_df.assign(Year=yr_cal)[col_order]
 
+        def layer_builder(valid_keys):
+            arrays = {key: np.zeros(data.NCELLS, dtype=np.float32) for key in valid_keys}
+            for (fm, fj), cells in mj_cell_map.items():
+                D = dvar_D[(fm, fj)]
+                for tname, leaf in leaf_fn(fm, fj, cells).items():
+                    q = (leaf * D) / gap
+                    q_ws_sum = q.sum(axis=0)
+                    for key in valid_keys:
+                        kd = dict(zip(dims, key))
+                        if kd.get('From-water-supply', 'ALL') not in ('ALL', lm_names[fm]):
+                            continue
+                        if kd.get('From-land-use', 'ALL') not in ('ALL', ag_names[fj]):
+                            continue
+                        if type_dim and kd[type_dim] not in ('ALL', tname):
+                            continue
+                        tw = kd.get('To-water-supply', 'ALL')
+                        qq = q[lm_names.index(tw)] if tw != 'ALL' else q_ws_sum     # (n, N_AG)
+                        tl = kd.get('To-land-use', 'ALL')
+                        v = qq[:, ag_names.index(tl)] if tl != 'ALL' else qq.sum(axis=1)
+                        arrays[key][cells] += v                                     # cells unique per source
+            return arrays
+
+        return region_df, layer_builder
+
+    def _save_layers(layer_builder, valid_mi, dims, fname):
+        save_flow_layers(layer_builder, valid_mi, dims, data.NCELLS, os.path.join(path, fname))
 
     # ==================== Transitions - Area ====================
+    dims_area = ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']
 
-    if yr_idx == 0:
-        # If it's the first year, we assume no transition cost (i.e., all land remains the same)
-        ag_trans_mat = xr.DataArray(
-            np.zeros_like(data.AG_L_MRJ).astype(np.float32),
-            coords={
-                'To-water-supply': data.LANDMANS,
-                'cell': range(data.NCELLS),
-                'To-land-use': data.AGRICULTURAL_LANDUSES,
-            }
-        )
-    else:
-        # Get the transition area matrices for agricultural land-uses
-        ag_trans_mat = xr.DataArray(
-            np.einsum('r,mrj,mrj->mrj', data.REAL_AREA, l_mrj_not, x_mrj).astype(np.float32),
-            coords={
-                'To-water-supply': data.LANDMANS,
-                'cell': range(data.NCELLS),
-                'To-land-use': data.AGRICULTURAL_LANDUSES,
-            }
-        )
-        
-    ag_trans_mat = ag_trans_mat / gap
+    def leaf_area(fm, fj, cells):
+        return {None: np.broadcast_to(data.REAL_AREA[cells][None, :, None],
+                                      (data.NLMS, len(cells), data.N_AG_LUS))}
 
-    xr_ag_trans_area = ag_dvar_mrj_base * ag_dvar_mrj_target * ag_trans_mat
-
-    xr_ag_trans_area = add_all(xr_ag_trans_area, dims=['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply'])
-
-    # Calculate total transition area by region and land-use (for report generation later)
-    transition_area_region = process_chunks(
-        xr_ag_trans_area, data, yr_cal, chunk_size,
-        groupby_cols=['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply'],
-        value_col='Transition Area (ha)',
-        region_levels=['region_state', 'region_NRM'],
+    area_region, area_layers = _flow_report(leaf_area, None, dims_area, 'Transition Area (ha)')
+    area_AUS = (
+        area_region.groupby(['region_level'] + dims_area)['Transition Area (ha)'].sum()
+        .reset_index()
+        .assign(region='AUSTRALIA', Year=yr_cal)
+        .query('`Transition Area (ha)` > 1')            # Skip transitions under 1 ha at national level
     )
-    transition_area_AUS = transition_area_region.groupby(['region_level', 'From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply']
-        )['Transition Area (ha)'
-        ].sum(
-        ).reset_index(
-        ).assign(region='AUSTRALIA', Year=yr_cal
-        ).query('`Transition Area (ha)` > 1') # Skip transitions under 1 ha at national level
-        
-    # Stack array and save to netcdf for later use in report (e.g., for setting colorbar limits)
-    valid_trans_area_layers = pd.MultiIndex.from_frame(
-        transition_area_AUS[['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']].drop_duplicates()
+    valid_area_layers = pd.MultiIndex.from_frame(
+        area_AUS[dims_area].drop_duplicates()
     ).sort_values()
 
-    # Save transition area to csv
-    pd.concat([transition_area_region, transition_area_AUS]
+    pd.concat([area_region, area_AUS]
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2ag_area_{yr_cal}.csv'), index=False)
-
-    
-    
-    transition_area_stacked = xr_ag_trans_area.stack({'layer': ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']}
-        ).sel(layer=valid_trans_area_layers
-        ).drop_vars(['region_state', 'region_NRM']
-        ).compute()
-        
-    save2nc(transition_area_stacked, os.path.join(path, f'xr_transition_ag2ag_area_{yr_cal}.nc'))
-        
-
+    _save_layers(area_layers, valid_area_layers, dims_area, f'xr_transition_ag2ag_area_{yr_cal}.nc')
 
     # ==================== Transitions - Cost ====================
-    if yr_idx == 0:
-        ag_transitions_cost_mat = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
-    else:
-        # Get the transition cost matrices for agricultural land-use
-        #   l_mrj_not and x_mrj are already considered in the `get_transition_matrices_ag2ag_from_base_year`
-        ag_transitions_cost_mat = ag_transitions.get_transition_matrices_ag2ag_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
+    dims_cost = ['From-land-use', 'To-land-use', 'Cost-type']
 
-    ag_transitions_cost_mat = xr.DataArray(
-        np.stack(list(ag_transitions_cost_mat.values())).astype(np.float32),
-        coords={
-            'Cost-type': list(ag_transitions_cost_mat.keys()),
-            'To-water-supply': data.LANDMANS,
-            'cell': range(data.NCELLS),
-            'To-land-use': data.AGRICULTURAL_LANDUSES
-        }
+    def leaf_cost(fm, fj, cells):
+        return ag_transitions.get_transition_matrices_ag2ag(data, yr_idx, fm, fj, cells, separate=True)
+
+    cost_region, cost_layers = _flow_report(leaf_cost, 'Cost-type', dims_cost, 'Cost ($)')
+    cost_AUS = (
+        cost_region.groupby(['region_level'] + dims_cost + ['Year'])['Cost ($)'].sum()
+        .reset_index()
+        .assign(region='AUSTRALIA')
+        # engine='python': the default (partial-numexpr) engine crashes on abs() for small frames
+        .query('abs(`Cost ($)`) > 1e4', engine='python')    # Skip transitions under $10,000 at national level
     )
-    ag_transitions_cost_mat = ag_transitions_cost_mat / gap
-
-    # Use xr.dot() to contract To-water-supply without broadcasting:
-    #   Plain `*` would first expand ag_dvar_mrj_target × ag_transitions_cost_mat into a full
-    #   [To-water-supply, To-land-use, Cost-type, cell] intermediate array, then sum — allocating that
-    #   array even though it is immediately discarded. xr.dot() fuses the multiply-and-sum into
-    #   one pass so the large intermediate never exists in memory.
-    #   Similarly, From-water-supply is summed on ag_dvar_mrj_base before the multiply to keep
-    #   the operand size small.
-    cost_xr = (
-        ag_dvar_mrj_base.sum(dim='From-water-supply')
-        * xr.dot(ag_dvar_mrj_delta, ag_transitions_cost_mat, dims=['To-water-supply'])
-    )
-
-    cost_xr = add_all(cost_xr, ['From-land-use', 'To-land-use', 'Cost-type'])
-
-    # Get transition cost by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
-    cost_df_region = process_chunks(
-        cost_xr, data, yr_cal, chunk_size,
-        groupby_cols=['Cost-type', 'From-land-use', 'To-land-use'],
-        value_col='Cost ($)',
-        region_levels=['region_state', 'region_NRM'],
-    )
-    cost_df_AUS = cost_df_region.groupby(['region_level', 'From-land-use', 'To-land-use', 'Cost-type', 'Year']
-        )['Cost ($)'
-        ].sum(
-        ).reset_index(
-        ).assign(region='AUSTRALIA'
-        ).query('abs(`Cost ($)`) > 1e4') # Skip transitions under $10,000 at national level
-
-    # Get valid data layers (before renaming/replacing)
-    valid_layers_transition = pd.MultiIndex.from_frame(
-        cost_df_AUS[['From-land-use', 'To-land-use', 'Cost-type']].drop_duplicates()
+    valid_cost_layers = pd.MultiIndex.from_frame(
+        cost_AUS[dims_cost].drop_duplicates()
     ).sort_values()
 
-    # Write to csv
-    pd.concat([cost_df_region, cost_df_AUS]
+    pd.concat([cost_region, cost_AUS]
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2ag_cost_{yr_cal}.csv'), index=False)
+    _save_layers(cost_layers, valid_cost_layers, dims_cost, f'xr_transition_ag2ag_cost_{yr_cal}.nc')
 
-    cost_xr_stacked = cost_xr.stack({'layer': ['From-land-use', 'To-land-use', 'Cost-type']}
-        ).drop_vars(['region_state', 'region_NRM']
-        ).sel(layer=valid_layers_transition
-        ).compute()
-
-
-    # Save the compact filtered array
-    save2nc(cost_xr_stacked, os.path.join(path, f'xr_transition_ag2ag_cost_{yr_cal}.nc'))
-    
-    
-    
     # ==================== Transitions - GHG ====================
+    dims_ghg = ['From-land-use', 'To-land-use', 'GHG-type']
 
-    if yr_cal == data.YR_CAL_BASE:
-        ghg_t_smrj_values = np.zeros_like(data.AG_L_MRJ).astype(np.float32)[np.newaxis]
-        ghg_t_types = ['Unallocated natural to modified']
-    else:
-        ghg_t_dict = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[yr_cal_sim_pre], separate=True)
-        ghg_t_smrj_values = (np.stack(list(ghg_t_dict.values()), axis=0) * l_mrj_not * x_mrj).astype(np.float32)
-        ghg_t_types = list(ghg_t_dict.keys())
+    def leaf_ghg(fm, fj, cells):
+        return ag_ghg.get_ghg_transition_emissions(data, fm, fj, cells, separate=True)
 
-    ghg_t_smrj = xr.DataArray(
-        ghg_t_smrj_values,
-        dims=['GHG-type', 'To-water-supply', 'cell', 'To-land-use'],
-        coords={
-            'GHG-type': ghg_t_types,
-            'To-water-supply': data.LANDMANS,
-            'cell': range(data.NCELLS),
-            'To-land-use': data.AGRICULTURAL_LANDUSES
-        }
+    ghg_region, ghg_layers = _flow_report(leaf_ghg, 'GHG-type', dims_ghg, 'Value (t CO2e)')
+    ghg_AUS = (
+        ghg_region.groupby(['region_level'] + dims_ghg + ['Year'])['Value (t CO2e)'].sum()
+        .reset_index()
+        .assign(region='AUSTRALIA')
+        # engine='python': the default (partial-numexpr) engine crashes on abs() for small frames
+        .query('abs(`Value (t CO2e)`) > 1e-3', engine='python')     # Skip transitions under 1 t CO2e at national level
     )
-    ghg_t_smrj = ghg_t_smrj / gap
+    valid_ghg_layers = pd.MultiIndex.from_frame(
+        ghg_AUS[dims_ghg].drop_duplicates()
+    ).sort_values()
 
-    # Calculate GHG emissions for transition penalties (collapse water dims via xr.dot, same rationale as cost)
-    xr_ghg_transition = (
-        ag_dvar_mrj_base.sum(dim='From-water-supply')
-        * xr.dot(ag_dvar_mrj_target, ghg_t_smrj, dims=['To-water-supply'])
-    )
-
-    xr_ghg_transition = add_all(xr_ghg_transition, ['From-land-use', 'To-land-use', 'GHG-type'])
-
-    # Get transition GHG emissions by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
-    ghg_df_region = process_chunks(
-        xr_ghg_transition, data, yr_cal, chunk_size,
-        groupby_cols=['GHG-type', 'From-land-use', 'To-land-use'],
-        value_col='Value (t CO2e)',
-        region_levels=['region_state', 'region_NRM'],
-    )
-    ghg_df_AUS = ghg_df_region.groupby(['region_level', 'From-land-use', 'To-land-use', 'GHG-type', 'Year']
-        )['Value (t CO2e)'
-        ].sum(
-        ).reset_index(
-        ).assign(region='AUSTRALIA'
-        ).query('abs(`Value (t CO2e)`) > 1e-3') # Skip transitions under 1 t CO2e at national level
-
-    # Get valid data layers (before renaming/replacing)
-    valid_transition_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['From-land-use', 'To-land-use', 'GHG-type']].drop_duplicates()).sort_values()
-
-    # Write to csv
-    pd.concat([ghg_df_AUS, ghg_df_region]
+    pd.concat([ghg_AUS, ghg_region]
         ).infer_objects(copy=False
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2ag_ghg_{yr_cal}.csv'), index=False)
-    transition_valid_layers = xr_ghg_transition.stack(layer=['From-land-use', 'To-land-use', 'GHG-type']
-        ).sel(layer=valid_transition_layers
-        ).drop_vars(['region_state', 'region_NRM'])
-    save2nc(transition_valid_layers, os.path.join(path, f'xr_transition_ag2ag_ghg_{yr_cal}.nc'))
-
-
+    _save_layers(ghg_layers, valid_ghg_layers, dims_ghg, f'xr_transition_ag2ag_ghg_{yr_cal}.nc')
 
     # ==================== Transitions - Water ====================
-    if yr_cal == data.YR_CAL_BASE:
-        w_delta_mrj = xr.DataArray(
-            np.zeros_like(data.AG_L_MRJ).astype(np.float32),
-            dims=['To-water-supply', 'cell', 'To-land-use'],
-            coords={
-                'To-water-supply': data.LANDMANS,
-                'cell': range(data.NCELLS),
-                'To-land-use': data.AGRICULTURAL_LANDUSES
-            }
-        )
-    else:
-        w_mrj = ag_water.get_wreq_matrices(data, yr_idx)                                                 
-        w_delta_mrj = tools.get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
-        w_delta_mrj = xr.DataArray(
-            np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not).astype(np.float32),
-            dims=['To-water-supply', 'cell', 'To-land-use'],
-            coords={
-                'To-water-supply': data.LANDMANS,
-                'cell': range(data.NCELLS),
-                'To-land-use': data.AGRICULTURAL_LANDUSES
-            }
-        )
+    dims_water = ['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply']
 
-    w_delta_mrj = w_delta_mrj / gap
+    def leaf_water(fm, fj, cells):
+        # TRUE ML requirement change: target requirement − the source's own requirement.
+        return {None: w_mrj_full[:, cells, :] - w_mrj_full[fm, cells, fj][None, :, None]}
 
-    # Calculate water requirement changes for transition penalties
-    xr_water_transition = (
-        ag_dvar_mrj_base
-        * ag_dvar_mrj_target
-        * w_delta_mrj
+    water_region, water_layers = _flow_report(leaf_water, None, dims_water, 'Water Requirement Change (ML)')
+    # Flip requirement → yield for the CSV (requirement decrease = yield increase); the NetCDF
+    # layers keep the requirement sign (matching the previous output convention).
+    water_region['Water Yield Change (ML)'] = -water_region['Water Requirement Change (ML)']
+    water_region = water_region.drop(columns='Water Requirement Change (ML)')
+    water_AUS = (
+        water_region.groupby(['region_level'] + dims_water + ['Year'])['Water Yield Change (ML)'].sum()
+        .reset_index()
+        .assign(region='AUSTRALIA')
     )
-    
-    xr_water_transition = add_all(xr_water_transition, ['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply'])
-    
-    # Get transition water requirement changes by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
-    # Flip the water requirement to water yield change for easier
-    #   interpolation in report (i.e., requirement decrease = yield increase).
-    water_df_region = process_chunks(
-        xr_water_transition, data, yr_cal, chunk_size,
-        groupby_cols=['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply'],
-        value_col='Water Requirement Change (ML)',
-        region_levels=['region_state', 'region_NRM'],
-    )
-    water_df_region['Water Yield Change (ML)'] = -water_df_region['Water Requirement Change (ML)']
-    water_df_region = water_df_region.drop(columns='Water Requirement Change (ML)')
-    water_df_AUS = water_df_region.groupby(['region_level', 'From-land-use', 'To-land-use', 'Year', 'From-water-supply', 'To-water-supply']
-        )['Water Yield Change (ML)'
-        ].sum(
-        ).reset_index(
-        ).assign(region='AUSTRALIA')
-    water_df_AUS = water_df_AUS.loc[water_df_AUS['Water Yield Change (ML)'].abs() > 1e3] # Skip transitions under 1,000 ML at national level
-        
-    # Get valid data layers (before renaming/replacing)
-    valid_water_transition_layers = pd.MultiIndex.from_frame(water_df_AUS[['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply']].drop_duplicates()).sort_values()
+    water_AUS = water_AUS.loc[water_AUS['Water Yield Change (ML)'].abs() > 1e3]  # Skip under 1,000 ML at national level
+    valid_water_layers = pd.MultiIndex.from_frame(
+        water_AUS[dims_water].drop_duplicates()
+    ).sort_values()
 
-    # Save to csv 
-    pd.concat([water_df_region, water_df_AUS]
+    pd.concat([water_region, water_AUS]
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2ag_water_{yr_cal}.csv'), index=False)
-    water_transition_valid_layers = (
-        xr_water_transition
-        .stack(layer=['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply'])
-        .sel(layer=valid_water_transition_layers)
-        .drop_vars(['region_state', 'region_NRM'])
-    )
-    save2nc(water_transition_valid_layers, os.path.join(path, f'xr_transition_ag2ag_water_{yr_cal}.nc'))
-    
-    
-    
+    _save_layers(water_layers, valid_water_layers, dims_water, f'xr_transition_ag2ag_water_{yr_cal}.nc')
+
     # ==================== Transitions - Bio ====================
     '''
     Only consider GBF2 for now. Will add more if requested.
     '''
     # TODO: complete bio transition after introducing the bio transition matrices module.
-    
-    
+
     return f"Agricultural to agricultural transition changes written for year {yr_cal}"
 
 
-
 def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
-    """Annualised by `gap`: transition area/cost/GHG/water matrices represent a one-off
-    change incurred over the period since the previous simulated year, so are divided
-    by `gap` to express as an annual rate."""
+    """Ag→non-ag transition reporting from the solved per-source flow deltas.
 
-    # Set up
-    chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
-    simulated_year_list = sorted(list(data.lumaps.keys()))
+    Every quantity is the TRUE flow `Σ_src leaf[src]·D[src]` over the solved delta dict
+    `data.delta_dvars_ag2nonag[yr_cal]` ({(from_m, from_j): [local_r, k]} over each source's dvar>θ
+    cells at the previous simulated year) — exact per-source from→to attribution, replacing the old
+    `base-composition × target-dvar × per-unit` approximation (which also double-weighted GHG/water:
+    per-unit × delta AND × target dvar):
+      - Area  : D × REAL_AREA                          ha converted from ag source → non-ag k
+      - Cost  : per-source ag2nonag cost leaves × D    $ paid, per Cost-type (≡ solver charge)
+      - GHG   : non-ag GHG matrix × D                  t CO2e on the newly converted area
+      - Water : non-ag net-yield matrix × D            ML yield change on the newly converted area
+    All annualised by `gap`. At the base year: header-only CSVs + one all-'ALL' zero layer per NetCDF.
+    """
+    from itertools import combinations
+
     yr_idx = yr_cal - data.YR_CAL_BASE
     gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
 
-    # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
+    simulated_year_list = sorted(data.lumaps.keys())
     yr_idx_sim = simulated_year_list.index(yr_cal)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
+    lm_names    = list(data.LANDMANS)
+    ag_names    = list(data.AGRICULTURAL_LANDUSES)
+    nonag_names = list(data.NON_AGRICULTURAL_LANDUSES)
+
     if yr_cal == data.YR_CAL_BASE:
-        base_lumap = None
+        mj_cell_map, dvar_D = {}, {}
+        ag2nonag_cost_mat, ghg_rk_full, water_rk_full = {}, None, None
     else:
-        base_lumap = data.lumaps[yr_cal_sim_pre]
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, yr_cal_sim_pre)
+        dvar_D      = data.delta_dvars_ag2nonag[yr_cal]      # always present for a solved year
+        ag2nonag_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
+            data, yr_cal_sim_pre, yr_cal, separate=True)     # {lu_name: {(fm,fj): {Cost-type: (n,)}}}
+        ag_g_mrj      = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
+        ghg_rk_full   = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal_sim_pre]).astype(np.float32)
+        ag_w_mrj      = ag_water.get_wreq_matrices(data, yr_idx)
+        water_rk_full = non_ag_water.get_w_net_yield_matrix(
+            data, ag_w_mrj, data.lumaps[yr_cal_sim_pre], yr_idx).astype(np.float32)
 
-    # Get the non-agricultural decision variable
-    ag_dvar_base = tools.ag_mrj_to_xr(data, (tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]))
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).rename({'lm': 'From-water-supply', 'lu': 'From-land-use'}
-        ).chunk({'cell': chunk_size})
-    non_ag_dvar_target = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
-        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-        ).rename({'lu': 'To-land-use'}
-        ).chunk({'cell': chunk_size})
+    # Region groupings (sorted unique names + integer codes, matching process_chunks).
+    reg_info = []
+    for level, labels in (('region_state', data.REGION_STATE_NAME), ('region_NRM', data.REGION_NRM_NAME)):
+        uniq, codes = np.unique(labels, return_inverse=True)
+        reg_info.append((level, codes, uniq))
 
-    # Delta dvars: actual net increases from the solver (D = max(0, X_new - x_old)).
-    # In blend/exact mode these come from solver D_nonag vars; in crisp mode compute post-hoc.
-    if yr_cal == data.YR_CAL_BASE:
-        non_ag_dvar_delta = non_ag_dvar_target
-    elif settings.TRANSITION_MODE != 'crisp' and data.non_ag_delta_dvars.get(yr_cal) is not None:
-        non_ag_dvar_delta = tools.non_ag_rk_to_xr(data, data.non_ag_delta_dvars[yr_cal]
-            ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-            ).rename({'lu': 'To-land-use'}
-            ).chunk({'cell': chunk_size})
-    else:
-        non_ag_dvar_old = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal_sim_pre])
-            ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME)
-            ).rename({'lu': 'To-land-use'}
-            ).chunk({'cell': chunk_size})
-        non_ag_dvar_delta = (non_ag_dvar_target - non_ag_dvar_old).clip(min=0)
+    def _flow_report(leaf_fn, type_dim, dims, value_col):
+        """Aggregate `leaf × D / gap` over all ag sources (leaves are (n, N_NON_AG_LUS)).
 
+        Mirrors write_transition_ag2ag's engine for the rk target family. Non-ag targets are always
+        dryland, so 'To-water-supply' (when present in dims) is the literal 'dry'.
+        Returns (region_df, layer_builder).
+        """
+        rows = []
+        for (fm, fj), cells in mj_cell_map.items():
+            D = dvar_D[(fm, fj)]                                             # (n, N_NON_AG_LUS)
+            for tname, leaf in leaf_fn(fm, fj, cells).items():
+                q = (leaf * D) / gap                                         # (n, N_NON_AG_LUS)
+                key_from = {'From-water-supply': lm_names[fm], 'From-land-use': ag_names[fj]}
+                if 'To-water-supply' in dims:
+                    key_from['To-water-supply'] = 'dry'
+                if type_dim:
+                    key_from[type_dim] = tname
+                for level, codes, uniq in reg_info:
+                    sums = np.zeros((len(uniq), len(nonag_names)))
+                    np.add.at(sums, codes[cells], q)
+                    for ri, k in np.argwhere(np.abs(sums) > 0):
+                        rows.append({**key_from, 'To-land-use': nonag_names[k], 'region_level': level,
+                                     'region': uniq[ri], value_col: float(sums[ri, k])})
 
-    
+        col_order = dims + ['region', value_col, 'Year', 'region_level']
+        if not rows:
+            region_df = pd.DataFrame(columns=col_order)
+        else:
+            leaf_df = pd.DataFrame(rows)
+            frames = []
+            for n_all in range(len(dims) + 1):
+                for combo in combinations(dims, n_all):
+                    g = leaf_df.copy()
+                    for c in combo:
+                        g[c] = 'ALL'
+                    frames.append(g.groupby(['region_level', 'region'] + dims, as_index=False)[value_col].sum())
+            region_df = pd.concat(frames, ignore_index=True)
+            region_df = region_df[np.abs(region_df[value_col]) > 1]         # match process_chunks filter
+            region_df = region_df.assign(Year=yr_cal)[col_order]
+
+        def layer_builder(valid_keys):
+            arrays = {key: np.zeros(data.NCELLS, dtype=np.float32) for key in valid_keys}
+            for (fm, fj), cells in mj_cell_map.items():
+                D = dvar_D[(fm, fj)]
+                for tname, leaf in leaf_fn(fm, fj, cells).items():
+                    q = (leaf * D) / gap
+                    for key in valid_keys:
+                        kd = dict(zip(dims, key))
+                        if kd.get('From-water-supply', 'ALL') not in ('ALL', lm_names[fm]):
+                            continue
+                        if kd.get('From-land-use', 'ALL') not in ('ALL', ag_names[fj]):
+                            continue
+                        if kd.get('To-water-supply', 'ALL') not in ('ALL', 'dry'):
+                            continue
+                        if type_dim and kd[type_dim] not in ('ALL', tname):
+                            continue
+                        tl = kd.get('To-land-use', 'ALL')
+                        v = q[:, nonag_names.index(tl)] if tl != 'ALL' else q.sum(axis=1)
+                        arrays[key][cells] += v                              # cells unique per source
+            return arrays
+
+        return region_df, layer_builder
+
+    def _save_layers(layer_builder, valid_mi, dims, fname):
+        save_flow_layers(layer_builder, valid_mi, dims, data.NCELLS, os.path.join(path, fname))
+
     # ==================== Transitions - Area ====================
-    # Use the solver delta dvar directly: area that newly transitioned to each non-ag LU.
-    # non_ag_dvar_delta is D = max(0, X_new - x_old) — the actual net increase per cell per LU.
-    non_ag_transitions_area_mat = (
-        xr.DataArray(
-            (data.REAL_AREA[:, np.newaxis] * non_ag_dvar_delta.values).astype(np.float32),
-            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES},
-        ) / gap
-        if yr_idx > 0
-        else xr.DataArray(
-            np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32),
-            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES},
-        )
-    )
+    dims_area = ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']
 
-    # Apportion transition area across source ag LUs proportional to base-year dvar composition
-    non_ag_transitions_area = ag_dvar_base * non_ag_transitions_area_mat.expand_dims({'To-water-supply': ['dry']})
-    non_ag_transitions_area = add_all(non_ag_transitions_area, ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use'])
-    
-    # Get transition area by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
-    area_df_region = process_chunks(
-        non_ag_transitions_area, data, yr_cal, chunk_size,
-        groupby_cols=['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use'],
-        value_col='Transition Area (ha)',
-        region_levels=['region_state', 'region_NRM'],
+    def leaf_area(fm, fj, cells):
+        return {None: np.broadcast_to(data.REAL_AREA[cells][:, None],
+                                      (len(cells), len(nonag_names)))}
+
+    area_region, area_layers = _flow_report(leaf_area, None, dims_area, 'Transition Area (ha)')
+    area_AUS = (
+        area_region.groupby(['region_level'] + dims_area + ['Year'])['Transition Area (ha)'].sum()
+        .reset_index()
+        .assign(region='AUSTRALIA')
+        .query('`Transition Area (ha)` > 1')            # Skip transitions under 1 ha at national level
     )
-    area_df_AUS = area_df_region.groupby(['region_level', 'From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use', 'Year']
-        )['Transition Area (ha)'
-        ].sum(
-        ).reset_index(
-        ).assign(region='AUSTRALIA'
-        ).query('`Transition Area (ha)` > 1') # Skip transitions under 1 ha at national level
-        
-        
-    # Get valid data layers (before renaming/replacing)
-    valid_layers_transition = pd.MultiIndex.from_frame(
-        area_df_AUS[['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']].drop_duplicates()
+    valid_area_layers = pd.MultiIndex.from_frame(
+        area_AUS[dims_area].drop_duplicates()
     ).sort_values()
-    
-    # Save to csv
-    pd.concat([area_df_region, area_df_AUS]
+
+    pd.concat([area_region, area_AUS]
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2nonag_area_{yr_cal}.csv'), index=False)
-    
-    valid_layers_stack_area = non_ag_transitions_area.stack({'layer': ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']}
-        ).sel(layer=valid_layers_transition).drop_vars(['region_state', 'region_NRM']).compute()
-    
-    save2nc(valid_layers_stack_area, os.path.join(path, f'xr_transition_ag2nonag_area_{yr_cal}.nc'))
-    
-        
-    
+    _save_layers(area_layers, valid_area_layers, dims_area, f'xr_transition_ag2nonag_area_{yr_cal}.nc')
 
     # ==================== Transitions - Cost ====================
-    if yr_idx == 0:
-        non_ag_transitions_cost_mat = {
-            k:{'Transition cost':np.zeros(data.NCELLS).astype(np.float32)}
-            for k in settings.NON_AG_LAND_USES.keys()
-        }
-    else:
-        non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
-            data, yr_cal_sim_pre, yr_cal, separate=True,
-        )
+    dims_cost = ['From-land-use', 'To-land-use', 'Cost-type']
 
-    non_ag_transitions_flat = {}
-    for lu, sub_dict in non_ag_transitions_cost_mat.items():
-        for source, arr in sub_dict.items():
-            non_ag_transitions_flat[(lu, source)] = arr
-            
-    non_ag_transitions_flat = xr.DataArray(
-        np.stack(list(non_ag_transitions_flat.values())).astype(np.float32),
-        coords={
-            'lu_source': pd.MultiIndex.from_tuples(list(non_ag_transitions_flat.keys()), names= ('To-land-use', 'Cost-type')),
-            'cell': range(data.NCELLS),
-        }
+    def leaf_cost(fm, fj, cells):
+        out = {}
+        for lu_name, per_src in ag2nonag_cost_mat.items():
+            k = nonag_names.index(lu_name)
+            comps = per_src.get((fm, fj))
+            if comps is None:
+                continue
+            for cost_type, cost_r in comps.items():
+                a = out.setdefault(cost_type, np.zeros((len(cells), len(nonag_names)), dtype=np.float32))
+                a[:, k] = cost_r
+        return out
+
+    cost_region, cost_layers = _flow_report(leaf_cost, 'Cost-type', dims_cost, 'Cost ($)')
+    cost_AUS = (
+        cost_region.groupby(['region_level'] + dims_cost + ['Year'])['Cost ($)'].sum()
+        .reset_index()
+        .assign(region='AUSTRALIA')
+        # engine='python': the default (partial-numexpr) engine crashes on abs() for small frames
+        .query('abs(`Cost ($)`) > 1000', engine='python')   # Skip transitions under $1,000 at national level
     )
-    non_ag_transitions_flat = non_ag_transitions_flat / gap
-
-    # Compute in chunks and aggregate to DataFrame; This is to reduce memory usage
-    cost_xr = (
-        ag_dvar_base.sum(dim='From-water-supply')       # Colapse water supply dimension to reduce mem
-        * non_ag_transitions_flat.unstack('lu_source')
-        * non_ag_dvar_delta
-    )
-    
-    cost_xr = add_all(cost_xr, ['From-land-use', 'To-land-use', 'Cost-type'])
-
-
-    # Get transition cost by region and land-use
-    cost_df_region = process_chunks(
-        cost_xr, data, yr_cal, chunk_size,
-        groupby_cols=['From-land-use', 'To-land-use', 'Cost-type'],
-        value_col='Cost ($)',
-        region_levels=['region_state', 'region_NRM'],
-    )
-    cost_df_AUS = cost_df_region.groupby(['region_level', 'From-land-use', 'To-land-use', 'Cost-type', 'Year']
-        )['Cost ($)'
-        ].sum(
-        ).reset_index(
-        ).assign(region='AUSTRALIA'
-        ).query('abs(`Cost ($)`) > 1000') # Skip transitions under $1,000 at national level
-        
-    # Get valid data layers (before renaming/replacing)
-    valid_layers_transition = pd.MultiIndex.from_frame(
-        cost_df_AUS[['From-land-use', 'To-land-use', 'Cost-type']].drop_duplicates()
+    valid_cost_layers = pd.MultiIndex.from_frame(
+        cost_AUS[dims_cost].drop_duplicates()
     ).sort_values()
 
-    pd.concat([cost_df_AUS, cost_df_region]
+    pd.concat([cost_AUS, cost_region]
         ).infer_objects(copy=False
-        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2nonag_cost_{yr_cal}.csv'), index=False)
-    
-    valid_layers_stack_cost = cost_xr.stack({'layer': ['From-land-use', 'To-land-use', 'Cost-type']}
-        ).sel(layer=valid_layers_transition).drop_vars(['region_state', 'region_NRM']).compute()
-    
-    save2nc(valid_layers_stack_cost, os.path.join(path, f'xr_transition_ag2nonag_cost_{yr_cal}.nc'))
-    
-    
-    
-    
+    _save_layers(cost_layers, valid_cost_layers, dims_cost, f'xr_transition_ag2nonag_cost_{yr_cal}.nc')
 
     # ==================== Transitions - GHG ====================
-    if yr_idx == 0:
-        g_rk = xr.DataArray(
-            np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32),
-            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
-        )
-    else:
-        ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
-        g_rk_raw = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal_sim_pre]).astype(np.float32)
-        g_rk_eligible = (g_rk_raw * non_ag_dvar_delta.values).astype(np.float32)
-        g_rk = xr.DataArray(
-            g_rk_eligible,
-            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
-        )
+    dims_ghg = ['From-land-use', 'To-land-use']
 
-    g_rk = g_rk / gap
+    def leaf_ghg(fm, fj, cells):
+        return {None: ghg_rk_full[cells, :]}
 
-    xr_ghg_transition = (
-        ag_dvar_base.sum(dim='From-water-supply')
-        * non_ag_dvar_target
-        * g_rk
+    ghg_region, ghg_layers = _flow_report(leaf_ghg, None, dims_ghg, 'Value (t CO2e)')
+    ghg_AUS = (
+        ghg_region.groupby(['region_level'] + dims_ghg + ['Year'])['Value (t CO2e)'].sum()
+        .reset_index()
+        .assign(region='AUSTRALIA')
+        # engine='python': the default (partial-numexpr) engine crashes on abs() for small frames
+        .query('abs(`Value (t CO2e)`) > 1e-3', engine='python')
     )
-    xr_ghg_transition = add_all(xr_ghg_transition, ['From-land-use', 'To-land-use'])
+    valid_ghg_layers = pd.MultiIndex.from_frame(
+        ghg_AUS[dims_ghg].drop_duplicates()
+    ).sort_values()
 
-    ghg_df_region = process_chunks(
-        xr_ghg_transition, data, yr_cal, chunk_size,
-        groupby_cols=['From-land-use', 'To-land-use'],
-        value_col='Value (t CO2e)',
-        region_levels=['region_state', 'region_NRM'],
-    )
-    ghg_df_AUS = ghg_df_region.groupby(['region_level', 'From-land-use', 'To-land-use', 'Year']
-        )['Value (t CO2e)'
-        ].sum(
-        ).reset_index(
-        ).assign(region='AUSTRALIA'
-        ).query('abs(`Value (t CO2e)`) > 1e-3')
-
-    valid_ghg_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['From-land-use', 'To-land-use']].drop_duplicates()).sort_values()
-
-    pd.concat([ghg_df_AUS, ghg_df_region]
+    pd.concat([ghg_AUS, ghg_region]
         ).infer_objects(copy=False
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2nonag_ghg_{yr_cal}.csv'), index=False)
-
-    ghg_transition_valid = xr_ghg_transition.stack(layer=['From-land-use', 'To-land-use']
-        ).sel(layer=valid_ghg_layers
-        ).drop_vars(['region_state', 'region_NRM'])
-    save2nc(ghg_transition_valid, os.path.join(path, f'xr_transition_ag2nonag_ghg_{yr_cal}.nc'))
-
-
+    _save_layers(ghg_layers, valid_ghg_layers, dims_ghg, f'xr_transition_ag2nonag_ghg_{yr_cal}.nc')
 
     # ==================== Transitions - Water ====================
-    if yr_idx == 0:
-        w_rk = xr.DataArray(
-            np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32),
-            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
-        )
-    else:
-        ag_w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-        w_rk_raw = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal_sim_pre], yr_idx).astype(np.float32)
-        w_rk_eligible = (w_rk_raw * non_ag_dvar_delta.values).astype(np.float32)
-        w_rk = xr.DataArray(
-            w_rk_eligible,
-            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
-        )
+    dims_water = ['From-land-use', 'To-land-use']
 
-    w_rk = w_rk / gap
+    def leaf_water(fm, fj, cells):
+        return {None: water_rk_full[cells, :]}
 
-    xr_water_transition = (
-        ag_dvar_base.sum(dim='From-water-supply')
-        * non_ag_dvar_target
-        * w_rk
+    water_region, water_layers = _flow_report(leaf_water, None, dims_water, 'Water Yield Change (ML)')
+    water_AUS = (
+        water_region.groupby(['region_level'] + dims_water + ['Year'])['Water Yield Change (ML)'].sum()
+        .reset_index()
+        .assign(region='AUSTRALIA')
     )
-    xr_water_transition = add_all(xr_water_transition, ['From-land-use', 'To-land-use'])
+    water_AUS = water_AUS.loc[water_AUS['Water Yield Change (ML)'].abs() > 1e3]
 
-    water_df_region = process_chunks(
-        xr_water_transition, data, yr_cal, chunk_size,
-        groupby_cols=['From-land-use', 'To-land-use'],
-        value_col='Water Yield Change (ML)',
-        region_levels=['region_state', 'region_NRM'],
-    )
-    water_df_AUS = water_df_region.groupby(['region_level', 'From-land-use', 'To-land-use', 'Year']
-        )['Water Yield Change (ML)'
-        ].sum(
-        ).reset_index(
-        ).assign(region='AUSTRALIA')
-    water_df_AUS = water_df_AUS.loc[water_df_AUS['Water Yield Change (ML)'].abs() > 1e3]
+    valid_water_layers = pd.MultiIndex.from_frame(
+        water_AUS[dims_water].drop_duplicates()
+    ).sort_values()
 
-    valid_water_layers = pd.MultiIndex.from_frame(water_df_AUS[['From-land-use', 'To-land-use']].drop_duplicates()).sort_values()
-
-    pd.concat([water_df_region, water_df_AUS]
+    pd.concat([water_region, water_AUS]
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2nonag_water_{yr_cal}.csv'), index=False)
-
-    water_transition_valid = xr_water_transition.stack(layer=['From-land-use', 'To-land-use']
-        ).sel(layer=valid_water_layers
-        ).drop_vars(['region_state', 'region_NRM'])
-    save2nc(water_transition_valid, os.path.join(path, f'xr_transition_ag2nonag_water_{yr_cal}.nc'))
-
-
+    _save_layers(water_layers, valid_water_layers, dims_water, f'xr_transition_ag2nonag_water_{yr_cal}.nc')
 
     return f"Agricultural to non-agricultural transition written for year {yr_cal}"
-
-
-
 
 
 def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
@@ -2299,67 +2155,95 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     yr_idx_sim = simulated_year_list.index(yr_cal)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
-    # Get the decision variables for agricultural land-use
-    nonag_dvar = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).rename({'lu': 'From-land-use'}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-    ag_dvar = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).rename({'lm': 'To-water-supply', 'lu': 'To-land-use'}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-        
+    # Non-ag sources are dryland; the report schema is (From-water-supply, From-land-use=non-ag
+    # source, To-land-use=ag target). D_nonag2ag[k] is [to_m, local_r, to_j] over source k's cells.
+    dims_area = ['From-water-supply', 'From-land-use', 'To-land-use']
+    dvar_D_nonag2ag = data.delta_dvars_nonag2ag[yr_cal] if yr_idx > 0 else {}   # EMPTY at base year / no non-ag sources
+
     # ==================== Transitions - Area ====================
-    '''
-    NonAg to Ag transition is currently prohibited in the model, so the transition area is zero.
-    We skip the area calculation and directly create a zero array for the cost calculation below.
-    We keep the code here as a placeholder for future when the transition is allowed.
-    '''
-    
-    area_df = pd.DataFrame({
-        'region': ['AUSTRALIA', 'ACT'],
-        'From-water-supply': ['ALL', 'ALL'],
-        'From-land-use': ['ALL', 'ALL'],
-        'To-land-use': ['ALL', 'ALL'],
-        'Transition Area (ha)': [0, 0],
-        'Year': [yr_cal, yr_cal]
-    })
-    
-    area_df.to_csv(os.path.join(path, f'transition_nonag2ag_area_{yr_cal}.csv'), index=False)
-    
+    # TRUE nonag→ag area: Σ_to_m D[k] × REAL_AREA, per (non-ag source k → ag target to_j), summed
+    # over target water supply. Reversible Destocked land returning to ag lands here (was a zeros
+    # placeholder — the old target-based reporting could not represent this direction).
+    area_flat = {}   # {From-land-use (non-ag source): dense (NCELLS, N_AG_LUS)}
+    if dvar_D_nonag2ag:
+        k_cell_map = non_ag_transitions.get_base_nonag_dvar_k_cell_map(data, yr_cal_sim_pre)
+        for k, D in dvar_D_nonag2ag.items():
+            cells = k_cell_map[k]
+            area_rj = (D * data.REAL_AREA[cells][None, :, None]).sum(axis=0)       # (ncells_k, N_AG_LUS)
+            full = np.zeros((data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+            full[cells] = area_rj
+            area_flat[data.NON_AGRICULTURAL_LANDUSES[k]] = full
+    if not area_flat:
+        area_flat[data.NON_AGRICULTURAL_LANDUSES[0]] = np.zeros((data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+
     area_xr = xr.DataArray(
-        np.zeros((1, 1, data.NCELLS, 1)).astype(np.float32),
-        coords={
-            'From-water-supply': ['ALL'],
-            'From-land-use': ['ALL'],
-            'cell': range(data.NCELLS),
-            'To-land-use': ['ALL']
-        }
+        np.stack(list(area_flat.values())).astype(np.float32),
+        coords={'From-land-use': list(area_flat.keys()),
+                'cell': range(data.NCELLS),
+                'To-land-use': data.AGRICULTURAL_LANDUSES},
+    ).expand_dims({'From-water-supply': ['dry']}   # non-ag source is dryland
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME)
+    ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+
+    area_xr = area_xr / gap   # annualise: one-off area over the period → annual rate
+    area_xr = add_all(area_xr, dims_area)
+
+    area_df_region = area_xr.groupby('region'
+        ).sum(dim='cell'
+        ).to_dataframe('Transition Area (ha)'
+        ).reset_index(
+        ).groupby(['region'] + dims_area, dropna=False
+        )['Transition Area (ha)'].sum(
+        ).reset_index(
+        ).assign(Year=yr_cal)
+    area_df_AUS = (
+        area_df_region.groupby(dims_area)['Transition Area (ha)'].sum()
+        .reset_index()
+        .assign(region='AUSTRALIA', Year=yr_cal)
+        .query('`Transition Area (ha)` > 1', engine='python')   # Skip transitions under 1 ha at national level
     )
-    area_xr_stack = area_xr.stack({'layer': ['From-water-supply', 'From-land-use', 'To-land-use']})
+    valid_area_layers = pd.MultiIndex.from_frame(
+        area_df_AUS[dims_area].drop_duplicates()
+    ).sort_values()
+    if len(valid_area_layers) == 0:
+        valid_area_layers = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL')], names=dims_area)
+
+    pd.concat([area_df_AUS, area_df_region]
+        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+        ).to_csv(os.path.join(path, f'transition_nonag2ag_area_{yr_cal}.csv'), index=False)
+
+    area_xr_stack = area_xr.stack({'layer': dims_area}).drop_vars('region').sel(layer=valid_area_layers).compute()
     save2nc(area_xr_stack, os.path.join(path, f'xr_transition_nonag2ag_area_{yr_cal}.nc'))
 
 
     # ==================== Transitions - Cost ====================
-    if yr_idx == 0:
-        non_ag_transitions_cost_mat = {
-            k:{'Transition cost (Non-Ag2Ag)':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
-            for k in settings.NON_AG_LAND_USES.keys()
-        }
-    else:
+    # TRUE per-source flow cost: Σ_k cost[k]·D[k] — the exact quantity the solver charged for
+    # nonag→ag conversions (e.g. reversible Destocked land back to ag). Both dicts are keyed by the
+    # non-ag source k with leaves [to_m, local_r, to_j] over that source's dvar>θ cells at the
+    # previous simulated year; local_r decodes to global cells via get_base_nonag_dvar_k_cell_map.
+    non_ag_transitions_flat = {}
+    if dvar_D_nonag2ag:
         non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_nonag2ag(
-            data,
-            yr_cal_sim_pre,
-            data.YR_CAL_BASE + yr_idx,
-            separate=True,
+            data, yr_cal_sim_pre, yr_cal, separate=True
+        )
+        k_cell_map = non_ag_transitions.get_base_nonag_dvar_k_cell_map(data, yr_cal_sim_pre)
+        for lu_name, per_k in non_ag_transitions_cost_mat.items():
+            k = data.NON_AGRICULTURAL_LANDUSES.index(lu_name)  # diagonal: source k pays its OWN nonag→ag cost
+            if k not in per_k or k not in dvar_D_nonag2ag:
+                continue
+            cells = k_cell_map[k]
+            for cost_type, cost_arr in per_k[k].items():
+                val_rj = (cost_arr * dvar_D_nonag2ag[k]).sum(axis=0)                       # Σ over to_m → (ncells_k, N_AG_LUS)
+                full_rj = np.zeros((data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+                full_rj[cells] = val_rj
+                non_ag_transitions_flat[(lu_name, cost_type)] = full_rj
+    if not non_ag_transitions_flat:
+        # Base year, or no non-ag sources present at the previous year → zero placeholder keeps the schema alive.
+        non_ag_transitions_flat[(data.NON_AGRICULTURAL_LANDUSES[0], 'Transition cost (Non-Ag2Ag)')] = (
+            np.zeros((data.NCELLS, data.N_AG_LUS), dtype=np.float32)
         )
 
-
-    non_ag_transitions_flat = {}
-    for lu, sub_dict in non_ag_transitions_cost_mat.items():
-        for source, arr in sub_dict.items():
-            non_ag_transitions_flat[(lu, source)] = arr.sum(0) # Sum over `lm` dimension
-            
-    non_ag_transitions_flat = xr.DataArray(
+    cost_xr = xr.DataArray(
         np.stack(list(non_ag_transitions_flat.values())).astype(np.float32),
         coords={
             'lu_source': pd.MultiIndex.from_tuples(
@@ -2369,22 +2253,14 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             'cell': range(data.NCELLS),
             'To-land-use': data.AGRICULTURAL_LANDUSES
         }
-    ).unstack('lu_source').chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    ).unstack('lu_source'
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME)
+    ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
 
-    non_ag_transitions_flat = non_ag_transitions_flat / gap
-
-    # Compute transition cost
-    cost_xr = xr.dot(ag_dvar, nonag_dvar, dim=['To-water-supply']) * non_ag_transitions_flat 
-    
+    cost_xr = cost_xr / gap   # annualise: one-off cost over the period → annual rate
     cost_xr = add_all(cost_xr, ['From-land-use', 'To-land-use', 'Cost-type'])
-    
-    
-    
-    #   !!! cost_xr is zero for now
-    #   !!! so only selecting a chunk to get the stats
-    chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
-    cost_df_region = cost_xr.isel(cell=slice(0, chunk_size)
-        ).groupby('region'
+
+    cost_df_region = cost_xr.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Cost ($)'
         ).reset_index(
@@ -2392,20 +2268,17 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         )['Cost ($)'].sum(
         ).reset_index(
         ).assign(Year=yr_cal)
-        
+
     cost_df_AUS = cost_df_region.groupby(['From-land-use', 'To-land-use', 'Cost-type'],
         )['Cost ($)'
         ].sum(
         ).reset_index(
         ).assign(region='AUSTRALIA', Year=yr_cal)
-        
-    '''
-    NoAg to Ag are currently all zeros, so we skip below calculation.
-    '''
-    # Get valid data layers (before renaming/replacing)
-    valid_layers_transition = pd.MultiIndex.from_frame(
-        cost_df_AUS[['From-land-use', 'Cost-type']].iloc[:1] # Only take the first row to avoid empty layers, since all costs are zero for now
-    ).sort_values()
+
+    # Valid data layers = the (From-land-use, Cost-type) combos actually built above.
+    valid_layers_transition = pd.MultiIndex.from_tuples(
+        sorted(non_ag_transitions_flat.keys()), names=('From-land-use', 'Cost-type')
+    )
     
     # Save to csv
     pd.concat([cost_df_AUS, cost_df_region]
@@ -2425,188 +2298,215 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
 
 def write_area_transition_start_end(data: Data, path, yr_cal_end):
-    """No annualisation: this is a cumulative area transition over the whole simulation
-    horizon (YR_CAL_BASE to `yr_cal_end`), not a per-period flow, so `gap` does not apply."""
+    """Cumulative start→end area transition (YR_CAL_BASE → yr_cal_end) from CHAINED per-period flows.
+
+    The solved per-period delta dicts (`data.delta_dvars_ag2ag/_ag2nonag/_nonag2ag`) are composed
+    per cell as a Markov chain over land pools (ag pools = (lm, lu); non-ag pools = k):
+    an attribution matrix A[cell, start_pool, current_pool] starts as the base-year composition and
+    is forward-propagated period by period — off-diagonal moves are `D / base` fractions of the pool
+    (all outflows of a period read the pre-period state, honouring the solver's no-pass-through
+    source cap), the diagonal keeps the stay remainder. Multi-hop paths (e.g. Beef→Sheep→EP, or
+    Destocked land returning to ag) therefore resolve to their TRUE start→end pairs — replacing the
+    old `dvar_start × dvar_end` composition cross-product, which attributed area by independence.
+
+    No annualisation: this is a cumulative area over the whole horizon, so `gap` does not apply.
+    Exact up to within-pool fungibility (land units inside one (cell, lm, lu) pool are
+    indistinguishable — inherent to the model).
+    """
+    from itertools import combinations
 
     yr_cal_start = data.YR_CAL_BASE
-    real_area_r = xr.DataArray(data.REAL_AREA.astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
-
-    # Get the decision variables for the start year
-    ag_dvar_base_mrj = tools.ag_mrj_to_xr(data, tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
-        ).assign_coords({'region': ('cell', data.REGION_NRM_NAME)}
-        ).rename({'lu':'From-land-use', 'lm':'From-water-supply'}
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-
-    ag_dvar_target_mrj = tools.ag_mrj_to_xr(
-        data, tools.lumap2ag_l_mrj(data.lumaps[yr_cal_end], data.lmmaps[yr_cal_end])
-        ).rename({'lu':'To-land-use', 'lm':'To-water-supply'}
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-
-    non_ag_dvar_target_rk = tools.non_ag_rk_to_xr(
-        data, data.non_ag_dvars[yr_cal_end]
-        ).rename({'lu':'To-land-use'}
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-
-    xr_ag2ag = ag_dvar_base_mrj * ag_dvar_target_mrj * real_area_r
-    xr_ag2non_ag = ag_dvar_base_mrj * non_ag_dvar_target_rk * real_area_r
-    
-    # Assign dry to water supply dimension for non-ag
-    xr_ag2non_ag = xr_ag2non_ag.expand_dims({'To-water-supply': ['dry']})
-
-    xr_ag2ag     = add_all(xr_ag2ag,     ['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use'])
-    xr_ag2non_ag = add_all(xr_ag2non_ag, ['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use'])
-
-
-    # ==================== Chunk Level Aggregation ====================
-    '''
-    Process both ag2ag and ag2non_ag transitions in a single loop to reduce memory usage.
-        This is because the `xr_ag2ag` and `xr_ag2non_ag` are huge intermediate arrays that consume a lot of memory.
-        By manually selecting each chunk, we can limit the size of the intermediate array.
-
-    '''
+    years = [y for y in sorted(data.lumaps.keys()) if y <= yr_cal_end]
     chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
-    transition_ag2ag_dfs = []
-    transition_ag2non_ag_dfs = []
 
-    for i in range(0, data.NCELLS, chunk_size):
-        end_idx = min(i + chunk_size, data.NCELLS)
-        cell_slice = slice(i, end_idx)
+    lm_names    = list(data.LANDMANS)
+    ag_names    = list(data.AGRICULTURAL_LANDUSES)
+    nonag_names = list(data.NON_AGRICULTURAL_LANDUSES)
+    N_AG, NLMS  = data.N_AG_LUS, data.NLMS
+    NPOOL_AG    = NLMS * N_AG
+    NPOOL       = NPOOL_AG + len(nonag_names)
+    ag_pool     = lambda m, j: m * N_AG + j          # noqa: E731
+    nonag_pool  = lambda k: NPOOL_AG + k             # noqa: E731
 
-        # Process ag2ag chunk
-        chunk_arr_ag2ag = xr_ag2ag.isel(cell=cell_slice).compute()
-        transition_df_ag2ag = chunk_arr_ag2ag.groupby('region'
-            ).sum(dim='cell'
-            ).to_dataframe('Area (ha)'
-            ).reset_index(
-            ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
-            )['Area (ha)'
-            ].sum(
-            ).reset_index(
-            ).query('abs(`Area (ha)`) > 0.01'
-            ).assign(chunk_idx=i//chunk_size)
-        transition_ag2ag_dfs.append(transition_df_ag2ag)
+    # ── Per-period flow specs: {from_pool: [(to_pool, cells, frac), ...]} with frac = D / base ──
+    period_flows = []
+    for yr_prev, yr in zip(years[:-1], years[1:]):
+        flows = {}
 
-        # Process ag2non_ag chunk
-        chunk_arr_ag2non_ag = xr_ag2non_ag.isel(cell=cell_slice).compute()
-        transition_df_ag2non_ag = chunk_arr_ag2non_ag.groupby('region'
-            ).sum(dim='cell'
-            ).to_dataframe('Area (ha)'
-            ).reset_index(
-            ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
-            )['Area (ha)'
-            ].sum(
-            ).reset_index(
-            ).query('abs(`Area (ha)`) > 0.01'
-            ).assign(chunk_idx=i//chunk_size)
-        transition_ag2non_ag_dfs.append(transition_df_ag2non_ag)
+        def _add(from_pool, to_pool, cells, vals, base_vals):
+            nz = vals > 0
+            if not nz.any():
+                return
+            frac = np.minimum(vals[nz] / base_vals[nz], 1.0).astype(np.float32)
+            flows.setdefault(from_pool, []).append((to_pool, cells[nz], frac))
 
-    # Combine all chunks df for ag2ag
-    transition_ag2ag = pd.concat(transition_ag2ag_dfs, ignore_index=True
-        ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
-        )['Area (ha)'
-        ].sum(
-        ).reset_index()
+        base_ag, base_nonag = data.ag_dvars[yr_prev], data.non_ag_dvars[yr_prev]
+        mj_cell_map = ag_transitions.get_base_dvar_mj_cell_map(data, yr_prev)
+        k_cell_map  = non_ag_transitions.get_base_nonag_dvar_k_cell_map(data, yr_prev)
+        D_a2a = data.delta_dvars_ag2ag[yr]
+        D_a2n = data.delta_dvars_ag2nonag[yr]
+        D_n2a = data.delta_dvars_nonag2ag[yr]
 
-    transition_ag2ag_AUS = transition_ag2ag.groupby(['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
-        )['Area (ha)'
-        ].sum(
-        ).reset_index(
-        ).assign(region='AUSTRALIA'
-        ).query('abs(`Area (ha)`) > 1')  # Skip transitions under 1 ha at national level
+        for (fm, fj), cells in mj_cell_map.items():
+            base = base_ag[fm, cells, fj]
+            d3, d2 = D_a2a[(fm, fj)], D_a2n[(fm, fj)]
+            for to_m in range(NLMS):
+                for to_j in range(N_AG):
+                    _add(ag_pool(fm, fj), ag_pool(to_m, to_j), cells, d3[to_m, :, to_j], base)
+            for k in range(len(nonag_names)):
+                _add(ag_pool(fm, fj), nonag_pool(k), cells, d2[:, k], base)
+        for fk, cells in k_cell_map.items():
+            base = base_nonag[cells, fk]
+            d3 = D_n2a[fk]
+            for to_m in range(NLMS):
+                for to_j in range(N_AG):
+                    _add(nonag_pool(fk), ag_pool(to_m, to_j), cells, d3[to_m, :, to_j], base)
+        period_flows.append(flows)
 
-    # Combine all chunks df for ag2non_ag
-    # To-water-supply is already set ('dry' and 'ALL') from xr_ag2non_ag via add_all.
-    transition_ag2non_ag = pd.concat(transition_ag2non_ag_dfs, ignore_index=True
-        ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
-        )['Area (ha)'
-        ].sum(
-        ).reset_index()
+    def _chained_blocks():
+        """Yield (cell_slice, A_block) — A[cell, start_pool, end_pool] after chaining all periods."""
+        start_ag, start_nonag = data.ag_dvars[yr_cal_start], data.non_ag_dvars[yr_cal_start]
+        for i in range(0, data.NCELLS, chunk_size):
+            sl = slice(i, min(i + chunk_size, data.NCELLS))
+            n = sl.stop - sl.start
+            A = np.zeros((n, NPOOL, NPOOL), dtype=np.float32)
+            for m in range(NLMS):
+                for j in range(N_AG):
+                    A[:, ag_pool(m, j), ag_pool(m, j)] = start_ag[m, sl, j]
+            for k in range(len(nonag_names)):
+                A[:, nonag_pool(k), nonag_pool(k)] = start_nonag[sl, k]
+            for flows in period_flows:
+                A_pre = A.copy()   # all outflows of a period read the pre-period state (no pass-through)
+                for from_pool, moves in flows.items():
+                    col = A_pre[:, :, from_pool]                          # (n, NPOOL)
+                    out_total = np.zeros(n, dtype=np.float32)
+                    for to_pool, cells, frac in moves:
+                        lo, hi = np.searchsorted(cells, (sl.start, sl.stop))
+                        if lo == hi:
+                            continue
+                        cl, fr = cells[lo:hi] - sl.start, frac[lo:hi]
+                        A[cl, :, to_pool] += col[cl] * fr[:, None]
+                        out_total[cl] += fr
+                    A[:, :, from_pool] -= col * np.minimum(out_total, 1.0)[:, None]
+            yield sl, A
 
-    transition_ag2non_ag_AUS = transition_ag2non_ag.groupby(['From-water-supply', 'From-land-use', 'To-land-use', 'To-water-supply']
-        )['Area (ha)'
-        ].sum(
-        ).reset_index(
-        ).assign(region='AUSTRALIA'
-        ).query('abs(`Area (ha)`) > 1')  # Skip transitions under 1 ha at national level
+    # ── PASS 1: region sums → CSV + valid layers ──
+    uniq_regions, region_codes = np.unique(data.REGION_NRM_NAME, return_inverse=True)
+    pool_area_sums = np.zeros((len(uniq_regions), NPOOL, NPOOL), dtype=np.float64)
+    for sl, A in _chained_blocks():
+        np.add.at(pool_area_sums, region_codes[sl], A * data.REAL_AREA[sl][:, None, None])
 
-    # Write the unified transition matrix (ag2ag + ag2non_ag)
-    pd.concat([transition_ag2ag, transition_ag2ag_AUS,
-               transition_ag2non_ag, transition_ag2non_ag_AUS]
-        ).infer_objects(copy=False
+    def _leaf_rows(end_pools_are_ag: bool):
+        rows = []
+        e_range = range(NPOOL_AG) if end_pools_are_ag else range(NPOOL_AG, NPOOL)
+        for ri, reg in enumerate(uniq_regions):
+            block = pool_area_sums[ri]
+            for s in range(NPOOL_AG):                                    # From = ag pools (start-year composition)
+                for e in e_range:
+                    v = block[s, e]
+                    if abs(v) <= 0.01:                                   # match the old per-chunk > 0.01 filter
+                        continue
+                    to_ws, to_lu = (
+                        (lm_names[e // N_AG], ag_names[e % N_AG]) if end_pools_are_ag
+                        else ('dry', nonag_names[e - NPOOL_AG])
+                    )
+                    rows.append({'region': reg,
+                                 'From-water-supply': lm_names[s // N_AG], 'From-land-use': ag_names[s % N_AG],
+                                 'To-water-supply': to_ws, 'To-land-use': to_lu, 'Area (ha)': v})
+        return pd.DataFrame(rows, columns=['region', 'From-water-supply', 'From-land-use',
+                                           'To-water-supply', 'To-land-use', 'Area (ha)'])
+
+    dims4 = ['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
+
+    def _lattice(leaf_df):
+        if leaf_df.empty:
+            return leaf_df
+        frames = []
+        for k in range(len(dims4) + 1):
+            for combo in combinations(dims4, k):
+                g = leaf_df.copy()
+                for c in combo:
+                    g[c] = 'ALL'
+                frames.append(g.groupby(['region'] + dims4, as_index=False)['Area (ha)'].sum())
+        return pd.concat(frames, ignore_index=True)
+
+    transition_ag2ag        = _lattice(_leaf_rows(end_pools_are_ag=True))
+    transition_ag2non_ag    = _lattice(_leaf_rows(end_pools_are_ag=False))
+    transition_ag2ag_AUS = (
+        transition_ag2ag.groupby(dims4, as_index=False)['Area (ha)'].sum()
+        .assign(region='AUSTRALIA')
+        .query('abs(`Area (ha)`) > 1', engine='python')  # Skip transitions under 1 ha at national level
+    )
+    transition_ag2non_ag_AUS = (
+        transition_ag2non_ag.groupby(dims4, as_index=False)['Area (ha)'].sum()
+        .assign(region='AUSTRALIA')
+        .query('abs(`Area (ha)`) > 1', engine='python')  # Skip transitions under 1 ha at national level
+    )
+
+    # Drop empty frames before concat (base year has no flows) to avoid the all-NA-column
+    # FutureWarning; guarantee a header-only CSV if everything is empty.
+    _cols = ['region'] + dims4 + ['Area (ha)']
+    _parts = [f for f in (transition_ag2ag, transition_ag2ag_AUS,
+                          transition_ag2non_ag, transition_ag2non_ag_AUS) if not f.empty]
+    combined = pd.concat(_parts, ignore_index=True) if _parts else pd.DataFrame(columns=_cols)
+    combined.infer_objects(copy=False
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_matrix_start_end.csv'), index=False)
 
-
-    # ==================== Stack Array, Get Valid Layers for ag2ag ====================
-    '''
-    We manually loop through chunks to save stacked array to reduce memory usage.
-        The materializing of stacked arrays requires a lot of memory.
-    '''
-
-    # Get valid data layers for ag2ag
-    valid_layers_ag2ag = pd.MultiIndex.from_frame(
-        transition_ag2ag_AUS[['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']]
-    ).sort_values()
-
-    xr_ag2ag_stacked = xr_ag2ag.stack({
-        'layer': ['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
-    }).sel(layer=valid_layers_ag2ag)
-
-    # Materialize the filtered array by looping through chunks
-    xr_ag2ag_filtered_array = xr.DataArray(
-        np.zeros((data.NCELLS, len(valid_layers_ag2ag)), dtype=np.float32),
-        coords={
-            'cell': range(data.NCELLS),
-            'layer': valid_layers_ag2ag
-        }
+    # ── PASS 2: densify only the valid layers (all-'ALL' zero layer if none, e.g. base year) ──
+    dims3 = ['From-water-supply', 'From-land-use', 'To-land-use']
+    valid_layers_ag2ag = (
+        pd.MultiIndex.from_frame(transition_ag2ag_AUS[dims4].drop_duplicates()).sort_values()
+        if not transition_ag2ag_AUS.empty
+        else pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL', 'ALL')], names=dims4)
+    )
+    valid_layers_ag2non_ag = (
+        pd.MultiIndex.from_frame(transition_ag2non_ag_AUS.query('`To-water-supply` == "dry"')[dims3].drop_duplicates()).sort_values()
+        if not transition_ag2non_ag_AUS.empty
+        else pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL')], names=dims3)
     )
 
-    for i in range(0, data.NCELLS, chunk_size):
-        end_idx = min(i + chunk_size, data.NCELLS)
-        cell_slice = slice(i, end_idx)
-        xr_ag2ag_filtered_array[cell_slice, :] = xr_ag2ag_stacked.isel(cell=cell_slice)
+    def _pool_sel(ws, lu, ag_side: bool):
+        """Pool indices matching a (ws, lu) layer facet; 'ALL' spans the whole family."""
+        if ag_side:
+            ms = range(NLMS) if ws == 'ALL' else [lm_names.index(ws)]
+            js = range(N_AG) if lu == 'ALL' else [ag_names.index(lu)]
+            return [ag_pool(m, j) for m in ms for j in js]
+        ks = range(len(nonag_names)) if lu == 'ALL' else [nonag_names.index(lu)]
+        return [nonag_pool(k) for k in ks]
 
-    # Save the compact filtered array
+    keys_a2a = list(valid_layers_ag2ag)
+    keys_a2n = list(valid_layers_ag2non_ag)
+    sel_a2a = [(_pool_sel(ws, lu, True), _pool_sel(tws, tlu, True)) for ws, lu, tws, tlu in keys_a2a]
+    sel_a2n = [(_pool_sel(ws, lu, True), _pool_sel(None, tlu, False)) for ws, lu, tlu in keys_a2n]
+
+    arr_a2a = np.zeros((data.NCELLS, len(keys_a2a)), dtype=np.float32)
+    arr_a2n = np.zeros((data.NCELLS, len(keys_a2n)), dtype=np.float32)
+    for sl, A in _chained_blocks():
+        area_block = A * data.REAL_AREA[sl][:, None, None]
+        for col_i, (s_ids, e_ids) in enumerate(sel_a2a):
+            arr_a2a[sl, col_i] = area_block[:, s_ids][:, :, e_ids].sum(axis=(1, 2))
+        for col_i, (s_ids, e_ids) in enumerate(sel_a2n):
+            arr_a2n[sl, col_i] = area_block[:, s_ids][:, :, e_ids].sum(axis=(1, 2))
+
+    xr_ag2ag_filtered_array = xr.DataArray(
+        arr_a2a, dims=['cell', 'layer'], coords={'cell': range(data.NCELLS)},
+    ).assign_coords(xr.Coordinates.from_pandas_multiindex(valid_layers_ag2ag, 'layer'))
     save2nc(xr_ag2ag_filtered_array, os.path.join(path, f'xr_transition_ag2ag_area_start_end.nc'))
 
-
-    # ==================== Stack Array, Get Valid Layers for ag2non_ag ====================
-
-    # Get valid data layers for ag2non_ag (spatial nc only needs the 'dry' slice;
-    # 'ALL' is the same values since non-ag has no irrigation dimension)
-    valid_layers_ag2non_ag = pd.MultiIndex.from_frame(
-        transition_ag2non_ag_AUS.query('`To-water-supply` == "dry"')[['From-water-supply', 'From-land-use', 'To-land-use']]
-    ).sort_values()
-
-    xr_ag2non_ag_stacked = xr_ag2non_ag.sel({'To-water-supply': 'dry'}).stack({
-        'layer': ['From-water-supply', 'From-land-use', 'To-land-use']
-    }).sel(layer=valid_layers_ag2non_ag)
-
-    # Materialize the filtered array by looping through chunks
     xr_ag2non_ag_filtered_array = xr.DataArray(
-        np.zeros((data.NCELLS, len(valid_layers_ag2non_ag)), dtype=np.float32),
-        coords={
-            'cell': range(data.NCELLS),
-            'layer': valid_layers_ag2non_ag
-        }
-    )
-
-    for i in range(0, data.NCELLS, chunk_size):
-        end_idx = min(i + chunk_size, data.NCELLS)
-        cell_slice = slice(i, end_idx)
-        xr_ag2non_ag_filtered_array[cell_slice, :] = xr_ag2non_ag_stacked.isel(cell=cell_slice)
-
-    # Save the compact filtered array
+        arr_a2n, dims=['cell', 'layer'], coords={'cell': range(data.NCELLS)},
+    ).assign_coords(xr.Coordinates.from_pandas_multiindex(valid_layers_ag2non_ag, 'layer'))
     save2nc(xr_ag2non_ag_filtered_array, os.path.join(path, f'xr_transition_area_ag2non_ag_start_end.nc'))
-    
+
     # Record maximum cell magnitude for this transition period for later use in scaling the transition area in the visualization
     def _minmax(arr):
-        return (arr.min().item(), arr.max().item()) if arr.size > 0 else (0.0, 0.0)
+        return (float(arr.min()), float(arr.max())) if arr.size > 0 else (0.0, 0.0)
 
     return (f"Area transition matrix written from year {data.YR_CAL_BASE} to {yr_cal_end}", {
         'transition_area': {
-            'ag2ag':     _minmax(xr_ag2ag_filtered_array),
-            'ag2non_ag': _minmax(xr_ag2non_ag_filtered_array),
+            'ag2ag':     _minmax(arr_a2a),
+            'ag2non_ag': _minmax(arr_a2n),
         }
     })
 
@@ -2697,7 +2597,9 @@ def write_ghg(data: Data, yr_cal: int, path: str):
     if yr_cal >= data.YR_CAL_BASE + 1:
         ghg_emissions = data.prod_data[yr_cal]['GHG']
     else:
-        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[settings.SIM_YEARS[0]]).sum()
+        # This branch only runs at the base year, so key the base-year dvars by data.YR_CAL_BASE
+        # (robust for offline/redo writes; settings.SIM_YEARS need not match the checkpoint's run).
+        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[data.YR_CAL_BASE]).sum()
     pd.DataFrame({
         'Variable': ['GHG_EMISSIONS_LIMIT_TCO2e', 'GHG_EMISSIONS_TCO2e'],
         'Emissions (t CO2e)': [ghg_limits, ghg_emissions],
@@ -2805,21 +2707,34 @@ def write_ghg(data: Data, yr_cal: int, path: str):
         yr_idx_sim = simulated_year_list.index(yr_cal)
         yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
 
-        ghg_t_dict = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[yr_cal_sim_pre], separate=True)
+        # TRUE transition GHG: Σ_src ghg_leaf[src]·D[src] — the exact source-keyed emissions the
+        # solver's GHG constraint charged (Σ flow_ghg·D), scattered onto the target [Type, lm, cell, lu]
+        # axes. Already absolute t CO2e — NO dvar multiplication downstream.
+        mj_cell_map  = ag_transitions.get_base_dvar_mj_cell_map(data, yr_cal_sim_pre)
+        dvar_D_ag2ag = data.delta_dvars_ag2ag[yr_cal]   # always present for a solved year
+        ghg_t_paid = {}   # {Type: dense (NLMS, NCELLS, N_AG_LUS) of t CO2e on [to_m, r, to_j]}
+        for (from_m, from_j), cell_idx in mj_cell_map.items():
+            ghg_leaves = ag_ghg.get_ghg_transition_emissions(data, from_m, from_j, cell_idx, separate=True)
+            D = dvar_D_ag2ag[(from_m, from_j)]
+            for ghg_type, ghg_arr in ghg_leaves.items():
+                paid = ghg_t_paid.setdefault(
+                    ghg_type, np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32))
+                paid[:, cell_idx, :] += ghg_arr * D
+
         ghg_t_smrj = xr.DataArray(
-            np.stack(list(ghg_t_dict.values()), axis=0).astype(np.float32),
+            np.stack(list(ghg_t_paid.values()), axis=0).astype(np.float32),
             dims=['Type', 'lm', 'cell', 'lu'],
             coords={
-                'Type': list(ghg_t_dict.keys()),
+                'Type': list(ghg_t_paid.keys()),
                 'lm': data.LANDMANS,
                 'cell': range(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES
             }
-        )
+        ).assign_coords(region_state=('cell', data.REGION_STATE_NAME),
+                        region_NRM=('cell', data.REGION_NRM_NAME))
         ghg_t_smrj = ghg_t_smrj / gap
 
-        xr_ghg_transition = ghg_t_smrj * ag_dvar_mrj
-        xr_ghg_transition = add_all(xr_ghg_transition, ['lm', 'Type'])
+        xr_ghg_transition = add_all(ghg_t_smrj, ['lm', 'Type'])
 
         ghg_trans_df, ghg_trans_df_AUS = to_region_and_aus_df(xr_ghg_transition, ['Type', 'lm', 'lu'], yr_cal, region_levels=['region_state', 'region_NRM'])
         (ghg_trans_df
