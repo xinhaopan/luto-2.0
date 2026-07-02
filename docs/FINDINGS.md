@@ -70,16 +70,89 @@ agreement (economics ag2ag total ≡ transition_ag2ag_cost total).
 - **Water semantic fix**: `transition_ag2ag_water` reported a $-valued licence-cost delta under the
   "ML" label; now the true ML requirement change (`wreq[to] − wreq[from]`).
 
-### Why true transition cost ≪ the old lumap approximation
+### Why true transition cost < the old lumap approximation
 
-On ONE solved solution reported both ways (same per-source cost data), the true flow cost is
-**~16%** of the composition cross-product (`true/lumap ≈ 0.16` for both cost and area). The cross-
-product over-counts because for a fully-ag cell it evaluates to `1 − Σ_j base_j·target_j` — the cell's
-**Gini–Simpson diversity**, not its change. A mixed cell that *stays put* (base=target=`p_j`) is still
-charged `1 − Σ p_j²` (≈ 1−1/N ≈ 0.83 for an N≈6-way cell at RF5) while the true flow `D`=0. So the
-error is `(actual churn) / (compositional diversity)` and scales with RESFACTOR (near-zero at RF1,
-large at RF5). The transition-cost drop seen against the old baseline is therefore substantially a
-**reporting-correctness** effect (removing phantom transitions), not the solver moving less land.
+Two isolation tests, both on a solved solution (so no confounds):
+
+- **Ceiling (pure composition cross-product):** reporting one solution as `base_frac × target_frac`
+  gives true/lumap ≈ **0.16** — because for a fully-ag cell the cross-product evaluates to
+  `1 − Σ_j base_j·target_j`, the cell's **Gini–Simpson diversity**, not its change: a mixed cell that
+  *stays put* (base=target=`p_j`) is still charged `1 − Σ p_j²` (≈ 1−1/N ≈ 0.83 for N≈6 LUs at RF5)
+  while the true flow `D`=0. So the error is `(actual churn)/(compositional diversity)` and scales
+  with RESFACTOR (≈0 at RF1, large at RF5). This 0.16 is the theoretical ceiling of over-count.
+- **Actual historical method (dominant-lumap × net-ΔX):** the archive baseline (BLENDED=False) did
+  NOT use the pure cross-product — it billed `l_mrj[dominant From] × clip(X_new−X_old)[To] × unit_cost`.
+  Reporting the SAME solution that way vs the true per-source `Σcost·D` gives **true/lumap ≈ 0.634**
+  (i.e. the old method over-charged ag2ag cost by ~58%, by billing the whole cell's target increase
+  at its *dominant* source's rate). **This 0.634 is the faithful number**; the 0.16 is only the ceiling.
+
+The drop seen against the old baseline is therefore substantially a **reporting-correctness** effect
+(removing the dominant-source over-charge), decomposed cleanly below.
+
+### Matched-settings comparison (MNES_likely 2010→2020) + method/solution decomposition
+
+Re-ran the fresh solve with `BIO_QUALITY_LAYER='MNES_likely'` to match the baseline (only `CULL_MODE`
+remains unmatchable — decommissioned). Full `write_outputs` (104 files) vs the pre-refactor baseline:
+
+- **Non-transition core reproduces tightly** (demand/physically anchored): crosstab / demand /
+  production-targets / water-limits / offland-GHG = 0.00%; ag area 0.11%, ag revenue 0.12%, GHG total
+  0.97%, ag cost 1.24%, ag profit 2.49%. → non-transition writes are structurally unchanged.
+- **Discretionary categories diverge 12–41%** (non-ag economics/area, AM, biodiversity-overall):
+  correctly-priced cheaper transitions relocate discretionary land (non-ag area per-LU: EP 470k→19k,
+  RP 1.92M→1.54M, Destocked 137k→0, Beef/Sheep AF →0). Not a reporting error — a different optimum.
+  `switches-lumap` (net-change-per-LU) shows 2.57e9→513M, but its raw national total is a comparator
+  artifact (summing a signed per-(region,LU) metric; 2.57e9 ≫ total land 464M).
+
+**Method-vs-solution decomposition of the −19% ag2ag-cost gap** (reporting the NEW solution under the
+OLD method — B — via the dominant-lumap cost map; A=baseline, D=new/true):
+
+| | ag2ag cost $/yr | |
+|---|---|---|
+| A old sol, old method | 2,278,261,755 | |
+| B **new sol, old method** | 2,898,804,326 | |
+| D new sol, new method | 1,837,370,279 | |
+
+`D/A = 0.807 = (B/A) × (D/B) = 1.272 × 0.634`:
+- **Solution effect B/A = ×1.272** — the flow solution transitions **+27% more** land (cheaper,
+  correctly-priced transitions → the solver does more; same phenomenon as the discretionary shifts).
+- **Method effect D/B = ×0.634** — on the **same** solution, true per-source cost is **−37%** vs the
+  dominant-lumap accounting.
+- **Net D/A = ×0.807** — the −19% observed in the file comparison.
+
+So the reported transition-cost fall is a reporting-correctness effect (−37%) partly offset by the
+new solution transitioning more than the old *target-based* baseline (+27%, B/A).
+
+### Controlled causal test — the lumap cost is a solver DISTORTION, not just a level shift
+
+Re-solved 2010→2020 twice under the IDENTICAL flow model / MNES settings / 2010 base, differing only
+in the ag2ag cost coefficients: true per-source `flow_cost` vs the dominant-lumap map sliced to each
+source (`get_ag2ag_dominant_source_cost_mrj`, i.e. every source in a cell billed the dominant rate):
+
+| | ag2ag transitioned area (ha) | total non-ag area (ha) |
+|---|---|---|
+| TRUE-cost (per-source) | 6,338,199 | 786,384 |
+| LUMAP-cost (dominant) | **31,811,116 (5.0×)** | 386,934 |
+
+**The lumap cost makes the solver transition 5× MORE ag land** (and convert *less* to non-ag) — the
+OPPOSITE of a simple "higher cost → less transition". Reason: the lumap approximation bills every
+source at its cell's DOMINANT rate; most cells are dominated by cheap-to-convert LUs, so expensive
+MINORITY sources (natural land, high-value crops) are **under-priced** → the solver cheaply churns
+land it shouldn't. This is consistent with p10 (non-uniform mis-pricing): on the true solution the
+lumap over-reports those specific moves (D/B=0.634), but the lumap-cost SOLVER abandons them for the
+cheap-under-lumap moves instead. **Corrected takeaway:** the exact flow cost differs from lumap not
+just in level but in per-source STRUCTURE; as a solver cost the lumap approximation distorts the
+optimum (≈5× excess ag churn, too little non-ag), and the exact implementation removes that
+distortion — the correctly-incentivised optimum has far less spurious ag churn.
+
+### Report robustness
+
+`create_report_data.py` did `pd.concat([df for path in X['path'] if not df.empty])` at ~24 sites,
+which raised "No objects to concatenate" when a category was empty in EVERY year (e.g. a scenario
+with zero non-ag revenue — the flow optimum here picked pure EP/CP with no ag-revenue component,
+implied non-ag revenue = −$80, below the abs>1 filter). Added `_read_concat(paths)` (skips empties;
+if all empty, returns one empty frame carrying the first file's columns so downstream ops don't fail)
+and replaced the 23 fragile sites. NOT caused by the transition rebuild; a pre-existing fragility the
+correct-but-sparse flow outputs exposed. The Vue report otherwise reads the identical output schema.
 
 ### Model size / solve time (RF5, 2010→2020 step: flow vs old target-based baseline)
 
@@ -97,6 +170,34 @@ a mid-horizon 2030→2035 step was ~1.7×). The trade is deliberate: a heavier s
 auditable transition accounting and a write side that reads flows instead of re-modelling them.
 (Raw solver objective is the internal rescaled value — not comparable across formulations; the
 economic comparison lives in the output CSVs.)
+
+### Full-run performance (RF5, 2020→2050, 7 steps: old target-based vs new flow)
+
+Per-year model size and Gurobi solve time parsed from each run's `LUTO_RUN__stdout.log` (7 solves
+each; one `Optimize a model with …` + one `Solved in … seconds` per simulated year):
+
+| | Old (target/lumap) | New (flow) | Ratio |
+|---|---|---|---|
+| Rows (mean) | 2.23 M | 4.62 M | 2.1× |
+| Columns (mean) | 3.10 M | 7.02 M | 2.3× |
+| Nonzeros (mean) | 17.1 M | 32.7 M | 1.9× |
+| Total solve (7 steps) | 21.3 min | 73.5 min | 3.4× |
+
+Per-step solve runs ~2–4 min old vs ~8–14 min new; the wall-clock ratio (3.4×) exceeds the
+matrix-size ratio because barrier iteration counts grow on the larger problem. Consistent with the
+single-step 2010→2020 figure above (that step is the heaviest reallocation, ~4.9×). Comparison
+scripts + rendered table/plots in `jinzhu_inspect_code/Fix_flow_trans_write/plots/`
+(`perf_size_time_table.png`, `make_perf_table.py`, plus stacked old-vs-new area/economics/water/GHG/
+transition plots and the split-cell start→end heatmap). Plain-language write-up:
+`jinzhu_inspect_code/Fix_flow_trans_write/POST.md`.
+
+### Dead-code cleanup
+
+Removed `tools.get_ag_to_ag_water_delta_matrix_by_lumap` — the map-based ($/cell) water-licence delta
+with the dry/irr `.any()` masks. Zero callers remained: the live per-source
+`get_ag_to_ag_water_delta_matrix` covers the transition-cost path, and the ag2ag water *report* uses
+the inline `wreq[to] − wreq[from]` ML delta (not this $ function). Also fixed its stale docstring
+cross-reference. Pure removal, no behaviour change.
 
 ---
 

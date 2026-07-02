@@ -259,8 +259,7 @@ def get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx) 
     """Source-parameterised water-licence delta ($/cell): transitioning FROM (from_m, from_j) TO every
     target (to_m, to_j) on `cells` — (target req − source req) × licence price, plus the dry↔irr
     irrigation setup/teardown. Returns (NLMS, len(cells), N_AG_LUS), RAW (un-amortised) upfront cost —
-    the caller amortises explicitly (see transitions.py). The map-based variant
-    get_ag_to_ag_water_delta_matrix_by_lumap (below) serves the write.py / nonag reporting callers.
+    the caller amortises explicitly (see transitions.py).
     """
     yr_cal   = data.YR_CAL_BASE + yr_idx
     area     = data.REAL_AREA[cells]
@@ -273,53 +272,6 @@ def get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx) 
         w_cost[0] += settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal] * area[:, None]
     return w_cost.astype(np.float32)
 
-
-def get_ag_to_ag_water_delta_matrix_by_lumap(w_mrj, l_mrj, data, yr_idx) -> np.ndarray:
-    """
-    Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
-    base transition costs. Includes the costs of water license fees.
-
-    Returns the RAW (un-amortised) upfront cost — the caller amortises explicitly (see write.py).
-
-    Parameters
-     w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for target year.
-     l_mrj (numpy.ndarray): Land-use and land management matrix for the base_year.
-     data (object): Data object containing necessary information.
-
-    Returns
-     w_delta_mrj (numpy.ndarray, <unit:$/cell>), un-amortised.
-    """
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    
-    # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per cell (inc. REAL_AREA).
-    # Sum total water requirements of current land-use and land management
-    w_r = (w_mrj * l_mrj).sum(axis=0).sum(axis=1)
-
-    # Net water requirements calculated as the diff in water requirements between current land-use and all other land-uses j.
-    w_net_mrj = w_mrj - w_r[:, np.newaxis]
-
-    # Water license cost calculated as net water requirements (ML/cell) x licence price ($/ML).
-    w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis] * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS
-
-    # When land-use changes from dryland to irrigated add <settings.NEW_IRRIG_COST> per hectare for establishing irrigation infrastructure
-    new_irrig = (
-        settings.NEW_IRRIG_COST
-        * data.IRRIG_COST_MULTS[yr_cal]
-        * data.REAL_AREA[:, np.newaxis]  # <unit:$/cell>
-    )
-    dryland_r = l_mrj[0].any(axis=1, keepdims=True)   # (NCELLS, 1) — cell was dryland
-    w_delta_mrj[1] = np.where(dryland_r, w_delta_mrj[1] + new_irrig, w_delta_mrj[1])
-
-    # When land-use changes from irrigated to dryland add <settings.REMOVE_IRRIG_COST> per hectare for removing irrigation infrastructure
-    remove_irrig = (
-        settings.REMOVE_IRRIG_COST
-        * data.IRRIG_COST_MULTS[yr_cal]
-        * data.REAL_AREA[:, np.newaxis]  # <unit:$/cell>
-    )
-    irrigated_r = l_mrj[1].any(axis=1, keepdims=True)  # (NCELLS, 1) — cell was irrigated
-    w_delta_mrj[0] = np.where(irrigated_r, w_delta_mrj[0] + remove_irrig, w_delta_mrj[0])
-
-    return w_delta_mrj.astype(np.float32)  # <unit:$/cell>, RAW upfront — caller amortises
 
 def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.ndarray, np.ndarray]:
     """
