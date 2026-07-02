@@ -115,10 +115,11 @@ class Data:
         self.lmmaps = {}
         self.ammaps = {}
         self.ag_dvars = {}
-        self.ag_delta_dvars = {}
         self.non_ag_dvars = {}
-        self.non_ag_delta_dvars = {}
+        self.delta_dvars_ag2nonag = {}
         self.ag_man_dvars = {}
+        self.delta_dvars_ag2ag = {}
+        self.delta_dvars_nonag2ag = {}
         self.prod_data = {}
         self.obj_vals = {}
 
@@ -1855,12 +1856,13 @@ class Data:
         """
         self.ag_dvars[yr] = ag_dvars
 
-    def add_ag_delta_dvars(self, yr: int, ag2ag_D_mrj: np.ndarray | None):
+    def add_delta_dvars_ag2ag(self, yr: int, dvar_D_ag2ag_mrj: dict | None):
         """
-        Saves solver delta dvar solution D=max(0,X_new-x_old) for blended ag2ag transition costs.
-        None when TRANSITION_MODE='crisp'.
+        Saves the solved ag→ag transition deltas, SOURCE-KEYED for true from→to flow reporting:
+        {(from_m, from_j): ndarray(NLMS, ncells_src, N_AG_LUS) [to_m, local_r, to_j]} over each
+        source's cells (get_base_dvar_mj_cell_map(self, base_year) recovers the global cell indices).
         """
-        self.ag_delta_dvars[yr] = ag2ag_D_mrj
+        self.delta_dvars_ag2ag[yr] = dvar_D_ag2ag_mrj
 
     def add_non_ag_dvars(self, yr: int, non_ag_dvars: np.ndarray):
         """
@@ -1868,12 +1870,20 @@ class Data:
         """
         self.non_ag_dvars[yr] = non_ag_dvars
 
-    def add_non_ag_delta_dvars(self, yr: int, ag2nonag_D_rk: np.ndarray | None):
+    def add_delta_dvars_ag2nonag(self, yr: int, dvar_D_ag2nonag_rk: dict | None):
         """
-        Saves solver delta dvar D=max(0,X_new-x_old) for blended ag->nonag transition costs.
-        None when TRANSITION_MODE='crisp'.
+        Saves the solved ag→non-ag transition deltas, SOURCE-KEYED:
+        {(from_m, from_j): ndarray(ncells_src, N_NON_AG_LUS) [local_r, k]} over each source's cells.
         """
-        self.non_ag_delta_dvars[yr] = ag2nonag_D_rk
+        self.delta_dvars_ag2nonag[yr] = dvar_D_ag2nonag_rk
+
+    def add_delta_dvars_nonag2ag(self, yr: int, dvar_D_nonag2ag_mrj: dict | None):
+        """
+        Saves the solved non-ag→ag transition deltas, SOURCE-KEYED:
+        {from_k: ndarray(NLMS, ncells_k, N_AG_LUS) [to_m, local_r, to_j]} over each source's cells
+        (get_base_nonag_dvar_k_cell_map) — e.g. reversible Destocked land converting back to ag.
+        """
+        self.delta_dvars_nonag2ag[yr] = dvar_D_nonag2ag_mrj
 
     def add_ag_man_dvars(self, yr: int, ag_man_dvars: dict[str, np.ndarray]):
         """

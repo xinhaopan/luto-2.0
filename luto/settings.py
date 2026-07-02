@@ -106,25 +106,17 @@ Mean FIRE_RISK cell values (%)
 # Amortise upfront (i.e., establishment and transitions) costs
 AMORTISE_UPFRONT_COSTS = False
 
-# Transition cost mode:
-#   'crisp'  — treat each cell as fully assigned to its dominant land use (cheapest, legacy)
-#   'blend'  — weight costs by the current fractional dvar composition; delta vars D = max(0, X_new - x_old)
-#              charge only net increases, avoiding spurious same-LU costs
-#   'exact'  — like 'blend' but with exact per-cell transition accounting (reserved for future use)
-TRANSITION_MODE = 'blend'
 
-# Minimum fraction of a coarse cell's land area that a SOURCE LU must occupy for that
-# source to be a valid transition-flow origin in exact mode (per-source, not summed).
-# Prevents ubiquitous background land uses (e.g. Unallocated-natural at RESFACTOR>1) from
-# granting eligibility to cells where that use is only a small sliver. Sub-threshold slivers
-# get no flow-out var and are conserved by the 'stay' fallback (get_ag2ag_lb). Only used when
-# TRANSITION_MODE='exact'. Tradeoff: lower θ ⇒ fewer dropped slivers but more flow vars /
-# larger matrix. 0.01 favours fidelity (≈68 ha dropped); 0.10 was more compact (≈6.0 M ha).
+# Minimum fraction of a coarse cell's land area that a SOURCE LU must occupy for that source to be a
+# valid transition-flow origin (per-source, not summed). Prevents ubiquitous background land uses (e.g.
+# Unallocated-natural at RESFACTOR>1) from granting eligibility to cells where that use is only a small
+# sliver. Sub-threshold slivers get no flow-out var and are conserved by the 'stay' fallback
+# (get_ag2ag_lb). Tradeoff: lower θ ⇒ fewer dropped slivers but more flow vars / larger matrix. 0.01
+# favours fidelity (≈68 ha dropped); 0.10 was more compact (≈6.0 M ha).
 EXACT_REACHABILITY_MIN_FRACTION = 0.01
 
-# Number of joblib "threading" workers used to compute the (m, j) combos for
-# TRANSITION_MODE='blend'/'exact', processed in batches of this size. n_jobs=4 was
-# found to give the best runtime/memory tradeoff (~42s, +2.4GB peak at RESFACTOR=5).
+# Number of joblib "threading" workers used to compute the (m, j) source combos in batches of this size.
+# n_jobs=4 was found to give the best runtime/memory tradeoff (~42s, +2.4GB peak at RESFACTOR=5).
 TRANSITION_MODE_N_JOBS = 4
 
 # Discount rate for amortisation
@@ -154,7 +146,7 @@ DYNAMIC_PRICE = True
 RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2020, 2051, 5))
+SIM_YEARS = list(range(2020, 2051, 5))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -942,7 +934,7 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 
 # Biodiversity quality options
 BIO_QUALITY_LAYERS = ['Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely']
-BIO_QUALITY_LAYER = 'Suitability' 
+BIO_QUALITY_LAYER = 'MNES_likely' 
 '''
 One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'.
     - 'Suitability': use the Zonation algorith to compute quanlity score over 10k species.
@@ -1332,17 +1324,6 @@ reduce the impacts of climate change on biodiversity and ecosystems.
 # ---------------------------------------------------------------------------- #
 # Other parameters
 # ---------------------------------------------------------------------------- #
-
-# Cell culling
-# Disabled by default: at typical resolutions cells average ~6 eligible LUs (cap is 12), so culling
-# removes <1% of the problem and changes no optimal solution — not worth the moving part. Re-enable
-# by switching CULL_MODE; the culling call is fed the real dominant-source transition cost.
-CULL_MODE = 'none'          # do no culling
-# CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
-# CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
-
-MAX_LAND_USES_PER_CELL = 12         if CULL_MODE == 'absolute' else 'Not used'
-LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
 
 # Non-ag output coding. Non-agricultural land uses will appear on the land use map offset by this amount (e.g. land use 0 will appear as 100)
 NON_AGRICULTURAL_LU_BASE_CODE = 100

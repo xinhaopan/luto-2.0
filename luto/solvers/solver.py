@@ -60,8 +60,9 @@ class SolverSolution:
     ag_X_mrj: np.ndarray
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
-    ag2ag_D_mrj: np.ndarray | None                                        # Ag->ag delta dvars D=max(0,X_new-x_old); None when TRANSITION_MODE='crisp'
-    ag2nonag_D_rk: np.ndarray | None                                      # Ag->nonag delta dvars; None when TRANSITION_MODE='crisp'
+    dvar_D_ag2ag_mrj: dict                                                # Solved ag->ag deltas, SOURCE-KEYED: {(from_m, from_j): ndarray(NLMS, ncells_src, N_AG_LUS) [to_m, local_r, to_j]} over the source's cells (get_base_dvar_mj_cell_map)
+    dvar_D_ag2nonag_rk: dict                                              # Solved ag->nonag deltas, SOURCE-KEYED: {(from_m, from_j): ndarray(ncells_src, N_NON_AG_LUS) [local_r, k]}
+    dvar_D_nonag2ag_mrj: dict                                             # Solved nonag->ag deltas, SOURCE-KEYED: {from_k: ndarray(NLMS, ncells_k, N_AG_LUS) [to_m, local_r, to_j]} (e.g. reversible Destocked back to ag; cells via get_base_nonag_dvar_k_cell_map)
     prod_data: dict[str, Any]
     obj_val: dict[str, float]
 
@@ -104,6 +105,9 @@ class LutoSolver:
         self.X_non_ag_vars_kr = None
         self.X_ag_man_dry_vars_jr = None
         self.X_ag_man_irr_vars_jr = None
+        self.F_ag2ag = {}       # (from_m, from_j) -> tupledict{(to_m, local_r, to_j): Var}
+        self.F_ag2nonag = {}    # (from_m, from_j) -> tupledict{(k, local_r): Var}
+        self.F_nonag2ag = {}    # from_k           -> tupledict{(to_m, local_r, to_j): Var}
         self.V = None
         self.E = None
         self.W = None
@@ -152,8 +156,7 @@ class LutoSolver:
         self._setup_non_ag_vars()
         self._setup_ag_management_variables()
         self._setup_deviation_penalties()
-        self._setup_delta_vars_ag2ag()
-        self._setup_delta_vars_ag2nonag()
+        self._setup_flow_vars()                 # per-source transition delta vars (needs X_ag / X_nonag)
 
     def _setup_constraints(self):
         print("├── Adding the constraints...")
@@ -166,9 +169,9 @@ class LutoSolver:
         self._add_regional_adoption_constraints()
         self._add_water_usage_limit_constraints()
         self._add_renewable_energy_constraints()
-        self._add_transition_delta_constraints_ag2ag()
-        self._add_transition_delta_constraints_ag2nonag()
-        
+        self._add_flow_out_constraints()        # source cap (Σ out ≤ x_old; bounds deltas)
+        self._add_flow_in_constraints()         # node balance (X = base + Σin − Σout)
+
     def _setup_objective(self):
         """
         Formulate the objective based on settings.OBJECTIVE
@@ -206,18 +209,24 @@ class LutoSolver:
         self.X_ag_irr_vars_jr = np.zeros(
             (self._input_data.n_ag_lus, self._input_data.ncells), dtype=object
         )
-        for j in range(self._input_data.n_ag_lus):
-            dry_lu_cells = self._input_data.feasible_ag_cells_mrj[0, j]
-            for r in dry_lu_cells:
-                self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
-                    ub=1, name=f"X_ag_dry_{j}_{r}".replace(" ", "_")
-                )
 
-            irr_lu_cells = self._input_data.feasible_ag_cells_mrj[1, j]
-            for r in irr_lu_cells:
-                self.X_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
-                    ub=1, name=f"X_ag_irr_{j}_{r}".replace(" ", "_")
+        # Target-var bounds from the TO view. dvar_lb_ag/dvar_ub_ag are already cleaned in input_data
+        # (0 ≤ lb ≤ base ≤ ub, with reporting), so use them directly; the node-balance/cap constant is
+        # just the (cleaned, in-box) base dvar — the all-delta=0 stay point is feasible by construction.
+        dvar_lb_ag = self._input_data.dvar_lb_ag
+        dvar_ub_ag = self._input_data.dvar_ub_ag
+        for j in range(self._input_data.n_ag_lus):
+            for r in self._input_data.feasible_ag_cells_mrj[0, j]:
+                self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
+                    lb=dvar_lb_ag[0, r, j], ub=dvar_ub_ag[0, r, j],
+                    name=f"X_ag_dry_{j}_{r}".replace(" ", "_")
                 )
+            for r in self._input_data.feasible_ag_cells_mrj[1, j]:
+                self.X_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
+                    lb=dvar_lb_ag[1, r, j], ub=dvar_ub_ag[1, r, j],
+                    name=f"X_ag_irr_{j}_{r}".replace(" ", "_")
+                )
+        self.const_ag = self._input_data.dvar_base_ag_mrj
 
 
     def _setup_non_ag_vars(self):
@@ -226,27 +235,22 @@ class LutoSolver:
             (self._input_data.n_non_ag_lus, self._input_data.ncells), dtype=object
         )
         
+        lb_n = self._input_data.dvar_lb_nonag
+        ub_n = self._input_data.dvar_ub_nonag
+        self.const_nonag = self._input_data.dvar_base_non_ag_rk
+        
+        # If the lower and upper bounds are very close (within 1% of the lower bound), collapse to a single value
+        collapse = (lb_n > 0) & (np.abs(ub_n - lb_n) / np.where(lb_n > 0, lb_n, 1.0) < 0.01)
+        lb_eff = np.where(collapse, self.const_nonag, lb_n)
+        ub_eff = np.where(collapse, self.const_nonag, ub_n)
+
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-            lu_cells = self._input_data.feasible_non_ag_cells[k]
-            for r in lu_cells:
-                x_lb = (
-                    0
-                    if NON_AG_LAND_USES_REVERSIBLE[k_name]
-                    else self._input_data.dvar_lb_nonag[r, k]
-                )
-                x_ub = self._input_data.dvar_ub_nonag[r, k]
-                # Collapse near-degenerate windows to fixed variables.  When lb ≈ ub
-                # (e.g. RP cells whose existing allocation fills almost all of RP_PROPORTION),
-                # the barrier's complementarity slack (ub - x) approaches zero at the optimum,
-                # making AA' near-singular.  Fixing lb = ub tells Gurobi the variable is fixed
-                # and removes it from the interior-point complementarity system entirely.
-                if x_lb > 0 and abs(x_ub - x_lb) / x_lb < 0.01:
-                    x_ub = x_lb
+            for r in self._input_data.feasible_non_ag_cells[k]:
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                    lb=x_lb,
-                    ub=x_ub,
+                    lb=lb_eff[r, k],
+                    ub=ub_eff[r, k],
                     name=f"X_non_ag_{k}_{r}".replace(" ", "_")
                 )
 
@@ -309,7 +313,7 @@ class LutoSolver:
                 # decreases between periods — lb(t) <= ceiling(t-1) = ceiling(t) always holds.
                 ag_mask = self._input_data.ag_mask_proportion_r
                 for r in sorted(renewable_cells):
-                    cap = float(exist_r[r])
+                    cap = exist_r[r]
                     if not cap:
                         continue
                     terms = [
@@ -321,7 +325,7 @@ class LutoSolver:
                         if isinstance(v, gp.Var) # only set ub if the cell is a valide Renewable location
                     ]
                     if terms:
-                        ceiling = max(float(ag_mask[r]) - cap, 0.0)
+                        ceiling = max(ag_mask[r] - cap, 0.0)
                         self.gurobi_model.addConstr(
                             gp.quicksum(terms) <= ceiling,
                             name=f"const_{am_name}_solvable_ub_{r}"
@@ -369,7 +373,7 @@ class LutoSolver:
         3) [W] Penalty vector for water usage, each one corespondes a region, that minimises the deviations from the target.
         4) [B] A single penalty scalar for biodiversity, minimises its deviation from the target.
         """
-        print("│   └── Setting up decision variables for soft constraints...")
+        print("│   ├── setting up decision variables for soft constraints...")
 
         if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
             self.V = self.gurobi_model.addMVar(self._input_data.ncms, lb=0, name="V")  # lb=0: demand must be met or exceeded
@@ -381,111 +385,144 @@ class LutoSolver:
             num_regions = len(self._input_data.limits["water"].keys())
             self.W = self.gurobi_model.addMVar(num_regions, name="W")
 
-    def _setup_delta_vars_ag2ag(self):
-        """Add non-negative delta variables D[m,j,r] for blended ag2ag transition costs.
+    def _setup_flow_vars(self):
 
-        D[m,j,r] = max(0, X_new[m,j,r] - x_old[m,j,r]) at optimality, enforced by
-        _add_transition_delta_constraints_ag2ag. Only created for (m,j,r) triples
-        where the rescaled transition cost coefficient meets SOLVER_COEFF_MIN.
+        print("│   └── setting up transition flow delta variables (D)...")
+        model = self.gurobi_model
+        idata = self._input_data
+
+        # Feasibility is fully resolved in input_data (feasible_ag2ag_mrj / feasible_nonag2ag_mrj /
+        # feasible_ag2nonag_rk — source-keyed dicts, keyed/shaped like the flow_cost dicts): each leaf
+        # already combines target eligibility ∧ the source's T_MAT row ∧ the diagonal drop. Here we
+        # just materialise one delta var per True entry.
+
+        # ── ag → ag :  D[(fm,fj)][to_m, local_r, to_j], OFF-DIAGONAL only (positive-increment delta) ──
+        # No stay/diagonal var: "staying" as (fm,fj) is free — the node-balance constant carries the base.
+        for (fm, fj), valid in idata.feasible_ag2ag_mrj.items():
+            idx = list(map(tuple, np.argwhere(valid).tolist()))
+            self.F_ag2ag[(fm, fj)] = model.addVars(idx, lb=0.0, name=f"F_a2a_{fm}_{fj}")
+
+        # ── ag → non-ag :  F[(fm,fj)][k, local_r] ──
+        for (fm, fj), valid in idata.feasible_ag2nonag_rk.items():
+            idx = [(int(k), int(lr)) for lr, k in np.argwhere(valid)]
+            self.F_ag2nonag[(fm, fj)] = model.addVars(idx, lb=0.0, name=f"F_a2n_{fm}_{fj}")
+
+        # ── non-ag → ag :  F[k][to_m, local_r, to_j] ──
+        for fk, valid in idata.feasible_nonag2ag_mrj.items():
+            idx = list(map(tuple, np.argwhere(valid).tolist()))
+            self.F_nonag2ag[fk] = model.addVars(idx, lb=0.0, name=f"F_n2a_{fk}")
+
+        n_a2a = sum(len(v) for v in self.F_ag2ag.values())
+        n_a2n = sum(len(v) for v in self.F_ag2nonag.values())
+        n_n2a = sum(len(v) for v in self.F_nonag2ag.values())
+        print(f"│       ├── ag2ag    : {n_a2a:,} delta vars")
+        print(f"│       ├── ag2nonag : {n_a2n:,} delta vars")
+        print(f"│       ├── nonag2ag : {n_n2a:,} delta vars")
+        print(f"│       └── total    : {n_a2a + n_a2n + n_n2a:,} delta vars")
+
+
+    def _add_flow_out_constraints(self):
+        """Source cap: a source cannot export more land than it holds.
+
+            Σ_out D[src]  ≤  x_old[src]
+
+        This BOUNDS the delta vars (with negative `flow_cost` entries — water/GHG deltas can be < 0 —
+        the objective would otherwise push a `D` to +∞ around a negative-cost cycle → unbounded). It also
+        rules out "pass-through" (a source re-exporting land it imported). Combined with the node-balance
+        equality (which ties each `D` to real per-LU movement) this gives an EXACT, bounded
+        min-cost transition flow. RHS = `const` (base clipped into the effective [lb,ub] box) — the same
+        quantity node-balance uses, so a source may export at most the land it actually holds.
+
+        ag source (fm,fj) at cell r:  Σ_to D_ag2ag[(fm,fj)][·,r,·] + Σ_k D_ag2nonag[(fm,fj)][k,r] ≤ const_ag[fm,r,fj]
+        non-ag source k at cell r:    Σ_to D_nonag2ag[k][·,r,·]                                    ≤ const_nonag[r,k]
         """
-        if settings.TRANSITION_MODE == 'crisp':
-            return
-        
-        print("│   └── setting up delta variables for blended ag transition costs...")
-        t_mat  = self._input_data.trans_ag2ag_mrj
-        n_lus  = self._input_data.n_ag_lus
-        ncells = self._input_data.ncells
+        print("│   ├── Adding source-cap (Σ out ≤ base) constraints...")
+        model     = self.gurobi_model
+        idata     = self._input_data
+        const_ag  = self.const_ag
+        const_non = self.const_nonag
 
-        self.D_ag_dry_vars_jr = np.zeros((n_lus, ncells), dtype=object)
-        self.D_ag_irr_vars_jr = np.zeros((n_lus, ncells), dtype=object)
-
-        for j in range(n_lus):
-            for r in self._input_data.feasible_ag_cells_mrj[0, j]:
-                if abs(t_mat[0, r, j]) >= settings.SOLVER_COEFF_MIN:
-                    self.D_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
-                        lb=0, ub=1, name=f"D_dry_{j}_{r}"
-                    )
-            for r in self._input_data.feasible_ag_cells_mrj[1, j]:
-                if abs(t_mat[1, r, j]) >= settings.SOLVER_COEFF_MIN:
-                    self.D_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
-                        lb=0, ub=1, name=f"D_irr_{j}_{r}"
-                    )
-
-
-    def _add_transition_delta_constraints_ag2ag(self):
-        """Link delta vars to ag decision vars: D[m,j,r] >= X_new[m,j,r] - x_old[m,j,r].
-
-        Combined with the negative sign on D in the maximisation objective (or positive
-        in mincost), the solver naturally drives D = max(0, X_new - x_old), so transition
-        costs are charged only on net land-use increases.
-        """
-        if settings.TRANSITION_MODE == 'crisp':
-            return
-        
-        print("│   └── adding delta linking constraints for blended ag transition costs...")
-        x_old = self._input_data.dvar_base_ag_mrj  # shape (NLMS, NCELLS, N_AG_LUS)
-
-        for j in range(self._input_data.n_ag_lus):
-            for r in self._input_data.feasible_ag_cells_mrj[0, j]:
-                if not isinstance(self.D_ag_dry_vars_jr[j, r], gp.Var):
+        n = 0
+        for (fm, fj), cells in idata.ag_source_cells.items():
+            F_a2a = self.F_ag2ag[(fm, fj)]
+            F_a2n = self.F_ag2nonag[(fm, fj)]
+            for local_r, r in enumerate(cells):
+                out = F_a2a.sum('*', local_r, '*') + F_a2n.sum('*', local_r)
+                if out.size() == 0:
                     continue
-                self.gurobi_model.addConstr(
-                    self.D_ag_dry_vars_jr[j, r] >= self.X_ag_dry_vars_jr[j, r] - x_old[0, r, j],
-                    name=f"delta_dry_{j}_{r}"
-                )
+                model.addConstr(out <= const_ag[fm, r, fj], name=f"srccap_a_{fm}_{fj}_{local_r}")
+                n += 1
 
-            for r in self._input_data.feasible_ag_cells_mrj[1, j]:
-                if not isinstance(self.D_ag_irr_vars_jr[j, r], gp.Var):
+        for fk, cells in idata.nonag_source_cells.items():
+            F_n2a = self.F_nonag2ag[fk]
+            for local_r, r in enumerate(cells):
+                out = F_n2a.sum('*', local_r, '*')
+                if out.size() == 0:
                     continue
-                self.gurobi_model.addConstr(
-                    self.D_ag_irr_vars_jr[j, r] >= self.X_ag_irr_vars_jr[j, r] - x_old[1, r, j],
-                    name=f"delta_irr_{j}_{r}"
-                )
+                model.addConstr(out <= const_non[r, fk], name=f"srccap_n_{fk}_{local_r}")
+                n += 1
+        print(f"│   │   └── added {n:,} source-cap constraints")
 
-    def _setup_delta_vars_ag2nonag(self):
-        """Add non-negative delta variables D_nonag[r,k] for blended ag->nonag transition costs.
 
-        D_nonag[r,k] = max(0, X_nonag_new[r,k] - x_nonag_old[r,k]) at optimality, enforced by
-        _add_transition_delta_constraints_ag2nonag. Only created for (r,k) pairs where the
-        rescaled transition cost coefficient meets SOLVER_COEFF_MIN.
+    def _add_flow_in_constraints(self):
+        """Node-balance equality: each LU's final area = base + inflows − outflows.
+
+            X_ag[m,r,j]  = const_ag[m,r,j]  + Σ_in D[·→(m,j)] − Σ_out D[(m,j)→·]
+            X_nonag[r,k] = const_nonag[r,k] + Σ_in D_ag2nonag[·→k] − Σ_out D_nonag2ag[k→·]
+
+        This ties every delta to REAL per-LU land movement (so a single negative-cost arc can't be
+        harvested without moving land — the flaw that made an import/export-only relaxation unbounded),
+        and together with the source cap gives an exact, bounded min-cost transition flow. "Staying" is
+        the all-D=0 solution (X = const). `const` = the base clipped into the var's effective [lb,ub]
+        box (`_setup_*_vars`) ⇒ the stay point is feasible by construction — this replaces the earlier
+        raw/floor(x_old) which fell OUTSIDE the box on float-noise cells (base>ub, base<0, floor<lb) and
+        made presolve infeasible. No non-ag→non-ag term exists.
         """
-        if settings.TRANSITION_MODE == 'crisp':
-            return
+        print("│   └── Adding node-balance (X = base + Σin − Σout) constraints...")
+        model     = self.gurobi_model
+        idata     = self._input_data
+        const_ag  = self.const_ag
+        const_non = self.const_nonag
 
-        print("│   └── setting up delta variables for blended ag->nonag transition costs...")
-        t_rk   = self._input_data.trans_ag2nonag_rk   # (NCELLS, N_NON_AG_LUS), already rescaled
-        ncells = self._input_data.ncells
-        n_k    = self._input_data.n_non_ag_lus
+        # Reverse indices (global cell keys): inflows arrive at a target, outflows leave a source LU.
+        in_ag     = defaultdict(list)   # (m, r, j) -> [vars] arriving at ag LU (m,j)   (ag2ag + nonag2ag)
+        out_ag    = defaultdict(list)   # (m, r, j) -> [vars] leaving  ag LU (m,j)      (ag2ag + ag2nonag)
+        in_nonag  = defaultdict(list)   # (r, k)    -> [vars] arriving at non-ag k       (ag2nonag)
+        out_nonag = defaultdict(list)   # (r, k)    -> [vars] leaving  non-ag k          (nonag2ag)
 
-        self.D_nonag_vars_rk = np.zeros((ncells, n_k), dtype=object)
-        for k in range(n_k):
-            non_ag_cells = self._input_data.feasible_non_ag_cells[k]
-            for r in non_ag_cells:
-                if abs(t_rk[r, k]) >= settings.SOLVER_COEFF_MIN:
-                    self.D_nonag_vars_rk[r, k] = self.gurobi_model.addVar(
-                        lb=0, ub=1, name=f"D_nonag_{r}_{k}"
-                    )
+        for (fm, fj), cells in idata.ag_source_cells.items():
+            for (to_m, local_r, to_j), var in self.F_ag2ag[(fm, fj)].items():
+                g = cells[local_r]
+                in_ag[(to_m, g, to_j)].append(var)   # arrives at (to_m,to_j)
+                out_ag[(fm, g, fj)].append(var)      # leaves source (fm,fj)
+            for (k, local_r), var in self.F_ag2nonag[(fm, fj)].items():
+                g = cells[local_r]
+                in_nonag[(g, k)].append(var)         # arrives at non-ag k
+                out_ag[(fm, g, fj)].append(var)      # leaves ag source (fm,fj)
+        for fk, cells in idata.nonag_source_cells.items():
+            for (to_m, local_r, to_j), var in self.F_nonag2ag[fk].items():
+                g = cells[local_r]
+                in_ag[(to_m, g, to_j)].append(var)   # arrives at ag (to_m,to_j)
+                out_nonag[(g, fk)].append(var)       # leaves non-ag source k
 
-    def _add_transition_delta_constraints_ag2nonag(self):
-        """Link D_nonag[r,k] >= X_nonag_new[r,k] - x_nonag_old[r,k].
+        n = 0
+        for j in range(idata.n_ag_lus):
+            for m, X_row in ((0, self.X_ag_dry_vars_jr), (1, self.X_ag_irr_vars_jr)):
+                for r in idata.feasible_ag_cells_mrj[m, j]:
+                    model.addConstr(
+                        X_row[j, r] == const_ag[m, r, j]
+                        + gp.quicksum(in_ag.get((m, r, j), [])) - gp.quicksum(out_ag.get((m, r, j), [])),
+                        name=f"bal_a_{m}_{j}_{r}")
+                    n += 1
+        for k in range(idata.n_non_ag_lus):
+            for r in idata.feasible_non_ag_cells[k]:
+                model.addConstr(
+                    self.X_non_ag_vars_kr[k, r] == const_non[r, k]
+                    + gp.quicksum(in_nonag.get((r, k), [])) - gp.quicksum(out_nonag.get((r, k), [])),
+                    name=f"bal_n_{k}_{r}")
+                n += 1
+        print(f"│       └── added {n:,} node-balance constraints")
 
-        Combined with the cost sign in the objective, the solver drives
-        D_nonag = max(0, X_nonag_new - x_nonag_old) at optimality.
-        """
-        if settings.TRANSITION_MODE == 'crisp':
-            return
-
-        print("│   └── adding delta linking constraints for blended ag->nonag transition costs...")
-        x_old = self._input_data.dvar_base_non_ag_rk   # (NCELLS, N_NON_AG_LUS)
-
-        for k in range(self._input_data.n_non_ag_lus):
-            for r in self._input_data.feasible_non_ag_cells[k]:
-                if not isinstance(self.D_nonag_vars_rk[r, k], gp.Var):
-                    continue
-                self.gurobi_model.addConstr(
-                    self.D_nonag_vars_rk[r, k] >= self.X_non_ag_vars_kr[k, r] - x_old[r, k],
-                    name=f"delta_nonag_{r}_{k}"
-                )
 
     def _setup_economy_objective(self):
         print("    ├── setting up objective for economy...")
@@ -527,32 +564,33 @@ class LutoSolver:
         self.economy_ag_man_contr = gp.quicksum(ag_mam_exprs)
         self.economy_non_ag_contr = gp.quicksum(non_ag_exprs)
 
-        # Blended ag2ag transition costs: applied to delta vars D = max(0, X_new - x_old).
-        if settings.TRANSITION_MODE != 'crisp':
-            t_mat  = self._input_data.trans_ag2ag_mrj
-            t_sign = -1 if settings.OBJECTIVE == "maxprofit" else 1
-            blend_t_exprs = []
-            for j in range(self._input_data.n_ag_lus):
-                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
-                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
-                blend_t_exprs.append(
-                    _qsum(t_sign * t_mat[0, dry_cells, j], self.D_ag_dry_vars_jr[j, dry_cells])
-                    + _qsum(t_sign * t_mat[1, irr_cells, j], self.D_ag_irr_vars_jr[j, irr_cells])
-                )
-            self.economy_trans_ag2ag_contr = gp.quicksum(blend_t_exprs)
+        # Land-use transition cost = Σ flow_cost · D over the positive-increment delta vars,
+        # SUBTRACTED from profit (maxprofit). Source-keyed flow_cost gives the exact per-source transition
+        # cost; _qsum drops |coeff| < SOLVER_COEFF_MIN, same filter as every other term.
+        idata = self._input_data
 
-            # Blended ag->nonag transition costs: same pattern, applied to D_nonag[r,k].
-            t_rk = self._input_data.trans_ag2nonag_rk
-            blend_nonag_t_exprs = []
-            for k in range(self._input_data.n_non_ag_lus):
-                non_ag_cells = self._input_data.feasible_non_ag_cells[k]
-                blend_nonag_t_exprs.append(
-                    _qsum(t_sign * t_rk[non_ag_cells, k], self.D_nonag_vars_rk[non_ag_cells, k])
-                )
-            self.economy_trans_ag2nonag_contr = gp.quicksum(blend_nonag_t_exprs)
-        else:
-            self.economy_trans_ag2ag_contr = 0
-            self.economy_trans_ag2nonag_contr = 0
+        def _flow_cost_expr(Fdict, coeff_of):
+            if not Fdict:
+                return gp.LinExpr(0)
+            keys   = list(Fdict.keys())
+            coeffs = np.fromiter((coeff_of(k) for k in keys), dtype=np.float64, count=len(keys))
+            varr   = np.fromiter((Fdict[k] for k in keys), dtype=object, count=len(keys))
+            return _qsum(coeffs, varr)
+
+        trans_a2a = gp.quicksum(
+            _flow_cost_expr(self.F_ag2ag[s], (lambda k, c=idata.flow_cost_ag2ag[s]: c[k[0], k[1], k[2]]))
+            for s in self.F_ag2ag
+        )
+        trans_n2a = gp.quicksum(
+            _flow_cost_expr(self.F_nonag2ag[fk], (lambda k, c=idata.flow_cost_nonag2ag[fk]: c[k[0], k[1], k[2]]))
+            for fk in self.F_nonag2ag
+        )
+        trans_a2n = gp.quicksum(
+            _flow_cost_expr(self.F_ag2nonag[s], (lambda k, c=idata.flow_cost_ag2nonag[s]: c[k[0]][k[1]]))
+            for s in self.F_ag2nonag
+        )
+        self.economy_trans_ag2ag_contr    = -(trans_a2a + trans_n2a)   # all inflows INTO ag targets
+        self.economy_trans_ag2nonag_contr = -trans_a2n                 # inflows INTO non-ag targets
 
         return (
             (
@@ -634,11 +672,11 @@ class LutoSolver:
         ag_mask = self._input_data.ag_mask_proportion_r
 
         # Precompute max feasible allocation per cell.
-        # Ag vars each have ub=1; cells with any ag var can always cover ag_mask (<=1).
-        # Cells with no ag vars are limited by the sum of their non-ag UBs.
+        # A cell with any ag var can always cover ag_mask (its sources can at least "stay" — conservation,
+        # dvar_ub_ag ≥ x_old). Cells with no ag var are limited by the sum of their non-ag UBs.
         has_any_ag_r = (
-            (self._input_data.ag_x_mrj[0] > 0).any(axis=1) |
-            (self._input_data.ag_x_mrj[1] > 0).any(axis=1)
+            (self._input_data.dvar_ub_ag[0] > 0).any(axis=1) |
+            (self._input_data.dvar_ub_ag[1] > 0).any(axis=1)
         )
         max_nonag_r = self._input_data.dvar_ub_nonag.sum(axis=1)
         max_alloc_r  = np.where(has_any_ag_r, 1.0, max_nonag_r)
@@ -679,10 +717,10 @@ class LutoSolver:
             for j_idx, j in enumerate(am_j_list):
                 if cells is not None:
                     lm_dry_r_vals = [
-                        r for r in cells if self._input_data.ag_x_mrj[0, r, j]
+                        r for r in cells if self._input_data.dvar_ub_ag[0, r, j] > 0
                     ]
                     lm_irr_r_vals = [
-                        r for r in cells if self._input_data.ag_x_mrj[1, r, j]
+                        r for r in cells if self._input_data.dvar_ub_ag[1, r, j] > 0
                     ]
                 else:
                     lm_dry_r_vals = self._input_data.feasible_ag_cells_mrj[0, j]
@@ -891,10 +929,10 @@ class LutoSolver:
     def _add_water_usage_limit_constraints(self) -> None:
 
         if settings.WATER_LIMITS != "on":
-            print("│   └── TURNING OFF water usage constraints ...")
+            print("│   ├── TURNING OFF water usage constraints ...")
             return
 
-        print("│   └── Adding constraints for water usage limits...")
+        print("│   ├── Adding constraints for water usage limits...")
         
         # Ensure water use remains below limit for each region
         water_scale = self._input_data.scale_factors['Water']
@@ -929,10 +967,10 @@ class LutoSolver:
     def _add_renewable_energy_constraints(self) -> None:
 
         if not any(settings.RENEWABLES_OPTIONS.values()):
-            print("│   └── TURNING OFF renewable energy constraints ...")
+            print("│   ├── TURNING OFF renewable energy constraints ...")
             return
 
-        print("│   └── Adding constraints for renewable energy production targets ...")
+        print("│   ├── Adding constraints for renewable energy production targets ...")
 
         re_types = {
             'Utility Solar PV': {
@@ -1007,8 +1045,11 @@ class LutoSolver:
 
 
     def _get_total_ghg_expr(self) -> gp.LinExpr:
-        g_dry_coeff = self._input_data.ag_g_mrj[0, :, :] + self._input_data.ag_ghg_t_mrj[0, :, :]
-        g_irr_coeff = self._input_data.ag_g_mrj[1, :, :] + self._input_data.ag_ghg_t_mrj[1, :, :]
+        # Ongoing ag GHG only — the source-dependent TRANSITION GHG (carbon release on conversion)
+        # rides on the transition deltas: Σ flow_ghg_ag2ag·D (added below). flow_ghg_ag2ag is on the
+        # same GHG rescale band as ag_g_mrj.
+        g_dry_coeff = self._input_data.ag_g_mrj[0, :, :]
+        g_irr_coeff = self._input_data.ag_g_mrj[1, :, :]
 
         ghg_ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
@@ -1040,11 +1081,26 @@ class LutoSolver:
                 _qsum(self._input_data.non_ag_g_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
             )
 
+        # Transition GHG: Σ flow_ghg_ag2ag · D_ag2ag — source-correct carbon release on ag→ag conversion
+        # (per-source, aligned with F_ag2ag's cell axis).
+        idata = self._input_data
+        ghg_trans_exprs = []
+        for s, Fdict in self.F_ag2ag.items():
+            if not Fdict:
+                continue
+            c = idata.flow_ghg_ag2ag[s]                      # [to_m, local_r, to_j]
+            keys = list(Fdict.keys())
+            coeffs = np.fromiter((c[k[0], k[1], k[2]] for k in keys), dtype=np.float64, count=len(keys))
+            varr = np.fromiter((Fdict[k] for k in keys), dtype=object, count=len(keys))
+            ghg_trans_exprs.append(_qsum(coeffs, varr))
+
         self.ghg_ag_contr = gp.quicksum(ghg_ag_exprs)
         self.ghg_ag_man_contr = gp.quicksum(ghg_ag_man_exprs)
         self.ghg_non_ag_contr = gp.quicksum(ghg_non_ag_exprs)
+        self.ghg_trans_contr = gp.quicksum(ghg_trans_exprs)
 
-        return self.ghg_ag_contr + self.ghg_ag_man_contr + self.ghg_non_ag_contr + self._input_data.offland_ghg
+        return (self.ghg_ag_contr + self.ghg_ag_man_contr + self.ghg_non_ag_contr
+                + self.ghg_trans_contr + self._input_data.offland_ghg)
 
     def _add_ghg_emissions_limit_constraints(self):
         """
@@ -1495,31 +1551,41 @@ class LutoSolver:
         # Stack dryland and irrigated decision variables — fractional values preserved as-is
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
 
-        # Extract D var solutions: D[m,j,r] = max(0, X_new - x_old) at optimality
-        if settings.TRANSITION_MODE != 'crisp':
-            D_dry_sol_rj = np.zeros((self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32)
-            D_irr_sol_rj = np.zeros((self._input_data.ncells, self._input_data.n_ag_lus), dtype=np.float32)
-            for j in range(self._input_data.n_ag_lus):
-                for r in self._input_data.feasible_ag_cells_mrj[0, j]:
-                    if isinstance(self.D_ag_dry_vars_jr[j, r], gp.Var):
-                        D_dry_sol_rj[r, j] = self.D_ag_dry_vars_jr[j, r].X
-                for r in self._input_data.feasible_ag_cells_mrj[1, j]:
-                    if isinstance(self.D_ag_irr_vars_jr[j, r], gp.Var):
-                        D_irr_sol_rj[r, j] = self.D_ag_irr_vars_jr[j, r].X
-            ag2ag_D_mrj = np.stack((D_dry_sol_rj, D_irr_sol_rj))
+        # Transition deltas from the SOLVED per-source delta vars — the gross flows the objective
+        # actually charged, kept SOURCE-KEYED so reporting can attribute the TRUE from→to land-use
+        # flows (X-derived max(0, X_new − x_old) can neither split ag2ag from nonag2ag inflows nor
+        # attribute a flow to its source LU). Leaf axes mirror the flow_cost dicts — [to_m, local_r,
+        # to_j] for ag targets, [local_r, k] for non-ag targets — where local_r indexes the source's
+        # cell list (recover global cells via get_base_dvar_mj_cell_map / get_base_nonag_dvar_k_cell_map
+        # at the base year, the same maps that built ag_source_cells / nonag_source_cells).
+        idata = self._input_data
+        dvar_D_ag2ag_mrj    = {}   # (from_m, from_j) -> (NLMS, ncells_src, N_AG_LUS)
+        dvar_D_ag2nonag_rk  = {}   # (from_m, from_j) -> (ncells_src, N_NON_AG_LUS)
+        dvar_D_nonag2ag_mrj = {}   # from_k           -> (NLMS, ncells_k, N_AG_LUS)
+        for (fm, fj), cells in idata.ag_source_cells.items():
+            arr = np.zeros((idata.nlms, len(cells), idata.n_ag_lus), dtype=np.float32)
+            Fd = self.F_ag2ag[(fm, fj)]
+            if len(Fd):
+                keys = np.array(list(Fd.keys()), dtype=np.int64)                            # (n, 3): to_m, local_r, to_j
+                vals = np.array(self.gurobi_model.getAttr('X', list(Fd.values())), dtype=np.float32)
+                arr[keys[:, 0], keys[:, 1], keys[:, 2]] = vals
+            dvar_D_ag2ag_mrj[(fm, fj)] = arr
 
-            # Extract D_nonag[r,k] = max(0, X_nonag_new - x_nonag_old) at optimality
-            non_ag_D_sol_rk = np.zeros(
-                (self._input_data.ncells, self._input_data.n_non_ag_lus), dtype=np.float32
-            )
-            for k in range(self._input_data.n_non_ag_lus):
-                for r in self._input_data.feasible_non_ag_cells[k]:
-                    if isinstance(self.D_nonag_vars_rk[r, k], gp.Var):
-                        non_ag_D_sol_rk[r, k] = self.D_nonag_vars_rk[r, k].X
-            ag2nonag_D_rk = non_ag_D_sol_rk
-        else:
-            ag2ag_D_mrj = None
-            ag2nonag_D_rk = None
+            arr = np.zeros((len(cells), idata.n_non_ag_lus), dtype=np.float32)
+            Fd = self.F_ag2nonag[(fm, fj)]
+            if len(Fd):
+                keys = np.array(list(Fd.keys()), dtype=np.int64)                            # (n, 2): k, local_r
+                vals = np.array(self.gurobi_model.getAttr('X', list(Fd.values())), dtype=np.float32)
+                arr[keys[:, 1], keys[:, 0]] = vals
+            dvar_D_ag2nonag_rk[(fm, fj)] = arr
+        for fk, cells in idata.nonag_source_cells.items():
+            arr = np.zeros((idata.nlms, len(cells), idata.n_ag_lus), dtype=np.float32)
+            Fd = self.F_nonag2ag[fk]
+            if len(Fd):
+                keys = np.array(list(Fd.keys()), dtype=np.int64)                            # (n, 3): to_m, local_r, to_j
+                vals = np.array(self.gurobi_model.getAttr('X', list(Fd.values())), dtype=np.float32)
+                arr[keys[:, 0], keys[:, 1], keys[:, 2]] = vals
+            dvar_D_nonag2ag_mrj[fk] = arr
 
         ag_man_X_mrj = {
             am: np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
@@ -1628,8 +1694,9 @@ class LutoSolver:
             ag_X_mrj=ag_X_mrj,
             non_ag_X_rk=non_ag_X_sol_rk,
             ag_man_X_mrj=ag_man_X_mrj,
-            ag2ag_D_mrj=ag2ag_D_mrj,
-            ag2nonag_D_rk=ag2nonag_D_rk,
+            dvar_D_ag2ag_mrj=dvar_D_ag2ag_mrj,
+            dvar_D_ag2nonag_rk=dvar_D_ag2nonag_rk,
+            dvar_D_nonag2ag_mrj=dvar_D_nonag2ag_mrj,
             prod_data=prod_data,
             obj_val={
                 "ObjVal":(

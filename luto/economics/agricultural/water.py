@@ -27,11 +27,13 @@ import numpy as np
 import pandas as pd
 import luto.settings as settings
 
+from functools import lru_cache
 from typing import Optional
 from luto import tools
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 
 
+@lru_cache(maxsize=1)
 def get_wreq_matrices(data, yr_idx) -> np.ndarray:
     """
     Return water requirement (water use by irrigation and livestock drinking water) matrices
@@ -43,6 +45,11 @@ def get_wreq_matrices(data, yr_idx) -> np.ndarray:
 
     Returns
         numpy.ndarray: The w_mrj <unit: ML/cell> water requirement matrices, indexed (m, r, j).
+
+    Cached (lru_cache maxsize=1, keyed by (data, yr_idx)) — the per-source ag2ag transition builder
+    calls this once per source, so caching keeps it a single compute per step. maxsize=1 because a new
+    yr_idx means the simulation has advanced a year and the previous year's matrix is useless (evicted).
+    All callers read the result (slice / multiply / .astype-copy) and MUST NOT mutate it in place.
     """
 
     # Stack water requirements data

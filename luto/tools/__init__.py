@@ -255,10 +255,31 @@ def get_non_ag_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap >= settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
 
 
-def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx) -> np.ndarray:
+def get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx) -> np.ndarray:
+    """Source-parameterised water-licence delta ($/cell): transitioning FROM (from_m, from_j) TO every
+    target (to_m, to_j) on `cells` — (target req − source req) × licence price, plus the dry↔irr
+    irrigation setup/teardown. Returns (NLMS, len(cells), N_AG_LUS), RAW (un-amortised) upfront cost —
+    the caller amortises explicitly (see transitions.py). The map-based variant
+    get_ag_to_ag_water_delta_matrix_by_lumap (below) serves the write.py / nonag reporting callers.
+    """
+    yr_cal   = data.YR_CAL_BASE + yr_idx
+    area     = data.REAL_AREA[cells]
+    w_target = w_mrj[:, cells, :] * settings.INCLUDE_WATER_LICENSE_COSTS
+    w_base   = w_mrj[from_m, cells, from_j]
+    w_cost   = (w_target - w_base[None, :, None]) * data.WATER_LICENCE_PRICE[cells, None] * data.WATER_LICENSE_COST_MULTS[yr_cal]
+    if from_m == 0:    # was dryland → irrigation setup when switching to irrigated (m=1)
+        w_cost[1] += settings.NEW_IRRIG_COST    * data.IRRIG_COST_MULTS[yr_cal] * area[:, None]
+    else:              # was irrigated → teardown when switching to dryland (m=0)
+        w_cost[0] += settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal] * area[:, None]
+    return w_cost.astype(np.float32)
+
+
+def get_ag_to_ag_water_delta_matrix_by_lumap(w_mrj, l_mrj, data, yr_idx) -> np.ndarray:
     """
     Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
+
+    Returns the RAW (un-amortised) upfront cost — the caller amortises explicitly (see write.py).
 
     Parameters
      w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for target year.
@@ -266,7 +287,7 @@ def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx) -> np.ndarray:
      data (object): Data object containing necessary information.
 
     Returns
-     w_delta_mrj (numpy.ndarray, <unit:$/cell>).
+     w_delta_mrj (numpy.ndarray, <unit:$/cell>), un-amortised.
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
     
@@ -297,11 +318,8 @@ def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx) -> np.ndarray:
     )
     irrigated_r = l_mrj[1].any(axis=1, keepdims=True)  # (NCELLS, 1) — cell was irrigated
     w_delta_mrj[0] = np.where(irrigated_r, w_delta_mrj[0] + remove_irrig, w_delta_mrj[0])
-    
-    # Amortise upfront costs to annualised costs
-    w_delta_mrj = amortise(w_delta_mrj)
-    
-    return w_delta_mrj.astype(np.float32)  # <unit:$/cell>
+
+    return w_delta_mrj.astype(np.float32)  # <unit:$/cell>, RAW upfront — caller amortises
 
 def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.ndarray, np.ndarray]:
     """

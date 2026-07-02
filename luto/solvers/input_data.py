@@ -30,7 +30,10 @@ from typing import Any, Optional
 
 from luto.data import Data
 from luto import settings
-from luto.economics import land_use_culling
+# from luto.economics import land_use_culling   # DECOMMISSIONED: land-use culling is incompatible with
+#   the per-source (from→to) flow transition model — it pruned the exclude matrix using a single
+#   dominant-LU-per-cell transition cost, whereas costs/deltas are now keyed per (from_m, from_j) source,
+#   and pruning after the flow-feasibility dicts are built would leave deltas targeting cells with no X var.
 
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.ghg as ag_ghg
@@ -62,7 +65,6 @@ class SolverInputData:
     ag_b_mrj: np.ndarray                                                # Agricultural biodiversity matrices based on bio-quality layer.
     ag_x_mrj: np.ndarray                                                # Agricultural exclude matrices.
     ag_q_mrp: np.ndarray                                                # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray                                            # GHG emissions released during transitions between agricultural land uses.
 
     non_ag_g_rk: np.ndarray                                             # Non-agricultural greenhouse gas emissions matrix.
     non_ag_w_rk: np.ndarray                                             # Non-agricultural water yields matrix.
@@ -76,8 +78,6 @@ class SolverInputData:
     ag_man_limits: dict                                                 # Agricultural Management options' adoption limits.
     ag_man_lb_mrj: dict                                                 # Agricultural Management options' lower bounds.
 
-    trans_ag2ag_mrj: np.ndarray                                         # Ag→ag transition cost matrix; economy-rescaled.
-    trans_ag2nonag_rk: np.ndarray                                       # Ag→non-ag transition cost matrix (NCELLS, N_NON_AG_LUS); economy-rescaled.
     dvar_base_ag_mrj: np.ndarray                                        # Agricultural base year decision variable values.
     dvar_base_non_ag_rk: np.ndarray                                     # Non-agricultural base year decision variable values.
 
@@ -131,25 +131,30 @@ class SolverInputData:
     real_area: np.ndarray                                               # Area of each cell, indexed by cell (r)
     ag_mask_proportion_r: np.ndarray                                    # Initial (2010) total agricultural land proportion per cell (r).
 
-    # ── Source-keyed flow transition costs (all modes); economy-rescaled ──
+    # ── FROM-view: the cells of each (from_m, from_j) source; local_r in the dicts below indexes into these ──
+    ag_source_cells: dict                                               # {(from_m,from_j): cell_idx}   — anchors ag2ag AND ag2nonag flow families (exact only).
+    nonag_source_cells: dict                                            # {from_k: cell_idx}            — anchors nonag2ag AND nonag2nonag flow families (exact only).
+
+    # ── FROM-view: cost of (from_m, from_j) -> (to_m, to_j); economy-rescaled ──
     flow_cost_ag2ag: dict                                               # dict[(from_m,from_j)] → ndarray(NLMS, ncells_src, N_AG_LUS).
     flow_cost_ag2nonag: dict                                            # dict[(from_m,from_j)] → dict[k → ndarray(ncells_src,)].
     flow_cost_nonag2ag: dict                                            # dict[k] → ndarray(NLMS, ncells_k, N_AG_LUS).
-    flow_ghg_ag2ag: dict                                                # dict[(from_m,from_j)] → ndarray(NLMS, ncells_src, N_AG_LUS) raw t CO2, GHG-rescaled. Physical parallel of flow_cost_ag2ag; Phase-3 GHG constraint sums Σ flow_ghg·F (replaces target-based ag_ghg_t_mrj). NOT yet consumed.
+    flow_ghg_ag2ag: dict                                                # dict[(from_m,from_j)] → ndarray(NLMS, ncells_src, N_AG_LUS) raw t CO2, GHG-rescaled. Physical parallel of flow_cost_ag2ag; the GHG constraint sums Σ flow_ghg·D (source-correct transition emissions).
 
-    # ── TO-view ag target bounds (which ag (to_m,to_j) a cell may become, and its lb..ub) ──
-    dvar_ub_ag: np.ndarray                                              # Ag target upper bound (NLMS, NCELLS, N_AG_LUS): ag2ag + nonag2ag reachable share (crisp 0/1, exact fractional).
+    # ── FROM-view: feasibility of (from_m, from_j) -> (to_m, to_j); True if a delta var may be created ──
+    feasible_ag2ag_mrj: dict                                            # {(from_m,from_j): bool (NLMS, ncells_src, N_AG_LUS) [to_m, local_r, to_j]}.
+    feasible_nonag2ag_mrj: dict                                         # {from_k: bool (NLMS, ncells_k, N_AG_LUS) [to_m, local_r, to_j]}.
+    feasible_ag2nonag_rk: dict                                          # {(from_m,from_j): bool (ncells_src, N_NON_AG_LUS) [local_r, k]}.
+
+    # ── TO-view: Target-keyed bounds (which target a cell may become, and its lb..ub) ──
+    dvar_ub_ag: np.ndarray                                              # Ag target upper bound (NLMS, NCELLS, N_AG_LUS): ag2ag + nonag2ag reachable share (fractional).
     dvar_lb_ag: np.ndarray                                              # Ag target lower bound (NLMS, NCELLS, N_AG_LUS) — zeros for now.
-    feasible_ag_cells_mrj: dict                                        # {(to_m,to_j): cell_idx} — cells with a routable >θ source (per-source, from ag_x_mrj>0) get an ag target var (was ag_lu2cells).
+    feasible_ag_cells_mrj: dict                                         # {(to_m,to_j): cell_idx} — cells with a routable >θ source (per-source, from ag_x_mrj>0) get an ag target var (was ag_lu2cells).
 
-    # ── TO-view non-ag target bounds (which non-ag k a cell may become, and its lb..ub) ──
+    # ── TO-view: Target-keyed bounds (which non-ag k a cell may become, and its lb..ub) ──
     dvar_ub_nonag: np.ndarray                                           # Non-ag TARGET upper bound (NCELLS, N_NON_AG_LUS); reachability + reversibility lock-in + RP/destock caps.
     dvar_lb_nonag: np.ndarray                                           # Non-ag TARGET lower bound (NCELLS, N_NON_AG_LUS); irreversible LU lock-in floor (0 for reversible).
-    feasible_non_ag_cells: dict                                        # {k: cell_idx} — cells whose dvar_ub_nonag > 0 get a non-ag target var (was non_ag_lu2cells).
-
-    # ── FROM-view source-cell maps (which cells hold each source, to anchor the per-source flow vars) ──
-    ag_source_cells: dict                                              # {(from_m,from_j): cell_idx} — anchors ag2ag AND ag2nonag flow families (exact only).
-    nonag_source_cells: dict                                           # {from_k: cell_idx}        — anchors nonag2ag AND nonag2nonag flow families (exact only).
+    feasible_non_ag_cells: dict                                         # {k: cell_idx} — cells whose dvar_ub_nonag > 0 get a non-ag target var (was non_ag_lu2cells).
 
     @property
     def ncms(self):
@@ -159,6 +164,11 @@ class SolverInputData:
     def ncells(self):
         # Number of cells
         return self.ag_g_mrj.shape[1]
+    
+    @property
+    def nlms(self):
+        # Number of water managements
+        return self.ag_g_mrj.shape[0]
 
     @property
     def n_ag_lus(self):
@@ -356,44 +366,17 @@ def get_non_ag_q_crk(data: Data, ag_q_mrp: np.ndarray, base_year: int):
     return output.astype(np.float32)
 
 
-def get_ag_ghg_t_mrj(data: Data, base_year):
-    print('Getting agricultural transitions GHG emissions...', flush = True)
-    ag_X_mrj = data.ag_dvars[base_year] if settings.TRANSITION_MODE != 'crisp' else None
-    output = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[base_year], ag_X_mrj=ag_X_mrj)
-    return output.astype(np.float32)
-
-
 def get_ag_t_mrj(data: Data, target_index, base_year):
     print('Getting agricultural transition cost matrices...', flush = True)
-    # Returns the from-based flow-cost dict[(from_m, from_j)] -> ndarray (all modes). Leaves are cast
-    # to float32 during the economy rescale in get_input_data (no premature .astype on the dict).
-    return ag_transition.get_transition_matrices_ag2ag_from_base_year(
-        data,
-        target_index,
-        base_year
-    )
-
-
-def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, trans_ag2ag_mrj):
-    print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
-    non_ag_t_mrj = non_ag_transition.get_transition_matrix_ag2nonag(
-        data,
-        base_year,
-        data.YR_CAL_BASE + target_index,
-    ).astype(np.float32)
-    # Transition costs occures if the base year is not the target year
-    return non_ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_t_mrj).astype(np.float32)
-
-
-def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
-    print('Getting non-agricultural to agricultural transition cost matrices...', flush = True)
-    non_ag_to_ag_mrj = non_ag_transition.get_transition_matrix_nonag2ag(
-        data,
-        base_year,
-        data.YR_CAL_BASE + target_index,
-    ).astype(np.float32)
-    # Transition costs occures if the base year is not the target year
-    return non_ag_to_ag_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_to_ag_mrj).astype(np.float32)
+    # From-based flow-cost dict[(from_m, from_j)] -> ndarray(NLMS, ncells_src, N_AG_LUS), sliced per
+    # source over each source's dvar>θ cells (the same cells `ag_source_cells` uses, so the solver
+    # delta's local_r aligns with this dict's cell axis). Leaves are cast to float32 during the economy
+    # rescale in get_input_data (no premature .astype on the dict).
+    mj_cell_map = ag_transition.get_base_dvar_mj_cell_map(data, base_year)
+    return {
+        (from_m, from_j): ag_transition.get_transition_matrices_ag2ag(data, target_index, from_m, from_j, cell_idx)
+        for (from_m, from_j), cell_idx in mj_cell_map.items()
+    }
 
 
 def get_non_ag_t_rk(data: Data, base_year):
@@ -407,7 +390,7 @@ def get_non_ag_t_rk(data: Data, base_year):
 
 def get_ag_x_mrj(data: Data, base_year):
     print('Getting agricultural exclude matrices...', flush = True)
-    return ag_transition.get_to_ag_exclude_matrices(data, data.lumaps[base_year], base_year)
+    return ag_transition.get_to_ag_exclude_matrices(data, base_year)
 
 
 def get_feasible_ag_cells_mrj(ag_x_mrj: np.ndarray, dvar_lb_ag: np.ndarray) -> dict:
@@ -437,34 +420,117 @@ def get_nonag_source_cells(data: Data, base_year: int) -> dict:
     return non_ag_transition.get_base_nonag_dvar_k_cell_map(data, base_year)
 
 
+def get_feasible_ag2ag_mrj(ag_x_mrj: np.ndarray, ag_source_cells: dict, T_ag2ag_reach_jj: np.ndarray) -> dict:
+    """Ag2ag delta-var feasibility, SOURCE-KEYED like flow_cost_ag2ag:
+
+        {(from_m, from_j): bool (NLMS, ncells_src, N_AG_LUS) [to_m, local_r, to_j]}
+
+        feasible[to_m, local_r, to_j] = (ag_x_mrj[to_m, r, to_j] > 0)     target eligible (X var exists)
+                                      ∧ T_MAT[from_j → to_j]              THIS source may make the move
+                                      ∧ not the diagonal                  staying is not a transition
+
+    One leaf per source over that source's dvar>θ cells (`ag_source_cells`, the same
+    get_base_dvar_mj_cell_map slices that anchor the flow vars) — the solver adds one delta var per
+    True entry, nothing more. `ag_x_mrj > 0` (exclude matrix: union reach × EXCLUDE × no-go) is the
+    same quantity that creates the ag X vars, so every delta lands on an existing var.
+    """
+    print('Getting feasible ag2ag delta-var targets...', flush = True)
+    eligible = ag_x_mrj > 0
+    result = {}
+    for (fm, fj), cells in ag_source_cells.items():
+        valid = eligible[:, cells, :] & T_ag2ag_reach_jj[fj][None, None, :]     # (NLMS, ncells_src, N_AG)
+        valid[fm, :, fj] = False                                                # drop the diagonal
+        result[(fm, fj)] = valid
+    return result
+
+
+def get_feasible_nonag2ag_mrj(ag_x_mrj: np.ndarray, nonag_source_cells: dict, T_nonag2ag_reach_kj: np.ndarray) -> dict:
+    """Nonag2ag delta-var feasibility, SOURCE-KEYED like flow_cost_nonag2ag:
+
+        {from_k: bool (NLMS, ncells_k, N_AG_LUS) [to_m, local_r, to_j]}
+
+    Same construction as get_feasible_ag2ag_mrj but from the non-ag sources (`nonag_source_cells`,
+    e.g. reversible Destocked land converting back to ag). No diagonal to drop (cross-family).
+    """
+    print('Getting feasible nonag2ag delta-var targets...', flush = True)
+    eligible = ag_x_mrj > 0
+    return {
+        fk: eligible[:, cells, :] & T_nonag2ag_reach_kj[fk][None, None, :]      # (NLMS, ncells_k, N_AG)
+        for fk, cells in nonag_source_cells.items()
+    }
+
+
+def get_feasible_ag2nonag_rk(dvar_ub_nonag: np.ndarray, ag_source_cells: dict, T_ag2nonag_reach_jk: np.ndarray) -> dict:
+    """Ag2nonag delta-var feasibility, SOURCE-KEYED like flow_cost_ag2nonag:
+
+        {(from_m, from_j): bool (ncells_src, N_NON_AG_LUS) [local_r, k]}
+
+    The target side gates on `dvar_ub_nonag > 0` — NOT raw T_MAT reach — because the non-ag ub
+    carries extra zeroing caps (RP stream-buffer, Destocked eligibility, non-ag no-go): a raw-reach
+    gate would point deltas at targets with no X var and land would vanish through the missing
+    node-balance row. No diagonal to drop (cross-family).
+    """
+    print('Getting feasible ag2nonag delta-var targets...', flush = True)
+    eligible = dvar_ub_nonag > 0
+    return {
+        (fm, fj): eligible[cells, :] & T_ag2nonag_reach_jk[fj][None, :]         # (ncells_src, N_NONAG)
+        for (fm, fj), cells in ag_source_cells.items()
+    }
+
+
+def _clamp_dvar_bound(arr: np.ndarray, lo, hi, name: str) -> np.ndarray:
+    """Return clip(arr, lo, hi) as float32, REPORTING cells changed beyond the ROUND_DECIMALS
+    threshold (mirrors get_non_ag_lb_matrices' 'NonAg lb capped' message). `lo`/`hi` may be scalars
+    or same-shape arrays. This is where dvar-bound float noise is cleaned — explicitly and logged —
+    rather than silently min/max'd in the solver."""
+    out = np.clip(arr, lo, hi).astype(np.float32)
+    thr = 10 ** (-settings.ROUND_DECIMALS)
+    chg = np.abs(out - arr) > thr
+    if np.any(chg):
+        gap = np.abs(out - arr)[chg]
+        print(f"  └── {name}: clamped {int(chg.sum())} cells, max gap={gap.max():.2e}, mean gap={gap.mean():.2e}", flush=True)
+    return out
+
+
 def get_dvar_ub_ag(data: Data, base_year: int) -> np.ndarray:
     print('Getting agricultural target upper bounds...', flush = True)
-    return (
+    ub = (
         ag_transition.get_ag2ag_ub(data, base_year)
         + non_ag_transition.get_nonag2ag_ub(data, base_year)
     ).astype(np.float32)
-    
+    # A cell can always KEEP its base LU ⇒ ub must be ≥ base (exact Σfrac can land a hair below base
+    # on float noise, e.g. 0.9999<1.0, which would break cell-usage saturation Σ X = ag_mask). Also ≥0.
+    base = data.ag_dvars[base_year].astype(np.float32)
+    return _clamp_dvar_bound(ub, np.maximum(base, 0.0), np.inf, 'Ag ub raised to base')
+
 def get_dvar_ub_nonag(data: Data, base_year):
     print('Getting non-agricultural target upper bounds...', flush = True)
     base_dvar_nonag = (
         data.non_ag_dvars[base_year] if base_year != data.YR_CAL_BASE
         else np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32)
     )
-    return non_ag_transition.get_non_ag_ub_matrices(
+    ub = non_ag_transition.get_non_ag_ub_matrices(
         data,
-        data.lumaps[base_year],
         base_dvar_nonag_rk=base_dvar_nonag,
         base_dvar_ag_mrj=data.ag_dvars[base_year],
     )
+    return _clamp_dvar_bound(ub, np.maximum(base_dvar_nonag, 0.0), np.inf, 'NonAg ub raised to base')
 
 def get_dvar_lb_ag(data: Data, base_year: int) -> np.ndarray:
     print('Getting agricultural target lower bounds...', flush = True)
-    return ag_transition.get_ag2ag_lb(data, base_year)
+    lb = ag_transition.get_ag2ag_lb(data, base_year)
+    base = data.ag_dvars[base_year].astype(np.float32)
+    # lb must sit in [0, base] (never above the base it locks in).
+    return _clamp_dvar_bound(lb, 0.0, np.maximum(base, 0.0), 'Ag lb clamped to [0,base]')
 
 def get_dvar_lb_nonag(data: Data, base_year):
     print('Getting non-agricultural lower bound matrices...', flush = True)
-    output = non_ag_transition.get_non_ag_lb_matrices(data, base_year)
-    return output
+    lb = non_ag_transition.get_non_ag_lb_matrices(data, base_year)
+    base = (
+        data.non_ag_dvars[base_year].astype(np.float32) if base_year != data.YR_CAL_BASE
+        else np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32)
+    )
+    return _clamp_dvar_bound(lb, 0.0, np.maximum(base, 0.0), 'NonAg lb clamped to [0,base]')
 
 def get_ag_man_lb_mrj(data: Data, base_year):
     print('Getting agricultural lower bound matrices...', flush = True)
@@ -572,10 +638,9 @@ def get_economic_mrj(
 
     print('Getting base year economic matrix...', flush = True)
 
-    # Land-use TRANSITION costs (ag2ag, ag2nonag, nonag2ag) are NOT baked here. In every mode they are
-    # attached to the target X_new vars in the solver via the source-keyed flow_cost dicts (Σ flow_cost·F);
-    # crisp is just the trivial 1-source case (flow = X_new × 1), so all modes speak the same transition
-    # language. get_economic_mrj is pure operating economics: revenue − (production cost). Two non-flow
+    # Land-use TRANSITION costs (ag2ag, ag2nonag, nonag2ag) are NOT baked here. They are charged in the
+    # solver against the per-source delta vars via the source-keyed flow_cost dicts (Σ flow_cost·D).
+    # get_economic_mrj is pure operating economics: revenue − (production cost). Two non-flow
     # terms remain: non_ag_t_rk (nonag→nonag — currently a ZERO matrix, since non-ag↛non-ag is disallowed;
     # kept as a hook if it's ever priced) and ag_man_t_mrj (ag-management adoption cost).
     if settings.OBJECTIVE == "maxprofit":
@@ -991,24 +1056,26 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     """
 
     target_index = target_year - data.YR_CAL_BASE
-    ag_c_mrj                        = get_ag_c_mrj(data, target_index)
-    ag_r_mrj                        = get_ag_r_mrj(data, target_index)
+    ag_c_mrj     = get_ag_c_mrj(data, target_index)
+    ag_r_mrj     = get_ag_r_mrj(data, target_index)
 
-    # ── Transition costs — SOURCE-KEYED flow-cost dicts (all modes) ──────────────
-    # Every mode returns source-keyed ("from_m, from_j" for ag, "k" for non-ag) flow-cost dicts; the
-    # solver attaches them to the target X_new vars as Σ flow_cost·F (crisp = trivial 1-source flow).
-    # get_economic_mrj no longer bakes any land-use transition cost. The two flat arrays below survive
-    # only as zero placeholders for the legacy delta-var solver path (removed in Phase 3 with ag_x_mrj).
-    trans_ag2ag_mrj    = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
-    trans_ag2nonag_rk  = np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32)
+    # ── Transition costs — SOURCE-KEYED flow-cost dicts ──────────────
+    # Sliced by base-year source ("(from_m, from_j)" for ag, "k" for non-ag) over each source's dvar>θ
+    # cells; the solver creates a matching delta var per (source, cell, target) and charges
+    # Σ flow_cost·D in the objective. get_economic_mrj bakes no land-use transition cost.
 
-    # ag→ag: dict[(from_m, from_j)] → ndarray(NLMS, ncells, N_AG_LUS)
+    # ag→ag: dict[(from_m, from_j)] → ndarray(NLMS, ncells_src, N_AG_LUS)
     flow_cost_ag2ag = get_ag_t_mrj(data, target_index, base_year)
 
     # ag→ag transition GHG EMISSIONS (raw t CO2), source-keyed — the physical parallel of
-    # flow_cost_ag2ag. Phase 3: the GHG constraint sums Σ flow_ghg·F (replaces target-based
-    # ag_ghg_t_mrj). GHG-rescaled below; not yet consumed by the solver.
+    # flow_cost_ag2ag. The GHG constraint sums Σ flow_ghg·D (source-correct transition emissions).
+    # GHG-rescaled below.
     flow_ghg_ag2ag = ag_ghg.get_ghg_transition_emissions_from_base_year(data, base_year)
+
+    # Per-source transition reachability (T_MAT finite ⇒ allowed) — decides which delta vars exist.
+    T_ag2ag_reach_jj    = ~np.isnan(data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES,     to_lu=data.AGRICULTURAL_LANDUSES).values)
+    T_ag2nonag_reach_jk = ~np.isnan(data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES,     to_lu=data.NON_AGRICULTURAL_LANDUSES).values)
+    T_nonag2ag_reach_kj = ~np.isnan(data.T_MAT.sel(from_lu=data.NON_AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values)
 
     # ag→nonag: dispatcher gives dict[lu_name → dict[(fm,fj)]]; transpose to dict[(fm,fj) → dict[k]]
     # so the solver loops ag sources first.
@@ -1062,7 +1129,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_source_cells                 = get_ag_source_cells(data, base_year)   # FROM-view: cells holding each ag (from_m,from_j) source
     nonag_source_cells              = get_nonag_source_cells(data, base_year)# FROM-view: cells holding each non-ag source k
     ag_q_mrp                        = get_ag_q_mrp(data, target_index)
-    ag_ghg_t_mrj                    = get_ag_ghg_t_mrj(data, base_year)
 
     non_ag_g_rk                     = get_non_ag_g_rk(data, ag_g_mrj, base_year)
     non_ag_w_rk                     = (
@@ -1119,23 +1185,19 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     # Fetch all raw limit targets once — reused in both rescaling and get_limits below.
     limits = get_limits(data, target_year)
 
-    # Cull unprofitable land uses before rescaling (needs unscaled c/t/r matrices). The flow refactor
-    # zeroed the flat trans_ag2ag_mrj, so culling must be fed a real transition cost explicitly — the
-    # flat dominant-source matrix (cost from the cell's base-year LU to each target). Computed only when
-    # culling is active, since get_transition_matrices_ag2ag_base also rebuilds water/ghg.
-    if settings.CULL_MODE != 'none':
-        cull_t_mrj = ag_transition.get_transition_matrices_ag2ag_base(
-            data, target_index, data.lumaps[base_year], data.lmmaps[base_year]
-        )
-        ag_x_mrj = land_use_culling.apply_agricultural_land_use_culling(ag_x_mrj, ag_c_mrj, cull_t_mrj, ag_r_mrj)
-
-    # Derive target eligibility from the POST-culling ag_x_mrj so it matches the mask the solver reads
-    # (per-source θ; was ag_lu2cells). Placed after culling deliberately — culling removes options.
-    # Stay-floor cells (dvar_lb_ag>0, sub-θ slivers locked in) are unioned in so their var exists.
+    # Derive target eligibility from ag_x_mrj so it matches the mask the solver reads (per-source θ;
+    # was ag_lu2cells). Stay-floor cells (dvar_lb_ag>0, sub-θ slivers locked in) are unioned in so
+    # their var exists.
     feasible_ag_cells_mrj          = get_feasible_ag_cells_mrj(ag_x_mrj, dvar_lb_ag)  # cells that get a target ag var
 
+    # Per-source delta-var feasibility — keyed/shaped like the flow_cost dicts; the solver adds one
+    # delta var per True entry.
+    feasible_ag2ag_mrj    = get_feasible_ag2ag_mrj(ag_x_mrj, ag_source_cells, T_ag2ag_reach_jj)
+    feasible_nonag2ag_mrj = get_feasible_nonag2ag_mrj(ag_x_mrj, nonag_source_cells, T_nonag2ag_reach_kj)
+    feasible_ag2nonag_rk  = get_feasible_ag2nonag_rk(dvar_ub_nonag, ag_source_cells, T_ag2nonag_reach_jk)
+
     # Rescale solver input data
-    [ag_obj_mrj, non_ag_obj_rk, ag_man_objs, trans_ag2ag_mrj, trans_ag2nonag_rk], economy_scale = rescale_lhs([ag_obj_mrj, non_ag_obj_rk, ag_man_objs, trans_ag2ag_mrj, trans_ag2nonag_rk])
+    [ag_obj_mrj, non_ag_obj_rk, ag_man_objs], economy_scale = rescale_lhs([ag_obj_mrj, non_ag_obj_rk, ag_man_objs])
 
     # Put the source-keyed flow-cost dicts on the same economy band as the flat arrays above
     # (rescale_lhs only walks one dict level; these are 1–2 levels deep, so do it explicitly).
@@ -1147,12 +1209,13 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],   demand_scale = rescale_lhs_rhs([ag_q_mrp, non_ag_q_crk, ag_man_q_mrp], limits['demand'])
     [ag_b_mrj, non_ag_b_rk, ag_man_b_mrj],    biodiv_scale = rescale_lhs([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj])
 
-    [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], ghg_scale = (
-        rescale_lhs_rhs([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], limits['ghg'])
+    [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj], ghg_scale = (
+        rescale_lhs_rhs([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj], limits['ghg'])
         if settings.GHG_EMISSIONS_LIMITS != 'off' else
-        ([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], 1.0)
+        ([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj], 1.0)
     )
-    # Put the source-keyed transition-GHG dict on the same band as the (target-based) ag_ghg_t_mrj.
+    # Put the source-keyed transition-GHG dict on the same GHG rescale band as ag_g_mrj
+    # (the GHG constraint sums Σ flow_ghg·D — the source-correct transition emissions).
     flow_ghg_ag2ag = {s: (v / ghg_scale).astype(np.float32) for s, v in flow_ghg_ag2ag.items()}
 
     [renewable_solar_r], renewable_solar_scale = (
@@ -1262,9 +1325,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_mask_proportion_r=data.AG_MASK_PROPORTION_R
     
     # Base year dvars
-    dvar_base_ag_mrj = data.ag_dvars[base_year]
-    dvar_base_non_ag_rk = data.non_ag_dvars[base_year]
-    
+    # Base dvars are the node-balance "stay" constant; clip them into the cleaned [lb, ub] box so the
+    # all-delta=0 stay point is feasible by construction (fixes base's own float noise, e.g. -1e-8<lb=0).
+    # Bounds were already clamped so lb ≤ base ≤ ub for real values — this only bites on noise. Reported.
+    dvar_base_ag_mrj    = _clamp_dvar_bound(data.ag_dvars[base_year],     dvar_lb_ag,    dvar_ub_ag,    'Ag base clipped to [lb,ub]')
+    dvar_base_non_ag_rk = _clamp_dvar_bound(data.non_ag_dvars[base_year], dvar_lb_nonag, dvar_ub_nonag, 'NonAg base clipped to [lb,ub]')
+
 
     return SolverInputData(
         base_year,
@@ -1275,7 +1341,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_b_mrj,
         ag_x_mrj,
         ag_q_mrp,
-        ag_ghg_t_mrj,
 
         non_ag_g_rk,
         non_ag_w_rk,
@@ -1289,8 +1354,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_limits,
         ag_man_lb_mrj,
 
-        trans_ag2ag_mrj,
-        trans_ag2nonag_rk,
         dvar_base_ag_mrj,
         dvar_base_non_ag_rk,
         
@@ -1344,11 +1407,20 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         real_area,
         ag_mask_proportion_r,
 
-        # Source-keyed flow transition costs (all modes).
+        # FROM-view source-cell maps (anchor the per-source flow vars).
+        ag_source_cells,
+        nonag_source_cells,
+
+        # Source-keyed flow transition costs.
         flow_cost_ag2ag,
         flow_cost_ag2nonag,
         flow_cost_nonag2ag,
         flow_ghg_ag2ag,
+
+        # Per-source delta-var feasibility (keyed/shaped like the flow_cost dicts).
+        feasible_ag2ag_mrj,
+        feasible_nonag2ag_mrj,
+        feasible_ag2nonag_rk,
 
         # TO-view ag target bounds + eligibility.
         dvar_ub_ag,
@@ -1359,9 +1431,5 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         dvar_ub_nonag,
         dvar_lb_nonag,
         feasible_non_ag_cells,
-
-        # FROM-view source-cell maps (anchor the per-source flow vars).
-        ag_source_cells,
-        nonag_source_cells,
     )
 

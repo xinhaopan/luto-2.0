@@ -29,7 +29,6 @@ import luto.data as Data
 import luto.economics.agricultural.ghg as ag_ghg
 
 from functools import lru_cache
-from joblib import Parallel, delayed
 from luto import settings
 from typing import Dict
 from luto.data import Data
@@ -40,21 +39,19 @@ from luto.economics.agricultural.water import get_wreq_matrices
 @lru_cache(maxsize=1)
 def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
     """Slice the base-year ag dvar by each (from_m, from_j), returning {(from_m, from_j): cell_idx}
-    for every source combo whose dvar fraction exceeds `threshold` in at least one cell. Only used
-    in exact mode.
+    for every source combo whose dvar fraction exceeds `threshold` in at least one cell.
 
-    ★ THIS IS THE KEY DESIGN FOR EXACT TRANSITION COST. We slice the base-year dvar by the same
+    ★ THIS IS THE KEY DESIGN FOR THE DELTA TRANSITION COST. We slice the base-year dvar by the same
     source (from_m, from_j) — e.g. dry-Apples. All cells in one slice share the same transition
     costs (the cost of leaving dry-Apples for each target). The solver then creates, for each slice,
     the same number of delta variables (delta >= 0, positive-increment Gurobi vars) — one per sliced
     cell — that represent the TRUE transition flow out of that source on those cells. Transition cost
-    is then trans_cost = delta_dvars * cost_cells, and the objective minimises sum(trans_cost). This
-    replaces the crisp/blend approximation where a whole cell carried a single dominant-LU cost.
+    is then trans_cost = delta_dvars * cost_cells, and the objective minimises sum(trans_cost). This is the per-source basis of the delta transition model (no single dominant-LU cost per cell).
 
     Uses settings.EXACT_REACHABILITY_MIN_FRACTION as the single fraction threshold (not a parameter,
     so every caller — and the exact GHG cell-slicing in ghg.py — shares one value). This map is the
     single source of truth for BOTH (a) the solver's per-source delta/cost slices and (b) target
-    eligibility (`get_to_ag_exclude_matrices_exact`). Keeping one threshold keeps the two consistent — a
+    eligibility (`get_to_ag_exclude_matrices`). Keeping one threshold keeps the two consistent — a
     source below the threshold is dropped from both (it gets no flow-out var), and its sliver of land
     is conserved by the 'stay' fallback (`get_ag2ag_lb` locks it in place as itself), so nothing is lost.
 
@@ -71,33 +68,22 @@ def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
     }
 
 
-def get_to_ag_exclude_matrices_crisp(data: Data, lumap: np.ndarray) -> np.ndarray:
-    """Return x_mrj exclude matrices (NLMS, NCELLS, N_AG_LUS) based on the dominant LU (crisp/blend).
+def get_to_ag_exclude_matrices(data: Data, base_year: int) -> np.ndarray:
+    """To-ag target-eligibility (exclude) matrix (NLMS, NCELLS, N_AG_LUS) via per-source reachability.
 
-    Derived as the union of the two per-source TO-ag upper bounds: ag2ag (ag-dominant cells reach ag
-    targets from their dominant ag LU) and nonag2ag (non-ag-dominant cells reach ag targets from their
-    current non-ag LU AND 2010 ag status). Since cell dominance partitions ag vs non-ag cells, the two
-    components are disjoint and `(ag2ag_ub + nonag2ag_ub) > 0` reproduces the old monolithic exclude
-    bit-for-bit — for the real base-year map AND the cost primitive's synthetic single-source maps.
-    Single source of truth: the crisp exclude logic now lives only in the two ub builders.
-    """
-    # Lazy import to avoid the agricultural <-> non_agricultural transitions import cycle.
-    from luto.economics.non_agricultural.transitions import get_nonag2ag_ub_crisp
+    Covers BOTH ag→ag and non-ag→ag reachability. A cell r is eligible for ag target tj iff:
 
-    to_ag_ub = get_ag2ag_ub_crisp(data, lumap) + get_nonag2ag_ub_crisp(data, lumap)          # (NLMS, NCELLS, N_AG_LUS)
-    return (to_ag_ub > 0).astype(np.int8)
+    - SOME land use present at r above `EXACT_REACHABILITY_MIN_FRACTION` — whether an agricultural
+      source or a non-agricultural source — can transition to tj (finite T_MAT entry); AND
+    - tj is spatially allowed (EXCLUDE) and not a no-go LU there.
 
+    Notes:
 
-def get_to_ag_exclude_matrices_exact(data: Data, base_year: int) -> np.ndarray:
-    """Return x_mrj exclude matrices (NLMS, NCELLS, N_AG_LUS) via per-source reachability (exact mode).
-
-    A cell r is eligible for ag target tj if and only if SOME land use present at r above
-    `EXACT_REACHABILITY_MIN_FRACTION` can transition to tj (finite T_MAT entry), AND tj is
-    spatially allowed (EXCLUDE) and not a no-go LU there. The present sources come from
-    `get_base_dvar_mj_cell_map` (ag) and `get_base_nonag_dvar_k_cell_map` (nonag) — the SAME maps
-    that drive the solver's per-source flow-out slices, so eligibility and the flow vars share one
-    threshold. `ag_lu2cells` then derives straight from this matrix and cannot diverge from the
-    solver's direct `ag_x_mrj[m, r, j]` reads.
+    - The present sources come from `get_base_dvar_mj_cell_map` (ag) and
+      `get_base_nonag_dvar_k_cell_map` (nonag) — the SAME maps that drive the solver's per-source
+      flow-out slices, so eligibility and the flow vars share one threshold.
+    - `ag_lu2cells` then derives straight from this matrix and cannot diverge from the solver's
+      direct `ag_x_mrj[m, r, j]` reads.
     """
     # Lazy import to avoid the agricultural <-> non_agricultural transitions import cycle.
     from luto.economics.non_agricultural.transitions import get_base_nonag_dvar_k_cell_map
@@ -124,7 +110,7 @@ def get_to_ag_exclude_matrices_exact(data: Data, base_year: int) -> np.ndarray:
 
     t_rj = reach_rj.astype(np.int8)  # (NCELLS, N_AG_LUS)
 
-    # Spatial exclusion and no-go zones (same logic as crisp)
+    # Spatial exclusion and no-go zones
     x_mrj = data.EXCLUDE.copy().astype(np.int8)
 
     no_go_x_mrj = np.ones_like(data.AG_L_MRJ)
@@ -135,66 +121,27 @@ def get_to_ag_exclude_matrices_exact(data: Data, base_year: int) -> np.ndarray:
     return (x_mrj * t_rj[np.newaxis, :, :] * no_go_x_mrj).astype(np.int8)
 
 
-def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray = None, base_year: int = None) -> np.ndarray:
-    """Dispatch to the appropriate exclude matrix builder based on TRANSITION_MODE.
-
-    crisp / blend: uses dominant-LU lumap  (requires lumap).
-    exact:         uses base-year dvar reachability (requires base_year).
-    """
-    if settings.TRANSITION_MODE in ('crisp', 'blend'):
-        return get_to_ag_exclude_matrices_crisp(data, lumap)
-    elif settings.TRANSITION_MODE == 'exact':
-        return get_to_ag_exclude_matrices_exact(data, base_year)
-    else:
-        raise ValueError(f"Unknown TRANSITION_MODE: {settings.TRANSITION_MODE!r}")
-
-
-def get_ag2ag_ub_crisp(data: Data, lumap: np.ndarray) -> np.ndarray:
-    """ag→ag TARGET upper bound (NLMS, NCELLS, N_AG_LUS), 0/1, from the dominant LU in `lumap`.
-
-    TO-view bound (which ag target a cell may become), ag-source component only. For a cell whose
-    dominant LU is ag LU j, target to_j is allowed (1) iff T_MAT[j→to_j] is finite, spatially
-    allowed (data.EXCLUDE), and not no-go. Non-ag-dominant cells contribute 0 here (their reach to
-    ag targets is the nonag2ag ub). crisp/blend share this (blend's exclusion is lumap-based too).
-
-    Parametrised by `lumap` (not base_year) so it serves BOTH the TO-view (lumap = real base-year map,
-    passed by the dispatcher) AND the cost primitive's synthetic single-source maps (all-sheep, etc.).
-    Together with get_nonag2ag_ub_crisp it reconstructs get_to_ag_exclude_matrices_crisp exactly.
-    """
-    t_ij  = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values  # (from_j, to_j)
-    ag_cells, _ = tools.get_ag_and_non_ag_cells(lumap)
-
-    # Transition exclusion (T_MAT): target to_j reachable from the cell's dominant ag LU?
-    # NaN default → non-ag cells (and forbidden ag transitions) collapse to 0; allowed ag → 1.
-    t_rj = np.full((data.NCELLS, data.N_AG_LUS), np.nan, dtype=np.float32)
-    t_rj[ag_cells] = t_ij[lumap[ag_cells]]
-    reach_rj = np.where(np.isnan(t_rj), 0.0, 1.0).astype(np.float32)
-
-    # No-go exclusion: user-defined LUs banned in specific regions.
-    no_go = np.ones((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
-    if settings.EXCLUDE_NO_GO_LU:
-        for no_go_x_r, no_go_desc in zip(data.NO_GO_REGION_AG, data.NO_GO_LANDUSE_AG):
-            no_go[:, :, data.DESC2AGLU[no_go_desc]] = no_go_x_r
-
-    # Spatial exclusion (data.EXCLUDE): LU never present in the SA2 region in 2010 → banned there.
-    x_mrj = data.EXCLUDE.astype(np.float32)
-    return (x_mrj * reach_rj[np.newaxis, :, :] * no_go).astype(np.float32)
-
-
-def get_ag2ag_ub_exact(data: Data, base_year: int) -> np.ndarray:
+def get_ag2ag_ub(data: Data, base_year: int) -> np.ndarray:
     """ag→ag TARGET upper bound (NLMS, NCELLS, N_AG_LUS), FRACTIONAL.
 
-    ub[to_m, r, to_j] = (fraction of cell r's ag land that may reach to_j) × data.EXCLUDE × no-go,
-    where the reachable fraction = Σ_{from_j : T_MAT[from_j→to_j] finite} Σ_m base_dvar[m, r, from_j].
-    Example: cell is 0.2 Apples + 0.8 (reachable LUs); if Apples↛to_j then ub[to_j] = 0.8. This is the
-    fractional generalisation of the crisp 0/1 (overlapping sources summed, not OR-ed). ag-source
-    component only — nonag2ag adds its own fraction in the combined ag ub (later step).
+    `ub[to_m, r, to_j]` is the product of four factors:
+
+    - T_MAT: binary allow/disallow per (from_j → to_j) — `finite → 1`, `NaN → 0`.
+    - fraction: reachable land share = `Σ_{from_j : T_MAT[from_j→to_j] finite} Σ_m base_dvar[m, r, from_j]`
+      (base-year fractions of every source LU that can reach to_j; overlapping sources summed, not OR-ed).
+    - no-go: user-defined LUs banned in specific regions.
+    - spatial exclusion (`data.EXCLUDE`): LU never present in the SA2 region in 2010 → banned there.
+
+    Example: cell is 0.2 Apples + 0.8 (reachable LUs); if Apples↛to_j then ub[to_j] = 0.8.
+    ag-source component only — nonag2ag adds its own fraction in the combined ag ub (later step).
     """
     ag_dvar    = data.ag_dvars[base_year]                                                              # (NLMS, NCELLS, N_AG_LUS)
+    
     # Transition exclusion (T_MAT): binary allow/disallow per (from_j → to_j).
     t_ag2ag_jj = (~np.isnan(
         data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values
     )).astype(np.float32)                                                                              # (from_j, to_j)
+    
     # Reachable land share: sum the base-year fractions of every source LU that can reach to_j.
     ag_frac_rj    = ag_dvar.sum(axis=0)                                                                # (NCELLS, from_j)
     reach_frac_rj = (ag_frac_rj @ t_ag2ag_jj).astype(np.float32)                                       # (NCELLS, to_j)
@@ -210,34 +157,23 @@ def get_ag2ag_ub_exact(data: Data, base_year: int) -> np.ndarray:
     return (x_mrj * reach_frac_rj[np.newaxis, :, :] * no_go).astype(np.float32)
 
 
-def get_ag2ag_ub(data: Data, base_year: int) -> np.ndarray:
-    """Dispatch the ag→ag target upper bound by TRANSITION_MODE.
-
-    crisp / blend: 0/1 from the dominant base LU (get_ag2ag_ub_crisp).
-    exact:         fractional reachable-land share (get_ag2ag_ub_exact).
-    """
-    if settings.TRANSITION_MODE in ('crisp', 'blend'):
-        return get_ag2ag_ub_crisp(data, data.lumaps[base_year])
-    elif settings.TRANSITION_MODE == 'exact':
-        return get_ag2ag_ub_exact(data, base_year)
-    else:
-        raise ValueError(f"Unknown TRANSITION_MODE: {settings.TRANSITION_MODE!r}")
-
-
 def get_ag2ag_lb(data: Data, base_year: int) -> np.ndarray:
-    """ag→ag TARGET lower bound (NLMS, NCELLS, N_AG_LUS): the exact-mode 'stay' fallback (Q4, source side).
+    """ag→ag TARGET lower bound (NLMS, NCELLS, N_AG_LUS): the 'stay' floor for sub-threshold slivers.
 
-    θ = EXACT_REACHABILITY_MIN_FRACTION filters which dvars are eligible for exact flow transition.
-    E.g. a cell of 0.01 Apples + 0.90 Beef + 0.09 Citrus: with θ = 0.05, Apples (< θ) just "stays the
-    same", while only Beef and Citrus are given flow-dvars and may transition. This lb pins those stayed
-    slivers — lb[m,r,j] = x_old[m,r,j] — so their land is conserved instead of vanishing (Σx_old = ag_mask).
+    - In principle lb SHOULD be all 0s — any ag cell can be fully cleared and re-allocated, so no
+      land use is ever forced to persist.
+    - In practice we exempt tiny dvar fractions from the transition machinery: θ =
+      EXACT_REACHABILITY_MIN_FRACTION is the cutoff below which a source is too small to be worth
+      creating flow-dvars for. Sources with fraction ≤ θ are skipped from the real transition
+      considering/processing and instead just "stay the same".
+    - This lb pins those skipped slivers in place — `lb[m,r,j] = x_old[m,r,j]` — so their land is
+      conserved instead of vanishing (`Σ x_old = ag_mask` stays satisfied).
+    - Example: a cell of 0.01 Apples + 0.90 Beef + 0.09 Citrus with θ = 0.05 — Apples (< θ) just
+      stays as itself, while only Beef and Citrus get flow-dvars and may transition.
 
-    Exact only (crisp/blend have no slivers). Floor-truncated at ROUND_DECIMALS and capped at the exact
-    ub so lb ≤ ub by construction; get_feasible_ag_cells_mrj unions in lb>0 cells so the stay var exists.
+    Floor-truncated at ROUND_DECIMALS and capped at the exact ub so lb ≤ ub by construction;
+    get_feasible_ag_cells_mrj unions in lb>0 cells so the stay var exists.
     """
-    if settings.TRANSITION_MODE != 'exact':
-        return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
-
     x_old = data.ag_dvars[base_year]
     noise = 10 ** (-settings.ROUND_DECIMALS)
     sliver = (x_old > noise) & (x_old <= settings.EXACT_REACHABILITY_MIN_FRACTION)
@@ -245,289 +181,61 @@ def get_ag2ag_lb(data: Data, base_year: int) -> np.ndarray:
     scale = 10 ** settings.ROUND_DECIMALS
     lb = np.where(sliver, np.floor(x_old * scale) / scale, 0.0).astype(np.float32)
 
-    # Cap at the exact ag2ag ub so a stay floor can never exceed the cell's allowable bound: the
-    # sliver's own diagonal is part of ag2ag_ub, and lb ≤ ag2ag_ub ≤ combined dvar_ub_ag, so lb ≤ ub.
-    ub_ag2ag = get_ag2ag_ub_exact(data, base_year)
+    # Cap at ag2ag ub to guarantee lb ≤ ub. The no-go mask / spatial-exclusion can drive ub to 0
+    # where the dvar still holds a sliver (lb > 0) → empty [lb, ub] box → presolve infeasible.
+    ub_ag2ag = get_ag2ag_ub(data, base_year)
     return np.minimum(lb, ub_ag2ag).astype(np.float32)
 
-# Even been used multiple times for getting sheep/beef agroforestry, this function is not cacheable
-# because using np.array as input (np.array is not hashable, and hashable is required for caching).
-def get_transition_matrices_ag2ag_base(data: Data, yr_idx: int, base_lumap: np.ndarray, base_lmmap: np.ndarray, separate=False, w_mrj=None, t_ij=None):
-    """
-    Base ag2ag transition-cost primitive: flat (NLMS, NCELLS, N_AG_LUS), the cost for each cell
-    to switch to (to_m, to_j) given its base_lumap/base_lmmap source. This is the single shared
-    building block all three modes build on (called with a uniform single-source map to get
-    "cost from one source"):
-      - crisp : base(actual lumap/lmmap) grouped by dominant (from_m, from_j)
-      - blend : base(uniform source) weighted by the source's base-year dvar fraction
-      - exact : base(uniform source) sliced to the source's cells (get_base_dvar_mj_cell_map)
-    It is also reused directly by the nonag->ag cost functions ("cost from one source").
 
-    Calculate the transition matrices for land-use and land management transitions.
-    Args:
-        data (Data object): The data object containing the necessary input data.
-        yr_idx (int): The index of the current year.
-        base_lumap (np.ndarray): Land use map of the base year for the transitions.
-        base_lmmap (np.ndarray): Land management map of the base year for the transitions.
-        separate (bool, optional): Whether to return separate cost matrices for each cost component.
-                                   Defaults to False.
-        w_mrj (np.ndarray, optional): Precomputed water requirement matrices, to avoid recomputation
-                                   when this function is called repeatedly for the same yr_idx.
-        t_ij (np.ndarray, optional): Precomputed lexicographical transition-cost matrix, to avoid
-                                   recomputation when this function is called repeatedly for the same yr_idx.
-    Returns:
-            numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
-                               If `separate` is False, returns a numpy array representing the total costs.
-                               If `separate` is True, returns a dictionary with separate cost matrices for
-                               establishment costs, Water license cost, and carbon releasing costs.
+def get_transition_matrices_ag2ag(data: Data, yr_idx: int, from_m: int, from_j: int, cells=None, separate=False):
+    """Source-parameterised ag2ag transition-cost primitive.
+
+    Answers ONE question: transitioning FROM a single source (from_m, from_j) TO every target
+    (to_m, to_j), on `cells` (default all NCELLS), what is the cost/water/GHG per cell? Returns
+    (NLMS, len(cells), N_AG_LUS) [to_m, r, to_j] (separate=True → {component: same-shape array}).
+
+    UNMASKED — no exclude / no "not-staying" mask. The diagonal ((to_m,to_j)==(from_m,from_j)) is
+    naturally 0 (T_MAT[j→j]=0, zero water-delta, zero GHG), and target eligibility is the solver's job
+    (a flow/delta var is created only for a valid transition).
+
+    This is THE per-source cost primitive of the delta transition model. Callers select which cells to
+    evaluate per source: the ag2ag/ag2nonag cost builds it on each source's dvar>θ cells
+    (`get_base_dvar_mj_cell_map`, θ = EXACT_REACHABILITY_MIN_FRACTION); the nonag→ag levers call it for a
+    uniform livestock source (cells=None → all cells). The year-invariant water / T_MAT terms are
+    derived internally each call (water via the lru_cached `get_wreq_matrices`, so per-source calls in
+    a dict loop stay a single compute per step).
+
+    Components:
+      - Establishment  : amortise(T_MAT[from_j → to_j] × mult) × REAL_AREA  (both target lm equal)
+      - Water license  : amortised [(target req − source (from_m,from_j) req) × price + irrigation setup/teardown]
+      - GHG (× carbon price) : natural→modified / unallocated-natural→livestock-natural release
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
+    if cells is None:
+        cells = np.arange(data.NCELLS)
+    n = len(cells)
+    N_AG = data.N_AG_LUS
+    area = data.REAL_AREA[cells]                                                    # (n,)
 
-    # Return l_mrj (Boolean) for current land-use and land management
-    l_mrj = tools.lumap2ag_l_mrj(base_lumap, base_lmmap)
-    l_mrj_not = np.logical_not(l_mrj)
+    # ── Establishment: source only enters via the T_MAT[from_j] row ──
+    t_ij  = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
+    t_row = np.nan_to_num(t_ij[from_j]).astype(np.float32)                          # (N_AG,)
+    e_rj  = tools.amortise(np.tile(t_row, (n, 1))) * area[:, None]                  # (n, N_AG)
+    e_mrj = np.stack([e_rj, e_rj], axis=0).astype(np.float32)                       # (NLMS, n, N_AG)
 
-    # Get the exclusion matrix
-    x_mrj = get_to_ag_exclude_matrices_crisp(data, base_lumap)
+    # ── Water licence delta (source-parameterised), amortised like Establishment above ──
+    w_mrj       = get_wreq_matrices(data, yr_idx)                                   # <ML/cell> (lru_cached)
+    w_raw_mrj   = tools.get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx)
+    w_delta_mrj = tools.amortise(w_raw_mrj).astype(np.float32)
 
-    ag_cells, _ = tools.get_ag_and_non_ag_cells(base_lumap)
-
-    n_ag_lms, ncells, n_ag_lus = data.AG_L_MRJ.shape
-
-    # -------------------------------------------------------------- #
-    # Transition costs (upfront, amortised to annual, per cell).     #
-    # -------------------------------------------------------------- #
-
-    # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
-    if t_ij is None:
-        t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
-
-    # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
-    # Only consider for cells currently being used for agriculture.
-    e_rj = np.zeros((ncells, n_ag_lus)).astype(np.float32)
-    e_rj[ag_cells, :] = t_ij[base_lumap[ag_cells]]
-
-    # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
-    e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, None]
-
-    # Repeat the transition costs into dryland and irrigated land management types
-    e_mrj = np.stack([e_rj, e_rj], axis=0)
-
-    # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
-    e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not).astype(np.float32)
-    e_mrj = np.nan_to_num(e_mrj)
-
-    # -------------------------------------------------------------- #
-    # Water license cost (upfront, amortised to annual, per cell).   #
-    # -------------------------------------------------------------- #
-
-    if w_mrj is None:
-        w_mrj = get_wreq_matrices(data, yr_idx)                                                 # <unit: ML/cell>
-    w_delta_mrj = tools.get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
-    w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not).astype(np.float32)
-
-    # -------------------------------------------------------------- #
-    # Carbon costs of transitioning cells.                           #
-    # -------------------------------------------------------------- #
-
-    # Apply the cost of carbon released by transitioning natural land to modified land
-    ghg_transition = ag_ghg.get_ghg_transition_emissions(data, base_lumap, separate=True)       # <unit: t/ha>
-        
-    ghg_transition = {
-        k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)                 # No GHG penalty for cells that remain the same, or are prohibited from transitioning
-        for k, v in ghg_transition.items()
-    }
-    
-    ghg_transition = {
-        k:tools.amortise(v * data.get_carbon_price_by_yr_idx(yr_idx))                           # Amortise the GHG penalties
-        for k,v in ghg_transition.items()
-    }
-    
-    ghg_t_types = ghg_transition.keys()
-    ghg_t_smrj = np.stack([ghg_transition[t] for t in ghg_t_types], axis=0)                     # s: ghg_t_types, m: land management, r: cell, j: land use
-    ghg_t_mrj = np.einsum('smrj->mrj', ghg_t_smrj)
-
-    
-    # TODO: add cost of biodiversity loss/gain from land-use transitions.
-    
-    # -------------------------------------------------------------- #
-    # Total costs.                                                   #
-    # -------------------------------------------------------------- #
+    # ── GHG release ($ = carbon price × raw emissions, amortised): source-parameterised ──
+    price   = data.get_carbon_price_by_yr_idx(yr_idx)
+    ghg_raw = ag_ghg.get_ghg_transition_emissions(data, from_m, from_j, cells, separate=True)   # raw t/cell
+    ghg     = {k: tools.amortise(v * price).astype(np.float32) for k, v in ghg_raw.items()}
 
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, **ghg_transition}
-    else:
-        t_mrj = e_mrj + w_delta_mrj + ghg_t_mrj
-        return t_mrj
-
-
-def get_transition_matrices_ag2ag_crisp(data: Data, yr_idx: int, base_lumap: np.ndarray, base_lmmap: np.ndarray, separate=False, w_mrj=None, t_ij=None):
-    """Crisp ag2ag transition cost in flow (from_m, from_j) format.
-
-    Returns dict[(from_m, from_j)] -> ndarray(NLMS, ncells_src, N_AG_LUS)  [to_m, r, to_j]
-    (separate=True -> the leaf is {component: same-shape array}), where ncells_src is the number
-    of cells whose DOMINANT base-year LU is (from_m, from_j).
-
-    crisp assigns each cell exactly one dominant (from_m, from_j) via the integerised
-    lumap/lmmap, so the flat building block `flat[:, r, :]` IS the cost from cell r's dominant
-    source. We compute the flat matrix once (get_transition_matrices_ag2ag_base) and slice
-    it per source — no recompute. Collapsing this dict back (scatter each slice into its cells)
-    reproduces the flat matrix exactly on ag-dominant cells. Non-ag-dominant cells are not keyed
-    here — their ag transition is the nonag2ag direction.
-    """
-    flat = get_transition_matrices_ag2ag_base(
-        data, yr_idx, base_lumap, base_lmmap, separate, w_mrj=w_mrj, t_ij=t_ij
-    )
-    result = {}
-    for from_m in range(data.NLMS):
-        for from_j in range(data.N_AG_LUS):
-            cells = np.where((base_lmmap == from_m) & (base_lumap == from_j))[0]
-            if cells.size == 0:
-                continue
-            if separate:
-                result[(from_m, from_j)] = {k: v[:, cells, :] for k, v in flat.items()}
-            else:
-                result[(from_m, from_j)] = flat[:, cells, :]
-    return result
-
-
-def get_transition_matrices_ag2ag_blend(data: Data, yr_idx: int, base_year: int, separate=False):
-    """Blend ag2ag transition cost in flow (from_m, from_j) format.
-
-    Per-source contribution = (source's base-year dvar fraction) × (`base` cost from that source)
-    / (eligible-source denominator) — i.e. exactly one term of the fractional-dvar-weighted blend
-    sum, kept unsummed. Scatter-summing the dict over sources reproduces the flat blend to float
-    tolerance; sources whose fraction is below the rounding threshold are dropped (their
-    frac × cost contribution is negligible).
-
-    Returns dict[(from_m, from_j)] -> ndarray(NLMS, ncells_src, N_AG_LUS)  [to_m, r, to_j]
-    (separate=True -> the leaf is {component: same-shape array}), with cells = the source's
-    present cells (base-year dvar fraction above the rounding threshold).
-    """
-    yr_cal   = data.YR_CAL_BASE + yr_idx
-    ag_X_mrj = data.ag_dvars[base_year]
-
-    # Hoist invariants shared across all sources (same as the flat blend).
-    w_mrj = get_wreq_matrices(data, yr_idx)
-    t_ij  = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
-
-    valid_mask       = ~np.isnan(t_ij)
-    ag_frac_per_lu   = ag_X_mrj.sum(axis=0)
-    eligible_rj      = ag_frac_per_lu @ valid_mask
-    eligible_rj_safe = np.where(eligible_rj > 10 ** (-settings.ROUND_DECIMALS), eligible_rj, 1.0)
-
-    threshold = 10 ** (-settings.ROUND_DECIMALS)
-    present   = [(m, j) for m in range(data.NLMS) for j in range(data.N_AG_LUS)
-                 if (ag_X_mrj[m, :, j] > threshold).any()]
-
-    def _compute_from(m, j):
-        cells       = np.where(ag_X_mrj[m, :, j] > threshold)[0]
-        all_j_lumap = np.full(data.NCELLS, j, dtype=np.int64)
-        all_m_lumap = np.full(data.NCELLS, m, dtype=np.int64)
-        base = get_transition_matrices_ag2ag_base(data, yr_idx, all_j_lumap, all_m_lumap, separate, w_mrj=w_mrj, t_ij=t_ij)
-        # per-source factor[r, to_j] = frac[m,r,j] / eligible[r, to_j]  (broadcast over to_m)
-        factor = ag_X_mrj[m, cells, j][:, None] / eligible_rj_safe[cells, :]
-        if separate:
-            return (m, j), {k: (v[:, cells, :] * factor[None, :, :]).astype(np.float32) for k, v in base.items()}
-        return (m, j), (base[:, cells, :] * factor[None, :, :]).astype(np.float32)
-
-    result = {}
-    n_jobs = settings.TRANSITION_MODE_N_JOBS
-    for i in range(0, len(present), n_jobs):
-        batch = present[i:i + n_jobs]
-        for key, arr in Parallel(n_jobs=n_jobs, backend="threading")(delayed(_compute_from)(m, j) for m, j in batch):
-            result[key] = arr
-    return result
-
-
-def get_transition_matrices_ag2ag_exact(data: Data, base_year: int, target_year: int, mj_cell_map: dict, separate=False):
-    """
-    Create exact transition matrices for every (from_m, from_j) combo in mj_cell_map.
-
-    Cost components (all $/cell/yr, amortised):
-      - Establishment cost   — T_MAT lookup × area
-      - Water licence delta  — (target – base water need) × price
-      - GHG penalty          — lvstk-natural → modified only
-
-    Parameters
-    ----------
-    mj_cell_map : dict returned by get_exact_mj_cell_map(data, base_year)
-
-    Returns
-    -------
-    dict[(from_m, from_j)] → ndarray (NLMS, len(cell_idx), N_AG_LUS) in $/cell/yr
-    OR, if separate=True:
-    dict[(from_m, from_j)] → {'Establishment cost', 'Water license cost',
-                               'Livestock natural to modified'}  each same shape
-    """
-    yr_idx = target_year - data.YR_CAL_BASE
-
-    # Hoist invariants outside the per-(from_m, from_j) loop
-    #   (N_AG_LUS, N_AG_LUS); NaN = prohibited transition
-    t_ij = (
-        data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values
-        * data.TRANS_COST_MULTS[target_year]
-    )
-    # Single target-year water matrix — mirrors crisp: w_r = (w_mrj * l_mrj).sum() uses
-    # target-year req at the base-year LU, so exact does the same via w_mrj[from_m, cell_idx, from_j]
-    w_req_mrj = get_wreq_matrices(data, yr_idx)  # (NLMS, NCELLS, N_AG_LUS), ML/cell
-
-    result = {}
-
-    for (from_m, from_j), cell_idx in mj_cell_map.items():
-
-        # --- Establishment cost: $/cell/yr ---
-        # NaN in t_ij = prohibited transition → 0 cost (exclude enforced in solver)
-        t_row = np.nan_to_num(t_ij[from_j]).astype(np.float32)                        # (N_AG_LUS,)
-        t_rj  = tools.amortise(np.tile(t_row, (len(cell_idx), 1))) * data.REAL_AREA[cell_idx, None]
-        t_mrj = np.stack([t_rj, t_rj], axis=0).astype(np.float32)                    # (NLMS, ncells*, N_AG_LUS)
-
-        # --- Water licence delta cost: $/cell/yr ---
-        # w_base: target-yr req at from_LU — matches crisp's w_r = (w_mrj * l_mrj).sum()
-        w_target  = w_req_mrj[:, cell_idx, :] * settings.INCLUDE_WATER_LICENSE_COSTS
-        w_base    = w_req_mrj[from_m, cell_idx, from_j]                              # (ncells*,)
-        w_cost    = (w_target - w_base[None, :, None]) * data.WATER_LICENCE_PRICE[cell_idx, None] * data.WATER_LICENSE_COST_MULTS[target_year]
-        irrig_cell = settings.NEW_IRRIG_COST    * data.IRRIG_COST_MULTS[target_year] * data.REAL_AREA[cell_idx, None]
-        deirr_cell = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year] * data.REAL_AREA[cell_idx, None]
-        if from_m == 0:    # was dryland → setup cost when switching to irrigated (m=1)
-            w_cost[1] += irrig_cell
-        else:              # was irrigated → teardown cost when switching to dryland (m=0)
-            w_cost[0] += deirr_cell
-        w_cost_mrj = tools.amortise(w_cost).astype(np.float32)                       # (NLMS, ncells*, N_AG_LUS)
-
-        # --- GHG transition cost: $/cell/yr (all three source-type penalties) ---
-        carbon_price    = data.get_carbon_price_by_yr_idx(yr_idx)
-        ghg_lvstk_mod   = tools.amortise(ag_ghg.get_ghg_lvstk_natural_to_modified_exact(data, base_year, from_m, from_j)      * carbon_price).astype(np.float32)
-        ghg_unall_lvstk = tools.amortise(ag_ghg.get_ghg_unall_natural_to_lvstk_natural_exact(data, base_year, from_m, from_j) * carbon_price).astype(np.float32)
-        ghg_unall_mod   = tools.amortise(ag_ghg.get_ghg_unall_natural_to_modified_exact(data, base_year, from_m, from_j)      * carbon_price).astype(np.float32)
-
-        if separate:
-            result[(from_m, from_j)] = {
-                'Establishment cost':                       t_mrj,
-                'Water license cost':                       w_cost_mrj,
-                'Livestock natural to unallocated natural': np.zeros_like(ghg_lvstk_mod),
-                'Unallocated natural to livestock natural': ghg_unall_lvstk,
-                'Livestock natural to modified':            ghg_lvstk_mod,
-                'Unallocated natural to modified':          ghg_unall_mod,
-            }
-        else:
-            result[(from_m, from_j)] = t_mrj + w_cost_mrj + ghg_lvstk_mod + ghg_unall_lvstk + ghg_unall_mod
-
-    return result
-
-
-def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, separate=False):
-    """Dispatch to the from-based ag2ag transition cost (dict[(from_m, from_j)]) by TRANSITION_MODE."""
-    if settings.TRANSITION_MODE == 'crisp':
-        return get_transition_matrices_ag2ag_crisp(data, yr_idx, data.lumaps[base_year], data.lmmaps[base_year], separate)
-    elif settings.TRANSITION_MODE == 'blend':
-        return get_transition_matrices_ag2ag_blend(data, yr_idx, base_year, separate)
-    elif settings.TRANSITION_MODE == 'exact':
-        yr_cal = data.YR_CAL_BASE + yr_idx
-        mj_cell_map = get_base_dvar_mj_cell_map(data, base_year)
-        return get_transition_matrices_ag2ag_exact(data, base_year, yr_cal, mj_cell_map, separate)
-    else:
-        raise ValueError(f"Unknown TRANSITION_MODE: {settings.TRANSITION_MODE}")
+        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, **ghg}
+    return (e_mrj + w_delta_mrj + sum(ghg.values())).astype(np.float32)
 
 
 def get_asparagopsis_effect_t_mrj(data: Data):
