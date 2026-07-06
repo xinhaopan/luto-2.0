@@ -294,16 +294,16 @@ def get_ghg_transition_emissions(data: Data, from_m: int, from_j: int, cells=Non
 
 
 def get_ghg_transition_emissions_from_base_year(data: Data, base_year: int) -> dict:
-    """Exact: the source's raw emissions on its θ cells (dvar > EXACT_REACHABILITY_MIN_FRACTION)."""
-    threshold = settings.EXACT_REACHABILITY_MIN_FRACTION
-    ag_X = data.ag_dvars[base_year]
-    result = {}
-    for fm in range(data.NLMS):
-        for fj in range(data.N_AG_LUS):
-            cells = np.where(ag_X[fm, :, fj] > threshold)[0]
-            if cells.size:
-                result[(fm, fj)] = get_ghg_transition_emissions(data, fm, fj, cells).astype(np.float32)
-    return result
+    """Exact: the source's raw emissions on its source cells. Slices come from the SHARED folded
+    source map (get_base_dvar_mj_cell_map) so the leaves stay aligned with ag_source_cells and the
+    solver's per-source delta vars — never re-derive the cell slices independently here."""
+    # Lazy import to avoid the transitions <-> ghg import cycle.
+    from luto.economics.agricultural.transitions import get_base_dvar_mj_cell_map
+
+    return {
+        (fm, fj): get_ghg_transition_emissions(data, fm, fj, cells).astype(np.float32)
+        for (fm, fj), cells in get_base_dvar_mj_cell_map(data, base_year).items()
+    }
 
 
 def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):

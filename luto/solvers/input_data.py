@@ -488,13 +488,15 @@ def get_dvar_ub_ag(data: Data, base_year: int) -> np.ndarray:
     # A cell can always KEEP its base LU ⇒ ub must be ≥ base (exact Σfrac can land a hair below base
     # on float noise, e.g. 0.9999<1.0, which would break cell-usage saturation Σ X = ag_mask). Also ≥0.
     
-    # NOTE: if a real gap is reported here (not float noise), some base holding is banned by
+    # NOTE: if a real gap is reported here (not float noise), some base land-use is banned by
     # EXCLUDE/no-go (e.g. a pre-reconciliation x_mrj.npy, or a no-go region overlapping the base map).
     # The raise does NOT let such cells keep their base LU — with ag_x_mrj=0 and lb=0 no X var exists
-    # (get_feasible_ag_cells_mrj), so the solver force-converts the holding; the raise only keeps the
+    # (get_feasible_ag_cells_mrj), so the solver force-converts that land; the raise only keeps the
     # lb <= base <= ub box coherent for bookkeeping (const clipping, has_any_ag_r).
 
-    base = data.ag_dvars[base_year].astype(np.float32)
+    # FOLDED base: the solver's const/base is the folded dvar, so ub must cover THAT (dominant
+    # entries carry their absorbed sub-θ mass; folded-away entries need no headroom).
+    base = ag_transition.get_folded_base_ag_dvar(data, base_year)
     return tools.clamp_dvar_bound(ub, np.maximum(base, 0.0), np.inf, 'Ag ub raised to base')
 
 def get_dvar_ub_nonag(data: Data, base_year):
@@ -506,14 +508,14 @@ def get_dvar_ub_nonag(data: Data, base_year):
     ub = non_ag_transition.get_non_ag_ub_matrices(
         data,
         base_dvar_nonag_rk=base_dvar_nonag,
-        base_dvar_ag_mrj=data.ag_dvars[base_year],
+        base_dvar_ag_mrj=ag_transition.get_folded_base_ag_dvar(data, base_year),   # solver-world identity
     )
     return tools.clamp_dvar_bound(ub, np.maximum(base_dvar_nonag, 0.0), np.inf, 'NonAg ub raised to base')
 
 def get_dvar_lb_ag(data: Data, base_year: int) -> np.ndarray:
     print('Getting agricultural target lower bounds...', flush = True)
-    lb = ag_transition.get_ag2ag_lb(data, base_year)
-    base = data.ag_dvars[base_year].astype(np.float32)
+    lb = ag_transition.get_ag2ag_lb(data, base_year)      # all zeros — sliver pin superseded by θ-folding
+    base = ag_transition.get_folded_base_ag_dvar(data, base_year)
     # lb must sit in [0, base] (never above the base it locks in).
     return tools.clamp_dvar_bound(lb, 0.0, np.maximum(base, 0.0), 'Ag lb clamped to [0,base]')
 
@@ -1322,7 +1324,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     # Base dvars are the node-balance "stay" constant; clip them into the cleaned [lb, ub] box so the
     # all-delta=0 stay point is feasible by construction (fixes base's own float noise, e.g. -1e-8<lb=0).
     # Bounds were already clamped so lb ≤ base ≤ ub for real values — this only bites on noise. Reported.
-    dvar_base_ag_mrj    = tools.clamp_dvar_bound(data.ag_dvars[base_year],     dvar_lb_ag,    dvar_ub_ag,    'Ag base clipped to [lb,ub]')
+    dvar_base_ag_mrj    = tools.clamp_dvar_bound(ag_transition.get_folded_base_ag_dvar(data, base_year), dvar_lb_ag, dvar_ub_ag, 'Ag base clipped to [lb,ub]')
     dvar_base_non_ag_rk = tools.clamp_dvar_bound(data.non_ag_dvars[base_year], dvar_lb_nonag, dvar_ub_nonag, 'NonAg base clipped to [lb,ub]')
 
 

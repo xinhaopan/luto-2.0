@@ -37,35 +37,106 @@ from luto.economics.agricultural.water import get_wreq_matrices
 
 
 @lru_cache(maxsize=1)
-def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
-    """Slice the base-year ag dvar by each (from_m, from_j), returning {(from_m, from_j): cell_idx}
-    for every source combo whose dvar fraction exceeds `threshold` in at least one cell.
+def get_folded_base_ag_dvar(data: Data, base_year: int) -> np.ndarray:
+    """SOLVER-WORLD base ag dvar (NLMS, NCELLS, N_AG_LUS): the true base with every sub-θ land-use
+    fraction FOLDED into the cell's dominant source (θ = EXACT_REACHABILITY_MIN_FRACTION).
 
-    ★ THIS IS THE KEY DESIGN FOR THE DELTA TRANSITION COST. We slice the base-year dvar by the same
-    source (from_m, from_j) — e.g. dry-Apples. All cells in one slice share the same transition
+    ★ FOLD-INTO-DOMINANT: θ is a dial between the exact per-source flow model and the old crisp
+    dominant-LU model, applied per cell. Worked example, θ = 0.10, one dry cell:
+
+        true base:    Beef 0.55 │ Winter cereals 0.35 │ Hay 0.06 │ Citrus 0.04
+        folded base:  Beef 0.65 │ Winter cereals 0.35           (Hay+Citrus → Beef)
+
+    - Beef and Winter cereals are > θ, so each becomes its own SOURCE: the solver attaches one flow
+      delta variable per legal (T_MAT-finite) target, e.g. D[Beef→Sheep], D[Beef→EP],
+      D[WC→Barley], ... Their transitions are TRUE and EXACT — a flow out of Winter cereals is
+      charged Winter cereals' own from→to cost/water/GHG row, never some cell-average.
+    - Hay (0.06) and Citrus (0.04) are ≤ θ: they get NO delta variables of their own. Their 0.10 of
+      land is added to Beef (the dominant), stays fully mobile through Beef's delta variables, and
+      pays Beef's from→to costs if it moves — the crisp approximation, confined to the sub-θ tail.
+    - Beef, the cell's overall-largest land-use, is always exempt from folding (receiver of last
+      resort), so every cell keeps at least one source and NO land is ever locked in by θ.
+
+    Receiver choice: the sliver's same-lm largest land-use if that land-use is itself > θ (avoids
+    fake dry↔irr cost attribution), else the cell's overall-largest land-use. Cell totals are
+    preserved exactly, so ag_mask/Σ-X accounting is unchanged. θ→0: nothing folds (pure exact);
+    θ→1: one source per cell carrying the whole cell (pure crisp).
+
+    Everything the solver derives from the base-year ag dvar (source maps, flow costs, ub/base
+    consts, ag-man lb) MUST use this folded base so the solver world is self-consistent. The true
+    map (data.ag_dvars) is untouched — reporting sees real allocations; solved delta flows attribute
+    folded land's moves to its dominant source (bounded by the folded area, reported below).
+
+    Cached (maxsize=1): every consumer calls this for the same (data, base_year) within one step.
+    """
+    base = data.ag_dvars[base_year].astype(np.float32).copy()
+    noise = 10 ** (-settings.ROUND_DECIMALS)
+    theta = settings.EXACT_REACHABILITY_MIN_FRACTION
+
+    # Overall dominant (m*, j*) per cell — receiver of last resort, exempt from folding.
+    flat = base.transpose(1, 0, 2).reshape(data.NCELLS, data.NLMS * data.N_AG_LUS)
+    dom_flat = flat.argmax(axis=1)
+    dom_m, dom_j = np.divmod(dom_flat, data.N_AG_LUS)
+
+    # Same-lm dominant per (m, cell).
+    dom_j_same = base.argmax(axis=2)                                     # (NLMS, NCELLS)
+
+    sliver = (base > noise) & (base <= theta)
+    sliver[dom_m, np.arange(data.NCELLS), dom_j] = False                 # exempt the receiver
+    if not sliver.any():
+        return base
+
+    m_i, r_i, j_i = np.where(sliver)
+    vals = base[m_i, r_i, j_i].copy()
+
+    # Receiver: same-lm dominant if itself > θ, else the overall dominant. (A sliver that IS its
+    # lm's largest land-use fails the > θ test on itself and falls through to the overall dominant.)
+    recv_j_same = dom_j_same[m_i, r_i]
+    same_ok = base[m_i, r_i, recv_j_same] > theta
+    recv_m = np.where(same_ok, m_i, dom_m[r_i])
+    recv_j = np.where(same_ok, recv_j_same, dom_j[r_i])
+
+    np.add.at(base, (recv_m, r_i, recv_j), vals)
+    base[m_i, r_i, j_i] = 0.0
+
+    folded_ha = float((vals * data.REAL_AREA[r_i]).sum())
+    print(
+        f"  └── θ fold (θ={theta}): {len(vals):,} sub-θ land-use fractions folded into dominant sources, "
+        f"{folded_ha:,.1f} ha re-attributed (max single fraction {vals.max():.4f})",
+        flush=True,
+    )
+    return base
+
+
+@lru_cache(maxsize=1)
+def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
+    """Slice the FOLDED base ag dvar by each (from_m, from_j), returning {(from_m, from_j): cell_idx}
+    for every source combo holding land in at least one cell.
+
+    ★ THIS IS THE KEY DESIGN FOR THE DELTA TRANSITION COST. We slice the solver-world base dvar by the
+    same source (from_m, from_j) — e.g. dry-Apples. All cells in one slice share the same transition
     costs (the cost of leaving dry-Apples for each target). The solver then creates, for each slice,
     the same number of delta variables (delta >= 0, positive-increment Gurobi vars) — one per sliced
     cell — that represent the TRUE transition flow out of that source on those cells. Transition cost
-    is then trans_cost = delta_dvars * cost_cells, and the objective minimises sum(trans_cost). This 
-    is the per-source basis of the delta transition model (no single dominant-LU cost per cell).
+    is then trans_cost = delta_dvars * cost_cells, and the objective minimises sum(trans_cost).
 
-    Uses settings.EXACT_REACHABILITY_MIN_FRACTION as the single fraction threshold (not a parameter,
-    so every caller — and the exact GHG cell-slicing in ghg.py — shares one value). This map is the
-    single source of truth for BOTH (a) the solver's per-source delta/cost slices and (b) target
-    eligibility (`get_to_ag_exclude_matrices`). Keeping one threshold keeps the two consistent — a
-    source below the threshold is dropped from both (it gets no flow-out var), and its sliver of land
-    is conserved by the 'stay' fallback (`get_ag2ag_lb` locks it in place as itself), so nothing is lost.
+    Sources come from `get_folded_base_ag_dvar` (sub-θ land-uses already folded into their dominant),
+    so EVERY nonzero land-use is a source — the noise cutoff here only drops float dust, and no land
+    is ever left without flow-to vars. θ's effect on model size acts through the folding, not through this
+    slice. This map is the single source of truth for BOTH (a) the solver's per-source delta/cost
+    slices and (b) target eligibility (`get_to_ag_exclude_matrices`), and ghg.py's exact transition-
+    emission slicing reuses it, so all stay aligned.
 
     Cached (maxsize=1): the exclude builder and all exact cost functions call this for the same
     (data, base_year) pair within one solve step, so subsequent calls are free.
     """
-    threshold = settings.EXACT_REACHABILITY_MIN_FRACTION
-    base_dvar_mrj = data.ag_dvars[base_year]
+    noise = 10 ** (-settings.ROUND_DECIMALS)
+    base_dvar_mrj = get_folded_base_ag_dvar(data, base_year)
     return {
-        (m, j): np.where(base_dvar_mrj[m, :, j] > threshold)[0]
+        (m, j): np.where(base_dvar_mrj[m, :, j] > noise)[0]
         for m in range(data.NLMS)
         for j in range(data.N_AG_LUS)
-        if (base_dvar_mrj[m, :, j] > threshold).any()
+        if (base_dvar_mrj[m, :, j] > noise).any()
     }
 
 
@@ -74,9 +145,13 @@ def get_to_ag_exclude_matrices(data: Data, base_year: int) -> np.ndarray:
 
     Covers BOTH ag→ag and non-ag→ag reachability. A cell r is eligible for ag target tj iff:
 
-    - SOME land use present at r above `EXACT_REACHABILITY_MIN_FRACTION` — whether an agricultural
-      source or a non-agricultural source — can transition to tj (finite T_MAT entry); AND
+    - SOME source present at r — an agricultural source from the FOLDED base (every nonzero folded
+      land-use; sub-θ land is already absorbed into its dominant) or a non-agricultural source — can
+      transition to tj (finite T_MAT entry); AND
     - tj is spatially allowed (EXCLUDE) and not a no-go LU there.
+
+    Every ag land-use vouches for itself via the finite T_MAT diagonal, so (with a reconciled
+    x_mrj) every held land-use always gets its own X var — no lb pin needed for var existence.
 
     Notes:
 
@@ -135,8 +210,9 @@ def get_ag2ag_ub(data: Data, base_year: int) -> np.ndarray:
 
     Example: cell is 0.2 Apples + 0.8 (reachable LUs); if Apples↛to_j then ub[to_j] = 0.8.
     ag-source component only — nonag2ag adds its own fraction in the combined ag ub (later step).
+    Uses the FOLDED base (get_folded_base_ag_dvar): reach follows solver-world source identity.
     """
-    ag_dvar    = data.ag_dvars[base_year]                                                              # (NLMS, NCELLS, N_AG_LUS)
+    ag_dvar    = get_folded_base_ag_dvar(data, base_year)                                              # (NLMS, NCELLS, N_AG_LUS)
     
     # Transition exclusion (T_MAT): binary allow/disallow per (from_j → to_j).
     t_ag2ag_jj = (~np.isnan(
@@ -159,43 +235,14 @@ def get_ag2ag_ub(data: Data, base_year: int) -> np.ndarray:
 
 
 def get_ag2ag_lb(data: Data, base_year: int) -> np.ndarray:
-    """ag→ag TARGET lower bound (NLMS, NCELLS, N_AG_LUS): the 'stay' floor for sub-threshold slivers.
+    """ag→ag TARGET lower bound (NLMS, NCELLS, N_AG_LUS): all zeros.
 
-    - In principle lb SHOULD be all 0s — any ag cell can be fully cleared and re-allocated, so no
-      land use is ever forced to persist.
-    - In practice we exempt tiny dvar fractions from the transition machinery: θ =
-      EXACT_REACHABILITY_MIN_FRACTION is the cutoff below which a source is too small to be worth
-      creating flow-dvars for. Sources with fraction ≤ θ are skipped from the real transition
-      considering/processing and instead just "stay the same".
-    - This lb pins those skipped slivers in place — `lb[m,r,j] = x_old[m,r,j]` — so their land is
-      conserved instead of vanishing (`Σ x_old = ag_mask` stays satisfied).
-    - Example: a cell of 0.01 Apples + 0.90 Beef + 0.09 Citrus with θ = 0.05 — Apples (< θ) just
-      stays as itself, while only Beef and Citrus get flow-dvars and may transition.
-
-    Floor-truncated at ROUND_DECIMALS; get_feasible_ag_cells_mrj unions in lb>0 cells so the stay
-    var exists. NOT capped at the raw ag2ag ub: the final box is safe regardless (get_dvar_lb_ag
-    clamps lb ≤ base, get_dvar_ub_ag raises ub ≥ base), and capping here would zero the pin exactly
-    where EXCLUDE/no-go bans a held sliver — deleting its X var and making Σ X = ag_mask infeasible.
+    The old sub-θ sliver 'stay' pin is gone — fold-into-dominant (get_folded_base_ag_dvar) absorbs
+    every sub-θ land-use into the cell's dominant source BEFORE the solver world is built, so no
+    land-use is ever left without flow-to vars or without an X var, and nothing needs to be locked in place.
+    Kept as a function (rather than deleted) as the hook for any future genuine ag lower bound.
     """
-    x_old = data.ag_dvars[base_year]
-    noise = 10 ** (-settings.ROUND_DECIMALS)
-    sliver = (x_old > noise) & (x_old <= settings.EXACT_REACHABILITY_MIN_FRACTION)
-
-    scale = 10 ** settings.ROUND_DECIMALS
-    lb = np.where(sliver, np.floor(x_old * scale) / scale, 0.0).astype(np.float32)
-
-    # Report the lock-in instead of passing silently: pinned slivers cannot move until they exceed θ
-    # (which the pin itself prevents), so this is the land θ takes out of the transition market. Pins
-    # sitting on EXCLUDE/no-go-banned entries are flagged separately — there the pin is load-bearing
-    # (without it the holding has no X var and Σ X = ag_mask goes infeasible).
-    if np.any(lb > 0):
-        pinned_ha = float((lb.sum(axis=(0, 2)) * data.REAL_AREA).sum())
-        banned = int(((lb > 0) & (get_ag2ag_ub(data, base_year) == 0)).sum())
-        msg = f"  └── Ag lb sliver pin (θ={settings.EXACT_REACHABILITY_MIN_FRACTION}): {int((lb > 0).sum()):,} entries, {pinned_ha:,.1f} ha locked in place"
-        if banned:
-            msg += f"; {banned:,} on EXCLUDE/no-go-banned entries (kept alive by the pin)"
-        print(msg, flush=True)
-    return lb
+    return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
 
 
 def get_transition_matrices_ag2ag(data: Data, yr_idx: int, from_m: int, from_j: int, cells=None, separate=False):
@@ -546,7 +593,9 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
             if settings.AG_MANAGEMENTS[am]
         }
 
-    ag_dvar = data.ag_dvars[base_year].astype(np.float32)  # (NLMS, NCELLS, N_AG_LUS)
+    # FOLDED base: am lb must not exceed the SOLVER-WORLD host ag land-use (an am fraction whose host
+    # sliver was folded away is clamped to 0 — its land now lives under the dominant source).
+    ag_dvar = get_folded_base_ag_dvar(data, base_year)     # (NLMS, NCELLS, N_AG_LUS)
 
     result = {}
     for am in settings.AG_MANAGEMENTS_TO_LAND_USES:

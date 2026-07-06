@@ -342,14 +342,18 @@ def get_base_nonag_dvar_k_cell_map(data: Data, base_year: int, threshold: float 
     trans_cost = delta_cells * cost_cells, and the objective minimises sum(trans_cost). This is the 
     per-source basis of the delta transition model (no single dominant-LU cost per cell).
 
-    `threshold` defaults to settings.EXACT_REACHABILITY_MIN_FRACTION — the same fraction used by
-    `get_base_dvar_mj_cell_map` and target eligibility, so the nonag source slices, cost dicts,
-    and `get_to_ag_exclude_matrices` reachability all agree on one threshold.
+    `threshold` defaults to the ROUND_DECIMALS noise floor, NOT θ (EXACT_REACHABILITY_MIN_FRACTION):
+    the non-ag side is ALWAYS EXACT — there is no fold-into-dominant here (folding would fake-delete
+    permanent commitments or grant free destocked→ag reversion), so every nonzero non-ag land-use
+    must keep its own flow delta variables at any θ. Decoupled from θ so that raising θ for the ag
+    exact↔crisp dial cannot strand reversible non-ag land (e.g. Destocked) without a reversion path.
+    Cheap by nature: only 9 non-ag LUs, present only where the solver placed them (~188k nonag2ag
+    delta vars at 2050 vs ~2.5M ag2ag).
 
     Cached (maxsize=1): all nonag→ag cost functions call this for the same (data, base_year)
     pair within one solve step, so subsequent calls are free.
     """
-    threshold = settings.EXACT_REACHABILITY_MIN_FRACTION if threshold is None else threshold
+    threshold = 10 ** (-settings.ROUND_DECIMALS) if threshold is None else threshold
     base_dvar_rk = data.non_ag_dvars[base_year]
     return {
         k: np.where(base_dvar_rk[:, k] > threshold)[0]
