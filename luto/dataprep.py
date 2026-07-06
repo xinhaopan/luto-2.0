@@ -587,6 +587,17 @@ def create_new_dataset(refresh=False):
     # Stack arrays.
     x_mrj = np.stack((x_dry, x_irr)).astype(bool)
 
+    # Reconcile with the observed 2010 map (per-cell OR): the precipitation/irrigation overlays above
+    # can ban a cell's OWN 2010 land use (~360 cells), which downstream leaves that holding without an
+    # X var and forces its conversion in the first simulation step. A cell's observed (lm, lu) is
+    # always eligible on that cell; all other entries (incl. the rest of the SA2) are untouched.
+    ag_cells = np.where((lumap >= 0).values)[0]
+    x_mrj[
+        lmap['IRRIGATION'].values[ag_cells].astype(np.int64),
+        ag_cells,
+        lumap.values[ag_cells].astype(np.int64),
+    ] = True
+
     # Save to file
     np.save(outpath + 'x_mrj.npy', x_mrj)
 
