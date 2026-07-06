@@ -762,14 +762,6 @@ def get_non_ag_lb_matrices(data: Data, base_year) -> np.ndarray:
             lb_rk[:, k] = np.floor(prev_dvars[:, k] * scale) / scale
 
     # NonAg lb can not exceed the available ag-mask proportion of the cell
-    lb_capped = np.minimum(lb_rk, data.AG_MASK_PROPORTION_R[:, np.newaxis]).astype(np.float32)
-
-    lb_update = lb_capped < lb_rk
-    if lb_update.any():
-        gap = lb_rk[lb_update] - lb_capped[lb_update]
-        print(
-            f"  └── NonAg lb capped: {lb_update.sum()} cells updated,"
-            f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
-        )
-
-    return lb_capped
+    return tools.clamp_dvar_bound(
+        lb_rk, 0.0, data.AG_MASK_PROPORTION_R[:, np.newaxis], 'NonAg lb capped to ag-mask'
+    )

@@ -65,10 +65,24 @@ def read_timestamp():
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
     """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
-    if settings.AMORTISE_UPFRONT_COSTS: 
+    if settings.AMORTISE_UPFRONT_COSTS:
         return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
-    else: 
-        return cost   
+    else:
+        return cost
+
+
+def clamp_dvar_bound(arr: np.ndarray, lo, hi, name: str) -> np.ndarray:
+    """Return clip(arr, lo, hi) as float32, REPORTING entries changed beyond the ROUND_DECIMALS
+    noise threshold. `lo`/`hi` may be scalars or same-shape arrays. Shared by the dvar bound/base
+    builders in solvers/input_data.py and the ag/non-ag transition lb builders — all dvar-bound
+    cleaning goes through here, explicitly and logged, rather than silently min/max'd."""
+    out = np.clip(arr, lo, hi).astype(np.float32)
+    thr = 10 ** (-settings.ROUND_DECIMALS)
+    chg = np.abs(out - arr) > thr
+    if np.any(chg):
+        gap = np.abs(out - arr)[chg]
+        print(f"  └── {name}: clamped {int(chg.sum())} cells, max gap={gap.max():.2e}, mean gap={gap.mean():.2e}", flush=True)
+    return out
 
 
 def lumap2ag_l_mrj(lumap, lmmap):

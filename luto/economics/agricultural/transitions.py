@@ -46,7 +46,8 @@ def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
     costs (the cost of leaving dry-Apples for each target). The solver then creates, for each slice,
     the same number of delta variables (delta >= 0, positive-increment Gurobi vars) — one per sliced
     cell — that represent the TRUE transition flow out of that source on those cells. Transition cost
-    is then trans_cost = delta_dvars * cost_cells, and the objective minimises sum(trans_cost). This is the per-source basis of the delta transition model (no single dominant-LU cost per cell).
+    is then trans_cost = delta_dvars * cost_cells, and the objective minimises sum(trans_cost). This 
+    is the per-source basis of the delta transition model (no single dominant-LU cost per cell).
 
     Uses settings.EXACT_REACHABILITY_MIN_FRACTION as the single fraction threshold (not a parameter,
     so every caller — and the exact GHG cell-slicing in ghg.py — shares one value). This map is the
@@ -171,8 +172,10 @@ def get_ag2ag_lb(data: Data, base_year: int) -> np.ndarray:
     - Example: a cell of 0.01 Apples + 0.90 Beef + 0.09 Citrus with θ = 0.05 — Apples (< θ) just
       stays as itself, while only Beef and Citrus get flow-dvars and may transition.
 
-    Floor-truncated at ROUND_DECIMALS and capped at the exact ub so lb ≤ ub by construction;
-    get_feasible_ag_cells_mrj unions in lb>0 cells so the stay var exists.
+    Floor-truncated at ROUND_DECIMALS; get_feasible_ag_cells_mrj unions in lb>0 cells so the stay
+    var exists. NOT capped at the raw ag2ag ub: the final box is safe regardless (get_dvar_lb_ag
+    clamps lb ≤ base, get_dvar_ub_ag raises ub ≥ base), and capping here would zero the pin exactly
+    where EXCLUDE/no-go bans a held sliver — deleting its X var and making Σ X = ag_mask infeasible.
     """
     x_old = data.ag_dvars[base_year]
     noise = 10 ** (-settings.ROUND_DECIMALS)
@@ -181,10 +184,18 @@ def get_ag2ag_lb(data: Data, base_year: int) -> np.ndarray:
     scale = 10 ** settings.ROUND_DECIMALS
     lb = np.where(sliver, np.floor(x_old * scale) / scale, 0.0).astype(np.float32)
 
-    # Cap at ag2ag ub to guarantee lb ≤ ub. The no-go mask / spatial-exclusion can drive ub to 0
-    # where the dvar still holds a sliver (lb > 0) → empty [lb, ub] box → presolve infeasible.
-    ub_ag2ag = get_ag2ag_ub(data, base_year)
-    return np.minimum(lb, ub_ag2ag).astype(np.float32)
+    # Report the lock-in instead of passing silently: pinned slivers cannot move until they exceed θ
+    # (which the pin itself prevents), so this is the land θ takes out of the transition market. Pins
+    # sitting on EXCLUDE/no-go-banned entries are flagged separately — there the pin is load-bearing
+    # (without it the holding has no X var and Σ X = ag_mask goes infeasible).
+    if np.any(lb > 0):
+        pinned_ha = float((lb.sum(axis=(0, 2)) * data.REAL_AREA).sum())
+        banned = int(((lb > 0) & (get_ag2ag_ub(data, base_year) == 0)).sum())
+        msg = f"  └── Ag lb sliver pin (θ={settings.EXACT_REACHABILITY_MIN_FRACTION}): {int((lb > 0).sum()):,} entries, {pinned_ha:,.1f} ha locked in place"
+        if banned:
+            msg += f"; {banned:,} on EXCLUDE/no-go-banned entries (kept alive by the pin)"
+        print(msg, flush=True)
+    return lb
 
 
 def get_transition_matrices_ag2ag(data: Data, yr_idx: int, from_m: int, from_j: int, cells=None, separate=False):
@@ -542,17 +553,11 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
         if not settings.AG_MANAGEMENTS[am]:
             continue
         am_dvar = data.ag_man_dvars[base_year][am].astype(np.float32)
-        am_dvar_true = np.minimum(am_dvar, ag_dvar)          # clamp: am cannot exceed its host ag
+        am_dvar_true = tools.clamp_dvar_bound(am_dvar, 0.0, ag_dvar, f'Ag man lb clamped [{am}]')   # am cannot exceed its host ag
         am_lb = np.divide(
             np.floor(am_dvar_true * 10 ** settings.ROUND_DECIMALS),
             10 ** settings.ROUND_DECIMALS,
         )
-        clamped = am_dvar_true < am_dvar
-        if clamped.any():
-            gap = am_dvar[clamped] - am_dvar_true[clamped]
-            print(
-                f"  └── Ag man lb clamped [{am}]: {clamped.sum()} cells, max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
-            )
         result[am] = am_lb
     return result
 

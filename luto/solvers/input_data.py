@@ -30,6 +30,7 @@ from typing import Any, Optional
 
 from luto.data import Data
 from luto import settings
+import luto.tools as tools
 # from luto.economics import land_use_culling   # DECOMMISSIONED: land-use culling is incompatible with
 #   the per-source (from→to) flow transition model — it pruned the exclude matrix using a single
 #   dominant-LU-per-cell transition cost, whereas costs/deltas are now keyed per (from_m, from_j) source,
@@ -478,20 +479,6 @@ def get_feasible_ag2nonag_rk(dvar_ub_nonag: np.ndarray, ag_source_cells: dict, T
     }
 
 
-def _clamp_dvar_bound(arr: np.ndarray, lo, hi, name: str) -> np.ndarray:
-    """Return clip(arr, lo, hi) as float32, REPORTING cells changed beyond the ROUND_DECIMALS
-    threshold (mirrors get_non_ag_lb_matrices' 'NonAg lb capped' message). `lo`/`hi` may be scalars
-    or same-shape arrays. This is where dvar-bound float noise is cleaned — explicitly and logged —
-    rather than silently min/max'd in the solver."""
-    out = np.clip(arr, lo, hi).astype(np.float32)
-    thr = 10 ** (-settings.ROUND_DECIMALS)
-    chg = np.abs(out - arr) > thr
-    if np.any(chg):
-        gap = np.abs(out - arr)[chg]
-        print(f"  └── {name}: clamped {int(chg.sum())} cells, max gap={gap.max():.2e}, mean gap={gap.mean():.2e}", flush=True)
-    return out
-
-
 def get_dvar_ub_ag(data: Data, base_year: int) -> np.ndarray:
     print('Getting agricultural target upper bounds...', flush = True)
     ub = (
@@ -500,8 +487,15 @@ def get_dvar_ub_ag(data: Data, base_year: int) -> np.ndarray:
     ).astype(np.float32)
     # A cell can always KEEP its base LU ⇒ ub must be ≥ base (exact Σfrac can land a hair below base
     # on float noise, e.g. 0.9999<1.0, which would break cell-usage saturation Σ X = ag_mask). Also ≥0.
+    
+    # NOTE: if a real gap is reported here (not float noise), some base holding is banned by
+    # EXCLUDE/no-go (e.g. a pre-reconciliation x_mrj.npy, or a no-go region overlapping the base map).
+    # The raise does NOT let such cells keep their base LU — with ag_x_mrj=0 and lb=0 no X var exists
+    # (get_feasible_ag_cells_mrj), so the solver force-converts the holding; the raise only keeps the
+    # lb <= base <= ub box coherent for bookkeeping (const clipping, has_any_ag_r).
+
     base = data.ag_dvars[base_year].astype(np.float32)
-    return _clamp_dvar_bound(ub, np.maximum(base, 0.0), np.inf, 'Ag ub raised to base')
+    return tools.clamp_dvar_bound(ub, np.maximum(base, 0.0), np.inf, 'Ag ub raised to base')
 
 def get_dvar_ub_nonag(data: Data, base_year):
     print('Getting non-agricultural target upper bounds...', flush = True)
@@ -514,14 +508,14 @@ def get_dvar_ub_nonag(data: Data, base_year):
         base_dvar_nonag_rk=base_dvar_nonag,
         base_dvar_ag_mrj=data.ag_dvars[base_year],
     )
-    return _clamp_dvar_bound(ub, np.maximum(base_dvar_nonag, 0.0), np.inf, 'NonAg ub raised to base')
+    return tools.clamp_dvar_bound(ub, np.maximum(base_dvar_nonag, 0.0), np.inf, 'NonAg ub raised to base')
 
 def get_dvar_lb_ag(data: Data, base_year: int) -> np.ndarray:
     print('Getting agricultural target lower bounds...', flush = True)
     lb = ag_transition.get_ag2ag_lb(data, base_year)
     base = data.ag_dvars[base_year].astype(np.float32)
     # lb must sit in [0, base] (never above the base it locks in).
-    return _clamp_dvar_bound(lb, 0.0, np.maximum(base, 0.0), 'Ag lb clamped to [0,base]')
+    return tools.clamp_dvar_bound(lb, 0.0, np.maximum(base, 0.0), 'Ag lb clamped to [0,base]')
 
 def get_dvar_lb_nonag(data: Data, base_year):
     print('Getting non-agricultural lower bound matrices...', flush = True)
@@ -530,7 +524,7 @@ def get_dvar_lb_nonag(data: Data, base_year):
         data.non_ag_dvars[base_year].astype(np.float32) if base_year != data.YR_CAL_BASE
         else np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32)
     )
-    return _clamp_dvar_bound(lb, 0.0, np.maximum(base, 0.0), 'NonAg lb clamped to [0,base]')
+    return tools.clamp_dvar_bound(lb, 0.0, np.maximum(base, 0.0), 'NonAg lb clamped to [0,base]')
 
 def get_ag_man_lb_mrj(data: Data, base_year):
     print('Getting agricultural lower bound matrices...', flush = True)
@@ -1328,8 +1322,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     # Base dvars are the node-balance "stay" constant; clip them into the cleaned [lb, ub] box so the
     # all-delta=0 stay point is feasible by construction (fixes base's own float noise, e.g. -1e-8<lb=0).
     # Bounds were already clamped so lb ≤ base ≤ ub for real values — this only bites on noise. Reported.
-    dvar_base_ag_mrj    = _clamp_dvar_bound(data.ag_dvars[base_year],     dvar_lb_ag,    dvar_ub_ag,    'Ag base clipped to [lb,ub]')
-    dvar_base_non_ag_rk = _clamp_dvar_bound(data.non_ag_dvars[base_year], dvar_lb_nonag, dvar_ub_nonag, 'NonAg base clipped to [lb,ub]')
+    dvar_base_ag_mrj    = tools.clamp_dvar_bound(data.ag_dvars[base_year],     dvar_lb_ag,    dvar_ub_ag,    'Ag base clipped to [lb,ub]')
+    dvar_base_non_ag_rk = tools.clamp_dvar_bound(data.non_ag_dvars[base_year], dvar_lb_nonag, dvar_ub_nonag, 'NonAg base clipped to [lb,ub]')
 
 
     return SolverInputData(
