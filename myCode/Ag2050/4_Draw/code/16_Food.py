@@ -7,6 +7,7 @@ import _path_setup  # noqa: F401
 
 import pandas as pd
 
+from tools.parameters import GENERATE_TABLES
 from tools.two_row_figure import (
     LU_COLORS,
     RENAME_NON_AG,
@@ -15,6 +16,7 @@ from tools.two_row_figure import (
     export_long_tables,
     get_am_colors,
     input_files,
+    load_long_tables,
     load_report_source_csv,
     save_three_row_figure,
 )
@@ -114,20 +116,23 @@ def prepare_am():
 
 
 def main():
-    overview_df = prepare_overview()
-    land_use_df = prepare_land_use()
-    am_df = prepare_am()
+    workbook = '16_food_long_tables.xlsx'
+    if GENERATE_TABLES:
+        export_long_tables(
+            workbook,
+            overview=prepare_overview(),
+            land_use=prepare_land_use(),
+            agricultural_management=prepare_am(),
+        )
+    tables = load_long_tables(workbook, 'overview', 'land_use', 'agricultural_management')
+    overview_df = tables['overview']
+    land_use_df = tables['land_use']
+    am_df = tables['agricultural_management']
     am_colors = {
         label: color
         for label, color in get_am_colors().items()
         if label != 'Other land-use'
     }
-    export_long_tables(
-        '15_food_long_tables.xlsx',
-        overview=overview_df,
-        land_use=land_use_df,
-        agricultural_management=am_df,
-    )
     save_three_row_figure(
         overview_df,
         land_use_df,
@@ -136,7 +141,7 @@ def main():
         LU_COLORS,
         am_colors,
         'Agri-food production (Mt yr⁻¹)',
-        '15_food.svg',
+        '16_food.svg',
         y_label_x=0.020,
     )
 

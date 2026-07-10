@@ -7,6 +7,7 @@ import _path_setup  # noqa: F401
 
 import pandas as pd
 
+from tools.parameters import GENERATE_TABLES
 from tools.two_row_figure import (
     LU_COLORS,
     RENAME_NON_AG,
@@ -15,6 +16,7 @@ from tools.two_row_figure import (
     export_long_tables,
     get_am_colors,
     input_files,
+    load_long_tables,
     load_report_source_csv,
     save_three_row_figure,
 )
@@ -38,8 +40,8 @@ def prepare_overview():
         revenue_ag = load_report_source_csv(scenario, 'economics_ag_revenue')
         cost_ag = load_report_source_csv(scenario, 'economics_ag_cost')
         if not revenue_ag.empty or not cost_ag.empty:
-            revenue_ag = revenue_ag.query('region == "AUSTRALIA" and Water_supply != "ALL" and Type != "ALL"').copy()
-            cost_ag = cost_ag.query('region == "AUSTRALIA" and Water_supply != "ALL" and Type != "ALL"').copy()
+            revenue_ag = revenue_ag.query('region == "AUSTRALIA" and Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"').copy()
+            cost_ag = cost_ag.query('region == "AUSTRALIA" and Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"').copy()
             if not revenue_ag.empty:
                 data = revenue_ag.groupby('Year', as_index=False)['Value ($)'].sum()
                 for _, row in data.iterrows():
@@ -52,8 +54,8 @@ def prepare_overview():
         revenue_am = load_report_source_csv(scenario, 'economics_am_revenue')
         cost_am = load_report_source_csv(scenario, 'economics_am_cost')
         if not revenue_am.empty or not cost_am.empty:
-            revenue_am = revenue_am.query('region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL"').copy()
-            cost_am = cost_am.query('region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL"').copy()
+            revenue_am = revenue_am.query('region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"').copy()
+            cost_am = cost_am.query('region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"').copy()
             if not revenue_am.empty:
                 data = revenue_am.groupby('Year', as_index=False)['Value ($)'].sum()
                 for _, row in data.iterrows():
@@ -66,8 +68,8 @@ def prepare_overview():
         revenue_non_ag = load_report_source_csv(scenario, 'economics_non_ag_revenue')
         cost_non_ag = load_report_source_csv(scenario, 'economics_non_ag_cost')
         if not revenue_non_ag.empty or not cost_non_ag.empty:
-            revenue_non_ag = revenue_non_ag.query('region == "AUSTRALIA"').copy()
-            cost_non_ag = cost_non_ag.query('region == "AUSTRALIA"').copy()
+            revenue_non_ag = revenue_non_ag.query('region == "AUSTRALIA" and `Land-use` != "ALL"').copy()
+            cost_non_ag = cost_non_ag.query('region == "AUSTRALIA" and `Land-use` != "ALL"').copy()
             if not revenue_non_ag.empty:
                 data = revenue_non_ag.groupby('Year', as_index=False)['Value ($)'].sum()
                 for _, row in data.iterrows():
@@ -77,10 +79,10 @@ def prepare_overview():
                 for _, row in data.iterrows():
                     rows.append({'year': int(row['Year']), 'scenario': scenario, 'category': 'Non-ag cost', 'value': -float(row['Value ($)']) / 1e9})
 
-        cost_transition_ag2ag = load_report_source_csv(scenario, 'transition_cost_ag2ag')
+        cost_transition_ag2ag = load_report_source_csv(scenario, 'transition_ag2ag_cost')
         if not cost_transition_ag2ag.empty:
             cost_transition_ag2ag = cost_transition_ag2ag.query(
-                '`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL"'
+                'region == "AUSTRALIA" and `From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL"'
             ).copy()
             cost_transition_ag2ag = cost_transition_ag2ag.groupby('Year', as_index=False)['Cost ($)'].sum()
             for _, row in cost_transition_ag2ag.iterrows():
@@ -91,10 +93,10 @@ def prepare_overview():
                     'value': -float(row['Cost ($)']) / 1e9,
                 })
 
-        cost_transition_ag2non = load_report_source_csv(scenario, 'transition_cost_ag2non_ag')
+        cost_transition_ag2non = load_report_source_csv(scenario, 'transition_ag2nonag_cost')
         if not cost_transition_ag2non.empty:
             cost_transition_ag2non = cost_transition_ag2non.query(
-                '`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"'
+                'region == "AUSTRALIA" and `From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"'
             ).copy()
             cost_transition_ag2non = cost_transition_ag2non.groupby('Year', as_index=False)['Cost ($)'].sum()
             for _, row in cost_transition_ag2non.iterrows():
@@ -144,10 +146,10 @@ def prepare_land_use():
             cost_non_ag = cost_non_ag.copy()
             if not revenue_non_ag.empty:
                 revenue_non_ag['Land-use'] = revenue_non_ag['Land-use'].replace(RENAME_NON_AG)
-                revenue_non_ag = revenue_non_ag.query('region == "AUSTRALIA"').copy()
+                revenue_non_ag = revenue_non_ag.query('region == "AUSTRALIA" and `Land-use` != "ALL"').copy()
             if not cost_non_ag.empty:
                 cost_non_ag['Land-use'] = cost_non_ag['Land-use'].replace(RENAME_NON_AG)
-                cost_non_ag = cost_non_ag.query('region == "AUSTRALIA"').copy()
+                cost_non_ag = cost_non_ag.query('region == "AUSTRALIA" and `Land-use` != "ALL"').copy()
                 cost_non_ag['Value ($)'] = cost_non_ag['Value ($)'] * -1
             economics_non_ag = pd.concat([revenue_non_ag, cost_non_ag], ignore_index=True)
             economics_non_ag = economics_non_ag.groupby(['Year'], as_index=False)['Value ($)'].sum()
@@ -176,12 +178,12 @@ def prepare_am():
         if not revenue_am.empty:
             revenue_am['Management Type'] = revenue_am['Management Type'].replace(RENAME_AM_NON_AG)
             revenue_am = revenue_am.query(
-                'region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL"'
+                'region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"'
             ).copy()
         if not cost_am.empty:
             cost_am['Management Type'] = cost_am['Management Type'].replace(RENAME_AM_NON_AG)
             cost_am = cost_am.query(
-                'region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL"'
+                'region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"'
             ).copy()
             cost_am['Value ($)'] = cost_am['Value ($)'] * -1
 
@@ -199,20 +201,23 @@ def prepare_am():
 
 
 def main():
-    overview_df = prepare_overview()
-    land_use_df = prepare_land_use()
-    am_df = prepare_am()
+    workbook = '13_net_economic_return_long_tables.xlsx'
+    if GENERATE_TABLES:
+        export_long_tables(
+            workbook,
+            overview=prepare_overview(),
+            land_use=prepare_land_use(),
+            agricultural_management=prepare_am(),
+        )
+    tables = load_long_tables(workbook, 'overview', 'land_use', 'agricultural_management')
+    overview_df = tables['overview']
+    land_use_df = tables['land_use']
+    am_df = tables['agricultural_management']
     am_colors = {
         label: color
         for label, color in get_am_colors().items()
         if label != 'Other land-use'
     }
-    export_long_tables(
-        '12_net_economic_return_long_tables.xlsx',
-        overview=overview_df,
-        land_use=land_use_df,
-        agricultural_management=am_df,
-    )
     save_three_row_figure(
         overview_df,
         land_use_df,
@@ -221,7 +226,7 @@ def main():
         LU_COLORS,
         am_colors,
         'Net economic returns (Billion AU$ yr⁻¹)',
-        '12_net_economic_return.svg',
+        '13_net_economic_return.svg',
         total_legend_label='Net economic return',
         y_label_x=0.020,
     )

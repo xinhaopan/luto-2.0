@@ -2,7 +2,7 @@
 Task runner for AG2050 scenarios (AgS1 – AgS4).
 
 Scenarios:
-  AgS1 – Regional Ag capitals:   Non-ag OFF, full AG managements, maintain historical GHG & biodiversity
+  AgS1 – Regional Ag capitals:   Non-ag ON,  full AG managements, maintain historical GHG & biodiversity
   AgS2 – Landscape stewardship:  Non-ag ON,  full AG managements, low GHG, restore 50% biodiversity
   AgS3 – Climate survival:       Non-ag OFF, limited AG managements (Eco Grazing/Savanna/HIR only), GHG off
   AgS4 – System decline:         Non-ag OFF, limited AG managements (Eco Grazing/Savanna/HIR only), GHG off
@@ -97,8 +97,8 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260605_Paper3_aquila'],
-    'KEEP_OUTPUTS': [True],
+    'TASK_NAME': ['20260707_Paper3_aquila'],
+    'KEEP_OUTPUTS': [False],
     'QUEUE': ['normalsr'],
     'NUMERIC_FOCUS': [0],
     # ---- Computational settings (not model parameters) ----------------------
@@ -213,9 +213,9 @@ grid_search = {
 
 # Conditional rules: for each scenario keep only its matching NON_AG / AG_MAN pair.
 conditional_rules = [
-    # AgS1 – non-ag OFF, full managements
+    # AgS1 – non-ag ON, full managements
     {'conditions':    {'AG2050_SCENARIO': ['AgS1']},
-     'restrictions':  {'NON_AG_LAND_USES': [_non_ag_off], 'AG_MANAGEMENTS': [_ag_man_full]}},
+     'restrictions':  {'NON_AG_LAND_USES': [_non_ag_on],  'AG_MANAGEMENTS': [_ag_man_full]}},
     # AgS2 – non-ag ON, full managements
     {'conditions':    {'AG2050_SCENARIO': ['AgS2']},
      'restrictions':  {'NON_AG_LAND_USES': [_non_ag_on],  'AG_MANAGEMENTS': [_ag_man_full]}},

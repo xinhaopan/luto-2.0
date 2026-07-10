@@ -21,7 +21,8 @@ plt.rcParams['svg.fonttype'] = 'none'
 
 sys.path.insert(0, os.path.dirname(__file__))
 from _path_setup import *  # noqa: F401,F403
-from tools.parameters import OUTPUT_DIR
+from tools.parameters import OUTPUT_DIR, GENERATE_TABLES
+from tools.two_row_figure import export_long_tables, load_long_tables
 
 
 INPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../input'))
@@ -34,6 +35,7 @@ LABOUR_COST_FORECAST = os.path.abspath(os.path.join(
 ))
 
 YEARS = list(range(2010, 2051))
+WORKBOOK = '10_input_data_long_tables.xlsx'
 LAST_HIST_YEAR = 2023
 LC_HIST_END = 2024
 FEEDLOT_HIST_END = 2024
@@ -171,6 +173,94 @@ def _load_feedlots():
     return result
 
 
+def _series_rows(panel, series_type, series, scenario='', level=''):
+    rows = []
+    for year, value in series.dropna().items():
+        rows.append({
+            'panel': panel,
+            'series_type': series_type,
+            'scenario': scenario,
+            'level': level,
+            'year': int(year),
+            'value': float(value),
+        })
+    return rows
+
+
+def build_input_table():
+    rows = []
+
+    abares_hist, abares_fut, abares_trend = _load_productivity_abares()
+    for panel in ABARES_VARS:
+        rows.extend(_series_rows(panel, 'historical', abares_hist[panel]))
+        rows.extend(_series_rows(panel, 'trend', abares_trend[panel]))
+        for scenario, series in abares_fut[panel].items():
+            rows.extend(_series_rows(panel, 'future', series, scenario=scenario))
+
+    lc_hist, lc_fut, lc_trend = _load_labour_cost()
+    rows.extend(_series_rows('Labour cost', 'historical', lc_hist))
+    rows.extend(_series_rows('Labour cost', 'trend', lc_trend))
+    for scenario, series in lc_fut.items():
+        rows.extend(_series_rows('Labour cost', 'future', series, scenario=scenario))
+
+    for panel, (hist_s, fut_dict, trend_s) in _load_feedlots().items():
+        rows.extend(_series_rows(panel, 'historical', hist_s))
+        rows.extend(_series_rows(panel, 'trend', trend_s))
+        for level, series in fut_dict.items():
+            rows.extend(_series_rows(panel, 'future', series, level=level))
+
+    return pd.DataFrame(rows)
+
+
+def _blank_or_equal(series, value):
+    return series.isna() | (series.astype(str) == '') if value == '' else series.astype(str) == value
+
+
+def _select_series(series_df, panel, series_type, scenario='', level=''):
+    mask = (
+        (series_df['panel'] == panel) &
+        (series_df['series_type'] == series_type) &
+        _blank_or_equal(series_df['scenario'], scenario) &
+        _blank_or_equal(series_df['level'], level)
+    )
+    sub = series_df.loc[mask].sort_values('year')
+    if sub.empty:
+        return pd.Series(dtype=float)
+    return pd.Series(sub['value'].astype(float).to_numpy(), index=sub['year'].astype(int).to_numpy())
+
+
+def load_input_series():
+    series_df = load_long_tables(WORKBOOK, 'series')['series']
+    abares_hist, abares_fut, abares_trend = {}, {}, {}
+    for panel in ABARES_VARS:
+        abares_hist[panel] = _select_series(series_df, panel, 'historical')
+        abares_trend[panel] = _select_series(series_df, panel, 'trend')
+        abares_fut[panel] = {
+            scenario: _select_series(series_df, panel, 'future', scenario=scenario)
+            for scenario in SCENARIOS
+        }
+
+    lc_hist = _select_series(series_df, 'Labour cost', 'historical')
+    lc_trend = _select_series(series_df, 'Labour cost', 'trend')
+    lc_fut = {
+        scenario: _select_series(series_df, 'Labour cost', 'future', scenario=scenario)
+        for scenario in SCENARIOS
+    }
+
+    feedlots = {}
+    for panel in ('Revenue ratio', 'Cost ratio', 'GHG ratio', 'Water ratio'):
+        feedlots[panel] = (
+            _select_series(series_df, panel, 'historical'),
+            {
+                level: _select_series(series_df, panel, 'future', level=level)
+                for level in FEEDLOT_LEVELS
+            },
+            _select_series(series_df, panel, 'trend'),
+        )
+
+    return abares_hist, abares_fut, abares_trend, lc_hist, lc_fut, lc_trend, feedlots
+
+
 def _style_ax(ax, title, xlim):
     ax.set_title(title, fontsize=TEXT_SIZE, pad=8)
     ax.tick_params(axis='both', labelsize=TEXT_SIZE, direction='out')
@@ -257,9 +347,9 @@ def _legend_handles():
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    abares_hist, abares_fut, abares_trend = _load_productivity_abares()
-    lc_hist, lc_fut, lc_trend = _load_labour_cost()
-    feedlots = _load_feedlots()
+    if GENERATE_TABLES:
+        export_long_tables(WORKBOOK, series=build_input_table())
+    abares_hist, abares_fut, abares_trend, lc_hist, lc_fut, lc_trend, feedlots = load_input_series()
 
     fig = plt.figure(figsize=(18, 30))
     gs = gridspec.GridSpec(

@@ -26,8 +26,8 @@ from tools.plot_helper import (
     set_plot_style,
     stacked_area_pos_neg,
 )
-from tools.parameters import input_files, font_size, OUTPUT_DIR, SCENARIO_LABELS
-from tools.two_row_figure import export_long_tables, _add_vertical_unit_label
+from tools.parameters import input_files, font_size, OUTPUT_DIR, SCENARIO_LABELS, GENERATE_TABLES
+from tools.two_row_figure import export_long_tables, load_long_tables, _add_vertical_unit_label
 
 RENAME_AM = {
     "Asparagopsis taxiformis": "Methane reduction (livestock)",
@@ -254,13 +254,16 @@ def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     set_plot_style(font_size=font_size)
 
-    area_lu = prepare_land_use()
-    area_am = prepare_am()
-    export_long_tables(
-        '02_area_long_tables.xlsx',
-        land_use=area_lu,
-        agricultural_management=area_am,
-    )
+    workbook = '02_area_long_tables.xlsx'
+    if GENERATE_TABLES:
+        export_long_tables(
+            workbook,
+            land_use=prepare_land_use(),
+            agricultural_management=prepare_am(),
+        )
+    tables = load_long_tables(workbook, 'land_use', 'agricultural_management')
+    area_lu = tables['land_use']
+    area_am = tables['agricultural_management']
 
     am_colors_all = get_colors(COLORS_FILE, 'am')
     am_colors = {

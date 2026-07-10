@@ -498,3 +498,37 @@ def export_long_tables(workbook_name, **tables):
                 export_df = pd.DataFrame({'note': ['No data']})
             export_df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
     print(f"Saved: {out}")
+    return out
+
+
+def table_cache_path(workbook_name):
+    return os.path.join(EXCEL_DIR, workbook_name)
+
+
+def missing_table_error(path, sheet_name=None):
+    target = f'{path}' if sheet_name is None else f'{path} [{sheet_name}]'
+    return FileNotFoundError(
+        f'Missing table cache: {target}\n'
+        'Set GENERATE_TABLES = True in tools/parameters.py and run the script once '
+        'before plotting with GENERATE_TABLES = False.'
+    )
+
+
+def load_long_tables(workbook_name, *sheet_names):
+    path = table_cache_path(workbook_name)
+    if not os.path.exists(path):
+        raise missing_table_error(path)
+
+    tables = {}
+    for sheet_name in sheet_names:
+        excel_sheet = sheet_name[:31]
+        try:
+            df = pd.read_excel(path, sheet_name=excel_sheet)
+        except ValueError as exc:
+            raise missing_table_error(path, excel_sheet) from exc
+        if list(df.columns) == ['note']:
+            df = pd.DataFrame()
+        if 'scenario_label' in df.columns:
+            df = df.drop(columns='scenario_label')
+        tables[sheet_name] = df
+    return tables

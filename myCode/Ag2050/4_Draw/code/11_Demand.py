@@ -18,8 +18,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 import pandas as pd
 
-from tools.parameters import OUTPUT_DIR, font_size, SCENARIO_LABELS
-from tools.two_row_figure import _add_vertical_unit_label, export_long_tables
+from tools.parameters import OUTPUT_DIR, font_size, SCENARIO_LABELS, GENERATE_TABLES
+from tools.two_row_figure import _add_vertical_unit_label, export_long_tables, load_long_tables
 
 # ── Scenario groups ───────────────────────────────────────────────────────────
 # Each entry: (scenario_key, panel_label)
@@ -36,6 +36,7 @@ SCENARIO_GROUPS = [
 # All_demand = domestic + exports + feed − imports, matching LUTO's production target.
 COLORS = ['#66c2a5', '#fcbd62', '#bda0cb', '#fc8d62']
 LABELS = ['Domestic', 'Exports', 'Feed', 'Imports']
+STACK_CATEGORIES = ('domestic', 'exports', 'feed', 'imports')
 OFF_LAND_COMMODITIES = {'aquaculture', 'chicken', 'eggs', 'pork'}
 
 N_ROWS_G = 13
@@ -57,6 +58,7 @@ CSV_PATH = os.path.join(
 )
 
 YEARS = list(range(2010, 2051))
+WORKBOOK = '11_demand_long_tables.xlsx'
 
 
 def _compact_tick_label(value, _):
@@ -97,19 +99,16 @@ def prepare(df_raw, scenario):
     return sub  # groupby in plot loop
 
 
-def draw_figure():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    df_raw      = load_demand()
+def build_demand_table():
+    df_raw = load_demand()
     commodities = get_commodities(df_raw)[:N_ROWS_G * N_COLS_G]
 
-    # Export filtered long-format demand table to Excel
     long_rows = []
     for scen_key, scen_label in SCENARIO_GROUPS:
         sub = prepare(df_raw, scen_key)
         sub = sub[sub['SPREAD_Commodity'].isin(commodities)]
         for _, row in sub.iterrows():
-            for component in ('domestic', 'exports', 'feed', 'imports'):
+            for component in STACK_CATEGORIES:
                 long_rows.append({
                     'scenario': f'Run_{scen_key}',
                     'year':     int(row['Year']),
@@ -127,10 +126,25 @@ def draw_figure():
                 'category':  'All_demand (net)',
                 'value':     all_d / 1e6,
             })
-    export_long_tables(
-        '11_demand_long_tables.xlsx',
-        demand=pd.DataFrame(long_rows),
-    )
+    return pd.DataFrame(long_rows)
+
+
+def get_commodities_from_table(demand_df):
+    sub = demand_df[
+        (demand_df['scenario'] == 'Run_AgS1') &
+        (demand_df['category'].isin(STACK_CATEGORIES)) &
+        (~demand_df['commodity'].isin(OFF_LAND_COMMODITIES))
+    ]
+    return sorted(sub['commodity'].dropna().unique())[:N_ROWS_G * N_COLS_G]
+
+
+def draw_figure():
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    if GENERATE_TABLES:
+        export_long_tables(WORKBOOK, demand=build_demand_table())
+    demand_df = load_long_tables(WORKBOOK, 'demand')['demand']
+    commodities = get_commodities_from_table(demand_df)
 
     plt.rcParams.update({
         'font.family':     'Arial',
@@ -161,7 +175,24 @@ def draw_figure():
     ref_axes        = {}   # c_idx -> ax from scen_idx==0, used for sharey
 
     for scen_idx, (scen_key, _) in enumerate(SCENARIO_GROUPS):
-        sub_df = prepare(df_raw, scen_key)
+        demand_sub = demand_df[
+            (demand_df['scenario'] == f'Run_{scen_key}') &
+            (demand_df['category'].isin(STACK_CATEGORIES))
+        ]
+        sub_df = (
+            demand_sub.pivot_table(
+                index=['year', 'commodity'],
+                columns='category',
+                values='value',
+                aggfunc='sum',
+            )
+            .reindex(columns=STACK_CATEGORIES, fill_value=0)
+            .reset_index()
+            .rename(columns={'year': 'Year', 'commodity': 'SPREAD_Commodity'})
+        )
+        sub_df.columns.name = None
+        for component in STACK_CATEGORIES:
+            sub_df[component] = sub_df[component] * 1e6
 
         inner = gridspec.GridSpecFromSubplotSpec(
             N_ROWS_G, N_COLS_G,

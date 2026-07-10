@@ -5,15 +5,21 @@
 
 # ── Task root ────────────────────────────────────────────────────────────────
 # Switch between NCI results and local test run as needed
-TASK_ROOT = "20260605_Paper3_aquila"    # NCI run (zip archives, auto-read by data_helper)
+TASK_ROOT = "20260707_Paper3_aquila"    # NCI run (zip archives, auto-read by data_helper)
 # TASK_ROOT = "20260312_Paper3_test" # local test run (RF15, immediately available)
 
 INPUT_DIR  = '../../../input'
 # All outputs under ag2050/ alongside run results
 AG2050_DIR  = f"../../../../output/{TASK_ROOT}/ag2050"
 OUTPUT_DIR  = f"{AG2050_DIR}/figures"   # charts and assembled maps
-TIFF_DIR    = f"{AG2050_DIR}/tiffs"     # extracted GeoTIFFs from zip
+TIFF_DIR    = f"{AG2050_DIR}/tiffs"     # extracted GeoTIFFs from zip (internal cache)
+TIF_DIR     = f"{AG2050_DIR}/tif"       # exported land-use GeoTIFFs (2010 & 2050)
 EXCEL_DIR   = f"{AG2050_DIR}/excel"     # exported long tables for figures
+
+# Table-cache switch used by all Ag2050 drawing scripts.
+# True: regenerate the source tables first, then plot by reading those tables.
+# False: skip data preparation and plot only from existing tables; missing tables raise.
+GENERATE_TABLES = True
 
 # ── Scenario definitions ─────────────────────────────────────────────────────
 run_number_origin = [1, 2, 3, 4]

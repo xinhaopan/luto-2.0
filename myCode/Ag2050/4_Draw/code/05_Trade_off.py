@@ -34,8 +34,9 @@ if str(CODE_DIR) not in sys.path:
 
 import _path_setup  # noqa: F401
 
-from tools.parameters import EXCEL_DIR, OUTPUT_DIR, input_files
+from tools.parameters import EXCEL_DIR, OUTPUT_DIR, input_files, GENERATE_TABLES
 from tools.data_helper import get_path, get_zip_info
+from tools.two_row_figure import missing_table_error
 
 
 UNIT_DEJAVU_CHARS = {'₂', '⁻', '¹'}
@@ -77,7 +78,7 @@ INDICATORS = [
         unit_label="Mt yr⁻¹",
         higher_is_better=True,
         decimals=1,
-        filename="15_Food.py",
+        filename="16_Food.py",
     ),
     IndicatorSpec(
         key="net_economic_return",
@@ -87,7 +88,7 @@ INDICATORS = [
         unit_label="B AU$",
         higher_is_better=True,
         decimals=1,
-        filename="12_Net_Economic_Return.py",
+        filename="13_Net_Economic_Return.py",
     ),
     IndicatorSpec(
         key="net_ghg_emissions",
@@ -97,7 +98,7 @@ INDICATORS = [
         unit_label="Mt CO₂e yr⁻¹",
         higher_is_better=False,
         decimals=1,
-        filename="13_GHG.py",
+        filename="14_GHG.py",
     ),
     IndicatorSpec(
         key="biodiversity",
@@ -107,7 +108,7 @@ INDICATORS = [
         unit_label="Mha yr⁻¹",
         higher_is_better=True,
         decimals=1,
-        filename="14_Biodiversity.py",
+        filename="15_Biodiversity.py",
     ),
     IndicatorSpec(
         key="water_yield",
@@ -117,7 +118,7 @@ INDICATORS = [
         unit_label="GL yr⁻¹",
         higher_is_better=False,
         decimals=0,
-        filename="16_Water.py",
+        filename="17_Water.py",
     ),
     IndicatorSpec(
         key="land_use_change_extent",
@@ -489,8 +490,30 @@ def save_summary_tables(raw_values: pd.DataFrame, score_values: pd.DataFrame, lo
         long_df.to_excel(writer, sheet_name="long", index=False)
         raw_export.to_excel(writer, sheet_name="raw_2050_values")
         score_export.to_excel(writer, sheet_name="relative_scores")
+        raw_values.to_excel(writer, sheet_name="raw_values_machine", index_label="indicator")
+        score_values.to_excel(writer, sheet_name="relative_scores_machine", index_label="indicator")
 
     return out_path
+
+
+def summary_table_path() -> Path:
+    return Path(EXCEL_DIR).resolve() / "05_scenario_synthesis_2050.xlsx"
+
+
+def load_summary_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
+    path = summary_table_path()
+    if not path.exists():
+        raise missing_table_error(path)
+    try:
+        raw_values = pd.read_excel(path, sheet_name="raw_values_machine", index_col=0)
+        score_values = pd.read_excel(path, sheet_name="relative_scores_machine", index_col=0)
+    except ValueError as exc:
+        raise missing_table_error(path, "raw_values_machine / relative_scores_machine") from exc
+
+    indicator_keys = [spec.key for spec in INDICATORS]
+    raw_values = raw_values.reindex(index=indicator_keys, columns=input_files).astype(float)
+    score_values = score_values.reindex(index=indicator_keys, columns=input_files).astype(float)
+    return raw_values, score_values
 
 
 def _place_text_pair_outward(
@@ -1007,8 +1030,11 @@ def plot_ring_bar_chart(raw_values: pd.DataFrame, score_values: pd.DataFrame) ->
 
 
 def main():
-    raw_values, score_values, long_df = build_summary_tables()
-    table_path = save_summary_tables(raw_values, score_values, long_df)
+    table_path = summary_table_path()
+    if GENERATE_TABLES:
+        raw_values, score_values, long_df = build_summary_tables()
+        table_path = save_summary_tables(raw_values, score_values, long_df)
+    raw_values, score_values = load_summary_tables()
     svg_path = plot_ring_bar_chart(raw_values, score_values)
     print(f"Saved: {table_path}")
     print(f"Saved: {svg_path}")

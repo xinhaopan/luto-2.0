@@ -21,8 +21,9 @@ import matplotlib.patches as mpatches
 import matplotlib.gridspec as gridspec
 import rasterio
 
-from tools.parameters import TIFF_DIR, OUTPUT_DIR, input_files, SCENARIO_LABELS
+from tools.parameters import TIFF_DIR, OUTPUT_DIR, input_files, SCENARIO_LABELS, GENERATE_TABLES
 from tools.data_helper import get_zip_info, extract_nc_layer_as_tiff
+from tools.two_row_figure import export_long_tables, load_long_tables, missing_table_error
 
 # ── Geography constants (EPSG:4283 / GDA94) ──────────────────────────────────
 TIFF_LEFT, TIFF_BOTTOM, TIFF_RIGHT, TIFF_TOP = 112.925, -43.665, 153.625, -10.015
@@ -32,6 +33,8 @@ EXTENT = [TIFF_LEFT, TIFF_RIGHT, TIFF_BOTTOM, TIFF_TOP]
 _HERE   = os.path.dirname(os.path.abspath(__file__))
 ASSETS  = os.path.normpath(os.path.join(_HERE, '../../../draw_all/code/Assets'))
 STE_SHP = os.path.join(ASSETS, 'AUS_adm/STE11aAust_mercator_simplified.shp')
+WORKBOOK = '03_mapping_tiff_manifest.xlsx'
+_TIFF_MANIFEST = None
 
 # ── 8-category LU scheme ──────────────────────────────────────────────────────
 CROPLAND = frozenset([0, 3, 4, 7, 8, 9, 10, 11, 12, 13,
@@ -116,11 +119,67 @@ def add_states(ax, gdf, lw=0.4, color='#555555'):
 
 
 # ── Tiff extraction helpers ───────────────────────────────────────────────────
-def _get_tiff(scen, layer_name, sel, year, cache_key):
+def _extract_or_get_tiff(scen, layer_name, sel, year, cache_key):
     cached = os.path.join(TIFF_DIR, f'_extracted_{scen}_{layer_name}_{cache_key}.tiff')
     if os.path.exists(cached):
         return cached
     return extract_nc_layer_as_tiff(scen, layer_name, sel, year)
+
+
+def build_tiff_manifest():
+    rows = []
+    requests = []
+    for scen in input_files:
+        requests.extend([
+            (scen, 'map_lumap', {'lm': 'ALL'}, 2050, 'lmALL'),
+            (scen, 'map_lumap', {'lm': 'dry'}, 2050, 'lmDRY'),
+            (scen, 'dvar_am', {'am': 'ALL', 'lm': 'ALL', 'lu': 'ALL'}, 2050, 'dvarAM'),
+        ])
+
+    for scen, layer_name, sel, year, cache_key in requests:
+        path = _extract_or_get_tiff(scen, layer_name, sel, year, cache_key)
+        rows.append({
+            'scenario': scen,
+            'year': int(year),
+            'layer_name': layer_name,
+            'cache_key': cache_key,
+            'selector': repr(sel),
+            'path': path or '',
+        })
+    return pd.DataFrame(rows)
+
+
+def load_tiff_manifest():
+    global _TIFF_MANIFEST
+    _TIFF_MANIFEST = load_long_tables(WORKBOOK, 'tiffs')['tiffs']
+    return _TIFF_MANIFEST
+
+
+def _lookup_manifest_tiff(scen, layer_name, cache_key):
+    if _TIFF_MANIFEST is None:
+        return None
+    match = _TIFF_MANIFEST[
+        (_TIFF_MANIFEST['scenario'] == scen) &
+        (_TIFF_MANIFEST['layer_name'] == layer_name) &
+        (_TIFF_MANIFEST['cache_key'] == cache_key)
+    ]
+    if match.empty:
+        raise missing_table_error(WORKBOOK, f'{scen} {layer_name} {cache_key}')
+    path = str(match.iloc[0]['path'])
+    if not path or path == 'nan' or not os.path.exists(path):
+        raise FileNotFoundError(
+            f'Missing TIFF listed in table cache: {path}\n'
+            'Set GENERATE_TABLES = True in tools/parameters.py and run 03_Mapping.py once '
+            'before plotting with GENERATE_TABLES = False.'
+        )
+    return path
+
+
+def _get_tiff(scen, layer_name, sel, year, cache_key):
+    manifest_path = _lookup_manifest_tiff(scen, layer_name, cache_key)
+    if manifest_path is not None:
+        return manifest_path
+    return _extract_or_get_tiff(scen, layer_name, sel, year, cache_key)
 
 
 def get_lu_all(scen):  return _get_tiff(scen, 'map_lumap', {'lm': 'ALL'}, 2050, 'lmALL')
@@ -536,6 +595,9 @@ def save_combined_maps(gdf_states):
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(TIFF_DIR, exist_ok=True)
+    if GENERATE_TABLES:
+        export_long_tables(WORKBOOK, tiffs=build_tiff_manifest())
+    load_tiff_manifest()
     gdf_states = load_states()
     save_combined_maps(gdf_states)
 
