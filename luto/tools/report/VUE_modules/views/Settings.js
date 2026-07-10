@@ -34,7 +34,7 @@ window.SettingsView = {
       },
       'Biodiversity Quality & Connectivity': {
         icon: '🌿',
-        keywords: ['BIO_QUALITY_LAYER', 'BIO_CONTRIBUTION', 'CONNECTIVITY_SOURCE', 'CONNECTIVITY_LB', 'CONTRIBUTION_PERCENTILE', 'HABITAT', 'SUITABILITY']
+        keywords: ['BIO_QUALITY_LAYER', 'BIO_CONTRIBUTION', 'CONNECTIVITY_SOURCE', 'CONNECTIVITY_LB', 'HCAS_CONTRIBUTION_PERCENTILE', 'HABITAT', 'SUITABILITY']
       },
       'Biodiversity GBF Targets': {
         icon: '🎯',
@@ -66,15 +66,15 @@ window.SettingsView = {
       },
       'Agricultural Management': {
         icon: '🚜',
-        keywords: ['AG_MANAGEMENTS_TO_LAND_USES', 'AG_MANAGEMENTS', 'ASPARAGOPSIS', 'PRECISION_AGRICULTURE', 'ECOLOGICAL_GRAZING', 'SAVANNA_BURNING', 'AGTECH_EI', 'BIOCHAR', 'HIR', 'SAVBURN', 'AGRICULTURAL_MANAGEMENT_USE_THRESHOLD']
+        keywords: ['AG_MANAGEMENTS_TO_LAND_USES', 'AG_MANAGEMENTS', 'ASPARAGOPSIS', 'PRECISION_AGRICULTURE', 'ECOLOGICAL_GRAZING', 'SAVANNA_BURNING', 'AGTECH_EI', 'BIOCHAR', 'HIR', 'SAVBURN', 'AGRICULTURAL_MANAGEMENT_USE_THRESHOLD', 'LUS_', 'LU2TYPE']
       },
       'Solver & Optimization': {
         icon: '🔧',
-        keywords: ['SOLVE_METHOD', 'SOLVE_WEIGHT', 'SOLVER_WEIGHT', 'TOLERANCE', 'PRESOLVE', 'CROSSOVER', 'BARRIER', 'SCALE_FLAG', 'NUMERIC_FOCUS', 'BARHOMOGENOUS', 'CONSTRAINT_TYPE', 'ALPHA', 'BETA', 'RESCALE_FACTOR']
+        keywords: ['SOLVE_WEIGHT', 'SOLVER_WEIGHT', 'TOLERANCE', 'CROSSOVER', 'BARRIER', 'SCALE_FLAG', 'RETRY_PARAMS', 'CONSTRAINT_TYPE', 'ALPHA', 'BETA', 'RESCALE_FACTOR']
       },
       'Output & Processing': {
         icon: '📊',
-        keywords: ['WRITE', 'OUTPUT', 'WRITE_PARALLEL', 'WRITE_THREADS', 'GEOTIFFS', 'VERBOSE', 'KEEP_OUTPUTS', 'ROUND_DECMIALS']
+        keywords: ['WRITE', 'OUTPUT', 'GEOTIFFS', 'VERBOSE', 'KEEP_OUTPUTS', 'ROUND_DECIMALS']
       },
       'System Resources': {
         icon: '💻',
@@ -82,7 +82,7 @@ window.SettingsView = {
       },
       'Regional Constraints': {
         icon: '🗺️',
-        keywords: ['EXCLUDE_NO_GO', 'NO_GO_VECTORS', 'REGIONAL_ADOPTION_CONSTRAINTS', 'REGIONAL_ADOPTION_NON_AG_UNIFORM', 'REGIONAL_ADOPTION_ZONE']
+        keywords: ['EXCLUDE_NO_GO', 'NO_GO_VECTORS', 'REGIONAL_ADOPTION_CONSTRAINTS', 'REGIONAL_ADOPTION_NON_AG_CAP', 'REGIONAL_ADOPTION_ZONE']
       },
       'Off-Land Commodities': {
         icon: '🥚',
@@ -171,9 +171,17 @@ window.SettingsView = {
       }
 
       if (activeFilter.value && activeFilter.value !== 'all') {
-        filtered = filtered.filter(param =>
-          param.parameter.includes(activeFilter.value)
-        );
+        if (activeFilter.value === 'RENEWABLE') {
+          filtered = filtered.filter(param =>
+            param.parameter.includes('RENEWABLE') ||
+            param.parameter.includes('RE_TARGET') ||
+            param.parameter.includes('INSTALL_CAPACITY_MW')
+          );
+        } else {
+          filtered = filtered.filter(param =>
+            param.parameter.includes(activeFilter.value)
+          );
+        }
       }
 
       return filtered;

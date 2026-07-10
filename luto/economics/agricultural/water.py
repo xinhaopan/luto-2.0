@@ -27,12 +27,14 @@ import numpy as np
 import pandas as pd
 import luto.settings as settings
 
+from functools import lru_cache
 from typing import Optional
 from luto import tools
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 
 
-def get_wreq_matrices(data, yr_idx):
+@lru_cache(maxsize=1)
+def get_wreq_matrices(data, yr_idx) -> np.ndarray:
     """
     Return water requirement (water use by irrigation and livestock drinking water) matrices
     by land management, cell, and land-use type.
@@ -43,6 +45,11 @@ def get_wreq_matrices(data, yr_idx):
 
     Returns
         numpy.ndarray: The w_mrj <unit: ML/cell> water requirement matrices, indexed (m, r, j).
+
+    Cached (lru_cache maxsize=1, keyed by (data, yr_idx)) — the per-source ag2ag transition builder
+    calls this once per source, so caching keeps it a single compute per step. maxsize=1 because a new
+    yr_idx means the simulation has advanced a year and the previous year's matrix is useless (evicted).
+    All callers read the result (slice / multiply / .astype-copy) and MUST NOT mutate it in place.
     """
 
     # Stack water requirements data
@@ -55,7 +62,6 @@ def get_wreq_matrices(data, yr_idx):
             w_req_mrj[0, :, j] = w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)  # Water reqs depend on current stocking rate for drinking water
             w_req_mrj[1, :, j] = w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)       # Water reqs depend on initial stocking rate for irrigation
 
-    # Convert to ML per cell via REAL_AREA
     w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
 
     # AG2050 MODE: apply feedlot water ratio for 'Beef - modified land'.
@@ -206,7 +212,7 @@ def get_precision_agriculture_effect_w_mrj(data, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each land use
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, "Water_use"]
+        multiplier = data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, "Water_use"]
         if multiplier != 1:
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
@@ -299,7 +305,7 @@ def get_agtech_ei_effect_w_mrj(data, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.AGTECH_EI_DATA[lu].loc[yr_cal, "Water_use"]
+        multiplier = data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, "Water_use"]
         if multiplier != 1:
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
@@ -336,7 +342,7 @@ def get_biochar_effect_w_mrj(data, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.BIOCHAR_DATA[lu].loc[yr_cal, "Water_use"]
+        multiplier = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, "Water_use"]
         if multiplier != 1:
             j = lu_codes[lu_idx]
             w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
@@ -467,7 +473,7 @@ def get_onshore_wind_effect_w_mrj(data, yr_idx):
      
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
         return w_mrj_effect
-    
+
     for lu_idx, lu in enumerate(land_uses):
         water_impact = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['INPUT-wrt_water-required'].item()
         if water_impact != 1:

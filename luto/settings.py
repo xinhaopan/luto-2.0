@@ -22,7 +22,7 @@
 """ LUTO model settings. """
 
 import os
-import pandas as pd
+
 
 
 # ---------------------------------------------------------------------------- #
@@ -30,16 +30,6 @@ import pandas as pd
 # ---------------------------------------------------------------------------- #
 
 VERSION = '2.3'
-
-
-# ---------------------------------------------------------------------------- #
-# Spyder options                                                               #
-# ---------------------------------------------------------------------------- #
-
-pd.set_option('display.width', 470)
-pd.set_option('display.max_columns', 100)
-pd.set_option('display.max_rows', 100)
-pd.set_option('display.float_format', '{:,.4f}'.format)
 
 
 # ---------------------------------------------------------------------------- #
@@ -60,27 +50,26 @@ SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
-SCENARIO = 'SSP' + SSP[0]           # SSP1, SSP2, SSP3, SSP4, SSP5
-DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
-DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
-CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
-IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports for each commodity) or 'Trend' (follows historical rate of change in shares of imports for each commodity)
-WASTE = 1                           # 1 for full waste, 0.5 for half waste
-FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
+SCENARIO        = 'SSP' + SSP[0]     # SSP1, SSP2, SSP3, SSP4, SSP5
+DIET_DOM        = 'BAU'              # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
+DIET_GLOB       = 'BAU'              # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
+CONVERGENCE     = 2050               # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
+IMPORT_TREND    = 'Static'            # [Xinhao] kept (jinzhu: 'Trend')
+WASTE           = 1                  # 1 for full waste, 0.5 for half waste
+FEED_EFFICIENCY = 'BAU'              # 'BAU' or 'High'
 
 # Set the demand and supply multipliers
-APPLY_DEMAND_MULTIPLIERS = False     # True or False. Whether to apply demand multipliers from AusTIME model.
+APPLY_DEMAND_MULTIPLIERS = False     # [Xinhao] kept master value (jinzhu default: True)
 
-# Productivity trend;
-PRODUCTIVITY_TREND = 'BAU'           # 'BAU', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH', 'CONSTANT'
-                                     # 'CONSTANT': all multipliers fixed at 1.0 (no productivity growth), used as constant run
+# Productivity trend; 
+PRODUCTIVITY_TREND = 'BAU'           # 'BAU', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'
 
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
 CO2_FERT = 'off'   # 'on' or 'off'
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
-CARBON_EFFECTS_WINDOW = 50 # 50, 60, 70, 80, or 90 
+CARBON_EFFECTS_WINDOW = 50 # [Xinhao] kept (jinzhu: 60). One of 50,60,70,80,90
 '''
 Available options are  50, 60, 70, 80, 90 years. This is the number of years over which to spread (average) 
 soil carbon accumulation. 
@@ -94,13 +83,21 @@ for the first 50 years after planting and then use the average as the annual seq
 
 
 # Fire impacts on carbon sequestration
-RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
+RISK_OF_REVERSAL = 0.05  # [Xinhao] kept (jinzhu: 0)
+'''
+As of 20260318, RISK_OF_REVERSAL is set to 0 and just use the 5% ERF risk of reversal, as per Brett's comment in 
+the LUF 2026 scenario runs document: "I suggested that we drop the fire risk and just use the 5% ERF risk of reversal. 
+Doubling up is very conservative and leads to more area reqd to meet targets. You still want both on?"
+'''
+
+
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
 """ 
 Mean FIRE_RISK cell values (%)
 - FD_RISK_PERC_5TH    80.3967
 - FD_RISK_MEDIAN      89.2485
 - FD_RISK_PERC_95TH   93.2735 
+
 """
 
 
@@ -111,14 +108,41 @@ Mean FIRE_RISK cell values (%)
 # Amortise upfront (i.e., establishment and transitions) costs
 AMORTISE_UPFRONT_COSTS = False
 
+
+# θ — the EXACT ↔ CRISP dial of the transition flow model (fold-into-dominant, per cell).
+# Essentially: COLLAPSE each cell's small dvar fractions (≤ θ) into its dominant fraction, so the
+# solver sets up delta variables only for the collapsed base — every (source, cell) pair removed
+# saves one full row of delta vars (~28 targets × 2 lms), while the collapsed land stays in the
+# model (mobile, conserved) under the dominant's identity.
+# Example, θ = 0.10, one dry cell:
+#
+#     true base:    Beef 0.55 | Winter cereals 0.35 | Hay 0.06 | Citrus 0.04
+#     folded base:  Beef 0.65 | Winter cereals 0.35                            (Hay+Citrus -> Beef)
+# θ→0: pure exact per-source model (at RESFACTOR=5 nothing folds below 0.04, the min block fraction).
+# θ→1: one source per cell carrying the whole cell = the old crisp dominant-LU model.
+# θ only applies to AG land-uses; non-ag sources are always exact (noise-floor cutoff, no folding).
+EXACT_REACHABILITY_MIN_FRACTION = 1.0
+
+# Number of joblib "threading" workers used to compute the (m, j) source combos in batches of this size.
+# n_jobs=4 was found to give the best runtime/memory tradeoff (~42s, +2.4GB peak at RESFACTOR=5).
+TRANSITION_MODE_N_JOBS = 4
+
 # Discount rate for amortisation
 DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
+# Scenario multiplier for land-use transition costs (establishment + water license + carbon penalty).
+# 1 = baseline; <1 cheaper switching; >1 higher barrier. Applied on top of data.TRANS_COST_MULTS.
+TRANSITION_COST_MULT = 1
+
+# Scenario multiplier for technical-adoption ceilings (Asparagopsis, Precision Ag, AgTech EI, Biochar).
+# 1 = baseline; <1 tighter ceilings; >1 relaxed ceilings (capped at 1.0 to stay a valid proportion).
+TECH_ADOPT_MULT = 1
+
 # Set whether to use demand elasticity when calculating commodity prices
-DYNAMIC_PRICE = False
+DYNAMIC_PRICE = False   # [Xinhao] kept (jinzhu default: True)
 
 
 
@@ -127,10 +151,10 @@ DYNAMIC_PRICE = False
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 10        # [Xinhao] kept (jinzhu: 5). 1=full resolution
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2010, 2051, 1))
+SIM_YEARS = list(range(2010, 2051, 1))   # [Xinhao] kept (jinzhu: range(2020,2051,5))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -155,21 +179,21 @@ SOLVER_WEIGHT_DEMAND = 1
 SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 
-DEMAND_CONSTRAINT_TYPE = 'hard'
+DEMAND_CONSTRAINT_TYPE = 'hard'   
 '''
 Options are 'soft', or 'hard'. This determines the type of demand constraint to apply in the model.
 - 'soft': commodity can be produced under/over the target, but the under/over part will pay a penalty that
-  equals the deviation amount multiplied by the corresponding prices.
-- 'hard': commodity must be produced at the target amount, with a relaxation factor (DEMAND_BOUNDS)
+  equals the deviation amount multiplied by the corresponding prices. 
+- 'hard': commodity must be produced at the target amount, with a relaxation factor (DEMAND_BOUNDS) 
   that allows for a certain percentage above the target to be produced (e.g., 1.05 allows for 5% overproduction).
-'''
+'''                      
 
 DEMAND_BOUNDS = {
     # Commodities need relaxation
-    'sheep lexp':               [1.0, 1.0],     # Sheep live exports can be met exactly because its not co-produced with sheep (some sheep just not exported).
+    'sheep lexp':               [1.0, 1.0],     # Sheep live exports can be met exactly because its not co-produced with sheep (some sheep just not exported). 
     'sheep meat':               [1.0, 1.0],     # Meat and wool are co-produced in biologically fixed ratios, so either overproduce meat (~2.5 times), or
-    'sheep wool':               [0.0, 1.0],     # underproduce wool (0.8 times).
-
+    'sheep wool':               [0.1, 1.5],     # underproduce wool (0.8 times).
+    
     # Commodities with no relaxation (one-to-one land-use to commodity)
     'apples':                   [1.0, 1.0],
     'beef lexp':                [1.0, 1.0],
@@ -201,8 +225,11 @@ hit the demand target exactly. Values > 1.0 allow overproduction; values < 1.0 a
 
 Livestock co-production note: sheep (and beef) land-use cells simultaneously produce multiple commodities
 (sheep: meat + wool + live exports) in biologically fixed ratios that differ from demand ratios.
-Wool is anchored at [1.0, 1.0] (target must be met). Sheep meat gets lb=1.0 (must produce at least demand),
-and ub derived from the maximum observed meat/wool ratio across the planning horizon.
+The anchor commodity is wool (tight [1.0, 1.0]); meat must be given a wide UB because:
+  - biological median meat/wool ratio = 1.856, but demand meat/wool = 1.60-1.75 (and declining)
+  - soft-demand run shows sheep meat overshoots up to 2.23x by 2050 when wool demand is met
+  - setting UB=2.34 (= 2.23 * 1.05 safety margin) avoids infeasibility across all years 2010-2050
+Crops are one-to-one land-use to commodity — keep at [1.0, 1.0].
 '''
 
 RESCALE_FACTOR = 1e3
@@ -213,53 +240,141 @@ E.g., the water yield for some cells is 10t but the Biodiversity-score is 1e-7, 
 the model sensitive to variations in input data. 
 '''
 
+SOLVER_COEFF_MIN = 1e-4
+'''
+Minimum absolute coefficient threshold applied by ``_qsum()`` in solver.py before
+adding a term to any Gurobi expression (constraints and objective alike).
+
+After rescaling, cross-products of two rescaled values can still be tiny (e.g.
+val_vector[r]=1e-3 × coeff[j]=1e-5 = 1e-8), stretching the matrix/objective
+coefficient range far below Gurobi's recommended [1e-3, 1e6] band and causing
+barrier divergence ("Numerical trouble encountered"). This threshold filters such
+terms before they enter Gurobi.
+
+Applied to ALL constraint / objective builders:
+  Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8,
+  Demand/Quantity, and Regional Adoption limits.
+
+1e-4 was chosen empirically: 1e-3 caused ~3% economic loss by filtering meaningful
+small production coefficients; 1e-4 retains those while keeping the matrix range
+ratio at 1e8 (well within Gurobi's safe zone).
+'''
+
+DO_IIS = False
+'''
+If True, when a per-year solve terminates infeasible the run will compute and write
+the Irreducible Infeasible Subsystem (.ilp) and call analyze_iis() for diagnostics.
+Off by default because computeIIS() can be expensive on large LUTO models; turn on
+for debugging infeasibility (e.g. as a grid_search parameter).
+'''
+
+
 
 
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-WRITE_PARALLEL = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(6, os.cpu_count())      # The Threads to use for map making, only work with WRITE_PARALLEL = True
+WRITE_OUTPUTS = True                        # Whether to write outputs (e.g., GeoTIFFs) at the end of the run. Set to False to skip output writing (e.g. when doing a quick test run or debugging IIS infeasibility).
 
-WRITE_REPORT_MAX_MEM_GB = 64                # The maximum memory (in GB) to use for writing report layers.
-                                            #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13 
+WRITE_REPORT_MAX_MEM_MB = 64 * 1024         # The maximum memory (in MB) to use for writing report layers.
+                                            #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13
                                             #   (for example, for RESFACTOR = 5, the MEM usage will be 0.5 * (13/5)^2 = 3.4 GB).
 
-WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk during writeing process. 
+WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk during writeing process.
                                             #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
                                             #   This makes memory usage to be ~1/200 of the original size.
 
+WRITE_GBF3_NVIS  = 'off'                    # 'on' or 'off'. Controls writing of Biodiversity GBF3 NVIS scores and map layers.
+WRITE_GBF4_SNES  = 'off'                    # 'on' or 'off'. If write, will take ~5 hours to finish.
+WRITE_GBF4_ECNES = 'off'                    # 'on' or 'off'. Controls writing of Biodiversity GBF4 ECNES scores and map layers.
 
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
 # ---------------------------------------------------------------------------- #
 
-# Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model. Default is automatic.
-SOLVE_METHOD = 2  # 'automatic: -1, primal simplex: 0, dual simplex: 0, barrier: 2, concurrent: 3, deterministic concurrent: 4, deterministic concurrent simplex: 5
-
-# Presolve parameters (switching both to 0 solves numerical problems)
-PRESOLVE = 0     # automatic (-1), off (0), conservative (1), or aggressive (2)
-AGGREGATE = 0    # Controls the aggregation level in presolve. The options are off (0), moderate (1), or aggressive (2). In rare instances, aggregation can lead to an accumulation of numerical errors. Turning it off can sometimes improve solution accuracy (it did not fix sub-optimal termination issue)
-
 # Print detailed output to screen
 VERBOSE = 1
 
-# Relax the tolerances for feasibility and optimality
-FEASIBILITY_TOLERANCE = 1e-2              # Primal feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
-OPTIMALITY_TOLERANCE = 1e-2               # Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
-BARRIER_CONVERGENCE_TOLERANCE = 1e-5      # Range from 1e-2 to 1e-8 (default), that larger the number the faster but the less exact the solve. 1e-5 is a good compromise between optimality and speed.
+# Number of threads to use in parallel algorithms (e.g., barrier). PBS_NCPUS is the requested CPUs on GADI hpc.
+THREADS = min(32, os.cpu_count())   # [Xinhao] kept (jinzhu: 32)
 
-# Whether to use crossover in barrier solve. 0 = off, -1 = automatic. Auto cleans up sub-optimal termination errors without much additional compute time (apart from 2050 when it sometimes never finishes).
-CROSSOVER = 0
+# Primal feasibility tolerance — defines the solver precision granule.
+# ROUND_DECIMALS is derived from this: floor-truncation keeps digits down to
+# this precision, so lb values are exact multiples of FEASIBILITY_TOLERANCE.
+# Snap threshold for near-zero bounds and near-degenerate windows = FEASIBILITY_TOLERANCE * 10.
+FEASIBILITY_TOLERANCE = 1e-2   # [Xinhao] kept (jinzhu: 1e-6)
+''' Primal feasibility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
 
-# Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
-SCALE_FLAG = 0      # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
-NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
-BARHOMOGENOUS = -1   # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
+OPTIMALITY_TOLERANCE = 1e-2               
+''' Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
 
-# Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = min(32, os.cpu_count())
+BARRIER_CONVERGENCE_TOLERANCE = 1e-5
+'''
+Barrier stops when the RELATIVE duality gap falls below this tolerance:
+  |dual_obj - primal_obj| / (1 + |primal_obj|) < BarConvTol
+ - Primal obj: objective at the current interior feasible point — a LOWER bound on the true
+   maximum (the model has achieved at least this much; the true optimum could be higher).
+ - Dual obj: derived from dual variables — an UPPER bound on the true maximum (the model
+   cannot exceed this; ideally converges down toward the primal as the gap closes).
+Range from 1e-2 (fast, loose) to 1e-8 (slow, tight; Gurobi default).
+ - 20260606: relaxed from 1e-5 to 1e-3 — more constraint targets cause dual blow-up that
+   prevents the barrier from closing the gap to 1e-5; crossover polishes the result.
+'''
+
+SCALE_FLAG = 0                      
+''' 
+Scales the rows and columns of the model to improve the numerical properties of 
+the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each 
+row to make its largest nonzero entry to be magnitude one, then scale each column to 
+max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed 
+that 1 tripled solve time, 3 led to numerical problems.
+'''
+
+RETRY_PARAMS = [
+    (0, 2, -1, -1, -1),   # NF, Method, Crossover, Presolve, BarHomogeneous
+    (0, 1,  0, -1, 0 ),
+]
+'''
+List of solve attempts to try in order, per year. Each entry MUST be a
+(NumericFocus, Method, Crossover, Presolve, BarHomogeneous) tuple.
+
+NumericFocus:
+    0 = automatic (slight preference for speed); 1-3 = increasingly careful.
+    NF=0 is safe for all attempts since geometry mean rescaling (2026-05)
+    keeps LHS/RHS coefficients well within Gurobi's recommended range.
+
+Method:
+    -1 = automatic, 0 = primal simplex, 1 = dual simplex, 2 = barrier,
+     3 = concurrent, 4 = deterministic concurrent, 5 = det. concurrent simplex.
+
+Crossover:
+    -1 = automatic, 0 = off, 1/2/3 = forced variants.
+    Converts a barrier interior-point solution to a vertex; can be slow on
+    large models. Use -1 (auto) as a fallback if barrier stagnates.
+
+Presolve:
+    -1 = automatic, 0 = off, 1 = conservative, 2 = aggressive.
+    Keep OFF (0) for barrier (Method=2) — observed to introduce numerical
+    errors that cause the homogeneous barrier to declare false infeasibility.
+    Safe to enable for simplex (Method=0 or 1).
+
+BarHomogeneous:
+    -1 = automatic, 0 = off, 1 = on.
+    Keep OFF (0): the homogeneous algorithm's tau parameter drifts toward zero
+    in highly degenerate problems, triggering false INFEASIBLE (status 3) even
+    with NumericFocus=3. With 0, the barrier reports NUMERIC (12) or SUBOPTIMAL
+    (13) instead — both handled by the retry loop. Set to 1 only when debugging
+    to avoid ambiguous INF_OR_UNBD status.
+
+Default sequence:
+  (0, 2, -1, -1, -1) barrier, auto crossover, presolve off, homogeneous off  — fast first pass
+  (0, 1,  0, -1, 0)  dual simplex, presolve auto, homogeneous off            — fallback; simplex
+                     walks the boundary so it cannot misdiagnose feasibility
+                     from an interior-point argument; presolve safe with simplex
+'''
+
+
 
 
 
@@ -274,8 +389,8 @@ The exclude no-go land-uses option.
 - False: do not exclude land-uses from no-go areas.
 '''
 NO_GO_VECTORS = {
-    'Winter cereals':           os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Winter_cereals.shp'),
-    'Environmental Plantings':  os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
+    'Winter cereals':           'no_go_areas/no_go_Winter_cereals.shp',
+    'Environmental Plantings':  'no_go_areas/no_go_Enviornmental_Plantings.shp'
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 
@@ -288,15 +403,9 @@ REGIONAL_ADOPTION_CONSTRAINTS = 'off'
 Adoption mode for non-ag land uses.
 - 'off': no regional adoption constraints
 - 'on', user needs to set the percentage targets in 'input/regional_adoption_zones.xlsx'
-- 'NON_AG_UNIFORM', each of the non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_UNIFORM) in every region
+- 'NON_AG_CAP', the SUM of all non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_CAP) in every region
 '''
 
-REGIONAL_ADOPTION_NON_AG_UNIFORM = 15            
-'''
-None or numbers between 0-100 (both inclusive); 
- Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_UNIFORM'. E.g., 5 means each non-ag land can not exceed 5% adoption in every region.
-'''
-                                        
 REGIONAL_ADOPTION_ZONE = 'NRM_CODE'              # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
@@ -309,6 +418,24 @@ The options are:
 '''
 
 
+REGIONAL_ADOPTION_NON_AG_REGION = 'NRM'
+'''
+The regional adoption zone for non-agricultural land uses when using the 'NON_AG_CAP' mode.
+The options are the same as REGIONAL_ADOPTION_ZONE:
+- 'NRM': Natural Resource Management code.
+- 'State': Australian state regions.
+'''
+
+
+REGIONAL_ADOPTION_NON_AG_CAP = 15            
+'''
+None or numbers between 0-100 (both inclusive); 
+ Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_CAP'. 
+ E.g., 15 means the combined area of all non-ag land uses can not exceed 15% of each region's area.
+'''
+                                        
+
+
 
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
@@ -317,7 +444,7 @@ The options are:
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
-    'Sheep Agroforestry': True,
+    'Sheep Agroforestry': True,    
     'Beef Agroforestry': True,
     'Carbon Plantings (Block)': True,
     'Sheep Carbon Plantings (Belt)': True,
@@ -398,53 +525,133 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 
 
 # ---------------------------------------------------------------------------- #
+# Renewable energy parameters
+# ---------------------------------------------------------------------------- #
+RENEWABLES_OPTIONS = {
+    'Utility Solar PV': False,
+    'Onshore Wind': False,
+}
+
+
+EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS = True
+'''
+Whether to exclude renewable energy installation on cells inside the GBF2 masked layer (i.e., cells with very high biodiversity value).
+ - True: The model cannot install renewable energy on GBF2-masked cells.
+ - False: The model can install renewable energy on GBF2-masked cells.
+'''
+
+RENEWABLE_GBF2_CUT_WIND = 20
+RENEWABLE_GBF2_CUT_SOLAR = 20
+'''
+Independent biodiversity area coverage percentage thresholds (same scale as GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT)
+for determining which cells to exclude from renewable energy installation.
+Cells with biodiversity quality >= the conservation performance curve value at this cut are excluded.
+Lower values = fewer cells excluded, higher values = more cells excluded.
+'''
+
+EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK = True
+'''
+Whether to exclude renewable energy installation on cells inside the EPBC MNES prioritization layer
+(i.e., cells with high MNES priority rank).
+ - True: The model cannot install renewable energy on MNES high-priority cells.
+ - False: The model can install renewable energy on MNES high-priority cells.
+'''
+
+RENEWABLE_EPBC_MNES_CUT_SOLAR = 10
+RENEWABLE_EPBC_MNES_CUT_WIND = 10
+'''
+Independent MNES area coverage percentage thresholds for determining which cells to exclude from
+renewable energy installation. Cells with MNES priority rank >= the performance curve value at this
+cut are excluded.
+Lower values = fewer cells excluded, higher values = more cells excluded.
+'''
+
+
+RENEWABLE_TARGET_SCENARIO_TARGETS = 'Gladstone - Core'
+'''
+The renewable energy target scenario to use when `RENEWABLES_OPTIONS` is set to True. One of
+ - 'AEMO 2026 ISP - Accelerated Transition'
+ - 'AEMO 2026 ISP - Slower Growth'
+ - 'AEMO 2026 ISP - Step Change'
+ - 'Gladstone - BESS Sensitivity'
+ - 'Gladstone - Core'
+'''
+
+
+RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'
+'''
+The renewable energy target scenario for input spatial layersto use when `RENEWABLES_OPTIONS`
+is set to True. One of
+ - 'step_change',
+ - 'accelerated_transition',
+ - 'ANU_transmission_T3',
+ - 'ANU_transmission_T5',
+ - 'ANU_transmission_T10'.
+'''
+
+RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
+'''
+The spatial level at which to apply the renewable energy targets when `RENEWABLES_OPTIONS` is set to True.
+Options include "STATE" or "NRM". Currently (20260205) only support STATE.
+'''
+
+INSTALL_CAPACITY_MW_HA = {
+    "Utility Solar PV": 0.45,
+    "Onshore Wind": 0.04,
+}
+'''
+The per/ha capacity (Mw/ha) for each renewable energy management type.
+'''
+
+
+RENEWABLES_ADOPTION_LIMITS = {
+    'Utility Solar PV': 1.0,        # Maximum proportion of land that can be used for Utility Solar PV
+    'Onshore Wind': 1.0,            # Maximum proportion of land that can be used for Onshore Wind
+}
+'''
+The maximum proportion of land that can be used for each renewable energy management type.
+For example, if RENEWABLES_ADOPTION_LIMITS['Utility Solar PV'] = 0.5, then at most 50% of
+the land can be used for Utility Solar PV.
+'''
+
+
+
+# ---------------------------------------------------------------------------- #
+# Land use type groupings (used by AgTech bundles)
+# ---------------------------------------------------------------------------- #
+
+LUS_CROPPING     = ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
+LUS_INT_CROPPING = ['Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']
+LUS_HORTICULTURE = ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']
+
+LU2TYPE = (
+    {lu: "cropping"     for lu in LUS_CROPPING}
+  | {lu: "int_cropping" for lu in LUS_INT_CROPPING}
+  | {lu: "horticulture" for lu in LUS_HORTICULTURE}
+)
+
+
+# ---------------------------------------------------------------------------- #
 # Agricultural Management parameters
 # ---------------------------------------------------------------------------- #
 
-
 AG_MANAGEMENTS_TO_LAND_USES = {
     'Asparagopsis taxiformis':  ['Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'],
-    
-    'Precision Agriculture':    [# Cropping:
-                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-                                # Intensive Cropping:
-                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
-                                # Horticulture:
-                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
-    
+    'Precision Agriculture':    LUS_CROPPING + LUS_INT_CROPPING + LUS_HORTICULTURE,
     'Ecological Grazing':       ['Beef - modified land', 'Sheep - modified land', 'Dairy - modified land'],
-    
     'Savanna Burning':          ['Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land'],
-    
-    'AgTech EI':                [# Cropping:
-                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-                                # Intensive Cropping:
-                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
-                                # Horticulture:
-                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
-    
-    'Biochar':                  [# Cropping
-                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-                                # Horticulture:
-                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
-
+    'AgTech EI':                LUS_CROPPING + LUS_INT_CROPPING + LUS_HORTICULTURE,
+    'Biochar':                  LUS_CROPPING + LUS_HORTICULTURE,
     'HIR - Beef':               ['Beef - natural land'],
     'HIR - Sheep':              ['Sheep - natural land'],
-    'Utility Solar PV':         [# Unallocated lands
-                                'Unallocated - modified land',
-                                # Livestock
-                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
-                                # Cropping:
-                                'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'], 
-    'Onshore Wind':             [#Unallocated lands
-                                'Unallocated - modified land',
-                                # Livestock
-                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
-                                # Cropping:
-                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-                                # Intensive Cropping:
-                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']
-                                }                                
+    'Utility Solar PV':         ['Unallocated - modified land',
+                                 'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                 *[lu for lu in LUS_CROPPING if lu != 'Hay']],  # 'Hay' is missing in the PV raw bundle data.
+    'Onshore Wind':             ['Unallocated - modified land',
+                                 'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                 *LUS_CROPPING,
+                                 *LUS_INT_CROPPING]
+}                                
 
 
 AG_MANAGEMENTS = {
@@ -456,8 +663,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': None,   # Set later from RENEWABLES_OPTIONS
-    'Onshore Wind': None,       # Set later from RENEWABLES_OPTIONS
+    'Utility Solar PV': RENEWABLES_OPTIONS['Utility Solar PV'],
+    'Onshore Wind': RENEWABLES_OPTIONS['Onshore Wind'],
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -473,8 +680,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
-    'HIR - Beef': True,
-    'HIR - Sheep': True,
+    'HIR - Beef': False,        # Can not abandon HIR - Beef once adopted (irreversible)
+    'HIR - Sheep': False,       # Can not abandon HIR - Sheep once adopted (irreversible)
     'Utility Solar PV': False,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
     'Onshore Wind': False,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
 }
@@ -503,7 +710,7 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 
 # HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
-HIR_CEILING_PERCENTAGE = 0.9
+HIR_CEILING_PERCENTAGE = 0.9   # [Xinhao] kept (jinzhu: 0.8)
 
 # Maintainace cost for HIR
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
@@ -511,77 +718,6 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 
 
 
-# ---------------------------------------------------------------------------- #
-# Renewable energy parameters
-# ---------------------------------------------------------------------------- #
-RENEWABLES_OPTIONS = {
-    'Utility Solar PV': False,
-    'Onshore Wind': False,
-}
-
-AG_MANAGEMENTS['Utility Solar PV'] = RENEWABLES_OPTIONS['Utility Solar PV']
-AG_MANAGEMENTS['Onshore Wind']     = RENEWABLES_OPTIONS['Onshore Wind']
-
-EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS = True
-'''
-Whether to exclude renewable energy installation on cells inside the GBF2 masked layer.
-'''
-RENEWABLE_GBF2_CUT_SOLAR = 20
-RENEWABLE_GBF2_CUT_WIND  = 20
-'''
-Biodiversity area coverage % threshold for GBF2-based renewable exclusion.
-Cells with biodiversity quality >= the conservation performance curve value at this cut are excluded.
-'''
-
-EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK = True
-'''
-Whether to exclude renewable energy installation on cells inside the EPBC MNES prioritization layer.
-'''
-RENEWABLE_EPBC_MNES_CUT_SOLAR = 10
-RENEWABLE_EPBC_MNES_CUT_WIND  = 10
-'''
-MNES area coverage % threshold for EPBC-based renewable exclusion.
-'''
-
-RENEWABLE_TARGET_SCENARIO_TARGETS = 'Gladstone - Core'
-'''
-The renewable energy target scenario to use for generation targets.
-One of:
- - 'AEMO 2026 ISP - Accelerated Transition'
- - 'AEMO 2026 ISP - Slower Growth'
- - 'AEMO 2026 ISP - Step Change'
- - 'Gladstone - BESS Sensitivity'
- - 'Gladstone - Core'
-'''
-
-RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'
-'''
-The renewable energy scenario for spatial input layers.
-One of: 'step_change', 'accelerated_transition', 'ANU_transmission_T3',
-        'ANU_transmission_T5', 'ANU_transmission_T10'.
-'''
-
-RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
-'''
-The spatial level at which to apply the renewable energy targets.
-Options include "STATE" or "NRM". Currently (20260205) only support STATE.
-'''
-
-INSTALL_CAPACITY_MW_HA = {
-    "Utility Solar PV": 0.45,
-    "Onshore Wind": 0.04,
-}
-'''
-The per/ha capacity (MW/ha) for each renewable energy management type.
-'''
-
-RENEWABLES_ADOPTION_LIMITS = {
-    'Utility Solar PV': 1.0,
-    'Onshore Wind': 1.0,
-}
-'''
-The maximum proportion of land that can be used for each renewable energy management type.
-'''
 
 
 
@@ -606,16 +742,16 @@ GHG_TARGETS_DICT = {
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
+GHG_EMISSIONS_LIMITS = 'high'         # [Xinhao] kept (jinzhu: 'low'). 'off','low','medium','high'
 '''
 `GHG_EMISSIONS_LIMITS` options include: 
-- Assuming agriculture is responsible to sequester 100% of the carbon emissions
+- (deprecated) Assuming agriculture is responsible to sequester 100% of the carbon emissions
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
-- Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
+- (deprecated) Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
     - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
-- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types)
+- (deprecated) Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types)
     - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
-- When turning off the 'Carbon Planttings', including block/belt, use the following options:
+- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types):
     - '1.5C 50%', '1.8C 67%'
 '''
   	  	  
@@ -635,24 +771,34 @@ Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
 '''
 
 
-# Biodiversity price scenario: 'CONSTANT' or a sheet name from 'biodiversity_prices.xlsx'.
-# When 'CONSTANT', a fixed price ($/unit of biodiversity score) is used for all years.
-# When a sheet name is given, prices are read year-by-year from the corresponding Excel sheet.
-BIODIVERSITY_PRICES_FIELD = 'CONSTANT'
-
-if BIODIVERSITY_PRICES_FIELD == 'CONSTANT':
-    BIODIVERSITY_PRICE_CONSTANT = 0.0  # Price per unit of biodiversity score (AUD/unit). Set to 0 to disable.
+USE_GHG_SCOPE_1 = True
 '''
-Only works when BIODIVERSITY_PRICES_FIELD is set to 'CONSTANT'.
-The biodiversity score unit is BIO_QUALITY_RAW * REAL_AREA (dimensionless quality index × ha).
-A positive price rewards high-biodiversity land uses; a negative effective score penalises degradation.
-'''
+Controls whether the solver uses only scope 1 (direct, on-farm) GHG emissions — as defined
+by the Australian NGGI (National Greenhouse Gas Inventory) — or the full profile that also
+includes scope 2 electricity and scope 3 indirect emissions (fertiliser/pesticide production).
 
+Rationale (Sanson, van Schoten et al., 2025):
+  AusTIMES agriculture sector scope 1 baseline (2022, excl. off-land): ~81.3 MtCO2e
+  LUTO2 on-land ag baseline (2022, full profile):                       ~95.1 MtCO2e
+  LUTO2 on-land ag baseline (2022, after all scope 1 exclusions):       ~70-73 MtCO2e
 
-USE_GHG_SCOPE_1 = True  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
-'''
-Basic GHG types are the direct emissions from the land-use and livestock types, excluding
-indirect emissions such as fertiliser, irrigation, land management, etc.
+  Because AusTIMES already models energy-system decarbonisation externally, including
+  scope 2/3 emissions in LUTO2's solve causes double-counting of those reductions.
+  The ~70-73 Mt revised LUTO2 baseline aligns with the NGGI scope 1 column used in
+  the AusTIMES pathway targets (1.5C 50% excl. avoided emissions).
+
+When True, the solver excludes:
+  Crops     — energy-related CO2 from: chemical application (non-liming), crop management,
+              cultivation, fodder production, harvesting, irrigation, pasture seed production,
+              and sowing; plus fertiliser production and pesticide production.
+              Only CROP_GHG_SCOPE_1 sources (soil N2O) enter the constraint.
+  Livestock — electricity use (CO2E_KG_HEAD_ELEC), fuel use (CO2E_KG_HEAD_FUEL),
+              fodder production (CO2E_KG_HEAD_FODDER), and seed (CO2E_KG_HEAD_SEED).
+              Only LVSTK_GHG_SCOPE_1 sources (enteric, dung/urine, manure, leach/runoff)
+              enter the constraint.
+
+Note: BECCS should also be disabled when using AusTIMES pathway targets to maintain
+inter-model consistency (energy-related CO2 displacement is handled by AusTIMES).
 '''
 
 CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']
@@ -661,14 +807,6 @@ LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG
 
 GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
-
-# Weight for the GHG/Demand deviation in the objective function
-SOLVE_WEIGHT_ALPHA = 1  
-''' 
-Range from 0 to 1 that balances the relative important between economic values and biodiversity scores.
- - if approaching 0, the model will focus on maximising biodiversity scores.
- - if approaching 1, the model will focus on maximising prifit (or minimising cost).
-'''
 
 SOLVE_WEIGHT_BETA = 0.5
 '''
@@ -755,24 +893,8 @@ INCLUDE_WATER_LICENSE_COSTS = 1
 
 # ------------------- Agricultural biodiversity parameters -------------------
 
-GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
-'''
-The constraint type for the biodiversity target.
-- 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
-- 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
-'''
-
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-GBF2_TARGETS_DICT = {
-    'off':     None,
-    'low':    {2030: 0,    2050: 0,    2100: 0},
-    'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
-    'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
-}
-
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSITY_TARGET_GBF_2 = 'high'            # 'off', 'low', 'medium', or 'high'
+GBF2_TARGET = 'high'              # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -784,7 +906,25 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+GBF2_TARGETS_DICT = {
+    'off':     None,
+    'low':    {2030: 0,    2050: 0,    2100: 0},
+    'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
+    'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
+}
+
+
+GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+'''
+The constraint type for the biodiversity target.
+- 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
+- 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+'''
+
+
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40   # [Xinhao] kept (jinzhu: 15)
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -802,7 +942,7 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 
 # Biodiversity quality options
 BIO_QUALITY_LAYERS = ['Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely']
-BIO_QUALITY_LAYER = 'MNES_likely' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'              
+BIO_QUALITY_LAYER = 'MNES_likely' 
 '''
 One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'.
     - 'Suitability': use the Zonation algorith to compute quanlity score over 10k species.
@@ -849,10 +989,10 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'
+HCAS_CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of ['10', '25', '50', '75', '90'], 'USER_DEFINED', or 'AG_UNIFORM'
 '''
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
-suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of [10, 25, 50, 75, 90].
+suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of ['10', '25', '50', '75', '90'].
 
 For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land retains 22% biodiversity score compared
 to undisturbed natural land.
@@ -860,19 +1000,20 @@ to undisturbed natural land.
 
 
 # Biodiversity value under default late dry season savanna fire regime
-BIO_CONTRIBUTION_LDS = 0.8
+BIO_CONTRIBUTION_LDS = 0.8   # [Xinhao] kept (jinzhu: 0.75)
 ''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value
     (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value (i.e., 1.0).
 '''
 
 # Non-agricultural biodiversity parameters 
-BIO_CONTRIBUTION_ENV_PLANTING = 0.8
-BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.1
-BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
-BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2
-BIO_CONTRIBUTION_AGROFORESTRY = 0.75       
+BIO_CONTRIBUTION_ENV_PLANTING = 0.8   # [Xinhao] kept (jinzhu: 0.7)
+BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.1   # [Xinhao] kept (jinzhu: 0.12)
+BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1   # [Xinhao] kept (jinzhu: 0.12)
+BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2   # [Xinhao] kept (jinzhu: 1.0)
+BIO_CONTRIBUTION_AGROFORESTRY = 0.75   # [Xinhao] kept (jinzhu: 0.7)
 BIO_CONTRIBUTION_BECCS = 0
-''' 
+BIO_CONTRIBUTION_DESTOCKING = 0.75  # If 'GAP', uses BIO_HABITAT_CONTRIBUTION_LOOK_UP difference; if set to a number (e.g. 0.75), overrides with a fixed scalar
+'''
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
 For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
 will be 0.6 * 0.8 = 0.48.
@@ -883,59 +1024,121 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-BIODIVERSITY_TARGET_GBF_3_NVIS = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+GBF3_NVIS_TARGET = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
 
 - if 'off' is selected, turn off the GBF-3 NVIS target for biodiversity.
-- if 'medium' is selected, the conservation target is set to 30% for each vegetation group at 2050.
-- if 'high' is selected, the conservation target is set to 50% for each vegetation group at 2050.
+- if 'medium' is selected, the conservation target is set to 30% by 2030 and 30% by 2050 for each vegetation group.
+- if 'high' is selected, the conservation target is set to 30% by 2030 and 50% by 2050 for each vegetation group.
 - if 'USER_DEFINED' is selected, the conservation target is reading from input Excel file.
-'''
-
-BIODIVERSITY_TARGET_GBF_3_IBRA = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
-'''
-Target 3 of the Kunming-Montreal Global Biodiversity Framework (IBRA):
-protect and manage bioregions using the Interim Biogeographic Regionalisation for Australia.
-
-- if 'off' is selected, turn off the GBF-3 IBRA target for biodiversity.
-- if 'medium' is selected, the conservation target is set to 30% for each bioregion at 2050.
-- if 'high' is selected, the conservation target is set to 50% for each bioregion at 2050.
-- if 'USER_DEFINED' is selected, the conservation target is reading from input Excel file.
-'''
-
-GBF3_NVIS_TARGET_CLASS  = 'MVG'                  # 'MVG', 'MVS'
-'''
-The National Vegetation Information System (NVIS) provides the 100m resolution information on
-the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
-
-We resampled the layers to 1km resolution by calculating the percentage of each type in
-each 1km cell. The original layer is converted to n-bands (n=number of types)
-raster layer, with each band representing the percentage of that type in each 1km cell.
-'''
-
-GBF3_IBRA_TARGET_CLASS  = 'IBRA_Regions'         # 'IBRA_Regions', 'IBRA_SubRegions'
-'''
-IBRA (Interim Biogeographic Regionalisation for Australia) provides bioregional classifications
-with regions or subregions. There are 89 regions and 419 subregions across Australia.
 '''
 
 
 GBF3_TARGETS_DICT = {
     'off':     None,
-    'medium':  30,
-    'high':    50,
+    'medium':  {2030: 30, 2050: 30},
+    'high':    {2030: 30, 2050: 50},
     'USER_DEFINED': None
 }
 
 
+GBF3_NVIS_TARGET_CLASS  = 'NVIS_MVG'             # 'NVIS_MVG', 'NVIS_MVS'
+'''
+The National Vegetation Information System (NVIS) provides the 100m resolution information on
+the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
+Also used as the class selector for IBRA bioregion layers when GBF3_NVIS_REGION_MODE = 'IBRA'.
+'''
 
 
-# ------------------------------- Species parameters -------------------------------
-BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
+GBF3_NVIS_REGION_MODE = 'NRM'                    # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
+'''
+Controls the spatial resolution of GBF3 NVIS constraints.
+ - 'AUSTRALIA' → nationwide NVIS vegetation-group targets (existing behaviour, default)
+ - 'NRM'       → per-NRM-region NVIS targets (masked to selected NRM regions)
+ - 'IBRA_REG'  → IBRA bioregion targets (bio_GBF3_NVIS_MVG/MVS.nc + IBRA Excel file)
+'''
 
+GBF3_NVIS_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
+'''
+List of NRM region names to enforce GBF3 NVIS constraints for.
+Must match region names in REGION_NRM_NAME. Only used when GBF3_NVIS_REGION_MODE = 'NRM'.
+'''
+
+# -- GBF3 NVIS explicit (region, group) exclusions, keyed by GBF3_NVIS_TARGET_CLASS.
+# data.py automatically drops any group where IN_LUTO_HA <= 100 ha (structurally
+# infeasible: constraint LHS ≈ 0). The entries below document those groups for both
+# NVIS_MVG and NVIS_MVS target classes, confirmed from
+# BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_NRM.xlsx on 2026-05-02.
+# To add IIS-diagnosed exclusions beyond the auto filter, append tuples here.
+GBF3_NVIS_EXCLUDE_REGION_GROUPS = {
+    'NVIS_MVG': [
+        # IN_LUTO_HA = 78.4 ha
+        ('Goulburn Broken', 'Acacia Open Woodlands'),
+        # IN_LUTO_HA = 24.8 ha
+        ('North East',      'Callitris Forests and Woodlands'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Chenopod Shrublands, Samphire Shrublands and Forblands'),
+        # IN_LUTO_HA = 0.2 ha
+        ('North East',      'Eucalypt Tall Open Forests'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Heathlands'),
+        # IN_LUTO_HA = 44.5 ha
+        ('North East',      'Heathlands'),
+        # IN_LUTO_HA = 4.9 ha
+        ('Goulburn Broken', 'Naturally bare - sand, rock, claypan, mudflat'),
+        # IN_LUTO_HA = 0.0 ha
+        ('North East',      'Naturally bare - sand, rock, claypan, mudflat'),
+        # IN_LUTO_HA = 78.8 ha
+        ('Goulburn Broken', 'Other Forests and Woodlands'),
+        # IN_LUTO_HA = 45.5 ha
+        ('North East',      'Other Forests and Woodlands'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Other Open Woodlands'),
+        # IN_LUTO_HA = 15.1 ha
+        ('Goulburn Broken', 'Rainforests and Vine Thickets'),
+        # IN_LUTO_HA = 0.0 ha
+        ('North East',      'Tussock Grasslands'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Unclassified native vegetation'),
+    ],
+    'NVIS_MVS': [
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Boulders/rock with algae, lichen or scattered plants, or alpine fjaeldmarks'),
+        # IN_LUTO_HA = 0.0 ha
+        ('North East',      'Boulders/rock with algae, lichen or scattered plants, or alpine fjaeldmarks'),
+        # IN_LUTO_HA = 24.8 ha
+        ('North East',      'Callitris forests and woodlands'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Callitris open woodlands'),
+        # IN_LUTO_HA = 15.1 ha
+        ('Goulburn Broken', 'Cool temperate rainforest'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Heathlands'),
+        # IN_LUTO_HA = 44.5 ha
+        ('North East',      'Heathlands'),
+        # IN_LUTO_HA = 78.8 ha
+        ('Goulburn Broken', 'Leptospermum forests and woodlands'),
+        # IN_LUTO_HA = 45.5 ha
+        ('North East',      'Leptospermum forests and woodlands'),
+        # IN_LUTO_HA = 4.9 ha
+        ('Goulburn Broken', 'Naturally bare, sand, rock, claypan, mudflat'),
+        # IN_LUTO_HA = 0.0 ha
+        ('North East',      'Naturally bare, sand, rock, claypan, mudflat'),
+        # IN_LUTO_HA = 0.0 ha
+        ('North East',      'Other grasslands'),
+        # IN_LUTO_HA = 0.9 ha
+        ('Goulburn Broken', 'Other tussock grasslands'),
+        # IN_LUTO_HA = 38.5 ha
+        ('North East',      'Other tussock grasslands'),
+        # IN_LUTO_HA = 2.0 ha
+        ('Goulburn Broken', 'Unclassified native vegetation'),
+    ],
+}
+
+
+# ------------------------------- GBF4 Parameters -------------------------------
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 halt the extinction of known threatened species, protect genetic diversity, 
@@ -943,9 +1146,181 @@ and manage human-wildlife interactions
 '''
 
 
+GBF4_TARGET_SNES  = 'off'           # 'off', 'USER_DEFINED', or 'dict'
+GBF4_TARGET_ECNES = 'off'           # 'off', 'USER_DEFINED', or 'dict'
+'''
+'off'               — GBF4 SNES/ECNES constraints disabled.
+'USER_DEFINED'      — read targets from input CSV file.
+'dict'              — still selecte sepecies as "USER_DEFINED", but overwrite targets by the values in GBF4_{SNES,ECNES}_TARGETS_DICT.
+'''
+
+GBF4_SNES_PRESENCE_CLASS  = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
+GBF4_ECNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
+
+GBF4_SNES_TARGETS_DICT  = {2030: 30, 2050: 50, 2100: 50}
+GBF4_ECNES_TARGETS_DICT = {2030: 30, 2050: 50, 2100: 50}
+
+GBF4_SNES_REGION_MODE       = 'AUSTRALIA'                    # 'AUSTRALIA' or 'NRM'
+GBF4_SNES_SELECTED_REGIONS  = ['North East', 'Goulburn Broken']
+'''
+Controls the spatial resolution of GBF4 SNES constraints.
+ - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
+ - 'NRM'       → per-NRM-region targets from NRM target files
+GBF4_SNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
+'''
+
+GBF4_ECNES_REGION_MODE      = 'AUSTRALIA'                   # 'AUSTRALIA' or 'NRM'
+GBF4_ECNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
+'''
+Controls the spatial resolution of GBF4 ECNES constraints.
+ - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
+ - 'NRM'       → per-NRM-region targets from NRM target files
+GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
+'''
+
+# -- Trouble-maker exclusions used by the rule_out_trouble_maker_speceis workflow.
+# GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES: list of (region, COMMUNITY) tuples to drop.
+# GBF4_SNES_EXCLUDE_REGION_SPECIES:      list of (region, SCIENTIFIC_NAME) tuples to drop.
+#   NRM mode       — matches on the (region, name) pair exactly.
+#   AUSTRALIA mode — only the name part is used (region is ignored).
+# Match exactly the values in BIODIVERSITY_GBF4_TARGET_*[_NRM].csv.
+GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES = [
+    # Community: "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived
+    # Native Grassland" (EPBC Critically Endangered).
+
+    # North East — flagged in IIS at RF=10 (2026-05-01).
+    #   BASELINE_AUS = 353 132.5 ; OUT_LUTO = 34 248.4 ; INSIDE_LUTO = 71 554.4
+    #   out_pct = 9.7 % vs target_2030 = 50 %. The 1 595 free decision variables at
+    #   RF=10 cannot deliver enough INSIDE_LUTO restoration to close the ~40 % gap.
+    ('North East',      "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived Native Grassland"),
+
+    # Goulburn Broken — same deficit shape as North East, excluded pre-emptively.
+    #   BASELINE_AUS = 559 541.9 ; OUT_LUTO = 28 770.0 ; INSIDE_LUTO = 120 881.0
+    #   out_pct = 5.1 % vs target_2030 = 50 %. Even larger gap than North East;
+    #   would surface as the next IIS once North East is dropped.
+    ('Goulburn Broken', "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived Native Grassland"),
+
+    # North East — BASEYEAR_SCORE_INSIDE_LUTO_NATURAL_LIKELY = 6.2 ha (≤ 100 ha threshold).
+    # data.py NRM mode drops this community automatically; listed here for explicitness.
+    # Confirmed via check on 2026-05-02.
+    ('North East', 'Buloke Woodlands of the Riverina and Murray-Darling Depression Bioregions'),
+
+    # Goulburn Broken — INFEASIBLE in 2045→2050 per-community test (2026-06-11).
+    # tightness=1.27, n_cells=118, coeff_ratio=150: available habitat cannot meet 2050 target.
+    ('Goulburn Broken', 'Buloke Woodlands of the Riverina and Murray-Darling Depression Bioregions'),
+
+    # --- 2040→2045 exclusions (Check_NECMA_G0001_2040_2045 per-community test, 2026-06-12) ---
+    # TIME_LIMIT / INFEASIBLE in isolation for the 2040→2045 transition (Run_G0001).
+    ('Goulburn Broken', 'Grey Box (Eucalyptus microcarpa) Grassy Woodlands and Derived Native Grasslands of South-eastern Australia'),  # TIME_LIMIT, tightness=1.60, n_cells=434
+    ('North East',      'Grey Box (Eucalyptus microcarpa) Grassy Woodlands and Derived Native Grasslands of South-eastern Australia'),  # INFEASIBLE, tightness=1.55, n_cells=116
+
+    # --- 2045→2050 exclusions (Check_NECMA_G0001_2045_2050 per-community test, 2026-06-13) ---
+    # INFEASIBLE in isolation for the 2045→2050 transition (Run_G0001).
+    ('Goulburn Broken', 'Natural Grasslands of the Murray Valley Plains'),                                    # INFEASIBLE, tightness=1.50, n_cells=10
+    ('Goulburn Broken', 'Seasonal Herbaceous Wetlands (Freshwater) of the Temperate Lowland Plains'),         # INFEASIBLE, tightness=1.42, n_cells=141
+]
+GBF4_SNES_EXCLUDE_REGION_SPECIES = [
+    # Burramys parvus has zero LUTO habitat in Goulburn Broken and the outside-LUTO
+    # component alone (19.6%) cannot meet the 50% target → structurally infeasible.
+    ('Goulburn Broken', 'Burramys parvus'),
+
+    # Swainsona recta — flagged in IIS across 8 NECMA_follow_runs at RF=3 (2026-06-01).
+    # 32 variables locked by transition bounds from 2035 solution; 150 free variables
+    # cannot deliver enough habitat restoration to meet the target >= 2188.68 (rescaled).
+    ('Goulburn Broken', 'Swainsona recta'),
+
+    # North East — 8 species with BASEYEAR_SCORE_INSIDE_LUTO_NATURAL_LIKELY ≤ 100 ha.
+    # data.py drops these in NRM mode (threshold = 100 ha) because the constraint LHS
+    # is effectively zero and the target can never be met → ValueError at Data() init.
+    # Confirmed via check_snes_nrm.py on 2026-05-02.
+    ('North East', 'Argyrotegium nitidulum'),                       # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Burramys parvus'),                              # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Euphrasia crassiuscula subsp. glandulifera'),   # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Euphrasia eichleri'),                           # INSIDE_LUTO_ha = 82.6 (below 100 ha threshold)
+    ('North East', 'Grevillea burrowa'),                            # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Kelleria bogongensis'),                         # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Lobelia gelida'),                               # INSIDE_LUTO_ha = 0.0
+    ('North East', 'Zieria citriodora'),                            # INSIDE_LUTO_ha = 24.7 (below 100 ha threshold)
+
+    # INFEASIBLE in NECMA single-species debug (2026-06-10): n_cells=9, tightness=1.505,
+    # coeff_ratio=62.1 (range [10.2, 633.0]). Extreme within-row coefficient spread on
+    # very few cells causes NUMERIC in the full model before infeasibility can be proven.
+    ('North East', 'Pomaderris subplicata'),
+
+    # --- 2045→2050 exclusions (identified by Check_NECMA_2045_2050 per-species test, 2026-06-11) ---
+    # INFEASIBLE: structurally infeasible even in isolation — available area cannot meet 2050 target.
+    ('North East',      'Acacia phasmoides'),               # tightness=1.68, n_cells=10
+    ('North East',      'Litoria booroolongensis'),         # tightness=1.62, n_cells=36
+    ('North East',      'Caladenia concolor'),              # tightness=1.44, n_cells=149
+    ('Goulburn Broken', 'Calidris ferruginea'),             # tightness=1.41, n_cells=25
+    ('Goulburn Broken', 'Maccullochella macquariensis'),    # tightness=1.36, n_cells=115
+    
+    # TIME_LIMIT: individually borderline-feasible but cause full-model infeasibility when combined —
+    # cells shared across constraints cannot simultaneously satisfy all targets given 2045 lower bounds.
+    ('North East',      'Grevillea jephcottii'),            # tightness=1.93, n_cells=10
+    ('Goulburn Broken', 'Eucalyptus crenulata'),            # tightness=1.83, n_cells=2
+    ('Goulburn Broken', 'Callocephalon fimbriatum'),        # tightness=1.73, n_cells=453
+    ('Goulburn Broken', 'Amphibromus fluitans'),            # tightness=1.43, n_cells=607
+    ('Goulburn Broken', 'Delma impar'),                     # tightness=1.36, n_cells=256
+    ('Goulburn Broken', 'Dianella amoena'),                 # tightness=1.34, n_cells=126
+    ('Goulburn Broken', 'Litoria raniformis'),              # tightness=1.33, n_cells=196
+
+    # --- 2040→2045 exclusions (Check_NECMA_G0001_2040_2045 per-species test, 2026-06-12) ---
+    # INFEASIBLE: structurally infeasible even in isolation — available area cannot meet 2045 target.
+    ('Goulburn Broken', 'Senecio behrianus'),                       # INFEASIBLE, tightness=1.74, n_cells=3
+    ('Goulburn Broken', 'Eucalyptus alligatrix subsp. limaensis'),  # INFEASIBLE, tightness=1.65, n_cells=16
+    ('North East',      'Lathamus discolor'),                       # INFEASIBLE, tightness=1.58, n_cells=218
+    ('Goulburn Broken', 'Caladenia concolor'),                      # INFEASIBLE, tightness=1.56, n_cells=91
+    ('Goulburn Broken', 'Pimelea spinescens subsp. spinescens'),    # INFEASIBLE, tightness=1.53, n_cells=135
+
+    # TIME_LIMIT: individually borderline-feasible but cause full-model infeasibility when combined.
+    ('North East',      'Anthochaera phrygia'),             # TIME_LIMIT, tightness=2.26, n_cells=436
+    ('North East',      'Maccullochella peelii'),           # TIME_LIMIT, tightness=1.70, n_cells=174
+    ('Goulburn Broken', 'Grantiella picta'),                # TIME_LIMIT, tightness=1.59, n_cells=803
+    ('Goulburn Broken', 'Maccullochella peelii'),           # TIME_LIMIT, tightness=1.57, n_cells=262
+    ('Goulburn Broken', 'Rostratula australis'),            # TIME_LIMIT, tightness=1.57, n_cells=772
+    ('North East',      'Crinia sloanei'),                  # TIME_LIMIT, tightness=1.55, n_cells=143
+
+    # --- 2045→2050 exclusions (Check_NECMA_G0001_2045_2050 per-species test, 2026-06-13) ---
+    # INFEASIBLE: structurally infeasible even in isolation — available area cannot meet 2050 target.
+    ('Goulburn Broken', 'Calochilus richiae'),                              # INFEASIBLE, tightness=1.95, n_cells=14
+    ('North East',      'Maccullochella macquariensis'),                   # INFEASIBLE, tightness=1.75, n_cells=111
+    ('North East',      'Eucalyptus cadens'),                              # INFEASIBLE, tightness=1.61, n_cells=54
+    ('Goulburn Broken', 'Lepidium monoplocoides'),                          # INFEASIBLE, tightness=1.50, n_cells=136
+    ('Goulburn Broken', 'Anthochaera phrygia'),                             # INFEASIBLE, tightness=1.48, n_cells=632
+    ('Goulburn Broken', 'Macquaria australasica'),                          # INFEASIBLE, tightness=1.46, n_cells=60
+    ('North East',      'Rostratula australis'),                            # INFEASIBLE, tightness=1.45, n_cells=217
+    ('North East',      'Synemon plana'),                                   # INFEASIBLE, tightness=1.44, n_cells=6
+    ('Goulburn Broken', 'Falco hypoleucos'),                                 # INFEASIBLE, tightness=1.44, n_cells=711
+    ('Goulburn Broken', 'Swainsona murrayana'),                             # INFEASIBLE, tightness=1.44, n_cells=207
+    ('Goulburn Broken', 'Crinia sloanei'),                                   # INFEASIBLE, tightness=1.44, n_cells=156
+    ('Goulburn Broken', 'Bidyanus bidyanus'),                                # INFEASIBLE, tightness=1.43, n_cells=130
+    ('Goulburn Broken', 'Nannoperca australis Murray-Darling Basin lineage'),# INFEASIBLE, tightness=1.43, n_cells=108
+    ('Goulburn Broken', 'Polytelis swainsonii'),                             # INFEASIBLE, tightness=1.42, n_cells=378
+    ('Goulburn Broken', 'Hibbertia humifusa subsp. erigens'),                # INFEASIBLE, tightness=1.41, n_cells=77
+    ('Goulburn Broken', 'Synemon plana'),                                    # INFEASIBLE, tightness=1.41, n_cells=209
+
+    # TIME_LIMIT: individually borderline-feasible but cause full-model infeasibility when combined.
+    ('Goulburn Broken', 'Galaxias rostratus'),               # TIME_LIMIT, tightness=1.54, n_cells=451
+    ('Goulburn Broken', 'Brachyscome muelleroides'),         # TIME_LIMIT, tightness=1.52, n_cells=61
+    ('Goulburn Broken', 'Glycine latrobeana'),               # TIME_LIMIT, tightness=1.45, n_cells=400
+    ('Goulburn Broken', 'Myriophyllum porcatum'),            # TIME_LIMIT, tightness=1.43, n_cells=471
+    ('Goulburn Broken', 'Sclerolaena napiformis'),           # TIME_LIMIT, tightness=1.42, n_cells=176
+    ('Goulburn Broken', 'Lathamus discolor'),                # TIME_LIMIT, tightness=1.41, n_cells=655
+    ('Goulburn Broken', 'Pteropus poliocephalus'),           # TIME_LIMIT, tightness=1.41, n_cells=275
+    ('Goulburn Broken', 'Botaurus poiciloptilus'),           # TIME_LIMIT, tightness=1.41, n_cells=411
+
+    # --- EP-fill driver (Check_GB_filled_EP analysis, 2026-06-15) ---
+    # 2030->2050 USER_DEFINED target (50%->70%) is EXACTLY binding every year 2020-2050
+    # (total/target ratio = 1.000, 755 cells, 83.2% spatial overlap with 2050 EP dvar area).
+    # This constraint is the primary driver of near-total Environmental Plantings
+    # saturation across Goulburn Broken in Run_G0001. Excluded to break the EP-fill loop.
+    ('Goulburn Broken', 'Hirundapus caudacutus'),
+]
+
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSITY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
+GBF8_TARGET = 'off'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.
@@ -958,19 +1333,11 @@ reduce the impacts of climate change on biodiversity and ecosystems.
 # Other parameters
 # ---------------------------------------------------------------------------- #
 
-# Cell culling
-CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
-# CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
-# CULL_MODE = 'none'          # do no culling
-
-MAX_LAND_USES_PER_CELL = 12         if CULL_MODE == 'absolute' else 'Not used'
-LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
-
 # Non-ag output coding. Non-agricultural land uses will appear on the land use map offset by this amount (e.g. land use 0 will appear as 100)
 NON_AGRICULTURAL_LU_BASE_CODE = 100
 
-# Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
-ROUND_DECMIALS = 6
+# Number of decimals to round any value; designed to remove insignificant decimals
+ROUND_DECIMALS = 6
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
@@ -1224,18 +1591,34 @@ RIVER REGIONS
 
 
 # ============================================================================ #
-# AG2050 Scenario Settings                                                      #
+# [Xinhao] Custom feature settings (preserved across jinzhu merge)             #
+# ============================================================================ #
+
+# ---------------------------------------------------------------------------- #
+# Biodiversity price scenario (custom feature; not present in upstream jinzhu). #
+# 'CONSTANT' uses a fixed price ($/unit of biodiversity score) for all years;  #
+# a sheet name reads year-by-year prices from 'biodiversity_prices.xlsx'.       #
+# Consumed by luto/data.py.                                                     #
+# ---------------------------------------------------------------------------- #
+BIODIVERSITY_PRICES_FIELD = 'CONSTANT'
+
+if BIODIVERSITY_PRICES_FIELD == 'CONSTANT':
+    BIODIVERSITY_PRICE_CONSTANT = 0.0  # Price per unit of biodiversity score (AUD/unit). 0 disables.
+
+
+# ============================================================================ #
+# AG2050 Scenario Settings (custom feature; not present in upstream jinzhu)     #
 # ============================================================================ #
 # Switch: set to True to enable AG2050 scenario mode.
 # When enabled, AG2050_SCENARIO drives PRODUCTIVITY_TREND, GHG_EMISSIONS_LIMITS,
-# and BIODIVERSITY_TARGET_GBF_2 automatically via the mapping tables below.
+# and GBF2_TARGET automatically via the mapping tables below.
 AG2050_MODE = False
 
 # Active scenario: one of 'AgS1', 'AgS2', 'AgS3', 'AgS4', or '' (disabled).
 # Must be a string (not None) so create_task_runs does not eval() the value.
 AG2050_SCENARIO = ''
 
-# ---------- Scenario → model-setting mappings --------------------------------
+# ---------- Scenario -> model-setting mappings -------------------------------
 
 # Yield / productivity: maps to sheet name in yieldincreases_ag_2050.xlsx
 AG2050_PRODUCTIVITY_MAP = {
@@ -1263,7 +1646,7 @@ AG2050_AC_MAP = {
 }
 
 # GHG target per scenario.
-# 'maintain_historical' keeps GHG ≤ 2010 base-year level for every future year.
+# 'maintain_historical' keeps GHG <= 2010 base-year level for every future year.
 AG2050_GHG_MAP = {
     'AgS1': 'maintain_historical',
     'AgS2': 'low',
@@ -1282,13 +1665,14 @@ AG2050_BIO_MAP = {
 }
 
 # ---------- Auto-configure: override dependent settings ----------------------
-# When AG2050_MODE is True and a scenario is selected, the three settings below
-# are overridden automatically.  The carbon-price field is forced to 'CONSTANT'
+# When AG2050_MODE is True and a scenario is selected, the settings below are
+# overridden automatically.  The carbon-price field is forced to 'CONSTANT'
 # (zero carbon price) so that the AS_GHG lookup never runs on 'maintain_historical'.
+# NOTE: BIODIVERSITY_TARGET_GBF_2 was renamed to GBF2_TARGET in the jinzhu update.
 if AG2050_MODE and AG2050_SCENARIO:
-    PRODUCTIVITY_TREND        = AG2050_PRODUCTIVITY_MAP[AG2050_SCENARIO]
-    GHG_EMISSIONS_LIMITS      = AG2050_GHG_MAP[AG2050_SCENARIO]
-    BIODIVERSITY_TARGET_GBF_2 = AG2050_BIO_MAP[AG2050_SCENARIO]
+    PRODUCTIVITY_TREND   = AG2050_PRODUCTIVITY_MAP[AG2050_SCENARIO]
+    GHG_EMISSIONS_LIMITS = AG2050_GHG_MAP[AG2050_SCENARIO]
+    GBF2_TARGET          = AG2050_BIO_MAP[AG2050_SCENARIO]
     # Force constant (zero) carbon price so the GHG-target-dict lookup is skipped
     CARBON_PRICES_FIELD = 'CONSTANT'
     CARBON_PRICE_COSTANT = 0.0

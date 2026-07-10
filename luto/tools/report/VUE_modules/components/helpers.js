@@ -17,7 +17,7 @@ window.loadScript = (src, name) => {
         document.head.appendChild(script);
 
         script.onload = async () => {
-            const timeout = 5000;
+            const timeout = 60000;
             const startTime = Date.now();
             while (!window[name]) {
                 if (Date.now() - startTime > timeout) {
@@ -47,7 +47,7 @@ window.loadScriptWithTracking = (src, name, viewName) => {
         }
 
         script.onload = async () => {
-            const timeout = 5000;
+            const timeout = 60000;
             const startTime = Date.now();
             while (!window[name]) {
                 if (Date.now() - startTime > timeout) {
@@ -63,3 +63,49 @@ window.loadScriptWithTracking = (src, name, viewName) => {
     });
 };
 
+
+/**
+ * Factory that creates a reactive per-combo map-layer loader for a view.
+ *
+ * Each call to `ensureComboLayer(layerPrefix, comboValues)` loads the JS file
+ * named `<layerPrefix>__<safe(dim1)>__...__<safe(dimN)>.js`, stores the
+ * year-keyed layer data in `currentLayerData`, and releases the previous
+ * combo's data for garbage collection.
+ *
+ * Usage in a view:
+ *   const { currentLayerData, ensureComboLayer } = window.createMapLayerLoader(VIEW_NAME);
+ *   // selectMapData: computed(() => currentLayerData.value?.[selectYear.value] ?? {})
+ *
+ * @param {string} viewName  Passed to loadScriptWithTracking for memory tracking.
+ * @returns {{ currentLayerData: Ref<object|null>, loadedComboKey: Ref<string|null>, ensureComboLayer: Function }}
+ */
+window.createMapLayerLoader = function(viewName) {
+    const { ref } = Vue;
+    const _safeKey = (s) => String(s).replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+    const currentLayerData = ref(null);
+    const loadedComboKey   = ref(null);
+
+    async function ensureComboLayer(layerPrefix, comboValues, pageRange = null) {
+        // pageRange: [start, end] for paged SNES/ECNES/NVIS layers; null for standard layers.
+        // The var name never includes the page so each new page overwrites the window variable,
+        // keeping only the current page in memory.
+        const pageKey = pageRange ? `||page_${pageRange[0]}_${pageRange[1]}` : '';
+        const key     = `${layerPrefix}||${comboValues.join('||')}${pageKey}`;
+        if (loadedComboKey.value === key && currentLayerData.value) return;
+
+        const varName  = `${layerPrefix}__${comboValues.map(_safeKey).join('__')}`;
+        const filename = pageRange
+            ? `${varName}_${pageRange[0]}_${pageRange[1]}.js`
+            : `${varName}.js`;
+
+        const filePath = `data/map_layers/${filename}`;
+        currentLayerData.value = null;
+        await window.loadScriptWithTracking(filePath, varName, viewName);
+        currentLayerData.value = window[varName] ?? null;
+        delete window[varName];
+        loadedComboKey.value = key;
+    }
+
+    return { currentLayerData, loadedComboKey, ensureComboLayer };
+};

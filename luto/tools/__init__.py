@@ -65,10 +65,24 @@ def read_timestamp():
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
     """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
-    if settings.AMORTISE_UPFRONT_COSTS: 
+    if settings.AMORTISE_UPFRONT_COSTS:
         return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
-    else: 
+    else:
         return cost
+
+
+def clamp_dvar_bound(arr: np.ndarray, lo, hi, name: str) -> np.ndarray:
+    """Return clip(arr, lo, hi) as float32, REPORTING entries changed beyond the ROUND_DECIMALS
+    noise threshold. `lo`/`hi` may be scalars or same-shape arrays. Shared by the dvar bound/base
+    builders in solvers/input_data.py and the ag/non-ag transition lb builders — all dvar-bound
+    cleaning goes through here, explicitly and logged, rather than silently min/max'd."""
+    out = np.clip(arr, lo, hi).astype(np.float32)
+    thr = 10 ** (-settings.ROUND_DECIMALS)
+    chg = np.abs(out - arr) > thr
+    if np.any(chg):
+        gap = np.abs(out - arr)[chg]
+        print(f"  └── {name}: clamped {int(chg.sum())} cells, max gap={gap.max():.2e}, mean gap={gap.mean():.2e}", flush=True)
+    return out
 
 
 def lumap2ag_l_mrj(lumap, lmmap):
@@ -129,9 +143,7 @@ def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
 
     # get all agricultural and non agricultural cells
     non_agricultural_cells = np.nonzero(lumap >= non_ag_base)[0]
-    agricultural_cells = np.nonzero(
-        ~np.isin(all_cells, non_agricultural_cells)
-    )[0]
+    agricultural_cells = np.nonzero(~np.isin(all_cells, non_agricultural_cells))[0]
 
     return agricultural_cells, non_agricultural_cells
 
@@ -257,51 +269,23 @@ def get_non_ag_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap >= settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
 
 
-def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
+def get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx) -> np.ndarray:
+    """Source-parameterised water-licence delta ($/cell): transitioning FROM (from_m, from_j) TO every
+    target (to_m, to_j) on `cells` — (target req − source req) × licence price, plus the dry↔irr
+    irrigation setup/teardown. Returns (NLMS, len(cells), N_AG_LUS), RAW (un-amortised) upfront cost —
+    the caller amortises explicitly (see transitions.py).
     """
-    Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
-    base transition costs. Includes the costs of water license fees.
+    yr_cal   = data.YR_CAL_BASE + yr_idx
+    area     = data.REAL_AREA[cells]
+    w_target = w_mrj[:, cells, :] * settings.INCLUDE_WATER_LICENSE_COSTS
+    w_base   = w_mrj[from_m, cells, from_j]
+    w_cost   = (w_target - w_base[None, :, None]) * data.WATER_LICENCE_PRICE[cells, None] * data.WATER_LICENSE_COST_MULTS[yr_cal]
+    if from_m == 0:    # was dryland → irrigation setup when switching to irrigated (m=1)
+        w_cost[1] += settings.NEW_IRRIG_COST    * data.IRRIG_COST_MULTS[yr_cal] * area[:, None]
+    else:              # was irrigated → teardown when switching to dryland (m=0)
+        w_cost[0] += settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal] * area[:, None]
+    return w_cost.astype(np.float32)
 
-    Parameters
-     w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for target year.
-     l_mrj (numpy.ndarray): Land-use and land management matrix for the base_year.
-     data (object): Data object containing necessary information.
-
-    Returns
-     w_delta_mrj (numpy.ndarray, <unit:$/cell>).
-    """
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    
-    # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per cell (inc. REAL_AREA).
-    # Sum total water requirements of current land-use and land management
-    w_r = (w_mrj * l_mrj).sum(axis=0).sum(axis=1)
-
-    # Net water requirements calculated as the diff in water requirements between current land-use and all other land-uses j.
-    w_net_mrj = w_mrj - w_r[:, np.newaxis]
-
-    # Water license cost calculated as net water requirements (ML/cell) x licence price ($/ML).
-    w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis] * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS
-
-    # When land-use changes from dryland to irrigated add <settings.NEW_IRRIG_COST> per hectare for establishing irrigation infrastructure
-    new_irrig = (
-        settings.NEW_IRRIG_COST
-        * data.IRRIG_COST_MULTS[yr_cal]
-        * data.REAL_AREA[:, np.newaxis]  # <unit:$/cell>
-    )
-    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + new_irrig, w_delta_mrj[1])
-
-    # When land-use changes from irrigated to dryland add <settings.REMOVE_IRRIG_COST> per hectare for removing irrigation infrastructure
-    remove_irrig = (
-        settings.REMOVE_IRRIG_COST
-        * data.IRRIG_COST_MULTS[yr_cal]
-        * data.REAL_AREA[:, np.newaxis]  # <unit:$/cell>
-    )
-    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + remove_irrig, w_delta_mrj[0])
-    
-    # Amortise upfront costs to annualised costs
-    w_delta_mrj = amortise(w_delta_mrj)
-    
-    return w_delta_mrj  # <unit:$/cell>
 
 def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.ndarray, np.ndarray]:
     """
@@ -596,14 +580,16 @@ class _TeeIO:
         if buf.strip() and not self._ts_re.match(buf):
             buf = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {buf}"
         self._file.write(buf)
-        enc = getattr(self._orig, 'encoding', None) or 'utf-8'
-        self._orig.write(buf.encode(enc, errors='replace').decode(enc))
+        self._orig.write(buf)
 
     def flush(self):
         self._file.flush()
+        self._orig.flush()
 
 
 class LogToFile:
+    _active: set = set()  # paths currently being logged; prevents double-open on nested calls
+
     def __init__(self, log_path, mode: str = 'a'):
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
@@ -614,17 +600,23 @@ class LogToFile:
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            with (
-                open(self.log_path_stdout, self.mode, encoding="utf-8") as f_out,
-                open(self.log_path_stderr, self.mode, encoding="utf-8") as f_err,
-                redirect_stdout(_TeeIO(sys.stdout, f_out)),
-                redirect_stderr(_TeeIO(sys.stderr, f_err)),
-            ):
-                try:
-                    return func(*args, **kwargs)
-                except Exception:
-                    sys.stderr.write(traceback.format_exc() + '\n')
-                    raise
+            if self.log_path_stdout in LogToFile._active:
+                return func(*args, **kwargs)
+            LogToFile._active.add(self.log_path_stdout)
+            try:
+                with (
+                    open(self.log_path_stdout, self.mode, encoding='utf-8') as f_out,
+                    open(self.log_path_stderr, self.mode, encoding='utf-8') as f_err,
+                    redirect_stdout(_TeeIO(sys.stdout, f_out)),
+                    redirect_stderr(_TeeIO(sys.stderr, f_err)),
+                ):
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception:
+                        sys.stderr.write(traceback.format_exc() + '\n')
+                        raise
+            finally:
+                LogToFile._active.discard(self.log_path_stdout)
         return wrapper
             
             
@@ -638,7 +630,7 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
         interval (int): The interval in seconds to log the memory usage.
     '''
     
-    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode, encoding="utf-8") as file:
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
         while not stop_event.is_set():
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             process = psutil.Process(os.getpid())

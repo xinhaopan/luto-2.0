@@ -1,317 +1,706 @@
 window.BiodiversityView = {
   name: 'BiodiversityView',
   setup() {
-    const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, inject, computed, watch } = Vue;
 
-    // Data|Map service — top-level keys are metric names
     const chartRegister = window.ChartService.chartCategories["Biodiversity"];
     const mapRegister = window.MapService.mapCategories["Biodiversity"];
     const loadScript = window.loadScriptWithTracking;
-
-    // View identification for memory management
     const VIEW_NAME = "Biodiversity";
 
-    // Global selection state
     const yearIndex = ref(0);
     const selectYear = ref(2020);
     const selectRegion = inject("globalSelectedRegion");
+    const availableRegionLevels = ['region_state', 'region_NRM'];
+    const selectRegionLevel = ref('region_state');
 
-    // Available variables
+    // ── Paged species (SNES / ECNES / GBF3_NVIS) ────────────────────────────
+    const selectPage = ref(0);
+    const isPaged = computed(() => !!mapRegister[selectMetric.value]?.[selectCategory.value]?.paged);
+    const pagedIndex = computed(() => {
+      if (!isPaged.value) return null;
+      const idxName = mapRegister[selectMetric.value]?.[selectCategory.value]?.indexName;
+      return idxName ? (window[idxName] ?? null) : null;
+    });
+    const totalPages = computed(() => Object.keys(pagedIndex.value?.pages ?? {}).length);
+    const currentPageInfo = computed(() => {
+      if (!pagedIndex.value) return null;
+      return pagedIndex.value.pages?.[String(selectPage.value)] ?? null;
+    });
+
     const availableYears = ref([]);
-    const availableUnit = {
-      Biodiversity: "Relative Percentage (Pre-1750 = 100%)",
-    };
+    const availableUnit = { Biodiversity: "Relative Percentage (Pre-1750 = 100%)" };
 
-    // Metric display labels (internal keys must match MapService/ChartService)
     const METRIC_LABELS = {
-      'quality':     'Quality',
-      'GBF2':        'GBF2',
-      'GBF3_NVIS':   'GBF3 NVIS',
-      'GBF3_IBRA':   'GBF3 IBRA',
-      'GBF4_SNES':   'GBF4 SNES',
-      'GBF4_ECNES':  'GBF4 ECNES',
-      'GBF8_GROUP':  'GBF8 Group',
-      'GBF8_SPECIES':'GBF8 Species',
+      'quality': 'Quality', 'GBF2': 'GBF2', 'GBF3_NVIS': 'GBF3 NVIS',
+      'GBF4_SNES': 'GBF4 SNES', 'GBF4_ECNES': 'GBF4 ECNES',
+      'GBF8_GROUP': 'GBF8 Group', 'GBF8_SPECIES': 'GBF8 Species',
     };
-
-    // Metric → Supporting_info setting key (null = always available)
     const METRIC_TO_SETTING = {
-      'quality':     null,
-      'GBF2':        'BIODIVERSITY_TARGET_GBF_2',
-      'GBF3_NVIS':   'BIODIVERSITY_TARGET_GBF_3_NVIS',
-      'GBF3_IBRA':   'BIODIVERSITY_TARGET_GBF_3_IBRA',
-      'GBF4_SNES':   'BIODIVERSITY_TARGET_GBF_4_SNES',
-      'GBF4_ECNES':  'BIODIVERSITY_TARGET_GBF_4_ECNES',
-      'GBF8_GROUP':  'BIODIVERSITY_TARGET_GBF_8',
-      'GBF8_SPECIES':'BIODIVERSITY_TARGET_GBF_8',
+      'quality': null, 'GBF2': 'GBF2_TARGET',
+      'GBF3_NVIS': 'WRITE_GBF3_NVIS',
+      'GBF4_SNES': 'WRITE_GBF4_SNES',
+      'GBF4_ECNES': 'WRITE_GBF4_ECNES',
+      'GBF8_GROUP': 'GBF8_TARGET',
+      'GBF8_SPECIES': 'GBF8_TARGET',
     };
 
-    // Available selections
     const availableMetrics = ref(['quality']);
-    const availableCategories = ["Ag", "Ag Mgt", "Non-Ag"];
+    const ALL_CATEGORIES = ["Sum", "Ag", "Ag Mgt", "Non-Ag"];
+    const availableCategories = computed(() => {
+      const mr = mapRegister[selectMetric.value] || {};
+      return ALL_CATEGORIES.filter(c => mr[c]);
+    });
     const availableAgMgt = ref([]);
     const availableWater = ref([]);
+    const availableSpecies = ref([]);
     const availableLanduse = ref([]);
 
-    // Map selection state
     const selectMetric = ref("quality");
     const selectCategory = ref("");
     const selectAgMgt = ref("");
     const selectWater = ref("");
+    const selectSpecies = ref("");
     const selectLanduse = ref("");
+    const selectBackend = ref("");
+    const availableBackends = ref([]);
+    const modelBackend = ref("");
 
-    // Previous selections memory (per category)
-    const previousSelections = ref({
-      "Ag":     { water: "", landuse: "" },
-      "Ag Mgt": { agMgt: "", water: "", landuse: "" },
-      "Non-Ag": { landuse: "" }
+    const METRICS_WITH_SPECIES = ['GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8_GROUP', 'GBF8_SPECIES'];
+    const hasSpecies = computed(() => METRICS_WITH_SPECIES.includes(selectMetric.value));
+    const speciesLabel = computed(() => {
+      const m = selectMetric.value;
+      if (m === 'GBF3_NVIS') return 'Veg group:';
+      if (m === 'GBF4_SNES' || m === 'GBF8_SPECIES') return 'Species:';
+      if (m === 'GBF4_ECNES') return 'Community:';
+      if (m === 'GBF8_GROUP') return 'Group:';
+      return 'Species:';
     });
 
-    // UI state
-    const dataLoaded = ref(false);
-    const isDrawerOpen = ref(false);
+    const previousSelections = ref({
+      "Sum": { species: "", landuse: "" },
+      "Ag": { water: "", species: "", landuse: "" },
+      "Ag Mgt": { agMgt: "", water: "", species: "", landuse: "" },
+      "Non-Ag": { species: "", landuse: "" }
+    });
 
-    // Cascade helper — reads from mapRegister[selectMetric]
-    function doCascade(category) {
-      const mr = mapRegister[selectMetric.value];
-      const agData   = window[mr?.["Ag"]?.["name"]];
-      const amData   = window[mr?.["Ag Mgt"]?.["name"]];
-      const nonAgData = window[mr?.["Non-Ag"]?.["name"]];
-
-      if (category === "Ag") {
-        availableWater.value = Object.keys(agData || {});
-        const prevWater = previousSelections.value["Ag"].water;
-        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-        availableLanduse.value = Object.keys(agData?.[selectWater.value] || {});
-        const prevLU = previousSelections.value["Ag"].landuse;
-        selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
-
-      } else if (category === "Ag Mgt") {
-        availableAgMgt.value = Object.keys(amData || {});
-        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
-        selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
-
-        availableWater.value = Object.keys(amData?.[selectAgMgt.value] || {});
-        const prevWater = previousSelections.value["Ag Mgt"].water;
-        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-        availableLanduse.value = Object.keys(amData?.[selectAgMgt.value]?.[selectWater.value] || {});
-        const prevLU = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
-
-      } else if (category === "Non-Ag") {
-        availableLanduse.value = Object.keys(nonAgData || {});
-        const prevLU = previousSelections.value["Non-Ag"].landuse;
-        selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
-      }
+    const SUM_TYPE_LABELS = { 'ALL': 'ALL', 'ag': 'Ag', 'non-ag': 'Non-Ag', 'ag-man': 'Ag Mgt' };
+    function formatLanduse(val) {
+      return (selectCategory.value === 'Sum') ? (SUM_TYPE_LABELS[val] || val) : val;
     }
 
-    // Reactive data
-    // map_bio_*_Ag:    Water → LU → Year
-    // map_bio_*_Am:    AgMgt → Water → LU → Year
-    // map_bio_*_NonAg: LU → Year
+    const dataLoaded = ref(false);
+    const isLoadingData = ref(false);
+    const isDrawerOpen = ref(false);
+
+    const gbf2MaskOverlay = computed(() =>
+      (dataLoaded.value && selectMetric.value === 'GBF2') ? (window.BIO_GBF2_MASK || null) : null
+    );
+
+    // ── Per-combo map layer loader ──────────────────────────────────────────
+    const { currentLayerData, ensureComboLayer } = window.createMapLayerLoader(VIEW_NAME);
+
     const selectMapData = computed(() => {
-      if (!dataLoaded.value) return {};
-      const mr = mapRegister[selectMetric.value];
-      const mapData = window[mr?.[selectCategory.value]?.["name"]];
-      if (selectCategory.value === "Ag") {
-        return mapData?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
-      } else if (selectCategory.value === "Ag Mgt") {
-        return mapData?.[selectAgMgt.value]?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
-      } else if (selectCategory.value === "Non-Ag") {
-        return mapData?.[selectLanduse.value]?.[selectYear.value] || {};
+      const data = currentLayerData.value;
+      if (!data) return {};
+      // Paged layers: outer key = species name, inner key = year.
+      if (isPaged.value && hasSpecies.value && selectSpecies.value) {
+        return data?.[selectSpecies.value]?.[selectYear.value] ?? {};
       }
-      return {};
+      return data?.[selectYear.value] ?? {};
     });
 
-    // BIO_*_Ag chart:    Region → Water → [series(name=LU)]
-    // BIO_*_Am chart:    Region → AgMgt → Water → [series(name=LU)]
-    // BIO_*_NonAg chart: Region → [series(name=LU)]
-    const selectChartData = computed(() => {
-      if (!dataLoaded.value) return {};
-      const cr = chartRegister[selectMetric.value];
-      const chartData = window[cr?.[selectCategory.value]?.["name"]]?.[selectRegion.value];
-      let seriesData;
+    // For the quality metric, chart data has an extra 'backend' outermost key.
+    function qualityRoot(name) {
+      const isQuality = selectMetric.value === 'quality' && selectBackend.value;
+      return isQuality ? window[name]?.[selectBackend.value] : window[name];
+    }
 
-      if (selectCategory.value === "Ag") {
-        seriesData = chartData?.[selectWater.value] || [];
-        seriesData = seriesData.filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
-      } else if (selectCategory.value === "Ag Mgt") {
-        seriesData = chartData?.[selectAgMgt.value]?.[selectWater.value] || [];
-        seriesData = seriesData.filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
-      } else if (selectCategory.value === "Non-Ag") {
-        seriesData = (chartData || []).filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
+    const selectMultiInput = computed(() => {
+      if (!dataLoaded.value) return null;
+      const metric = selectMetric.value;
+      const cat = selectCategory.value;
+      const cr = chartRegister[metric];
+      const region = selectRegion.value;
+      const water = selectWater.value;
+      const agMgt = selectAgMgt.value;
+      const landuse = selectLanduse.value;
+      const species = selectSpecies.value;
+      const withSpecies = hasSpecies.value;
+
+      let candidate = null;
+
+      if (cat === 'Sum') {
+        const sumEntry = cr?.['Sum'] ?? cr?.['overview']?.['sum'];
+        if (!sumEntry) return null;
+        const raw = qualityRoot(sumEntry.name)?.[selectRegionLevel.value]?.[region];
+        if (!raw) return null;
+        candidate = withSpecies ? raw?.[species] : raw;
+      } else if (cat === 'Ag') {
+        const entry = cr?.['Ag'];
+        if (!entry) return null;
+        const root = qualityRoot(entry.name);
+        const node = withSpecies ? root?.[selectRegionLevel.value]?.[region]?.[species] : root?.[selectRegionLevel.value]?.[region];
+        candidate = node?.[water];
+      } else if (cat === 'Ag Mgt') {
+        const entry = cr?.['Ag Mgt'];
+        if (!entry) return null;
+        const root = qualityRoot(entry.name);
+        const node = withSpecies ? root?.[selectRegionLevel.value]?.[region]?.[species] : root?.[selectRegionLevel.value]?.[region];
+        candidate = node?.[agMgt]?.[water];
+      } else if (cat === 'Non-Ag') {
+        const entry = cr?.['Non-Ag'];
+        if (!entry) return null;
+        const raw = qualityRoot(entry.name)?.[selectRegionLevel.value]?.[region];
+        candidate = withSpecies ? raw?.[species] : raw;
       }
 
+      if (!candidate || Array.isArray(candidate) || candidate['Area'] === undefined) return null;
+
+      if (landuse !== 'ALL' && cat !== 'Sum') {
+        return {
+          Percent: (candidate.Percent || []).filter(s => s.name === landuse),
+          Area: (candidate.Area || []).filter(s => s.name === landuse),
+        };
+      }
+      return candidate;
+    });
+
+    const selectMultiYAxis = {
+      'Area': 'Area-weighted Score (ha)',
+      'Percent': 'Relative Percentage (Pre-1750 = 100%)',
+    };
+
+    const selectChartData = computed(() => {
+      const metric = selectMetric.value;
+      const cat = selectCategory.value;
+      const agMgt = selectAgMgt.value;
+      const water = selectWater.value;
+      const landuse = selectLanduse.value;
+      const region = selectRegion.value;
+      const species = selectSpecies.value;
+      const withSpecies = hasSpecies.value;
+      if (!dataLoaded.value) return {};
+      const cr = chartRegister[metric];
+      const dataRoot = qualityRoot(cr?.[cat]?.["name"]);
+      const regionNode = dataRoot?.[selectRegionLevel.value]?.[region];
+      const chartData = withSpecies ? regionNode?.[species] : regionNode;
+      let seriesData;
+
+      if (cat === "Sum") {
+        const sumEntry = cr?.['Sum'] ?? cr?.['overview']?.['sum'];
+        const rawSumData = qualityRoot(sumEntry?.['name'])?.[selectRegionLevel.value]?.[region];
+        const candidate = withSpecies ? rawSumData?.[species] : rawSumData;
+        const isMultiInput = candidate && !Array.isArray(candidate) && candidate['Area'] !== undefined;
+        seriesData = isMultiInput ? [] : (candidate || []);
+      } else if (cat === "Ag") {
+        const agData = chartData?.[water];
+        seriesData = Array.isArray(agData) ? agData.filter(s => landuse === "ALL" || s.name === landuse) : [];
+      } else if (cat === "Ag Mgt") {
+        const amData = chartData?.[agMgt]?.[water];
+        seriesData = Array.isArray(amData) ? amData.filter(s => landuse === "ALL" || s.name === landuse) : [];
+      } else if (cat === "Non-Ag") {
+        seriesData = Array.isArray(chartData) ? chartData.filter(s => landuse === "ALL" || s.name === landuse) : [];
+      }
       return {
         ...window["Chart_default_options"],
         chart: { height: 440 },
+        plotOptions: { column: { stacking: 'normal' } },
         yAxis: { title: { text: availableUnit["Biodiversity"] } },
         series: seriesData || [],
-        colors: window["Supporting_info"].colors,
       };
     });
 
-    // Memory cleanup on component unmount
-    onUnmounted(() => {
-      window.MemoryService.cleanupViewData(VIEW_NAME);
-    });
+    onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function getTree(metric, cat) {
+      const rawTree = window[mapRegister[metric]?.[cat]?.indexName]?.tree ?? (cat === "Non-Ag" ? [] : {});
+      // For quality metric the outermost tree key is backend — slice it so doCascade
+      // sees the same structure as every other metric (lm → lu, am → lm → lu, etc.).
+      if (metric === 'quality' && selectBackend.value && !Array.isArray(rawTree)) {
+        return rawTree[selectBackend.value] ?? (cat === "Non-Ag" ? [] : {});
+      }
+      return rawTree;
+    }
+
+    async function ensureIndexLoaded(metric, cat) {
+      const entry = mapRegister[metric]?.[cat];
+      if (entry && !window[entry.indexName]) {
+        isLoadingData.value = true;
+        await loadScript(entry.indexPath, entry.indexName, VIEW_NAME);
+        isLoadingData.value = false;
+      }
+    }
+
+    // Build combo array for ensureComboLayer
+    function buildCombo(cat, tree, withSpecies) {
+      const metric = selectMetric.value;
+      const isQuality = metric === 'quality';
+      const b = isQuality ? [selectBackend.value] : [];
+      // Paged metrics: species is the JS outer key, NOT part of the file combo.
+      if (isPaged.value) {
+        if (cat === "Sum")    return [...b, selectLanduse.value];
+        if (cat === "Ag")     return [...b, selectWater.value, selectLanduse.value];
+        if (cat === "Ag Mgt") return [...b, selectAgMgt.value, selectWater.value, selectLanduse.value];
+        if (cat === "Non-Ag") return [...b, selectLanduse.value];
+        return [...b, selectLanduse.value];
+      }
+      if (cat === "Sum") {
+        return [...b, ...(withSpecies ? [selectSpecies.value, selectLanduse.value] : [selectLanduse.value])];
+      } else if (cat === "Ag") {
+        return [...b, ...(withSpecies ? [selectWater.value, selectSpecies.value, selectLanduse.value] : [selectWater.value, selectLanduse.value])];
+      } else if (cat === "Ag Mgt") {
+        return [...b, ...(withSpecies ? [selectAgMgt.value, selectWater.value, selectSpecies.value, selectLanduse.value] : [selectAgMgt.value, selectWater.value, selectLanduse.value])];
+      } else if (cat === "Non-Ag") {
+        return [...b, ...(withSpecies ? [selectSpecies.value, selectLanduse.value] : [selectLanduse.value])];
+      }
+      return [...b, selectLanduse.value];
+    }
+
+    function _pagedSpecies() {
+      // Species list for the current page from the index's pages field.
+      return currentPageInfo.value?.species || [];
+    }
+
+    async function _ensureLayer(cat, tree, withSpecies) {
+      const metric = selectMetric.value;
+      const entry  = mapRegister[metric]?.[cat];
+      if (!entry?.layerPrefix) return;
+      const combo = buildCombo(cat, tree, withSpecies);
+      if (isPaged.value && currentPageInfo.value) {
+        const { start, end } = currentPageInfo.value;
+        await ensureComboLayer(entry.layerPrefix, combo, [start, end]);
+      } else {
+        await ensureComboLayer(entry.layerPrefix, combo);
+      }
+    }
+
+    async function doCascade(cat) {
+      const metric = selectMetric.value;
+      const tree = getTree(metric, cat);
+      const withSpecies = hasSpecies.value;
+      const paged = isPaged.value;
+      const curW = selectWater.value, curL = selectLanduse.value;
+      const curAm = selectAgMgt.value, curSp = selectSpecies.value;
+
+      if (cat === "Sum") {
+        availableAgMgt.value = []; availableWater.value = [];
+        if (withSpecies && paged) {
+          // tree: [lu]  — species come from pages
+          availableLanduse.value = Array.isArray(tree) ? tree : Object.keys(tree);
+          availableSpecies.value = _pagedSpecies();
+          const prevSp = previousSelections.value["Sum"]?.species || curSp;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+        } else if (withSpecies && !Array.isArray(tree)) {
+          // tree: { species: [lu] }
+          availableSpecies.value = Object.keys(tree);
+          const prevSp = previousSelections.value["Sum"]?.species || curSp;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+          availableLanduse.value = tree[selectSpecies.value] || [];
+        } else {
+          availableSpecies.value = [];
+          selectSpecies.value = '';
+          availableLanduse.value = Array.isArray(tree) ? tree : Object.keys(tree);
+        }
+        const prevLU = previousSelections.value["Sum"]?.landuse || curL;
+        selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
+
+      } else if (cat === "Ag") {
+        if (withSpecies && paged) {
+          // tree: { water: [lu] }  — species from pages
+          availableWater.value = Object.keys(tree);
+          const prevW = previousSelections.value["Ag"]?.water || curW;
+          selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
+          availableLanduse.value = tree[selectWater.value] || [];
+          availableSpecies.value = _pagedSpecies();
+          const prevSp = previousSelections.value["Ag"]?.species || curSp;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+        } else if (withSpecies) {
+          // tree: { water: { species: [lu] } }
+          availableWater.value = Object.keys(tree);
+          const prevW = previousSelections.value["Ag"]?.water || curW;
+          selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
+          availableSpecies.value = Object.keys(tree[selectWater.value] || {});
+          const prevSp = previousSelections.value["Ag"]?.species || curSp;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+          availableLanduse.value = tree[selectWater.value]?.[selectSpecies.value] || [];
+        } else {
+          // tree: { water: [lu] }
+          availableSpecies.value = []; selectSpecies.value = '';
+          availableWater.value = Object.keys(tree);
+          const prevW = previousSelections.value["Ag"]?.water || curW;
+          selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
+          availableLanduse.value = tree[selectWater.value] || [];
+        }
+        const prevLU = previousSelections.value["Ag"]?.landuse || curL;
+        selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
+
+      } else if (cat === "Ag Mgt") {
+        if (withSpecies && paged) {
+          // tree: { am: { lm: [lu] } }  — species from pages
+          availableAgMgt.value = Object.keys(tree);
+          const prevAm = previousSelections.value["Ag Mgt"]?.agMgt || curAm;
+          selectAgMgt.value = (prevAm && availableAgMgt.value.includes(prevAm)) ? prevAm : (availableAgMgt.value[0] || '');
+          availableWater.value = Object.keys(tree[selectAgMgt.value] || {});
+          const prevW = previousSelections.value["Ag Mgt"]?.water || curW;
+          selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
+          availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value] || [];
+          availableSpecies.value = _pagedSpecies();
+          const prevSp = previousSelections.value["Ag Mgt"]?.species || curSp;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+        } else if (withSpecies) {
+          // tree: { am: { lm: { species: [lu] } } }
+          availableAgMgt.value = Object.keys(tree);
+          const prevAm = previousSelections.value["Ag Mgt"]?.agMgt || curAm;
+          selectAgMgt.value = (prevAm && availableAgMgt.value.includes(prevAm)) ? prevAm : (availableAgMgt.value[0] || '');
+          availableWater.value = Object.keys(tree[selectAgMgt.value] || {});
+          const prevW = previousSelections.value["Ag Mgt"]?.water || curW;
+          selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
+          availableSpecies.value = Object.keys(tree[selectAgMgt.value]?.[selectWater.value] || {});
+          const prevSp = previousSelections.value["Ag Mgt"]?.species || curSp;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+          availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value]?.[selectSpecies.value] || [];
+        } else {
+          // tree: { am: { lm: [lu] } }
+          availableSpecies.value = []; selectSpecies.value = '';
+          availableAgMgt.value = Object.keys(tree);
+          const prevAm = previousSelections.value["Ag Mgt"]?.agMgt || curAm;
+          selectAgMgt.value = (prevAm && availableAgMgt.value.includes(prevAm)) ? prevAm : (availableAgMgt.value[0] || '');
+          availableWater.value = Object.keys(tree[selectAgMgt.value] || {});
+          const prevW = previousSelections.value["Ag Mgt"]?.water || curW;
+          selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
+          availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value] || [];
+        }
+        const prevLU = previousSelections.value["Ag Mgt"]?.landuse || curL;
+        selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
+
+      } else if (cat === "Non-Ag") {
+        availableAgMgt.value = []; availableWater.value = [];
+        if (withSpecies && paged) {
+          // tree: [lu]  — species from pages
+          availableLanduse.value = Array.isArray(tree) ? tree : Object.keys(tree);
+          availableSpecies.value = _pagedSpecies();
+          const prevSp = previousSelections.value["Non-Ag"]?.species || curSp;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+        } else if (withSpecies && !Array.isArray(tree)) {
+          // tree: { species: [lu] }
+          availableSpecies.value = Object.keys(tree);
+          const prevSp = previousSelections.value["Non-Ag"]?.species || curSp;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+          availableLanduse.value = tree[selectSpecies.value] || [];
+        } else {
+          availableSpecies.value = []; selectSpecies.value = '';
+          availableLanduse.value = Array.isArray(tree) ? tree : Object.keys(tree);
+        }
+        const prevLU = previousSelections.value["Non-Ag"]?.landuse || curL;
+        selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
+      }
+
+      await _ensureLayer(cat, tree, withSpecies);
+      if (isPaged.value && currentPageInfo.value) {
+        const { start, end } = currentPageInfo.value;
+        isLoadingData.value = true;
+        await _loadChartPage(start, end);
+        isLoadingData.value = false;
+      }
+    }
+
+    async function loadAllCharts() {
+      const pending = [];
+      for (const metric of availableMetrics.value) {
+        const metricCr = chartRegister[metric];
+        for (const [key, val] of Object.entries(metricCr || {})) {
+          if (key === 'overview') {
+            for (const entry of Object.values(val || {})) {
+              if (entry?.paged) continue; // loaded on demand when page changes
+              if (entry?.name && !window[entry.name]) pending.push(loadScript(entry.path, entry.name, VIEW_NAME));
+            }
+          } else {
+            if (val?.paged) continue; // loaded on demand when page changes
+            if (val?.name && !window[val.name]) pending.push(loadScript(val.path, val.name, VIEW_NAME));
+          }
+        }
+      }
+      if (pending.length > 0) await Promise.allSettled(pending);
+    }
+
+    // Load chart page files for paged metrics and alias to base window names.
+    async function _loadChartPage(start, end) {
+      const metric = selectMetric.value;
+      const metricCr = chartRegister[metric];
+      if (!metricCr) return;
+      const pending = [];
+      const entries = [];
+      for (const [key, val] of Object.entries(metricCr)) {
+        if (key === 'overview') {
+          for (const entry of Object.values(val || {})) {
+            if (!entry?.paged || !entry.name) continue;
+            const pagedName = `${entry.name}_${start}_${end}`;
+            if (!window[pagedName]) pending.push(loadScript(`data/${pagedName}.js`, pagedName, VIEW_NAME));
+            entries.push({ base: entry.name, paged: pagedName });
+          }
+        } else if (val?.paged && val.name) {
+          const pagedName = `${val.name}_${start}_${end}`;
+          if (!window[pagedName]) pending.push(loadScript(`data/${pagedName}.js`, pagedName, VIEW_NAME));
+          entries.push({ base: val.name, paged: pagedName });
+        }
+      }
+      if (pending.length > 0) await Promise.allSettled(pending);
+      // Alias paged data to base names so existing chart lookup code is unchanged
+      for (const { base, paged } of entries) {
+        window[base] = window[paged];
+      }
+    }
 
     onMounted(async () => {
       await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
-      // Determine enabled metrics from run scenario settings
       const runScenario = {};
-      (window.Supporting_info.model_run_settings || []).forEach(s => {
-        runScenario[s.parameter] = s.val;
-      });
+      (window.Supporting_info.model_run_settings || []).forEach(s => { runScenario[s.parameter] = s.val; });
+
+      METRIC_LABELS['GBF3_NVIS'] = 'GBF3 (NVIS)';
 
       const enabledMetrics = ['quality'];
       for (const [metric, settingKey] of Object.entries(METRIC_TO_SETTING)) {
         if (metric === 'quality') continue;
-        if (settingKey && runScenario[settingKey] !== 'off' && mapRegister[metric]) {
+        if (!mapRegister[metric]) continue;
+        if (settingKey === null || runScenario[settingKey] !== 'off') {
           enabledMetrics.push(metric);
         }
       }
       availableMetrics.value = enabledMetrics;
 
-      // Load all enabled metrics
-      for (const metric of enabledMetrics) {
-        const mr = mapRegister[metric];
-        const cr = chartRegister[metric];
-        if (mr) {
-          await loadScript(mr["Ag"]["path"],     mr["Ag"]["name"],     VIEW_NAME);
-          await loadScript(mr["Ag Mgt"]["path"], mr["Ag Mgt"]["name"], VIEW_NAME);
-          await loadScript(mr["Non-Ag"]["path"], mr["Non-Ag"]["name"], VIEW_NAME);
-        }
-        if (cr) {
-          await loadScript(cr["Ag"]["path"],     cr["Ag"]["name"],     VIEW_NAME);
-          await loadScript(cr["Ag Mgt"]["path"], cr["Ag Mgt"]["name"], VIEW_NAME);
-          await loadScript(cr["Non-Ag"]["path"], cr["Non-Ag"]["name"], VIEW_NAME);
-        }
+      if (enabledMetrics.includes('GBF2')) {
+        const mask = mapRegister['GBF2']['mask'];
+        await loadScript(mask.path, mask.name, VIEW_NAME);
       }
 
-      // Initial selections
       availableYears.value = window.Supporting_info.years;
-      selectMetric.value = enabledMetrics[0];
-      selectCategory.value = availableCategories[0];
+      selectYear.value = availableYears.value[0] || 2020;
 
-      await nextTick(() => {
-        dataLoaded.value = true;
-      });
-    });
+      const initMetric = enabledMetrics[0];
+      const initMr = mapRegister[initMetric] || {};
+      const initCat = ALL_CATEGORIES.find(c => initMr[c]) || "Ag";
 
-    // Watchers and methods
-    const toggleDrawer = () => {
-      isDrawerOpen.value = !isDrawerOpen.value;
-    };
+      await Promise.all([ensureIndexLoaded(initMetric, initCat), loadAllCharts()]);
 
-    watch(yearIndex, (newIndex) => {
-      selectYear.value = availableYears.value[newIndex];
-    });
+      selectMetric.value = initMetric;
 
-    // Metric change: re-cascade based on current category
-    watch(selectMetric, () => {
-      doCascade(selectCategory.value);
-    });
-
-    // Progressive selection chain watchers
-    watch(selectCategory, (newCategory, oldCategory) => {
-      // Save previous selections before switching
-      if (oldCategory === "Ag") {
-        previousSelections.value["Ag"] = { water: selectWater.value, landuse: selectLanduse.value };
-      } else if (oldCategory === "Ag Mgt") {
-        previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectLanduse.value };
-      } else if (oldCategory === "Non-Ag") {
-        previousSelections.value["Non-Ag"] = { landuse: selectLanduse.value };
+      // Discover available backends from BIO_quality_Ag top-level keys
+      if (window["BIO_quality_Ag"]) {
+        const backends = Object.keys(window["BIO_quality_Ag"]);
+        availableBackends.value = backends;
+        const mbSetting = (window.Supporting_info.model_run_settings || []).find(s => s.parameter === "BIO_QUALITY_LAYER")?.val || "";
+        modelBackend.value = mbSetting;
+        selectBackend.value = backends[0] || "";
       }
-      doCascade(newCategory);
+
+      await doCascade(initCat);
+      selectCategory.value = initCat;
+      dataLoaded.value = true;
     });
 
-    watch(selectAgMgt, (newAgMgt) => {
+    const toggleDrawer = () => { isDrawerOpen.value = !isDrawerOpen.value; };
+    watch(yearIndex, (i) => { selectYear.value = availableYears.value[i]; });
+    watch(selectRegionLevel, () => { selectRegion.value = 'AUSTRALIA'; });
+
+    watch(selectMetric, async (newMetric) => {
+      selectPage.value = 0;
+      const mr = mapRegister[newMetric] || {};
+      let cat = selectCategory.value;
+      if (!mr[cat]) {
+        cat = ALL_CATEGORIES.find(c => mr[c]) || cat;
+        selectCategory.value = cat;
+        return;
+      }
+      await ensureIndexLoaded(newMetric, cat);
+      await doCascade(cat);
+    });
+
+    watch(selectCategory, async (newCat, oldCat) => {
+      selectPage.value = 0;
+      if (oldCat === "Sum") previousSelections.value["Sum"] = { species: selectSpecies.value, landuse: selectLanduse.value };
+      if (oldCat === "Ag") previousSelections.value["Ag"] = { water: selectWater.value, species: selectSpecies.value, landuse: selectLanduse.value };
+      if (oldCat === "Ag Mgt") previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, species: selectSpecies.value, landuse: selectLanduse.value };
+      if (oldCat === "Non-Ag") previousSelections.value["Non-Ag"] = { species: selectSpecies.value, landuse: selectLanduse.value };
+      await ensureIndexLoaded(selectMetric.value, newCat);
+      await doCascade(newCat);
+    });
+
+    watch(selectAgMgt, async (newAgMgt) => {
       if (selectCategory.value !== "Ag Mgt") return;
       previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-      const amData = window[mapRegister[selectMetric.value]?.["Ag Mgt"]?.["name"]];
-
-      availableWater.value = Object.keys(amData?.[newAgMgt] || {});
-      const prevWater = previousSelections.value["Ag Mgt"].water;
-      selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-      availableLanduse.value = Object.keys(amData?.[newAgMgt]?.[selectWater.value] || {});
-      const prevLU = previousSelections.value["Ag Mgt"].landuse;
-      selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
+      const metric = selectMetric.value;
+      const tree = getTree(metric, "Ag Mgt");
+      const withSpecies = hasSpecies.value;
+      const paged = isPaged.value;
+      availableWater.value = Object.keys(tree[newAgMgt] || {});
+      const prevW = previousSelections.value["Ag Mgt"].water;
+      selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
+      if (withSpecies && paged) {
+        availableLanduse.value = tree[newAgMgt]?.[selectWater.value] || [];
+        availableSpecies.value = _pagedSpecies();
+      } else if (withSpecies) {
+        availableSpecies.value = Object.keys(tree[newAgMgt]?.[selectWater.value] || {});
+        const prevSp = previousSelections.value["Ag Mgt"].species;
+        selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+        availableLanduse.value = tree[newAgMgt]?.[selectWater.value]?.[selectSpecies.value] || [];
+      } else {
+        availableLanduse.value = tree[newAgMgt]?.[selectWater.value] || [];
+      }
+      const prevL = previousSelections.value["Ag Mgt"].landuse;
+      selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
+      await _ensureLayer("Ag Mgt", tree, withSpecies);
     });
 
-    watch(selectWater, (newWater) => {
-      if (selectCategory.value === "Ag") {
-        previousSelections.value["Ag"].water = newWater;
-        const agData = window[mapRegister[selectMetric.value]?.["Ag"]?.["name"]];
+    watch(selectWater, async (newWater) => {
+      const cat = selectCategory.value;
+      if (cat !== "Ag" && cat !== "Ag Mgt") return;
+      previousSelections.value[cat].water = newWater;
+      const metric = selectMetric.value;
+      const tree = getTree(metric, cat);
+      const withSpecies = hasSpecies.value;
+      const paged = isPaged.value;
+      if (cat === "Ag") {
+        if (withSpecies && paged) {
+          availableLanduse.value = tree[newWater] || [];
+          availableSpecies.value = _pagedSpecies();
+        } else if (withSpecies) {
+          availableSpecies.value = Object.keys(tree[newWater] || {});
+          const prevSp = previousSelections.value["Ag"].species;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+          availableLanduse.value = tree[newWater]?.[selectSpecies.value] || [];
+        } else {
+          availableLanduse.value = tree[newWater] || [];
+        }
+      } else { // Ag Mgt
+        if (withSpecies && paged) {
+          availableLanduse.value = tree[selectAgMgt.value]?.[newWater] || [];
+          availableSpecies.value = _pagedSpecies();
+        } else if (withSpecies) {
+          availableSpecies.value = Object.keys(tree[selectAgMgt.value]?.[newWater] || {});
+          const prevSp = previousSelections.value["Ag Mgt"].species;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+          availableLanduse.value = tree[selectAgMgt.value]?.[newWater]?.[selectSpecies.value] || [];
+        } else {
+          availableLanduse.value = tree[selectAgMgt.value]?.[newWater] || [];
+        }
+      }
+      const prevL = previousSelections.value[cat].landuse;
+      selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
+      await _ensureLayer(cat, tree, withSpecies);
+    });
 
-        availableLanduse.value = Object.keys(agData?.[newWater] || {});
-        const prevLU = previousSelections.value["Ag"].landuse;
-        selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
-
-      } else if (selectCategory.value === "Ag Mgt") {
-        previousSelections.value["Ag Mgt"].water = newWater;
-        const amData = window[mapRegister[selectMetric.value]?.["Ag Mgt"]?.["name"]];
-
-        availableLanduse.value = Object.keys(amData?.[selectAgMgt.value]?.[newWater] || {});
-        const prevLU = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
+    watch(selectSpecies, async (newSpecies) => {
+      if (!hasSpecies.value || !newSpecies) return;
+      const cat = selectCategory.value;
+      const metric = selectMetric.value;
+      const tree = getTree(metric, cat);
+      previousSelections.value[cat].species = newSpecies;
+      // Paged: species is the JS outer key — landuse doesn't change with species selection.
+      if (!isPaged.value) {
+        if (cat === "Sum") {
+          availableLanduse.value = tree[newSpecies] || [];
+        } else if (cat === "Ag") {
+          availableLanduse.value = tree[selectWater.value]?.[newSpecies] || [];
+        } else if (cat === "Ag Mgt") {
+          availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value]?.[newSpecies] || [];
+        } else if (cat === "Non-Ag") {
+          availableLanduse.value = tree[newSpecies] || [];
+        }
+        if (!availableLanduse.value.includes(selectLanduse.value)) {
+          selectLanduse.value = availableLanduse.value[0] || '';
+        }
+      }
+      // For paged metrics selectSpecies just changes the map lookup — no file reload needed
+      // (the file already contains all species on this page). Only reload if non-paged.
+      if (!isPaged.value) {
+        await _ensureLayer(cat, tree, true);
       }
     });
 
-    watch(selectLanduse, (newLanduse) => {
-      if (selectCategory.value === "Ag") {
-        previousSelections.value["Ag"].landuse = newLanduse;
-      } else if (selectCategory.value === "Ag Mgt") {
-        previousSelections.value["Ag Mgt"].landuse = newLanduse;
-      } else if (selectCategory.value === "Non-Ag") {
-        previousSelections.value["Non-Ag"].landuse = newLanduse;
+    watch(selectLanduse, async (newLanduse) => {
+      const cat = selectCategory.value;
+      const metric = selectMetric.value;
+      previousSelections.value[cat] = { ...(previousSelections.value[cat] || {}), landuse: newLanduse };
+      const tree = getTree(metric, cat);
+      const withSpecies = hasSpecies.value;
+      await _ensureLayer(cat, tree, withSpecies);
+    });
+
+    watch(selectPage, async () => {
+      if (!isPaged.value || !selectCategory.value) return;
+      const cat    = selectCategory.value;
+      const metric = selectMetric.value;
+      const tree   = getTree(metric, cat);
+      availableSpecies.value = _pagedSpecies();
+      const prevSp = previousSelections.value[cat]?.species;
+      selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp))
+          ? prevSp : (availableSpecies.value[0] || '');
+      await _ensureLayer(cat, tree, hasSpecies.value);
+      if (currentPageInfo.value) {
+        const { start, end } = currentPageInfo.value;
+        isLoadingData.value = true;
+        await _loadChartPage(start, end);
+        isLoadingData.value = false;
       }
+    });
+
+    watch(selectBackend, async () => {
+      if (selectMetric.value !== 'quality' || !selectCategory.value) return;
+      await doCascade(selectCategory.value);
     });
 
     const _state = {
-      yearIndex,
-      selectYear,
-      selectRegion,
-
-      METRIC_LABELS,
-      availableYears,
-      availableMetrics,
-      availableCategories,
-      availableAgMgt,
-      availableWater,
-      availableLanduse,
-
-      selectMetric,
-      selectCategory,
-      selectAgMgt,
-      selectWater,
-      selectLanduse,
-
-      selectMapData,
-      selectChartData,
-
-      dataLoaded,
-      isDrawerOpen,
-      toggleDrawer,
+      yearIndex, selectYear, selectRegion,
+      availableRegionLevels, selectRegionLevel,
+      METRIC_LABELS, availableYears, availableMetrics, availableCategories,
+      availableAgMgt, availableWater, availableSpecies, availableLanduse,
+      selectMetric, selectCategory, selectAgMgt, selectWater, selectSpecies, selectLanduse,
+      selectBackend, availableBackends, modelBackend,
+      hasSpecies, speciesLabel, formatLanduse,
+      selectMapData, selectChartData, selectMultiInput, selectMultiYAxis, gbf2MaskOverlay,
+      dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
+      // Paged species
+      selectPage, isPaged, totalPages, currentPageInfo,
     };
+    const _fn = v => String(v).trim().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    _state.mapFileName = computed(() =>
+      [VIEW_NAME, selectMetric.value, selectCategory.value, selectAgMgt.value, selectWater.value, selectSpecies.value, selectLanduse.value, selectYear.value]
+        .filter(Boolean).map(_fn).filter(Boolean).join('__')
+    );
     window._debug[VIEW_NAME] = _state;
     return _state;
   },
   template: /*html*/`
     <div class="relative w-full h-screen">
 
-      <!-- Region selection dropdown -->
-      <div class="absolute w-[262px] top-32 left-[20px] z-50 bg-white/70 rounded-lg shadow-lg max-w-xs z-[9999]">
-        <filterable-dropdown></filterable-dropdown>
+      <!-- Region level tabs + Region selection dropdown -->
+      <div class="absolute w-[262px] top-28 left-[20px] z-[9999] max-w-xs">
+        <!-- Drawer-style region level tabs -->
+        <div class="flex gap-1 ml-2 mb-0">
+          <button v-for="lvl in availableRegionLevels" :key="lvl"
+            @click="selectRegionLevel = lvl"
+            class="px-2 py-0.5 text-[0.65rem] font-medium rounded-t-md border border-b-0 transition-colors"
+            :class="selectRegionLevel === lvl
+              ? 'bg-white/90 border-gray-300 text-sky-600'
+              : 'bg-white/40 border-gray-200 text-gray-500 hover:bg-white/60'">
+            {{ lvl === 'region_state' ? 'State' : 'NRM' }}
+          </button>
+        </div>
+        <!-- Dropdown panel -->
+        <div class="bg-white/70 rounded-lg shadow-lg">
+          <filterable-dropdown
+            :key="selectRegionLevel"
+            :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'">
+          </filterable-dropdown>
+        </div>
       </div>
 
       <!-- Year slider -->
-      <div class="absolute top-[200px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
+      <div class="absolute top-[240px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
         <p class="text-[0.8rem]">Year: <strong>{{ selectYear }}</strong></p>
         <el-slider
           v-if="availableYears && availableYears.length > 0"
@@ -327,7 +716,7 @@ window.BiodiversityView = {
       </div>
 
       <!-- Data selection controls container -->
-      <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
+      <div class="absolute top-[325px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
         <!-- Metric buttons (always visible) -->
         <div class="flex flex-wrap gap-1 max-w-[300px]">
@@ -337,6 +726,20 @@ window.BiodiversityView = {
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
             :class="{'bg-sky-500 text-white': selectMetric === val}">
             {{ METRIC_LABELS[val] || val }}
+          </button>
+        </div>
+
+        <!-- Backend layer buttons (quality metric only) -->
+        <div v-if="dataLoaded && selectMetric === 'quality' && availableBackends.length > 1" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Backend:</span>
+          <button v-for="val in availableBackends" :key="val"
+            @click="selectBackend = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1 border border-transparent"
+            :class="{
+              'bg-sky-500 text-white': selectBackend === val,
+              '!border-dashed !border-sky-700': val === modelBackend,
+            }">
+            {{ val }}
           </button>
         </div>
 
@@ -362,8 +765,8 @@ window.BiodiversityView = {
           </button>
         </div>
 
-        <!-- Water options (Ag and Ag Mgt) -->
-        <div v-if="selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+        <!-- Water options (Ag and Ag Mgt only) -->
+        <div v-if="selectCategory !== 'Non-Ag' && selectCategory !== 'Sum' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
@@ -373,24 +776,82 @@ window.BiodiversityView = {
           </button>
         </div>
 
-        <!-- Landuse options -->
+        <!-- Landuse options (for Sum: shows Type dimension values) -->
         <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Landuse:' }}</span>
           <button v-for="(val, key) in availableLanduse" :key="key"
             @click="selectLanduse = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
             :class="{'bg-sky-500 text-white': selectLanduse === val}">
-            {{ val }}
+            {{ formatLanduse(val) }}
           </button>
+        </div>
+
+        <!-- Backend legend note -->
+        <div v-if="dataLoaded && selectMetric === 'quality' && availableBackends.length > 1"
+          style="font-size:0.6rem; line-height:1.3;" class="flex items-center gap-1 text-gray-500">
+          <span class="inline-block px-1 py-0.5 rounded border border-dashed border-sky-700 text-[0.6rem] leading-none">abc</span>
+          <span>= user-selected backend</span>
         </div>
       </div>
 
       <!-- Map container with slide-out chart drawer -->
       <div style="position: relative; width: 100%; height: 100%; overflow: hidden;">
 
+        <!-- Species / VegGroup / Community panel — floating bottom-right, paginated for paged metrics -->
+        <div v-if="dataLoaded && availableSpecies.length > 0"
+          class="absolute bottom-[20px] right-[20px] z-[1001] w-[280px] max-h-[290px] bg-white/85 rounded-lg shadow-md p-2 flex flex-col"
+          :class="{ 'right-[440px]': isDrawerOpen }"
+          style="transition: right 0.3s ease;">
+          <div class="text-[0.8rem] font-medium mb-1 flex-shrink-0">{{ speciesLabel }}</div>
+          <div class="flex flex-col gap-0.5 overflow-y-auto flex-1 pr-1">
+            <button v-for="val in availableSpecies" :key="val"
+              @click="selectSpecies = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded text-left w-full"
+              :class="{'bg-sky-500 text-white': selectSpecies === val}">
+              {{ val }}
+            </button>
+          </div>
+          <!-- Page navigation — only shown for paged metrics with more than one page -->
+          <div v-if="isPaged && totalPages > 1"
+            class="flex items-center justify-between mt-1 pt-1 border-t border-gray-200 flex-shrink-0">
+            <button
+              @click="selectPage = Math.max(0, selectPage - 1)"
+              :disabled="selectPage === 0"
+              class="px-2 py-0.5 text-[0.65rem] rounded bg-white border border-gray-300 disabled:opacity-30 cursor-pointer">
+              ←
+            </button>
+            <span class="text-[0.6rem] text-gray-500">
+              {{ selectPage + 1 }}&thinsp;/&thinsp;{{ totalPages }}
+            </span>
+            <button
+              @click="selectPage = Math.min(totalPages - 1, selectPage + 1)"
+              :disabled="selectPage === totalPages - 1"
+              class="px-2 py-0.5 text-[0.65rem] rounded bg-white border border-gray-300 disabled:opacity-30 cursor-pointer">
+              →
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading overlay shown while lazy-loading a new map file -->
+        <div v-if="isLoadingData"
+          class="absolute inset-0 z-[2000] flex items-center justify-center bg-white/60 backdrop-blur-sm">
+          <div class="flex flex-col items-center gap-2 text-gray-600 text-sm font-medium">
+            <svg class="animate-spin h-8 w-8 text-sky-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+            Loading map data…
+          </div>
+        </div>
+
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          :file-name="mapFileName"
+          :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
+          :overlayGeoJSON="gbf2MaskOverlay"
+          :show-legend="!isDrawerOpen"
           style="width: 100%; height: 100%;">
         </regions-map>
 
@@ -419,6 +880,8 @@ window.BiodiversityView = {
           }">
           <chart-container
             :chartData="selectChartData"
+            :multiInput="selectMultiInput"
+            :multiYAxis="selectMultiYAxis"
             :draggable="true"
             :zoomable="true"
             style="width: 100%; height: 200px;">
