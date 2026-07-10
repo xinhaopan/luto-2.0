@@ -40,6 +40,12 @@ Reference: myCode/tasks_run/Paper2_tasks.py
 """
 
 import os
+import sys
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 import pandas as pd
 from tools.helpers import create_grid_search_template, create_task_runs
 
@@ -159,9 +165,10 @@ grid_search = {
     # top-20% priority areas: CUT = normalised area % (0=none, 100=all) → 20 = top 20%
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
     'GBF2_TARGETS_DICT': [{
-        'low':    {2030: 0.05, 2050: 0.05, 2100: 0.05},   # AgS1 Regional Ag capitals: restore 5%
-        'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
-        'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},   # AgS2 Landscape stewardship: restore 50% by 2050
+        # The 2030 milestone is half of the corresponding 2050 target.
+        'low':    {2030: 0.025, 2050: 0.05, 2100: 0.05},  # AgS1 Regional Ag capitals: restore 5% by 2050
+        'medium': {2030: 0.15,  2050: 0.30, 2100: 0.30},
+        'high':   {2030: 0.25,  2050: 0.50, 2100: 0.50},  # AgS2 Landscape stewardship: restore 50% by 2050
     }],
     'BIO_QUALITY_LAYER': ['Suitability'],
     'GBF3_NVIS_TARGET': ['off'],
