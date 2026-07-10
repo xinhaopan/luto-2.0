@@ -100,11 +100,11 @@ grid_search = {
     'TASK_NAME': ['20260530_Paper3_NCI'],
     'KEEP_OUTPUTS': [True],
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
     # ---- Computational settings (not model parameters) ----------------------
     'MEM': ['68GB'],
     'NCPUS': ['17'],
-    'WRITE_THREADS': ['2'],
+    # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
     'TIME': ['48:00:00'],
 
     # ---- AG2050 scenario switch and selector ---------------------------------
@@ -115,7 +115,7 @@ grid_search = {
     'AG2050_SCENARIO': ['AgS1', 'AgS2', 'AgS3', 'AgS4'],
 
     # ---- Model settings -----------------------------------------------------
-    'SOLVE_WEIGHT_ALPHA': [1],
+    # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
     'WRITE_OUTPUT_GEOTIFFS': [True],
@@ -153,10 +153,10 @@ grid_search = {
         'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
     }],
     'BIO_QUALITY_LAYER': ['Suitability'],
-    'BIODIVERSITY_TARGET_GBF_3': ['off'],
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],
-    'BIODIVERSITY_TARGET_GBF_8': ['off'],
+    'GBF3_NVIS_TARGET': ['off'],
+    'GBF4_TARGET_SNES': ['off'],
+    'GBF4_TARGET_ECNES': ['off'],
+    'GBF8_TARGET': ['off'],
 
     # ---- Water settings -----------------------------------------------------
     'WATER_STRESS': [0.6],

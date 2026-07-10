@@ -6,16 +6,16 @@ grid_search = {
     'TASK_NAME': ['20260611_paper4_NCI'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [2],
+    # 'NUMERIC_FOCUS': [2],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['40GB'],
     'NCPUS': ['10'],
-    'WRITE_THREADS': ['2'],
+    # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
     'TIME': ['12:00:00'],
     'PRODUCTIVITY_TREND': ['CONSTANT'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
-    'BIODIVERSITY_TARGET_GBF_2': ['off'],
+    'GBF2_TARGET': ['off'],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     # Carbon: 0 to 360, step = 20 (multiple of 10) → 19 points
@@ -25,7 +25,7 @@ grid_search = {
     # Headline P50 = A$22,000/ha (NSW BOS ecosystem-credit median: A$4,000/credit × 5.5 credits/ha)
     'BIODIVERSITY_PRICE_CONSTANT': list(range(0, 22001, 1000)),
     # ---------------------------------- Model settings ------------------------------
-    'SOLVE_WEIGHT_ALPHA': [1],
+    # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
@@ -44,10 +44,10 @@ grid_search = {
         'high': {2030: 0.30, 2050: 0.50, 2100: 0.50},
     }],
     'BIO_QUALITY_LAYER': ['Suitability'],
-    'BIODIVERSITY_TARGET_GBF_3': ['off'],
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],
-    'BIODIVERSITY_TARGET_GBF_8': ['off'],
+    'GBF3_NVIS_TARGET': ['off'],
+    'GBF4_TARGET_SNES': ['off'],
+    'GBF4_TARGET_ECNES': ['off'],
+    'GBF8_TARGET': ['off'],
 
     # ----------------------------------- Water settings --------------------------------
     'WATER_STRESS': [0.6],
