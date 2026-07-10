@@ -108,16 +108,16 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260710_Paper3_NCI'],
+    'TASK_NAME': ['20260711_Paper3_HPC'],
     'KEEP_OUTPUTS': [False],
     'QUEUE': ['normalsr'],
     # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
     # ---- Computational settings (not model parameters) ----------------------
-    # NCI production run: 36 CPUs / 144 GB at RESFACTOR=3
-    'MEM': ['144GB'],
-    'NCPUS': ['36'],
+    # HPC production run: 10 CPUs / 160 GB / 144 hours at RESFACTOR=3
+    'MEM': ['160GB'],
+    'NCPUS': ['10'],
     # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
-    'TIME': ['72:00:00'],
+    'TIME': ['144:00:00'],
 
     # ---- AG2050 scenario switch and selector ---------------------------------
     # Set AG2050_MODE=True to activate all AG2050 overrides.
@@ -270,7 +270,7 @@ print(grid_search_settings_df.columns)
 create_task_runs(
     task_root_dir,
     grid_search_settings_df,
-    platform="NCI",
+    platform="HPC",
     n_workers=min(len(grid_search_settings_df.columns), 50),
     use_parallel=True,
 )
