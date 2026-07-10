@@ -2,10 +2,15 @@
 Task runner for AG2050 scenarios (AgS1 – AgS4).
 
 Scenarios:
-  AgS1 – Regional Ag capitals:   Non-ag ON,  full AG managements, maintain historical GHG & biodiversity
-  AgS2 – Landscape stewardship:  Non-ag ON,  full AG managements, low GHG, restore 50% biodiversity
+  AgS1 – Regional Ag capitals:   Non-ag ON,  full AG managements, maintain historical GHG, restore 5% biodiversity, High productivity
+  AgS2 – Landscape stewardship:  Non-ag ON,  full AG managements, low GHG, restore 50% biodiversity, Very High productivity
   AgS3 – Climate survival:       Non-ag OFF, limited AG managements (Eco Grazing/Savanna/HIR only), GHG off
   AgS4 – System decline:         Non-ag OFF, limited AG managements (Eco Grazing/Savanna/HIR only), GHG off
+
+  AgS1 & AgS2 restore 5% / 50% of the top-20% biodiversity-priority areas
+  (GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT=20) and both cap total non-ag
+  land at <=15% per NRM region (REGIONAL_ADOPTION_CONSTRAINTS='NON_AG_CAP').
+  Transitions use jinzhu's per-source delta-flow model (now the only mode).
 
 AG management availability per scenario:
   ─────────────────────────────────────────────────────────────────────
@@ -97,15 +102,16 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260707_Paper3_aquila'],
+    'TASK_NAME': ['20260710_Paper3_aquila'],
     'KEEP_OUTPUTS': [False],
     'QUEUE': ['normalsr'],
     # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
     # ---- Computational settings (not model parameters) ----------------------
-    'MEM': ['68GB'],
-    'NCPUS': ['17'],
+    # aquila RESFACTOR=5 test run: 24 CPUs / 96 GB (Jinzhu-recommended for res5)
+    'MEM': ['96GB'],
+    'NCPUS': ['24'],
     # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
-    'TIME': ['48:00:00'],
+    'TIME': ['72:00:00'],
 
     # ---- AG2050 scenario switch and selector ---------------------------------
     # Set AG2050_MODE=True to activate all AG2050 overrides.
@@ -118,6 +124,9 @@ grid_search = {
     # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
+    # Higher solver precision for the final paper runs (jinzhu default; tighter than the 1e-2 baseline)
+    'FEASIBILITY_TOLERANCE': [1e-6],
+    'OPTIMALITY_TOLERANCE': [1e-6],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],
@@ -140,17 +149,19 @@ grid_search = {
     }],
 
     # ---- Biodiversity settings ----------------------------------------------
-    # BIODIVERSITY_TARGET_GBF_2 is auto-set by AG2050_SCENARIO; shown as comments:
-    #   AgS1 → 'maintain_historical'  (floor = 2010 GBF-2 score)
-    #   AgS2 → 'high'                 (restore 50 % in top-30 % priority areas)
-    #   AgS3 → 'off'
-    #   AgS4 → 'off'
+    # GBF2_TARGET is auto-set from AG2050_BIO_MAP[scenario] at runtime (data.py).
+    # Override the map here so:
+    #   AgS1 Regional Ag capitals  → 'low'  (restore  5% of top-20% priority areas)
+    #   AgS2 Landscape stewardship → 'high' (restore 50% by 2050)
+    #   AgS3 / AgS4                → 'off'
+    'AG2050_BIO_MAP': [{'AgS1': 'low', 'AgS2': 'high', 'AgS3': 'off', 'AgS4': 'off'}],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
+    # top-20% priority areas: CUT = normalised area % (0=none, 100=all) → 20 = top 20%
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
     'GBF2_TARGETS_DICT': [{
-        'low':    {2030: 0,    2050: 0,    2100: 0},
+        'low':    {2030: 0.05, 2050: 0.05, 2100: 0.05},   # AgS1 Regional Ag capitals: restore 5%
         'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
-        'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
+        'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},   # AgS2 Landscape stewardship: restore 50% by 2050
     }],
     'BIO_QUALITY_LAYER': ['Suitability'],
     'GBF3_NVIS_TARGET': ['off'],
@@ -203,9 +214,15 @@ grid_search = {
     }],
 
 
+    # ---- Regional adoption: 15% NRM non-ag cap ------------------------------
+    # Total combined non-ag land <= 15% of each NRM region. Binds AgS1/AgS2
+    # (non-ag ON); harmless for AgS3/AgS4 (non-ag OFF).
+    'REGIONAL_ADOPTION_CONSTRAINTS': ['NON_AG_CAP'],
+    'REGIONAL_ADOPTION_NON_AG_REGION': ['NRM'],
+    'REGIONAL_ADOPTION_NON_AG_CAP': [15],
+
     # ---- Per-scenario land use & management options -------------------------
     # Two variants each; conditional_rules below select the correct pair.
-    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],
     'NON_AG_LAND_USES': [_non_ag_off, _non_ag_on],
     'AG_MANAGEMENTS':   [_ag_man_full, _ag_man_limited],
 }
