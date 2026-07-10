@@ -152,11 +152,12 @@ class LutoSolver:
 
     def _setup_vars(self):
         print("├── Setting up decision variables...")
-        self._setup_ag_vars()
+        self._setup_ag_folded_vars()         
+        self._setup_ag_accounting_vars()     
         self._setup_non_ag_vars()
         self._setup_ag_management_variables()
         self._setup_deviation_penalties()
-        self._setup_flow_vars()                 # per-source transition delta vars (needs X_ag / X_nonag)
+        self._setup_flow_vars()  
 
     def _setup_constraints(self):
         print("├── Adding the constraints...")
@@ -169,8 +170,8 @@ class LutoSolver:
         self._add_regional_adoption_constraints()
         self._add_water_usage_limit_constraints()
         self._add_renewable_energy_constraints()
-        self._add_flow_out_constraints()        # source cap (Σ out ≤ x_old; bounds deltas)
-        self._add_flow_in_constraints()         # node balance (X = base + Σin − Σout)
+        self._add_flow_out_constraints()                    # source cap (Σ out ≤ x_old; bounds deltas)
+        self._add_flow_in_constraints()                     # node balance (X = base + Σin − Σout)
 
     def _setup_objective(self):
         """
@@ -201,7 +202,7 @@ class LutoSolver:
         self.gurobi_model.setObjective(objective, sense)
            
 
-    def _setup_ag_vars(self):
+    def _setup_ag_folded_vars(self):
         print("│   ├── setting up decision variables for agricultural land uses...")
         self.X_ag_dry_vars_jr = np.zeros(
             (self._input_data.n_ag_lus, self._input_data.ncells), dtype=object
@@ -227,6 +228,61 @@ class LutoSolver:
                     name=f"X_ag_irr_{j}_{r}".replace(" ", "_")
                 )
         self.const_ag = self._input_data.dvar_base_ag_mrj
+
+
+    def _setup_ag_accounting_vars(self):
+        """Build the ACCOUNTING stream dvar_account — a linear re-expression of the folded decision vars dvar_flow.
+
+        dvar_flow carries the FOLDED composition: every sub-θ sliver's land was merged into its cell's dominant.
+        Accounting (profit/water/GHG/GBF/production) must instead score each TRUE land-use's fraction. For a
+        folded group (dominant receiver d with post-fold mass dominant_frac, true base
+        base_d = dominant_frac − Σ slivers, and each sliver s carrying its folded fraction `slivers[s]`):
+
+            dvar_account[d] = (base_d / dominant_frac) · dvar_flow[d]                  dominant → its TRUE share
+            dvar_account[s] = dvar_flow[s] + (slivers / dominant_frac) · dvar_flow[d]  sliver inflow-land + folded share
+            dvar_account[·] = dvar_flow[·]                                             any LU not in a fold: unchanged
+
+        This adds NO Gurobi variables and NO constraints — the same terms the retired blended coefficient
+        produced, written per true LU. Σ_LU coeff·dvar_account == coeff_eff[d]·dvar_flow[d] + Σ_s coeff_s·dvar_flow[s]
+        exactly (stay-exact, scales with the live dominant, → 0 on a full flip). Entries stay Gurobi Var where
+        untouched and become LinExpr where adjusted; `_qsum` handles both. The dominant's ORIGINAL dvar_flow is
+        read when spreading sliver shares, so scale the dominant last / read from dvar_flow (never dvar_account).
+        """
+        self.X_acct_dry_jr = self.X_ag_dry_vars_jr.copy()
+        self.X_acct_irr_jr = self.X_ag_irr_vars_jr.copy()
+
+        fold_map = self._input_data.ag_fold_map
+        if not fold_map['cells'].size:
+            return
+
+        dvar_flow    = (self.X_ag_dry_vars_jr, self.X_ag_irr_vars_jr)   # folded decision vars (read-only source)
+        dvar_account = (self.X_acct_dry_jr,    self.X_acct_irr_jr)      # accounting stream (written)
+
+        cells          = fold_map['cells']
+        from_m, from_j = fold_map['from_m'], fold_map['from_j']
+        to_m, to_j     = fold_map['to_m'], fold_map['to_j']
+        slivers        = fold_map['vals'].astype(np.float64)
+        dominant_frac  = fold_map['folded_dom'].astype(np.float64)   # > 0 by construction (holds ≥ Σ slivers)
+
+        # A folded dominant's var `dom` collapses the cell's original composition [raw dominant, *slivers]
+        # into ONE variable (dominant_frac = raw + Σ slivers). Un-fold it by TRANSFERRING each sliver's share
+        # of the LIVE var from the dominant to the sliver — the dominant keeps whatever the slivers don't take,
+        # so the group total is conserved and no separate dominant-scaling pass is needed. dvar_account[d]
+        # starts as `dom` (a copy of the flow var), so each subtraction whittles it down to (raw/dominant_frac)·dom.
+        # NOTE the transferred share is the LIVE (slivers/dominant_frac)·dom — subtracting the constant slivers
+        # would freeze the dominant at its base and go negative once it sheds (the rejected v1 error).
+        for k, r in enumerate(cells):
+            dom = dvar_flow[to_m[k]][to_j[k], r]                # the receiver dominant's live folded var
+            if not isinstance(dom, (gp.Var, gp.LinExpr)):
+                # No folded var for the dominant ⇒ the dominant LU is banned (EXCLUDE_NO_GO_LU) in this
+                # region, so the folded stream force-converts that land — its whole folded group has no
+                # STANDING ag to account. Skip; do NOT mint a fresh var (X_acct must stay a re-expression
+                # of the folded decision vars, never a new free variable). The sliver's own var, if any,
+                # is still scored via acct_cells; only the folded-in mass (force-converted) gets nothing.
+                continue
+            share = (slivers[k] / dominant_frac[k]) * dom       # this sliver's fraction of the folded dominant (live)
+            dvar_account[from_m[k]][from_j[k], r] = dvar_account[from_m[k]][from_j[k], r] + share   # sliver gains it
+            dvar_account[to_m[k]][to_j[k], r]     = dvar_account[to_m[k]][to_j[k], r]     - share   # dominant loses it
 
 
     def _setup_non_ag_vars(self):
@@ -530,13 +586,14 @@ class LutoSolver:
         # Get economic contributions
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
 
+        # ACCOUNTING stream: raw coeff (ag_obj_mrj) × X_acct over the accounting support (feasible ∪ slivers).
         ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
-            irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
+            dry_cells = self._input_data.acct_cells_mrj[0, j]
+            irr_cells = self._input_data.acct_cells_mrj[1, j]
             ag_exprs.append(
-                _qsum(ag_obj_mrj[0, dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
-                + _qsum(ag_obj_mrj[1, irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
+                _qsum(ag_obj_mrj[0, dry_cells, j], self.X_acct_dry_jr[j, dry_cells])
+                + _qsum(ag_obj_mrj[1, irr_cells, j], self.X_acct_irr_jr[j, irr_cells])
             )
 
         ag_mam_exprs = []
@@ -781,12 +838,15 @@ class LutoSolver:
         # Precompute j→c quantity coefficient arrays in numpy (bypasses p loop entirely).
         # jc_dry_coeff[j][c] = ag_q_mrp[0, dry_cells, :] @ pr2cm_cp[c, :] for active p only
         # Shape per j: (ncms, len(dry_cells)) — built once, reused in quicksum.
+        # ACCOUNTING stream: raw ag_q_mrp × X_acct over the accounting support (feasible ∪ slivers).
+        # Production becomes uniform — no special per-sliver correction: a folded sliver's X_acct entry
+        # carries its own inflow-land plus its folded share of the dominant, scored at its own products.
         self.ag_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
-            irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
-            X_ag_dry_r = self.X_ag_dry_vars_jr[j, dry_cells]
-            X_ag_irr_r = self.X_ag_irr_vars_jr[j, irr_cells]
+            dry_cells = self._input_data.acct_cells_mrj[0, j]
+            irr_cells = self._input_data.acct_cells_mrj[1, j]
+            X_ag_dry_r = self.X_acct_dry_jr[j, dry_cells]
+            X_ag_irr_r = self.X_acct_irr_jr[j, irr_cells]
 
             # active products for this land use
             active_p = np.where(self._input_data.lu2pr_pj[:, j])[0]
@@ -900,11 +960,13 @@ class LutoSolver:
         Get the Gurobi linear expression for the net water yield of a given region.
         """
 
+        # ACCOUNTING stream: raw ag_w_mrj × X_acct. The loop already visits every cell in `ind` for every
+        # j, so a folded sliver's X_acct term (nonzero at its own j) is captured without acct_cells here.
         ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
             ag_exprs.append(
-                _qsum(self._input_data.ag_w_mrj[0, ind, j], self.X_ag_dry_vars_jr[j, ind])
-                + _qsum(self._input_data.ag_w_mrj[1, ind, j], self.X_ag_irr_vars_jr[j, ind])
+                _qsum(self._input_data.ag_w_mrj[0, ind, j], self.X_acct_dry_jr[j, ind])
+                + _qsum(self._input_data.ag_w_mrj[1, ind, j], self.X_acct_irr_jr[j, ind])
             )
 
         ag_mam_exprs = []
@@ -1051,13 +1113,14 @@ class LutoSolver:
         g_dry_coeff = self._input_data.ag_g_mrj[0, :, :]
         g_irr_coeff = self._input_data.ag_g_mrj[1, :, :]
 
+        # ACCOUNTING stream: raw ag_g_mrj × X_acct over the accounting support (feasible ∪ slivers).
         ghg_ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
-            irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
+            dry_cells = self._input_data.acct_cells_mrj[0, j]
+            irr_cells = self._input_data.acct_cells_mrj[1, j]
             ghg_ag_exprs.append(
-                _qsum(g_dry_coeff[dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
-                + _qsum(g_irr_coeff[irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
+                _qsum(g_dry_coeff[dry_cells, j], self.X_acct_dry_jr[j, dry_cells])
+                + _qsum(g_irr_coeff[irr_cells, j], self.X_acct_irr_jr[j, irr_cells])
             )
 
         ghg_ag_man_exprs = []
@@ -1159,15 +1222,16 @@ class LutoSolver:
         bio_ag_man_exprs = []
         bio_non_ag_exprs = []
 
+        # ACCOUNTING stream: raw per-j biodiv scalar × X_acct over (accounting support ∩ GBF2 mask).
         for j in range(self._input_data.n_ag_lus):
             c_ag = self._input_data.biodiv_contr_ag_j[j]
             if c_ag == 0:
                 continue
-            ind_dry = np.intersect1d(self._input_data.feasible_ag_cells_mrj[0, j], self._input_data.GBF2_mask_idx)
-            ind_irr = np.intersect1d(self._input_data.feasible_ag_cells_mrj[1, j], self._input_data.GBF2_mask_idx)
+            ind_dry = np.intersect1d(self._input_data.acct_cells_mrj[0, j], self._input_data.GBF2_mask_idx)
+            ind_irr = np.intersect1d(self._input_data.acct_cells_mrj[1, j], self._input_data.GBF2_mask_idx)
             bio_ag_exprs.append(
-                _qsum(self._input_data.GBF2_mask_area_r[ind_dry] * c_ag, self.X_ag_dry_vars_jr[j, ind_dry])
-                + _qsum(self._input_data.GBF2_mask_area_r[ind_irr] * c_ag, self.X_ag_irr_vars_jr[j, ind_irr])
+                _qsum(self._input_data.GBF2_mask_area_r[ind_dry] * c_ag, self.X_acct_dry_jr[j, ind_dry])
+                + _qsum(self._input_data.GBF2_mask_area_r[ind_irr] * c_ag, self.X_acct_irr_jr[j, ind_irr])
             )
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
@@ -1213,15 +1277,16 @@ class LutoSolver:
         Gurobi's recommended [1e-3, 1e6] band.
         """
 
-        # Agricultural contributions (biodiv_contr_ag_j[j] is a per-j scalar)
+        # ACCOUNTING stream: raw per-j biodiv scalar × X_acct. The loop visits every cell in `ind` for
+        # every j, so a folded sliver's X_acct term (nonzero at its own j) is captured without acct_cells.
         ag_terms = []
         for j in range(self._input_data.n_ag_lus):
             c = self._input_data.biodiv_contr_ag_j[j]
             if c == 0:
                 continue
             ag_terms.append(
-                _qsum(val_vector[ind] * c, self.X_ag_dry_vars_jr[j, ind])
-                + _qsum(val_vector[ind] * c, self.X_ag_irr_vars_jr[j, ind])
+                _qsum(val_vector[ind] * c, self.X_acct_dry_jr[j, ind])
+                + _qsum(val_vector[ind] * c, self.X_acct_irr_jr[j, ind])
             )
 
         # Agricultural management contributions (biodiv_contr_ag_man[am][j_idx] is per-cell)

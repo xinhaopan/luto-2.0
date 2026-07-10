@@ -37,15 +37,27 @@ from luto.economics.agricultural.water import get_wreq_matrices
 
 
 @lru_cache(maxsize=1)
-def get_folded_base_ag_dvar(data: Data, base_year: int) -> np.ndarray:
-    """SOLVER-WORLD base ag dvar (NLMS, NCELLS, N_AG_LUS): the true base with every sub-θ land-use
-    fraction FOLDED into the cell's dominant source (θ = EXACT_REACHABILITY_MIN_FRACTION).
+def _fold_ag_dvar(data: Data, base_year: int):
+    """SOLVER-WORLD base ag dvar fold — shared compute behind ``get_folded_base_ag_dvar`` ([0], the
+    folded base) and ``get_ag_dvar_fold_map`` ([1], the sliver map). Returns ``(folded_base, fold_map)``.
+    Prefer the two public wrappers; this private, ``lru_cache``-d function exists only so the single fold
+    (which most callers need only the folded base of) is computed once per (data, base_year).
+
+    - ``[0]`` folded base dvar — sub-θ slivers merged into the dominant. This is the FOLDED composition,
+      used by the TRANSITION machinery (source maps, flow costs, ub/lb bounds, node-balance base). It makes
+      the transition problem small, but it is NOT the true composition.
+    - ``[1]`` fold map — the sliver bookkeeping that recovers the ACTUAL (unfolded, true) dvar for
+      ACCOUNTING. The two-stream accounting model uses it to build X_acct (the true per-land-use fractions)
+      so water/GHG/biodiversity/production/profit score the TRUE composition rather than the folded one.
+
+    ``folded_base`` (NLMS, NCELLS, N_AG_LUS): the true base with every sub-θ land-use fraction FOLDED into
+    the cell's dominant source (θ = EXACT_REACHABILITY_MIN_FRACTION).
 
     ★ FOLD-INTO-DOMINANT: θ is a dial between the exact per-source flow model and the old crisp
     dominant-LU model, applied per cell. Worked example, θ = 0.10, one dry cell:
 
         true base:    Beef 0.55 │ Winter cereals 0.35 │ Hay 0.06 │ Citrus 0.04
-        folded base:  Beef 0.65 │ Winter cereals 0.35           (Hay+Citrus → Beef)
+        folded base:  Beef 0.65 │ Winter cereals 0.35                            (Hay+Citrus → Beef)
 
     - Beef and Winter cereals are > θ, so each becomes its own SOURCE: the solver attaches one flow
       delta variable per legal (T_MAT-finite) target, e.g. D[Beef→Sheep], D[Beef→EP],
@@ -63,9 +75,18 @@ def get_folded_base_ag_dvar(data: Data, base_year: int) -> np.ndarray:
     θ→1: one source per cell carrying the whole cell (pure crisp).
 
     Everything the solver derives from the base-year ag dvar (source maps, flow costs, ub/base
-    consts, ag-man lb) MUST use this folded base so the solver world is self-consistent. The true
-    map (data.ag_dvars) is untouched — reporting sees real allocations; solved delta flows attribute
-    folded land's moves to its dominant source (bounded by the folded area, reported below).
+    consts, ag-man lb) MUST use the folded base (``[0]``, via ``get_folded_base_ag_dvar``) so the solver
+    world is self-consistent. The true map (data.ag_dvars) is untouched — reporting sees real allocations;
+    solved delta flows attribute folded land's moves to its dominant source (bounded by the folded area).
+
+    ``fold_map`` (``[1]``, via ``get_ag_dvar_fold_map``) is a dict describing every folded sliver — the
+    data the two-stream accounting needs to re-express each dominant as its true land-uses (all arrays are
+    size 0 when nothing folded, so X_acct == the folded stream, a no-op):
+
+        from_m, cells, from_j : sliver source (lm, cell, land-use) index arrays
+        vals                  : the sliver's base-year fraction moved into the dominant (the `slivers` array)
+        to_m, to_j            : the receiver dominant's (lm, land-use) index arrays (cell is `cells`)
+        folded_dom            : folded_base[to_m, cells, to_j] — the dominant's post-fold mass (denominator)
 
     Cached (maxsize=1): every consumer calls this for the same (data, base_year) within one step.
     """
@@ -83,29 +104,68 @@ def get_folded_base_ag_dvar(data: Data, base_year: int) -> np.ndarray:
 
     sliver = (base > noise) & (base <= theta)
     sliver[dom_m, np.arange(data.NCELLS), dom_j] = False                 # exempt the receiver
-    if not sliver.any():
-        return base
 
-    m_i, r_i, j_i = np.where(sliver)
-    vals = base[m_i, r_i, j_i].copy()
+    # Fold map — initialised empty, filled below once the slivers are known. Empty (size-0) arrays ⇒
+    # nothing folded, so X_acct == the folded stream (the accounting correction is a no-op).
+    fold_map = dict(
+        from_m=np.array([], dtype=np.intp),
+        cells=np.array([], dtype=np.intp),
+        from_j=np.array([], dtype=np.intp),
+        vals=np.array([], dtype=np.float32),
+        to_m=np.array([], dtype=np.intp),
+        to_j=np.array([], dtype=np.intp),
+        folded_dom=np.array([], dtype=np.float32),
+    )
+    if not sliver.any():
+        return base, fold_map
+
+    from_m, cells, from_j = np.where(sliver)
+    vals = base[from_m, cells, from_j].copy()
 
     # Receiver: same-lm dominant if itself > θ, else the overall dominant. (A sliver that IS its
     # lm's largest land-use fails the > θ test on itself and falls through to the overall dominant.)
-    recv_j_same = dom_j_same[m_i, r_i]
-    same_ok = base[m_i, r_i, recv_j_same] > theta
-    recv_m = np.where(same_ok, m_i, dom_m[r_i])
-    recv_j = np.where(same_ok, recv_j_same, dom_j[r_i])
+    to_j_same = dom_j_same[from_m, cells]
+    same_ok = base[from_m, cells, to_j_same] > theta
+    to_m = np.where(same_ok, from_m, dom_m[cells])
+    to_j = np.where(same_ok, to_j_same, dom_j[cells])
 
-    np.add.at(base, (recv_m, r_i, recv_j), vals)
-    base[m_i, r_i, j_i] = 0.0
+    np.add.at(base, (to_m, cells, to_j), vals)
+    base[from_m, cells, from_j] = 0.0
 
-    folded_ha = float((vals * data.REAL_AREA[r_i]).sum())
+    fold_map.update(
+        from_m=from_m.astype(np.intp),
+        cells=cells.astype(np.intp),
+        from_j=from_j.astype(np.intp),
+        vals=vals.astype(np.float32),
+        to_m=to_m.astype(np.intp),
+        to_j=to_j.astype(np.intp),
+        folded_dom=base[to_m, cells, to_j].astype(np.float32),   # post-fold dominant mass (denominator)
+    )
+
+    folded_ha = float((vals * data.REAL_AREA[cells]).sum())
     print(
         f"  └── θ fold (θ={theta}): {len(vals):,} sub-θ land-use fractions folded into dominant sources, "
         f"{folded_ha:,.1f} ha re-attributed (max single fraction {vals.max():.4f})",
         flush=True,
     )
-    return base
+    return base, fold_map
+
+
+def get_folded_base_ag_dvar(data: Data, base_year: int) -> np.ndarray:
+    """SOLVER-WORLD folded base ag dvar (NLMS, NCELLS, N_AG_LUS) — sub-θ slivers merged into the cell's
+    dominant source. This is what the TRANSITION machinery (source maps, flow costs, ub/lb bounds,
+    node-balance base) reads. See ``_fold_ag_dvar`` for the full fold semantics, and
+    ``get_ag_dvar_fold_map`` for the sliver bookkeeping the accounting stream needs.
+    """
+    return _fold_ag_dvar(data, base_year)[0]
+
+
+def get_ag_dvar_fold_map(data: Data, base_year: int) -> dict:
+    """θ-fold sliver map (dict) consumed by the two-stream accounting to build X_acct — the true
+    per-land-use composition — from the folded decision vars. Its arrays are empty when nothing folded.
+    See ``_fold_ag_dvar`` for the field descriptions.
+    """
+    return _fold_ag_dvar(data, base_year)[1]
 
 
 @lru_cache(maxsize=1)
@@ -131,7 +191,7 @@ def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
     (data, base_year) pair within one solve step, so subsequent calls are free.
     """
     noise = 10 ** (-settings.ROUND_DECIMALS)
-    base_dvar_mrj = get_folded_base_ag_dvar(data, base_year)
+    base_dvar_mrj = get_folded_base_ag_dvar(data, base_year)   # folded dvar, for TRANSITION (solver world)
     return {
         (m, j): np.where(base_dvar_mrj[m, :, j] > noise)[0]
         for m in range(data.NLMS)
@@ -212,8 +272,8 @@ def get_ag2ag_ub(data: Data, base_year: int) -> np.ndarray:
     ag-source component only — nonag2ag adds its own fraction in the combined ag ub (later step).
     Uses the FOLDED base (get_folded_base_ag_dvar): reach follows solver-world source identity.
     """
-    ag_dvar    = get_folded_base_ag_dvar(data, base_year)                                              # (NLMS, NCELLS, N_AG_LUS)
-    
+    ag_dvar = get_folded_base_ag_dvar(data, base_year)                                                  # folded dvar, for TRANSITION reach (NLMS, NCELLS, N_AG_LUS)
+
     # Transition exclusion (T_MAT): binary allow/disallow per (from_j → to_j).
     t_ag2ag_jj = (~np.isnan(
         data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values
@@ -595,7 +655,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
 
     # FOLDED base: am lb must not exceed the SOLVER-WORLD host ag land-use (an am fraction whose host
     # sliver was folded away is clamped to 0 — its land now lives under the dominant source).
-    ag_dvar = get_folded_base_ag_dvar(data, base_year)     # (NLMS, NCELLS, N_AG_LUS)
+    ag_dvar = get_folded_base_ag_dvar(data, base_year)     # folded dvar, for TRANSITION (NLMS, NCELLS, N_AG_LUS)
 
     result = {}
     for am in settings.AG_MANAGEMENTS_TO_LAND_USES:

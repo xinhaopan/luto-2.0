@@ -95,6 +95,8 @@ class SolverInputData:
     water_region_names: dict[int, str]                                  # Water yield for the BASE_YR based on historical water yield layers.
       
     biodiv_contr_ag_j: np.ndarray                                       # Biodiversity contribution scale from agricultural land uses.
+    ag_fold_map: dict                                                   # θ-fold sliver bookkeeping; consumed in solver.py to build the accounting stream X_acct.
+    acct_cells_mrj: dict                                                # {(m,j): cells} = feasible_ag_cells_mrj ∪ folded-sliver cells — the accounting needs to iterate over.
     biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
     biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale from agricultural management options.
     
@@ -403,8 +405,8 @@ def get_feasible_ag_cells_mrj(ag_x_mrj: np.ndarray, dvar_lb_ag: np.ndarray) -> d
         for j in range(n_lus)
         for m in range(n_lms)
     }
-    
-    
+
+
 def get_feasible_non_ag_cells(dvar_ub_nonag: np.ndarray, threshold: float = 0.0) -> dict:
     print('Getting feasible non-agricultural cells...', flush = True)
     n_k = dvar_ub_nonag.shape[1]
@@ -1304,6 +1306,23 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
     commodity_names = data.COMMODITIES
 
+    # Bookkeeping for which under theta sliver are folded into which domain cells.  
+    ag_fold_map = ag_transition.get_ag_dvar_fold_map(data, base_year)   
+
+    # Accounting support: X_acct is nonzero at EXACTLY feasible_ag_cells ∪ {folded-sliver cells}.
+    # A folded sliver has folded base 0, so it is absent from feasible_ag_cells; the per-j accounting builders
+    # (economy/GHG/GBF2/demand) must iterate THIS union or they'd drop its (slivers/fd)·Xf[d] term and silently
+    # collapse the two-stream back to the folded stream. The sliver cells come straight from the fold map.
+    acct_cells_mrj = {}
+    for m in range(data.NLMS):
+        for j in range(data.N_AG_LUS):
+            feas = feasible_ag_cells_mrj[m, j]
+            if ag_fold_map['cells'].size:
+                extra = ag_fold_map['cells'][(ag_fold_map['from_m'] == m) & (ag_fold_map['from_j'] == j)]
+                acct_cells_mrj[m, j] = np.union1d(feas, extra) if extra.size else feas
+            else:
+                acct_cells_mrj[m, j] = feas
+
     economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs)
     economic_prices=get_commodity_prices_target_yr(data, target_year)
     economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year)
@@ -1366,6 +1385,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         water_region_names,
         
         biodiv_contr_ag_j,
+        ag_fold_map,
+        acct_cells_mrj,
         biodiv_contr_non_ag_k,
         biodiv_contr_ag_man,
         

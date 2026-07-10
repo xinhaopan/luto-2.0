@@ -5,6 +5,129 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260710 — θ-fold accounting leak fixed via a two-stream (folded / accounting) dvar model
+
+### TL;DR
+
+The θ-fold (`get_folded_base_ag_dvar`, θ = `EXACT_REACHABILITY_MIN_FRACTION`) merges every sub-θ ag
+land-use fraction into its cell's dominant to shrink the transition problem. But the folded array was also
+the solver's **global base composition** anchoring `X_ag`, so **every** accounting constraint (profit,
+water, GHG, GBF2/3/4/8, production) scored a folded sliver at its *dominant's* coefficient instead of its
+own. Fix: a **two-stream** model — the folded decision vars `X_ag` (`dvar_flow`) still drive the transition
+machinery, and a second **accounting stream `X_acct`** (a LinExpr re-expression, **no new Gurobi
+variables**) carries each true land-use's fraction. Accounting builders read the **raw** coefficient
+against `X_acct`; only biodiversity/GHG/water/profit/production switched streams — structural builders
+(cell usage, node balance, adoption, renewable) keep `X_ag`.
+
+`X_acct` is built by **transferring** each sliver's live share off the dominant:
+`X_acct[s] += (A_s/fd)·X_ag[d]`, `X_acct[d] -= same`, where `fd = folded_dom = raw + Σ A_s`. The dominant
+starts as a copy of `X_ag[d]` and ends at `(raw/fd)·X_ag[d]` — conservation is structural (one pass, no
+scaling loop). Equivalent to an area-weighted **blended coefficient** on the dominant var; the blend form
+was the first cut, replaced by the transfer for readability. Validated `== blend` to ~1e-15
+(`script_2_validate_two_stream.py`) and end-to-end on the θ grid.
+
+### The leak (diagnosis)
+
+`X_ag = folded_base + Σin − Σout`, and folding preserves cell totals — so **ag/non-ag AREA is
+fold-invariant** (the coarse metric can't see the bug). The distortion is in the *per-LU scoring*: in a
+GBF2 mask cell, a high-`c` natural remnant folded into low-`c` grazing is scored at grazing's `c`. The doc
+`jinzhu_inspect_code/Correc_folding/correct_dvar_folding.md` decomposes the 2010 mask fold to −0.89 Mha
+GBF2, predicting the solver backfills EP and over-states the 2050 GHG sink (~16%) and profit (~4%).
+
+### Implementation
+
+- **`transitions.py`** — one cached `_fold_ag_dvar` → `(folded_base, fold_map)`; wrappers
+  `get_folded_base_ag_dvar` (`[0]`) and `get_ag_dvar_fold_map` (`[1]`). Fold map keys:
+  `from_m/cells/from_j` (sliver), `vals` (A_s), `to_m/to_j` (receiver), `folded_dom` (fd).
+- **`input_data.py`** — coefficients ship **raw** (no blend). New fields `ag_fold_map` and
+  `acct_cells_mrj = feasible_ag_cells ∪ {fold-map sliver cells}` (folded slivers have base 0 so are absent
+  from `feasible_ag_cells`; the per-`j` builders must visit them or the term is silently dropped).
+- **`solver.py`** — `_setup_ag_accounting_vars` builds `X_acct`; accounting builders (objective, GHG,
+  GBF2, demand) swap `feasible_ag_cells_mrj → acct_cells_mrj` and `X_ag → X_acct`; water &
+  `_build_biodiv_contr_expr` keep their fixed region `ind` (already visit every cell). Production is now
+  uniform (the earlier per-commodity correction is gone). Guard `if not isinstance(dom, (Var, LinExpr))`:
+  a `no_go`-banned/force-converted dominant has no var → skip (never mint a fresh var — `X_acct` must stay
+  a re-expression of the folded vars).
+
+### Proof it's in the Gurobi model (`script_4_coeff_probe.py`)
+
+Minimal Gurobi build of the worked cell (Beef-mod 0.70 | Beef-nat 0.20 | WC 0.10; `g` = 2.0 / −3.0 / 0.5):
+the coefficient on the **same dominant var** in the GHG expression is **+2.00 folded → +0.85 two-stream**
+(the area-weighted blend), and the stay-point score moves +2.00 (folded, charging the sequestering natural
+remnant as grazing) → **+0.85 = TRUE** `Σ g_j·base_j`. So `X_acct` (a LinExpr, not a new var) literally
+changes constraint-matrix coefficients on the folded vars.
+
+### Empirical θ-sweep (RF5, renewables off, GHG on, GBF2 binding; 2050)
+
+Before = `20260708_Check_diff_trans_theta` (folded), after = `20260710_...with_accounting` (two-stream),
+θ ∈ {0.01…0.50} (`script_3_compare_area.py`):
+
+- **GHG — the clean positive result.** Net sink over-grows with θ: **before Δ = 17.4 Mt (16%)**, matching
+  the predicted −16%; **after Δ = 13.3 Mt (12%)** → **θ-drift cut ~24%**, pulling the spurious high-θ sink
+  back ~4 Mt.
+- **The fix is unambiguously applied** — before≡after at θ=0.01 (nothing folds → `X_acct ≈ X_ag`; GHG Δ
+  0.01 Mt) and they diverge **monotonically with folding** to ~4 Mt at θ=0.5. A no-op couldn't produce a
+  θ-scaled gap.
+- **Area unchanged** (ag Δ 0.5%, non-ag Δ ~10% — same before/after): fold-invariant, and the ag↔non-ag
+  split is pinned by the binding constraints, so the scoring correction doesn't move it.
+- **GBF2 = 61.975 Mha-eq flat** — a binding hard constraint sits on its target under either accounting, so
+  the achieved value can't reveal the drift (the fix changes *how* it's met, not the number).
+- **Profit** moved (higher at high θ, +0.4 B AUD) but did **not** converge (after Δ slightly larger); the
+  observed direction is opposite the doc's "+4% over-state" — flagged, not claimed.
+
+### Takeaway / caveats
+
+The two-stream behaves exactly as a **Role-2 (accounting) correction**: it fixes the *scored* quantity
+(GHG drift −24%, matching the predicted magnitude; validated to machine precision), leaving the physical
+allocation almost unmoved because binding constraints pin it. The **residual ~12% GHG drift is the
+untouched Role-1 transition approximation** (folded slivers still move through the dominant's reachability
+and pay its cost — the fix deliberately doesn't touch this; T_MAT audit: ag2ag forbids are all `→natural
+land`, so that reachability distortion is small). v2 proportional-shed is exact on full flips (~99% of
+dominant shifting per the θ=0.01 data) and only approximate on ~1.3 Mha of partial-shed cells.
+
+---
+
+## 20260706 — fold-into-dominant θ model replaces the ag sliver stay-pin
+
+### TL;DR
+
+Turned `EXACT_REACHABILITY_MIN_FRACTION` (θ) into a per-cell **exact↔crisp dial** for the transition
+model. Sub-θ ag land-use fractions are now **folded into the cell's dominant source** BEFORE the solver
+world is built (`get_folded_base_ag_dvar`, cached), so every remaining source keeps its own flow-delta
+vars and **no land is ever pinned in place**. This retired the old sub-θ "sliver stay-pin" (which locked
+immovable land) and the two support fixes it needed. θ→0 recovers the pure exact per-source model; θ→1 is
+pure crisp dominant-source; default θ changed 0.01 → 1.0.
+
+### Fold-into-dominant (`8adf9b2f`)
+
+- **`get_folded_base_ag_dvar`** (cached) merges every `base ≤ θ` non-dominant fraction into the cell's
+  dominant (same-lm dominant if it is itself > θ, else the overall dominant; the overall-largest LU is the
+  exempt receiver of last resort). Cell totals are preserved, so `ag_mask` / Σ-X accounting is unchanged.
+- The **source map, ag2ag ub, and ag-man lb** are all rebuilt from the folded base so the solver world is
+  self-consistent; `get_ag2ag_lb` is reduced to zeros (the stay-pin is superseded — folded sub-θ land
+  stays mobile through the dominant's delta vars). The **true map `data.ag_dvars` is untouched** for
+  reporting.
+- **ghg**: exact transition-emission slices reuse the shared folded source map (a lazy import breaks the
+  transitions↔ghg cycle) instead of re-deriving cell slices from the raw dvar.
+- **non-ag transitions decoupled from θ** — always exact at the `ROUND_DECIMALS` floor (folding would
+  fake-delete permanent commitments or grant free Destocked→ag reversion).
+- ⚠️ This fold silently became the accounting base too — the **θ-fold accounting leak** fixed on 20260710
+  (see that entry).
+
+### Support fixes
+
+- **`clamp_dvar_bound` unified** (`b9a5b576`): `_clamp_dvar_bound` moved to `tools.clamp_dvar_bound`, with
+  all dvar-bound cleaning routed through it (ag/non-ag ub/lb/base, ag-man lb, non-ag ag-mask cap) under
+  uniform logging. `get_ag2ag_lb` no longer caps lb at the raw ag2ag ub — capping zeroed the pin exactly
+  where EXCLUDE/no-go bans a held sliver, deleting its X var and making cell-usage saturation infeasible.
+  Pinned-sliver entries/area are now reported, and pins landing on banned entries flagged.
+- **dataprep x_mrj eligibility** (`86e6fff8`): the precipitation/irrigation overlays could ban a cell's
+  own observed 2010 `(lm, lu)` (~360 cells), leaving that holding with no X var and forcing its conversion
+  in the first sim step. Each cell's observed `(lm, lu)` is now OR-ed back into `x_mrj`; all other entries
+  untouched.
+
+---
+
 ## 20260702 — flow transition model finalised + write.py reporting rebuilt on the deltas
 
 ### TL;DR
