@@ -19,12 +19,8 @@
 
 import os
 import re
-import base64
 import numpy as np
 import pandas as pd
-
-from io import BytesIO
-from PIL import Image
 
 from luto import settings
 from luto.tools.report.data_tools.parameters import RENAME_AM_NON_AG
@@ -52,14 +48,20 @@ def extract_dtype_from_path(path):
             'economics_ag':['economics_ag_'],
             'economics_am':['economics_am_'],
             'economics_non_ag':['economics_non_ag_'],
-            'transition_cost':['transition_cost_'],
+            'transition':['transition_ag2ag_', 'transition_ag2nonag_', 'transition_nonag2ag_'],
             'biodiversity':['biodiversity'],
+            'renewable':['renewable_energy_'],
             # Metrics xarrays
             'xarray_layer':['xr_'],
     }
 
-    # Get the base name of the file path
-    base_name = os.path.basename(path)
+    # For .nc/.json files inside a _chunks directory, classify by the directory name (stripped of _{year}_chunks).
+    parent = os.path.dirname(path)
+    in_chunks = re.search(r'_\d{4}_chunks$', os.path.basename(parent))
+    if (path.endswith('.nc') or os.path.basename(path) == 'manifest.json') and in_chunks:
+        base_name = re.sub(r'_\d{4}_chunks$', '', os.path.basename(parent))
+    else:
+        base_name = os.path.basename(path)
 
     # Check the file type
     for ftype, fpat in f_cat.items():
@@ -115,8 +117,19 @@ def get_all_files(data_root):
     # Append the year type and category to the file paths
     file_paths.insert(1, 'category', f_cats)
 
-    # Get the base name and extension of the file path
-    file_paths[['base_name','base_ext']] = [os.path.splitext(os.path.basename(i)) for i in file_paths['path']]
+    # Get the base name and extension of the file path.
+    # For chunk files (inside a _YYYY_chunks dir) use the directory name as base_name.
+    def _base_name_ext(path):
+        parent = os.path.dirname(path)
+        parent_base = os.path.basename(parent)
+        in_chunks = re.search(r'_\d{4}_chunks$', parent_base)
+        if (path.endswith('.nc') or os.path.basename(path) == 'manifest.json') and in_chunks:
+            stem = re.sub(r'_\d{4}_chunks$', '', parent_base)
+            ext = '.nc' if path.endswith('.nc') else '.json'
+            return stem, ext
+        return os.path.splitext(os.path.basename(path))
+
+    file_paths[['base_name','base_ext']] = [_base_name_ext(i) for i in file_paths['path']]
     file_paths = file_paths.reindex(columns=['Year','category','base_name','base_ext','path'])
 
     # Remove the datatime stamp <YYYY_MM_DD__HH_mm_SS> from the base_name
@@ -132,15 +145,6 @@ def get_all_files(data_root):
     
 
     return file_paths
-
-
-def array_to_base64(arr_4band: np.ndarray) -> dict:
-    image = Image.fromarray(arr_4band, 'RGBA')
-    buffered = BytesIO()
-    image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    
-    return {'img_str': 'data:image/png;base64,' + img_str}
 
 
 def tuple_dict_to_nested(flat_dict):
@@ -175,6 +179,11 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     4. 'lu' (Land-use) has to be the lowest level in the hierarchy.
     '''
     sel_rename = {}
+
+    # 0: 'backend' (outermost dim for quality-metric layers)
+    if 'backend' in sel:
+        sel_rename['backend'] = sel['backend']
+
     # 1: 'am'
     if 'am' in sel:
         sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
@@ -183,7 +192,13 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     if 'lm' in sel:
         sel_rename['lm'] =  {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
         
-    # 3-1: Commodity dimensions
+    # 3: 'species' or 'group' (biodiversity GBF4/GBF8 — top level in hierarchy)
+    if 'species' in sel:
+        sel_rename['species'] = sel['species']
+    if 'group' in sel:
+        sel_rename['group'] = sel['group']
+        
+    # 4: Commodity dimensions
     if 'Commodity' in sel:
         commodity = sel['Commodity'].capitalize()
         sel_rename['Commodity'] = {
@@ -192,8 +207,18 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Beef lexp': 'Beef live export'
         }.get(commodity, commodity)
         
-    # 3-2: Profit/Revenue/Cost/Source
-    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu', 'from_lu'}
+    # 5: Transitions. 
+    if 'From-water-supply' in sel:
+        sel_rename['From-water-supply'] = {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['From-water-supply'], sel['From-water-supply'])
+    if 'To-water-supply' in sel:
+        sel_rename['To-water-supply'] = {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['To-water-supply'], sel['To-water-supply'])
+    if 'From-land-use' in sel:
+        sel_rename['From-land-use'] = RENAME_AM_NON_AG.get(sel['From-land-use'], sel['From-land-use'])
+    if 'To-land-use' in sel:
+        sel_rename['To-land-use'] = RENAME_AM_NON_AG.get(sel['To-land-use'], sel['To-land-use'])
+
+    # 6: Other dims (source, GHG_source, cost-type, etc.) — must precede lu so lu is always last
+    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu', 'from_lu', 'species', 'group'}
     for key in leftover_keys:
         sel_rename[key] = {
             'Operation-cost': 'Cost (operation)',
@@ -201,9 +226,11 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Transition-cost-ag2nonag': 'Cost (trans Ag2NonAg)',
             'Transition-cost-nonag2ag': 'Cost (trans NonAg2Ag)',
             'Transition-cost-agMgt': 'Cost (trans AgMgt)',
+            'Operating Cost': 'Operating Cost',
+            'Capital expenditure': 'Capital expenditure',
         }.get(sel[key], sel[key])
 
-    # 4 last: 'lu' or 'from_lu' (treated identically as the land-use selection level)
+    # 7: last: 'lu' or 'from_lu' (land-use is always the bottom-level UI selection)
     if 'lu' in sel:
         sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
     elif 'from_lu' in sel:

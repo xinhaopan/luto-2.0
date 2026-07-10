@@ -32,10 +32,10 @@ collect(RATE_07, "Figure 09 Shadow solution price maps",
         "Figure 6. Spatial distribution of shadow carbon and biodiversity prices")
 
 # ── Supplementary S1–S3 (0.07) ───────────────────────────────────────────────
-collect(RATE_07, "Figure 04 Change in GHG emissions",
-        "Figure S1. Annual change in GHG emissions")
-collect(RATE_07, "Figure 05 Change in Biodiversity",
-        "Figure S2. Annual change in biodiversity")
+collect(RATE_07, "Figure 04 Difference in GHG emissions",
+        "Figure S1. Annual difference in GHG emissions")
+collect(RATE_07, "Figure 05 Difference in Biodiversity",
+        "Figure S2. Annual difference in biodiversity")
 collect(RATE_07, "Figure S01 Biodiversity contribution curve",
         "Figure S3. Cumulative biodiversity contribution curve")
 
@@ -86,23 +86,23 @@ collect(RATE_07, "Figure S11 Cost of agricultural management",
         "Figure S23. Annual costs of agricultural management solutions")
 collect(RATE_07, "Figure S12 Cost of non-agriculture",
         "Figure S24. Annual costs of non-agricultural land-use solutions")
-collect(RATE_07, "Figure S13 Change in Transition(ag\u2192non-ag) cost",
+collect(RATE_07, "Figure S13 Difference in Transition(ag\u2192non-ag) cost",
         "Figure S25. Annual transition costs from agricultural to non-agricultural land uses")
-collect(RATE_07, "Figure S14 Change in GHG emissions from agricultural management",
-        "Figure S26. Annual change in GHG emissions from agricultural management solutions")
-collect(RATE_07, "Figure S15 Change in GHG emissions from non-agriculture",
-        "Figure S27. Annual change in GHG emissions from non-agricultural land-use solutions")
-collect(RATE_07, "Figure S16 Change in Biodiversity from agricultural management",
-        "Figure S28. Annual change in biodiversity from agricultural management solutions")
-collect(RATE_07, "Figure S17 Change in Biodiversity from non-agriculture",
-        "Figure S29. Annual change in biodiversity from non-agricultural land-use solutions")
+collect(RATE_07, "Figure S14 Difference in GHG emissions from agricultural management",
+        "Figure S26. Annual difference in GHG emissions from agricultural management solutions")
+collect(RATE_07, "Figure S15 Difference in GHG emissions from non-agriculture",
+        "Figure S27. Annual difference in GHG emissions from non-agricultural land-use solutions")
+collect(RATE_07, "Figure S16 Difference in Biodiversity from agricultural management",
+        "Figure S28. Annual difference in biodiversity from agricultural management solutions")
+collect(RATE_07, "Figure S17 Difference in Biodiversity from non-agriculture",
+        "Figure S29. Annual difference in biodiversity from non-agricultural land-use solutions")
 collect(RATE_07, "Figure S18 Shadow solution carbon price",
         "Figure S30. Solution-based annual shadow carbon price by target combination")
 collect(RATE_07, "Figure S19 Shadow solution biodiversity price",
         "Figure S31. Solution-based annual shadow biodiversity price by target combination")
-collect(RATE_07, "Figure S20 Change in Non-agricultural GHG emissions maps",
+collect(RATE_07, "Figure S20 Difference in Non-agricultural GHG emissions maps",
         "Figure S32. Spatial distribution of GHG emissions changes associated with non-agricultural land-use solutions")
-collect(RATE_07, "Figure S21 Change in Non-agricultural Biodiversity maps",
+collect(RATE_07, "Figure S21 Difference in Non-agricultural Biodiversity maps",
         "Figure S33. Spatial distribution of biodiversity changes associated with non-agricultural land-use solutions")
 collect(RATE_07, "Figure S22 Agricultural management area maps",
         "Figure S34. Spatial distribution of agricultural management solutions")

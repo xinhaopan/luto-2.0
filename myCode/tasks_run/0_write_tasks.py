@@ -5,8 +5,8 @@ from tools.helpers import create_task_runs
 import time
 # time.sleep(60*60*5)
 platform = "aquila"  # 可选值: 'HPC', 'Denethor', 'NCI',"aquila"
-tasks = ['20260414_Paper3_NCI'] # 任务名称列表,可以包含一个或多个任务
-model_name = 'Rewrite' # 'Run','Write','Rewrite','Report','Zip'
+tasks = ['20260605_Paper3_aquila'] # 任务名称列表,可以包含一个或多个任务
+model_name = 'Zip' # 'Run','Write','Rewrite','Report','Rereport','Zip'
 
 input_path_dict = {"HPC": "/home/remote/s222552331/LUTO2_XH/LUTO2/input",
                     "Denethor": "N:/LUF-Modelling/LUTO2_XH/LUTO2/input",

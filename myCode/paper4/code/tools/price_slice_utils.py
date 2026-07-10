@@ -18,12 +18,21 @@ OUT_DIR = TASK_ROOT / "paper4" / "figures"
 DATA_DIR = TASK_ROOT / "paper4" / "data"
 
 PAPER4_COLOR_OVERRIDES = {
-    "crops": "#5d1b41",
-    "livestock": "#cac559",
-    "modifiedlivestock": "#cac559",
-    "naturallivestock": "#cac559",
-    "unallocatedmodifiedland": "#f5ec7e",
-    "unallocatednaturalland": "#669b25",
+    "crops": "#aecb75",
+    "livestock": "#c49a67",
+    "modifiedlivestock": "#762500",
+    "naturallivestock": "#c49a67",
+    "unallocatedmodifiedland": "#fbbc45",
+    "unallocatednaturalland": "#e6d8a8",
+}
+
+DISPLAY_LABEL_REPLACEMENTS = {
+    "Modified livestock": "Livestock (modified land)",
+    "Natural Livestock": "Livestock (natural land)",
+    "Natural livestock": "Livestock (natural land)",
+    "Unallocated - modified land": "Unallocated (modified land)",
+    "Unallocated - natural land": "Unallocated (natural land)",
+    "Destocked - natural land": "Destocked (natural land)",
 }
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -36,6 +45,12 @@ def get_paper4_paths():
 
 def normalize_style_key(value):
     return re.sub(r"[\s\-]+", "", str(value).strip().lower())
+
+
+def standardize_display_label(value):
+    if pd.isna(value):
+        return value
+    return DISPLAY_LABEL_REPLACEMENTS.get(str(value), str(value))
 
 
 def apply_paper4_color_overrides(color_map):
@@ -64,6 +79,10 @@ def apply_paper4_color_overrides_to_style_df(df):
 
         if override is not None:
             df.at[idx, "color"] = override
+
+    for column in ("desc_new", "desc", "ag_group"):
+        if column in df.columns:
+            df[column] = df[column].map(standardize_display_label)
 
     return df
 
@@ -116,9 +135,9 @@ def get_price_column(varying_key):
 
 def get_price_axis_label(varying_key):
     if varying_key == "cp":
-        return r"Carbon price (AU\$/tCO$_2$e yr$^{-1}$)"
+        return r"Carbon price (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)"
     if varying_key == "bp":
-        return r"Biodiversity price (AU\$/ha yr$^{-1}$)"
+        return r"Biodiversity price (AU\$ ha$^{-1}$ yr$^{-1}$)"
     raise ValueError(f"Unsupported varying_key: {varying_key}")
 
 
@@ -162,6 +181,35 @@ def add_zero_line(ax):
 def apply_compact_ticks(ax, x_nbins=8, y_nbins=5):
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=x_nbins))
     ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=y_nbins))
+
+
+def set_sparse_index_price_ticks(ax, price_vals, max_ticks=8):
+    price_vals = list(price_vals)
+    if not price_vals:
+        ax.set_xticks([])
+        return []
+
+    x = np.arange(len(price_vals))
+    if len(price_vals) <= max_ticks:
+        tick_idx = x
+    else:
+        step = int(np.ceil((len(price_vals) - 1) / max(1, max_ticks - 1)))
+        tick_idx = np.arange(0, len(price_vals), step)
+        if tick_idx[-1] != len(price_vals) - 1:
+            tick_idx = np.append(tick_idx, len(price_vals) - 1)
+
+    ax.set_xticks(tick_idx)
+    ax.set_xticklabels([format_thousands(price_vals[int(idx)]) for idx in tick_idx])
+    return tick_idx
+
+
+def apply_carbon_price_ticks(ax, axis="x"):
+    # 0-360 range with step 20: MultipleLocator(60) gives 0,60,120,180,240,300,360
+    locator = ticker.MultipleLocator(60)
+    if axis == "x":
+        ax.xaxis.set_major_locator(locator)
+    elif axis == "y":
+        ax.yaxis.set_major_locator(locator)
 
 
 def stacked_area_pos_neg(ax, pivot_df, color_map, alpha=0.88):

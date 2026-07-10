@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 
-TASK_NAME = "20260505_paper4_HPC"
+TASK_NAME = "20260610_paper4_NCI"
 
 CODE_DIR = Path(__file__).resolve().parent
 TASK_ROOT = (CODE_DIR / ".." / ".." / ".." / ".." / "output" / TASK_NAME).resolve()
@@ -285,7 +285,7 @@ REVENUE_DICT = {
 NAME_DICT = {
     "cp": {"title": "Carbon Price", "unit": "(AU$/tCO2e)"},
     "bp": {"title": "Biodiversity Price", "unit": "(AU$/ha)"},
-    "ghg": {"title": "GHG Emissions", "unit": "(Mt CO2e)"},
+    "ghg": {"title": "GHG Abatement", "unit": "(Mt CO2e)"},
     "cost": {"title": "Cost", "unit": "(MAU$)"},
 }
 

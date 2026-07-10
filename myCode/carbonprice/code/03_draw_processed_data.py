@@ -21,14 +21,14 @@ plot_specs = [
     PlotSpec("xr_cost_non_ag",                              "non_ag",            1e3, r"Cost (Billion AU\$ yr$^{-1}$)",                                             1, None,    False),
     PlotSpec("xr_transition_cost_ag2non_ag_amortised_diff", "non_ag",            1e3, r"Cost (Billion AU\$ yr$^{-1}$)",                                             1, None,    False),
 
-    PlotSpec("xr_total_carbon",                             "carbon_total",      1,   r"Change in net GHG emissions (MtCO$_2$e yr$^{-1}$)",                         1, "Total", True),
-    PlotSpec("xr_total_bio",                                "biodiversity_total", 1,  r"Change in biodiversity (contribution-weighted area, Mha yr$^{-1}$)",         1, "Total", False),
+    PlotSpec("xr_total_carbon",                             "carbon_total",      1,   r"Difference in net GHG emissions (MtCO$_2$e yr$^{-1}$)",                         1, "Total", True),
+    PlotSpec("xr_total_bio",                                "biodiversity_total", 1,  r"Difference in biodiversity (contribution-weighted area, Mha yr$^{-1}$)",         1, "Total", False),
 
-    PlotSpec("xr_GHG_ag_management",                        "am",                1,   r"Change in net GHG emissions (MtCO$_2$e yr$^{-1}$)",                         1, None,    True),
-    PlotSpec("xr_GHG_non_ag",                               "non_ag",            1,   r"Change in net GHG emissions (MtCO$_2$e yr$^{-1}$)",                         1, None,    True),
+    PlotSpec("xr_GHG_ag_management",                        "am",                1,   r"Difference in net GHG emissions (MtCO$_2$e yr$^{-1}$)",                         1, None,    True),
+    PlotSpec("xr_GHG_non_ag",                               "non_ag",            1,   r"Difference in net GHG emissions (MtCO$_2$e yr$^{-1}$)",                         1, None,    True),
 
-    PlotSpec("xr_biodiversity_GBF2_priority_ag_management", "am",                1,   r"Change in biodiversity (contribution-weighted area, Mha yr$^{-1}$)",         1, None,    False),
-    PlotSpec("xr_biodiversity_GBF2_priority_non_ag",        "non_ag",            1,   r"Change in biodiversity (contribution-weighted area, Mha yr$^{-1}$)",         1, None,    False),
+    PlotSpec("xr_biodiversity_GBF2_priority_ag_management", "am",                1,   r"Difference in biodiversity (contribution-weighted area, Mha yr$^{-1}$)",         1, None,    False),
+    PlotSpec("xr_biodiversity_GBF2_priority_non_ag",        "non_ag",            1,   r"Difference in biodiversity (contribution-weighted area, Mha yr$^{-1}$)",         1, None,    False),
 ]
 
 for spec in plot_specs:

@@ -155,7 +155,7 @@ def extract_nc_layer_as_tiff(scenario, nc_stem, nc_sel, year, output_dir=None):
     if output_dir is None:
         output_dir = TIFF_DIR
     sel_tag = "_".join(f"{k}{v}" for k, v in nc_sel.items())
-    out_path = os.path.join(output_dir, f"_extracted_{scenario}_{nc_stem}_{sel_tag}.tiff")
+    out_path = os.path.join(output_dir, f"_extracted_{scenario}_{nc_stem}_{sel_tag}_{year}.tiff")
     os.makedirs(output_dir, exist_ok=True)
     if os.path.exists(out_path):
         return out_path
@@ -275,6 +275,43 @@ def _read_csv_from_zip(zip_path, prefix, year, csv_name):
             return None
         with z.open(internal) as f:
             return pd.read_csv(io.BytesIO(f.read()))
+
+
+def list_output_years(scenario):
+    """Sorted output years for a scenario, from Run_Archive.zip or folders."""
+    info = get_zip_info(scenario)
+    if info is not None:
+        zip_path, prefix = info
+        return _list_years_zip(zip_path, prefix)
+    try:
+        return _list_years(get_path(scenario))
+    except (FileNotFoundError, StopIteration):
+        return []
+
+
+def load_output_dataset(scenario, year, filename):
+    """Load a NetCDF output dataset from Run_Archive.zip or unpacked folders."""
+    import xarray as xr
+
+    info = get_zip_info(scenario)
+    if info is not None:
+        zip_path, prefix = info
+        internal = f"{prefix}/out_{year}/{filename}"
+        with zipfile.ZipFile(zip_path) as z:
+            if internal not in z.namelist():
+                return None
+            with z.open(internal) as f:
+                return xr.load_dataset(io.BytesIO(f.read()))
+
+    try:
+        base = get_path(scenario)
+    except (FileNotFoundError, StopIteration):
+        return None
+
+    path = os.path.join(base, f"out_{year}", filename)
+    if not os.path.exists(path):
+        return None
+    return xr.load_dataset(path)
 
 
 def load_long(input_files, csv_name, value_col, category_col=None,

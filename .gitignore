@@ -42,6 +42,7 @@ anthropic.yml
 *.log
 *.7z
 nul
+.github/copilot-instructions.md
 
 # Xinhao
 myCode/draw_all/output/**

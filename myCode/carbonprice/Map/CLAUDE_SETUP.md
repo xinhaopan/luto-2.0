@@ -91,17 +91,16 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - Determines annual sequestration rate by averaging total CO2 over this period
   - Default: 50 years (follows S-curve logic with rapid early accumulation)
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
-  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
+  - `GBF2_TARGET`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
   - `GBF2_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
-  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
+  - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
   - `BIODIVERSITY_TARGET_GBF_3_IBRA`: IBRA bioregion targets ('off', 'medium', 'high', 'USER_DEFINED')
-  - `BIODIVERSITY_TARGET_GBF_4_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
-  - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Community NES ('on' or 'off')
-  - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
+  - `GBF4_TARGET_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
+  - `GBF4_TARGET_ECNES`: Ecological Community NES ('on' or 'off')
+  - `GBF8_TARGET`: Species conservation targets ('on' or 'off')
 
 ### Renewable Energy Settings
-- `RENEWABLE_ENERGY_CONSTRAINTS`: Enable renewable energy generation targets ('on' or 'off')
-- `RENEWABLES_OPTIONS`: Renewable energy types: `['Utility Solar PV', 'Onshore Wind']`
+- `RENEWABLES_OPTIONS`: Dict controlling which renewable energy types are enabled, e.g. `{'Utility Solar PV': True, 'Onshore Wind': True}`. Set values to `False` to disable individual types. Also drives the corresponding `AG_MANAGEMENTS` entries.
 - `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
 - `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
 - `INSTALL_CAPACITY_MW_HA`: Per-hectare capacity (MW/ha) per renewable type
@@ -114,16 +113,15 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
 - `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
 - `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
+- `SOLVER_COEFF_MIN`: Universal minimum coefficient threshold (default: 1e-4). The `_qsum(coeffs, gurobi_vars)` helper in `solver.py` is called by **all** constraint and objective builders; any term whose absolute value falls below this threshold is dropped before entering Gurobi. Applies to Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8, Demand/Quantity, and Regional Adoption limits. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix range ratio at 1e8 (well within Gurobi's safe zone). `RESCALE_ZERO_THRESHOLD` was removed — post-rescale zeroing is superseded by this universal filter.
 
 ### Output Writing Configuration
-- `WRITE_PARALLEL`: Enable parallel output writing (default: True)
-- `WRITE_THREADS`: Number of parallel write threads (default: min(6, cpu_count))
 - `WRITE_REPORT_MAX_MEM_GB`: Max memory for report generation (default: 64)
 - `WRITE_CHUNK_SIZE`: Chunk size for NetCDF writing (default: 4096)
 
 ### No-Go Areas & Regional Adoption
 - `EXCLUDE_NO_GO_LU`: Enforce no-go area constraints (True/False)
-- `REGIONAL_ADOPTION_CONSTRAINTS`: Regional adoption limits ('off', 'on', 'NON_AG_UNIFORM')
+- `REGIONAL_ADOPTION_CONSTRAINTS`: Regional adoption limits ('off', 'on', 'NON_AG_CAP')
 - `REGIONAL_ADOPTION_ZONE`: Zone type ('NRM_CODE', 'LGA_CODE', etc.)
 
 ### Land-Use Culling
@@ -295,7 +293,7 @@ Key locations where xr.dot() is used in LUTO2:
 - [write.py:424](luto/tools/write.py#L424) - Commodity production calculations
 - [write.py:652](luto/tools/write.py#L652) - Agricultural profit aggregation
 - [write.py:758](luto/tools/write.py#L758) - Non-agricultural profit aggregation
-- [write.py:840](luto/tools/write.py#L840) - Agricultural management profit
+- [write.py:840](luto/tools/write.py#L840) - Agricultural Management profit
 - [write.py:1266](luto/tools/write.py#L1266) - Ag-to-ag transition costs (dimension elimination)
 - [write.py:1987](luto/tools/write.py#L1987) - GHG emissions calculation
 

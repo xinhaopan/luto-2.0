@@ -97,14 +97,14 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260324_Paper3_test'],
+    'TASK_NAME': ['20260520_Paper3_aquila_test'],
     'KEEP_OUTPUTS': [True],
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [0],
+    # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
     # ---- Computational settings (not model parameters) ----------------------
     'MEM': ['68GB'],
     'NCPUS': ['17'],
-    'WRITE_THREADS': ['2'],
+    # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
     'TIME': ['48:00:00'],
 
     # ---- AG2050 scenario switch and selector ---------------------------------
@@ -115,7 +115,7 @@ grid_search = {
     'AG2050_SCENARIO': ['AgS1', 'AgS2', 'AgS3', 'AgS4'],
 
     # ---- Model settings -----------------------------------------------------
-    'SOLVE_WEIGHT_ALPHA': [1],
+    # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
     'WRITE_OUTPUT_GEOTIFFS': [True],
@@ -153,10 +153,10 @@ grid_search = {
         'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
     }],
     'BIO_QUALITY_LAYER': ['Suitability'],
-    'BIODIVERSITY_TARGET_GBF_3': ['off'],
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],
-    'BIODIVERSITY_TARGET_GBF_8': ['off'],
+    'GBF3_NVIS_TARGET': ['off'],
+    'GBF4_TARGET_SNES': ['off'],
+    'GBF4_TARGET_ECNES': ['off'],
+    'GBF8_TARGET': ['off'],
 
     # ---- Water settings -----------------------------------------------------
     'WATER_STRESS': [0.6],
@@ -170,7 +170,36 @@ grid_search = {
     # Demand is read from All_LUTO_demand_scenarios_with_convergences.csv when
     # AG2050_MODE is True; APPLY_DEMAND_MULTIPLIERS is skipped automatically.
     'DYNAMIC_PRICE': [False],
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],
+    'DEMAND_CONSTRAINT_TYPE': ['hard'],
+    'DEMAND_BOUNDS': [{
+        'sheep lexp':             [1.0, 1.01],
+        'sheep meat':             [1.0, 1.01],
+        'sheep wool':             [1.0, 1.01],
+        'apples':                 [1.0, 1.01],
+        'beef lexp':              [1.0, 1.01],
+        'beef meat':              [1.0, 1.01],
+        'citrus':                 [1.0, 1.01],
+        'cotton':                 [1.0, 1.01],
+        'dairy':                  [1.0, 1.01],
+        'grapes':                 [1.0, 1.01],
+        'hay':                    [1.0, 1.01],
+        'nuts':                   [1.0, 1.01],
+        'other non-cereal crops': [1.0, 1.01],
+        'pears':                  [1.0, 1.01],
+        'plantation fruit':       [1.0, 1.01],
+        'rice':                   [1.0, 1.01],
+        'stone fruit':            [1.0, 1.01],
+        'sugar':                  [1.0, 1.01],
+        'summer cereals':         [1.0, 1.01],
+        'summer legumes':         [1.0, 1.01],
+        'summer oilseeds':        [1.0, 1.01],
+        'tropical stone fruit':   [1.0, 1.01],
+        'vegetables':             [1.0, 1.01],
+        'winter cereals':         [1.0, 1.01],
+        'winter legumes':         [1.0, 1.01],
+        'winter oilseeds':        [1.0, 1.01],
+    }],
+
 
     # ---- Per-scenario land use & management options -------------------------
     # Two variants each; conditional_rules below select the correct pair.

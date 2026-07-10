@@ -421,7 +421,7 @@ def plot_13_layout(
     bbox_to_anchor=[0.58, 0.82, 0.4, 0.1],
     stacked_area_pos_neg=stacked_area_pos_neg,
     draw_legend=draw_legend,
-    ylabel: str = 'Net economic returns (Billion AU$)',
+    ylabel: str = 'Budget (Billion AU$)',
     dividing_line=0.5,
     ncol=2,
     column_spacing=1,
@@ -543,7 +543,7 @@ def plot_25_layout(
         bbox_to_anchor=[0.2, -0.05, 0.6, 0.05],  # 调整图例到底部
         stacked_area_pos_neg=stacked_area_pos_neg,
         draw_legend=draw_legend,
-        ylabel: str = 'Net economic returns (Billion AU$)',
+        ylabel: str = 'Budget (Billion AU$)',
         dividing_line=0.5,
         ncol=1,  # 图例列数增加
         column_spacing=1,

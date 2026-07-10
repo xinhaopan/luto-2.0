@@ -17,18 +17,21 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os, re, json
+import os, re, json, time
 import shutil, itertools, subprocess, zipfile
 import pandas as pd
 import matplotlib.pyplot as plt
 
 from tqdm.auto import tqdm
 from typing import Literal
+from pathlib import Path
 from joblib import delayed, Parallel
 from matplotlib import patches
 
 from luto import settings
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, HATCH_PATTERNS, SERVER_PARAMS, PLOT_COL_WIDTH
+
+LUTO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
 
 
 def get_settings_df(task_root_dir:str) -> pd.DataFrame:
@@ -41,7 +44,7 @@ def get_settings_df(task_root_dir:str) -> pd.DataFrame:
         os.makedirs(task_root_dir, exist_ok=True)
     
     # Get the settings from luto.settings
-    with open('luto/settings.py', 'r') as file, \
+    with open(os.path.join(LUTO_ROOT, 'luto/settings.py'), 'r') as file, \
          open(f'{task_root_dir}/non_str_val.txt', 'w') as non_str_val_file:
         
         # Regex patterns that matches variable assignments from settings
@@ -67,7 +70,7 @@ def get_settings_df(task_root_dir:str) -> pd.DataFrame:
 
 
 
-def get_grid_search_param_df(grid_dict:dict) -> None:
+def get_grid_search_param_df(grid_dict:dict) -> pd.DataFrame:
     '''
     Permutate the grid search parameters and save them to a datafram.
     '''
@@ -95,8 +98,14 @@ def update_settings(settings_dict:dict, job_name:str):
     E.g. job name, input directory, raw data directory, and threads.
     '''
     settings_dict['JOB_NAME'] = job_name
-    settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
-    settings_dict['RAW_DATA'] = os.path.abspath(settings_dict['RAW_DATA']).replace('\\','/')
+    # Resolve INPUT_DIR and RAW_DATA relative to LUTO_ROOT (not cwd) so that
+    # create_task_runs can be called from any working directory. Stored as
+    # POSIX paths (forward slashes) so settings.py is portable to Linux.
+    for key in ('INPUT_DIR', 'RAW_DATA'):
+        p = Path(settings_dict[key])
+        if not p.is_absolute():
+            p = Path(LUTO_ROOT) / p
+        settings_dict[key] = p.resolve().as_posix()
     settings_dict['THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
@@ -115,7 +124,7 @@ def get_grid_search_settings_df(task_root_dir:str, settings_df:pd.DataFrame, gri
     for _, row in grid_search_param_df.iterrows():
         settings_dict = template_grid_search.set_index('Name')['Default_run'].to_dict()
         settings_dict.update(row.to_dict())
-        settings_dict = update_settings(settings_dict, f'{task_dir}_Run_{row['run_idx']:04}')
+        settings_dict = update_settings(settings_dict, f'run_{row["run_idx"]:04}')
         run_settings_dfs.append(pd.Series(settings_dict, name=f'Run_{row['run_idx']:04}'))
     
     template_grid_search = pd.concat(run_settings_dfs, axis=1).reset_index(names='Name')
@@ -140,7 +149,7 @@ def copy_folder_custom(source, destination, ignore_dirs=None):
     return jobs   
 
 def create_run_folders(task_root_dir:str, col:str, n_workers:int):
-    src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
+    src_dir = LUTO_ROOT
     dst_dir = f'{task_root_dir}/{col}'
     # Copy the files from the source to the destination
     from_to_files = copy_folder_custom(src_dir, dst_dir, EXCLUDE_DIRS)
@@ -149,35 +158,71 @@ def create_run_folders(task_root_dir:str, col:str, n_workers:int):
     os.makedirs(f'{dst_dir}/output', exist_ok=True)
     
     
-def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster'], max_concurrent_tasks): 
-    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{task_root_dir}/{col}/task_cmd.sh')
-    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{task_root_dir}/{col}/python_script.py')
-    
-    # Wait until the number of running jobs is less than max_concurrent_tasks
-    if os.name == 'posix':
-        while True:
-            try:
-                running_jobs = int(subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
-            except Exception as e:
-                print(f"Error checking running jobs: {e}")
-            if running_jobs < max_concurrent_tasks:
-                break
-            else:
-                print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
-                import time; time.sleep(10)
-        
-    # Open log files for the task run
+def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cluster', max_concurrent_tasks:int=300):
+    _bash_scripts = os.path.join(LUTO_ROOT, 'luto/tools/create_task_runs/bash_scripts')
+
+    # Deposit the run scripts; needed regardless of mode or platform (Windows/Linux)
+    shutil.copyfile(os.path.join(_bash_scripts, 'python_script.py'), f'{task_root_dir}/{col}/python_script.py')
+    shutil.copyfile(os.path.join(_bash_scripts, 'cmd.sh'),           f'{task_root_dir}/{col}/cmd.sh')
+
+    if mode == 'single':
+        # User executes each run manually
+        return
+
+    # Wait until the number of running jobs is less than max_concurrent_tasks.
+    # Cap the total wait at 24 h to avoid silent infinite hangs.
+    _wait_deadline = time.time() + 86400
+    while True:
+        try:
+            running_jobs = int(subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
+        except Exception as e:
+            print(f"Error checking running jobs: {e}")
+            running_jobs = 0
+        if running_jobs < max_concurrent_tasks:
+            break
+        if time.time() > _wait_deadline:
+            raise TimeoutError(
+                f"Timed out waiting for a free slot after 24 h "
+                f"({running_jobs} jobs still running, limit {max_concurrent_tasks})"
+            )
+        print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
+        time.sleep(10)
+
+    TASK_CMD_TIMEOUT = 120
     with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
          open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
-        if mode == 'single': 
-            subprocess.run(['python', 'python_script.py'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file, check=True)
-        elif mode == 'cluster' and os.name == 'posix':
-            subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file, check=True)
-        else:
-            raise ValueError('Mode must be either "single" or "cluster"!')
+        try:
+            subprocess.run(
+                ['bash', 'cmd.sh'],
+                cwd=f'{task_root_dir}/{col}',
+                stdout=std_file, stderr=err_file,
+                check=True,
+                timeout=TASK_CMD_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            raise TimeoutError(
+                f"cmd.sh for '{col}' did not finish within {TASK_CMD_TIMEOUT} s. "
+                f"Check {task_root_dir}/{col}/run_err.log for details."
+            )
 
     
 def write_settings(task_dir:str, settings_dict:dict):
+    with open(os.path.join(LUTO_ROOT, 'luto/settings.py'), 'r') as src:
+        src_text = src.read()
+
+    # Reorder settings_dict to match the original settings.py key order
+    parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
+    src_key_order = [m[1].strip() for line in src_text.splitlines() if (m := parameter_reg.match(line))]
+    settings_dict = {k: settings_dict[k] for k in src_key_order if k in settings_dict} | \
+                    {k: v for k, v in settings_dict.items() if k not in src_key_order}
+
+    # Sync AG_MANAGEMENTS renewable entries from RENEWABLES_OPTIONS.
+    # write_settings flattens all values to literals, breaking the dynamic link
+    # in settings.py. Values are already evaluated here (via non_str_val.txt).
+    for re_type, enabled in settings_dict['RENEWABLES_OPTIONS'].items():
+        if re_type in settings_dict['AG_MANAGEMENTS']:
+            settings_dict['AG_MANAGEMENTS'][re_type] = enabled
+
     with open(f'{task_dir}/luto/settings.py', 'w') as file:
         for k, v in settings_dict.items():
             if isinstance(v, str):
@@ -187,23 +232,27 @@ def write_settings(task_dir:str, settings_dict:dict):
         
                 
 def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
-    with open(f'{task_dir}/luto/settings_bash.py', 'w') as bash_file:
-        for key, value in settings_dict.items():
-            if key not in SERVER_PARAMS:
-                continue
-            if isinstance(value, str):
-                bash_file.write(f'export {key}="{value}"\n')
-            else:
-                bash_file.write(f'export {key}={value}\n')
+    lines = []
+    for key, value in settings_dict.items():
+        if key not in SERVER_PARAMS:
+            continue
+        if isinstance(value, str):
+            lines.append(f'export {key}="{value}"\n')
+        else:
+            lines.append(f'export {key}={value}\n')
+    # newline='\n' avoids Windows CRLF translation — task_param.py is sourced
+    # by bash (cmd.sh) on Linux, where a stray '\r' would corrupt exported values.
+    Path(f'{task_dir}/task_param.py').write_text(''.join(lines), newline='\n')
         
 
 
 def create_task_runs(
-    task_root_dir:str, 
-    custom_settings:pd.DataFrame, 
-    mode:Literal['single','cluster']='single', 
+    task_root_dir:str,
+    custom_settings:pd.DataFrame,
+    mode:Literal['single','cluster']='cluster',
     n_workers:int=4,
     max_concurrent_tasks:int=300,
+    overwrite:bool=False,
 ) -> None:
     '''
     Submit the tasks to the cluster using the custom settings.\n
@@ -216,7 +265,10 @@ def create_task_runs(
     
     if mode not in ['single', 'cluster']:
         raise ValueError('Mode must be either "single" or "cluster"!')
-   
+
+    _bash_scripts = os.path.join(LUTO_ROOT, 'luto/tools/create_task_runs/bash_scripts')
+    shutil.copyfile(os.path.join(_bash_scripts, 'run_all.py'), os.path.join(task_root_dir, 'run_all.py'))
+
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
     custom_settings = custom_settings.set_index('Name')
@@ -235,7 +287,8 @@ def create_task_runs(
         create_run_folders(task_root_dir, col, n_workers)
         write_settings(f'{task_root_dir}/{col}', settings_dict)
         write_terminal_vars(f'{task_root_dir}/{col}', col, settings_dict)
-        submit_task(task_root_dir, col, mode, max_concurrent_tasks)
+        if not overwrite:
+            submit_task(task_root_dir, col, mode, max_concurrent_tasks)
     
     # Run the tasks in parallel
     tasks = [delayed(task_wraper)(col) for col in custom_settings.columns]

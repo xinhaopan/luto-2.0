@@ -103,7 +103,7 @@ luto/                                    # Main package directory
 input/                                   # Input data directory (requires separate download)
 output/                                  # Simulation outputs with interactive HTML reports
 docs/                                    # Documentation files
-requirements.yml                        # Python package dependencies (conda environment spec)
+requirements.yml                         # Python package dependencies (conda environment spec)
 pyproject.toml                           # Project configuration
 ```
 
@@ -222,17 +222,18 @@ settings.SIM_YEARS = [2010, 2020, 2030, 2040, 2050]
 
 settings.WATER_LIMITS = 'on'                            # 'on' or 'off'.
 settings.GHG_EMISSIONS_LIMITS = 'high'                  # 'off', 'low', 'medium', or 'high'
-settings.BIODIVERSITY_TARGET_GBF_2 = 'high'             # 'off', 'low', 'medium', or 'high'
-settings.BIODIVERSITY_TARGET_GBF_3_NVIS = 'off'         # 'off', 'medium', 'high', or 'USER_DEFINED'
+settings.GBF2_TARGET = 'high'             # 'off', 'low', 'medium', or 'high'
+settings.GBF3_NVIS_TARGET = 'off'         # 'off', 'medium', 'high', or 'USER_DEFINED'
 settings.BIODIVERSITY_TARGET_GBF_3_IBRA = 'off'         # 'off', 'medium', 'high', or 'USER_DEFINED'
-settings.BIODIVERSITY_TARGET_GBF_4_SNES = 'off'         # 'on' or 'off'
-settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'        # 'on' or 'off'
-settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'
+settings.GBF4_TARGET_SNES = 'off'         # 'on' or 'off'
+settings.GBF4_TARGET_ECNES = 'off'        # 'on' or 'off'
+settings.GBF8_TARGET = 'off'              # 'on' or 'off'
 
 settings.DYNAMIC_PRICE = False                          # Enable demand elasticity-based dynamic pricing
 
-settings.RENEWABLE_ENERGY_CONSTRAINTS = 'on'             # Enable renewable energy targets
-settings.RENEWABLE_TARGET_SCENARIO = 'CNS25 - Accelerated Transition'  # Target scenario
+settings.RENEWABLES_OPTIONS = {'Utility Solar PV': True, 'Onshore Wind': True}      # Enable renewable energy types
+settings.RENEWABLE_TARGET_SCENARIO_TARGETS = 'Gladstone - Core'                      # Generation target scenario
+settings.RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'                      # Spatial layer scenario
 
 # Load data with custom parameters
 data = sim.load_data()
@@ -282,20 +283,26 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
   - Determines the time period over which carbon sequestration is averaged
   - Must match available ages in NetCDF input data
   - Default: 50 years (based on S-curve carbon accumulation pattern)
-- `BIODIVERSITY_TARGET_GBF_2`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
-- `BIODIVERSITY_TARGET_GBF_3_NVIS`: Conservation targets for NVIS vegetation types ('off', 'medium', 'high', 'USER_DEFINED')
+- `GBF2_TARGET`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
+- `GBF3_NVIS_TARGET`: Conservation targets for NVIS vegetation types ('off', 'medium', 'high', 'USER_DEFINED')
 - `BIODIVERSITY_TARGET_GBF_3_IBRA`: Conservation targets for IBRA bioregions ('off', 'medium', 'high', 'USER_DEFINED')
-- `BIODIVERSITY_TARGET_GBF_4_SNES`: Species of National Environmental Significance ('on' or 'off')
-- `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Communities of National Environmental Significance ('on' or 'off')
-- `BIODIVERSITY_TARGET_GBF_8`: Species and group targets ('on' or 'off')
+- `GBF4_TARGET_SNES`: Species of National Environmental Significance ('on' or 'off')
+- `GBF4_TARGET_ECNES`: Ecological Communities of National Environmental Significance ('on' or 'off')
+- `GBF8_TARGET`: Species and group targets ('on' or 'off')
 
 ### Renewable Energy Constraints
-- `RENEWABLE_ENERGY_CONSTRAINTS`: Enable/disable renewable energy generation targets ('on' or 'off')
-- `RENEWABLES_OPTIONS`: List of renewable energy types (`['Utility Solar PV', 'Onshore Wind']`)
-- `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
-- `RE_TARGET_LEVEL`: Spatial level for targets ('STATE' or 'NRM')
+- `RENEWABLES_OPTIONS`: Dict of renewable energy types and whether each is enabled (e.g., `{'Utility Solar PV': True, 'Onshore Wind': True}`). Set values to `False` to disable individual types.
+- `RENEWABLE_TARGET_SCENARIO_TARGETS`: Generation target scenario. Valid values: `'AEMO 2026 ISP - Accelerated Transition'`, `'AEMO 2026 ISP - Slower Growth'`, `'AEMO 2026 ISP - Step Change'`, `'Gladstone - BESS Sensitivity'`, `'Gladstone - Core'`
+- `RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS`: Spatial layer scenario. Valid values: `'step_change'`, `'accelerated_transition'`, `'ANU_transmission_T3'`, `'ANU_transmission_T5'`, `'ANU_transmission_T10'`
+- `RE_TARGET_LEVEL`: Spatial level for targets ('STATE' or 'NRM'; only STATE currently supported)
 - `INSTALL_CAPACITY_MW_HA`: Per-hectare generation capacity (MW/ha) for each renewable type
 - `RENEWABLES_ADOPTION_LIMITS`: Maximum fraction of compatible land available for each renewable type (default: 1.0)
+- `EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS`: Prevent renewable installation on high-biodiversity GBF2-masked cells (default: True)
+- `RENEWABLE_GBF2_CUT_SOLAR` / `RENEWABLE_GBF2_CUT_WIND`: Biodiversity area coverage % threshold for GBF2 exclusion (default: 20)
+- `EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK`: Prevent renewable installation on EPBC MNES high-priority cells (default: True)
+- `RENEWABLE_EPBC_MNES_CUT_SOLAR` / `RENEWABLE_EPBC_MNES_CUT_WIND`: MNES priority rank % threshold for EPBC exclusion (default: 10)
+
+> **Existing capacity reporting**: Pre-simulation real-world solar/wind installations are automatically included in all output reports as `lu='Existing Capacity'` — visible in area, economics, production, and map layers without any extra configuration.
 
 ### Land Use Options
 - `NON_AG_LAND_USES`: Enable/disable non-agricultural land uses (Environmental Plantings, Carbon Plantings, etc.)
@@ -316,7 +323,6 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `VERBOSE`: Control solver output verbosity
 
 ### Output Control
-- `WRITE_PARALLEL`: Use parallel processing for output generation
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
 
 Refer to `luto/settings.py` for a complete list of configurable parameters and detailed descriptions.

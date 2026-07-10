@@ -66,7 +66,6 @@ if _os.path.isdir(_LOCAL_ASSETS):
 else:
     _ASSETS_DIR = _os.path.abspath(_os.path.join(_CODE_DIR, '../../../draw_all/code/Assets'))
 
-
 class MapConfig:
     def __init__(self, path='../output', input_name='', source_name=''):
         self.write_png = False

@@ -1,33 +1,36 @@
 import os
-import numpy as np
 import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260502_paper4_NCI'],
+    'TASK_NAME': ['20260611_paper4_NCI'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
-    'NUMERIC_FOCUS': [2], 
+    # 'NUMERIC_FOCUS': [2],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['40GB'],
-    'NCPUS': ['10'], 
-    'WRITE_THREADS': ['2'],
-    'TIME': ['6:00:00'],
+    'NCPUS': ['10'],
+    # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
+    'TIME': ['12:00:00'],
+    'PRODUCTIVITY_TREND': ['CONSTANT'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
-    'BIODIVERSITY_TARGET_GBF_2': ['off'],
+    'GBF2_TARGET': ['off'],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     'CARBON_PRICES_FIELD': ['CONSTANT'],
-    'CARBON_PRICE_COSTANT': [i for i in range(0,361,20)], # [0,8.92,17.85,26.77,35.69,44.61,53.54,62.46,75.84,89.23,133.84,178.46,233.07,267.69,312.3,356.92],
+    # Carbon: 0 to 360, step = 20 (multiple of 10) → 19 points
+    'CARBON_PRICE_COSTANT': list(range(0, 361, 20)),
     'BIODIVERSITY_PRICES_FIELD': ['CONSTANT'],
-    'BIODIVERSITY_PRICE_CONSTANT': [i for i in range(0,90001,5000)], # [0, 5500, 11000, 16500, 22000, 27500, 33000, 38500,44000, 49500, 55000, 60500, 66000, 71500, 77000, 82500],
+    # Biodiversity: 0 to 22,000, step = 1000 → 23 points
+    # Headline P50 = A$22,000/ha (NSW BOS ecosystem-credit median: A$4,000/credit × 5.5 credits/ha)
+    'BIODIVERSITY_PRICE_CONSTANT': list(range(0, 22001, 1000)),
     # ---------------------------------- Model settings ------------------------------
-    'SOLVE_WEIGHT_ALPHA': [1],
+    # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],
-    'SIM_YEARS': [[i for i in range(2010,2051,5)]],
+    'SIM_YEARS': [[i for i in range(2010,2026,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
     'GHG_CONSTRAINT_TYPE': ['hard'],
@@ -41,10 +44,10 @@ grid_search = {
         'high': {2030: 0.30, 2050: 0.50, 2100: 0.50},
     }],
     'BIO_QUALITY_LAYER': ['Suitability'],
-    'BIODIVERSITY_TARGET_GBF_3': ['off'],
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],
-    'BIODIVERSITY_TARGET_GBF_8': ['off'],
+    'GBF3_NVIS_TARGET': ['off'],
+    'GBF4_TARGET_SNES': ['off'],
+    'GBF4_TARGET_ECNES': ['off'],
+    'GBF8_TARGET': ['off'],
 
     # ----------------------------------- Water settings --------------------------------
     'WATER_STRESS': [0.6],
@@ -54,14 +57,45 @@ grid_search = {
     'WATER_REGION_DEF': ['Drainage Division'],
     'WATER_CLIMATE_CHANGE_IMPACT': ['on'],
     # ----------------------------------- Demand settings --------------------------------
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],
+    'DYNAMIC_PRICE': [False],
+    'DEMAND_CONSTRAINT_TYPE': ['hard'],
+    'DEMAND_BOUNDS': [{
+        'sheep lexp': [1.0, 1.0],
+        'sheep meat': [1.0, 1.0],
+        'sheep wool': [0, 1.5],
+
+        # all other commodities
+        'apples': [1.0, 1.0],
+        'beef lexp': [1.0, 1.0],
+        'beef meat': [1.0, 1.0],
+        'citrus': [1.0, 1.0],
+        'cotton': [1.0, 1.0],
+        'dairy': [1.0, 1.0],
+        'grapes': [1.0, 1.0],
+        'hay': [1.0, 1.0],
+        'nuts': [1.0, 1.0],
+        'other non-cereal crops': [1.0, 1.0],
+        'pears': [1.0, 1.0],
+        'plantation fruit': [1.0, 1.0],
+        'rice': [1.0, 1.0],
+        'stone fruit': [1.0, 1.0],
+        'sugar': [1.0, 1.0],
+        'summer cereals': [1.0, 1.0],
+        'summer legumes': [1.0, 1.0],
+        'summer oilseeds': [1.0, 1.0],
+        'tropical stone fruit': [1.0, 1.0],
+        'vegetables': [1.0, 1.0],
+        'winter cereals': [1.0, 1.0],
+        'winter legumes': [1.0, 1.0],
+        'winter oilseeds': [1.0, 1.0],
+    }],
     #----------------------------------- other settings --------------------------------
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],
 
     "AG_MANAGEMENTS": [{
         'Asparagopsis taxiformis': True,
         'Precision Agriculture': True,
-        'Ecological Grazing': True,
+        'Ecological Grazing': False,
         'Savanna Burning': True,
         'AgTech EI': True,
         'Biochar': True,

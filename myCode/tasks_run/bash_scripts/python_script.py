@@ -22,6 +22,25 @@ def monitor_memory(func, *args, **kwargs):
     peak_memory = max(mem_usage) / 1024  # 转换为 GB
     return result, peak_memory
 
+
+def _ensure_gdal_data_env():
+    """Best-effort setup for GDAL_DATA to avoid repeated header.dxf warnings."""
+    if os.environ.get("GDAL_DATA"):
+        return
+    candidates = []
+    try:
+        import sys
+        candidates.extend([
+            pathlib.Path(sys.prefix) / "Library" / "share" / "gdal",
+            pathlib.Path(sys.prefix) / "share" / "gdal",
+        ])
+    except Exception:
+        pass
+    for p in candidates:
+        if p.exists():
+            os.environ["GDAL_DATA"] = str(p)
+            break
+
 def _find_lz4(output_path="output"):
     """Find Data_RES*.lz4 in the first '2010-2050' output subfolder.
     Returns (lz4_path, subfolder_name)."""
@@ -172,6 +191,8 @@ def report_only():
     from luto.tools.report.create_report_layers import save_report_layer
     from luto.tools.report.create_report_data import save_report_data
 
+    _ensure_gdal_data_env()
+
     lz4_path, subfolder = _find_lz4()
 
     # Skip if report already exists
@@ -193,10 +214,43 @@ def report_only():
         shutil.copytree('luto/tools/report/VUE_modules',
                         f"{data.path}/DATA_REPORT", dirs_exist_ok=True)
         save_report_data(data.path)
-        save_report_layer(data)
+        save_report_layer(data.path)
 
     _create_report()
     print("Report created successfully.")
+
+
+def rereport_only():
+    """Force rebuild report by deleting existing DATA_REPORT, then recreate."""
+    import joblib, shutil
+    from luto import tools, settings
+    from luto.tools.report.create_report_layers import save_report_layer
+    from luto.tools.report.create_report_data import save_report_data
+
+    _ensure_gdal_data_env()
+
+    lz4_path, subfolder = _find_lz4()
+    report_root = os.path.join("output", subfolder, "DATA_REPORT")
+    if os.path.exists(report_root):
+        print(f"Removing existing report directory: {report_root}")
+        shutil.rmtree(report_root)
+
+    print(f"Loading data from: {lz4_path}")
+    data = joblib.load(lz4_path)
+
+    print("Recreating report...")
+    save_dir = (f"{settings.OUTPUT_DIR}/{tools.read_timestamp()}"
+                f"_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}")
+
+    @tools.LogToFile(f"{save_dir}/LUTO_RUN_", mode='a')
+    def _create_report():
+        shutil.copytree('luto/tools/report/VUE_modules',
+                        f"{data.path}/DATA_REPORT", dirs_exist_ok=True)
+        save_report_data(data.path)
+        save_report_layer(data.path)
+
+    _create_report()
+    print("Report re-created successfully.")
 
 def create_zip(data):
     """Zip results into two archives: full archive + report-only archive, then clean up."""
@@ -334,6 +388,8 @@ if __name__ == "__main__":
         write_only()
     elif os.path.exists('rewrite_mode.flag'):
         rewrite_only()
+    elif os.path.exists('rereport_mode.flag'):
+        rereport_only()
     elif os.path.exists('report_mode.flag'):
         report_only()
     else:

@@ -24,6 +24,8 @@ Pure functions to calculate biodiversity by lm, lu.
 
 import itertools
 import numpy as np
+import pandas as pd
+import xarray as xr
 
 from luto import settings
 from luto import tools
@@ -44,24 +46,30 @@ different from the biodiversity constraints which are for specific species
 (e.g., GBF2-GBF4, GBF8) or specific areas (NRM, STATE ...).
 '''
 
-def get_bio_quality_score_mrj(data:Data):
+def get_bio_quality_score_mrj(data: Data, bio_quality_raw: np.ndarray = None, bio_quality_lds: np.ndarray = None):
     """
     Return b_mrj biodiversity score matrices by land management, cell, and land-use type.
 
     Parameters
     - data: The data object containing information about land management, cells, and land-use types.
+    - bio_quality_raw: Optional override for data.BIO_QUALITY_RAW (used when computing scores for
+      a backend layer other than settings.BIO_QUALITY_LAYER).
+    - bio_quality_lds: Optional override for data.BIO_QUALITY_LDS.
 
     Returns
     - np.ndarray.
     """
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+    bq_lds = bio_quality_lds if bio_quality_lds is not None else data.BIO_QUALITY_LDS
+
     b_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
 
     for j in range(data.N_AG_LUS):
         b_mrj[:, :, j] = (
-            data.BIO_QUALITY_LDS -                                                     # Biodiversity score after Late Dry Season (LDS) burning
-            (data.BIO_QUALITY_RAW * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]))    # Biodiversity degradation for land-use j
-        ) * data.REAL_AREA    
-    
+            bq_lds -                                                       # Biodiversity score after Late Dry Season (LDS) burning
+            (bq_raw * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]))     # Biodiversity degradation for land-use j
+        ) * data.REAL_AREA
+
     return b_mrj
 
 
@@ -107,7 +115,7 @@ def get_ecological_grazing_effect_b_mrj(data:Data):
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
-def get_savanna_burning_effect_b_mrj(data:Data):
+def get_savanna_burning_effect_b_mrj(data: Data, bio_quality_raw: np.ndarray = None):
     """
     Gets biodiversity impacts of using Savanna Burning.
 
@@ -117,19 +125,21 @@ def get_savanna_burning_effect_b_mrj(data:Data):
 
     Parameters
     - data: The input data containing information about land management and biodiversity.
+    - bio_quality_raw: Optional override for data.BIO_QUALITY_RAW.
 
     Returns
     - new_b_mrj: A numpy array representing the biodiversity impacts of using Savanna Burning.
     """
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+
     nlus = len(settings.AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
     eds_sav_burning_biodiv_benefits = np.where(
-        data.SAVBURN_ELIGIBLE, 
-        data.BIO_QUALITY_RAW * (1 - settings.BIO_CONTRIBUTION_LDS) * data.REAL_AREA, 
+        data.SAVBURN_ELIGIBLE,
+        bq_raw * (1 - settings.BIO_CONTRIBUTION_LDS) * data.REAL_AREA,
         0
     ).astype(np.float32)
-    
 
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
         new_b_mrj[m, :, j] = eds_sav_burning_biodiv_benefits
@@ -176,7 +186,7 @@ def get_biochar_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx):
         return b_mrj_effect
 
     for lu_idx, lu in enumerate(land_uses):
-        biodiv_impact = data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact']
+        biodiv_impact = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Biodiversity_impact']
 
         if biodiv_impact != 1:
             j = lu_codes[lu_idx]
@@ -261,7 +271,7 @@ def get_utility_solar_pv_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: i
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
     # Set up the effects matrix
-    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
         return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
@@ -285,7 +295,7 @@ def get_onshore_wind_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
     # Set up the effects matrix
-    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
         return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
@@ -296,28 +306,31 @@ def get_onshore_wind_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     return b_mrj_effect
 
 
-def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
+def get_ag_mgt_biodiversity_matrices(data: Data, ag_b_mrj: np.ndarray, yr_idx: int, bio_quality_raw: np.ndarray = None):
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 
     Parameters
     - data: The input data used for calculations.
+    - ag_b_mrj: Agricultural biodiversity matrix (already computed for the desired backend layer).
+    - yr_idx: Year index.
+    - bio_quality_raw: Optional override for data.BIO_QUALITY_RAW (forwarded to Savanna Burning).
 
     Returns
     A dictionary containing the biodiversity matrices for different agricultural management practices.
     The keys of the dictionary represent the management practices, and the values represent the corresponding biodiversity matrices.
     """
 
-    asparagopsis_data = get_asparagopsis_effect_b_mrj(data)                       
-    precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data)     
-    eco_grazing_data = get_ecological_grazing_effect_b_mrj(data)                   
-    sav_burning_data = get_savanna_burning_effect_b_mrj(data)                       
-    agtech_ei_data = get_agtech_ei_effect_b_mrj(data)                               
-    biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx)                 
-    beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj)                       
+    asparagopsis_data = get_asparagopsis_effect_b_mrj(data)
+    precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data)
+    eco_grazing_data = get_ecological_grazing_effect_b_mrj(data)
+    sav_burning_data = get_savanna_burning_effect_b_mrj(data, bio_quality_raw)
+    agtech_ei_data = get_agtech_ei_effect_b_mrj(data)
+    biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx)
+    beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj)
     sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj)
     solar_pv_data = get_utility_solar_pv_effect_b_mrj(data, ag_b_mrj, yr_idx)
-    wind_data = get_onshore_wind_effect_b_mrj(data, ag_b_mrj, yr_idx)                  
+    wind_data = get_onshore_wind_effect_b_mrj(data, ag_b_mrj, yr_idx)
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -360,14 +373,14 @@ score by 20% (compared to 'pre-1750' land), thus the biodiversity contribution o
 def get_GBF2_MASK_area(data:Data) -> np.ndarray:
     return data.BIO_GBF2_MASK * data.REAL_AREA
 
-def get_GBF3_NVIS_matrices_vr(data:Data) -> np.ndarray:
+def get_GBF3_NVIS_matrices_vr(data:Data) -> xr.DataArray:
     """
     Gets the NVIS vegetation group matrices for GBF3 constraint.
 
     Returns
     -------
-    np.ndarray
-        indexed (v, r) where v is NVIS vegetation group and r is cell
+    xr.DataArray
+        dims (group, cell) — only the unique selected vegetation groups
     """
     return data.GBF3_NVIS_LAYERS_LDS * data.REAL_AREA * data.AG_MASK_PROPORTION_R
 
@@ -384,44 +397,51 @@ def get_GBF3_IBRA_matrices_vr(data:Data) -> np.ndarray:
     return data.GBF3_IBRA_LAYERS_LDS * data.REAL_AREA
 
 
-def get_GBF4_SNES_matrix_sr(data:Data) -> np.ndarray:
+def get_GBF4_SNES_matrix_sr(data: Data) -> xr.DataArray:
     """
-    Gets the SNES contributions  matrix.
-    
+    Gets the SNES pre-1750 area matrix.
+
     Returns
     -------
-    np.ndarray
-        indexed (s, r) where s is species (independent of species conversation limits) and r is cell
+    xr.DataArray
+        dims ['layer', 'cell'] — layer coord is a MultiIndex of (species, presence).
+        Full-Australia layers; no per-region masking.
     """
-    return np.where(
-        data.SAVBURN_ELIGIBLE,
-        data.BIO_GBF4_SPECIES_LAYERS * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.BIO_GBF4_SPECIES_LAYERS * data.REAL_AREA
-    ).astype(np.float32)
-    
+    return data.GBF4_SNES_LAYERS_LDS * data.REAL_AREA
 
-def get_GBF4_ECNES_matrix_sr(data:Data) -> np.ndarray:
+
+def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
     """
-    Gets the ECNES contributions  matrix.
-    
+    Gets the ECNES pre-1750 area matrix.
+
     Returns
     -------
-    np.ndarray
-        indexed (s, r) where s is species (independent of species conversation limits) and r is cell
+    xr.DataArray
+        dims ['layer', 'cell'] — layer coord is a MultiIndex of (species, presence).
+        Full-Australia layers; no per-region masking.
     """
-    return np.where(
+    return data.GBF4_ECNES_LAYERS_LDS * data.REAL_AREA
+
+
+def get_GBF8_matrix_sr(data: Data, target_year: int) -> xr.DataArray:
+    """
+    Gets the GBF8 species suitability area matrix for the given year.
+
+    Returns
+    -------
+    xr.DataArray
+        dims ['species', 'cell'] — species coord holds species name strings.
+    """
+    bio_layers = data.get_GBF8_bio_layers_by_yr(target_year)  # numpy (n_species, n_cells)
+    base = np.where(
         data.SAVBURN_ELIGIBLE,
-        data.BIO_GBF4_COMUNITY_LAYERS * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.BIO_GBF4_COMUNITY_LAYERS * data.REAL_AREA
+        bio_layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+        bio_layers * data.REAL_AREA,
     ).astype(np.float32)
-    
-
-
-def get_GBF8_matrix_sr(data:Data, target_year: int):
-    return np.where(
-        data.SAVBURN_ELIGIBLE,
-        data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA
+    return xr.DataArray(
+        base,
+        dims=['species', 'cell'],
+        coords={'species': data.BIO_GBF8_SEL_SPECIES, 'cell': np.arange(data.NCELLS)},
     )
 
 
@@ -438,7 +458,7 @@ def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:
     Returns
     - np.ndarray.
     """
-    return np.array(list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()))
+    return np.array(list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())).astype(np.float32)
 
 
 @lru_cache(maxsize=1)
@@ -450,7 +470,7 @@ def get_ag_management_biodiversity_contribution(
     Return the biodiversity contribution of each agricultural management practice by land-use type.
     
     - If settings.AG_MANAGEMENTS['Biochar'] is True, then the biodiversity contribution 
-      of Biochar for land-use j is calculated as (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1),
+      of Biochar for land-use j is calculated as (data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Biodiversity_impact'] - 1),
       where lu is the land-use corresponding to land-use code j. 
       
     - If settings.AG_MANAGEMENTS['Biochar'] is False, then the biodiversity contribution 
@@ -486,7 +506,7 @@ def get_ag_management_biodiversity_contribution(
         }
     if settings.AG_MANAGEMENTS['Biochar']:
         am_contr_dict['Biochar'] = {
-            j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
+            j_idx: (data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
         }
     if settings.AG_MANAGEMENTS['HIR - Beef']:
