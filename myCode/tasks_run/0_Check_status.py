@@ -310,6 +310,7 @@ if __name__ == "__main__":
     # 支持检查多个任务
     task_names = [
         '20260711_Paper3_aquila',
+        '20260712_Paper3_test_RF10',
         '20260711_Paper3_HPC',
         # 可以在此添加更多任务名称
     ]
