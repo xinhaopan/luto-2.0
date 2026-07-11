@@ -75,52 +75,98 @@ def parse_year_from_stream(stream):
 
 
 def parse_solver_state_from_stream(stream):
-    """从 stdout/stderr 文本流中解析求解器状态（Optimal, Infeasible, Unbounded, Timeout, Error, Running）。
-    
-    优先级顺序（从高到低）:
-    1. Infeasible ("Infeasible model", "INFEASIBLE", "no feasible", "Status: 3")
-    2. Unbounded
-    3. Timeout ("time limit", "timed out", "interrupted")
-    4. Error (error, exception, traceback)
-    5. Optimal (complete solve success)
+    """从 stdout 文本流中解析求解器最终状态。
+
+    关键：求解器带重试逻辑（"Non-optimal status ... retrying with next attempt"），
+    某一年可能先报 Infeasible、重试后又求解成功。因此不能"见到 infeasible 就返回"，
+    必须扫完整个日志、以【最后一个决定性事件】为准。
+
+    决定性事件（按出现顺序记录，取最后一个）:
+      - "Solver status for year XXXX: INFEASIBLE"  -> 所有重试均失败，确定不可行
+      - "Infeasible or unbounded model"            -> 不可行/无界（求解直接崩在这里）
+      - "Optimal solution found"                   -> 该年求解成功
     """
+    final_state = None          # 最后一个决定性事件
     error_state = None
-    found_optimal = False
-    
+    timeout_state = None
+
+    pat_status = re.compile(r"Solver status for year\s+\d{4}\s*:\s*([A-Z_]+)", re.IGNORECASE)
+
     for line in stream:
         low = line.lower()
-        
-        # Highest priority: Infeasible status (multiple patterns)
-        if 'infeasible model' in low or 'infeasible' in low and 're-solving' not in low:
-            return 'Infeasible'
-        if 'barrier reported infeasible' in low:
-            return 'Infeasible'
-        if 'status: 3' in low:  # Gurobi status code 3 = infeasible
-            return 'Infeasible'
-        if 'no feasible' in low:
-            return 'Infeasible'
-        
-        # Second priority: Unbounded
-        if 'unbounded' in low:
-            return 'Unbounded'
-        
-        # Third priority: Timeout
-        if 'time limit' in low or 'timed out' in low or 'interrupted' in low or 'aborted' in low:
-            return 'Timeout'
-        
-        # Fourth priority: Error
-        if ('error' in line and 'no error' not in low) or 'exception' in low or 'traceback' in low:
+
+        # 权威终态：某年所有重试都失败后打印的最终状态
+        m = pat_status.search(line)
+        if m:
+            status = m.group(1).upper()
+            if status == 'INFEASIBLE':
+                final_state = 'Infeasible'
+            elif 'UNBOUNDED' in status:
+                final_state = 'Unbounded'
+            elif status == 'OPTIMAL':
+                final_state = 'Optimal'
+            else:
+                final_state = status.capitalize()
+            continue
+
+        # 求解直接崩在不可行/无界（不会再打印上面的最终状态行）
+        if 'infeasible or unbounded' in low:
+            final_state = 'Infeasible'
+            continue
+
+        # 单次尝试成功（重试成功也走这里，会覆盖之前的 infeasible 尝试）
+        if 'optimal solution found' in low or 'optimal objective' in low or 'barrier solved model' in low:
+            final_state = 'Optimal'
+            continue
+
+        if 'time limit' in low or 'timed out' in low or 'aborted' in low:
+            timeout_state = 'Timeout'
+
+        if 'traceback' in low or 'exception' in low:
             error_state = 'Error'
-        
-        # Fifth priority: Optimal (but don't return yet, keep checking for errors)
-        if 'optimal objective' in low or 'completed solve' in low or 'barrier solved model' in low:
-            found_optimal = True
-    
-    # Return in priority order
+
+    # 不可行/无界优先于后续的 Python 报错（崩溃往往只是不可行的后果）
+    if final_state in ('Infeasible', 'Unbounded'):
+        return final_state
+    if timeout_state:
+        return timeout_state
     if error_state:
         return error_state
-    if found_optimal:
-        return 'Optimal'
+    return final_state
+
+
+def parse_output_stage_from_stream(stream):
+    """判断写出（write_outputs）阶段是否【已开始】。
+
+    写出阶段的标记：write_outputs 会逐年打印 "Mosaic maps written for year XXXX"。
+    注意：'Report created successfully' 只在独立的 Report 模式下才会打印，普通 Run
+    模式跑完 write_outputs 也不会有，所以不能拿它当写出完成的判据。
+    """
+    for line in stream:
+        if 'Mosaic maps written' in line or 'Writing outputs' in line or 'Report created successfully' in line:
+            return 'Writing'
+    return None
+
+
+def parse_run_result(output_dir):
+    """从 output/simulation_log.txt 读取整轮运行的最终结果（python_script.py 写入）。
+
+    成功 -> "Run completed. Peak memory usage: ..."
+    失败 -> "Run failed."
+    返回 'Completed' / 'Failed' / None（仍在跑或日志缺失）。
+    """
+    log_path = os.path.join(output_dir, 'simulation_log.txt')
+    if not os.path.exists(log_path):
+        return None
+    try:
+        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+            text = f.read()
+    except Exception:
+        return None
+    if 'Run failed' in text:
+        return 'Failed'
+    if 'Run completed' in text:
+        return 'Completed'
     return None
 
 def check_report_created(runing_file):
@@ -263,7 +309,7 @@ if __name__ == "__main__":
     
     # 支持检查多个任务
     task_names = [
-        '20260530_Paper3_aquila',
+        '20260710_Paper3_aquila',
         # 可以在此添加更多任务名称
     ]
     target_year = 2050
@@ -353,41 +399,48 @@ if __name__ == "__main__":
                     runing_file = candidate_stdout
                     break
 
-            # 检查是否存在 "Report created successfully"
-            if runing_file and check_report_created(runing_file):
-                row["Output Status"] = "Success"
-
-            # 获取运行年份和内存信息（优先子文件夹的 mem log）
+            # 一次性读入 stdout，解析：运行年份 / 求解器终态 / 写出阶段
+            solver_state = None
+            output_stage = None
             if runing_file:
-                row["RunningYear"] = parse_running_year(runing_file)
                 try:
                     with open(runing_file, 'r', encoding='utf-8', errors='ignore') as rf:
                         txt = rf.read().splitlines()
-                        solver_state = parse_solver_state_from_stream(txt)
-                        if solver_state:
-                            row["Solver Status"] = solver_state
-                        elif total_lz4 > 0:
-                            # Output files exist → assume solver completed successfully
-                            row["Solver Status"] = 'Optimal'
-                        elif error_found:
-                            row["Solver Status"] = 'Error'
-                        else:
-                            row["Solver Status"] = 'Running'
+                    row["RunningYear"] = parse_year_from_stream(txt)
+                    solver_state = parse_solver_state_from_stream(txt)
+                    output_stage = parse_output_stage_from_stream(txt)
                 except Exception:
-                    if total_lz4 > 0:
-                        row["Solver Status"] = 'Optimal'
-                    elif error_found:
-                        row["Solver Status"] = 'Error'
-                    else:
-                        row["Solver Status"] = 'Unknown'
+                    pass
+
+            # ---- Solver Status ----
+            if solver_state:
+                row["Solver Status"] = solver_state
+            elif total_lz4 > 0:
+                # 已存出 Data_RES*.lz4 → 求解已完成
+                row["Solver Status"] = 'Optimal'
+            elif error_found:
+                row["Solver Status"] = 'Error'
+            elif runing_file:
+                row["Solver Status"] = 'Running'
             else:
-                # 没有 stdout 的情况下，用 lz4 或 error 判定
-                if total_lz4 > 0:
-                    row["Solver Status"] = 'Optimal'
-                elif error_found:
-                    row["Solver Status"] = 'Error'
-                else:
-                    row["Solver Status"] = 'Unknown'
+                row["Solver Status"] = 'Unknown'
+
+            # ---- Output Status ----
+            # 权威判据：simulation_log.txt 里的 "Run completed" / "Run failed."
+            run_result = parse_run_result(output_dir)
+
+            if row["Solver Status"] in ('Infeasible', 'Unbounded'):
+                # 求解就没过，根本走不到写出阶段
+                row["Output Status"] = 'Not started'
+            elif run_result == 'Completed':
+                row["Output Status"] = 'Success'
+            elif run_result == 'Failed' or error_found:
+                # 已进入写出阶段才算写出失败；否则是求解阶段就失败了
+                row["Output Status"] = 'Failed' if output_stage == 'Writing' else 'Not started'
+            elif output_stage == 'Writing':
+                row["Output Status"] = 'Writing'
+            else:
+                row["Output Status"] = 'Running'
 
             # mem log
             mem_found = False
@@ -424,13 +477,13 @@ if __name__ == "__main__":
         results_df = pd.DataFrame(rows, columns=[
             "Name",
             "RunningYear",
+            "Solver Status",
+            "Output Status",
             "Runtime",
             "RuntimeHours",
             "Memory",
             "MaxMemoryGB",
             "PeakTime",
-            "Solver Status",
-            "Output Status",
             # "ArchiveExists",
             # "ArchiveSize_MB",
             # "Num_Data_RES_lz4",

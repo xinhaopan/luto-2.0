@@ -280,6 +280,16 @@ WRITE_REPORT_MAX_MEM_MB = 64 * 1024         # The maximum memory (in MB) to use 
                                             #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13
                                             #   (for example, for RESFACTOR = 5, the MEM usage will be 0.5 * (13/5)^2 = 3.4 GB).
 
+WRITE_MAX_WORKERS_WINDOWS = 16              # [Xinhao] Cap on parallel write workers on WINDOWS only (no effect on Linux/HPC/NCI).
+'''
+Windows' WaitForMultipleObjects can wait on at most 64 handles. The previous cap of 61
+workers sat right on that boundary and write_data() deadlocked during executor shutdown:
+every task finished and all output was written, but "Data writing complete" was never
+reached and the process idled forever (seen on a 192-core Windows box). loky's memmap
+resource-tracker also hits Windows file-locking errors at that worker count.
+16 keeps a wide margin while still parallelising the write. Linux uses os.cpu_count().
+'''
+
 WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk during writeing process.
                                             #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
                                             #   This makes memory usage to be ~1/200 of the original size.

@@ -49,6 +49,30 @@ def get_settings_df(task_root_dir:str) -> pd.DataFrame:
 
 
 
+AG2050_DERIVE_BLOCK = '''
+# --------------------------------------------------------------------------- #
+# AG2050 scenario derivation (emitted by write_settings).                      #
+#                                                                              #
+# In AG2050 mode, PRODUCTIVITY_TREND / GHG_EMISSIONS_LIMITS / GBF2_TARGET are  #
+# derived from the scenario maps. data.py also applies this at runtime, but    #
+# that mutation lives only in the parent process: joblib/loky workers (used by #
+# the parallel write) re-import settings from THIS file and would otherwise    #
+# see the un-derived template defaults -- e.g. GHG_EMISSIONS_LIMITS='high'     #
+# while data.GHG_TARGETS is {} -> KeyError in write_ghg, and GBF2_TARGET='high'#
+# while the run was actually 'off' -> wrong biodiversity output.               #
+# Emitting the derivation here keeps parent and workers in agreement.          #
+# --------------------------------------------------------------------------- #
+if AG2050_MODE and AG2050_SCENARIO:
+    PRODUCTIVITY_TREND          = AG2050_PRODUCTIVITY_MAP[AG2050_SCENARIO]
+    GHG_EMISSIONS_LIMITS        = AG2050_GHG_MAP[AG2050_SCENARIO]
+    GBF2_TARGET                 = AG2050_BIO_MAP[AG2050_SCENARIO]
+    CARBON_PRICES_FIELD         = 'CONSTANT'
+    CARBON_PRICE_COSTANT        = 0.0
+    BIODIVERSITY_PRICES_FIELD   = 'CONSTANT'
+    BIODIVERSITY_PRICE_CONSTANT = 0.0
+'''
+
+
 def write_settings(task_dir:str, settings_dict:dict):
     with open(f'{task_dir}/luto/settings.py', 'w') as file:
         for k, v in settings_dict.items():
@@ -56,6 +80,11 @@ def write_settings(task_dir:str, settings_dict:dict):
                 file.write(f'{k}="{v}"\n')
             else:
                 file.write(f'{k}={v}\n')
+
+        # Make the flat settings file self-deriving in AG2050 mode so that
+        # subprocess-based writers/reporters see the same values as the parent.
+        if settings_dict.get('AG2050_MODE') and settings_dict.get('AG2050_SCENARIO'):
+            file.write(AG2050_DERIVE_BLOCK)
 
 def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
     with open(f'{task_dir}/luto/settings_bash.py', 'w') as bash_file:
