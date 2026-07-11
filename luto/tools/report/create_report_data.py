@@ -770,7 +770,7 @@ def process_economics_data(files, SAVE_DIR):
             out_dict[region_level][region] = {}
         out_dict[region_level][region][rev_cost] = df.to_dict(orient='records')
     profit_na_files = files.query('base_name == "economics_non_ag_profit"').reset_index(drop=True)
-    profit_na_df = pd.concat([df for p in profit_na_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_na_df = _read_concat(profit_na_files['path'])
     profit_na_df = profit_na_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
     profit_na_df = profit_na_df.query('`Land-use` != "ALL"').round({'Value ($)': 2})
 
@@ -870,7 +870,7 @@ def process_economics_data(files, SAVE_DIR):
 
     # Ag Transition (Ag2Ag): region → Type(source) → Water → [series by To-LU]
     ag2ag_files = files.query('base_name == "economics_ag_transition_Ag2Ag"').reset_index(drop=True)
-    ag2ag_df = pd.concat([df for p in ag2ag_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    ag2ag_df = _read_concat(ag2ag_files['path'])
     ag2ag_df = ag2ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
     ag2ag_df['Value ($)'] = ag2ag_df['Value ($)'] * -1   # Convert cost to negative
 
@@ -968,7 +968,7 @@ def process_economics_data(files, SAVE_DIR):
 
     # Am Profit: region → AgMgt → Water → [series by LU]
     profit_am_files = files.query('base_name == "economics_am_profit"').reset_index(drop=True)
-    profit_am_df = pd.concat([df for p in profit_am_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_am_df = _read_concat(profit_am_files['path'])
     profit_am_df = profit_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
     profit_am_df = profit_am_df.query('`Land-use` != "ALL"').round({'Value ($)': 2})
 
@@ -1027,7 +1027,7 @@ def process_economics_data(files, SAVE_DIR):
 
     # NonAg Profit: region → [series by LU]
     profit_na_files = files.query('base_name == "economics_non_ag_profit"').reset_index(drop=True)
-    profit_na_df = pd.concat([df for p in profit_na_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_na_df = _read_concat(profit_na_files['path'])
     profit_na_df = profit_na_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
     profit_na_df = profit_na_df.query('`Land-use` != "ALL"').round({'Value ($)': 2})
 
@@ -1047,7 +1047,7 @@ def process_economics_data(files, SAVE_DIR):
 
     # NonAg Transition (Ag2NonAg): region → [series by LU]
     t_ag2nonag_files = files.query('base_name == "economics_non_ag_transition_Ag2NonAg"').reset_index(drop=True)
-    t_ag2nonag_df = pd.concat([df for p in t_ag2nonag_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    t_ag2nonag_df = _read_concat(t_ag2nonag_files['path'])
     t_ag2nonag_df = t_ag2nonag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
     t_ag2nonag_df['Value ($)'] = t_ag2nonag_df['Value ($)'] * -1   # Convert cost to negative
     t_ag2nonag_filt = t_ag2nonag_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
@@ -1098,14 +1098,14 @@ def process_economics_data(files, SAVE_DIR):
     profit_ag_sum_df = profit_ag_sum_df.query('`Land-use` != "ALL" and Water_supply != "ALL"')
 
     profit_am_files = files.query('base_name == "economics_am_profit"').reset_index(drop=True)
-    profit_am_sum_df = pd.concat([df for p in profit_am_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_am_sum_df = _read_concat(profit_am_files['path'])
     profit_am_sum_df = profit_am_sum_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
     profit_am_sum_df = profit_am_sum_df.query('`Land-use` != "ALL" and Water_supply != "ALL" and `Management Type` != "ALL"')
     # Sum over management types to get (region, Water_supply, Land-use, Year) level
     profit_am_sum_df = profit_am_sum_df.groupby(['region_level', 'region', 'Water_supply', 'Land-use', 'Year'])[['Value ($)']].sum().reset_index()
 
     profit_na_files = files.query('base_name == "economics_non_ag_profit"').reset_index(drop=True)
-    profit_na_sum_df = pd.concat([df for p in profit_na_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_na_sum_df = _read_concat(profit_na_files['path'])
     profit_na_sum_df = profit_na_sum_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
     profit_na_sum_df = profit_na_sum_df.query('`Land-use` != "ALL"')
     # Assign nonag to Dryland to avoid double counting
