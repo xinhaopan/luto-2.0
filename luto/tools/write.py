@@ -456,8 +456,14 @@ def write_data(data: Data):
     paths = [f"{data.path}/out_{yr}" for yr in years]
     write_settings(data.path)
 
-    # Windows WaitForMultipleObjects limit: 63 handles total;
-    max_workers = min(os.cpu_count(), 61) if os.name == 'nt' else os.cpu_count()
+    # Windows WaitForMultipleObjects can wait on at most 64 handles. Running 61
+    # loky workers sits right on that boundary: once every task had finished, the
+    # executor never shut down and write_data() hung forever (observed on a
+    # 192-core Windows box -- all output written, but "Data writing complete" was
+    # never reached). loky's memmap resource-tracker also fights Windows file
+    # locking at that worker count. Keep a wide margin on Windows; Linux (HPC/NCI)
+    # is unaffected and still uses every core.
+    max_workers = min(os.cpu_count(), settings.WRITE_MAX_WORKERS_WINDOWS) if os.name == 'nt' else os.cpu_count()
 
     def get_n_jobs(peak_mb):
         return min(max_workers, max(1, settings.WRITE_REPORT_MAX_MEM_MB // max(peak_mb, 1)))

@@ -108,7 +108,7 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260710_Paper3_NCI'],
+    'TASK_NAME': ['20260711_Paper3_NCI'],
     'KEEP_OUTPUTS': [False],
     'QUEUE': ['normalsr'],
     # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
