@@ -812,7 +812,20 @@ def write_dvar_area(data: Data, yr_cal, path):
     # ==================== Agricultural Management Area ====================
     valid_am_layers = pd.MultiIndex.from_frame(am_area_df_AUS[['am', 'lm', 'lu']]).sort_values()
 
-    if yr_cal == data.YR_CAL_BASE:
+    if am_area_df_AUS['Value'].abs().sum() < 1e-3:
+        # No agricultural management is adopted anywhere this year -- either the scenario
+        # disables them all, or none was taken up in the solution. write_dvar_and_mosaic_map
+        # then emits an xr_dvar_am_*.nc with ZERO layers, and the empty am/lm/lu index levels
+        # come back typed float64, so .sel(am='ALL', lm='ALL', lu='ALL') below dies with
+        # "ValueError: could not convert string to float: 'ALL'" and takes the whole write
+        # down with it. Emit the same all-zero 'ALL' placeholder the Non-Ag branch uses.
+        area_am_cat = xr.DataArray(
+            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
+            dims=['am', 'lm', 'lu', 'cell'],
+            coords={'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['am', 'lm', 'lu'])
+
+    elif yr_cal == data.YR_CAL_BASE:
         # Base year: no dvar file exists, so build from existing capacity layers only (no mosaic)
         area_am_cat = area_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars(['region_state', 'region_NRM'], errors='ignore')
 
