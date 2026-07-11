@@ -130,11 +130,12 @@ grid_search = {
     # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
-    # Solver tolerance: keep 1e-2. LUTO rescales coefficients to ~1e3, so 1e-2 ABSOLUTE
-    # is ~1e-5 RELATIVE -- not loose. Tightening to 1e-6 made AgS4 INFEASIBLE at 2013
-    # (verified: the same dumped model solves OPTIMAL in 80s at 1e-2).
-    'FEASIBILITY_TOLERANCE': [1e-2],
-    'OPTIMALITY_TOLERANCE': [1e-2],
+    # Solver tolerance = 1e-4. LUTO runs with ScaleFlag=0 (Gurobi scaling DISABLED),
+    # under which 1e-6 is numerically unreachable -> AgS4 was INFEASIBLE at 2013.
+    # Sweep on the dumped model (3.05M vars): 1e-6 INFEASIBLE; 1e-5/1e-4 OPTIMAL obj=3318.47;
+    # 1e-2 OPTIMAL obj=3317.98. So 1e-4 is both feasible AND more accurate than 1e-2.
+    'FEASIBILITY_TOLERANCE': [1e-4],
+    'OPTIMALITY_TOLERANCE': [1e-4],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],
