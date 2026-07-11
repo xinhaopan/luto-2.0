@@ -206,6 +206,13 @@ def solve_timeseries(
     checkpoint_path: Path | None = None,
 ) -> None:
 
+    # last_year now only advances on an ACCEPTED solve, so seed it with the base year:
+    # if the very first target year fails, last_year must still be a usable year (the base
+    # year is already populated) rather than the None that Data.__init__ leaves behind --
+    # write_data() filters on `yr <= data.last_year` and would blow up on None.
+    if data.last_year is None:
+        data.last_year = years_to_run[0]
+
     # Save the base-year state before any solving so a retry can re-attempt the
     # first target year. Skipped on resume (file already exists from a prior run).
     if checkpoint_path is not None:
@@ -224,7 +231,6 @@ def solve_timeseries(
 
         start_time = time.time()
         input_data = get_input_data(data, base_year, target_year)
-        data.last_year = target_year
 
         # Retry loop with escalating numerical settings. settings.RETRY_PARAMS is a list
         # of (NumericFocus, Method, Crossover) tuples tried in order; only GRB.OPTIMAL
@@ -251,20 +257,34 @@ def solve_timeseries(
 
             print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.")
 
-        data.add_lumap(target_year, solution.lumap)
-        data.add_lmmap(target_year, solution.lmmap)
-        data.add_ammaps(target_year, solution.ammaps)
-        data.add_ag_dvars(target_year, solution.ag_X_mrj)
-        data.add_delta_dvars_ag2ag(target_year, solution.dvar_D_ag2ag_mrj)
-        data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
-        data.add_delta_dvars_ag2nonag(target_year, solution.dvar_D_ag2nonag_rk)
-        data.add_delta_dvars_nonag2ag(target_year, solution.dvar_D_nonag2ag_mrj)
-        data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
-        data.add_obj_vals(target_year, solution.obj_val)
+        # Only a solution the solver actually ACCEPTED may enter `data`.
+        #
+        # LutoSolver.solve() reads the decision variables straight off the model without
+        # checking Status, and Gurobi will happily hand back the last (constraint-violating)
+        # iterate for a model it just declared INFEASIBLE. Committing that -- and advancing
+        # last_year to the failed year -- meant write_data() treated the failed year as a
+        # real result: AgS2 (RF5) died at 2043, yet out_2043/ was written with 104 files of
+        # numbers that violate the model's own constraints, and the run still archived itself
+        # as "completed". Leave last_year on the final ACCEPTED year so the outputs stop where
+        # the science stops.
+        if not accepted:
+            print(f"Year {target_year} was NOT accepted by the solver — discarding its solution. "
+                  f"Outputs will stop at {data.last_year}.")
+        else:
+            data.last_year = target_year
+            data.add_lumap(target_year, solution.lumap)
+            data.add_lmmap(target_year, solution.lmmap)
+            data.add_ammaps(target_year, solution.ammaps)
+            data.add_ag_dvars(target_year, solution.ag_X_mrj)
+            data.add_delta_dvars_ag2ag(target_year, solution.dvar_D_ag2ag_mrj)
+            data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
+            data.add_delta_dvars_ag2nonag(target_year, solution.dvar_D_ag2nonag_rk)
+            data.add_delta_dvars_nonag2ag(target_year, solution.dvar_D_nonag2ag_mrj)
+            data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
+            data.add_obj_vals(target_year, solution.obj_val)
 
-
-        for data_type, prod_data in solution.prod_data.items():
-            data.add_production_data(target_year, data_type, prod_data)
+            for data_type, prod_data in solution.prod_data.items():
+                data.add_production_data(target_year, data_type, prod_data)
 
         if checkpoint_path is not None and accepted:
             final_path = checkpoint_path / f"data_{target_year}.lz4"
