@@ -132,7 +132,22 @@ def groupby_to_records(df: pd.DataFrame, group_cols, out_cols, value_cols=('Year
 
     year_col, val_col = value_cols
     sim_years = np.sort(df[year_col].unique())
-    s = df.groupby(list(group_cols))[list(value_cols)].apply(
+    gb = df.groupby(list(group_cols))
+
+    # A NON-empty df can still yield ZERO groups: groupby drops rows whose group key is NaN
+    # (dropna=True by default). Scenarios that switch a whole category off (e.g. AgS3/AgS4
+    # disable every non-ag land use) still emit the category's rows as all-zero schema
+    # placeholders, but with a NaN group key -- e.g. 287 non-ag biodiversity rows whose
+    # `region_level` is NaN in every one. pandas 2.x then returns the same 2D DataFrame from
+    # .apply that the empty case produces (value_cols preserved instead of a Series of point
+    # lists), so `wide.columns = out_cols` blew up with
+    #     ValueError: Length mismatch: Expected axis has 5 elements, new values have 4
+    # Checking df.empty alone is not enough -- check the group count too. Returning the empty
+    # schema loses nothing: with zero groups there is, by construction, nothing to plot.
+    if gb.ngroups == 0:
+        return pd.DataFrame(columns=list(out_cols))
+
+    s = gb[list(value_cols)].apply(
         lambda x: annualise_points(x[year_col], x[val_col], sim_years)
     )
     wide = s.reset_index()
