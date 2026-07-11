@@ -2601,7 +2601,18 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 
     # ==================== Total / Limit Summary ====================
 
-    ghg_limits = 0 if settings.GHG_EMISSIONS_LIMITS == 'off' else data.GHG_TARGETS[yr_cal]
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
+        ghg_limits = 0
+    else:
+        # Offline/retry writes can load checkpoints whose target cache is incomplete.
+        # Fall back to the authoritative input table instead of failing (or reporting 0).
+        ghg_limits = data.GHG_TARGETS.get(yr_cal)
+        if ghg_limits is None:
+            target_column = settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]
+            ghg_limits = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, 'GHG_targets.xlsx'),
+                sheet_name='Data', index_col='YEAR', usecols=['YEAR', target_column],
+            ).at[yr_cal, target_column]
     if yr_cal >= data.YR_CAL_BASE + 1:
         ghg_emissions = data.prod_data[yr_cal]['GHG']
     else:
@@ -5191,7 +5202,6 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         }
     }
     return (f"Biodiversity GBF8 species scores written for year {yr_cal}", magnitudes)
-
 
 
 
