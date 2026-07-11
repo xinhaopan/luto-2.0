@@ -2603,10 +2603,18 @@ def process_water_data(files, SAVE_DIR):
     water_nonag = pd.concat([water_nonag_AUS, water_nonag_NRM], ignore_index=True)
 
     water_nonag_sim_years = np.sort(water_nonag['Year'].unique())
-    df_region_wide = water_nonag.groupby(['region_level', 'region', 'Landuse'])[['Year','Value (ML)']]\
-        .apply(lambda x: annualise_points(x['Year'], x['Value (ML)'], water_nonag_sim_years))\
-        .reset_index()
-    df_region_wide.columns = ['region_level', 'region', 'name', 'data']
+    if water_nonag.empty:
+        # Scenarios that disable every non-agricultural land use (e.g. AgS3/AgS4) emit no
+        # "Non-Agricultural Land-use" water rows at all. groupby().apply() on an empty frame
+        # does not collapse to the 4 expected columns, so the hard-coded rename below raised
+        # "ValueError: Length mismatch: Expected axis has 5 elements, new values have 4".
+        # Start from an empty frame carrying the target schema; every op below is a no-op on it.
+        df_region_wide = pd.DataFrame(columns=['region_level', 'region', 'name', 'data'])
+    else:
+        df_region_wide = water_nonag.groupby(['region_level', 'region', 'Landuse'])[['Year','Value (ML)']]\
+            .apply(lambda x: annualise_points(x['Year'], x['Value (ML)'], water_nonag_sim_years))\
+            .reset_index()
+        df_region_wide.columns = ['region_level', 'region', 'name', 'data']
     df_region_wide['type'] = 'column'
     df_region_wide['color'] = df_region_wide['name'].map(COLORS)
     df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
