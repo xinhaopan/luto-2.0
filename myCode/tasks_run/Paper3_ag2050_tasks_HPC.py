@@ -130,9 +130,11 @@ grid_search = {
     # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
-    # Higher solver precision for the final paper runs (jinzhu default; tighter than the 1e-2 baseline)
-    'FEASIBILITY_TOLERANCE': [1e-6],
-    'OPTIMALITY_TOLERANCE': [1e-6],
+    # Solver tolerance: keep 1e-2. LUTO rescales coefficients to ~1e3, so 1e-2 ABSOLUTE
+    # is ~1e-5 RELATIVE -- not loose. Tightening to 1e-6 made AgS4 INFEASIBLE at 2013
+    # (verified: the same dumped model solves OPTIMAL in 80s at 1e-2).
+    'FEASIBILITY_TOLERANCE': [1e-2],
+    'OPTIMALITY_TOLERANCE': [1e-2],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [3],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],
