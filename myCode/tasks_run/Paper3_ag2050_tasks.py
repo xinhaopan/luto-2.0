@@ -130,12 +130,15 @@ grid_search = {
     # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
-    # Solver tolerance = 1e-4. LUTO runs with ScaleFlag=0 (Gurobi scaling DISABLED),
-    # under which 1e-6 is numerically unreachable -> AgS4 was INFEASIBLE at 2013.
-    # Sweep on the dumped model (3.05M vars): 1e-6 INFEASIBLE; 1e-5/1e-4 OPTIMAL obj=3318.47;
-    # 1e-2 OPTIMAL obj=3317.98. So 1e-4 is both feasible AND more accurate than 1e-2.
-    'FEASIBILITY_TOLERANCE': [1e-4],
-    'OPTIMALITY_TOLERANCE': [1e-4],
+    # Solver tolerance = 1e-2. LUTO runs Gurobi with ScaleFlag=0 (scaling DISABLED); under
+    # that, a tight tolerance is numerically unreachable on the big models, and the retry loop
+    # only varies the ALGORITHM -- it can never rescue a tolerance failure. Measured on the
+    # dumped infeasible models: AgS4/2013 (3.05M vars) 1e-6 INFEASIBLE, 1e-5..1e-2 OPTIMAL;
+    # AgS2/2043 (4.94M vars) 1e-4 INFEASIBLE, 1e-3 OPTIMAL obj=4463.10, 1e-2 OPTIMAL obj=4463.43
+    # (0.007% apart). Enabling scaling does NOT help (ScaleFlag -1/2 both stay INFEASIBLE).
+    # The bigger the model the looser it must be, so RESFACTOR=3 gets 1e-2 as well.
+    'FEASIBILITY_TOLERANCE': [1e-2],
+    'OPTIMALITY_TOLERANCE': [1e-2],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],

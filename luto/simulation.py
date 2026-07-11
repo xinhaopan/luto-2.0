@@ -232,26 +232,48 @@ def solve_timeseries(
         start_time = time.time()
         input_data = get_input_data(data, base_year, target_year)
 
-        # Retry loop with escalating numerical settings. settings.RETRY_PARAMS is a list
-        # of (NumericFocus, Method, Crossover) tuples tried in order; only GRB.OPTIMAL
-        # is accepted — any other status falls through to the failure path.
+        # Retry loop. settings.RETRY_PARAMS is a list of
+        #   (NumericFocus, Method, Crossover, Presolve, BarHomogeneous[, FeasibilityTol])
+        # tuples tried in order; only GRB.OPTIMAL is accepted — any other status falls
+        # through to the failure path.
+        #
+        # The optional 6th element loosens the tolerance for that attempt alone. Without it
+        # the loop could only ever vary the ALGORITHM, so it could never rescue a *tolerance*
+        # failure — and on the big models that is precisely what kills the solve (AgS2/2043 is
+        # INFEASIBLE at 1e-4 but OPTIMAL at 1e-3; no ScaleFlag setting changes that). A year
+        # solved on a loosened tolerance is louder than the rest, because it is less precise
+        # than the others and that has to be visible.
         nf_attempts = list(settings.RETRY_PARAMS)
         accepted = False
+        loosened_tol = None
         luto_solver = LutoSolver(input_data)
         luto_solver.formulate()
 
-        for nf, method, crossover, presolve, barhomogenous in nf_attempts:
-            print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...")
+        for attempt in nf_attempts:
+            nf, method, crossover, presolve, barhomogenous = attempt[:5]
+            tol = attempt[5] if len(attempt) > 5 else None
+
+            tol_msg = f", FeasibilityTol={tol:g} (LOOSENED)" if tol else ""
+            print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous}{tol_msg} for year {target_year}...")
             luto_solver.gurobi_model.Params.NumericFocus    = nf
             luto_solver.gurobi_model.Params.Method          = method
             luto_solver.gurobi_model.Params.Crossover       = crossover
             luto_solver.gurobi_model.Params.Presolve        = presolve
             luto_solver.gurobi_model.Params.BarHomogeneous  = barhomogenous
+            luto_solver.gurobi_model.Params.FeasibilityTol  = tol if tol else settings.FEASIBILITY_TOLERANCE
+            luto_solver.gurobi_model.Params.OptimalityTol   = tol if tol else settings.OPTIMALITY_TOLERANCE
             solution = luto_solver.solve()
             status = luto_solver.gurobi_model.Status
 
             if status == GRB.OPTIMAL:
-                print(f"Optimal solution found with NumericFocus={nf}, Method={method}")
+                print(f"Optimal solution found with NumericFocus={nf}, Method={method}{tol_msg}")
+                if tol:
+                    loosened_tol = tol
+                    print('*' * 100)
+                    print(f"WARNING: year {target_year} only solved after LOOSENING the tolerance to {tol:g} "
+                          f"(configured: {settings.FEASIBILITY_TOLERANCE:g}). This year is solved less "
+                          f"precisely than the others — check it before using the results.")
+                    print('*' * 100)
                 accepted = True
                 break
 

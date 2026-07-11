@@ -342,12 +342,37 @@ that 1 tripled solve time, 3 led to numerical problems.
 '''
 
 RETRY_PARAMS = [
-    (0, 2, -1, -1, -1),   # NF, Method, Crossover, Presolve, BarHomogeneous
-    (0, 1,  0, -1, 0 ),
+    (0, 2, -1, -1, -1),         # NF, Method, Crossover, Presolve, BarHomogeneous
+    (0, 1,  0, -1,  0),
+    (0, 2, -1, -1, -1, 1e-1),   # last resort: same algorithm, LOOSER FeasibilityTol
 ]
 '''
-List of solve attempts to try in order, per year. Each entry MUST be a
-(NumericFocus, Method, Crossover, Presolve, BarHomogeneous) tuple.
+List of solve attempts to try in order, per year. Each entry is a
+(NumericFocus, Method, Crossover, Presolve, BarHomogeneous) tuple, with an OPTIONAL
+6th element: a FeasibilityTol/OptimalityTol override for that attempt only.
+
+Why the tolerance override exists
+---------------------------------
+Every attempt used to share the single FEASIBILITY_TOLERANCE, so the retry loop could
+only ever vary the ALGORITHM -- it could never rescue a *tolerance* failure, and a
+tolerance failure is exactly what kills the big models. LUTO runs Gurobi with
+ScaleFlag=0 (scaling DISABLED), under which a tight tolerance is numerically
+unreachable once the model gets large:
+
+    AgS4 / 2013 (3.05M vars):  1e-6 INFEASIBLE;  1e-5 .. 1e-2 OPTIMAL
+    AgS2 / 2043 (4.94M vars):  1e-4 INFEASIBLE;  1e-3 OPTIMAL (obj 4463.10)
+                                                 1e-2 OPTIMAL (obj 4463.43, 0.007% apart)
+
+Enabling scaling does NOT help -- ScaleFlag -1 (auto) and 2 (geometric) both stay
+INFEASIBLE at 1e-4. The bigger the model, the looser the tolerance has to be, and
+RESFACTOR=3 is ~2.8x bigger again than RESFACTOR=5.
+
+The runs therefore use a single uniform tolerance (so every year is solved at the same
+precision, which is what you want to be able to state in a paper), and the final entry
+below is a LAST-RESORT safety net: if a year cannot be solved at the configured
+tolerance, retry it once at 1e-1 rather than lose a 72-hour cluster job outright. When
+that fires it is logged loudly, because that year was solved less precisely than the
+rest and you need to know.
 
 NumericFocus:
     0 = automatic (slight preference for speed); 1-3 = increasingly careful.
