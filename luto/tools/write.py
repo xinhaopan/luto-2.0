@@ -2601,7 +2601,15 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 
     # ==================== Total / Limit Summary ====================
 
-    if settings.GHG_EMISSIONS_LIMITS == 'off':
+    # Take the "is the GHG target off?" fact from `data`, NOT from the settings string.
+    # data.GHG_TARGETS is {} exactly when the target is off (see data.py), and `data` is
+    # pickled to the parallel-write subprocesses -- whereas `settings` is re-imported from
+    # the flat settings.py in each loky worker and can disagree with the parent, because
+    # AG2050 mode derives GHG_EMISSIONS_LIMITS at runtime. Keying the guard off the settings
+    # string meant a worker could read 'high' on a run that was actually 'off', and then
+    # either index an empty GHG_TARGETS (KeyError, killing the whole write) or -- worse --
+    # fall through to the table below and report a GHG limit the run never had.
+    if not data.GHG_TARGETS:
         ghg_limits = 0
     else:
         # Offline/retry writes can load checkpoints whose target cache is incomplete.
@@ -3343,8 +3351,13 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
     Biodiversity GBF2 only being written to disk when `GBF2_TARGET` is not 'off' '''
 
-    # Do nothing if biodiversity limits are off and no need to report
-    if settings.GBF2_TARGET == 'off':
+    # Do nothing if biodiversity limits are off and no need to report.
+    # Also skip when `data` carries no BIO_GBF2_MASK: data.py only builds that mask when
+    # GBF2_TARGET != 'off', so its absence is the authoritative "GBF2 was off" signal.
+    # Trusting `data` (pickled to the parallel-write workers) rather than only the settings
+    # string keeps this correct when a worker re-imports a settings.py that disagrees with
+    # the parent -- otherwise this would run on an off-run and blow up on the missing mask.
+    if settings.GBF2_TARGET == 'off' or not hasattr(data, 'BIO_GBF2_MASK'):
         return 'Skipped: Biodiversity GBF2 scores not written as `GBF2_TARGET` is set to "off"'
 
         
