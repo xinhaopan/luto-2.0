@@ -2188,7 +2188,9 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     area_xr = area_xr / gap   # annualise: one-off area over the period → annual rate
     area_xr = add_all(area_xr, dims_area)
 
-    area_df_region = area_xr.groupby('region'
+    # xarray cannot infer UniqueGrouper labels from a Dask-backed coordinate.
+    # Compute only the small 1-D region coordinate; keep the large values lazy.
+    area_df_region = area_xr.groupby(area_xr['region'].compute()
         ).sum(dim='cell'
         ).to_dataframe('Transition Area (ha)'
         ).reset_index(
@@ -2260,7 +2262,7 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     cost_xr = cost_xr / gap   # annualise: one-off cost over the period → annual rate
     cost_xr = add_all(cost_xr, ['From-land-use', 'To-land-use', 'Cost-type'])
 
-    cost_df_region = cost_xr.groupby('region'
+    cost_df_region = cost_xr.groupby(cost_xr['region'].compute()
         ).sum(dim='cell'
         ).to_dataframe('Cost ($)'
         ).reset_index(
@@ -5183,7 +5185,6 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         }
     }
     return (f"Biodiversity GBF8 species scores written for year {yr_cal}", magnitudes)
-
 
 
 
