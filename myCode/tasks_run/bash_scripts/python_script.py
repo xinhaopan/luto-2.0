@@ -322,7 +322,22 @@ def main():
 
         # 监控运行模拟
         _, simulation_memory = monitor_memory(sim.run, data=data)
-        write_log(f"Run completed. Peak memory usage: {simulation_memory:.2f} GB")
+
+        # sim.run() swallows a solver failure (INFEASIBLE / non-optimal) so that the
+        # partial results still get written out. That means "no exception" does NOT mean
+        # "the model reached the final year": AgS2 stopped at 2043 yet was logged as
+        # "Run completed", archived, and left no error_log -- the only clue was the
+        # "Model finished in 2043" line. On a cluster that silently passes a truncated
+        # run off as a good one. Compare against the last requested year and say so.
+        last_year = getattr(data, 'last_year', None)
+        target_year = settings.SIM_YEARS[-1]
+        if last_year != target_year:
+            write_log(
+                f"Run INCOMPLETE: solver stopped at {last_year}, expected {target_year}. "
+                f"Outputs exist only up to {last_year} -- do NOT treat this run as successful."
+            )
+        else:
+            write_log(f"Run completed. Peak memory usage: {simulation_memory:.2f} GB")
 
         write_log(f"Model finished in {data.last_year}")
 

@@ -9,6 +9,11 @@ import subprocess
 from datetime import datetime
 
 
+# 最后一个模拟年份。求解没跑到这一年的 run 都是截断的，即使它写出了完整外观的输出、
+# 打包了归档、且没有 error_log（sim.run() 会吞掉求解器的 INFEASIBLE 以便写出部分结果）。
+FINAL_YEAR = 2050
+
+
 def get_max_memory_from_stream(stream):
     """从文件流中解析内存使用情况，返回第二列的最大值。"""
     max_mem = 0.0
@@ -151,9 +156,15 @@ def parse_output_stage_from_stream(stream):
 def parse_run_result(output_dir):
     """从 output/simulation_log.txt 读取整轮运行的最终结果（python_script.py 写入）。
 
-    成功 -> "Run completed. Peak memory usage: ..."
-    失败 -> "Run failed."
-    返回 'Completed' / 'Failed' / None（仍在跑或日志缺失）。
+    成功     -> "Run completed. Peak memory usage: ..."
+    未跑完   -> "Run INCOMPLETE: solver stopped at YYYY, expected 2050"
+    失败     -> "Run failed."
+
+    'Incomplete' 是最危险的一种：sim.run() 会吞掉求解器的 INFEASIBLE（好让部分结果仍能写出），
+    所以"没有异常"不等于"跑到了最后一年"。这类运行会留下完整外观的输出和归档、且没有 error_log，
+    极易被当成成功结果。必须单独标出来。
+
+    返回 'Completed' / 'Incomplete' / 'Failed' / None（仍在跑或日志缺失）。
     """
     log_path = os.path.join(output_dir, 'simulation_log.txt')
     if not os.path.exists(log_path):
@@ -165,9 +176,21 @@ def parse_run_result(output_dir):
         return None
     if 'Run failed' in text:
         return 'Failed'
+    if 'Run INCOMPLETE' in text:
+        return 'Incomplete'
     if 'Run completed' in text:
         return 'Completed'
     return None
+
+
+def check_reached_final_year(runing_file, target_year=2050):
+    """从 stdout 判断求解是否真的跑到了最后一年。
+
+    用于给旧的运行日志兜底（那时 python_script.py 还没有 'Run INCOMPLETE' 标记）：
+    只要 stdout 里最大的 "Running for year" 小于 target_year，这一轮就是没跑完的。
+    """
+    yr = parse_running_year(runing_file)
+    return (yr is not None) and (yr >= target_year)
 
 def check_report_created(runing_file):
     """检查 LUTO_RUN__stdout.log 文件中是否包含 'Report created successfully'。"""
@@ -227,11 +250,23 @@ def get_archived_run_info(archive_path):
                                 stderr_error_summary = line.strip()
                                 break
 
+        # An archive existing does NOT mean the run succeeded. sim.run() swallows a solver
+        # failure so the partial results still get written, so a run that died at 2043 still
+        # produces a full-looking output tree, gets archived, and leaves no error_log. Judge
+        # by what the archived stdout actually shows: the solver's final state, and whether
+        # it ever reached the last simulated year.
+        if solver_state in ('Infeasible', 'Unbounded'):
+            output_status = "Incomplete"
+        elif running_year is not None and running_year < FINAL_YEAR:
+            output_status = "Incomplete"
+        else:
+            output_status = "Success"
+
         return {
             "RunningYear": running_year,
             **memory_summary,
             "Solver Status": solver_state or ("Solved" if num_data_lz4 > 0 else "Unknown"),
-            "Output Status": "Success",
+            "Output Status": output_status,
             "ArchiveExists": True,
             "ArchiveSize_MB": round(archive_size_mb, 3) if archive_size_mb is not None else None,
             "Num_Data_RES_lz4": num_data_lz4,
@@ -314,7 +349,7 @@ if __name__ == "__main__":
         '20260711_Paper3_HPC',
         # 可以在此添加更多任务名称
     ]
-    target_year = 2050
+    target_year = FINAL_YEAR
 
     # 遍历每个任务
     for task_name in task_names:
@@ -428,17 +463,30 @@ if __name__ == "__main__":
                 row["Solver Status"] = 'Unknown'
 
             # ---- Output Status ----
-            # 权威判据：simulation_log.txt 里的 "Run completed" / "Run failed."
+            # 权威判据：simulation_log.txt 里的 "Run completed" / "Run INCOMPLETE" / "Run failed."
             run_result = parse_run_result(output_dir)
+            reached_final = check_reached_final_year(runing_file, target_year)
 
-            if row["Solver Status"] in ('Infeasible', 'Unbounded'):
-                # 求解就没过，根本走不到写出阶段
-                row["Output Status"] = 'Not started'
+            truncated = (
+                run_result == 'Incomplete'
+                # 兜底：旧日志没有 INCOMPLETE 标记。sim.run() 吞掉求解器的 INFEASIBLE 后，
+                # 一个只解到 2043 的运行照样会写 "Run completed"、生成 41 个 out_ 目录（后面几年是空的）、
+                # 打包归档、且不留 error_log。唯一的破绽是 stdout 里最大的年份 < 2050。
+                or (run_result == 'Completed' and runing_file and not reached_final)
+                or (row["Solver Status"] in ('Infeasible', 'Unbounded') and output_stage == 'Writing')
+            )
+
+            if truncated:
+                # 求解中途失败，但部分结果已写出 —— 最危险的一种：外观完整，实则截断
+                row["Output Status"] = 'Incomplete'
             elif run_result == 'Completed':
                 row["Output Status"] = 'Success'
             elif run_result == 'Failed' or error_found:
                 # 已进入写出阶段才算写出失败；否则是求解阶段就失败了
                 row["Output Status"] = 'Failed' if output_stage == 'Writing' else 'Not started'
+            elif row["Solver Status"] in ('Infeasible', 'Unbounded'):
+                # 求解没过，也没写出任何东西
+                row["Output Status"] = 'Not started'
             elif output_stage == 'Writing':
                 row["Output Status"] = 'Writing'
             else:
