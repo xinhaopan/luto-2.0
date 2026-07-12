@@ -34,6 +34,9 @@ from pathlib import Path
 import numpy as np
 
 from gurobipy import GRB
+
+# Gurobi refuses FeasibilityTol/OptimalityTol above this value.
+GRB_TOL_MAX = 1e-2
 import joblib
 from luto import settings
 from luto.data import Data
@@ -252,6 +255,12 @@ def solve_timeseries(
         for attempt in nf_attempts:
             nf, method, crossover, presolve, barhomogenous = attempt[:5]
             tol = attempt[5] if len(attempt) > 5 else None
+
+            # Gurobi hard-caps FeasibilityTol/OptimalityTol at 1e-2; setting anything looser
+            # raises GurobiError and would abort the whole run. Clamp rather than crash.
+            if tol is not None and tol > GRB_TOL_MAX:
+                print(f"WARNING: requested tolerance {tol:g} exceeds Gurobi's maximum {GRB_TOL_MAX:g} - clamping.")
+                tol = GRB_TOL_MAX
 
             tol_msg = f", FeasibilityTol={tol:g} (LOOSENED)" if tol else ""
             print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous}{tol_msg} for year {target_year}...")

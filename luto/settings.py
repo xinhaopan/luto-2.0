@@ -343,41 +343,45 @@ that 1 tripled solve time, 3 led to numerical problems.
 
 RETRY_PARAMS = [
     (0, 2, -1, -1, -1),         # NF, Method, Crossover, Presolve, BarHomogeneous
-    (0, 1,  0, -1,  0),
-    (0, 2, -1, -1, -1, 1e-1),   # last resort: same algorithm, LOOSER FeasibilityTol
+    (0, 1,  0, -1,  0),         # dual simplex
+    (3, 2, -1, -1, -1),         # escalate NumericFocus -> barrier
+    (3, 1,  0, -1,  0),         # escalate NumericFocus -> dual simplex
 ]
 '''
 List of solve attempts to try in order, per year. Each entry is a
 (NumericFocus, Method, Crossover, Presolve, BarHomogeneous) tuple, with an OPTIONAL
 6th element: a FeasibilityTol/OptimalityTol override for that attempt only.
 
-Why the tolerance override exists
----------------------------------
-Every attempt used to share the single FEASIBILITY_TOLERANCE, so the retry loop could
-only ever vary the ALGORITHM -- it could never rescue a *tolerance* failure, and a
-tolerance failure is exactly what kills the big models. LUTO runs Gurobi with
-ScaleFlag=0 (scaling DISABLED), under which a tight tolerance is numerically
-unreachable once the model gets large:
+Why the ladder escalates NumericFocus and NOT the tolerance
+-----------------------------------------------------------
+The retry loop used to only vary the ALGORITHM, so it could never rescue a *numerical*
+failure -- and a numerical failure is exactly what kills the big models. Two hard facts
+determine the shape of the ladder above:
 
-    AgS4 / 2013 (3.05M vars):  1e-6 INFEASIBLE;  1e-5 .. 1e-2 OPTIMAL
-    AgS2 / 2043 (4.94M vars):  1e-4 INFEASIBLE;  1e-3 OPTIMAL (obj 4463.10)
-                                                 1e-2 OPTIMAL (obj 4463.43, 0.007% apart)
+1. Gurobi caps FeasibilityTol and OptimalityTol at 1e-2. Anything looser raises
+   `GurobiError: Unable to set parameter FeasibilityTol to value 0.1 (maximum is 0.01)`.
+   So once a year fails at 1e-2 there is NO looser tolerance left to fall back to --
+   "loosen further" is not a strategy that exists.
 
-Enabling scaling does NOT help -- ScaleFlag -1 (auto) and 2 (geometric) both stay
-INFEASIBLE at 1e-4. The bigger the model, the looser the tolerance has to be, and
-RESFACTOR=3 is ~2.8x bigger again than RESFACTOR=5.
+2. Loosening is not even monotonically safe. Each year's solution seeds the next year's
+   transition bounds, so a sloppier solve can hand the following year an infeasible
+   starting point. Observed on AgS2 (RF=5): at 1e-4 it ran to 2043 before failing; at
+   1e-2 -- a LOOSER tolerance -- it failed at 2027, sixteen years EARLIER.
 
-The runs therefore use a single uniform tolerance (so every year is solved at the same
-precision, which is what you want to be able to state in a paper), and the final entry
-below is a LAST-RESORT safety net: if a year cannot be solved at the configured
-tolerance, retry it once at 1e-1 rather than lose a 72-hour cluster job outright. When
-that fires it is logged loudly, because that year was solved less precisely than the
-rest and you need to know.
+NumericFocus is the lever that actually works. AgS4/2013 (3.05M vars) is INFEASIBLE at
+1e-6 with NF=0, but solves to OPTIMAL at 1e-6 on the first try with NF=3. Note that
+LUTO runs with ScaleFlag=0 (scaling disabled); enabling scaling does NOT help here --
+ScaleFlag -1 (auto) and 2 (geometric) both stay INFEASIBLE.
+
+The tolerance override (6th element) is still supported for one-off experiments, but it
+is deliberately absent from the default ladder: a run should solve every year at the
+same precision, which is what you need to be able to state in a paper. If you do use it,
+values > 1e-2 are clamped by the solver loop, and any year solved at a loosened
+tolerance is logged loudly, because it was solved less precisely than the rest.
 
 NumericFocus:
     0 = automatic (slight preference for speed); 1-3 = increasingly careful.
-    NF=0 is safe for all attempts since geometry mean rescaling (2026-05)
-    keeps LHS/RHS coefficients well within Gurobi's recommended range.
+    Careful settings cost solve time, so they are used only as a fallback.
 
 Method:
     -1 = automatic, 0 = primal simplex, 1 = dual simplex, 2 = barrier,
