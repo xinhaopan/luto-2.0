@@ -342,46 +342,48 @@ that 1 tripled solve time, 3 led to numerical problems.
 '''
 
 RETRY_PARAMS = [
-    (0, 2, -1, -1, -1),         # NF, Method, Crossover, Presolve, BarHomogeneous
-    (0, 1,  0, -1,  0),         # dual simplex
-    (3, 2, -1, -1, -1),         # escalate NumericFocus -> barrier
-    (3, 1,  0, -1,  0),         # escalate NumericFocus -> dual simplex
+    (0, 2, 0, -1, -1),          # NF, Method, Crossover, Presolve, BarHomogeneous
+    (0, 1, 0, -1,  0),          # dual simplex
+    (3, 2, 0, -1, -1),          # escalate NumericFocus -> barrier
+    (3, 1, 0, -1,  0),          # escalate NumericFocus -> dual simplex
 ]
 '''
 List of solve attempts to try in order, per year. Each entry is a
 (NumericFocus, Method, Crossover, Presolve, BarHomogeneous) tuple, with an OPTIONAL
 6th element: a FeasibilityTol/OptimalityTol override for that attempt only.
 
-Why the ladder escalates NumericFocus and NOT the tolerance
------------------------------------------------------------
-The retry loop used to only vary the ALGORITHM, so it could never rescue a *numerical*
-failure -- and a numerical failure is exactly what kills the big models. Two hard facts
-determine the shape of the ladder above:
+CROSSOVER MUST STAY 0 -- this is the third element of every tuple
+----------------------------------------------------------------
+LUTO has always run barrier with crossover DISABLED. It used to be a top-level setting
+(`CROSSOVER = 0`, applied in solver.py) whose comment already warned that leaving it on
+auto meant it "sometimes never finishes". The upstream merge deleted that setting and
+folded the flag into these tuples with the value -1 (auto = crossover ON), which
+silently re-enabled it. That regression is what broke the RESFACTOR=5 Paper3 runs:
 
-1. Gurobi caps FeasibilityTol and OptimalityTol at 1e-2. Anything looser raises
-   `GurobiError: Unable to set parameter FeasibilityTol to value 0.1 (maximum is 0.01)`.
-   So once a year fails at 1e-2 there is NO looser tolerance left to fall back to --
-   "loosen further" is not a strategy that exists.
+    AgS2 / 2027:  barrier reached OPTIMAL (obj 4486.39), crossover pushed it to
+                  primal-infeasible and the year came back INFEASIBLE
+    AgS1 / 2040:  barrier reached OPTIMAL (obj 4816.67), same crossover failure
+    AgS1 / 2026:  barrier converged in minutes, then crossover's simplex clean-up
+                  stalled for 110+ minutes at primal infeasibility ~321 and never moved
 
-2. Loosening is not even monotonically safe. Each year's solution seeds the next year's
-   transition bounds, so a sloppier solve can hand the following year an infeasible
-   starting point. Observed on AgS2 (RF=5): at 1e-4 it ran to 2043 before failing; at
-   1e-2 -- a LOOSER tolerance -- it failed at 2027, sixteen years EARLIER.
+In every case the barrier itself was fine; crossover destroyed or stalled on a solution
+that was already optimal. LUTO does not need a basic (vertex) solution -- the decision
+variables are consumed as plain numbers by the next year -- so crossover buys nothing
+and costs everything. Keep it at 0.
 
-NumericFocus is the lever that actually works. AgS4/2013 (3.05M vars) is INFEASIBLE at
-1e-6 with NF=0, but solves to OPTIMAL at 1e-6 on the first try with NF=3. Note that
-LUTO runs with ScaleFlag=0 (scaling disabled); enabling scaling does NOT help here --
-ScaleFlag -1 (auto) and 2 (geometric) both stay INFEASIBLE.
-
-The tolerance override (6th element) is still supported for one-off experiments, but it
-is deliberately absent from the default ladder: a run should solve every year at the
-same precision, which is what you need to be able to state in a paper. If you do use it,
-values > 1e-2 are clamped by the solver loop, and any year solved at a loosened
-tolerance is logged loudly, because it was solved less precisely than the rest.
+Tolerance is NOT the lever, and it cannot be loosened past 1e-2
+--------------------------------------------------------------
+Gurobi caps FeasibilityTol and OptimalityTol at 1e-2; anything looser raises
+`GurobiError: Unable to set parameter FeasibilityTol to value 0.1 (maximum is 0.01)`.
+The 6th-element override therefore exists only for one-off experiments and is clamped by
+the solver loop; it is deliberately absent from the default ladder so that every year of
+a run is solved at the same precision, which is what you need to state in a paper.
 
 NumericFocus:
     0 = automatic (slight preference for speed); 1-3 = increasingly careful.
-    Careful settings cost solve time, so they are used only as a fallback.
+    NF=3 rescues genuine numerical failures -- AgS4/2013 is INFEASIBLE at 1e-6 with
+    NF=0 but OPTIMAL on the first attempt with NF=3 -- but it is expensive, so it is
+    used only as a fallback.
 
 Method:
     -1 = automatic, 0 = primal simplex, 1 = dual simplex, 2 = barrier,
