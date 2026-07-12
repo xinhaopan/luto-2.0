@@ -1,4 +1,4 @@
-import os, pathlib
+import os, pathlib, re
 import traceback
 import time
 from memory_profiler import memory_usage
@@ -316,12 +316,29 @@ def main():
         write_log("Simulation started")
         overall_start_time = time.time()
 
-        # 监控加载数据
-        data, load_data_memory = monitor_memory(sim.load_data)
-        write_log(f"Data loaded. Peak memory usage: {load_data_memory:.2f} GB")
+        # 断点续跑：若已有 data_YYYY.lz4 检查点，则复用原输出目录、跳过 load_data()，
+        # 由 sim.run() 内部从检查点恢复（data=None 时）。没有检查点才从头加载。
+        # A crash at year N leaves data_{N-1}.lz4 behind; without this, a restart would
+        # re-solve every year from 2010 and throw away hours of work.
+        checkpoint_dir = next(
+            (str(d) for d in sorted(pathlib.Path(settings.OUTPUT_DIR).iterdir(), key=lambda d: d.name)
+             if d.is_dir() and any(re.match(r'data_\d{4}\.lz4', f.name) for f in d.iterdir())),
+            None
+        )
+
+        if checkpoint_dir:
+            last_ckpt = sorted(
+                f.name for f in pathlib.Path(checkpoint_dir).iterdir()
+                if re.match(r'data_\d{4}\.lz4', f.name)
+            )[-1]
+            write_log(f"Checkpoint found ({last_ckpt}) — resuming from it, skipping load_data().")
+            data, load_data_memory = None, 0.0
+        else:
+            data, load_data_memory = monitor_memory(sim.load_data)
+            write_log(f"Data loaded. Peak memory usage: {load_data_memory:.2f} GB")
 
         # 监控运行模拟
-        _, simulation_memory = monitor_memory(sim.run, data=data)
+        data, simulation_memory = monitor_memory(sim.run, data=data, checkpoint_dir=checkpoint_dir)
 
         # sim.run() swallows a solver failure (INFEASIBLE / non-optimal) so that the
         # partial results still get written out. That means "no exception" does NOT mean

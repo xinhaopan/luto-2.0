@@ -1539,11 +1539,25 @@ class LutoSolver:
 
 
 
-    def solve(self) -> SolverSolution:
+    def solve(self) -> SolverSolution | None:
         print("Starting solve...\n")
 
         # Magic.
         self.gurobi_model.optimize()
+
+        # Only read the decision variables if the solver actually loaded a solution vector.
+        # A barrier run that aborts with NUMERIC leaves none, and touching .X then raises
+        # AttributeError -- which kills the whole run before simulation.py gets to inspect
+        # the status and move on to the next entry in RETRY_PARAMS. Returning None lets the
+        # retry ladder do its job. (An INFEASIBLE model usually *does* leave its last
+        # iterate behind, which is why this only ever bit the crossover-free path.)
+        if self.gurobi_model.SolCount == 0:
+            print(
+                f"Completed solve with status {self.gurobi_model.Status} and no solution "
+                f"available -- nothing to collect.\n",
+                flush=True,
+            )
+            return None
 
         print("Completed solve, collecting results...\n", flush=True)
 

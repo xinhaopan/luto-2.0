@@ -37,6 +37,17 @@ from gurobipy import GRB
 
 # Gurobi refuses FeasibilityTol/OptimalityTol above this value.
 GRB_TOL_MAX = 1e-2
+
+# Readable names for the statuses the retry ladder actually sees.
+GRB_STATUS_NAMES = {
+    GRB.INFEASIBLE:    "INFEASIBLE",
+    GRB.INF_OR_UNBD:   "INF_OR_UNBD",
+    GRB.UNBOUNDED:     "UNBOUNDED",
+    GRB.NUMERIC:       "NUMERIC (numerical trouble -- no solution produced)",
+    GRB.SUBOPTIMAL:    "SUBOPTIMAL",
+    GRB.ITERATION_LIMIT: "ITERATION_LIMIT",
+    GRB.TIME_LIMIT:    "TIME_LIMIT",
+}
 import joblib
 from luto import settings
 from luto.data import Data
@@ -274,7 +285,7 @@ def solve_timeseries(
             solution = luto_solver.solve()
             status = luto_solver.gurobi_model.Status
 
-            if status == GRB.OPTIMAL:
+            if status == GRB.OPTIMAL and solution is not None:
                 print(f"Optimal solution found with NumericFocus={nf}, Method={method}{tol_msg}")
                 if tol:
                     loosened_tol = tol
@@ -286,7 +297,8 @@ def solve_timeseries(
                 accepted = True
                 break
 
-            print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.")
+            reason = GRB_STATUS_NAMES.get(status, f"status {status}")
+            print(f"Solve failed ({reason}) with NumericFocus={nf}, Method={method}; retrying with next attempt if available.")
 
         # Only a solution the solver actually ACCEPTED may enter `data`.
         #
