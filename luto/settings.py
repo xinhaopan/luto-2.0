@@ -341,16 +341,39 @@ max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing re
 that 1 tripled solve time, 3 led to numerical problems.
 '''
 
+SOLVE_TIME_LIMIT_SECONDS = 4 * 3600
+'''
+Per-attempt wall-clock cap handed to Gurobi (TimeLimit).
+
+An attempt that stalls must not be allowed to eat the whole job. Dual simplex on
+AgS2/2027 ran 591,000 iterations with the objective oscillating between two values and
+dual infeasibility pinned at 3.7e13 -- it was cycling on a degenerate vertex and would
+never have terminated on its own. On exceeding this limit Gurobi returns TIME_LIMIT,
+which is not OPTIMAL, so the retry loop simply moves to the next attempt.
+
+4 hours is generous: the slowest legitimate solve observed at RESFACTOR=5 was 179 min.
+RESFACTOR=3 models are ~2.8x larger, so raise this if a real solve gets truncated (the
+log names TIME_LIMIT explicitly when it fires).
+'''
+
 RETRY_PARAMS = [
     (0, 2, 0, -1, -1),          # NF, Method, Crossover, Presolve, BarHomogeneous
-    (0, 1, 0, -1,  0),          # dual simplex
-    (3, 2, 0, -1, -1),          # escalate NumericFocus -> barrier
-    (3, 1, 0, -1,  0),          # escalate NumericFocus -> dual simplex
+    (3, 2, 0, -1, -1),          # numerical rescue: barrier with NumericFocus=3
+    (3, 2, 0, -1,  1),          # ... plus BarHomogeneous, for genuine infeasibility
+    (0, 1, 0, -1,  0),          # last resort: dual simplex (can stall -- see TimeLimit)
 ]
 '''
 List of solve attempts to try in order, per year. Each entry is a
 (NumericFocus, Method, Crossover, Presolve, BarHomogeneous) tuple, with an OPTIONAL
 6th element: a FeasibilityTol/OptimalityTol override for that attempt only.
+
+Order matters: the rescue must come before the attempt that can hang
+--------------------------------------------------------------------
+Attempt 1 is the fast path. Attempt 2 is NumericFocus=3, which is the attempt that has
+actually been observed to rescue a numerically-hard year (AgS2/2027, AgS4/2013). Dual
+simplex is LAST, because on these models it does not fail -- it cycles, and an attempt
+that never returns starves every attempt behind it. It was originally placed second,
+which meant the one thing known to work sat behind the one thing known to hang.
 
 CROSSOVER MUST STAY 0 -- this is the third element of every tuple
 ----------------------------------------------------------------

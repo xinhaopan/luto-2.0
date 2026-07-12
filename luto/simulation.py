@@ -282,6 +282,8 @@ def solve_timeseries(
             luto_solver.gurobi_model.Params.BarHomogeneous  = barhomogenous
             luto_solver.gurobi_model.Params.FeasibilityTol  = tol if tol else settings.FEASIBILITY_TOLERANCE
             luto_solver.gurobi_model.Params.OptimalityTol   = tol if tol else settings.OPTIMALITY_TOLERANCE
+            # Cap each attempt so a stalling one cannot starve the attempts behind it.
+            luto_solver.gurobi_model.Params.TimeLimit       = settings.SOLVE_TIME_LIMIT_SECONDS
             solution = luto_solver.solve()
             status = luto_solver.gurobi_model.Status
 
