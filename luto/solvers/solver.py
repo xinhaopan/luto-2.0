@@ -1636,17 +1636,14 @@ class LutoSolver:
                         j_idx, r
                     ].X
 
-        # Interior-point dust is NOT removed here -- see snap_dvar_noise() in tools, called from
-        # write_outputs(). Snapping the solution as it comes out of the solver was tried and it
-        # breaks the model: the removed land leaves each cell holding slightly less than its
-        # capacity, _project_base_into_cell scales agriculture back UP to compensate, and that can
-        # push an entry past the dvar_ub the clamp had just put it under -- at which point the
-        # all-deltas-zero "stay" point is no longer feasible and the year comes back INFEASIBLE.
-        # Measured on AgS2/2022 (RF=5): identical run without the snap solves on the first attempt;
-        # with it, the barrier returns INF_OR_UNBD. The dust does no harm inside the model (the
-        # transition machinery already ignores sub-ROUND_DECIMALS fractions when building source
-        # maps, and the cell totals are correct with the dust included) -- it only harms the
-        # OUTPUTS. So it is cleaned there, once, after every year has been solved.
+        # The decision variables are kept exactly as the solver returned them. With crossover on
+        # (upstream's default) they already sit on a vertex, so the zeros are exact and nothing
+        # needs cleaning. Turning crossover off and thresholding the interior-point dust instead
+        # was tried: the barrier alone cannot always reach FeasibilityTol, it returns SUBOPTIMAL,
+        # and the dual-simplex fallback then cycles -- AgS1/2021 (RF=5) ran 2.2M iterations with
+        # the objective at 1e+35 and never terminated. Crossover is what makes an approximate
+        # interior point into an exactly-feasible one; it is slow (and single-threaded), but it is
+        # what keeps the years solvable.
 
         # Stack dryland and irrigated decision variables — fractional values preserved as-is
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
