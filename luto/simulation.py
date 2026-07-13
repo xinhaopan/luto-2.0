@@ -353,17 +353,36 @@ def solve_timeseries(
             }
             print(f"Solver status for year {target_year}: {status_msgs.get(status, f'unexpected status {status}')}")
 
-            if status == GRB.INFEASIBLE:
-                model_path = f"{data.path}/debug_model_{base_year}_{target_year}.mps"
-                luto_solver.gurobi_model.write(model_path)
-                print(f"Saved model to {model_path}")
-                if do_analyze_iis:
+            # Dump the model for ANY rejected status, not just INFEASIBLE. The hard failures
+            # on the constrained scenarios come back NUMERIC, INF_OR_UNBD or SUBOPTIMAL --
+            # never a clean INFEASIBLE -- so gating the dump on INFEASIBLE meant the years we
+            # most needed to diagnose were the only ones that left no evidence behind.
+            model_path = f"{data.path}/debug_model_{base_year}_{target_year}.mps"
+            luto_solver.gurobi_model.write(model_path)
+            print(f"Saved model to {model_path}")
+
+            if do_analyze_iis:
+                # computeIIS() needs a definitive INFEASIBLE. Gurobi only returns INF_OR_UNBD
+                # because its dual reductions cannot tell infeasible from unbounded apart;
+                # turning them off forces it to commit to one, so re-solve first.
+                if status == GRB.INF_OR_UNBD:
+                    print("Status INF_OR_UNBD -- re-solving with DualReductions=0 to pin it down...")
+                    luto_solver.gurobi_model.Params.DualReductions = 0
+                    luto_solver.gurobi_model.optimize()
+                    status = luto_solver.gurobi_model.Status
+                    print(f"Resolved status: {GRB_STATUS_NAMES.get(status, status)}")
+
+                if status == GRB.INFEASIBLE:
                     print("Computing IIS...")
                     luto_solver.gurobi_model.computeIIS()
                     iis_path = f"{data.path}/debug_model_{base_year}_{target_year}.ilp"
                     luto_solver.gurobi_model.write(iis_path)
                     print(f"IIS saved to {iis_path}")
                     analyze_iis(iis_path, data)
+                else:
+                    print(f"No IIS: an IIS only exists for an infeasible model, and this one "
+                          f"ended {GRB_STATUS_NAMES.get(status, status)}. The .mps above holds "
+                          f"the model for offline analysis.")
 
             print('!' * 100)
             print('\n')
