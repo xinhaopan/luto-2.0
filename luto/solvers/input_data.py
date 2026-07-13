@@ -1158,24 +1158,24 @@ def _project_base_into_cell(data: Data, base_ag_mrj: np.ndarray, base_non_ag_rk:
     scale_r = np.divide(ag_target_r, ag_r, out=np.ones_like(ag_r), where=ag_r > 1e-12)
     out = (base_ag_mrj * scale_r[None, :, None].astype(np.float32)).astype(np.float32)
 
-    # Report the two directions separately -- they come from different causes and only one of
-    # them is dangerous to leave alone. A cell holding MORE than it has is the clamp bug: the
-    # solver spent its tolerance budget converting a non-reversible planting back to cropland
-    # and clamp_dvar_bound handed the planting back without taking the cropland away. A cell
-    # holding LESS is SNAP_DVAR_NOISE_TO_ZERO removing interior-point dust. Both are corrected
-    # here, and both must be: were the deficit left uncorrected, every snapped cell would lose
-    # a sliver of land each year and the map would quietly shrink over four decades.
+    # Report the two directions separately. A cell holding MORE than it has is the bug this
+    # function exists for: the solver spent its tolerance budget converting a non-reversible
+    # planting back to cropland, and clamp_dvar_bound handed the planting back without taking the
+    # cropland away. A cell holding LESS should be float32 noise and nothing else -- if a run ever
+    # starts reporting real deficits, something upstream is removing land, and leaving it
+    # uncorrected would let every affected cell shed a sliver per year until the map quietly
+    # shrank over four decades.
     thr = 10 ** -settings.ROUND_DECIMALS
     over = over_r > thr
     under = over_r < -thr
     if np.any(over):
         print(f"  └── Base OVER cell capacity: {int(over.sum())} cells, "
               f"max={over_r[over].max():.2e}, mean={over_r[over].mean():.2e} "
-              f"-- land the clamp created; scaled back out of agriculture", flush=True)
+              f"-- scaled back out of agriculture", flush=True)
     if np.any(under):
         print(f"  └── Base UNDER cell capacity: {int(under.sum())} cells, "
               f"max={-over_r[under].min():.2e}, mean={-over_r[under].mean():.2e} "
-              f"-- land the dvar snap removed; scaled back into agriculture", flush=True)
+              f"-- scaled back into agriculture", flush=True)
 
     # Scaling cannot land on the target exactly: every scaled entry is rounded back to
     # float32, and those roundings do not cancel. What is left is a float32 rounding

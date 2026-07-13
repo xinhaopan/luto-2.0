@@ -154,7 +154,6 @@ grid_search = {
     'RETRY_PARAMS': [[(0, 2, -1, -1, -1), (0, 1, 0, -1, 0)]],
     'FEASIBILITY_TOLERANCE': [1e-4],
     'OPTIMALITY_TOLERANCE': [1e-4],
-    'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [3],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],
 
