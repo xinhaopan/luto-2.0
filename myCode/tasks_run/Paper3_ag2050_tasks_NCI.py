@@ -108,16 +108,22 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260711_Paper3_NCI'],
+    'TASK_NAME': ['20260714_Paper3_NCI'],
     'KEEP_OUTPUTS': [False],
     'QUEUE': ['normalsr'],
     # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
     # ---- Computational settings (not model parameters) ----------------------
-    # NCI production run: 36 CPUs / 144 GB at RESFACTOR=3
-    'MEM': ['144GB'],
-    'NCPUS': ['36'],
+    # NCI RESFACTOR=3 production run: 200 GB / 50 CPUs / 48 h.
+    #
+    # Note on the CPUs: with Crossover on auto (-1), most of the wall time is single-threaded.
+    # Gurobi's barrier parallelises (measured: 22 cores busy), but the crossover clean-up that
+    # follows it is a sequential simplex -- AgS1/2019 at RESFACTOR=5 spent 143 minutes on ONE
+    # core after the barrier had found the optimum in 8 minutes on 22. Extra cores speed up the
+    # barrier and do nothing for the crossover, so 50 buys less than it looks like it should.
+    'MEM': ['200GB'],
+    'NCPUS': ['50'],
     # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
-    'TIME': ['72:00:00'],
+    'TIME': ['48:00:00'],
 
     # ---- AG2050 scenario switch and selector ---------------------------------
     # Set AG2050_MODE=True to activate all AG2050 overrides.
@@ -130,15 +136,20 @@ grid_search = {
     # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
-    # Solver tolerance = 1e-2. LUTO runs Gurobi with ScaleFlag=0 (scaling DISABLED); under
-    # that, a tight tolerance is numerically unreachable on the big models, and the retry loop
-    # only varies the ALGORITHM -- it can never rescue a tolerance failure. Measured on the
-    # dumped infeasible models: AgS4/2013 (3.05M vars) 1e-6 INFEASIBLE, 1e-5..1e-2 OPTIMAL;
-    # AgS2/2043 (4.94M vars) 1e-4 INFEASIBLE, 1e-3 OPTIMAL obj=4463.10, 1e-2 OPTIMAL obj=4463.43
-    # (0.007% apart). Enabling scaling does NOT help (ScaleFlag -1/2 both stay INFEASIBLE).
-    # The bigger the model the looser it must be, so RESFACTOR=3 gets 1e-2 as well.
-    'FEASIBILITY_TOLERANCE': [1e-2],
-    'OPTIMALITY_TOLERANCE': [1e-2],
+    # Upstream's retry params -- Crossover on auto (-1). None of the RESFACTOR=5 infeasibilities
+    # were a solver-configuration problem: every one of them was a cell whose base state held more
+    # land than the cell has, and the IIS for each is a handful of rows (one const_cell_usage plus
+    # that cell's bal_a/bal_n), never a biodiversity, GHG, water or regional-adoption constraint.
+    # `_project_base_into_cell` in solvers/input_data.py is what fixes them.
+    #
+    # Tolerance 1e-4, and it has to sit in that window from both sides. Above it, a loose tolerance
+    # buys a sloppy solution -- 1e-2 permits a 1% constraint violation. Below it, the base dvars are
+    # float32, so projecting agriculture onto `capacity - non_ag` leaves a rounding residual of ~2
+    # float32 ULP (measured at RESFACTOR=5: max 2.4e-07, mean 4e-10), and FEASIBILITY_TOLERANCE has
+    # to clear it: 1e-4 leaves 400x of margin, 1e-6 would leave 4x.
+    'RETRY_PARAMS': [[(0, 2, -1, -1, -1), (0, 1, 0, -1, 0)]],
+    'FEASIBILITY_TOLERANCE': [1e-4],
+    'OPTIMALITY_TOLERANCE': [1e-4],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [3],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],
