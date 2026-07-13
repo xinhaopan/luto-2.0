@@ -1636,6 +1636,40 @@ class LutoSolver:
                         j_idx, r
                     ].X
 
+        # Snap interior-point dust to zero.
+        #
+        # Barrier converges to a point INSIDE the feasible region, so no variable lands exactly
+        # on a bound: every land use ends up holding ~1e-9 of every cell. That is an artefact of
+        # the algorithm, not a decision -- and it is expensive. write.py skips layers that are
+        # all zero, and nothing is all zero once every layer carries dust, so the whole
+        # valid-layer optimisation collapses (measured: 47 GB -> 130 GB on the same scenario).
+        # It also puts phantom land uses in the outputs, and seeds them into next year's base.
+        #
+        # Crossover would remove the dust for us by walking the solution out to a vertex, but it
+        # can spend hours doing it -- AgS1/2019 sat 130+ minutes in a degenerate simplex clean-up
+        # after the barrier had already found the optimum in 8. Thresholding gets the sparsity
+        # without paying for the vertex.
+        #
+        # ROUND_DECIMALS is the noise floor the model already uses to decide what counts as land
+        # (transitions.py drops sub-noise fractions when building source maps), so it is the
+        # threshold to reuse here rather than inventing a second one. The land removed is far
+        # below the solver's own FeasibilityTol; _project_base_into_cell rebalances the cell.
+        if settings.SNAP_DVAR_NOISE_TO_ZERO:
+            noise = 10 ** (-settings.ROUND_DECIMALS)
+            arrays = [X_dry_sol_rj, X_irr_sol_rj, non_ag_X_sol_rk]
+            arrays += list(am_X_dry_sol_rj.values()) + list(am_X_irr_sol_rj.values())
+            n_dust = 0
+            n_nz_before = 0
+            for arr in arrays:
+                nz = arr != 0
+                n_nz_before += int(nz.sum())
+                dust = nz & (np.abs(arr) < noise)
+                n_dust += int(dust.sum())
+                arr[dust] = 0.0
+            if n_dust:
+                print(f"Snapped {n_dust:,} sub-{noise:g} dvar entries to zero "
+                      f"({100 * n_dust / max(n_nz_before, 1):.1f}% of the non-zeros).", flush=True)
+
         # Stack dryland and irrigated decision variables — fractional values preserved as-is
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
 

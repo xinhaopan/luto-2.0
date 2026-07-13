@@ -1374,6 +1374,24 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100
 # Number of decimals to round any value; designed to remove insignificant decimals
 ROUND_DECIMALS = 6
 
+SNAP_DVAR_NOISE_TO_ZERO = False
+'''
+Zero any decision variable below the ROUND_DECIMALS noise floor once the solver returns.
+
+Only matters when Crossover is off (third element of RETRY_PARAMS). Barrier stops at a point
+inside the feasible region, so nothing lands exactly on a bound and every land use ends up
+holding ~1e-9 of every cell. Crossover normally clears that up by walking the solution out to
+a vertex -- but it can take hours to do it (AgS1/2019: barrier found the optimum in 8 minutes,
+crossover then spent 130+ in a degenerate simplex clean-up), and LUTO never uses the basis it
+produces. Turning crossover off and snapping the dust to zero buys the sparsity without the
+vertex.
+
+The dust is not free to keep: write.py skips layers that are entirely zero, and no layer is
+entirely zero once each one carries 1e-9 everywhere, so peak memory went 47 GB -> 130 GB on the
+same scenario. It also writes phantom land uses into the outputs and seeds them into the next
+year's base state.
+'''
+
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
