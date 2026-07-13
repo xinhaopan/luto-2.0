@@ -121,7 +121,7 @@ AMORTISE_UPFRONT_COSTS = False
 # θ→0: pure exact per-source model (at RESFACTOR=5 nothing folds below 0.04, the min block fraction).
 # θ→1: one source per cell carrying the whole cell = the old crisp dominant-LU model.
 # θ only applies to AG land-uses; non-ag sources are always exact (noise-floor cutoff, no folding).
-EXACT_REACHABILITY_MIN_FRACTION = 1.0
+EXACT_REACHABILITY_MIN_FRACTION = 0.01
 
 # Number of joblib "threading" workers used to compute the (m, j) source combos in batches of this size.
 # n_jobs=4 was found to give the best runtime/memory tradeoff (~42s, +2.4GB peak at RESFACTOR=5).
@@ -357,50 +357,21 @@ log names TIME_LIMIT explicitly when it fires).
 '''
 
 RETRY_PARAMS = [
-    (0, 2, 0, -1, -1),          # NF, Method, Crossover, Presolve, BarHomogeneous
-    (3, 2, 0, -1, -1),          # numerical rescue: barrier with NumericFocus=3
-    (3, 2, 0, -1,  1),          # ... plus BarHomogeneous, for genuine infeasibility
-    (0, 1, 0, -1,  0),          # last resort: dual simplex (can stall -- see TimeLimit)
+    (0, 2, -1, -1, -1),         # NF, Method, Crossover, Presolve, BarHomogeneous
+    (0, 1,  0, -1,  0),         # dual simplex
 ]
 '''
 List of solve attempts to try in order, per year. Each entry is a
 (NumericFocus, Method, Crossover, Presolve, BarHomogeneous) tuple, with an OPTIONAL
 6th element: a FeasibilityTol/OptimalityTol override for that attempt only.
 
-Order matters: the rescue must come before the attempt that can hang
---------------------------------------------------------------------
-Attempt 1 is the fast path. Attempt 2 is NumericFocus=3, which is the attempt that has
-actually been observed to rescue a numerically-hard year (AgS2/2027, AgS4/2013). Dual
-simplex is LAST, because on these models it does not fail -- it cycles, and an attempt
-that never returns starves every attempt behind it. It was originally placed second,
-which meant the one thing known to work sat behind the one thing known to hang.
+Note that a value above 1e-2 for that 6th element is illegal -- Gurobi caps FeasibilityTol
+and OptimalityTol at 1e-2 and raises GurobiError otherwise -- so the solver loop clamps it.
 
-CROSSOVER MUST STAY 0 -- this is the third element of every tuple
-----------------------------------------------------------------
-LUTO has always run barrier with crossover DISABLED. It used to be a top-level setting
-(`CROSSOVER = 0`, applied in solver.py) whose comment already warned that leaving it on
-auto meant it "sometimes never finishes". The upstream merge deleted that setting and
-folded the flag into these tuples with the value -1 (auto = crossover ON), which
-silently re-enabled it. That regression is what broke the RESFACTOR=5 Paper3 runs:
-
-    AgS2 / 2027:  barrier reached OPTIMAL (obj 4486.39), crossover pushed it to
-                  primal-infeasible and the year came back INFEASIBLE
-    AgS1 / 2040:  barrier reached OPTIMAL (obj 4816.67), same crossover failure
-    AgS1 / 2026:  barrier converged in minutes, then crossover's simplex clean-up
-                  stalled for 110+ minutes at primal infeasibility ~321 and never moved
-
-In every case the barrier itself was fine; crossover destroyed or stalled on a solution
-that was already optimal. LUTO does not need a basic (vertex) solution -- the decision
-variables are consumed as plain numbers by the next year -- so crossover buys nothing
-and costs everything. Keep it at 0.
-
-Tolerance is NOT the lever, and it cannot be loosened past 1e-2
---------------------------------------------------------------
-Gurobi caps FeasibilityTol and OptimalityTol at 1e-2; anything looser raises
-`GurobiError: Unable to set parameter FeasibilityTol to value 0.1 (maximum is 0.01)`.
-The 6th-element override therefore exists only for one-off experiments and is clamped by
-the solver loop; it is deliberately absent from the default ladder so that every year of
-a run is solved at the same precision, which is what you need to state in a paper.
+Tuning this ladder is NOT how the RESFACTOR=5 infeasibilities were fixed. Those came from
+the base state itself overflowing its cell (see `_project_base_into_cell` in
+solvers/input_data.py); the amount by which it overflowed always tracked the tolerance, so
+no tolerance and no algorithm could escape it.
 
 NumericFocus:
     0 = automatic (slight preference for speed); 1-3 = increasingly careful.
