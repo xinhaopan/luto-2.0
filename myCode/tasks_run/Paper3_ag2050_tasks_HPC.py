@@ -108,16 +108,23 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260711_Paper3_HPC'],
+    'TASK_NAME': ['20260713_Paper3_HPC'],
     'KEEP_OUTPUTS': [True],
     'QUEUE': ['normalsr'],
     # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
     # ---- Computational settings (not model parameters) ----------------------
-    # HPC RESFACTOR=3 production run: 10 CPUs / 160 GB, 144-hour walltime
-    'MEM': ['160GB'],
-    'NCPUS': ['10'],
+    # HPC RESFACTOR=3: 320 GB / 15 CPUs.
+    # Peak memory scales linearly with cell count, measured end-to-end (solve + write):
+    #   RF=10  0.25x cells   26.7 GB
+    #   RF=5   1.00x cells  109.4 GB      -> 4.10x memory for 4.00x cells
+    #   RF=3   2.78x cells  ~304 GB (extrapolated)
+    # Runs that died early looked cheap (22-35 GB) only because they never reached the
+    # write phase; every run that finished peaked at 85-110 GB. Now that they all finish,
+    # they all pay it.
+    'MEM': ['320GB'],
+    'NCPUS': ['15'],
     # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
-    'TIME': ['144:00:00'],
+    'TIME': ['720:00:00'],   # 30 days -- school HPC, no quota; 15 CPUs on a RESFACTOR=3 model is slow
 
     # ---- AG2050 scenario switch and selector ---------------------------------
     # Set AG2050_MODE=True to activate all AG2050 overrides.
@@ -130,15 +137,23 @@ grid_search = {
     # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
-    # Solver tolerance = 1e-2. LUTO runs Gurobi with ScaleFlag=0 (scaling DISABLED); under
-    # that, a tight tolerance is numerically unreachable on the big models, and the retry loop
-    # only varies the ALGORITHM -- it can never rescue a tolerance failure. Measured on the
-    # dumped infeasible models: AgS4/2013 (3.05M vars) 1e-6 INFEASIBLE, 1e-5..1e-2 OPTIMAL;
-    # AgS2/2043 (4.94M vars) 1e-4 INFEASIBLE, 1e-3 OPTIMAL obj=4463.10, 1e-2 OPTIMAL obj=4463.43
-    # (0.007% apart). Enabling scaling does NOT help (ScaleFlag -1/2 both stay INFEASIBLE).
-    # The bigger the model the looser it must be, so RESFACTOR=3 gets 1e-2 as well.
-    'FEASIBILITY_TOLERANCE': [1e-2],
-    'OPTIMALITY_TOLERANCE': [1e-2],
+    # Tolerance 1e-4 -- and it has to sit in that window from both sides.
+    #
+    # Above it: the solver may violate a constraint by up to FeasibilityTol, and it pays to
+    # do so, because a non-reversible planting smaller than the tolerance can be converted
+    # back to cropland for free. That surplus reaches the next year's base state, and the
+    # transition model's flow balances carry it straight into const_cell_usage. The fix
+    # (`_project_base_into_cell`) removes it, but a loose tolerance still buys a sloppy
+    # solution -- 1e-2 permits a 1% constraint violation, which is not a number to put in
+    # a paper.
+    #
+    # Below it: the base dvars are float32, so projecting agriculture onto
+    # `capacity - non_ag` leaves a rounding residual of ~2 float32 ULP. Measured on the
+    # RESFACTOR=5 run: max 2.4e-07, mean 4e-10. FEASIBILITY_TOLERANCE must clear it.
+    # 1e-4 leaves 400x of margin; 1e-6 would leave 4x, which is not margin at all.
+    'RETRY_PARAMS': [[(0, 2, -1, -1, -1), (0, 1, 0, -1, 0)]],
+    'FEASIBILITY_TOLERANCE': [1e-4],
+    'OPTIMALITY_TOLERANCE': [1e-4],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [3],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],
