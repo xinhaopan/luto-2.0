@@ -426,6 +426,49 @@ def save_flow_layers(layer_builder, valid_mi, dims, ncells, save_path):
 
 # ── Config / Orchestration ────────────────────────────────────────────────────
 
+def snap_dvar_noise(data: Data) -> None:
+    """Zero the interior-point dust in the solved decision variables, for the outputs only.
+
+    With crossover off, barrier stops at a point INSIDE the feasible region, so nothing lands
+    exactly on a bound and every land use ends up holding ~1e-9 of every cell -- measured, 65% of
+    the non-zero entries. That is an artefact of the algorithm, not a decision, and it is only a
+    problem on the way out:
+
+      - write_data skips layers that are entirely zero, and no layer is entirely zero once each
+        one carries dust, so the valid-layer optimisation collapses (47 GB -> 130 GB, same scenario)
+      - the maps and tables end up listing land uses that hold a millionth of a hectare
+
+    Inside the model the dust is harmless: the transition machinery already ignores fractions below
+    the ROUND_DECIMALS floor when it builds source maps, and each cell's total is correct with the
+    dust counted. Removing it mid-run is what does damage -- the cell then holds less than its
+    capacity, _project_base_into_cell scales agriculture back up to compensate, and that can push an
+    entry past the dvar_ub the clamp had just put it under, leaving the all-deltas-zero "stay" point
+    infeasible. AgS2/2022 (RF=5) solved on the first attempt without the snap and returned
+    INF_OR_UNBD with it.
+
+    So it happens here instead: once, after every year has been solved, on the way to disk.
+    """
+    if not settings.SNAP_DVAR_NOISE_TO_ZERO:
+        return
+
+    noise = 10 ** (-settings.ROUND_DECIMALS)
+    n_dust = n_nz = 0
+    for yr in data.ag_dvars:
+        arrays = [data.ag_dvars[yr], data.non_ag_dvars[yr]]
+        arrays += list(data.ag_man_dvars[yr].values())
+        for arr in arrays:
+            nz = arr != 0
+            dust = nz & (np.abs(arr) < noise)
+            n_nz += int(nz.sum())
+            n_dust += int(dust.sum())
+            arr[dust] = 0.0
+
+    if n_dust:
+        print(f"Snapped {n_dust:,} sub-{noise:g} dvar entries to zero for the outputs "
+              f"({100 * n_dust / max(n_nz, 1):.1f}% of the non-zeros). The solved model is untouched.\n",
+              flush=True)
+
+
 def write_outputs(data: Data):
     """Write outputs using dynamic timestamp from read_timestamp."""
     timestamp = tools.read_timestamp()
@@ -437,6 +480,7 @@ def write_outputs(data: Data):
         memory_thread = threading.Thread(target=tools.log_memory_usage, args=(out_dir, 'a', 1, stop_event))
         memory_thread.start()
         try:
+            snap_dvar_noise(data)
             write_data(data)
             print("Data writing complete, now creating report...\n")
             create_report(data)

@@ -1376,20 +1376,29 @@ ROUND_DECIMALS = 6
 
 SNAP_DVAR_NOISE_TO_ZERO = False
 '''
-Zero any decision variable below the ROUND_DECIMALS noise floor once the solver returns.
+Zero the interior-point dust in the decision variables ON THE WAY TO DISK -- see
+`snap_dvar_noise()` in tools/write.py, which runs once, after every year has been solved.
 
 Only matters when Crossover is off (third element of RETRY_PARAMS). Barrier stops at a point
 inside the feasible region, so nothing lands exactly on a bound and every land use ends up
-holding ~1e-9 of every cell. Crossover normally clears that up by walking the solution out to
-a vertex -- but it can take hours to do it (AgS1/2019: barrier found the optimum in 8 minutes,
-crossover then spent 130+ in a degenerate simplex clean-up), and LUTO never uses the basis it
-produces. Turning crossover off and snapping the dust to zero buys the sparsity without the
-vertex.
+holding ~1e-9 of every cell -- measured, 65% of the non-zero entries. Crossover would clear that
+up by walking the solution out to a vertex, but Gurobi's simplex is sequential and it can take
+hours: AgS1/2019 spent 130+ minutes on ONE core in a degenerate crossover clean-up after the
+barrier had found the optimum in 8 minutes on 22. LUTO never uses the basis crossover produces,
+so turning it off and snapping the dust gets the sparsity without paying for the vertex.
 
-The dust is not free to keep: write.py skips layers that are entirely zero, and no layer is
-entirely zero once each one carries 1e-9 everywhere, so peak memory went 47 GB -> 130 GB on the
-same scenario. It also writes phantom land uses into the outputs and seeds them into the next
-year's base state.
+The dust is only a problem on the way out. write_data skips layers that are entirely zero, and
+no layer is entirely zero once each one carries 1e-9 everywhere, so peak memory went 47 GB ->
+130 GB on the same scenario; the maps also end up listing land uses that hold a millionth of a
+hectare.
+
+It must NOT be removed mid-run. Snapping the solution as the solver returns it was tried, and it
+breaks the model: the cell is then left holding less than its capacity, _project_base_into_cell
+scales agriculture back up to compensate, and that can push an entry past the dvar_ub the clamp
+had just put it under -- leaving the all-deltas-zero "stay" point infeasible. AgS2/2022 (RF=5)
+solved on the first attempt without the snap and returned INF_OR_UNBD with it. Inside the model
+the dust is harmless: the transition machinery already ignores sub-ROUND_DECIMALS fractions when
+building source maps, and every cell's total is correct with the dust counted.
 '''
 
 

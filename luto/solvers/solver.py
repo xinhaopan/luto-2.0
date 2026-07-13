@@ -1636,39 +1636,17 @@ class LutoSolver:
                         j_idx, r
                     ].X
 
-        # Snap interior-point dust to zero.
-        #
-        # Barrier converges to a point INSIDE the feasible region, so no variable lands exactly
-        # on a bound: every land use ends up holding ~1e-9 of every cell. That is an artefact of
-        # the algorithm, not a decision -- and it is expensive. write.py skips layers that are
-        # all zero, and nothing is all zero once every layer carries dust, so the whole
-        # valid-layer optimisation collapses (measured: 47 GB -> 130 GB on the same scenario).
-        # It also puts phantom land uses in the outputs, and seeds them into next year's base.
-        #
-        # Crossover would remove the dust for us by walking the solution out to a vertex, but it
-        # can spend hours doing it -- AgS1/2019 sat 130+ minutes in a degenerate simplex clean-up
-        # after the barrier had already found the optimum in 8. Thresholding gets the sparsity
-        # without paying for the vertex.
-        #
-        # ROUND_DECIMALS is the noise floor the model already uses to decide what counts as land
-        # (transitions.py drops sub-noise fractions when building source maps), so it is the
-        # threshold to reuse here rather than inventing a second one. The land removed is far
-        # below the solver's own FeasibilityTol; _project_base_into_cell rebalances the cell.
-        if settings.SNAP_DVAR_NOISE_TO_ZERO:
-            noise = 10 ** (-settings.ROUND_DECIMALS)
-            arrays = [X_dry_sol_rj, X_irr_sol_rj, non_ag_X_sol_rk]
-            arrays += list(am_X_dry_sol_rj.values()) + list(am_X_irr_sol_rj.values())
-            n_dust = 0
-            n_nz_before = 0
-            for arr in arrays:
-                nz = arr != 0
-                n_nz_before += int(nz.sum())
-                dust = nz & (np.abs(arr) < noise)
-                n_dust += int(dust.sum())
-                arr[dust] = 0.0
-            if n_dust:
-                print(f"Snapped {n_dust:,} sub-{noise:g} dvar entries to zero "
-                      f"({100 * n_dust / max(n_nz_before, 1):.1f}% of the non-zeros).", flush=True)
+        # Interior-point dust is NOT removed here -- see snap_dvar_noise() in tools, called from
+        # write_outputs(). Snapping the solution as it comes out of the solver was tried and it
+        # breaks the model: the removed land leaves each cell holding slightly less than its
+        # capacity, _project_base_into_cell scales agriculture back UP to compensate, and that can
+        # push an entry past the dvar_ub the clamp had just put it under -- at which point the
+        # all-deltas-zero "stay" point is no longer feasible and the year comes back INFEASIBLE.
+        # Measured on AgS2/2022 (RF=5): identical run without the snap solves on the first attempt;
+        # with it, the barrier returns INF_OR_UNBD. The dust does no harm inside the model (the
+        # transition machinery already ignores sub-ROUND_DECIMALS fractions when building source
+        # maps, and the cell totals are correct with the dust included) -- it only harms the
+        # OUTPUTS. So it is cleaned there, once, after every year has been solved.
 
         # Stack dryland and irrigated decision variables — fractional values preserved as-is
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
