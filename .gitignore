@@ -52,3 +52,9 @@ myCode/draw_all/code/Assets/basemap.tif
 myCode/draw_all/code/Assets/shp/output_shapefile.shp
 .vscode-upload.json
 .claude/settings.local.json
+
+# Local IIS / checkpoint debugging artefacts -- never commit
+diagnostics/
+*.ilp
+*.lz4
+*.mps
