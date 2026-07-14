@@ -1048,6 +1048,98 @@ def rescale_lhs_rhs_region_species(
 
 
 
+def _project_base_into_cell(data: Data, base_ag_mrj: np.ndarray, base_non_ag_rk: np.ndarray) -> np.ndarray:
+    """Make the base state fit the cell it sits in, by taking any surplus out of agriculture.
+
+    The solver requires, per cell r:
+
+        sum(X_ag) + sum(X_non_ag) == AG_MASK_PROPORTION_R[r]          (const_cell_usage)
+
+    and the transition model's flow balances conserve mass, so they also force
+
+        sum(X_ag) + sum(X_non_ag) == sum(base_ag) + sum(base_non_ag)  (bal_a / bal_n)
+
+    Those two are only compatible if the BASE state fits inside the cell. It does not.
+    The base is last year's solution, and last year's solve was allowed to violate its own
+    constraints by up to FeasibilityTol -- profitably so, since converting protected
+    non-reversible plantings back to cropland raises the objective. It duly spends that
+    budget: a non-ag parcel smaller than the tolerance can be zeroed out for free. Then
+    clamp_dvar_bound restores the non-ag dvar to its (non-reversible) lower bound WITHOUT
+    taking the land back from agriculture, and the cell ends up holding more land than it
+    has. Every RESFACTOR=5 infeasibility traced to exactly this, one cell at a time:
+
+        AgS4/2013  tol 1e-6   cell  54825   over by 1.01e-06   (1.01x tol)
+        AgS2/2037  tol 1e-6   cell 175527   over by 1.20e-06   (1.20x tol)
+        AgS2/2043  tol 1e-4   cell 124302   over by 1.13e-04   (1.13x tol)
+        AgS2/2027  tol 1e-2   cell 174216   over by 1.75e-02   (1.75x tol)
+        AgS1/2040  tol 1e-2   cell 171462   over by 1.74e-02   (1.74x tol)
+
+    The overflow tracks the tolerance because the tolerance is what licenses it, which is
+    why no tolerance and no algorithm escapes: the surplus is always just above the bar the
+    solver is asked to clear. The IIS for each is a handful of rows -- one const_cell_usage
+    plus that cell's bal_a/bal_n -- and never touches a biodiversity, GHG, water, demand or
+    regional-adoption constraint.
+
+    So the base has to be repaired before it reaches the solver. Non-ag is the side that
+    cannot move (a planting, once established, is not reversible; that is what its lower
+    bound means), so the surplus comes out of agriculture, spread proportionally over the
+    cell's agricultural land uses. Scaling agriculture to `capacity - non_ag` also makes the
+    two sides of the identity share one source, which removes the float32 discrepancy that
+    killed the 1e-6 runs -- `AG_MASK_PROPORTION_R` and the folded base were previously
+    summed along different paths and disagreed by ~9 ULP (~1e-6) on a cell that should have
+    been exactly full.
+    """
+    cap_r   = data.AG_MASK_PROPORTION_R.astype(np.float64)
+    nonag_r = base_non_ag_rk.sum(axis=1).astype(np.float64)
+    ag_r    = base_ag_mrj.sum(axis=(0, 2)).astype(np.float64)
+
+    ag_target_r = cap_r - nonag_r
+    over_r      = (ag_r + nonag_r) - cap_r
+
+    # Non-ag alone exceeding the cell would mean the surplus cannot be taken out of
+    # agriculture at all. Never yet observed; say so loudly rather than silently zero the ag.
+    impossible = ag_target_r < -(10 ** -settings.ROUND_DECIMALS)
+    if np.any(impossible):
+        n = int(impossible.sum())
+        worst = float(-ag_target_r[impossible].max())
+        print(f"  └── WARNING: non-ag base alone exceeds the cell in {n} cells "
+              f"(worst by {worst:.2e}) — clipping to zero agriculture there.", flush=True)
+    ag_target_r = np.maximum(ag_target_r, 0.0)
+
+    scale_r = np.divide(ag_target_r, ag_r, out=np.ones_like(ag_r), where=ag_r > 1e-12)
+    out = (base_ag_mrj * scale_r[None, :, None].astype(np.float32)).astype(np.float32)
+
+    # Report the two directions separately. A cell holding MORE than it has is the bug this
+    # function exists for: the solver spent its tolerance budget converting a non-reversible
+    # planting back to cropland, and clamp_dvar_bound handed the planting back without taking the
+    # cropland away. A cell holding LESS should be float32 noise and nothing else -- if a run ever
+    # starts reporting real deficits, something upstream is removing land, and leaving it
+    # uncorrected would let every affected cell shed a sliver per year until the map quietly
+    # shrank over four decades.
+    thr = 10 ** -settings.ROUND_DECIMALS
+    over = over_r > thr
+    under = over_r < -thr
+    if np.any(over):
+        print(f"  └── Base OVER cell capacity: {int(over.sum())} cells, "
+              f"max={over_r[over].max():.2e}, mean={over_r[over].mean():.2e} "
+              f"-- scaled back out of agriculture", flush=True)
+    if np.any(under):
+        print(f"  └── Base UNDER cell capacity: {int(under.sum())} cells, "
+              f"max={-over_r[under].min():.2e}, mean={-over_r[under].mean():.2e} "
+              f"-- scaled back into agriculture", flush=True)
+
+    # Scaling cannot land on the target exactly: every scaled entry is rounded back to
+    # float32, and those roundings do not cancel. What is left is a float32 rounding
+    # residual (~1 ULP), not the ~9 ULP disagreement of two independently-summed paths that
+    # it replaces -- but it is not zero, so FEASIBILITY_TOLERANCE still has to sit above it.
+    # Printed so the margin is measured rather than assumed.
+    resid_r = np.abs((out.sum(axis=(0, 2)).astype(np.float64) + nonag_r) - cap_r)
+    print(f"  └── Base-vs-cell residual after projection: max={resid_r.max():.2e}, "
+          f"mean={resid_r.mean():.2e}  (FEASIBILITY_TOLERANCE={settings.FEASIBILITY_TOLERANCE:.0e})",
+          flush=True)
+    return out
+
+
 def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputData:
     """
     Using the given Data object, prepare a SolverInputData object for the solver.
@@ -1345,6 +1437,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     # Bounds were already clamped so lb ≤ base ≤ ub for real values — this only bites on noise. Reported.
     dvar_base_ag_mrj    = tools.clamp_dvar_bound(ag_transition.get_folded_base_ag_dvar(data, base_year), dvar_lb_ag, dvar_ub_ag, 'Ag base clipped to [lb,ub]')
     dvar_base_non_ag_rk = tools.clamp_dvar_bound(data.non_ag_dvars[base_year], dvar_lb_nonag, dvar_ub_nonag, 'NonAg base clipped to [lb,ub]')
+
+    dvar_base_ag_mrj = _project_base_into_cell(data, dvar_base_ag_mrj, dvar_base_non_ag_rk)
 
 
     return SolverInputData(
