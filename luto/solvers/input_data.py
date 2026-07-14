@@ -1048,6 +1048,78 @@ def rescale_lhs_rhs_region_species(
 
 
 
+def _cap_nonag_to_region(data: Data, lb_nonag_rk: np.ndarray, base_nonag_rk: np.ndarray,
+                         limits: dict) -> tuple[np.ndarray, np.ndarray]:
+    """Keep the non-agricultural floor inside the regional cap it has to live under.
+
+    A non-agricultural land use is not reversible -- a planting, once established, stays -- so last
+    year's area becomes this year's LOWER BOUND. The regional cap says the opposite thing:
+
+        sum over the region of ( area * every non-ag dvar )  <=  cap      (reg_adopt_limit_non_ag_sum)
+
+    Both are enforced, but only one of them is enforced EXACTLY. Gurobi's presolve works out the
+    smallest value that row can take -- sum(coefficient * lower bound) -- and compares it to the cap
+    in exact arithmetic, ignoring FeasibilityTol entirely. A floor that oversteps the cap by ANY
+    amount therefore kills the year before a single variable is chosen, and no tolerance can absorb
+    it. AgS2/2047 (RESFACTOR=5): one NRM region had filled its 15% cap to the last hectare --
+
+        cap                                    695,002.575000 ha
+        already planted, cannot be undone      695,002.575140 ha
+        over                                         0.000140 ha   (1.4 square metres)
+
+    -- and presolve threw the year out over 1.4 m2, while FeasibilityTol was 69.5 ha, half a million
+    times larger. The overshoot is float32 noise from last year's solve, locked in by
+    non-reversibility: the same shape as the cell-capacity bug that `_project_base_into_cell` fixes,
+    where a violation the solver was allowed to make becomes a hard contradiction once it cannot be
+    undone.
+
+    BOTH arrays have to be scaled, not just the lower bound. `_setup_non_ag_vars` collapses a
+    variable whose bounds are within 1% of each other onto `dvar_base_non_ag_rk`:
+
+        collapse = (lb > 0) & (|ub - lb| / lb < 0.01)
+        lb_eff   = where(collapse, const_nonag, lb)
+
+    and an established planting is exactly such a variable -- so the floor Gurobi actually sees is
+    the BASE, not `dvar_lb_nonag`. Capping the lower bound alone changes nothing (tried; the year
+    still came back INF_OR_UNBD). Scaling both by the same factor keeps lb <= base intact.
+
+    The cost is nothing real: 1.4 m2 of notional planting out of a region holding 695,003 ha, a
+    relative change of 2e-10 -- far below float32, so the cell totals do not move and
+    `_project_base_into_cell` has nothing to undo. The objective, the constraints and the solution
+    are all untouched; only the starting position is made self-consistent. The small margin below
+    the cap is deliberate: landing exactly on it leaves no room for next year's rounding to do this
+    again.
+    """
+    reg_limits = limits.get("non_ag_regional_adoption_sum") or []
+    if not reg_limits:
+        return lb_nonag_rk, base_nonag_rk
+
+    area = data.REAL_AREA.astype(np.float64)
+    lb_out = lb_nonag_rk.copy()
+    base_out = base_nonag_rk.copy()
+    capped = []
+
+    for reg_id, reg_ind, reg_cap in reg_limits:
+        if len(reg_ind) == 0 or reg_cap <= 0:
+            continue
+        # The floor Gurobi sees is the base wherever the variable collapses, so measure that.
+        locked = float((base_out[reg_ind].astype(np.float64) * area[reg_ind, None]).sum())
+        if locked <= reg_cap:
+            continue
+        # Leave a hair of room so next year's float32 rounding does not put us straight back here.
+        scale = np.float32((reg_cap / locked) * (1.0 - 1e-6))
+        base_out[reg_ind] *= scale
+        lb_out[reg_ind] *= scale
+        capped.append((reg_id, locked - reg_cap, locked))
+
+    if capped:
+        worst = max(capped, key=lambda x: x[1])
+        print(f"  └── NonAg floor capped to regional limit: {len(capped)} region(s) over cap; "
+              f"worst region {worst[0]} by {worst[1]:.3e} ha on {worst[2]:,.0f} ha "
+              f"-- non-reversible plantings had saturated the cap", flush=True)
+    return lb_out, base_out
+
+
 def _project_base_into_cell(data: Data, base_ag_mrj: np.ndarray, base_non_ag_rk: np.ndarray) -> np.ndarray:
     """Make the base state fit the cell it sits in, by taking any surplus out of agriculture.
 
@@ -1438,6 +1510,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     dvar_base_ag_mrj    = tools.clamp_dvar_bound(ag_transition.get_folded_base_ag_dvar(data, base_year), dvar_lb_ag, dvar_ub_ag, 'Ag base clipped to [lb,ub]')
     dvar_base_non_ag_rk = tools.clamp_dvar_bound(data.non_ag_dvars[base_year], dvar_lb_nonag, dvar_ub_nonag, 'NonAg base clipped to [lb,ub]')
 
+    dvar_lb_nonag, dvar_base_non_ag_rk = _cap_nonag_to_region(data, dvar_lb_nonag, dvar_base_non_ag_rk, limits)
     dvar_base_ag_mrj = _project_base_into_cell(data, dvar_base_ag_mrj, dvar_base_non_ag_rk)
 
 
