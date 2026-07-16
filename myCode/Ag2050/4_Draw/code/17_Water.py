@@ -17,6 +17,7 @@ from tools.two_row_figure import (
     RENAME_AM_NON_AG,
     classify_land_use,
     export_long_tables,
+    filter_water_detail_rows,
     get_am_colors,
     input_files,
     load_long_tables,
@@ -49,16 +50,7 @@ def load_water_australia(scenario):
     water = load_report_source_csv(scenario, SOURCE_CSV)
     if water.empty:
         return water
-    water = (
-        water.groupby(
-            ['Water Supply', 'Landuse', 'Type', 'Agricultural Management', 'Year'],
-            dropna=False,
-            as_index=False,
-        )[VALUE_COL]
-        .sum()
-    )
-    water = water.replace(RENAME_AM_NON_AG)
-    return water.query('`Water Supply` != "ALL" and Landuse != "ALL"').copy()
+    return filter_water_detail_rows(water).replace(RENAME_AM_NON_AG)
 
 
 _CLIMATE_WATER_CACHE = None
@@ -207,7 +199,7 @@ def prepare_land_use():
         if water.empty:
             continue
 
-        water_ag = water.query('Type == "Agricultural land-use"').copy()
+        water_ag = water.query('Type == "Agricultural Land-use"').copy()
         if not water_ag.empty:
             water_ag['category'] = water_ag.apply(
                 lambda r: classify_land_use(r['Landuse'], r['Water Supply']), axis=1

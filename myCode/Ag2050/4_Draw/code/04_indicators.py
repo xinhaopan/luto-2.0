@@ -17,11 +17,19 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from tools.two_row_figure import (
+    COMMODITY_TO_FOOD_GROUP,
+    FOOD_PRODUCTION_CSV,
+    FOOD_PRODUCTION_VALUE_COL,
     RENAME_AM_NON_AG,
     export_long_tables,
+    filter_food_detail_rows,
+    filter_water_detail_rows,
     input_files,
     load_long_tables,
     load_report_source_csv,
+    prepare_biodiversity_overview,
+    prepare_ghg_overview,
+    prepare_net_economic_return_overview,
 )
 from tools.data_helper import extract_nc_layer_as_tiff, list_output_years, load_output_dataset
 from tools.parameters import EXCEL_DIR, OUTPUT_DIR, SCENARIO_LABELS, TIF_DIR, font_size, GENERATE_TABLES
@@ -34,6 +42,7 @@ NER_COLORS = {
     'Agmgt cost':                      '#ec7951',
     'Non-ag cost':                     '#cd4975',
     'Transition(ag->non-ag) cost':     '#6200ac',
+    'Transition(non-ag->ag) cost':     '#7b4ab4',
     'Transition(ag->ag) cost':         '#9f0e9e',
     'Ag revenue':                      '#2d688f',
     'Agmgt revenue':                   '#19928e',
@@ -43,7 +52,8 @@ NER_COLORS = {
 NER_LEGEND_ORDER = [
     'Non-ag revenue', 'Agmgt revenue', 'Ag revenue',
     'Ag cost', 'Agmgt cost', 'Non-ag cost',
-    'Transition(ag->non-ag) cost', 'Transition(ag->ag) cost',
+    'Transition(ag->non-ag) cost', 'Transition(non-ag->ag) cost',
+    'Transition(ag->ag) cost',
 ]
 
 GHG_COLORS = {
@@ -51,6 +61,7 @@ GHG_COLORS = {
     'Agricultural management':    '#9A8AB3',
     'Agricultural land-use':      '#f39b8b',
     'Transition':                 '#eb9132',
+    'Off-land commodities':       '#7f7f7f',
 }
 
 BIO_COLORS = {
@@ -97,7 +108,7 @@ FOOD_LEGEND_ORDER = [
 ROW_CONFIG = [
     ('NER',          NER_COLORS,   'Net economic returns\n(Billion AU$ yr⁻¹)', NER_LEGEND_ORDER),
     ('GHG',          GHG_COLORS,   'GHG emissions\n(MtCO₂e yr⁻¹)',       None),
-    ('Biodiversity', BIO_COLORS,   'Biodiversity contribution-\nweighted area (Mha yr⁻¹)', None),
+    ('Biodiversity', BIO_COLORS,   'Biodiversity contribution-\nweighted area (Mha)', None),
     ('Agri-food',    FOOD_COLORS,  'Agri-food production\n(Mt yr⁻¹)',     FOOD_LEGEND_ORDER),
     ('Water',        WATER_COLORS, 'Difference in water yield\nrelative to 2010 (GL yr⁻¹)', WATER_LEGEND_ORDER),
 ]
@@ -105,176 +116,32 @@ ROW_CONFIG = [
 # ── Data preparation ───────────────────────────────────────────────────────────
 
 def prepare_ner():
-    rows = []
-    for scenario in input_files:
-        revenue_ag = load_report_source_csv(scenario, 'economics_ag_revenue')
-        cost_ag    = load_report_source_csv(scenario, 'economics_ag_cost')
-        if not revenue_ag.empty:
-            rev = revenue_ag.query(
-                'region == "AUSTRALIA" and Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"'
-            ).copy()
-            for _, row in rev.groupby('Year', as_index=False)['Value ($)'].sum().iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario,
-                             'category': 'Ag revenue', 'value': float(row['Value ($)']) / 1e9})
-        if not cost_ag.empty:
-            cost = cost_ag.query(
-                'region == "AUSTRALIA" and Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"'
-            ).copy()
-            for _, row in cost.groupby('Year', as_index=False)['Value ($)'].sum().iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario,
-                             'category': 'Ag cost', 'value': -float(row['Value ($)']) / 1e9})
-
-        revenue_am = load_report_source_csv(scenario, 'economics_am_revenue')
-        cost_am    = load_report_source_csv(scenario, 'economics_am_cost')
-        if not revenue_am.empty:
-            rev = revenue_am.query(
-                'region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"'
-            ).copy()
-            for _, row in rev.groupby('Year', as_index=False)['Value ($)'].sum().iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario,
-                             'category': 'Agmgt revenue', 'value': float(row['Value ($)']) / 1e9})
-        if not cost_am.empty:
-            cost = cost_am.query(
-                'region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"'
-            ).copy()
-            for _, row in cost.groupby('Year', as_index=False)['Value ($)'].sum().iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario,
-                             'category': 'Agmgt cost', 'value': -float(row['Value ($)']) / 1e9})
-
-        revenue_non_ag = load_report_source_csv(scenario, 'economics_non_ag_revenue')
-        cost_non_ag    = load_report_source_csv(scenario, 'economics_non_ag_cost')
-        if not revenue_non_ag.empty:
-            rev = revenue_non_ag.query('region == "AUSTRALIA" and `Land-use` != "ALL"').copy()
-            for _, row in rev.groupby('Year', as_index=False)['Value ($)'].sum().iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario,
-                             'category': 'Non-ag revenue', 'value': float(row['Value ($)']) / 1e9})
-        if not cost_non_ag.empty:
-            cost = cost_non_ag.query('region == "AUSTRALIA" and `Land-use` != "ALL"').copy()
-            for _, row in cost.groupby('Year', as_index=False)['Value ($)'].sum().iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario,
-                             'category': 'Non-ag cost', 'value': -float(row['Value ($)']) / 1e9})
-
-        t_ag2ag = load_report_source_csv(scenario, 'transition_ag2ag_cost')
-        if not t_ag2ag.empty:
-            t = t_ag2ag.query(
-                'region == "AUSTRALIA" and `From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL"'
-            ).copy()
-            for _, row in t.groupby('Year', as_index=False)['Cost ($)'].sum().iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario,
-                             'category': 'Transition(ag->ag) cost',
-                             'value': -float(row['Cost ($)']) / 1e9})
-
-        t_ag2non = load_report_source_csv(scenario, 'transition_ag2nonag_cost')
-        if not t_ag2non.empty:
-            t = t_ag2non.query(
-                'region == "AUSTRALIA" and `From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"'
-            ).copy()
-            for _, row in t.groupby('Year', as_index=False)['Cost ($)'].sum().iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario,
-                             'category': 'Transition(ag->non-ag) cost',
-                             'value': -float(row['Cost ($)']) / 1e9})
-
-    return pd.DataFrame(rows)
+    return prepare_net_economic_return_overview()
 
 
 def prepare_ghg():
-    rows = []
-    for scenario in input_files:
-        for csv, cat, vcol, filt in [
-            ('GHG_emissions_separate_agricultural_landuse', 'Agricultural land-use',
-             'Value (t CO2e)',
-             'region == "AUSTRALIA" and Water_supply != "ALL" and Source != "ALL"'),
-            ('GHG_emissions_separate_agricultural_management', 'Agricultural management',
-             'Value (t CO2e)',
-             'region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL"'),
-            ('GHG_emissions_separate_no_ag_reduction', 'Non-agricultural land-use',
-             'Value (t CO2e)',
-             'region == "AUSTRALIA" and `Land-use` != "ALL"'),
-            ('GHG_emissions_separate_transition_penalty', 'Transition',
-             'Value (t CO2e)',
-             'region == "AUSTRALIA" and Type != "ALL" and Water_supply != "ALL"'),
-        ]:
-            df = load_report_source_csv(scenario, csv)
-            if df.empty:
-                continue
-            df = df.query(filt).copy()
-            for _, row in df.groupby('Year', as_index=False)[vcol].sum().iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario,
-                             'category': cat, 'value': float(row[vcol]) / 1e6})
-    return pd.DataFrame(rows)
+    return prepare_ghg_overview()
 
 
 def prepare_bio():
-    rows = []
-    vcol = 'Area Weighted Score (ha)'
-    cat_map = {
-        'Agricultural land-use':     'Agricultural land-use',
-        'Agricultural Management':   'Agricultural management',
-        'Non-Agricultural Land-use': 'Non-agricultural land-use',
-    }
-    for scenario in input_files:
-        bio = load_report_source_csv(scenario, 'biodiversity_GBF2_all_scores')
-        if bio.empty:
-            continue
-        bio = bio.replace(RENAME_AM_NON_AG).query(
-            'region == "AUSTRALIA" and Water_supply != "ALL" and Landuse != "ALL"'
-            ' and abs(`Area Weighted Score (ha)`) > 1e-4'
-        ).copy()
-        for _, row in bio.groupby(['Year', 'Type'], as_index=False)[vcol].sum().iterrows():
-            cat = cat_map.get(row['Type'])
-            if cat is None:
-                continue
-            rows.append({'year': int(row['Year']), 'scenario': scenario,
-                         'category': cat, 'value': float(row[vcol]) / 1e6})
-    return pd.DataFrame(rows)
+    return prepare_biodiversity_overview()
 
 
 def prepare_food():
     rows = []
-    vcol = 'Production (tonnes, KL)'
-    landuse_to_food_group = {
-        'Beef - modified land': 'Meat & live animals',
-        'Beef - natural land': 'Meat & live animals',
-        'Beef Agroforestry': 'Meat & live animals',
-        'Beef Carbon Plantings (Belt)': 'Meat & live animals',
-        'Sheep - modified land': 'Meat & live animals',
-        'Sheep - natural land': 'Meat & live animals',
-        'Sheep Agroforestry': 'Meat & live animals',
-        'Sheep Carbon Plantings (Belt)': 'Meat & live animals',
-        'Dairy - modified land': 'Livestock products',
-        'Dairy - natural land': 'Livestock products',
-        'Summer cereals': 'Grains & oilseeds',
-        'Winter cereals': 'Grains & oilseeds',
-        'Summer legumes': 'Grains & oilseeds',
-        'Winter legumes': 'Grains & oilseeds',
-        'Summer oilseeds': 'Grains & oilseeds',
-        'Winter oilseeds': 'Grains & oilseeds',
-        'Rice': 'Grains & oilseeds',
-        'Cotton': 'All other crops',
-        'Hay': 'All other crops',
-        'Other non-cereal crops': 'All other crops',
-        'Sugar': 'All other crops',
-        'Apples': 'Fruit & vegetables',
-        'Citrus': 'Fruit & vegetables',
-        'Grapes': 'Fruit & vegetables',
-        'Pears': 'Fruit & vegetables',
-        'Plantation fruit': 'Fruit & vegetables',
-        'Stone fruit': 'Fruit & vegetables',
-        'Tropical stone fruit': 'Fruit & vegetables',
-        'Vegetables': 'Fruit & vegetables',
-        'Nuts': 'All other horticulture',
-    }
     for scenario in input_files:
-        food = load_report_source_csv(scenario, 'quantity_production_kt_separate')
+        food = filter_food_detail_rows(
+            load_report_source_csv(scenario, FOOD_PRODUCTION_CSV)
+        )
         if food.empty:
             continue
-        food = food.copy()
-        food['category'] = food['Landuse'].map(landuse_to_food_group)
+        food['category'] = food['Commodity'].map(COMMODITY_TO_FOOD_GROUP)
         food = food.dropna(subset=['category'])
-        data = food.groupby(['Year', 'category'], as_index=False)[vcol].sum()
+        data = food.groupby(['Year', 'category'], as_index=False)[FOOD_PRODUCTION_VALUE_COL].sum()
         for _, row in data.iterrows():
             rows.append({'year': int(row['Year']), 'scenario': scenario,
-                         'category': row['category'], 'value': float(row[vcol]) / 1e6})
+                         'category': row['category'],
+                         'value': float(row[FOOD_PRODUCTION_VALUE_COL]) / 1e6})
     return pd.DataFrame(rows)
 
 
@@ -392,7 +259,7 @@ def _compute_climate_water_impact():
     return df
 
 
-def _load_climate_water_impact():
+def _load_climate_water_impact(force_regenerate=False):
     """Pure dryland/irrigated climate impact on water yield (GL), per (scenario, year).
 
     Reads the per-task-root cache EXCEL_DIR/04_water_climate_impact_split.csv; if it is
@@ -400,9 +267,15 @@ def _load_climate_water_impact():
     Data_RES*.lz4 objects via _compute_climate_water_impact(). Cached at module level.
     """
     global _CLIMATE_WATER_CACHE
-    if _CLIMATE_WATER_CACHE is None:
+    if force_regenerate or _CLIMATE_WATER_CACHE is None:
         path = os.path.join(EXCEL_DIR, CLIMATE_WATER_CSV)
-        if os.path.exists(path):
+        if force_regenerate:
+            print(
+                f'Regenerating {CLIMATE_WATER_CSV} from current Run_Archive.zip data...',
+                flush=True,
+            )
+            df = _compute_climate_water_impact()
+        elif os.path.exists(path):
             df = pd.read_csv(path)
         else:
             print(f'{CLIMATE_WATER_CSV} not found — computing from raw Data_RES*.lz4 '
@@ -423,17 +296,10 @@ def prepare_water():
         water = load_report_source_csv(scenario, 'water_yield_separate_watershed')
         if water.empty:
             continue
-        water = (
-            water.groupby(
-                ['Water Supply', 'Landuse', 'Type', 'Agricultural Management', 'Year'],
-                dropna=False, as_index=False,
-            )[vcol].sum()
-        )
-        water = water.replace(RENAME_AM_NON_AG)
-        water = water.query('`Water Supply` != "ALL" and Landuse != "ALL"').copy()
+        water = filter_water_detail_rows(water).replace(RENAME_AM_NON_AG)
 
-        irr    = water.query('Type == "Agricultural land-use" and `Water Supply` == "Irrigated"').groupby('Year', as_index=False)[vcol].sum()
-        dry    = water.query('Type == "Agricultural land-use" and `Water Supply` == "Dryland"').groupby('Year', as_index=False)[vcol].sum()
+        irr    = water.query('Type == "Agricultural Land-use" and `Water Supply` == "Irrigated"').groupby('Year', as_index=False)[vcol].sum()
+        dry    = water.query('Type == "Agricultural Land-use" and `Water Supply` == "Dryland"').groupby('Year', as_index=False)[vcol].sum()
         agmgt  = water.query('Type == "Agricultural Management"').groupby('Year', as_index=False)[vcol].sum()
         non_ag = water.query('Type == "Non-Agricultural Land-use"').groupby('Year', as_index=False)[vcol].sum()
 
@@ -637,6 +503,7 @@ def save_indicators_figure(all_dfs):
 def main():
     workbook = '04_indicators_long_tables.xlsx'
     if GENERATE_TABLES:
+        _load_climate_water_impact(force_regenerate=True)
         export_long_tables(
             workbook,
             net_economic_return=prepare_ner(),

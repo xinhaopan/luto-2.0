@@ -2,14 +2,14 @@
 Task runner for AG2050 scenarios (AgS1 – AgS4).
 
 Scenarios:
-  AgS1 – Regional Ag capitals:   Non-ag ON,  full AG managements, maintain historical GHG, restore 5% biodiversity, High productivity
+  AgS1 – Regional Ag capitals:   Non-ag ON, full AG managements, maintain historical GHG and 2010 national biodiversity, High productivity
   AgS2 – Landscape stewardship:  Non-ag ON,  full AG managements, low GHG, restore 50% biodiversity, Very High productivity
   AgS3 – Climate survival:       Non-ag OFF, limited AG managements (Eco Grazing/Savanna/HIR only), GHG off
   AgS4 – System decline:         Non-ag OFF, limited AG managements (Eco Grazing/Savanna/HIR only), GHG off
 
-  AgS1 & AgS2 restore 5% / 50% of the top-20% biodiversity-priority areas
-  (GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT=20) and both cap total non-ag
-  land at <=15% per NRM region (REGIONAL_ADOPTION_CONSTRAINTS='NON_AG_CAP').
+  AgS1 keeps the national all-cell Suitability score at or above its 2010 level.
+  AgS2 restores 50% of the top-20% biodiversity-priority areas. Both cap total
+  non-ag land at <=15% per NRM region (REGIONAL_ADOPTION_CONSTRAINTS='NON_AG_CAP').
   Transitions use jinzhu's per-source delta-flow model (now the only mode).
 
 AG management availability per scenario:
@@ -108,7 +108,7 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260713_Paper3_HPC'],
+    'TASK_NAME': ['20260718_Paper3_HPC'],
     'KEEP_OUTPUTS': [True],
     'QUEUE': ['normalsr'],
     # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
@@ -125,6 +125,7 @@ grid_search = {
     'NCPUS': ['15'],
     # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
     'TIME': ['720:00:00'],   # 30 days -- school HPC, no quota; 15 CPUs on a RESFACTOR=3 model is slow
+    'SOLVE_TIME_LIMIT_SECONDS': [30 * 24 * 3600],  # 30 days per Gurobi attempt
 
     # ---- AG2050 scenario switch and selector ---------------------------------
     # Set AG2050_MODE=True to activate all AG2050 overrides.
@@ -177,16 +178,21 @@ grid_search = {
     # ---- Biodiversity settings ----------------------------------------------
     # GBF2_TARGET is auto-set from AG2050_BIO_MAP[scenario] at runtime (data.py).
     # Override the map here so:
-    #   AgS1 Regional Ag capitals  → 'low'  (restore  5% of top-20% priority areas)
+    #   AgS1 Regional Ag capitals  → 'maintain_historical' (national 2010 floor)
     #   AgS2 Landscape stewardship → 'high' (restore 50% by 2050)
     #   AgS3 / AgS4                → 'off'
-    'AG2050_BIO_MAP': [{'AgS1': 'low', 'AgS2': 'high', 'AgS3': 'off', 'AgS4': 'off'}],
+    'AG2050_BIO_MAP': [{
+        'AgS1': 'maintain_historical',
+        'AgS2': 'high',
+        'AgS3': 'off',
+        'AgS4': 'off',
+    }],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
     # top-20% priority areas: CUT = normalised area % (0=none, 100=all) → 20 = top 20%
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
     'GBF2_TARGETS_DICT': [{
         # The 2030 milestone is half of the corresponding 2050 target.
-        'low':    {2030: 0.025, 2050: 0.05, 2100: 0.05},  # AgS1 Regional Ag capitals: restore 5% by 2050
+        'low':    {2030: 0.025, 2050: 0.05, 2100: 0.05},  # Unused in Paper3; AgS1 uses maintain_historical.
         'medium': {2030: 0.15,  2050: 0.30, 2100: 0.30},
         'high':   {2030: 0.25,  2050: 0.50, 2100: 0.50},  # AgS2 Landscape stewardship: restore 50% by 2050
     }],
@@ -273,6 +279,15 @@ settings_name_dict = {
     'AG2050_SCENARIO': 'SCN',
 }
 
+# Optional comma-separated filter for resubmitting only changed scenarios.
+requested_scenarios = os.environ.get('AG2050_RUN_SCENARIOS', '').strip()
+if requested_scenarios:
+    selected = [item.strip() for item in requested_scenarios.split(',') if item.strip()]
+    unknown = sorted(set(selected) - set(grid_search['AG2050_SCENARIO']))
+    if unknown:
+        raise ValueError(f'Unknown AG2050 scenario(s): {unknown}')
+    grid_search['AG2050_SCENARIO'] = selected
+
 task_root_dir = f"../../output/{grid_search['TASK_NAME'][0]}"
 
 # ---- Uncomment to generate the template CSV (first run only) ----------------
@@ -285,10 +300,13 @@ print(grid_search_settings_df.columns)
 # grid_search_settings_df = pd.read_csv(
 #     os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0
 # )
-create_task_runs(
-    task_root_dir,
-    grid_search_settings_df,
-    platform="HPC",
-    n_workers=min(len(grid_search_settings_df.columns), 50),
-    use_parallel=True,
-)
+if os.environ.get('AG2050_DRY_RUN') == '1':
+    print('AG2050_DRY_RUN=1: generated task tables without submitting jobs.')
+else:
+    create_task_runs(
+        task_root_dir,
+        grid_search_settings_df,
+        platform="HPC",
+        n_workers=min(len(grid_search_settings_df.columns), 50),
+        use_parallel=True,
+    )

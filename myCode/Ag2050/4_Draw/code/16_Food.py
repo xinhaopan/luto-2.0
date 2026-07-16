@@ -1,7 +1,7 @@
 """
 09_Food.py
-Combined stacked-area figure for food production by land use and agricultural
-management.
+Combined stacked-area figure for food production by source type, commodity
+group, and agricultural management.
 """
 import _path_setup  # noqa: F401
 
@@ -9,11 +9,12 @@ import pandas as pd
 
 from tools.parameters import GENERATE_TABLES
 from tools.two_row_figure import (
-    LU_COLORS,
-    RENAME_NON_AG,
+    COMMODITY_TO_FOOD_GROUP,
+    FOOD_PRODUCTION_CSV,
+    FOOD_PRODUCTION_VALUE_COL,
     RENAME_AM,
-    classify_land_use,
     export_long_tables,
+    filter_food_detail_rows,
     get_am_colors,
     input_files,
     load_long_tables,
@@ -21,7 +22,15 @@ from tools.two_row_figure import (
     save_three_row_figure,
 )
 
-VALUE_COL = 'Production (tonnes, KL)'
+FOOD_COLORS = {
+    'Meat & live animals': '#9B4528',
+    'Livestock products': '#CA927E',
+    'Grains & oilseeds': '#EB8500',
+    'All other crops': '#F3BD8B',
+    'Fruit & vegetables': '#5A8529',
+    'All other horticulture': '#D1D9BF',
+}
+FOOD_LEGEND_ORDER = list(FOOD_COLORS)
 OVERVIEW_COLORS = {
     'Agricultural land-use': '#f39b8b',
     'Agricultural management': '#9A8AB3',
@@ -29,28 +38,34 @@ OVERVIEW_COLORS = {
 }
 
 
+def _load_food(scenario):
+    return filter_food_detail_rows(
+        load_report_source_csv(scenario, FOOD_PRODUCTION_CSV)
+    )
+
+
 def prepare_overview():
     rows = []
 
     for scenario in input_files:
-        food = load_report_source_csv(scenario, 'quantity_production_kt_separate')
+        food = _load_food(scenario)
         if food.empty:
             continue
         for raw_name, name in [
-            ('Agricultural Landuse', 'Agricultural land-use'),
-            ('Agricultural Management', 'Agricultural management'),
-            ('Non-agricultural Landuse', 'Non-agricultural land-use'),
+            ('Agricultural', 'Agricultural land-use'),
+            ('Agricultural_Management', 'Agricultural management'),
+            ('Non_Agricultural', 'Non-agricultural land-use'),
         ]:
-            data = food.query('`Landuse Type` == @raw_name').copy()
+            data = food.query('Type == @raw_name').copy()
             if data.empty:
                 continue
-            data = data.groupby('Year', as_index=False)[VALUE_COL].sum()
+            data = data.groupby('Year', as_index=False)[FOOD_PRODUCTION_VALUE_COL].sum()
             for _, row in data.iterrows():
                 rows.append({
                     'year': int(row['Year']),
                     'scenario': scenario,
                     'category': name,
-                    'value': float(row[VALUE_COL]) / 1e6,
+                    'value': float(row[FOOD_PRODUCTION_VALUE_COL]) / 1e6,
                 })
 
     return pd.DataFrame(rows)
@@ -60,36 +75,20 @@ def prepare_land_use():
     rows = []
 
     for scenario in input_files:
-        food = load_report_source_csv(scenario, 'quantity_production_kt_separate')
+        food = _load_food(scenario)
         if food.empty:
             continue
-        food = food.copy()
-
-        food_ag = food.query('`Landuse Type` == "Agricultural Landuse"').copy()
-        food_ag['category'] = food_ag.apply(
-            lambda r: classify_land_use(r['Landuse'], r['Land management']), axis=1
-        )
-        food_ag = food_ag.dropna(subset=['category'])
-        food_ag = food_ag.groupby(['Year', 'category'], as_index=False)[VALUE_COL].sum()
-        for _, row in food_ag.iterrows():
+        food = food.query('Type != "Agricultural_Management"').copy()
+        food['category'] = food['Commodity'].map(COMMODITY_TO_FOOD_GROUP)
+        food = food.dropna(subset=['category'])
+        food = food.groupby(['Year', 'category'], as_index=False)[FOOD_PRODUCTION_VALUE_COL].sum()
+        for _, row in food.iterrows():
             rows.append({
                 'year': int(row['Year']),
                 'scenario': scenario,
                 'category': row['category'],
-                'value': float(row[VALUE_COL]) / 1e6,
+                'value': float(row[FOOD_PRODUCTION_VALUE_COL]) / 1e6,
             })
-
-        food_non_ag = food.query('`Landuse Type` == "Non-agricultural Landuse"').copy()
-        if not food_non_ag.empty:
-            food_non_ag['Landuse'] = food_non_ag['Landuse'].replace(RENAME_NON_AG)
-            food_non_ag = food_non_ag.groupby(['Year'], as_index=False)[VALUE_COL].sum()
-            for _, row in food_non_ag.iterrows():
-                rows.append({
-                    'year': int(row['Year']),
-                    'scenario': scenario,
-                    'category': 'Non-agricultural land-use',
-                    'value': float(row[VALUE_COL]) / 1e6,
-                })
 
     return pd.DataFrame(rows)
 
@@ -98,18 +97,18 @@ def prepare_am():
     rows = []
 
     for scenario in input_files:
-        food = load_report_source_csv(scenario, 'quantity_production_kt_separate')
+        food = _load_food(scenario)
         if food.empty:
             continue
-        food = food.query('`Landuse Type` == "Agricultural Management"').copy()
-        food['Landuse subtype'] = food['Landuse subtype'].replace(RENAME_AM)
-        food = food.groupby(['Year', 'Landuse subtype'], as_index=False)[VALUE_COL].sum()
+        food = food.query('Type == "Agricultural_Management"').dropna(subset=['am']).copy()
+        food['am'] = food['am'].replace(RENAME_AM)
+        food = food.groupby(['Year', 'am'], as_index=False)[FOOD_PRODUCTION_VALUE_COL].sum()
         for _, row in food.iterrows():
             rows.append({
                 'year': int(row['Year']),
                 'scenario': scenario,
-                'category': row['Landuse subtype'],
-                'value': float(row[VALUE_COL]) / 1e6,
+                'category': row['am'],
+                'value': float(row[FOOD_PRODUCTION_VALUE_COL]) / 1e6,
             })
 
     return pd.DataFrame(rows)
@@ -138,11 +137,12 @@ def main():
         land_use_df,
         am_df,
         OVERVIEW_COLORS,
-        LU_COLORS,
+        FOOD_COLORS,
         am_colors,
         'Agri-food production (Mt yr⁻¹)',
         '16_food.svg',
         y_label_x=0.020,
+        top_legend_order=FOOD_LEGEND_ORDER,
     )
 
 

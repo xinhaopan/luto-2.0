@@ -1226,6 +1226,20 @@ class LutoSolver:
         if settings.GBF2_TARGET == "off":
             print("│   │   ├── TURNING OFF constraints for biodiversity GBF 2...")
             return
+
+        if settings.GBF2_TARGET == 'maintain_historical':
+            self.bio_GBF2_expr = self._get_total_biodiversity_expr()
+            target = self._input_data.limits['GBF2']
+            scale = self._input_data.scale_factors['GBF2']
+            print(
+                '│   │   ├── Adding national biodiversity no-net-loss '
+                f'constraint: {target:15,.0f}'
+            )
+            self.bio_GBF2_constrs = self.gurobi_model.addConstr(
+                self.bio_GBF2_expr >= target / scale,
+                name='bio_national_2010_no_net_loss_limit',
+            )
+            return
         
         bio_ag_exprs = []
         bio_ag_man_exprs = []
@@ -1273,6 +1287,60 @@ class LutoSolver:
         self.bio_GBF2_constrs = self.gurobi_model.addConstr(
             self.bio_GBF2_expr >= self._input_data.limits["GBF2"] / self._input_data.scale_factors['GBF2'], 
             name="bio_GBF2_priority_degraded_area_limit"
+        )
+
+
+    def _get_total_biodiversity_expr(self) -> "gp.LinExpr":
+        """Return the national all-cell biodiversity-quality expression."""
+        ag_exprs = []
+        for j in range(self._input_data.n_ag_lus):
+            dry_cells = self._input_data.acct_cells_mrj[0, j]
+            irr_cells = self._input_data.acct_cells_mrj[1, j]
+            ag_exprs.append(
+                _qsum(
+                    self._input_data.ag_b_mrj[0, dry_cells, j],
+                    self.X_acct_dry_jr[j, dry_cells],
+                )
+                + _qsum(
+                    self._input_data.ag_b_mrj[1, irr_cells, j],
+                    self.X_acct_irr_jr[j, irr_cells],
+                )
+            )
+
+        ag_man_exprs = []
+        for am, am_j_list in self._input_data.am2j.items():
+            if not AG_MANAGEMENTS[am]:
+                continue
+            for j_idx, j in enumerate(am_j_list):
+                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
+                ag_man_exprs.append(
+                    _qsum(
+                        self._input_data.ag_man_b_mrj[am][0, dry_cells, j_idx],
+                        self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells],
+                    )
+                    + _qsum(
+                        self._input_data.ag_man_b_mrj[am][1, irr_cells, j_idx],
+                        self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells],
+                    )
+                )
+
+        non_ag_exprs = []
+        for k, k_name in enumerate(NON_AG_LAND_USES):
+            if not NON_AG_LAND_USES[k_name]:
+                continue
+            cells = self._input_data.feasible_non_ag_cells[k]
+            non_ag_exprs.append(
+                _qsum(
+                    self._input_data.non_ag_b_rk[cells, k],
+                    self.X_non_ag_vars_kr[k, cells],
+                )
+            )
+
+        return (
+            gp.quicksum(ag_exprs)
+            + gp.quicksum(ag_man_exprs)
+            + gp.quicksum(non_ag_exprs)
         )
 
 

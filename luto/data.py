@@ -2442,9 +2442,14 @@ class Data:
         float
             The priority degrade areas conservation target for the given year.
         """
-        # AG2050: maintain 2010 base-year GBF-2 score as a floor (no increase required)
+        # AG2050: maintain the national 2010 all-cell Suitability score as a
+        # floor. input_data.get_limits() populates this cache before calling.
         if settings.GBF2_TARGET == 'maintain_historical':
-            return self.BIO_GBF2_BASE_YR.sum()
+            if self.BASE_YR_overall_bio_value is None:
+                raise RuntimeError(
+                    'The national 2010 biodiversity baseline has not been initialised'
+                )
+            return float(self.BASE_YR_overall_bio_value)
 
         bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA * self.AG_MASK_PROPORTION_R).sum()
         bio_habitat_score_base_yr_sum = self.BIO_GBF2_BASE_YR.sum()

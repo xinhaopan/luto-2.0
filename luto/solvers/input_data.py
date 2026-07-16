@@ -880,7 +880,12 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
         limits['renewable_Utility Solar PV_exist'] = {state: vals['Utility Solar PV'] for state, vals in renewable_existing_capacity.items()}
         limits['renewable_Onshore Wind_exist']     = {state: vals['Onshore Wind']     for state, vals in renewable_existing_capacity.items()}
 
-    if settings.GBF2_TARGET != 'off':
+    if settings.GBF2_TARGET == 'maintain_historical':
+        # This mode is a national no-net-loss constraint using the same
+        # all-cell biodiversity-quality metric written to the overall report.
+        get_BASE_YR_bio_quality_value(data)
+        limits["GBF2"] = data.get_GBF2_target_for_yr_cal(yr_cal)
+    elif settings.GBF2_TARGET != 'off':
         limits["GBF2"] = data.get_GBF2_target_for_yr_cal(yr_cal)
 
     if settings.GBF3_NVIS_TARGET != 'off':
@@ -1447,11 +1452,16 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], 1.0)
     )
     
-    [GBF2_mask_area_r], gbf2_scale = (
-        rescale_lhs_rhs([GBF2_mask_area_r], limits['GBF2'])
-        if settings.GBF2_TARGET != "off" else
-        ([GBF2_mask_area_r], 1.0)
-    )
+    if settings.GBF2_TARGET == 'maintain_historical':
+        # The solver uses ag_b_mrj/non_ag_b_rk/ag_man_b_mrj for this mode,
+        # which were already divided by biodiv_scale above.
+        gbf2_scale = biodiv_scale
+    else:
+        [GBF2_mask_area_r], gbf2_scale = (
+            rescale_lhs_rhs([GBF2_mask_area_r], limits['GBF2'])
+            if settings.GBF2_TARGET != "off" else
+            ([GBF2_mask_area_r], 1.0)
+        )
     
     GBF3_NVIS_pre_1750_area_vr, gbf3_nvis_scale = (
         rescale_lhs_rhs_region_species(

@@ -160,7 +160,13 @@ def submit_task(task_root_dir: str, col: str, platform: Literal['aquila', 'Denet
                                         stdout=std_file, stderr=err_file)
             elif platform == 'aquila':
                 _lic = pathlib.Path.home() / 'gurobi.lic'
-                _env = {**os.environ, 'GRB_LICENSE_FILE': str(_lic)} if _lic.exists() else None
+                _env = {
+                    **os.environ,
+                    'PYTHONUTF8': '1',
+                    'PYTHONIOENCODING': 'utf-8',
+                }
+                if _lic.exists():
+                    _env['GRB_LICENSE_FILE'] = str(_lic)
                 result = subprocess.run(['python', script_name],
                                         cwd=f'{task_root_dir}/{col}',
                                         env=_env,

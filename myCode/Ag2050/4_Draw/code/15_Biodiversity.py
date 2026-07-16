@@ -14,15 +14,17 @@ from tools.two_row_figure import (
     RENAME_AM_NON_AG,
     classify_land_use,
     export_long_tables,
+    filter_biodiversity_rows,
     get_am_colors,
     input_files,
     load_long_tables,
     load_report_source_csv,
+    prepare_biodiversity_overview,
     save_three_row_figure,
 )
 
 VALUE_COL = 'Area Weighted Score (ha)'
-SOURCE_CSV = 'biodiversity_GBF2_all_scores'
+SOURCE_CSV = 'biodiversity_overall_priority_scores'
 OVERVIEW_COLORS = {
     'Agricultural land-use': '#f39b8b',
     'Agricultural management': '#9A8AB3',
@@ -31,48 +33,21 @@ OVERVIEW_COLORS = {
 
 
 def prepare_overview():
-    rows = []
-
-    for scenario in input_files:
-        bio = load_report_source_csv(scenario, SOURCE_CSV)
-        if bio.empty:
-            continue
-        bio = bio.replace(RENAME_AM_NON_AG).query(
-            'region == "AUSTRALIA" and Water_supply != "ALL" and Landuse != "ALL" and abs(`Area Weighted Score (ha)`) > 1e-4'
-        ).copy()
-        bio = bio.groupby(['Year', 'Type'], as_index=False)[VALUE_COL].sum()
-        for _, row in bio.iterrows():
-            category = row['Type']
-            if category == 'Agricultural land-use':
-                category = 'Agricultural land-use'
-            elif category == 'Agricultural Management':
-                category = 'Agricultural management'
-            elif category == 'Non-Agricultural Land-use':
-                category = 'Non-agricultural land-use'
-            else:
-                continue
-            rows.append({
-                'year': int(row['Year']),
-                'scenario': scenario,
-                'category': category,
-                'value': float(row[VALUE_COL]) / 1e6,
-            })
-
-    return pd.DataFrame(rows)
+    return prepare_biodiversity_overview()
 
 
 def prepare_land_use():
     rows = []
 
     for scenario in input_files:
-        bio = load_report_source_csv(scenario, SOURCE_CSV)
+        bio = filter_biodiversity_rows(load_report_source_csv(scenario, SOURCE_CSV))
         if bio.empty:
             continue
         bio = bio.replace(RENAME_AM_NON_AG).query(
-            'region == "AUSTRALIA" and Water_supply != "ALL" and Landuse != "ALL" and abs(`Area Weighted Score (ha)`) > 1e-4'
+            'abs(`Area Weighted Score (ha)`) > 1e-4'
         ).copy()
 
-        bio_ag = bio.query('Type == "Agricultural land-use"').copy()
+        bio_ag = bio.query('Type == "Agricultural Land-use"').copy()
         bio_ag['category'] = bio_ag.apply(
             lambda r: classify_land_use(r['Landuse'], r['Water_supply']), axis=1
         )
@@ -104,11 +79,11 @@ def prepare_am():
     rows = []
 
     for scenario in input_files:
-        bio = load_report_source_csv(scenario, SOURCE_CSV)
+        bio = filter_biodiversity_rows(load_report_source_csv(scenario, SOURCE_CSV))
         if bio.empty:
             continue
         bio = bio.replace(RENAME_AM_NON_AG).query(
-            'region == "AUSTRALIA" and Water_supply != "ALL" and Landuse != "ALL" and Type == "Agricultural Management" and abs(`Area Weighted Score (ha)`) > 1e-4'
+            'Type == "Agricultural Management" and abs(`Area Weighted Score (ha)`) > 1e-4'
         ).copy()
         bio = bio.groupby(['Year', 'Agricultural Management'], as_index=False)[VALUE_COL].sum()
         for _, row in bio.iterrows():
@@ -147,7 +122,7 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        "Biodiversity contribution-weighted area (Mha yr⁻¹)",
+        "Biodiversity contribution-weighted area (Mha)",
         '15_biodiversity.svg',
         y_label_x=0.020,
     )

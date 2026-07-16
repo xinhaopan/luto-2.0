@@ -13,13 +13,6 @@ import matplotlib.gridspec as gridspec
 import matplotlib.patches as mpatches
 import pandas as pd
 
-from tools.data_helper import (
-    get_zip_info,
-    get_path,
-    _list_years,
-    _list_years_zip,
-    _read_csv_from_zip,
-)
 from tools.plot_helper import (
     get_colors,
     calc_y_range,
@@ -27,7 +20,14 @@ from tools.plot_helper import (
     stacked_area_pos_neg,
 )
 from tools.parameters import input_files, font_size, OUTPUT_DIR, SCENARIO_LABELS, GENERATE_TABLES
-from tools.two_row_figure import export_long_tables, load_long_tables, _add_vertical_unit_label
+from tools.two_row_figure import (
+    _add_vertical_unit_label,
+    export_long_tables,
+    filter_area_ag_rows,
+    filter_area_am_rows,
+    load_long_tables,
+    load_report_source_csv,
+)
 
 RENAME_AM = {
     "Asparagopsis taxiformis": "Methane reduction (livestock)",
@@ -98,34 +98,14 @@ def classify_land_use(name, water_supply):
     return None
 
 
-def load_report_source_csv(scenario, csv_name):
-    info = get_zip_info(scenario)
-    frames = []
-    if info is not None:
-        zip_path, prefix = info
-        years = _list_years_zip(zip_path, prefix)
-        for year in years:
-            df = _read_csv_from_zip(zip_path, prefix, year, csv_name)
-            if df is not None and not df.empty:
-                frames.append(df)
-    else:
-        base = get_path(scenario)
-        for year in _list_years(base):
-            path = os.path.join(base, f'out_{year}', f'{csv_name}_{year}.csv')
-            if os.path.exists(path):
-                df = pd.read_csv(path)
-                if not df.empty:
-                    frames.append(df)
-    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-
-
 def prepare_land_use():
     rows = []
 
     for scenario in input_files:
-        area_ag = load_report_source_csv(scenario, 'area_agricultural_landuse')
+        area_ag = filter_area_ag_rows(
+            load_report_source_csv(scenario, 'area_agricultural_landuse')
+        )
         if not area_ag.empty:
-            area_ag = area_ag.query('region == "AUSTRALIA" and Water_supply != "ALL"').copy()
             area_ag['category'] = area_ag.apply(
                 lambda r: classify_land_use(r['Land-use'], r['Water_supply']), axis=1
             )
@@ -159,12 +139,13 @@ def prepare_am():
     rows = []
 
     for scenario in input_files:
-        area_am = load_report_source_csv(scenario, 'area_agricultural_management')
+        area_am = filter_area_am_rows(
+            load_report_source_csv(scenario, 'area_agricultural_management')
+        )
         if area_am.empty:
             continue
         area_am = area_am.copy()
         area_am['Type'] = area_am['Type'].replace(RENAME_AM_NON_AG)
-        area_am = area_am.query('region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL"').copy()
         for _, row in area_am.iterrows():
             rows.append({
                 'year': int(row['Year']),
@@ -311,7 +292,7 @@ def main():
              fontsize=font_size, fontfamily='Arial', fontweight='normal')
     fig.text(0.43, bot_pos.y1 + label_gap, 'Agricultural management', ha='center', va='bottom',
              fontsize=font_size, fontfamily='Arial', fontweight='normal')
-    _add_vertical_unit_label(fig, 0.038, 0.50, 'Area (Mha yr⁻¹)', font_size)
+    _add_vertical_unit_label(fig, 0.038, 0.50, 'Area (Mha)', font_size)
 
     # Bold scenario column headers at the very top
     for ax, scenario in zip(axes_top, input_files):

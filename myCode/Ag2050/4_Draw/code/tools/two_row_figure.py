@@ -6,6 +6,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from tools.data_helper import (
@@ -74,6 +75,39 @@ NATIVE_PASTURE_LUS = {
 UNALLOCATED_LUS = {
     "Unallocated - modified land", "Unallocated - natural land",
 }
+
+FOOD_PRODUCTION_CSV = 'quantity_production_t_separate'
+FOOD_PRODUCTION_VALUE_COL = 'Production (t/KL)'
+COMMODITY_TO_FOOD_GROUP = {
+    'beef lexp': 'Meat & live animals',
+    'beef meat': 'Meat & live animals',
+    'sheep lexp': 'Meat & live animals',
+    'sheep meat': 'Meat & live animals',
+    'dairy': 'Livestock products',
+    'sheep wool': 'Livestock products',
+    'summer cereals': 'Grains & oilseeds',
+    'winter cereals': 'Grains & oilseeds',
+    'summer legumes': 'Grains & oilseeds',
+    'winter legumes': 'Grains & oilseeds',
+    'summer oilseeds': 'Grains & oilseeds',
+    'winter oilseeds': 'Grains & oilseeds',
+    'rice': 'Grains & oilseeds',
+    'cotton': 'All other crops',
+    'hay': 'All other crops',
+    'other non-cereal crops': 'All other crops',
+    'sugar': 'All other crops',
+    'apples': 'Fruit & vegetables',
+    'citrus': 'Fruit & vegetables',
+    'grapes': 'Fruit & vegetables',
+    'pears': 'Fruit & vegetables',
+    'plantation fruit': 'Fruit & vegetables',
+    'stone fruit': 'Fruit & vegetables',
+    'tropical stone fruit': 'Fruit & vegetables',
+    'vegetables': 'Fruit & vegetables',
+    'nuts': 'All other horticulture',
+}
+
+BIODIVERSITY_BACKEND = 'Suitability'
 
 COLORS_FILE = 'tools/land use colors.xlsx'
 UNIT_DEJAVU_CHARS = {'₂', '⁻', '¹'}
@@ -202,6 +236,460 @@ def load_report_source_csv(scenario, csv_name):
                         df['Year'] = int(year)
                     frames.append(_filter_region_level(df))
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def filter_transition_cost_rows(df):
+    """Select detailed transition costs without double-counting regional output."""
+    if df.empty:
+        return df
+    cost_type_col = 'Cost-type' if 'Cost-type' in df.columns else 'Type'
+    mask = (
+        df['From-land-use'].ne('ALL')
+        & df['To-land-use'].ne('ALL')
+        & df[cost_type_col].ne('ALL')
+    )
+    detailed = df.loc[mask].copy()
+    if 'region' in detailed.columns and detailed['region'].eq('AUSTRALIA').any():
+        detailed = detailed[detailed['region'].eq('AUSTRALIA')].copy()
+    return detailed
+
+
+def require_columns(df, columns, source_name):
+    missing = [column for column in columns if column not in df.columns]
+    if missing:
+        raise ValueError(f'{source_name} is missing required columns: {missing}')
+
+
+def assert_series_close(actual, expected, label, atol=2e-3, rtol=1e-6):
+    """Fail loudly when plotted totals diverge from an independent aggregate."""
+    actual, expected = actual.align(expected, join='inner')
+    if actual.empty:
+        return
+    close = np.isclose(
+        actual.astype(float).to_numpy(),
+        expected.astype(float).to_numpy(),
+        atol=atol,
+        rtol=rtol,
+    )
+    if close.all():
+        return
+    mismatch = pd.DataFrame({'actual': actual, 'expected': expected})[~close]
+    raise ValueError(f'{label} total validation failed:\n{mismatch.to_string()}')
+
+
+def filter_am_cost_rows(df):
+    """Keep AM cost detail and remove the duplicate Cost_type=ALL hierarchy."""
+    if df.empty:
+        return df
+    require_columns(df, ['Cost_type'], 'economics_am_cost')
+    return df[df['Cost_type'] != 'ALL'].copy()
+
+
+def filter_area_ag_rows(df):
+    """Keep national agricultural area detail and verify its ALL-water total."""
+    if df.empty:
+        return df
+    required = ['region', 'Water_supply', 'Land-use', 'Year', 'Area (ha)']
+    require_columns(df, required, 'area_agricultural_landuse')
+    national = df[df['region'].eq('AUSTRALIA')].copy()
+    detail = national[
+        national['Water_supply'].ne('ALL')
+        & national['Land-use'].ne('ALL')
+    ].copy()
+    unknown = detail[
+        detail.apply(
+            lambda row: classify_land_use(row['Land-use'], row['Water_supply']) is None,
+            axis=1,
+        )
+    ]['Land-use'].drop_duplicates()
+    if not unknown.empty:
+        raise ValueError(f'Unclassified agricultural land uses: {sorted(unknown)}')
+    expected = (
+        national[
+            national['Water_supply'].eq('ALL')
+            & national['Land-use'].ne('ALL')
+        ]
+        .groupby('Year')['Area (ha)']
+        .sum()
+    )
+    actual = detail.groupby('Year')['Area (ha)'].sum()
+    assert_series_close(actual, expected, 'Agricultural area hierarchy', atol=10.0)
+    return detail
+
+
+def filter_area_am_rows(df):
+    """Keep AM area detail and verify its independent ALL-water hierarchy."""
+    if df.empty:
+        return df
+    required = ['region', 'Water_supply', 'Land-use', 'Year', 'Area (ha)']
+    require_columns(df, required, 'area_agricultural_management')
+    national = df[df['region'].eq('AUSTRALIA')].copy()
+    detail = national[
+        national['Water_supply'].ne('ALL')
+        & national['Land-use'].ne('ALL')
+    ].copy()
+    expected = (
+        national[
+            national['Water_supply'].eq('ALL')
+            & national['Land-use'].ne('ALL')
+        ]
+        .groupby('Year')['Area (ha)']
+        .sum()
+    )
+    actual = detail.groupby('Year')['Area (ha)'].sum()
+    assert_series_close(actual, expected, 'Agricultural-management area hierarchy', atol=10.0)
+    return detail
+
+
+def filter_food_detail_rows(df):
+    """Keep one food-production hierarchy and verify it against aggregate rows."""
+    if df.empty:
+        return df
+    required = [
+        'region', 'Water_supply', 'Commodity', 'Type', 'Year',
+        FOOD_PRODUCTION_VALUE_COL,
+    ]
+    require_columns(df, required, FOOD_PRODUCTION_CSV)
+    national = df[df['region'].eq('AUSTRALIA')].copy()
+    detail = national[
+        national['Water_supply'].ne('ALL')
+        & national['Commodity'].ne('ALL')
+    ].copy()
+    unknown_types = sorted(set(detail['Type'].dropna()) - {
+        'Agricultural', 'Agricultural_Management', 'Non_Agricultural',
+    })
+    if unknown_types:
+        raise ValueError(f'Unclassified food-production types: {unknown_types}')
+    unknown_commodities = sorted(
+        set(detail['Commodity'].dropna()) - set(COMMODITY_TO_FOOD_GROUP)
+    )
+    if unknown_commodities:
+        raise ValueError(f'Unclassified food commodities: {unknown_commodities}')
+
+    expected_parts = [
+        national[
+            national['Type'].eq('Agricultural')
+            & national['Water_supply'].eq('ALL')
+            & national['Commodity'].ne('ALL')
+        ],
+        national[
+            national['Type'].eq('Agricultural_Management')
+            & national['Water_supply'].eq('ALL')
+            & national['Commodity'].eq('ALL')
+        ],
+        national[national['Type'].eq('Non_Agricultural')],
+    ]
+    expected = (
+        pd.concat(expected_parts, ignore_index=True)
+        .groupby('Year')[FOOD_PRODUCTION_VALUE_COL]
+        .sum()
+    )
+    actual = detail.groupby('Year')[FOOD_PRODUCTION_VALUE_COL].sum()
+    assert_series_close(actual, expected, 'Food-production hierarchy', atol=10.0)
+    return detail
+
+
+def filter_biodiversity_rows(df):
+    """Return national all-cell Suitability rows at one non-aggregate hierarchy."""
+    if df.empty:
+        return df
+    require_columns(
+        df,
+        [
+            'region', 'backend', 'Water_supply', 'Landuse', 'Type',
+            'Agricultural Management', 'Area Weighted Score (ha)',
+        ],
+        'biodiversity_overall_priority_scores',
+    )
+    if BIODIVERSITY_BACKEND not in set(df['backend'].dropna()):
+        raise ValueError(
+            f'Biodiversity backend {BIODIVERSITY_BACKEND!r} is unavailable; '
+            f'found {sorted(df["backend"].dropna().unique())}'
+        )
+    detail = df[
+        (df['region'] == 'AUSTRALIA')
+        & (df['backend'] == BIODIVERSITY_BACKEND)
+        & (df['Water_supply'] != 'ALL')
+        & (df['Landuse'] != 'ALL')
+    ].copy()
+    duplicate_am_total = (
+        detail['Type'].eq('Agricultural Management')
+        & detail['Agricultural Management'].eq('ALL')
+    )
+    return detail[~duplicate_am_total].copy()
+
+
+def filter_water_detail_rows(df):
+    """Collapse watersheds and keep one detailed water-yield hierarchy."""
+    if df.empty:
+        return df
+    required = [
+        'Water Supply', 'Landuse', 'Type', 'Agricultural Management',
+        'Year', 'Water Net Yield (ML)',
+    ]
+    require_columns(df, required, 'water_yield_separate_watershed')
+    grouped = (
+        df.groupby(
+            ['Water Supply', 'Landuse', 'Type', 'Agricultural Management', 'Year'],
+            dropna=False,
+            as_index=False,
+        )['Water Net Yield (ML)']
+        .sum()
+    )
+
+    detail = grouped[
+        (grouped['Water Supply'] != 'ALL')
+        & (grouped['Landuse'] != 'ALL')
+    ].copy()
+    duplicate_am_total = (
+        detail['Type'].eq('Agricultural Management')
+        & detail['Agricultural Management'].eq('ALL')
+    )
+    detail = detail[~duplicate_am_total].copy()
+
+    expected_parts = [
+        grouped[
+            grouped['Type'].eq('Agricultural Land-use')
+            & grouped['Water Supply'].eq('ALL')
+            & grouped['Landuse'].eq('ALL')
+        ],
+        grouped[
+            grouped['Type'].eq('Agricultural Management')
+            & grouped['Water Supply'].eq('ALL')
+            & grouped['Landuse'].eq('ALL')
+            & grouped['Agricultural Management'].eq('ALL')
+        ],
+        grouped[
+            grouped['Type'].eq('Non-Agricultural Land-use')
+            & grouped['Water Supply'].ne('ALL')
+            & grouped['Landuse'].eq('ALL')
+        ],
+    ]
+    expected = (
+        pd.concat(expected_parts, ignore_index=True)
+        .groupby('Year')['Water Net Yield (ML)']
+        .sum()
+    )
+    actual = detail.groupby('Year')['Water Net Yield (ML)'].sum()
+    # Watershed CSV layers are independently rounded; their national hierarchies
+    # can differ by roughly 0.2 GL after summing thousands of rows.
+    assert_series_close(actual, expected, 'Water-yield hierarchy', atol=250.0)
+    return detail
+
+
+def prepare_net_economic_return_overview():
+    rows = []
+    for scenario in input_files:
+        for csv_name, category, sign, query in [
+            (
+                'economics_ag_revenue', 'Ag revenue', 1.0,
+                'region == "AUSTRALIA" and Water_supply != "ALL" and '
+                'Type != "ALL" and `Land-use` != "ALL"',
+            ),
+            (
+                'economics_ag_cost', 'Ag cost', -1.0,
+                'region == "AUSTRALIA" and Water_supply != "ALL" and '
+                'Type != "ALL" and `Land-use` != "ALL"',
+            ),
+            (
+                'economics_am_revenue', 'Agmgt revenue', 1.0,
+                'region == "AUSTRALIA" and Water_supply != "ALL" and '
+                '`Land-use` != "ALL" and `Management Type` != "ALL"',
+            ),
+            (
+                'economics_am_cost', 'Agmgt cost', -1.0,
+                'region == "AUSTRALIA" and Water_supply != "ALL" and '
+                '`Land-use` != "ALL" and `Management Type` != "ALL"',
+            ),
+            (
+                'economics_non_ag_revenue', 'Non-ag revenue', 1.0,
+                'region == "AUSTRALIA" and `Land-use` != "ALL"',
+            ),
+            (
+                'economics_non_ag_cost', 'Non-ag cost', -1.0,
+                'region == "AUSTRALIA" and `Land-use` != "ALL"',
+            ),
+        ]:
+            data = load_report_source_csv(scenario, csv_name)
+            if data.empty:
+                continue
+            data = data.query(query).copy()
+            if csv_name == 'economics_am_cost':
+                data = filter_am_cost_rows(data)
+            for _, row in data.groupby('Year', as_index=False)['Value ($)'].sum().iterrows():
+                rows.append({
+                    'year': int(row['Year']),
+                    'scenario': scenario,
+                    'category': category,
+                    'value': sign * float(row['Value ($)']) / 1e9,
+                })
+
+        for csv_name, category in [
+            ('transition_ag2ag_cost', 'Transition(ag->ag) cost'),
+            ('transition_nonag2ag_cost', 'Transition(non-ag->ag) cost'),
+            ('transition_ag2nonag_cost', 'Transition(ag->non-ag) cost'),
+        ]:
+            data = filter_transition_cost_rows(load_report_source_csv(scenario, csv_name))
+            if data.empty:
+                continue
+            for _, row in data.groupby('Year', as_index=False)['Cost ($)'].sum().iterrows():
+                rows.append({
+                    'year': int(row['Year']),
+                    'scenario': scenario,
+                    'category': category,
+                    'value': -float(row['Cost ($)']) / 1e9,
+                })
+
+    result = pd.DataFrame(rows, columns=['year', 'scenario', 'category', 'value'])
+    _validate_net_economic_return(result)
+    return result
+
+
+def _validate_net_economic_return(result):
+    for scenario in input_files:
+        expected_parts = []
+        for csv_name, query in [
+            (
+                'economics_ag_profit',
+                'region == "AUSTRALIA" and Water_supply == "ALL" and `Land-use` == "ALL"',
+            ),
+            (
+                'economics_am_profit',
+                'region == "AUSTRALIA" and Water_supply == "ALL" and '
+                '`Land-use` == "ALL" and `Management Type` == "ALL"',
+            ),
+            (
+                'economics_non_ag_profit',
+                'region == "AUSTRALIA" and `Land-use` == "ALL"',
+            ),
+        ]:
+            data = load_report_source_csv(scenario, csv_name)
+            if not data.empty:
+                expected_parts.append(data.query(query)[['Year', 'Value ($)']])
+        if not expected_parts:
+            continue
+        expected = (
+            pd.concat(expected_parts, ignore_index=True)
+            .groupby('Year')['Value ($)']
+            .sum()
+            / 1e9
+        )
+        actual = (
+            result[result['scenario'] == scenario]
+            .groupby('year')['value']
+            .sum()
+        )
+        assert_series_close(actual, expected, f'{scenario} net economic return')
+
+
+def prepare_ghg_overview():
+    rows = []
+    sources = [
+        (
+            'GHG_emissions_separate_agricultural_landuse',
+            'Agricultural land-use',
+            'region == "AUSTRALIA" and Water_supply != "ALL" and '
+            'Source != "ALL" and `Land-use` != "ALL"',
+            'region == "AUSTRALIA" and Water_supply == "ALL" and '
+            'Source == "ALL" and `Land-use` == "ALL"',
+        ),
+        (
+            'GHG_emissions_separate_agricultural_management',
+            'Agricultural management',
+            'region == "AUSTRALIA" and Water_supply != "ALL" and '
+            '`Land-use` != "ALL" and `Agricultural Management Type` != "ALL"',
+            'region == "AUSTRALIA" and Water_supply == "ALL" and '
+            '`Land-use` == "ALL" and `Agricultural Management Type` == "ALL"',
+        ),
+        (
+            'GHG_emissions_separate_no_ag_reduction',
+            'Non-agricultural land-use',
+            'region == "AUSTRALIA" and `Land-use` != "ALL"',
+            'region == "AUSTRALIA" and `Land-use` == "ALL"',
+        ),
+        (
+            'GHG_emissions_separate_transition_penalty',
+            'Transition',
+            'region == "AUSTRALIA" and Type != "ALL" and Water_supply != "ALL"',
+            'region == "AUSTRALIA" and Type == "ALL" and Water_supply == "ALL"',
+        ),
+    ]
+    for scenario in input_files:
+        for csv_name, category, query, aggregate_query in sources:
+            data = load_report_source_csv(scenario, csv_name)
+            if data.empty:
+                continue
+            detail = data.query(query).copy()
+            actual = detail.groupby('Year')['Value (t CO2e)'].sum()
+            expected = data.query(aggregate_query).groupby('Year')['Value (t CO2e)'].sum()
+            assert_series_close(
+                actual,
+                expected,
+                f'{scenario} {category} GHG hierarchy',
+                atol=100.0,
+            )
+            for _, row in detail.groupby('Year', as_index=False)['Value (t CO2e)'].sum().iterrows():
+                rows.append({
+                    'year': int(row['Year']),
+                    'scenario': scenario,
+                    'category': category,
+                    'value': float(row['Value (t CO2e)']) / 1e6,
+                })
+
+        offland = load_report_source_csv(scenario, 'GHG_emissions_offland_commodity')
+        if not offland.empty:
+            for _, row in offland.groupby('Year', as_index=False)['Total GHG Emissions (tCO2e)'].sum().iterrows():
+                rows.append({
+                    'year': int(row['Year']),
+                    'scenario': scenario,
+                    'category': 'Off-land commodities',
+                    'value': float(row['Total GHG Emissions (tCO2e)']) / 1e6,
+                })
+
+    return pd.DataFrame(rows, columns=['year', 'scenario', 'category', 'value'])
+
+
+def prepare_biodiversity_overview():
+    category_map = {
+        'Agricultural Land-use': 'Agricultural land-use',
+        'Agricultural Management': 'Agricultural management',
+        'Non-Agricultural Land-use': 'Non-agricultural land-use',
+    }
+    rows = []
+    for scenario in input_files:
+        data = filter_biodiversity_rows(
+            load_report_source_csv(scenario, 'biodiversity_overall_priority_scores')
+        )
+        for _, row in data.groupby(['Year', 'Type'], as_index=False)['Area Weighted Score (ha)'].sum().iterrows():
+            category = category_map.get(row['Type'])
+            if category is not None:
+                rows.append({
+                    'year': int(row['Year']),
+                    'scenario': scenario,
+                    'category': category,
+                    'value': float(row['Area Weighted Score (ha)']) / 1e6,
+                })
+
+        totals = load_report_source_csv(scenario, 'biodiversity_overall_priority_scores_all')
+        if totals.empty:
+            continue
+        expected = (
+            totals[
+                totals['region'].eq('AUSTRALIA')
+                & totals['backend'].eq(BIODIVERSITY_BACKEND)
+                & totals['Type'].eq('ALL')
+            ]
+            .set_index('Year')['Area Weighted Score (ha)']
+            / 1e6
+        )
+        scenario_rows = pd.DataFrame(rows)
+        actual = (
+            scenario_rows[scenario_rows['scenario'] == scenario]
+            .groupby('year')['value']
+            .sum()
+        )
+        assert_series_close(actual, expected, f'{scenario} biodiversity')
+    return pd.DataFrame(rows, columns=['year', 'scenario', 'category', 'value'])
 
 
 def get_am_colors():

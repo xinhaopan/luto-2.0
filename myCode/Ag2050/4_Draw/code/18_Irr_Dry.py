@@ -7,7 +7,7 @@ Columns: 4 scenarios (AgS1–AgS4)
 
 Land-use area uses the same land-use classification as 17_Water.py row 2 (LU_COLORS),
 split by water supply. Agri-food output uses the same food-group classification as
-04_indicators.py row 4 (FOOD_COLORS), split by land management.
+04_indicators.py row 4 (FOOD_COLORS), split by water supply.
 """
 import _path_setup  # noqa: F401
 
@@ -21,12 +21,17 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from tools.two_row_figure import (
+    COMMODITY_TO_FOOD_GROUP,
     CROPLAND_LUS,
+    FOOD_PRODUCTION_CSV,
+    FOOD_PRODUCTION_VALUE_COL,
     MODIFIED_PASTURE_LUS,
     NATIVE_PASTURE_LUS,
     UNALLOCATED_LUS,
     LU_COLORS,
     export_long_tables,
+    filter_area_ag_rows,
+    filter_food_detail_rows,
     input_files,
     load_long_tables,
     load_report_source_csv,
@@ -53,40 +58,6 @@ FOOD_LEGEND_ORDER = [
     'All other horticulture',
 ]
 
-LANDUSE_TO_FOOD_GROUP = {
-    'Beef - modified land': 'Meat & live animals',
-    'Beef - natural land': 'Meat & live animals',
-    'Beef Agroforestry': 'Meat & live animals',
-    'Beef Carbon Plantings (Belt)': 'Meat & live animals',
-    'Sheep - modified land': 'Meat & live animals',
-    'Sheep - natural land': 'Meat & live animals',
-    'Sheep Agroforestry': 'Meat & live animals',
-    'Sheep Carbon Plantings (Belt)': 'Meat & live animals',
-    'Dairy - modified land': 'Livestock products',
-    'Dairy - natural land': 'Livestock products',
-    'Summer cereals': 'Grains & oilseeds',
-    'Winter cereals': 'Grains & oilseeds',
-    'Summer legumes': 'Grains & oilseeds',
-    'Winter legumes': 'Grains & oilseeds',
-    'Summer oilseeds': 'Grains & oilseeds',
-    'Winter oilseeds': 'Grains & oilseeds',
-    'Rice': 'Grains & oilseeds',
-    'Cotton': 'All other crops',
-    'Hay': 'All other crops',
-    'Other non-cereal crops': 'All other crops',
-    'Sugar': 'All other crops',
-    'Apples': 'Fruit & vegetables',
-    'Citrus': 'Fruit & vegetables',
-    'Grapes': 'Fruit & vegetables',
-    'Pears': 'Fruit & vegetables',
-    'Plantation fruit': 'Fruit & vegetables',
-    'Stone fruit': 'Fruit & vegetables',
-    'Tropical stone fruit': 'Fruit & vegetables',
-    'Vegetables': 'Fruit & vegetables',
-    'Nuts': 'All other horticulture',
-}
-
-
 def _classify_area(name, water_supply):
     """Same land-use grouping as 17_Water.py row 2 (LU_COLORS), given a water supply."""
     prefix = 'Dryland' if water_supply == 'Dryland' else 'Irrigated'
@@ -107,10 +78,12 @@ def prepare_area(water_supply):
     """Agricultural land-use area (Mha) for one water supply ('Dryland'/'Irrigated')."""
     rows = []
     for scenario in input_files:
-        area = load_report_source_csv(scenario, 'area_agricultural_landuse')
+        area = filter_area_ag_rows(
+            load_report_source_csv(scenario, 'area_agricultural_landuse')
+        )
         if area.empty:
             continue
-        area = area.query('region == "AUSTRALIA" and Water_supply == @water_supply').copy()
+        area = area.query('Water_supply == @water_supply').copy()
         area['category'] = area.apply(
             lambda r: _classify_area(r['Land-use'], r['Water_supply']), axis=1
         )
@@ -122,21 +95,23 @@ def prepare_area(water_supply):
     return pd.DataFrame(rows)
 
 
-def prepare_production(land_management):
-    """Agri-food output (Mt) for one land management ('dry'/'irr'), by food group."""
+def prepare_production(water_supply):
+    """Agri-food output (Mt) for one water supply, grouped by commodity."""
     rows = []
     for scenario in input_files:
-        food = load_report_source_csv(scenario, 'quantity_production_kt_separate')
+        food = filter_food_detail_rows(
+            load_report_source_csv(scenario, FOOD_PRODUCTION_CSV)
+        )
         if food.empty:
             continue
-        food = food[food['Land management'] == land_management].copy()
-        food['category'] = food['Landuse'].map(LANDUSE_TO_FOOD_GROUP)
+        food = food.query('Water_supply == @water_supply').copy()
+        food['category'] = food['Commodity'].map(COMMODITY_TO_FOOD_GROUP)
         food = food.dropna(subset=['category'])
-        g = food.groupby(['Year', 'category'], as_index=False)['Production (tonnes, KL)'].sum()
+        g = food.groupby(['Year', 'category'], as_index=False)[FOOD_PRODUCTION_VALUE_COL].sum()
         for _, r in g.iterrows():
             rows.append({'year': int(r['Year']), 'scenario': scenario,
                          'category': r['category'],
-                         'value': float(r['Production (tonnes, KL)']) / 1e6})
+                         'value': float(r[FOOD_PRODUCTION_VALUE_COL]) / 1e6})
     return pd.DataFrame(rows)
 
 
@@ -255,8 +230,8 @@ def main():
             workbook,
             dryland_area=prepare_area('Dryland'),
             irrigated_area=prepare_area('Irrigated'),
-            dryland_production=prepare_production('dry'),
-            irrigated_production=prepare_production('irr'),
+            dryland_production=prepare_production('Dryland'),
+            irrigated_production=prepare_production('Irrigated'),
         )
     tables = load_long_tables(
         workbook,
@@ -271,8 +246,8 @@ def main():
     irr_food = tables['irrigated_production']
 
     row_config = [
-        ('Dryland area',        LU_COLORS,   'Dryland area\n(Mha yr⁻¹)',        None,              dry_area),
-        ('Irrigated area',      LU_COLORS,   'Irrigated area\n(Mha yr⁻¹)',      None,              irr_area),
+        ('Dryland area',        LU_COLORS,   'Dryland area\n(Mha)',        None,              dry_area),
+        ('Irrigated area',      LU_COLORS,   'Irrigated area\n(Mha)',      None,              irr_area),
         ('Dryland agri-food',   FOOD_COLORS, 'Dryland agri-food\n(Mt yr⁻¹)',    FOOD_LEGEND_ORDER, dry_food),
         ('Irrigated agri-food', FOOD_COLORS, 'Irrigated agri-food\n(Mt yr⁻¹)',  FOOD_LEGEND_ORDER, irr_food),
     ]

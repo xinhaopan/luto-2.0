@@ -929,7 +929,7 @@ INCLUDE_WATER_LICENSE_COSTS = 1
 # ------------------- Agricultural biodiversity parameters -------------------
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-GBF2_TARGET = 'high'              # 'off', 'low', 'medium', or 'high'
+GBF2_TARGET = 'high'              # 'off', 'maintain_historical', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -1690,8 +1690,9 @@ AG2050_GHG_MAP = {
     'AgS4': 'off',
 }
 
-# Biodiversity (GBF-2) target per scenario.
-# 'maintain_historical' keeps the 2010 base-year GBF-2 score as the floor target.
+# Biodiversity target per scenario.
+# 'maintain_historical' keeps the national 2010 all-cell Suitability score as
+# the floor target, matching the overall biodiversity indicator used in figures.
 # 'high' = restore 50 % in top-30 % priority areas (standard 'high' setting).
 AG2050_BIO_MAP = {
     'AgS1': 'maintain_historical',

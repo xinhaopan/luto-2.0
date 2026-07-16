@@ -53,7 +53,7 @@ SCENARIOS = {
     'AgS2': {
         'prod': 'very_high',
         'ac': 'very_high',
-        'flc': 'FLC_multiplier_very_high',
+        'flc': 'FLC_multiplier_high',
         'cattle': 'Very_High',
         'feedlot': 'AgS2',
         'color': '#2ca02c',
@@ -99,8 +99,9 @@ ABARES_VARS = {
 }
 FEEDLOT_LEVELS = {
     'High': {'source': 'AgS1', 'color': SCENARIOS['AgS1']['color']},
-    'Medium': {'source': 'AgS2', 'color': SCENARIOS['AgS3']['color']},
-    'Low': {'source': 'AgS3', 'color': SCENARIOS['AgS4']['color']},
+    'Very High': {'source': 'AgS2', 'color': SCENARIOS['AgS2']['color']},
+    'Medium': {'source': 'AgS3', 'color': SCENARIOS['AgS3']['color']},
+    'Low': {'source': 'AgS4', 'color': SCENARIOS['AgS4']['color']},
 }
 
 TEXT_SIZE = 25

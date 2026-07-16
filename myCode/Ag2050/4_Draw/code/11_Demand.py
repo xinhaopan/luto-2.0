@@ -107,6 +107,28 @@ def build_demand_table():
     for scen_key, scen_label in SCENARIO_GROUPS:
         sub = prepare(df_raw, scen_key)
         sub = sub[sub['SPREAD_Commodity'].isin(commodities)]
+        duplicate_keys = sub.duplicated(['Year', 'SPREAD_Commodity'], keep=False)
+        if duplicate_keys.any():
+            duplicates = sub.loc[duplicate_keys, ['Year', 'SPREAD_Commodity']]
+            raise ValueError(
+                f'{scen_key} demand filter returned duplicate year/commodity rows:\n'
+                f'{duplicates.to_string(index=False)}'
+            )
+
+        calculated = (
+            sub[['domestic', 'exports', 'feed']].fillna(0.0).sum(axis=1)
+            - sub['imports'].fillna(0.0)
+        )
+        tolerance = 1e-3 + 1e-9 * sub['All_demand'].abs()
+        mismatch = (calculated - sub['All_demand']).abs() > tolerance
+        if mismatch.any():
+            details = sub.loc[mismatch, ['Year', 'SPREAD_Commodity', 'All_demand']].copy()
+            details['calculated'] = calculated.loc[mismatch]
+            raise ValueError(
+                f'{scen_key} demand components do not match All_demand:\n'
+                f'{details.to_string(index=False)}'
+            )
+
         for _, row in sub.iterrows():
             for component in STACK_CATEGORIES:
                 long_rows.append({
@@ -171,7 +193,7 @@ def draw_figure():
     )
 
     first_row_edge  = []   # (ax_first_in_row, ax_last_in_row) for title placement
-    bottom_row_axes = []   # bottom-row axes for x-label ha adjustment
+    tick_label_axes = []   # all subplot axes for x-label alignment
     ref_axes        = {}   # c_idx -> ax from scen_idx==0, used for sharey
 
     for scen_idx, (scen_key, _) in enumerate(SCENARIO_GROUPS):
@@ -213,7 +235,6 @@ def draw_figure():
                 ref_axes[c_idx] = ax
             else:
                 ax = fig.add_subplot(inner[r, c], sharey=ref_axes[c_idx])
-                ax.tick_params(axis='y', labelleft=False)
 
             if r == 0:
                 if c == 0:
@@ -250,19 +271,15 @@ def draw_figure():
             ax.set_title(commodity.title(), fontsize=comm_fs, pad=5,
                          fontfamily='Arial', loc='center')
 
-            # X-axis: 2010 and 2050, labels set centrally, ha adjusted after draw
+            # Show comparable endpoint labels on every commodity subplot.
             ax.set_xticks([2010, 2050])
-            if r == N_ROWS_G - 1:
-                ax.set_xticklabels(['2010', '2050'], fontsize=tick_fs, rotation=0)
-                bottom_row_axes.append(ax)
-            else:
-                ax.set_xticklabels([])
+            ax.set_xticklabels(['2010', '2050'], fontsize=tick_fs, rotation=0)
+            tick_label_axes.append(ax)
 
             ax.tick_params(axis='x', length=2, pad=4)
-            if scen_idx == 0:
-                ax.tick_params(axis='y', labelsize=tick_fs, length=2, pad=2)
-                ax.yaxis.set_major_locator(MaxNLocator(nbins=3, min_n_ticks=2))
-                ax.yaxis.set_major_formatter(FuncFormatter(_compact_tick_label))
+            ax.tick_params(axis='y', labelleft=True, labelsize=tick_fs, length=2, pad=2)
+            ax.yaxis.set_major_locator(MaxNLocator(nbins=3, min_n_ticks=2))
+            ax.yaxis.set_major_formatter(FuncFormatter(_compact_tick_label))
 
         first_row_edge.append((ax_first, ax_last))
 
@@ -270,7 +287,7 @@ def draw_figure():
     fig.canvas.draw()
 
     # ── Nudge x-tick labels inward (2010 → left-aligned, 2050 → right-aligned) ─
-    for ax in bottom_row_axes:
+    for ax in tick_label_axes:
         lbls = ax.get_xticklabels()
         if len(lbls) >= 2:
             lbls[0].set_ha('left')    # 2010: text extends rightward (toward center)

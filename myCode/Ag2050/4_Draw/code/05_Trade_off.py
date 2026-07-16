@@ -82,10 +82,10 @@ INDICATORS = [
     ),
     IndicatorSpec(
         key="net_economic_return",
-        label="Net economic return \u2191\n(Billion AU$)",
+        label="Net economic return \u2191\n(Billion AU$ yr⁻¹)",
         sector_label="Net economic\nreturn",
         value_label="Return",
-        unit_label="B AU$",
+        unit_label="B AU$ yr⁻¹",
         higher_is_better=True,
         decimals=1,
         filename="13_Net_Economic_Return.py",
@@ -102,10 +102,10 @@ INDICATORS = [
     ),
     IndicatorSpec(
         key="biodiversity",
-        label="Biodiversity contribution-weighted area \u2191\n(Mha yr⁻¹)",
+        label="Biodiversity contribution-weighted area \u2191\n(Mha)",
         sector_label="Biodiversity",
         value_label="Bio",
-        unit_label="Mha yr⁻¹",
+        unit_label="Mha",
         higher_is_better=True,
         decimals=1,
         filename="15_Biodiversity.py",
@@ -122,10 +122,10 @@ INDICATORS = [
     ),
     IndicatorSpec(
         key="land_use_change_extent",
-        label="Land-use change extent \u2193\n(Mha yr⁻¹)",
+        label="Land-use change extent \u2193\n(Mha, 2010-2050)",
         sector_label="Land-use\nchange",
         value_label="Land change",
-        unit_label="Mha yr⁻¹",
+        unit_label="Mha",
         higher_is_better=False,
         decimals=1,
         filename=None,
@@ -219,27 +219,6 @@ def _read_landuse_layer_frame(
         ds.close()
 
 
-def _read_landuse_dvar_frame(scenario: str, year: int) -> pd.DataFrame:
-    frames = [
-        _read_landuse_layer_frame(
-            scenario,
-            year,
-            f"xr_dvar_ag_{year}.nc",
-            "ag",
-        ),
-        _read_landuse_layer_frame(
-            scenario,
-            year,
-            f"xr_dvar_non_ag_{year}.nc",
-            "non_ag",
-        ),
-    ]
-    frames = [frame for frame in frames if not frame.empty]
-    if not frames:
-        return pd.DataFrame(dtype=float)
-    return pd.concat(frames, axis=1)
-
-
 def _read_landuse_area_frame(scenario: str, year: int) -> pd.DataFrame:
     frames = [
         _read_landuse_layer_frame(
@@ -261,52 +240,38 @@ def _read_landuse_area_frame(scenario: str, year: int) -> pd.DataFrame:
     return pd.concat(frames, axis=1)
 
 
-def _infer_cell_area_from_dvars(dvar_frame: pd.DataFrame, area_frame: pd.DataFrame) -> pd.Series:
-    common_columns = dvar_frame.columns.intersection(area_frame.columns)
-    if len(common_columns) == 0:
-        return pd.Series(np.nan, index=dvar_frame.index, dtype=float)
-
-    dvar_sum = dvar_frame[common_columns].sum(axis=1)
-    area_sum = area_frame[common_columns].sum(axis=1)
-    cell_area = area_sum.divide(dvar_sum.where(dvar_sum > 1e-9))
-    return cell_area.replace([np.inf, -np.inf], np.nan)
-
-
 def _land_use_change_extent() -> pd.Series:
     values = {}
 
     for scenario in input_files:
-        base_dvar = _read_landuse_dvar_frame(scenario, BASELINE_YEAR)
-        target_dvar = _read_landuse_dvar_frame(scenario, YEAR)
-        if base_dvar.empty or target_dvar.empty:
+        base_area = _read_landuse_area_frame(scenario, BASELINE_YEAR)
+        target_area = _read_landuse_area_frame(scenario, YEAR)
+        if base_area.empty or target_area.empty:
             values[scenario] = np.nan
             continue
 
-        base_area = _read_landuse_area_frame(scenario, BASELINE_YEAR)
-        target_area = _read_landuse_area_frame(scenario, YEAR)
-        base_cell_area = _infer_cell_area_from_dvars(base_dvar, base_area)
-        target_cell_area = _infer_cell_area_from_dvars(target_dvar, target_area)
-        cell_area = base_cell_area.combine_first(target_cell_area)
-
-        cell_index = base_dvar.index.union(target_dvar.index).union(cell_area.index)
-        columns = base_dvar.columns.union(target_dvar.columns)
+        cell_index = base_area.index.union(target_area.index)
+        columns = base_area.columns.union(target_area.columns)
         base_matrix = (
-            base_dvar.reindex(index=cell_index, columns=columns, fill_value=0.0)
+            base_area.reindex(index=cell_index, columns=columns, fill_value=0.0)
             .to_numpy(dtype=np.float64)
         )
         target_matrix = (
-            target_dvar.reindex(index=cell_index, columns=columns, fill_value=0.0)
-            .to_numpy(dtype=np.float64)
-        )
-        cell_area_arr = (
-            cell_area.reindex(cell_index)
-            .fillna(0.0)
+            target_area.reindex(index=cell_index, columns=columns, fill_value=0.0)
             .to_numpy(dtype=np.float64)
         )
 
-        changed_area_ha = 0.5 * (
-            np.abs(target_matrix - base_matrix) * cell_area_arr[:, None]
-        ).sum()
+        base_total = float(base_matrix.sum())
+        target_total = float(target_matrix.sum())
+        if not np.isclose(base_total, target_total, rtol=2e-5, atol=1e3):
+            raise ValueError(
+                f'{scenario} land-use area is not conserved between '
+                f'{BASELINE_YEAR} ({base_total:,.1f} ha) and {YEAR} '
+                f'({target_total:,.1f} ha)'
+            )
+
+        # Half the L1 distance counts each transferred hectare once.
+        changed_area_ha = 0.5 * np.abs(target_matrix - base_matrix).sum()
         values[scenario] = float(changed_area_ha) / 1e6
 
     return pd.Series(values, index=input_files, dtype=float)
@@ -318,28 +283,15 @@ def _score_row(values: pd.Series, higher_is_better: bool) -> pd.Series:
     if valid.empty:
         return scores
 
-    max_value = float(valid.max())
-    if np.isclose(max_value, 0.0):
-        scores.loc[valid.index] = 0.0
+    low = float(valid.min())
+    high = float(valid.max())
+    if np.isclose(low, high):
+        scores.loc[valid.index] = 1.0
         return scores
 
-    scaled = valid.clip(lower=0.0) / max_value
-    scores.loc[valid.index] = scaled
-    return scores
-
-
-def _ghg_radius_row(values: pd.Series) -> pd.Series:
-    scores = pd.Series(np.nan, index=values.index, dtype=float)
-    valid = values.dropna()
-    if valid.empty:
-        return scores
-
-    max_abs = float(valid.abs().max())
-    if np.isclose(max_abs, 0.0):
-        scores.loc[valid.index] = 0.0
-        return scores
-
-    scaled = valid.abs() / max_abs
+    scaled = (valid - low) / (high - low)
+    if not higher_is_better:
+        scaled = 1.0 - scaled
     scores.loc[valid.index] = scaled
     return scores
 
@@ -446,13 +398,10 @@ def build_summary_tables() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     score_values = pd.DataFrame(index=raw_values.index, columns=raw_values.columns, dtype=float)
     for spec in INDICATORS:
         series = raw_values.loc[spec.key].astype(float)
-        if spec.key == "net_ghg_emissions":
-            score_values.loc[spec.key] = _ghg_radius_row(series).values
-        else:
-            score_values.loc[spec.key] = _score_row(
-                series,
-                higher_is_better=spec.higher_is_better,
-            ).values
+        score_values.loc[spec.key] = _score_row(
+            series,
+            higher_is_better=spec.higher_is_better,
+        ).values
 
     long_rows = []
     for spec in INDICATORS:
@@ -857,9 +806,9 @@ def plot_ring_bar_chart(raw_values: pd.DataFrame, score_values: pd.DataFrame) ->
         "food_production": ("Agri-food production", "Mt yr⁻¹"),
         "net_economic_return": ("Net economic returns", "B AU$ yr⁻¹"),
         "net_ghg_emissions": ("Net GHG emissions", "Mt CO₂e yr⁻¹"),
-        "biodiversity": ("Biodiversity", "Mha yr⁻¹"),
+        "biodiversity": ("Biodiversity", "Mha"),
         "water_yield": ("Water yield decrease", "GL yr⁻¹"),
-        "land_use_change_extent": ("Land-use change", "Mha yr⁻¹"),
+        "land_use_change_extent": ("Land-use change", "Mha (2010-2050)"),
     }
 
     fig = plt.figure(figsize=(9.2, 9.2), facecolor="white")

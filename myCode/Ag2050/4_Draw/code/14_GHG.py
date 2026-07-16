@@ -17,6 +17,7 @@ from tools.two_row_figure import (
     input_files,
     load_long_tables,
     load_report_source_csv,
+    prepare_ghg_overview,
     save_three_row_figure,
 )
 
@@ -25,44 +26,12 @@ OVERVIEW_COLORS = {
     'Agricultural management': '#9A8AB3',
     'Non-agricultural land-use': '#6eabb1',
     'Transition': '#eb9132',
+    'Off-land commodities': '#7f7f7f',
 }
 
 
 def prepare_overview():
-    rows = []
-
-    for scenario in input_files:
-        ghg_ag = load_report_source_csv(scenario, 'GHG_emissions_separate_agricultural_landuse')
-        if not ghg_ag.empty:
-            ghg_ag = ghg_ag.query('region == "AUSTRALIA" and Water_supply != "ALL" and Source != "ALL"').copy()
-            ghg_ag = ghg_ag.groupby('Year', as_index=False)['Value (t CO2e)'].sum()
-            for _, row in ghg_ag.iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario, 'category': 'Agricultural land-use', 'value': float(row['Value (t CO2e)']) / 1e6})
-
-        ghg_am = load_report_source_csv(scenario, 'GHG_emissions_separate_agricultural_management')
-        if not ghg_am.empty:
-            ghg_am = ghg_am.query('region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL"').copy()
-            ghg_am = ghg_am.groupby('Year', as_index=False)['Value (t CO2e)'].sum()
-            for _, row in ghg_am.iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario, 'category': 'Agricultural management', 'value': float(row['Value (t CO2e)']) / 1e6})
-
-        ghg_non_ag = load_report_source_csv(scenario, 'GHG_emissions_separate_no_ag_reduction')
-        if not ghg_non_ag.empty:
-            ghg_non_ag = ghg_non_ag.query('region == "AUSTRALIA" and `Land-use` != "ALL"').copy()
-            ghg_non_ag = ghg_non_ag.groupby('Year', as_index=False)['Value (t CO2e)'].sum()
-            for _, row in ghg_non_ag.iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario, 'category': 'Non-agricultural land-use', 'value': float(row['Value (t CO2e)']) / 1e6})
-
-        ghg_transition = load_report_source_csv(scenario, 'GHG_emissions_separate_transition_penalty')
-        if not ghg_transition.empty:
-            ghg_transition = ghg_transition.query(
-                'region == "AUSTRALIA" and Type != "ALL" and Water_supply != "ALL"'
-            ).copy()
-            ghg_transition = ghg_transition.groupby('Year', as_index=False)['Value (t CO2e)'].sum()
-            for _, row in ghg_transition.iterrows():
-                rows.append({'year': int(row['Year']), 'scenario': scenario, 'category': 'Transition', 'value': float(row['Value (t CO2e)']) / 1e6})
-
-    return pd.DataFrame(rows)
+    return prepare_ghg_overview()
 
 
 def prepare_land_use():
@@ -72,7 +41,8 @@ def prepare_land_use():
         ghg_ag = load_report_source_csv(scenario, 'GHG_emissions_separate_agricultural_landuse')
         if not ghg_ag.empty:
             ghg_ag = ghg_ag.query(
-                'region == "AUSTRALIA" and Water_supply != "ALL" and Source != "ALL"'
+                'region == "AUSTRALIA" and Water_supply != "ALL" and '
+                'Source != "ALL" and `Land-use` != "ALL"'
             ).copy()
             ghg_ag['category'] = ghg_ag.apply(
                 lambda r: classify_land_use(r['Land-use'], r['Water_supply']), axis=1
@@ -114,7 +84,8 @@ def prepare_am():
         ghg_am = ghg_am.copy()
         ghg_am['Agricultural Management Type'] = ghg_am['Agricultural Management Type'].replace(RENAME_AM_NON_AG)
         ghg_am = ghg_am.query(
-            'region == "AUSTRALIA" and Water_supply != "ALL" and `Land-use` != "ALL"'
+            'region == "AUSTRALIA" and Water_supply != "ALL" and '
+            '`Land-use` != "ALL" and `Agricultural Management Type` != "ALL"'
         ).copy()
         ghg_am = ghg_am.groupby(['Year', 'Agricultural Management Type'], as_index=False)['Value (t CO2e)'].sum()
         for _, row in ghg_am.iterrows():

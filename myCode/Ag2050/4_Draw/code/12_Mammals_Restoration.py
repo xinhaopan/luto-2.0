@@ -3,10 +3,10 @@
 Which mammal species occur where LUTO restores land (2010 agriculture -> 2050
 non-agricultural), using the Australian species occurrence dataset.
 
-Only AgS2 (Landscape Stewardship) restores any land; AgS1/AgS3/AgS4 convert none.
-For each of the 178 mammal species we count occurrence records (from each species'
-occur.csv) that fall within AgS2's restored 5 km cells, rank species, and draw the
-top-15 as a horizontal bar chart (EPBC-listed threatened species highlighted).
+This figure focuses on AgS2 (Landscape Stewardship). For each of the 178 mammal
+species we count occurrence records (from each species' occur.csv) that fall within
+AgS2's restored 5 km cells, rank species, and draw the top-15 as a horizontal bar
+chart (EPBC-listed threatened species highlighted).
 
 Inputs:
   - LUTO land-use GeoTIFFs in TIF_DIR: landuse_2010.tif, landuse_<AgS2>_2050.tif
@@ -30,7 +30,7 @@ from tools.parameters import EXCEL_DIR, OUTPUT_DIR, TIF_DIR, input_files, GENERA
 from tools.two_row_figure import missing_table_error
 
 SPECIES_DIR = r'F:\Users\s222552331\Work\Species-occurance-points'
-RESTORE_SCENARIO = input_files[1]   # Run_2_SCN_AgS2 — the only restoration scenario
+RESTORE_SCENARIO = input_files[1]   # Run_2_SCN_AgS2, the scenario assessed here
 
 # Non-agricultural land-use codes (restoration targets)
 NONAG_CODES = set(range(100, 109))
@@ -68,8 +68,17 @@ def build_restoration_mask():
         lu2010 = ds.read(1)
         transform = ds.transform
         shape = lu2010.shape
+        crs = ds.crs
     with rasterio.open(os.path.join(TIF_DIR, f'landuse_{RESTORE_SCENARIO}_2050.tif')) as ds:
         lu2050 = ds.read(1)
+        target_transform = ds.transform
+        target_crs = ds.crs
+    if lu2050.shape != shape or target_transform != transform or target_crs != crs:
+        raise ValueError('2010 and 2050 land-use rasters are not spatially aligned')
+    if crs is None or not crs.is_geographic:
+        raise ValueError(
+            f'Land-use raster CRS must use geographic lon/lat coordinates; found {crs}'
+        )
     restored = np.isin(lu2050, list(NONAG_CODES)) & (lu2010 >= 0) & (lu2010 < 100)
     return restored, transform, shape
 
