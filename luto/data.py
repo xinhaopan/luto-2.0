@@ -936,23 +936,27 @@ class Data:
         print("├── Loading productivity data", flush=True)
 
         # Yield increases.
-        if settings.PRODUCTIVITY_TREND == 'BAU':
+        productivity_trend_name = settings.PRODUCTIVITY_TREND.upper()
+        if productivity_trend_name in {'BAU', 'CONSTANT'}:
             fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
             productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
             productivity_trend.index = productivity_trend.index + self.YR_CAL_BASE  # Adjust year to absolute year
             productivity_trend.index.name = 'Year'
-            
+
+            if productivity_trend_name == 'CONSTANT':
+                productivity_trend[:] = 1.0
+
             # Convert to xarray for easier accessing.
             self.PRODUCTIVITY_MUL_xr = (
                 xr.DataArray(productivity_trend)
                 .unstack('dim_1')
                 .rename({'Year':'year', 'dim_1_level_0':'lm', 'dim_1_level_1':'product'})
             )
-        else: 
+        elif productivity_trend_name in {'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'}:
             fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_ag_2050.xlsx")
             productivity_trend = pd.read_excel(
-                fpath, 
-                sheet_name=f'{settings.PRODUCTIVITY_TREND.lower()}', 
+                fpath,
+                sheet_name=productivity_trend_name.lower(),
                 header=[0, 1],
                 index_col=0
             ).astype(np.float32)
@@ -962,6 +966,11 @@ class Data:
                 xr.DataArray(productivity_trend)
                 .unstack('dim_1')
                 .rename({'Year':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
+            )
+        else:
+            raise ValueError(
+                "PRODUCTIVITY_TREND must be one of BAU, CONSTANT, LOW, "
+                f"MEDIUM, HIGH, or VERY_HIGH; got {settings.PRODUCTIVITY_TREND!r}"
             )
 
 

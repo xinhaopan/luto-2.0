@@ -65,7 +65,7 @@ grid_search = {
     'CONVERGENCE': [2050],                                                  # Year at which dietary transformation is completed
     'CO2_FERT': ['off'],                                                    # 'on' or 'off'
     'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
-    'PRODUCTIVITY_TREND': ['BAU'],                                          # 'BAU', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'
+    'PRODUCTIVITY_TREND': ['BAU'],                                          # 'BAU', 'CONSTANT', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'
 
 
     # --------------- Economics ---------------
