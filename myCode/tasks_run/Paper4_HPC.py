@@ -2,18 +2,8 @@ import os
 import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
-# ── Constant switch ───────────────────────────────────────────────────────────
-# constant=False → BAU productivity (yieldincreases_bau2022.csv, +~1%/yr)
-# constant=True  → CONSTANT productivity (all multipliers=1.0, no growth)
-#                  task name gets '_constant' suffix for easy comparison
-constant = False
-
-_task_name  = '20260529_paper4' + ('_constant' if constant else '')
-_prod_trend = 'CONSTANT' if constant else 'BAU'
-# ──────────────────────────────────────────────────────────────────────────────
-
 grid_search = {
-    'TASK_NAME': [_task_name],
+    'TASK_NAME': ['20260718_paper4_HPC'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     # 'NUMERIC_FOCUS': [2],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
@@ -21,7 +11,8 @@ grid_search = {
     'MEM': ['40GB'],
     'NCPUS': ['10'],
     # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
-    'TIME': ['12:00:00'],
+    'TIME': ['720:00:00'],
+    'SOLVE_TIME_LIMIT_SECONDS': [30 * 24 * 3600],
 
     'PRODUCTIVITY_TREND': ['CONSTANT'],
 
@@ -40,7 +31,7 @@ grid_search = {
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [5],
+    'RESFACTOR': [5],  # RF5 only
     'SIM_YEARS': [[i for i in range(2010,2026,1)]],
 
     # ----------------------------------- GHG settings --------------------------------

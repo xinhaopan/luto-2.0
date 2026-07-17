@@ -3,7 +3,7 @@ import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
-    'TASK_NAME': ['20260611_paper4_NCI'],
+    'TASK_NAME': ['20260718_paper4_NCI'],
     'KEEP_OUTPUTS': [False],  # If False, only keep ZIP
     'QUEUE': ['normalsr'],
     # 'NUMERIC_FOCUS': [2],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
@@ -11,7 +11,8 @@ grid_search = {
     'MEM': ['40GB'],
     'NCPUS': ['10'],
     # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
-    'TIME': ['12:00:00'],
+    'TIME': ['720:00:00'],
+    'SOLVE_TIME_LIMIT_SECONDS': [30 * 24 * 3600],
     'PRODUCTIVITY_TREND': ['CONSTANT'],
 
     'GHG_EMISSIONS_LIMITS': ['off'],
@@ -29,7 +30,7 @@ grid_search = {
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'RESFACTOR': [5],
+    'RESFACTOR': [5],  # RF5 only
     'SIM_YEARS': [[i for i in range(2010,2026,1)]],
 
     # ----------------------------------- GHG settings --------------------------------
