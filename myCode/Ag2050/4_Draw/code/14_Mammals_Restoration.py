@@ -1,5 +1,5 @@
 """
-12_Mammals_Restoration.py
+14_Mammals_Restoration.py
 Which mammal species occur where LUTO restores land (2010 agriculture -> 2050
 non-agricultural), using the Australian species occurrence dataset.
 
@@ -12,8 +12,8 @@ Inputs:
   - LUTO land-use GeoTIFFs in TIF_DIR: landuse_2010.tif, landuse_<AgS2>_2050.tif
   - Species occurrence points: SPECIES_DIR/mammals/models/<Species>/occur.csv
 Outputs:
-  - EXCEL_DIR/12_mammals_restoration_ranked.csv   (all 178 species, ranked)
-  - OUTPUT_DIR/12_mammals_restoration.png          (top-15 bar chart)
+  - EXCEL_DIR/14_mammals_restoration_ranked.csv   (all 178 species, ranked)
+  - OUTPUT_DIR/14_mammals_restoration.png          (top-15 bar chart)
 """
 import _path_setup  # noqa: F401
 
@@ -126,16 +126,13 @@ def save_barchart(res):
     for i, r in enumerate(top.itertuples()):
         ax.text(r.n_in_restored + 30, i, f"{r.pct_in_restored:.0f}%", va='center', fontsize=9, color='#444')
     ax.set_xlabel('Occurrence records within restored areas', fontsize=11)
-    ax.set_title('Top 15 mammals recorded where AgS2 restores land\n'
-                 '(% = share of the species’ Australian records that fall in restored areas)',
-                 fontsize=12.5, fontweight='bold')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.legend(handles=[mpatches.Patch(facecolor='#c0392b', label='EPBC-listed threatened'),
                        mpatches.Patch(facecolor='#2d688f', label='Not listed / secure')],
               loc='lower right', fontsize=9.5, frameon=False)
 
-    out = os.path.join(OUTPUT_DIR, '12_mammals_restoration.png')
+    out = os.path.join(OUTPUT_DIR, '14_mammals_restoration.png')
     fig.savefig(out, dpi=250, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     print(f'Saved: {out}')
@@ -144,7 +141,7 @@ def save_barchart(res):
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(EXCEL_DIR, exist_ok=True)
-    csv_path = os.path.join(EXCEL_DIR, '12_mammals_restoration_ranked.csv')
+    csv_path = os.path.join(EXCEL_DIR, '14_mammals_restoration_ranked.csv')
     if GENERATE_TABLES:
         restored, transform, shape = build_restoration_mask()
         print(f'{RESTORE_SCENARIO}: {int(restored.sum())} restored 5 km cells')

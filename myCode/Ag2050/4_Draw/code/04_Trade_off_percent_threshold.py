@@ -1,13 +1,18 @@
-"""Alternative Fig. 4 showing scenario changes from the 2010 baseline.
+"""Fig. 4 showing scenario changes from the 2010 baseline.
 
 All six panels use percentages. Water uses absolute national yield totals before
 calculating its percentage; land-use change is scaled by total 2010 study area.
-The existing 05_Trade_off.py is unchanged.
+
+Self-contained: the land-use-change extent is computed here directly from the
+per-year area NetCDFs (it used to be read from 05_Trade_off.py's synthesis
+workbook, which is now retired to archive/).
 """
 
 import _path_setup  # noqa: F401
 
+import io
 import os
+import zipfile
 from pathlib import Path
 
 import matplotlib as mpl
@@ -25,6 +30,7 @@ from tools.parameters import (
     SCENARIO_LABELS,
     input_files,
 )
+from tools.data_helper import get_path, get_zip_info
 from tools.two_row_figure import (
     filter_water_detail_rows,
     load_long_tables,
@@ -35,8 +41,8 @@ from tools.two_row_figure import (
 
 YEAR = 2050
 BASELINE_YEAR = 2010
-WORKBOOK = '05_trade_off_percent_threshold.xlsx'
-INDICATOR_WORKBOOK = '04_indicators_long_tables.xlsx'
+WORKBOOK = '04_trade_off_percent_threshold.xlsx'
+INDICATOR_WORKBOOK = '03_indicators_long_tables.xlsx'
 
 SCENARIO_COLORS = {
     input_files[0]: '#2D688F',
@@ -88,7 +94,7 @@ def _percentage_change(totals, label):
 
 
 def _load_climate_water_2050():
-    path = Path(EXCEL_DIR) / '04_water_climate_impact_split.csv'
+    path = Path(EXCEL_DIR) / '03_water_climate_impact_split.csv'
     if not path.exists():
         raise missing_table_error(path)
     climate = pd.read_csv(path)
@@ -103,18 +109,106 @@ def _load_climate_water_2050():
     return values.astype(float)
 
 
-def _load_land_change():
-    path = Path(EXCEL_DIR) / '05_scenario_synthesis_2050.xlsx'
-    if not path.exists():
-        raise missing_table_error(path)
+def _load_output_nc(scenario, year, filename):
+    """Load an out_{year}/{filename} NetCDF from the run's zip archive or unpacked folder."""
+    import xarray as xr
+
+    info = get_zip_info(scenario)
+    if info is not None:
+        zip_path, prefix = info
+        internal_path = f'{prefix}/out_{year}/{filename}'
+        with zipfile.ZipFile(zip_path) as z:
+            if internal_path not in z.namelist():
+                return None
+            with z.open(internal_path) as f:
+                return xr.load_dataset(io.BytesIO(f.read()))
+
     try:
-        raw = pd.read_excel(path, sheet_name='raw_values_machine', index_col=0)
-    except ValueError as exc:
-        raise missing_table_error(path, 'raw_values_machine') from exc
-    values = raw.loc['land_use_change_extent'].reindex(input_files).astype(float)
-    if values.isna().any():
+        base_path = Path(get_path(scenario))
+    except (FileNotFoundError, StopIteration):
+        return None
+    nc_path = base_path / f'out_{year}' / filename
+    if not nc_path.exists():
+        return None
+    return xr.open_dataset(nc_path)
+
+
+def _read_landuse_layer_frame(scenario, year, filename, domain):
+    """Per-cell × land-use area (ha) from one area NetCDF, as a DataFrame."""
+    import cf_xarray as cfxr
+
+    ds = _load_output_nc(scenario, year, filename)
+    if ds is None:
+        return pd.DataFrame(dtype=float)
+    try:
+        arr = cfxr.decode_compress_to_multi_index(ds, 'layer')['data']
+        if 'layer' in arr.dims:
+            arr = arr.unstack('layer')
+        if arr.sizes.get('lu', 0) == 0:
+            return pd.DataFrame(index=arr['cell'].to_numpy(), dtype=float)
+        if 'lm' in arr.dims:
+            arr = arr.sel(lm='ALL')
+        if 'ALL' in set(arr['lu'].to_numpy()):
+            arr = arr.drop_sel(lu='ALL')
+        if arr.sizes.get('lu', 0) == 0:
+            return pd.DataFrame(index=arr['cell'].to_numpy(), dtype=float)
+        arr = arr.transpose('cell', 'lu').fillna(0.0)
+        columns = [f'{domain}: {lu}' for lu in arr['lu'].to_numpy()]
+        return pd.DataFrame(
+            arr.to_numpy().astype(np.float64, copy=False),
+            index=arr['cell'].to_numpy(),
+            columns=columns,
+            dtype=float,
+        )
+    finally:
+        ds.close()
+
+
+def _read_landuse_area_frame(scenario, year):
+    frames = [
+        _read_landuse_layer_frame(scenario, year, f'xr_area_agricultural_landuse_{year}.nc', 'ag'),
+        _read_landuse_layer_frame(scenario, year, f'xr_area_non_agricultural_landuse_{year}.nc', 'non_ag'),
+    ]
+    frames = [f for f in frames if not f.empty]
+    if not frames:
+        return pd.DataFrame(dtype=float)
+    return pd.concat(frames, axis=1)
+
+
+def _load_land_change():
+    """Land-use change extent (Mha): half the L1 distance between the 2010 and 2050
+    per-cell × land-use area allocations, so each transferred hectare is counted once.
+
+    Ported from the retired 05_Trade_off.py so this figure is self-contained.
+    """
+    values = {}
+    for scenario in input_files:
+        base_area = _read_landuse_area_frame(scenario, BASELINE_YEAR)
+        target_area = _read_landuse_area_frame(scenario, YEAR)
+        if base_area.empty or target_area.empty:
+            values[scenario] = np.nan
+            continue
+
+        cell_index = base_area.index.union(target_area.index)
+        columns = base_area.columns.union(target_area.columns)
+        base_matrix = base_area.reindex(index=cell_index, columns=columns, fill_value=0.0).to_numpy(dtype=np.float64)
+        target_matrix = target_area.reindex(index=cell_index, columns=columns, fill_value=0.0).to_numpy(dtype=np.float64)
+
+        base_total = float(base_matrix.sum())
+        target_total = float(target_matrix.sum())
+        if not np.isclose(base_total, target_total, rtol=2e-5, atol=1e3):
+            raise ValueError(
+                f'{scenario} land-use area is not conserved between '
+                f'{BASELINE_YEAR} ({base_total:,.1f} ha) and {YEAR} ({target_total:,.1f} ha)'
+            )
+
+        # Half the L1 distance counts each transferred hectare once.
+        values[scenario] = float(0.5 * np.abs(target_matrix - base_matrix).sum()) / 1e6
+
+    out = pd.Series(values, index=input_files, dtype=float)
+    if out.isna().any():
         raise ValueError('Land-use change is incomplete for one or more scenarios')
-    return values
+    return out
 
 
 def _load_water_2010_baseline():
@@ -143,7 +237,7 @@ def _load_water_2010_baseline():
 
 
 def _load_land_area_2010():
-    area = load_long_tables('02_area_long_tables.xlsx', 'land_use')['land_use']
+    area = load_long_tables('01_area_long_tables.xlsx', 'land_use')['land_use']
     totals = (
         area[area['year'].eq(BASELINE_YEAR)]
         .groupby('scenario')['value']
@@ -282,9 +376,9 @@ def _set_panel_style(ax, title, panel_letter):
     ax.set_title(
         f'({panel_letter}) {title}',
         loc='center',
-        fontsize=13,
+        fontsize=19,
         fontweight='bold',
-        pad=9,
+        pad=10,
     )
     ax.xaxis.set_major_formatter(mticker.StrMethodFormatter('{x:,.0f}'))
     ax.grid(axis='x', color='#D9D9D9', linewidth=0.7, zorder=0)
@@ -292,7 +386,7 @@ def _set_panel_style(ax, title, panel_letter):
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['left'].set_visible(False)
-    ax.tick_params(axis='both', labelsize=10)
+    ax.tick_params(axis='both', labelsize=15)
 
 
 def _draw_bars(ax, summary, column, formatter, x_values_extra=(), zero_line=True):
@@ -325,7 +419,7 @@ def _draw_bars(ax, summary, column, formatter, x_values_extra=(), zero_line=True
             formatter(value),
             va='center',
             ha=ha,
-            fontsize=10,
+            fontsize=15,
             color='#222222',
         )
     return y
@@ -340,17 +434,18 @@ def plot_figure(summary):
         'svg.fonttype': 'none',
     })
 
-    fig, axes = plt.subplots(2, 3, figsize=(18.5, 9.2))
+    # 3 rows x 2 columns — two panels per row.
+    fig, axes = plt.subplots(3, 2, figsize=(14.0, 14.5))
     fig.subplots_adjust(
         left=0.055,
         right=0.985,
         top=0.965,
-        bottom=0.16,
-        wspace=0.24,
-        hspace=0.42,
+        bottom=0.115,
+        wspace=0.20,
+        hspace=0.38,
     )
 
-    # Match the indicator order used in 04_indicators.py.
+    # Match the indicator order used in 03_indicators.py.
     ax = axes[0, 0]
     _draw_bars(ax, summary, 'ner_change_pct', lambda value: f'{value:+,.1f}%')
     _set_panel_style(ax, 'Net economic returns', 'a')
@@ -359,11 +454,11 @@ def plot_figure(summary):
     _draw_bars(ax, summary, 'ghg_change_pct', lambda value: f'{value:+,.1f}%')
     _set_panel_style(ax, 'GHG emissions', 'b')
 
-    ax = axes[0, 2]
+    ax = axes[1, 0]
     _draw_bars(ax, summary, 'biodiversity_change_pct', lambda value: f'{value:+,.1f}%')
     _set_panel_style(ax, 'Biodiversity', 'c')
 
-    ax = axes[1, 0]
+    ax = axes[1, 1]
     _draw_bars(
         ax,
         summary,
@@ -372,7 +467,7 @@ def plot_figure(summary):
     )
     _set_panel_style(ax, 'Agri-food production', 'd')
 
-    ax = axes[1, 1]
+    ax = axes[2, 0]
     climate_pct = summary['climate_only_water_change_pct'].astype(float).to_numpy()
     climate_benchmark = float(np.mean(climate_pct))
     _draw_bars(
@@ -391,7 +486,7 @@ def plot_figure(summary):
     )
     _set_panel_style(ax, 'Water yield', 'e')
 
-    ax = axes[1, 2]
+    ax = axes[2, 1]
     _draw_bars(
         ax,
         summary,
@@ -402,9 +497,9 @@ def plot_figure(summary):
 
     fig.supxlabel(
         'Change from 2010 baseline (%)',
-        fontsize=11,
+        fontsize=17,
         x=0.5,
-        y=0.095,
+        y=0.062,
     )
 
     scenario_handles = [
@@ -415,7 +510,7 @@ def plot_figure(summary):
             linestyle='none',
             markerfacecolor=SCENARIO_COLORS[scenario],
             markeredgecolor=SCENARIO_COLORS[scenario],
-            markersize=8,
+            markersize=12,
             label=SCENARIO_LABELS[scenario],
         )
         for scenario in input_files
@@ -431,16 +526,16 @@ def plot_figure(summary):
     fig.legend(
         handles=scenario_handles + [climate_handle],
         loc='lower center',
-        bbox_to_anchor=(0.5, 0.035),
+        bbox_to_anchor=(0.5, 0.012),
         ncol=5,
         frameon=False,
-        fontsize=10.5,
-        handlelength=0.8,
+        fontsize=15,
+        handlelength=1.2,
         columnspacing=2.0,
     )
 
-    svg_path = Path(OUTPUT_DIR) / '05_trade_off_percent_threshold.svg'
-    png_path = Path(OUTPUT_DIR) / '05_trade_off_percent_threshold.png'
+    svg_path = Path(OUTPUT_DIR) / '04_trade_off_percent_threshold.svg'
+    png_path = Path(OUTPUT_DIR) / '04_trade_off_percent_threshold.png'
     fig.savefig(svg_path, dpi=600, bbox_inches='tight', facecolor='white')
     fig.savefig(png_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close(fig)

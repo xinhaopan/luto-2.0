@@ -58,7 +58,7 @@ CSV_PATH = os.path.join(
 )
 
 YEARS = list(range(2010, 2051))
-WORKBOOK = '11_demand_long_tables.xlsx'
+WORKBOOK = '13_demand_long_tables.xlsx'
 
 
 def _compact_tick_label(value, _):
@@ -328,7 +328,7 @@ def draw_figure():
         columnspacing=2.5,
     )
 
-    out = os.path.join(OUTPUT_DIR, '11_demand.svg')
+    out = os.path.join(OUTPUT_DIR, '13_demand.svg')
     fig.savefig(out, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved: {out}')

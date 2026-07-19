@@ -344,7 +344,7 @@ if __name__ == "__main__":
     
     # 支持检查多个任务
     task_names = [
-        '20260715_Paper3_aquila',
+        '20260718_Paper3_aquila',
         # 可以在此添加更多任务名称
     ]
     target_year = FINAL_YEAR

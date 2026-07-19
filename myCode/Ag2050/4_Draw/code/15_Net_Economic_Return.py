@@ -132,7 +132,7 @@ def prepare_am():
 
 
 def main():
-    workbook = '13_net_economic_return_long_tables.xlsx'
+    workbook = '15_net_economic_return_long_tables.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
@@ -157,7 +157,7 @@ def main():
         LU_COLORS,
         am_colors,
         'Net economic returns (Billion AU$ yr⁻¹)',
-        '13_net_economic_return.svg',
+        '15_net_economic_return.svg',
         total_legend_label='Net economic return',
         y_label_x=0.020,
     )

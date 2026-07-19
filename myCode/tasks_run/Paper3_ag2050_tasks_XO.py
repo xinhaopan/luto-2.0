@@ -108,23 +108,16 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260714_Paper3_NCI'],
+    'TASK_NAME': ['20260713_Paper3_aquila_XO'],
     'KEEP_OUTPUTS': [False],
     'QUEUE': ['normalsr'],
     # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
     # ---- Computational settings (not model parameters) ----------------------
-    # NCI RESFACTOR=3 production run: 200 GB / 50 CPUs / 48 h.
-    #
-    # Note on the CPUs: with Crossover on auto (-1), most of the wall time is single-threaded.
-    # Gurobi's barrier parallelises (measured: 22 cores busy), but the crossover clean-up that
-    # follows it is a sequential simplex -- AgS1/2019 at RESFACTOR=5 spent 143 minutes on ONE
-    # core after the barrier had found the optimum in 8 minutes on 22. Extra cores speed up the
-    # barrier and do nothing for the crossover, so 50 buys less than it looks like it should.
-    'MEM': ['200GB'],
-    'NCPUS': ['50'],
+    # aquila RESFACTOR=5 test run: 24 CPUs / 96 GB (Jinzhu-recommended for res5)
+    'MEM': ['96GB'],
+    'NCPUS': ['24'],
     # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
-    'TIME': ['720:00:00'],  # 30 days
-    'SOLVE_TIME_LIMIT_SECONDS': [30 * 24 * 3600],  # 30 days per Gurobi attempt
+    'TIME': ['72:00:00'],
 
     # ---- AG2050 scenario switch and selector ---------------------------------
     # Set AG2050_MODE=True to activate all AG2050 overrides.
@@ -137,21 +130,31 @@ grid_search = {
     # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
-    # Upstream's retry params -- Crossover on auto (-1). None of the RESFACTOR=5 infeasibilities
-    # were a solver-configuration problem: every one of them was a cell whose base state held more
-    # land than the cell has, and the IIS for each is a handful of rows (one const_cell_usage plus
-    # that cell's bal_a/bal_n), never a biodiversity, GHG, water or regional-adoption constraint.
-    # `_project_base_into_cell` in solvers/input_data.py is what fixes them.
+    # Pre-merge solver configuration, restored: tolerance 1e-2 with CROSSOVER DISABLED.
+    # This is the combination LUTO ran under for every previous paper.
     #
-    # Tolerance 1e-4, and it has to sit in that window from both sides. Above it, a loose tolerance
-    # buys a sloppy solution -- 1e-2 permits a 1% constraint violation. Below it, the base dvars are
-    # float32, so projecting agriculture onto `capacity - non_ag` leaves a rounding residual of ~2
-    # float32 ULP (measured at RESFACTOR=5: max 2.4e-07, mean 4e-10), and FEASIBILITY_TOLERANCE has
-    # to clear it: 1e-4 leaves 400x of margin, 1e-6 would leave 4x.
-    'RETRY_PARAMS': [[(0, 2, -1, -1, -1), (0, 1, 0, -1, 0)]],
-    'FEASIBILITY_TOLERANCE': [1e-4],
-    'OPTIMALITY_TOLERANCE': [1e-4],
-    'RESFACTOR': [3],
+    # The merge deleted the top-level `CROSSOVER = 0` setting and folded the flag into
+    # RETRY_PARAMS as -1 (auto = crossover ON), which silently re-enabled it. Crossover --
+    # not the tolerance -- is what broke the RF=5 runs: in every failure the barrier had
+    # already reached OPTIMAL and crossover then destroyed or stalled on that solution.
+    #
+    #   AgS2/2027: barrier OPTIMAL (obj 4486.39) -> crossover push -> INFEASIBLE
+    #   AgS1/2040: barrier OPTIMAL (obj 4816.67) -> crossover push -> INFEASIBLE
+    #   AgS1/2026: barrier converged in minutes -> crossover clean-up stalled 110+ min
+    #              at primal infeasibility ~321 and never moved
+    #
+    # LUTO consumes the decision variables as plain numbers, so a basic (vertex) solution
+    # buys nothing. Third tuple element = Crossover; it must be 0.
+    'RETRY_PARAMS': [[
+        (0, 2, 0, -1, -1),   # NF=0, barrier, crossover OFF
+        (0, 1, 0, -1,  0),   # NF=0, dual simplex
+        (3, 2, 0, -1, -1),   # NF=3, barrier, crossover OFF
+        (3, 1, 0, -1,  0),   # NF=3, dual simplex
+    ]],
+    'FEASIBILITY_TOLERANCE': [1e-2],
+    'OPTIMALITY_TOLERANCE': [1e-2],
+    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'RESFACTOR': [5],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],
 
     # ---- GHG settings -------------------------------------------------------
@@ -177,12 +180,7 @@ grid_search = {
     #   AgS1 Regional Ag capitals  → 'low'  (restore  5% of top-20% priority areas)
     #   AgS2 Landscape stewardship → 'high' (restore 50% by 2050)
     #   AgS3 / AgS4                → 'off'
-    'AG2050_BIO_MAP': [{
-        'AgS1': 'low',
-        'AgS2': 'high',
-        'AgS3': 'off',
-        'AgS4': 'off',
-    }],
+    'AG2050_BIO_MAP': [{'AgS1': 'low', 'AgS2': 'high', 'AgS3': 'off', 'AgS4': 'off'}],
     'GBF2_CONSTRAINT_TYPE': ['hard'],
     # top-20% priority areas: CUT = normalised area % (0=none, 100=all) → 20 = top 20%
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
@@ -277,15 +275,6 @@ settings_name_dict = {
     'AG2050_SCENARIO': 'SCN',
 }
 
-# Optional comma-separated filter for resubmitting only changed scenarios.
-requested_scenarios = os.environ.get('AG2050_RUN_SCENARIOS', '').strip()
-if requested_scenarios:
-    selected = [item.strip() for item in requested_scenarios.split(',') if item.strip()]
-    unknown = sorted(set(selected) - set(grid_search['AG2050_SCENARIO']))
-    if unknown:
-        raise ValueError(f'Unknown AG2050 scenario(s): {unknown}')
-    grid_search['AG2050_SCENARIO'] = selected
-
 task_root_dir = f"../../output/{grid_search['TASK_NAME'][0]}"
 
 # ---- Uncomment to generate the template CSV (first run only) ----------------
@@ -298,13 +287,10 @@ print(grid_search_settings_df.columns)
 # grid_search_settings_df = pd.read_csv(
 #     os.path.join(task_root_dir, 'grid_search_template.csv'), index_col=0
 # )
-if os.environ.get('AG2050_DRY_RUN') == '1':
-    print('AG2050_DRY_RUN=1: generated task tables without submitting jobs.')
-else:
-    create_task_runs(
-        task_root_dir,
-        grid_search_settings_df,
-        platform="NCI",
-        n_workers=min(len(grid_search_settings_df.columns), 50),
-        use_parallel=True,
-    )
+create_task_runs(
+    task_root_dir,
+    grid_search_settings_df,
+    platform="aquila",
+    n_workers=min(len(grid_search_settings_df.columns), 50),
+    use_parallel=True,
+)

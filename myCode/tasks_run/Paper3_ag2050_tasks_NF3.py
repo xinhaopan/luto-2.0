@@ -108,14 +108,14 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260713_Paper3_aquila_FIX'],
+    'TASK_NAME': ['20260712_Paper3_aquila_NF3'],
     'KEEP_OUTPUTS': [False],
     'QUEUE': ['normalsr'],
-    # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
     # ---- Computational settings (not model parameters) ----------------------
-    # aquila RESFACTOR=5 test run: 24 CPUs / 96 GB (Jinzhu-recommended for res5)
-    'MEM': ['96GB'],
-    'NCPUS': ['24'],
+    # Runs ALONGSIDE the 20260712_Paper3_aquila baseline (4 x 24 threads = 96), so take
+    # only 12 threads each: 96 + 48 = 144 of 192 cores, leaving the baseline unstarved.
+    'MEM': ['64GB'],
+    'NCPUS': ['12'],
     # 'WRITE_THREADS': ['2'],  # [merge] removed in jinzhu; write threading is now internal (n_jobs auto)
     'TIME': ['72:00:00'],
 
@@ -130,19 +130,31 @@ grid_search = {
     # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'],
-    # Solver config is deliberately IDENTICAL to the 20260712 run that failed (tol 1e-2,
-    # crossover -1 = jinzhu's default). The only difference is _project_base_into_cell() in
-    # solvers/input_data.py, so if AgS1 and AgS2 now reach 2050 the fix is what did it.
+    # ---- EXPERIMENT: can NumericFocus=3 rescue a TIGHT (1e-6) tolerance? ----
     #
-    # Every RESFACTOR=5 infeasibility was one cell whose base state held more land than the
-    # cell has: last year's solve is allowed to violate cell-usage by up to FeasibilityTol,
-    # and it spends that budget converting non-reversible plantings back to cropland; the
-    # clamp then restores the non-ag lower bound without taking the land back from
-    # agriculture. The overflow always came out at 1.0-1.8x the tolerance, so no tolerance
-    # and no algorithm could escape it -- confirmed by IIS on all five failures.
-    'RETRY_PARAMS': [[(0, 2, -1, -1, -1), (0, 1, 0, -1, 0)]],
-    'FEASIBILITY_TOLERANCE': [1e-4],
-    'OPTIMALITY_TOLERANCE': [1e-4],
+    # The baseline run (20260712_Paper3_aquila) uses a uniform 1e-2, because at NumericFocus=0
+    # the big models are INFEASIBLE at tight tolerances -- measured on the dumped models:
+    #     AgS4/2013 (3.05M vars): 1e-6 INFEASIBLE; 1e-5 .. 1e-2 OPTIMAL
+    #     AgS2/2043 (4.94M vars): 1e-4 INFEASIBLE; 1e-3 OPTIMAL (obj 4463.10)
+    #                                              1e-2 OPTIMAL (obj 4463.43) -- 0.007% apart
+    # and NO ScaleFlag setting rescues either (-1 auto and 2 geometric both stay INFEASIBLE).
+    #
+    # NumericFocus=3 makes Gurobi maximally careful about numerics (at a large speed cost) --
+    # a genuinely different lever from scaling. NUMERIC_FOCUS is no longer a standalone
+    # setting (jinzhu removed it); it is the FIRST element of each RETRY_PARAMS tuple.
+    #
+    # The ladder below holds the tight 1e-6 for the first two attempts (varying only the
+    # algorithm), then steps the tolerance down. So the stdout reports, per year, exactly how
+    # loose it actually had to go -- and the run still finishes rather than dying on the first
+    # hard year. Any year that needed a looser tolerance is logged loudly.
+    'FEASIBILITY_TOLERANCE': [1e-6],
+    'OPTIMALITY_TOLERANCE': [1e-6],
+    'RETRY_PARAMS': [[
+        (3, 2, -1, -1, -1),          # NF=3, barrier      @ 1e-6
+        (3, 1,  0, -1,  0),          # NF=3, dual simplex @ 1e-6
+        (3, 2, -1, -1, -1, 1e-4),    # loosen -> 1e-4
+        (3, 2, -1, -1, -1, 1e-2),    # loosen -> 1e-2 (matches the baseline run)
+    ]],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],
     'SIM_YEARS': [[i for i in range(2010, 2051, 1)]],
