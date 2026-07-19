@@ -2,14 +2,14 @@
 Task runner for AG2050 scenarios (AgS1 – AgS4).
 
 Scenarios:
-  AgS1 – Regional Ag capitals:   Non-ag ON, full AG managements, maintain historical GHG and 2010 national biodiversity, High productivity
+  AgS1 – Regional Ag capitals:   Non-ag ON,  full AG managements, maintain historical GHG, restore 5% biodiversity, High productivity
   AgS2 – Landscape stewardship:  Non-ag ON,  full AG managements, low GHG, restore 50% biodiversity, Very High productivity
   AgS3 – Climate survival:       Non-ag OFF, limited AG managements (Eco Grazing/Savanna/HIR only), GHG off
   AgS4 – System decline:         Non-ag OFF, limited AG managements (Eco Grazing/Savanna/HIR only), GHG off
 
-  AgS1 keeps the national all-cell Suitability score at or above its 2010 level.
-  AgS2 restores 50% of the top-20% biodiversity-priority areas. Both cap total
-  non-ag land at <=15% per NRM region (REGIONAL_ADOPTION_CONSTRAINTS='NON_AG_CAP').
+  AgS1 & AgS2 restore 5% / 50% of the top-20% biodiversity-priority areas
+  (GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT=20) and both cap total non-ag
+  land at <=15% per NRM region (REGIONAL_ADOPTION_CONSTRAINTS='NON_AG_CAP').
   Transitions use jinzhu's per-source delta-flow model (now the only mode).
 
 AG management availability per scenario:
@@ -108,7 +108,7 @@ _ag_man_limited = {                      # AgS3 & AgS4
 
 
 grid_search = {
-    'TASK_NAME': ['20260718_Paper3_NCI'],
+    'TASK_NAME': ['20260714_Paper3_NCI'],
     'KEEP_OUTPUTS': [False],
     'QUEUE': ['normalsr'],
     # 'NUMERIC_FOCUS': [0],  # [merge] removed in jinzhu; solver NumericFocus no longer configurable via settings
@@ -174,11 +174,11 @@ grid_search = {
     # ---- Biodiversity settings ----------------------------------------------
     # GBF2_TARGET is auto-set from AG2050_BIO_MAP[scenario] at runtime (data.py).
     # Override the map here so:
-    #   AgS1 Regional Ag capitals  → 'maintain_historical' (national 2010 floor)
+    #   AgS1 Regional Ag capitals  → 'low'  (restore  5% of top-20% priority areas)
     #   AgS2 Landscape stewardship → 'high' (restore 50% by 2050)
     #   AgS3 / AgS4                → 'off'
     'AG2050_BIO_MAP': [{
-        'AgS1': 'maintain_historical',
+        'AgS1': 'low',
         'AgS2': 'high',
         'AgS3': 'off',
         'AgS4': 'off',
@@ -188,7 +188,7 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
     'GBF2_TARGETS_DICT': [{
         # The 2030 milestone is half of the corresponding 2050 target.
-        'low':    {2030: 0.025, 2050: 0.05, 2100: 0.05},  # Unused in Paper3; AgS1 uses maintain_historical.
+        'low':    {2030: 0.025, 2050: 0.05, 2100: 0.05},  # AgS1 Regional Ag capitals: restore 5% by 2050
         'medium': {2030: 0.15,  2050: 0.30, 2100: 0.30},
         'high':   {2030: 0.25,  2050: 0.50, 2100: 0.50},  # AgS2 Landscape stewardship: restore 50% by 2050
     }],
