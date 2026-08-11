@@ -12,10 +12,12 @@
 #     `luto/solvers/input_data.py`.
 #   - In that solver pathway, biodiversity payment is monetised as
 #     `bio_score x bio_price` before the economic objective is formed.
-#   - Archived `xr_economics_*_profit` outputs already include price-linked
-#     revenue, including biodiversity-price revenue, so this absolute composition
-#     figure uses those profit layers directly and does not add an extra
-#     biodiversity payment.
+#   - NOTE (20260810): the current write.py does NOT bake the biodiversity-price
+#     payment into xr_economics_*_profit. Older runs (<=20260611) did, so this
+#     figure used the profit layers directly. On current outputs the profit
+#     carries no bio-price payment, so we add it back
+#     (ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS = True) to reconstruct the solver-side
+#     net (revenue incl. bio - cost - transition).
 # ==============================================================================
 
 import io
@@ -37,6 +39,7 @@ import xarray as xr
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from tools.tools import select_bio_backend
 from tools.price_slice_utils import (
     DATA_DIR,
     OUT_DIR,
@@ -79,7 +82,7 @@ plt.rcParams.update({
     "axes.labelweight": "bold",
 })
 
-ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS = False
+ADD_BIO_PAYMENT_TO_ARCHIVED_PROFITS = True
 
 NON_AG_EXCLUDE = {
     "agriculturallanduse",
@@ -227,6 +230,7 @@ def open_metric_da(zip_path, file_name):
             ds = cfxr.decode_compress_to_multi_index(ds, "layer")
 
         da = next(iter(ds.data_vars.values()))
+        da = select_bio_backend(da)
         return da.load()
     finally:
         ds.close()

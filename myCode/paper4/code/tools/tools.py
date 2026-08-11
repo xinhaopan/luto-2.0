@@ -45,6 +45,44 @@ def decode_layer_multiindex_if_possible(
     return ds[da_name]
 
 
+# The biodiversity-priority NetCDFs written by the 20260718+ runs carry an extra
+# 'backend' layer dimension with 7 metrics (Suitability + SNES/MNES/ECNES x
+# likely/likely_may). The model's biodiversity constraint/objective uses
+# BIO_QUALITY_LAYER = 'Suitability', and the older runs (single-layer bio) are
+# equivalent to it. Older paper4 readers had no 'backend' handling, so they either
+# errored on duplicate 'lu' items (04/13/T1) or silently summed all 7 backends
+# (03/05/12, inflating biodiversity ~4-6x). Collapse to the single quality backend
+# here. No-op for files without a 'backend' coord (GHG, economics, area).
+BIO_BACKEND = "Suitability"
+
+
+def select_bio_backend(da: xr.DataArray, backend: str = BIO_BACKEND) -> xr.DataArray:
+    if not hasattr(da, "coords") or "backend" not in da.coords:
+        return da
+    coord = da.coords["backend"]
+    if coord.dims == ("layer",):
+        # 'backend' is one level of the 'layer' MultiIndex. Subset the layer
+        # positions to the chosen backend, then rebuild the 'layer' MultiIndex
+        # from the remaining levels (e.g. am/lm/lu, or just lu) so the array
+        # matches the pre-'backend' layout exactly. Leaving the constant
+        # 'backend' level in place carries it onto the 'item' dim downstream and
+        # breaks xr.align. A single remaining level is kept as a 1-level
+        # MultiIndex so 'layer' stays a coordinate and the level (e.g. 'lu')
+        # keeps dims == ('layer',), matching natively single-level files.
+        names = list(da.indexes["layer"].names)
+        da = da.isel(layer=(np.asarray(coord.values) == backend))
+        if "backend" in names:
+            keep = [n for n in names if n != "backend"]
+            level_arrays = [np.asarray(da.coords[n].values) for n in keep]
+            da = da.drop_vars(["layer"] + [n for n in names if n in da.coords])
+            mi = pd.MultiIndex.from_arrays(level_arrays, names=keep)
+            da = da.assign_coords(xr.Coordinates.from_pandas_multiindex(mi, "layer"))
+        return da
+    if "backend" in da.dims:
+        return da.sel(backend=backend, drop=True)
+    return da
+
+
 def get_year(parent_dir):
     """
     遍历指定目录，找到所有以 "out_" 开头的文件夹，并提取年份。

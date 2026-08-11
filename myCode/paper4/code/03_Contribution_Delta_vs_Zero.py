@@ -33,6 +33,7 @@ import xarray as xr
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from tools.tools import select_bio_backend
 from tools.price_slice_utils import (
     DATA_DIR,
     OUT_DIR,
@@ -238,6 +239,7 @@ def open_metric_da(zip_path, file_name):
             ds = cfxr.decode_compress_to_multi_index(ds, "layer")
 
         da = next(iter(ds.data_vars.values()))
+        da = select_bio_backend(da)
         return da.load()
     finally:
         ds.close()

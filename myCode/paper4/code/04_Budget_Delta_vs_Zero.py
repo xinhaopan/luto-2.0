@@ -12,10 +12,15 @@
 #     `luto/solvers/input_data.py`.
 #   - In that solver pathway, biodiversity payment is monetised as
 #     `bio_score x bio_price` before the economic objective is formed.
-#   - Do not use `xr_economics_*_profit` here because those archived profit
-#     layers already mix in absolute biodiversity-price revenue.
-#   - Instead, recompute net economic returns from cell-level NC outputs:
-#     revenue - cost - transition, removing absolute biodiversity-price revenue.
+#   - Recompute net economic returns from cell-level NC outputs as
+#     revenue - cost - transition.
+#   - NOTE (20260810): the current write.py does NOT bake the biodiversity-price
+#     payment into xr_economics_*_revenue. Older runs (<=20260611) did, via
+#     _get_biodiversity_price_{ag,am}_revenue_xr, so this figure used to subtract
+#     `bio * bio_price` to strip it back out. That subtraction has been REMOVED:
+#     on current outputs the revenue carries no bio-price payment, so subtracting
+#     it over-subtracted a payment that isn't there (it flipped the BioPrice
+#     budget sign). `bio` is still read, only to form the incremental payment.
 #   - For the biodiversity-price slice, add only the incremental biodiversity
 #     payment:
 #     bio_price x (scenario biodiversity contribution - zero-price contribution).
@@ -40,6 +45,7 @@ import xarray as xr
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from tools.tools import select_bio_backend
 from tools.price_slice_utils import (
     DATA_DIR,
     OUT_DIR,
@@ -244,6 +250,7 @@ def open_metric_da(zip_path, file_name, keep_coord=None):
             ds = cfxr.decode_compress_to_multi_index(ds, "layer")
 
         da = next(iter(ds.data_vars.values()))
+        da = select_bio_backend(da)
         if keep_coord is not None:
             for coord_name in list(da.coords):
                 if coord_name in {"cell", "layer", keep_coord}:
@@ -289,6 +296,26 @@ def to_item_cell_da(zip_path, file_name, item_coord, selectors=None, exclude_ite
 
     for coord_name, value in selectors.items():
         da = filter_coord(da, coord_name, value)
+
+    # Newer runs add extra layer-level decomposition coords (e.g. 'Cost_type' on
+    # am cost, 'source' on ag cost/revenue). Any such coord carrying an 'ALL'
+    # total must be collapsed here, or it duplicates the item_coord and breaks
+    # xr.align. ('backend' has no 'ALL' and is handled upstream by
+    # select_bio_backend in open_metric_da.)
+    for coord_name in list(da.coords):
+        if coord_name in {"cell", "layer", item_coord} or coord_name in selectors:
+            continue
+        coord = da.coords[coord_name]
+        try:
+            has_all = "ALL" in coord.values
+        except TypeError:
+            has_all = False
+        if not has_all:
+            continue
+        if coord.dims == ("layer",):
+            da = da.isel(layer=(coord.values == "ALL"))
+        elif coord_name in da.dims:
+            da = da.sel({coord_name: "ALL"})
 
     if item_coord in da.coords and da.coords[item_coord].dims == ("layer",):
         item_values = da.coords[item_coord].values
@@ -547,7 +574,6 @@ def get_area_item_inputs(zip_path, year, area_type, bio_price):
         )
         net_excl_bio_price = (
             revenue
-            - bio * bio_price
             - cost
             - transition_ag2ag
             - transition_non_ag2ag
@@ -582,7 +608,7 @@ def get_area_item_inputs(zip_path, year, area_type, bio_price):
             selectors=selectors,
         )
         revenue, bio, cost, transition = align_item_arrays(revenue, bio, cost, transition)
-        net_excl_bio_price = revenue - bio * bio_price - cost - transition
+        net_excl_bio_price = revenue - cost - transition
         return dvar, net_excl_bio_price, bio
 
     if area_type == "Non-ag":
@@ -621,7 +647,6 @@ def get_area_item_inputs(zip_path, year, area_type, bio_price):
         )
         net_excl_bio_price = (
             revenue
-            - bio * bio_price
             - cost
             - transition_non_ag2non_ag
             - transition_non_ag2ag
