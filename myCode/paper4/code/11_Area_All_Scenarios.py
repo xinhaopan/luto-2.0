@@ -576,9 +576,10 @@ for row_idx, area_type in enumerate(row_area_types):
     cats_right = stacked_bar(ax_right, pivot_bp, area_type, "bp", show_xlabel=(row_idx == len(row_area_types) - 1))
 
     # Force integer y-ticks on every panel for a consistent look (avoids the lone
-    # 2.5-step decimal ticks matplotlib would otherwise pick for the 0-15.5 panel).
-    ax_left.yaxis.set_major_locator(MaxNLocator(integer=True))
-    ax_right.yaxis.set_major_locator(MaxNLocator(integer=True))
+    # 2.5-step decimal ticks matplotlib would otherwise pick for the 0-15.5 panel);
+    # cap at ~4-6 ticks so the axes stay uncluttered.
+    ax_left.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
+    ax_right.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
 
     ax_left.set_ylabel(AREA_CONFIG[area_type]["ylabel"])
 
