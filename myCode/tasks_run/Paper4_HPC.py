@@ -30,7 +30,6 @@ grid_search = {
     # 'SOLVE_WEIGHT_ALPHA': [1],  # [merge] removed in jinzhu; objective now uses SOLVE_WEIGHT_BETA only
     'SOLVE_WEIGHT_BETA': [0.9],
     'OBJECTIVE': ['maxprofit'], # maxprofit
-    'WRITE_OUTPUT_GEOTIFFS': [True],
     'RESFACTOR': [5],  # RF5 only
     'SIM_YEARS': [[i for i in range(2010,2026,1)]],
 
