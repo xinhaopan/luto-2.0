@@ -57,8 +57,8 @@ BIO_METRIC  = "BiodiversityContributionChange_vs_ZeroPrice_MhaYr"
 COLOR_GHG = "#1d52a1"
 COLOR_BIO = "#2ca25f"
 COLOR_CON = "#888888"
-GHG_DIFF_LABEL = r"GHG abatement difference" + "\n" + r"(Mt CO$_2$e yr$^{-1}$)"
-BIO_DIFF_LABEL = r"Biodiversity contribution difference" + "\n" + r"(Mha yr$^{-1}$)"
+GHG_DIFF_LABEL = r"GHG abatement change" + "\n" + r"(Mt CO$_2$e yr$^{-1}$)"
+BIO_DIFF_LABEL = r"Biodiversity contribution change" + "\n" + r"(Mha yr$^{-1}$)"
 
 FS = 14
 TOP_N_CATS = None

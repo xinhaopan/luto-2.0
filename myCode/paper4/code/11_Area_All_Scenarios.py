@@ -18,6 +18,7 @@ mpl.use("Agg")
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.ticker import MaxNLocator
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -573,6 +574,11 @@ for row_idx, area_type in enumerate(row_area_types):
 
     cats_left = stacked_bar(ax_left, pivot_cp, area_type, "cp", show_xlabel=(row_idx == len(row_area_types) - 1))
     cats_right = stacked_bar(ax_right, pivot_bp, area_type, "bp", show_xlabel=(row_idx == len(row_area_types) - 1))
+
+    # Force integer y-ticks on every panel for a consistent look (avoids the lone
+    # 2.5-step decimal ticks matplotlib would otherwise pick for the 0-15.5 panel).
+    ax_left.yaxis.set_major_locator(MaxNLocator(integer=True))
+    ax_right.yaxis.set_major_locator(MaxNLocator(integer=True))
 
     ax_left.set_ylabel(AREA_CONFIG[area_type]["ylabel"])
 
