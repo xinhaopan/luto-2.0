@@ -593,7 +593,7 @@ LEGEND_FS = {
     "Non-ag": FS,
 }
 
-fig.supylabel(r"Area (Mha)", x=0.065, y=0.5, fontsize=FS + 1, fontweight="bold")
+fig.supylabel(r"Absolute area (Mha)", x=0.065, y=0.5, fontsize=FS + 1, fontweight="bold")
 plt.tight_layout(rect=[0.075, 0, 1, 1])
 plt.subplots_adjust(hspace=0.44, wspace=0.28)
 fig.canvas.draw()

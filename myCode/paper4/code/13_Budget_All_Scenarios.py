@@ -701,7 +701,7 @@ LEGEND_FS = {
     "Non-ag": FS,
 }
 
-fig.supylabel(r"Budget (AU\$ billion yr$^{-1}$)", x=0.065, y=0.5,
+fig.supylabel(r"Absolute budget (AU\$ billion yr$^{-1}$)", x=0.065, y=0.5,
               fontsize=FS + 1, fontweight="bold")
 plt.tight_layout(rect=[0.075, 0, 1, 1])
 plt.subplots_adjust(hspace=0.62, wspace=0.12)

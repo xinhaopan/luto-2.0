@@ -47,6 +47,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from tools.tools import select_bio_backend
 from tools.price_slice_utils import (
+    CACHE_DIR,
     DATA_DIR,
     OUT_DIR,
     add_zero_line,
@@ -68,7 +69,7 @@ DRAW_ALL_TOOLS_DIR = BASE_DIR.parents[1] / "draw_all" / "code" / "tools"
 COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 CACHE_PATH = DATA_DIR / f"04_Budget_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
-NC_CACHE_DIR = DATA_DIR / f"04_Budget_nc_cache_{YEAR}"
+NC_CACHE_DIR = CACHE_DIR / f"04_Budget_nc_cache_{YEAR}"
 
 FS = 20
 SUM_LINE_LABEL = "Sum"
@@ -989,7 +990,7 @@ LEGEND_FS = {
 
 sync_row_y_limits(axes)
 hide_redundant_y_ticks(axes)
-fig.supylabel(r"Budget difference relative to zero price (AU\$ billion yr$^{-1}$)",
+fig.supylabel(r"Budget change relative to zero price (AU\$ billion yr$^{-1}$)",
               x=0.065, y=0.5, fontsize=FS + 1, fontweight="bold")
 plt.tight_layout(rect=[0.075, 0, 1, 1])
 plt.subplots_adjust(hspace=0.44, wspace=0.28)

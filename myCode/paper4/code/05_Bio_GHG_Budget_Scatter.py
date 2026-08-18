@@ -48,6 +48,7 @@ YEAR = 2025
 BASE_DIR = Path(__file__).resolve().parent
 COLOR_FILE    = BASE_DIR.parents[1] / "draw_all" / "code" / "tools" / "land use colors.xlsx"
 CONTRIB_CACHE = DATA_DIR / f"03_Contribution_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
+BUDGET_CACHE  = DATA_DIR / f"04_Budget_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
 RAW_OUT       = DATA_DIR / f"05_Bio_GHG_Budget_raw_data_{YEAR}.xlsx"
 
 GHG_METRIC = "GHGAbatementChange_vs_ZeroPrice_MtCO2e"
@@ -220,12 +221,26 @@ def load_data():
     bp_bio = _get("BioPrice",    BIO_METRIC)
     bp_ghg = _get("BioPrice",    GHG_METRIC)
 
-    # Budget (B AUD) = price × primary metric / 1000
+    # Budget (B AUD) = net economic return change vs the zero-price baseline
+    # (same definition as Fig. 4 / Methods), summed across land-use components
+    # per price. Read from the Fig. 4 budget cache so all three use one definition
+    # (NOT price × outcome, which is the gross outlay — a different quantity).
     cp_prices = cp_ghg.index.to_numpy(float)
     bp_prices = bp_bio.index.to_numpy(float)
 
-    cp_budget_vals = cp_prices * cp_ghg.reindex(cp_prices).fillna(0).values / 1000
-    bp_budget_vals = bp_prices * bp_bio.reindex(bp_prices).fillna(0).values / 1000
+    bud_tot = (
+        pd.read_excel(BUDGET_CACHE, sheet_name="NetEconLong")
+        .groupby(["PriceType", "Price"])["NetEconChange_vs_ZeroPrice_BAUD"]
+        .sum().reset_index()
+    )
+
+    def _budget(price_type, prices):
+        s = bud_tot[bud_tot.PriceType == price_type].set_index("Price")["NetEconChange_vs_ZeroPrice_BAUD"]
+        s.index = s.index.astype(float)
+        return s.reindex(prices).fillna(0.0).values
+
+    cp_budget_vals = _budget("CarbonPrice", cp_prices)
+    bp_budget_vals = _budget("BioPrice", bp_prices)
 
     cp_budget = pd.Series(cp_budget_vals, index=cp_prices)
     bp_budget = pd.Series(bp_budget_vals, index=bp_prices)

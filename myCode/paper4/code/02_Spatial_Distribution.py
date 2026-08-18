@@ -585,11 +585,11 @@ axes[0, 0].set_title(
     pad=6,
 )
 axes[0, 1].set_title(
-    f"Carbon price: {format_thousands(MAX_CP)}\n" + r"AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$",
+    f"Carbon price: {format_thousands(MAX_CP)}\n" + r"AU\$ tCO$_2$e$^{-1}$",
     pad=6,
 )
 axes[0, 2].set_title(
-    f"Biodiversity price: {format_thousands(MAX_BP)}\n" + r"AU\$ ha$^{-1}$ yr$^{-1}$",
+    f"Biodiversity price: {format_thousands(MAX_BP)}\n" + r"AU\$ ha$^{-1}$",
     pad=6,
 )
 

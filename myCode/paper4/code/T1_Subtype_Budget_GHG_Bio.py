@@ -142,8 +142,8 @@ def selected_scenarios(contribution):
                 "Scenario": "Carbon price drive",
                 "PriceType": "CarbonPrice",
                 "Price": max_cp,
-                "Carbon price (AU$/tCO2e yr^-1)": max_cp,
-                "Biodiversity price (AU$/ha yr^-1)": 0.0,
+                "Carbon price (AU$/tCO2e)": max_cp,
+                "Biodiversity price (AU$/ha)": 0.0,
                 "Price setting": f"Carbon price = {format_thousands(max_cp)}; biodiversity price = 0",
                 "Scenario order": 1,
             },
@@ -151,8 +151,8 @@ def selected_scenarios(contribution):
                 "Scenario": "Biodiversity price drive",
                 "PriceType": "BioPrice",
                 "Price": max_bp,
-                "Carbon price (AU$/tCO2e yr^-1)": 0.0,
-                "Biodiversity price (AU$/ha yr^-1)": max_bp,
+                "Carbon price (AU$/tCO2e)": 0.0,
+                "Biodiversity price (AU$/ha)": max_bp,
                 "Price setting": f"Carbon price = 0; biodiversity price = {format_thousands(max_bp)}",
                 "Scenario order": 2,
             },
@@ -241,8 +241,8 @@ def make_metric_table(area, contribution, budget, scenarios):
     keep = [
         "Scenario",
         "Price setting",
-        "Carbon price (AU$/tCO2e yr^-1)",
-        "Biodiversity price (AU$/ha yr^-1)",
+        "Carbon price (AU$/tCO2e)",
+        "Biodiversity price (AU$/ha)",
         "Domain",
         "Subtype",
         AREA_COL,
@@ -263,16 +263,16 @@ def make_summary_table(table):
         "Scenario order",
         "Scenario",
         "Price setting",
-        "Carbon price (AU$/tCO2e yr^-1)",
-        "Biodiversity price (AU$/ha yr^-1)",
+        "Carbon price (AU$/tCO2e)",
+        "Biodiversity price (AU$/ha)",
     ]
     group_cols = [
         "Scenario order",
         "Domain order",
         "Scenario",
         "Price setting",
-        "Carbon price (AU$/tCO2e yr^-1)",
-        "Biodiversity price (AU$/ha yr^-1)",
+        "Carbon price (AU$/tCO2e)",
+        "Biodiversity price (AU$/ha)",
         "Domain",
     ]
     metric_cols = [AREA_COL, BUDGET_COL, GHG_COL, BIO_COL]
@@ -360,14 +360,14 @@ def style_workbook(path, table_for_excel):
 
     metric_headers = {AREA_COL, BUDGET_COL, GHG_COL, BIO_COL}
     price_headers = {
-        "Carbon price (AU$/tCO2e yr^-1)",
-        "Biodiversity price (AU$/ha yr^-1)",
+        "Carbon price (AU$/tCO2e)",
+        "Biodiversity price (AU$/ha)",
     }
     header_by_col = {cell.column: cell.value for cell in ws[5]}
     for col_idx, header in header_by_col.items():
         if header in metric_headers:
             for row in range(6, last_row + 1):
-                ws.cell(row=row, column=col_idx).number_format = '#,##0.000'
+                ws.cell(row=row, column=col_idx).number_format = '#,##0.0000'
         elif header in price_headers:
             for row in range(6, last_row + 1):
                 ws.cell(row=row, column=col_idx).number_format = '#,##0'
@@ -416,7 +416,7 @@ def style_workbook(path, table_for_excel):
             header = sheet.cell(row=1, column=col_idx).value
             if header in metric_headers:
                 for row_idx in range(2, sheet.max_row + 1):
-                    sheet.cell(row=row_idx, column=col_idx).number_format = '#,##0.000'
+                    sheet.cell(row=row_idx, column=col_idx).number_format = '#,##0.0000'
             elif header in price_headers:
                 for row_idx in range(2, sheet.max_row + 1):
                     sheet.cell(row=row_idx, column=col_idx).number_format = '#,##0'
@@ -487,7 +487,7 @@ def add_domain_sheets(wb, table_for_excel, body_font, header_font, header_fill, 
                     cell.border = border
                     cell.alignment = Alignment(vertical="center", wrap_text=True)
                     if col_idx > 1:
-                        cell.number_format = '#,##0.000'
+                        cell.number_format = '#,##0.0000'
                 row_idx += 1
 
             row_idx += 2
