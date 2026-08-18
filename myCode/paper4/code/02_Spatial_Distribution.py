@@ -16,6 +16,7 @@ import geopandas as gpd
 import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.patches as mpatches
+from matplotlib.legend_handler import HandlerPatch
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -628,6 +629,12 @@ LEGEND_FS = {
     "Ag management": FS,
     "Non-ag": FS,
 }
+# Fixed columns per row (as in Fig 1/3/4). Non-ag has long labels, so fewer columns.
+LEGEND_NCOL = {
+    "Agricultural land-use": 3,
+    "Ag management": 3,
+    "Non-ag": 2,
+}
 
 plt.tight_layout(pad=0.02)
 plt.subplots_adjust(hspace=0.26, wspace=0.01)
@@ -670,6 +677,25 @@ def add_split_row_legend(handles, x_center, y_anchor, row_key, n_rows, row_gap=0
             row_key,
         )
 
+class _HandlerSquare(HandlerPatch):
+    """Render legend swatches as squares (side = handle height)."""
+    def create_artists(self, legend, orig_handle, xdescent, ydescent,
+                       width, height, fontsize, trans):
+        s = height
+        sq = mpatches.Rectangle(
+            xy=(-xdescent + (width - s) / 2.0, -ydescent),
+            width=s, height=s,
+            facecolor=orig_handle.get_facecolor(),
+            edgecolor=orig_handle.get_edgecolor(),
+            linewidth=0,
+        )
+        sq.set_transform(trans)
+        return [sq]
+
+
+SQUARE_HANDLER = {mpatches.Patch: _HandlerSquare()}
+
+
 for row_idx, legend_handles in row_legend_handles.items():
     if not legend_handles:
         continue
@@ -683,32 +709,42 @@ for row_idx, legend_handles in row_legend_handles.items():
     row_key = ROW_KEYS[row_idx] if row_idx < len(ROW_KEYS) else "Non-ag"
     handles = list(legend_handles)
 
-    special_handles = handles[-2:] if len(handles) >= 2 else []
-    active_handles = handles[:-2] if special_handles else handles
-
-    if row_key == "Agricultural land-use":
-        # All 7 handles: 5 active + 2 special; split 3+3+1
-        all_ag = active_handles + special_handles
-        add_row_legend(all_ag[:3], x_center, y_anchor, row_key)
-        add_row_legend(all_ag[3:6], x_center, y_anchor - 0.025, row_key)
-        add_row_legend(all_ag[6:], x_center, y_anchor - 0.050, row_key)
-        continue
-
-    if row_key == "Non-ag":
-        # 9 handles: split 2+2+2+2+1
-        for legend_row, start in enumerate(range(0, len(handles), 2)):
-            add_row_legend(
-                handles[start:start + 2],
-                x_center,
-                y_anchor - legend_row * 0.025,
-                row_key,
-            )
-        continue
-
-    split_idx = int(np.ceil(len(active_handles) / 2))
-    add_row_legend(active_handles[:split_idx], x_center, y_anchor, row_key)
-    add_row_legend(active_handles[split_idx:], x_center, y_anchor - 0.025, row_key)
-    add_row_legend(special_handles, x_center, y_anchor - 0.050, row_key)
+    # Short handles go into a neat fixed-column grid; the long trailing "context"
+    # label ("Public and indigenous land ...") gets its own final row so it never
+    # forces a grid column very wide (which pushed the legend past the figure).
+    ncol = LEGEND_NCOL.get(row_key, 3)
+    grid_handles, tail_handles = handles[:-1], handles[-1:]
+    _fs = LEGEND_FS.get(row_key, FS - 1)
+    LABELSPACING = 0.35
+    grid_leg = None
+    if grid_handles:
+        grid_leg = fig.legend(
+            handles=grid_handles, loc="upper center",
+            bbox_to_anchor=(x_center, y_anchor), bbox_transform=fig.transFigure,
+            ncol=ncol, frameon=False, borderaxespad=0.0, borderpad=0.0,
+            handlelength=1.0, handleheight=1.0, columnspacing=0.75,
+            labelspacing=LABELSPACING, fontsize=_fs, handler_map=SQUARE_HANDLER,
+        )
+    if tail_handles:
+        # Left-align the long trailing label to the grid's left edge, one labelspacing
+        # below the grid's last row (same gap as the grid's own internal rows). Both
+        # legends use borderpad=0 so bb.y0 is exactly the grid's last-row bottom.
+        if grid_leg is not None:
+            fig.canvas.draw()
+            bb = grid_leg.get_window_extent(fig.canvas.get_renderer())
+            x_left = bb.x0 / fig_w_px
+            one_lab = LABELSPACING * _fs / (fig.get_figheight() * 72.0)
+            y_tail = bb.y0 / fig_h_px - one_lab
+        else:
+            x_left, y_tail = x_center, y_anchor
+        fig.legend(
+            handles=tail_handles, loc="upper left",
+            bbox_to_anchor=(x_left, y_tail),
+            bbox_transform=fig.transFigure,
+            ncol=1, frameon=False, borderaxespad=0.0, borderpad=0.0,
+            handlelength=1.0, handleheight=1.0, columnspacing=0.75,
+            labelspacing=LABELSPACING, fontsize=_fs, handler_map=SQUARE_HANDLER,
+        )
 
 out_path = OUT_DIR / "02_Spatial_Distribution.png"
 fig.savefig(out_path, dpi=300, bbox_inches="tight", pad_inches=0.02, facecolor="white")
