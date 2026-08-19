@@ -365,9 +365,10 @@ def _draw_drive_lines(ax, curves, drive, xlim):
     lines = [l_ghg, l_bio]
     labels = [l.get_label() for l in lines]
     # Biodiversity panel's curves fill the upper-left; drop the legend to the
-    # empty lower-right corner. No frame / background on either panel.
+    # empty lower-right corner. Keep the framed, semi-opaque background.
     leg_loc = "lower right" if drive == "biodiversity" else "upper left"
-    ax.legend(lines, labels, loc=leg_loc, frameon=False, fontsize=FS - 1)
+    ax.legend(lines, labels, loc=leg_loc, frameon=True,
+              framealpha=0.9, fontsize=FS - 1)
 
     return ax2
 
