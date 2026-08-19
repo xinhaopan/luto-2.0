@@ -745,7 +745,7 @@ for row_idx, area_type in enumerate(row_area_types):
 
 LEGEND_NCOL = {
     "_total": 5,
-    "Agricultural land-use": 5,
+    "Agricultural land-use": 3,  # 5 long labels -> wrap to two rows (3 + 2)
     "Ag management": 3,
     "Non-ag": 3,
 }
