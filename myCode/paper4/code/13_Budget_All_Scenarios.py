@@ -61,7 +61,7 @@ GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 CACHE_PATH = DATA_DIR / f"13_Budget_All_Scenarios_raw_data_{YEAR}.xlsx"
 DELTA_BUDGET_PATH = DATA_DIR / f"04_Budget_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
 
-FS = 18
+FS = 21
 SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Livestock (modified land)"

@@ -57,7 +57,7 @@ COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 CACHE_PATH = DATA_DIR / f"12_Contribution_All_Scenarios_raw_data_{YEAR}.xlsx"
 
-FS = 18
+FS = 21
 SUM_LINE_LABEL = "Sum"
 GHG_METRIC = "GHGAbatement_2025_MtCO2e"
 BIO_METRIC = "BiodiversityContribution_2025_MhaYr"

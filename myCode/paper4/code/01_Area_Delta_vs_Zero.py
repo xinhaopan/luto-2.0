@@ -601,7 +601,7 @@ LEGEND_FS = {
 
 sync_row_y_limits(axes)
 hide_redundant_y_ticks(axes)
-fig.supylabel(r"Area change relative to zero price (Mha)",
+fig.supylabel(r"Area (Mha)",
               x=0.065, y=0.5, fontsize=FS + 1, fontweight="bold")
 plt.tight_layout(rect=[0.075, 0, 1, 1])
 plt.subplots_adjust(hspace=0.52, wspace=0.12)

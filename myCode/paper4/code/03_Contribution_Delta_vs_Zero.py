@@ -57,7 +57,7 @@ COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 CACHE_PATH = DATA_DIR / f"03_Contribution_Delta_vs_Zero_raw_data_{YEAR}.xlsx"
 
-FS = 20
+FS = 21
 SUM_LINE_LABEL = "Sum"
 GHG_METRIC = "GHGAbatementChange_vs_ZeroPrice_MtCO2e"
 BIO_METRIC = "BiodiversityContributionChange_vs_ZeroPrice_MhaYr"
@@ -786,9 +786,9 @@ y_mid_l = (max(b.y1 for b in bb_ghg) + min(b.y0 for b in bb_ghg)) / 2 / fig_h_px
 y_mid_r = (max(b.y1 for b in bb_bio) + min(b.y0 for b in bb_bio)) / 2 / fig_h_px
 x_l = min(b.x0 for b in bb_ghg) / fig_w_px - 0.025
 x_r = max(b.x1 for b in bb_bio) / fig_w_px + 0.02
-fig.text(x_l, y_mid_l, r"GHG abatement difference (Mt CO$_2$e yr$^{-1}$)",
+fig.text(x_l, y_mid_l, r"GHG abatement (Mt CO$_2$e yr$^{-1}$)",
          rotation=90, va='center', ha='center', fontsize=FS + 1, fontweight="bold")
-fig.text(x_r, y_mid_r, r"Biodiversity contribution difference (Mha yr$^{-1}$)",
+fig.text(x_r, y_mid_r, r"Biodiversity contribution (Mha yr$^{-1}$)",
          rotation=270, va='center', ha='center', fontsize=FS + 1, fontweight="bold")
 
 all_rows = [("_total", 0)] + [(area_type, i + 1) for i, area_type in enumerate(row_area_types)]

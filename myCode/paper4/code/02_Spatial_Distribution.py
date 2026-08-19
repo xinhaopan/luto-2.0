@@ -48,7 +48,7 @@ MAP_PAD = 0.8
 XLIM = (EXTENT[0] - MAP_PAD, EXTENT[1] + MAP_PAD)
 YLIM = (EXTENT[2] - MAP_PAD, EXTENT[3] + MAP_PAD)
 
-FS = 20
+FS = 17
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Livestock (modified land)"
 NATURAL_LIVESTOCK_LABEL = "Livestock (natural land)"
