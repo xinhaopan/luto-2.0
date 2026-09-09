@@ -88,7 +88,8 @@ Added to Fig. 4 as a seventh panel, alone on a fourth row.
 
 > **(g) Comparison of the four scenarios.** The six axes carry, clockwise from the top, net GHG
 > emissions from land, the contribution-weighted biodiversity score, change in
-> water yield, net economic returns, agri-food production and land-use change
+> water yield relative to 2010, net economic returns, agri-food production and
+> land-use change
 > extent — the same six quantities, in the same order, as the radar in the
 > framework diagram. Each axis is first oriented so that further from the centre
 > is better: net emissions and land-use change extent are negated, and change in
@@ -110,6 +111,10 @@ the other axes.
 same sheet as panels a–f, so panel g cannot disagree with the bars above it.
 `05_scenario_synthesis_2050.xlsx` uses a different definition of net economic
 returns and biodiversity and must not be used.
+
+**Wording.** The water axis is labelled "Difference in water yield relative to
+2010", the same phrase 03_indicators.py and 19_Water.py use, so the reader is
+not left wondering what -14,000 GL is relative to.
 
 **Axis order** matches Extended Data Fig. 1 deliberately, with the framework
 diagram's abbreviations written out in full, so a reader turning from the

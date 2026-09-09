@@ -435,8 +435,10 @@ def _draw_bars(ax, summary, column, formatter, x_values_extra=(), zero_line=True
 # (summary column, label, unit, +1 if larger is already better else -1)
 RADAR_AXES = [
     ('ghg_2050_mtco2e',       'Net GHG emissions from land',           'Mt CO₂e yr⁻¹', -1),
-    ('biodiversity_2050_mha', 'Biodiversity contribution-weighted score', 'Mha',                     +1),
-    ('water_change_2050_gl',  'Change in water yield',                 'GL yr⁻¹',          +1),
+    ('biodiversity_2050_mha', 'Biodiversity contribution-\nweighted score', 'Mha', +1),
+    # Same wording as 03_indicators and 19_Water: "relative to 2010" matters,
+    # otherwise -14,000 GL has nothing to be relative to.
+    ('water_change_2050_gl',  'Difference in water yield\nrelative to 2010', 'GL yr⁻¹', +1),
     ('ner_2050_baud',         'Net economic returns',                  'billion AU$ yr⁻¹', +1),
     ('food_2050_mt',          'Agri-food production',                  'Mt yr⁻¹',          +1),
     ('land_use_change_2010_2050_mha', 'Land-use change extent',        'Mha',                        -1),
@@ -589,12 +591,7 @@ def _draw_radar(ax, summary):
 
         # Ordinary tick values for this axis, at the rings.
         sign = RADAR_AXES[i][3]
-        # The innermost ring sits at a fifth of the radius, so its six labels
-        # would crowd the centre and land on the polygons there.  The ring is
-        # drawn; only its number is left off.
         for k, ring in enumerate(rings, start=1):
-            if k == 1:
-                continue
             value = (starts[i, 0] + k * steps[i, 0]) * sign   # undo the flip
             # Horizontal, not tangential: these are the numbers the reader is
             # meant to check, and a rotated number is harder to read.  The white
@@ -603,9 +600,9 @@ def _draw_radar(ax, summary):
                 _radar_tick(value), xy=(angle, ring),
                 xytext=(-dy * 10.0, dx * 10.0), textcoords='offset points',
                 ha='center', va='center', fontsize=RADAR_FONTSIZE,
-                # Under the polygons, not over them: at zorder 20 the halo was
-                # punching holes in the data lines where they crossed a ring.
-                color='#6E6E6E', zorder=5, annotation_clip=False,
+                # Under the polygons, not over them: drawn on top, the halo
+                # punched holes in the data lines where they crossed a ring.
+                color='#222222', zorder=5, annotation_clip=False,
                 bbox=dict(boxstyle='round,pad=0.12', facecolor='white',
                           edgecolor='none', alpha=0.85),
             )
@@ -621,10 +618,10 @@ def plot_figure(summary):
     })
 
     # Three rows of two bar panels, then panel g alone across the fourth row.
-    fig = plt.figure(figsize=(14.0, 22.5))
+    fig = plt.figure(figsize=(14.0, 24.0))
     gs = fig.add_gridspec(
         4, 2,
-        height_ratios=[1.0, 1.0, 1.0, 2.05],
+        height_ratios=[1.0, 1.0, 1.0, 2.45],
         left=0.055, right=0.985, top=0.975, bottom=0.115,
         wspace=0.20, hspace=0.38,
     )
@@ -634,9 +631,12 @@ def plot_figure(summary):
             axes[row, col] = fig.add_subplot(gs[row, col])
 
     # The radar sits in the middle of the full-width row, leaving the outer
-    # thirds for its axis labels and the per-scenario values beside them.
+    # thirds for its axis labels.  A thin strip is reserved above it so the
+    # topmost axis label has somewhere to go and the panel title can sit above
+    # that, centred over the panel exactly as (a)-(f) are.
     radar_cell = gs[3, :].subgridspec(1, 3, width_ratios=[1.0, 2.1, 1.0])
-    ax_radar = fig.add_subplot(radar_cell[0, 1], polar=True)
+    radar_column = radar_cell[0, 1].subgridspec(2, 1, height_ratios=[0.27, 1.0])
+    ax_radar = fig.add_subplot(radar_column[1, 0], polar=True)
 
     # Match the indicator order used in 03_indicators.py.
     ax = axes[0, 0]
@@ -689,12 +689,14 @@ def plot_figure(summary):
     _set_panel_style(ax, 'Land-use change', 'f')
 
     _draw_radar(ax_radar, summary)
-    # Same size and weight as the (a)-(f) titles, but anchored to the row rather
-    # than to the polar axes, so it cannot collide with the topmost axis label.
-    radar_box = ax_radar.get_position(fig)
-    fig.text(0.055, radar_box.y1 + 0.012, '(g) Comparison of the four scenarios',
+    # Centred over the panel, same size and weight as the (a)-(f) titles, and
+    # anchored to the top of the row so the axis labels pass underneath it.
+    radar_cell_box = radar_cell[0, 1].get_position(fig)
+    fig.text(radar_cell_box.x0 + radar_cell_box.width / 2.0,
+             radar_cell_box.y1 - 0.004,
+             '(g) Comparison of the four scenarios',
              fontsize=19, fontweight='bold', color='#222222',
-             ha='left', va='bottom')
+             ha='center', va='top')
 
     # The shared x label belongs to the six bar panels, not to the radar, so it
     # sits just under the third row rather than at the foot of the figure.
