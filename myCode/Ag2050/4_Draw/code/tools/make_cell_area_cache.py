@@ -13,7 +13,7 @@ Why
         xr_area_non_agricultural_landuse_2050.nc  area by non-ag land use
         xr_area_agricultural_management_2050.nc   area by management option
     Reading them needs xarray and cf_xarray (the 'layer' dimension is a
-    compressed multi-index), so this runs once in the modelling environment and
+    compressed multi-index), which the xpluto environment provides.  It runs once and
     leaves a compact .npz the figure script can open with numpy alone.
 
 What it writes
@@ -23,7 +23,8 @@ What it writes
         am_ha          (n_scen, n_am, n_cells) area under each management option
         scenarios, categories, am_names        label arrays
 
-Run it from the 4_Draw/code directory:
+Run it from the 4_Draw/code directory with the xpluto environment, which is
+what the Ag2050 figures use throughout:
     <xpluto>/python.exe tools/make_cell_area_cache.py
 """
 

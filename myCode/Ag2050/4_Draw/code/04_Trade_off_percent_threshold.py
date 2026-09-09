@@ -31,6 +31,7 @@ from tools.parameters import (
     input_files,
 )
 from tools.data_helper import get_path, get_zip_info
+from tools.unit_text import needs_mixed_fonts
 from tools.two_row_figure import (
     filter_water_detail_rows,
     load_long_tables,
@@ -425,6 +426,113 @@ def _draw_bars(ax, summary, column, formatter, x_values_extra=(), zero_line=True
     return y
 
 
+# ── Panel g: six-axis radar ───────────────────────────────────────────────────
+# Clockwise from the top, the same order and the same six quantities as the
+# radar in the framework diagram (Extended Data Fig. 1, third block), so a
+# reader turning from the framework to the results sees the same object.  The
+# abbreviations used there are written out in full here.
+#
+# (summary column, label, unit, +1 if larger is already better else -1)
+RADAR_AXES = [
+    ('ghg_2050_mtco2e',       'Net GHG emissions from land',           'Mt CO₂e yr⁻¹', -1),
+    ('biodiversity_2050_mha', 'Biodiversity contribution-weighted score', 'Mha',                     +1),
+    ('water_change_2050_gl',  'Change in water yield',                 'GL yr⁻¹',          +1),
+    ('ner_2050_baud',         'Net economic returns',                  'billion AU$ yr⁻¹', +1),
+    ('food_2050_mt',          'Agri-food production',                  'Mt yr⁻¹',          +1),
+    ('land_use_change_2010_2050_mha', 'Land-use change extent',        'Mha',                        -1),
+]
+RADAR_RINGS = (0.25, 0.50, 0.75, 1.00)
+
+
+def _unit_font(unit):
+    """Arial for plain units, DejaVu Sans when the unit needs a superscript."""
+    return 'DejaVu Sans' if needs_mixed_fonts(unit) else 'Arial'
+
+
+
+def _draw_radar(ax, summary):
+    """Panel g. Every axis is oriented so that further out is better.
+
+    Two of the six are 'smaller is better' (net emissions, and how much land has
+    to change hands) and are negated first.  Change in water yield is already
+    negative everywhere, and a smaller loss is a larger number, so it needs no
+    flip.  Each axis is then min-max scaled across the four scenarios: the worst
+    scenario sits at the centre and the best on the outer ring.  That makes the
+    shape a comparison between scenarios, not a comparison between indicators.
+    """
+    n = len(RADAR_AXES)
+    angles = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
+
+    ax.set_theta_offset(np.pi / 2.0)     # first axis at the top
+    ax.set_theta_direction(-1)           # and then clockwise
+
+    raw = np.array([summary[column].astype(float).to_numpy()
+                    for column, _lab, _unit, _sign in RADAR_AXES])
+    oriented = raw * np.array([[sign] for _c, _l, _u, sign in RADAR_AXES])
+    lo = oriented.min(axis=1, keepdims=True)
+    hi = oriented.max(axis=1, keepdims=True)
+    span = np.where(hi - lo == 0, 1.0, hi - lo)
+    scaled = (oriented - lo) / span                      # (axis, scenario)
+
+    ax.set_ylim(0.0, 1.0)
+    ax.set_yticks(list(RADAR_RINGS))
+    ax.set_yticklabels([])
+    ax.set_xticks(angles)
+    ax.set_xticklabels([])
+    ax.grid(color='#D9D9D9', linewidth=0.7)
+    ax.spines['polar'].set_color('#D9D9D9')
+    ax.spines['polar'].set_linewidth(0.7)
+    ax.set_axisbelow(True)
+
+    closed = np.concatenate([angles, angles[:1]])
+    for j, scenario in enumerate(summary['scenario']):
+        values = np.concatenate([scaled[:, j], scaled[:1, j]])
+        color = SCENARIO_COLORS[scenario]
+        # Opaque stroke, barely-there fill: with four overlapping polygons a
+        # heavier fill hides whichever is drawn first.
+        ax.plot(closed, values, color=color, linewidth=2.2, zorder=3)
+        ax.fill(closed, values, color=color, alpha=0.13, zorder=2)
+
+    # Labels are placed by offsetting from the end of each axis in display
+    # space, not by pushing the radius out.  A radial offset moves a label
+    # diagonally, so on the side axes the name and the numbers underneath it
+    # drift into each other; offsetting in points keeps the numbers squarely
+    # below the name whatever direction the axis points.
+    label_pad, line_step = 14.0, 15.0
+    for i, (_column, label, unit, _sign) in enumerate(RADAR_AXES):
+        angle = angles[i]
+        direction = (np.pi / 2.0) - angle          # theta_offset, then clockwise
+        dx, dy = np.cos(direction), np.sin(direction)
+
+        if dx > 0.25:
+            ha = 'left'
+        elif dx < -0.25:
+            ha = 'right'
+        else:
+            ha = 'center'
+
+        x0, y0 = dx * label_pad, dy * label_pad
+        ax.annotate(label, xy=(angle, 1.0), xytext=(x0, y0),
+                    textcoords='offset points', ha=ha, va='center',
+                    fontsize=13, color='#222222', zorder=5,
+                    annotation_clip=False)
+        # Arial has no subscript two or superscript minus, so the unit is drawn
+        # in DejaVu Sans, as tools/unit_text.py does for the other figures.
+        ax.annotate(f'({unit})', xy=(angle, 1.0),
+                    xytext=(x0, y0 - line_step), textcoords='offset points',
+                    ha=ha, va='center', fontsize=13, color='#222222',
+                    fontfamily=_unit_font(unit), zorder=5,
+                    annotation_clip=False)
+        # The raw 2050 values, in scenario order and in scenario colour, so the
+        # reader does not have to go back to the table to read the panel.
+        for j, scenario in enumerate(summary['scenario']):
+            ax.annotate(f'{raw[i, j]:,.1f}', xy=(angle, 1.0),
+                        xytext=(x0, y0 - line_step * (2.2 + j)),
+                        textcoords='offset points', ha=ha, va='center',
+                        fontsize=11, color=SCENARIO_COLORS[scenario], zorder=5,
+                        annotation_clip=False)
+
+
 def plot_figure(summary):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     plt.rcParams.update({
@@ -434,16 +542,23 @@ def plot_figure(summary):
         'svg.fonttype': 'none',
     })
 
-    # 3 rows x 2 columns — two panels per row.
-    fig, axes = plt.subplots(3, 2, figsize=(14.0, 14.5))
-    fig.subplots_adjust(
-        left=0.055,
-        right=0.985,
-        top=0.965,
-        bottom=0.115,
-        wspace=0.20,
-        hspace=0.38,
+    # Three rows of two bar panels, then panel g alone across the fourth row.
+    fig = plt.figure(figsize=(14.0, 22.5))
+    gs = fig.add_gridspec(
+        4, 2,
+        height_ratios=[1.0, 1.0, 1.0, 2.05],
+        left=0.055, right=0.985, top=0.975, bottom=0.115,
+        wspace=0.20, hspace=0.38,
     )
+    axes = np.empty((3, 2), dtype=object)
+    for row in range(3):
+        for col in range(2):
+            axes[row, col] = fig.add_subplot(gs[row, col])
+
+    # The radar sits in the middle of the full-width row, leaving the outer
+    # thirds for its axis labels and the per-scenario values beside them.
+    radar_cell = gs[3, :].subgridspec(1, 3, width_ratios=[1.0, 2.1, 1.0])
+    ax_radar = fig.add_subplot(radar_cell[0, 1], polar=True)
 
     # Match the indicator order used in 03_indicators.py.
     ax = axes[0, 0]
@@ -495,11 +610,20 @@ def plot_figure(summary):
     )
     _set_panel_style(ax, 'Land-use change', 'f')
 
-    fig.supxlabel(
+    _draw_radar(ax_radar, summary)
+    # Same size and weight as the (a)-(f) titles, but anchored to the row rather
+    # than to the polar axes, so it cannot collide with the topmost axis label.
+    radar_box = ax_radar.get_position(fig)
+    fig.text(0.055, radar_box.y1 + 0.012, '(g) Scenario profile',
+             fontsize=19, fontweight='bold', color='#222222',
+             ha='left', va='bottom')
+
+    # The shared x label belongs to the six bar panels, not to the radar, so it
+    # sits just under the third row rather than at the foot of the figure.
+    fig.text(
+        0.5, gs[2, 0].get_position(fig).y0 - 0.028,
         'Change from 2010 baseline (%)',
-        fontsize=17,
-        x=0.5,
-        y=0.062,
+        fontsize=17, ha='center', va='top',
     )
 
     scenario_handles = [

@@ -9,6 +9,7 @@ into the paper and is settled at the end.
 | 31 | [31_Pairwise.py](31_Pairwise.py) | `figures/31_Pairwise.svg` | Fig. 5 (provisional) |
 | 32 | [32_Driver_outcome_matrix.py](32_Driver_outcome_matrix.py) | `figures/32_Driver_outcome_matrix.svg` | Extended Data Fig. 11 (provisional) |
 | 33 | [33_Consistency_maps.py](33_Consistency_maps.py) | `figures/33_Consistency_maps.svg` + `excel/33_consistency_agreement.xlsx` | Extended Data Fig. 12 (provisional) |
+| 04g | [04_Trade_off_percent_threshold.py](04_Trade_off_percent_threshold.py) | `figures/04_trade_off_percent_threshold.svg` | Fig. 4 panel g |
 | 30 | *(pending — waits on Run_5_SCN_AgS1_VHP)* | `excel/30_table_*.xlsx` | Table S10 (provisional) |
 
 Output root: `output/20260714_Paper3_NCI/ag2050/`. SVG only — no PNG is written.
@@ -78,6 +79,41 @@ AgS4→Medium. Climate Survival and System Decline therefore plot on top of one
 another; this is correct and is not to be jittered apart. Within these rows Very
 High is not always above High — that is a property of the weighted average, not
 a data error.
+
+---
+
+## 04 panel g — Scenario profile (radar)
+
+Added to Fig. 4 as a seventh panel, alone on a fourth row.
+
+> **(g) Scenario profile.** The six axes carry, clockwise from the top, net GHG
+> emissions from land, the contribution-weighted biodiversity score, change in
+> water yield, net economic returns, agri-food production and land-use change
+> extent — the same six quantities, in the same order, as the radar in the
+> framework diagram. Each axis is first oriented so that further from the centre
+> is better: net emissions and land-use change extent are negated, and change in
+> water yield needs no flip because a smaller loss is already the larger number.
+> Each axis is then scaled between the worst scenario, at the centre, and the
+> best, on the outer ring, so the panel compares scenarios against each other
+> and not indicators against each other; the rings carry no values for that
+> reason. The 2050 value behind every point is printed beside its axis, in
+> scenario colour and in scenario order.
+
+**Read the shape with care.** Because each axis is min-max scaled across just
+four scenarios, a scenario that is worst on an axis sits exactly at the centre.
+System Decline is worst on four of the six, so its polygon collapses to a
+near-line with a single spike on land-use change extent. That is the data, not a
+plotting fault, and it is worth a sentence in the text so a reader does not read
+it as an error.
+
+**Source.** `excel/04_trade_off_percent_threshold.xlsx`, sheet `summary` — the
+same sheet as panels a–f, so panel g cannot disagree with the bars above it.
+`05_scenario_synthesis_2050.xlsx` uses a different definition of net economic
+returns and biodiversity and must not be used.
+
+**Axis order** matches Extended Data Fig. 1 deliberately, with the framework
+diagram's abbreviations written out in full, so a reader turning from the
+framework to the results meets the same object twice.
 
 ---
 

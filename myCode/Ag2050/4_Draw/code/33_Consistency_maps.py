@@ -115,21 +115,20 @@ assert len(PANELS) == 12 == len(LETTERS)
 def build_cell_area_cache():
     """Extract the per-cell areas from the run archives into EXCEL_DIR.
 
-    This is the GENERATE_TABLES half of the pattern.  It reads the xr_area_*
-    NetCDFs out of each Run_Archive.zip, which needs xarray and cf_xarray, so it
-    only works in the modelling environment; the drawing half needs nothing but
-    numpy.  The message says so rather than letting an ImportError surface.
+    This is the GENERATE_TABLES half of the pattern: it reads the xr_area_*
+    NetCDFs out of each Run_Archive.zip.  Run the Ag2050 figures with the xpluto
+    environment and everything needed is present; the check below only exists so
+    a stripped-down environment fails with a sentence instead of a traceback.
     """
-    # make_cell_area_cache imports xarray lazily, inside the reader, so check
-    # up front rather than letting a bare ModuleNotFoundError surface halfway
+    # make_cell_area_cache imports xarray lazily, inside the reader, so check up
+    # front rather than letting a bare ModuleNotFoundError surface halfway
     # through the extraction.
     missing = [name for name in ('xarray', 'cf_xarray')
                if importlib.util.find_spec(name) is None]
     if missing:
         raise ImportError(
-            f'Extracting the per-cell areas needs {" and ".join(missing)}, which '
-            'the plotting environment does not have. Either run '
-            '"<xpluto>/python.exe tools/make_cell_area_cache.py" once, or set '
+            f'Extracting the per-cell areas needs {" and ".join(missing)}. Run '
+            'this script with the xpluto environment, which has them, or set '
             'GENERATE_TABLES = False in tools/parameters.py to draw from the '
             'cache that is already in EXCEL_DIR.'
         )
@@ -142,7 +141,7 @@ def load_cell_areas():
     path = os.path.join(EXCEL_DIR, AREA_CACHE)
     if not os.path.exists(path):
         raise FileNotFoundError(
-            f'{path} not found. Build it once with the modelling environment:\n'
+            f'{path} not found. Build it once with the xpluto environment:\n'
             '    <xpluto>/python.exe tools/make_cell_area_cache.py'
         )
     cache = np.load(path, allow_pickle=True)
