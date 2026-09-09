@@ -6,6 +6,7 @@ into the paper and is settled at the end.
 
 | Working no. | Script | Output | Manuscript no. |
 |---|---|---|---|
+| 02 | [02_Mapping.py](02_Mapping.py) | `figures/02_maps.svg` | Fig. 2 |
 | 31 | [31_Pairwise.py](31_Pairwise.py) | `figures/31_Pairwise.svg` | Fig. 5 (provisional) |
 | 32 | [32_Driver_outcome_matrix.py](32_Driver_outcome_matrix.py) | `figures/32_Driver_outcome_matrix.svg` | Extended Data Fig. 11 (provisional) |
 | 33 | [33_Consistency_maps.py](33_Consistency_maps.py) | `figures/33_Consistency_maps.svg` + `excel/33_consistency_agreement.xlsx` | Extended Data Fig. 12 (provisional) |
@@ -14,6 +15,34 @@ into the paper and is settled at the end.
 | 30 | *(pending — waits on Run_5_SCN_AgS1_VHP)* | `excel/30_table_*.xlsx` | Table S10 (provisional) |
 
 Output root: `output/20260714_Paper3_NCI/ag2050/`. SVG only — no PNG is written.
+
+---
+
+## 02 — Legend symbols (Referee 1)
+
+Referee 1 asked for the land-use and the agricultural-management legends to be
+told apart. Colour cannot carry that on its own, so in Fig. 2 each family now
+has its own symbol. Only the symbols changed: the colours still come from
+`tools/land use colors.xlsx` and the layout is unchanged.
+
+| Family | Symbol |
+|---|---|
+| Agricultural land-use | square `s` |
+| Agricultural management | circle `o` |
+| Non-agricultural land-use | triangle `^` |
+| Neither (public and indigenous land, urban land, plantation forestry and water bodies) | plain bar |
+
+Panel (b) draws *No agricultural management* as a hollow circle with a mid-grey
+edge: filled, it is a pale grey dot on the pale grey land behind it and reads as
+nothing at all. Panel (a)'s *Non-agricultural land-use* entry is a triangle
+among squares, and panel (c)'s *Agricultural land-use* backdrop is a square
+among triangles, so each panel states which family it is showing.
+
+The rule is applied by `legend_family()` in
+[tools/plot_helper.py](tools/plot_helper.py), which classifies an entry from its
+label, with `category_handles()` and `place_category_legend()` building the
+legend. The helpers are general, but only Fig. 2 uses them for now — the other
+figures keep the legends they had.
 
 ---
 

@@ -221,6 +221,174 @@ def stacked_area_pos_neg(ax, df, colors=None, alpha=0.60,
     return ax
 
 
+# ── Legend symbols ────────────────────────────────────────────────────────────
+# Referee 1 asked for the land-use and the agricultural-management legends to be
+# told apart.  Colour cannot do that on its own -- the two families draw from
+# overlapping parts of the palette -- so each family carries its own symbol, the
+# same symbol in every figure of the paper:
+#
+#     agricultural land-use        square    (s)
+#     agricultural management      circle    (o)
+#     non-agricultural land-use    triangle  (^)
+#
+# Entries belonging to none of the three (transitions, off-land commodities, the
+# climate-change reference line, commodity groups) keep a plain bar, which reads
+# as "not one of the three families" rather than as a fourth one.
+#
+# Colours are untouched: they still come from tools/land use colors.xlsx.
+
+LEGEND_MARKERS = {'ag': 's', 'am': 'o', 'non_ag': '^'}
+
+LEGEND_MARKER_SCALE = 0.62   # marker height as a fraction of the entry's font
+LEGEND_MARKERSIZE = 6.5      # fallback when the font size cannot be resolved
+GROUP_TITLE_BOOST = 1.0      # group titles sit one point above their entries
+HOLLOW_EDGE_COLOR = '#808080'
+
+# Both the model's own names and the display names the figures rename them to,
+# so a legend works whether or not it has been through RENAME_AM/RENAME_NON_AG.
+_AM_LABELS = frozenset(_normalize(s) for s in (
+    'Methane reduction (livestock)', 'Agricultural technology (fertiliser)',
+    'Regenerative agriculture (livestock)', 'Early dry-season savanna burning',
+    'Agricultural technology (energy)', 'Biochar (soil amendment)',
+    'Managed regeneration (beef)', 'Managed regeneration (sheep)',
+    'Utility Solar PV', 'Onshore wind',
+    'Asparagopsis taxiformis', 'Precision Agriculture', 'Ecological Grazing',
+    'Savanna Burning', 'AgTech EI', 'Biochar', 'HIR - Beef', 'HIR - Sheep',
+))
+
+_NON_AG_LABELS = frozenset(_normalize(s) for s in (
+    'Environmental plantings (mixed species)',
+    'Environmental plantings (mixed local native species)',
+    'Riparian buffer restoration (mixed species)',
+    'Agroforestry (mixed species + sheep)',
+    'Agroforestry (mixed species + beef)',
+    'Carbon plantings (monoculture)',
+    'Farm forestry (hardwood timber + sheep)',
+    'Farm forestry (hardwood timber + beef)',
+    'BECCS (Bioenergy with Carbon Capture and Storage)',
+    'BECCS (Bioenergy with carbon capture and storage)',
+    'Destocked - natural land', 'Destocked (natural land)',
+    'Environmental Plantings', 'Riparian Plantings', 'Sheep Agroforestry',
+    'Beef Agroforestry', 'Carbon Plantings (Block)',
+    'Sheep Carbon Plantings (Belt)', 'Beef Carbon Plantings (Belt)', 'BECCS',
+))
+
+_AG_LABELS = frozenset(_normalize(s) for s in (
+    # the eight-category scheme of Fig. 2 and the area figures
+    'Dryland cropland and horticulture', 'Irrigated cropland and horticulture',
+    'Dryland grazing (modified pastures)', 'Irrigated grazing (modified pastures)',
+    'Grazing (native vegetation)', 'Unallocated land',
+    'Dryland agriculture', 'Irrigated agriculture',
+    # the individual land uses, where a figure lists them one by one
+    'Apples', 'Citrus', 'Cotton', 'Grapes', 'Hay', 'Nuts',
+    'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice',
+    'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes',
+    'Summer oilseeds', 'Tropical stone fruit', 'Vegetables',
+    'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+    'Beef - modified land', 'Beef - natural land',
+    'Dairy - modified land', 'Dairy - natural land',
+    'Sheep - modified land', 'Sheep - natural land',
+    'Unallocated - modified land', 'Unallocated - natural land',
+))
+
+
+def legend_family(label):
+    """Which of the three families a legend entry belongs to, or None.
+
+    Order matters: 'Non-agricultural land-use' contains 'agricultural', and
+    'No agricultural management' contains 'agricultural management', so the
+    more specific tests come first.
+    """
+    s = _normalize(label)
+    if not s:
+        return None
+    if s in _NON_AG_LABELS or s.startswith('nonag'):
+        return 'non_ag'
+    if s in _AM_LABELS or 'agriculturalmanagement' in s or s.startswith('agmgt'):
+        return 'am'
+    if (s in _AG_LABELS or 'agriculturallanduse' in s
+            or s.startswith('agcost') or s.startswith('agrevenue')):
+        return 'ag'
+    return None
+
+
+def _resolved_fontsize(fontsize=None):
+    """The point size a legend entry will actually be drawn at."""
+    size = plt.rcParams['legend.fontsize'] if fontsize is None else fontsize
+    if not isinstance(size, (int, float)):     # 'medium', 'large', ...
+        size = plt.rcParams['font.size']
+    return float(size)
+
+
+def marker_size(fontsize=None):
+    """Marker height matched to the text, so symbols read as swatches."""
+    return max(4.0, LEGEND_MARKER_SCALE * _resolved_fontsize(fontsize))
+
+
+def category_handle(label, color, family=None, hollow=False, markersize=None):
+    """One legend entry drawn with its family's symbol.
+
+    *hollow* draws the marker unfilled with a mid-grey edge, or filled with a
+    given colour if a colour string is passed -- used for "No agricultural
+    management", which would otherwise be a grey blob indistinguishable from
+    the grey land behind the maps.
+    """
+    family = legend_family(label) if family is None else family
+    if family is None:
+        return Patch(facecolor=color, edgecolor='none', label=label)
+    if hollow is False:
+        face, edge, width = color, 'none', 0.0
+    else:
+        face = 'none' if hollow is True else hollow
+        edge, width = HOLLOW_EDGE_COLOR, 0.9
+    return Line2D([], [], linestyle='none',
+                  marker=LEGEND_MARKERS[family],
+                  markersize=marker_size() if markersize is None else markersize,
+                  markerfacecolor=face, markeredgecolor=edge, markeredgewidth=width,
+                  label=label)
+
+
+def category_handles(colors, order=None, hollow=(), family=None, markersize=None,
+                     fontsize=None):
+    """Legend handles for a {label: colour} mapping, in *order* if given."""
+    hollow = set(hollow)
+    markersize = marker_size(fontsize) if markersize is None else markersize
+    labels = [l for l in order if l in colors] if order else list(colors)
+    labels += [l for l in colors if l not in set(labels)]
+    return [category_handle(l, colors[l], family=family,
+                            hollow=(l in hollow), markersize=markersize)
+            for l in labels]
+
+
+def place_category_legend(ax, handles, ncol=1, fontsize=None, title=None,
+                          loc='center left', title_align='left', on_figure=False,
+                          **kwargs):
+    """Draw an already-built handle list with the shared legend styling."""
+    # A bar handle fills the whole handle box, a marker draws a fixed symbol in
+    # the middle of it.  Give a mixed legend a wider box so the two cannot be
+    # mistaken for each other; a marker-only legend stays tight.
+    mixed = any(isinstance(h, Patch) for h in handles)
+    opts = dict(handlelength=1.8 if mixed else 1.0, handleheight=1.0,
+                handletextpad=0.5, frameon=False)
+    if fontsize is not None:
+        opts['fontsize'] = fontsize
+    opts.update(kwargs)
+    if title:
+        opts['title'] = title
+        opts['title_fontproperties'] = {
+            'weight': 'bold',
+            'size': _resolved_fontsize(fontsize) + GROUP_TITLE_BOOST,
+        }
+    target = ax.get_figure() if on_figure else ax
+    leg = target.legend(handles, [h.get_label() for h in handles],
+                        loc=loc, ncol=ncol, **opts)
+    # Left-align the title over the entries rather than centring it over the
+    # whole block, which reads as a caption rather than a heading.
+    if title:
+        leg._legend_box.align = title_align
+    return leg
+
+
 # ── Figure legend ─────────────────────────────────────────────────────────────
 
 def draw_legend(ax, bbox_to_anchor=(0.5, -0.05), ncol=4, column_spacing=1.0):
