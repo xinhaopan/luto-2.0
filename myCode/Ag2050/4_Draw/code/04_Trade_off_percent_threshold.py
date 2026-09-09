@@ -441,14 +441,46 @@ RADAR_AXES = [
     ('food_2050_mt',          'Agri-food production',                  'Mt yr⁻¹',          +1),
     ('land_use_change_2010_2050_mha', 'Land-use change extent',        'Mha',                        -1),
 ]
-# The worst scenario on an axis is drawn on this inner ring rather than at the
-# exact centre.  With only four scenarios a plain min-max pins the worst at
-# radius zero, and a scenario that is worst on four of six axes then has a
-# polygon with no area at all -- System Decline came out as a bare line, which
-# is not a profile.  Lifting the floor changes nothing about the ordering and
-# nothing about which scenario is best; it only gives every scenario a shape.
-RADAR_FLOOR = 0.16
-RADAR_RINGS = (RADAR_FLOOR, 0.44, 0.72, 1.00)
+# Every axis carries an ordinary scale with round tick values, like the bar
+# panels above: a nice step is chosen per axis and the rings sit at whole
+# multiples of it.  Because the scale starts below the smallest value rather
+# than at it, no scenario is pinned to the centre -- an earlier min-max version
+# collapsed System Decline to a bare line.
+RADAR_INTERVALS = 4
+# Same size as the tick labels and value annotations of panels a-f.
+RADAR_FONTSIZE = 15
+
+
+def _nice_scale(low, high, intervals=RADAR_INTERVALS):
+    """A round step and a round starting value covering [low, high].
+
+    Same idea as a normal axis locator, but the number of intervals is fixed so
+    that all six axes can share the same rings while each keeps its own units.
+    The start is nudged down when the data would otherwise touch the centre.
+    """
+    if high <= low:
+        high = low + 1.0
+    raw = (high - low) / intervals
+    magnitude = 10.0 ** np.floor(np.log10(raw))
+    for multiple in (1.0, 2.0, 2.5, 5.0, 10.0):
+        step = multiple * magnitude
+        if step >= raw:
+            break
+    start = np.floor(low / step) * step
+    if low - start < 0.15 * step:        # keep the smallest value off the centre
+        start -= step
+    while start + intervals * step < high:
+        step *= 2.0
+        start = np.floor(low / step) * step
+    return float(start), float(step)
+
+
+def _radar_tick(value):
+    """Tick text: the axes run from 152 Mt to -18,504 GL, so one format cannot
+    serve both."""
+    if value == 0:
+        return '0'          # a step landing on zero can arrive as -0.0
+    return f'{value:,.0f}' if abs(value) >= 10.0 else f'{value:,.1f}'
 
 
 def _unit_font(unit):
@@ -463,9 +495,9 @@ def _draw_radar(ax, summary):
     Two of the six are 'smaller is better' (net emissions, and how much land has
     to change hands) and are negated first.  Change in water yield is already
     negative everywhere, and a smaller loss is a larger number, so it needs no
-    flip.  Each axis is then min-max scaled across the four scenarios: the worst
-    scenario sits at the centre and the best on the outer ring.  That makes the
-    shape a comparison between scenarios, not a comparison between indicators.
+    flip.  Each axis then gets an ordinary scale of its own -- a round step and
+    round tick values, chosen by _nice_scale -- so the rings can be read as
+    numbers rather than as ranks, and no scenario is pinned to the centre.
     """
     n = len(RADAR_AXES)
     angles = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
@@ -476,13 +508,22 @@ def _draw_radar(ax, summary):
     raw = np.array([summary[column].astype(float).to_numpy()
                     for column, _lab, _unit, _sign in RADAR_AXES])
     oriented = raw * np.array([[sign] for _c, _l, _u, sign in RADAR_AXES])
-    lo = oriented.min(axis=1, keepdims=True)
-    hi = oriented.max(axis=1, keepdims=True)
-    span = np.where(hi - lo == 0, 1.0, hi - lo)
-    scaled = RADAR_FLOOR + (1.0 - RADAR_FLOOR) * (oriented - lo) / span
 
+    # One ordinary scale per axis: a round step, a round starting value, and
+    # RADAR_INTERVALS rings, so every axis can be read off its own ticks while
+    # all six share the same rings.
+    starts, steps = [], []
+    for i in range(len(RADAR_AXES)):
+        start, step = _nice_scale(float(oriented[i].min()), float(oriented[i].max()))
+        starts.append(start)
+        steps.append(step)
+    starts = np.array(starts)[:, None]
+    steps = np.array(steps)[:, None]
+    scaled = (oriented - starts) / (RADAR_INTERVALS * steps)
+
+    rings = [k / RADAR_INTERVALS for k in range(1, RADAR_INTERVALS + 1)]
     ax.set_ylim(0.0, 1.0)
-    ax.set_yticks(list(RADAR_RINGS))
+    ax.set_yticks(rings)
     ax.set_yticklabels([])
     ax.set_xticks(angles)
     ax.set_xticklabels([])
@@ -499,13 +540,12 @@ def _draw_radar(ax, summary):
         scenario = summary['scenario'].iloc[j]
         values = np.concatenate([scaled[:, j], scaled[:1, j]])
         color = SCENARIO_COLORS[scenario]
-        # Opaque stroke, barely-there fill: with four overlapping polygons a
-        # heavier fill hides whichever is drawn first.
-        ax.fill(closed, values, color=color, alpha=0.13, zorder=2 + rank)
+        # Outline only -- four translucent fills stacked on top of each other
+        # muddied the colours and hid the rings underneath.
         ax.plot(closed, values, color=color, linewidth=2.2,
                 zorder=10 + rank, solid_joinstyle='round')
-        # A dot on every vertex, so a scenario that sits near the floor on most
-        # axes still shows where it actually is.
+        # A dot on every vertex, so a scenario sitting low on most axes still
+        # shows where it actually is.
         ax.plot(angles, scaled[:, j], linestyle='none', marker='o',
                 markersize=5, color=color, zorder=10 + rank)
 
@@ -514,39 +554,50 @@ def _draw_radar(ax, summary):
     # diagonally, so on the side axes the name and the numbers underneath it
     # drift into each other; offsetting in points keeps the numbers squarely
     # below the name whatever direction the axis points.
-    label_pad, line_step = 14.0, 15.0
     for i, (_column, label, unit, _sign) in enumerate(RADAR_AXES):
         angle = angles[i]
         direction = (np.pi / 2.0) - angle          # theta_offset, then clockwise
         dx, dy = np.cos(direction), np.sin(direction)
 
-        if dx > 0.25:
-            ha = 'left'
-        elif dx < -0.25:
-            ha = 'right'
-        else:
-            ha = 'center'
+        # Labels run along the tangent, i.e. square to the axis they belong to,
+        # so each block reads as part of its own spoke.  Flip any that would
+        # come out upside down.
+        rotation = np.degrees(direction) - 90.0
+        while rotation > 90.0:
+            rotation -= 180.0
+        while rotation <= -90.0:
+            rotation += 180.0
 
-        x0, y0 = dx * label_pad, dy * label_pad
-        ax.annotate(label, xy=(angle, 1.0), xytext=(x0, y0),
-                    textcoords='offset points', ha=ha, va='center',
-                    fontsize=13, color='#222222', zorder=5,
-                    annotation_clip=False)
-        # Arial has no subscript two or superscript minus, so the unit is drawn
-        # in DejaVu Sans, as tools/unit_text.py does for the other figures.
-        ax.annotate(f'({unit})', xy=(angle, 1.0),
-                    xytext=(x0, y0 - line_step), textcoords='offset points',
-                    ha=ha, va='center', fontsize=13, color='#222222',
-                    fontfamily=_unit_font(unit), zorder=5,
-                    annotation_clip=False)
-        # The raw 2050 values, in scenario order and in scenario colour, so the
-        # reader does not have to go back to the table to read the panel.
-        for j, scenario in enumerate(summary['scenario']):
-            ax.annotate(f'{raw[i, j]:,.1f}', xy=(angle, 1.0),
-                        xytext=(x0, y0 - line_step * (2.2 + j)),
-                        textcoords='offset points', ha=ha, va='center',
-                        fontsize=11, color=SCENARIO_COLORS[scenario], zorder=5,
-                        annotation_clip=False)
+        def _place(text, pad, fontsize, color, family=None):
+            ax.annotate(
+                text, xy=(angle, 1.0), xytext=(dx * pad, dy * pad),
+                textcoords='offset points', ha='center', va='center',
+                rotation=rotation, rotation_mode='anchor',
+                fontsize=fontsize, color=color, zorder=5,
+                annotation_clip=False,
+                **({'fontfamily': family} if family else {}),
+            )
+
+        # The unit always sits on the inside, the name outside it, on every
+        # axis, so the pair reads the same way all the way round.
+        _place(f'({unit})', 42.0, RADAR_FONTSIZE, '#222222', _unit_font(unit))
+        _place(label, 64.0, RADAR_FONTSIZE, '#222222')
+
+        # Ordinary tick values for this axis, at the rings.
+        sign = RADAR_AXES[i][3]
+        for k, ring in enumerate(rings, start=1):
+            value = (starts[i, 0] + k * steps[i, 0]) * sign   # undo the flip
+            # Horizontal, not tangential: these are the numbers the reader is
+            # meant to check, and a rotated number is harder to read.  The white
+            # halo keeps them legible where a polygon crosses a ring.
+            ax.annotate(
+                _radar_tick(value), xy=(angle, ring),
+                xytext=(-dy * 10.0, dx * 10.0), textcoords='offset points',
+                ha='center', va='center', fontsize=RADAR_FONTSIZE,
+                color='#6E6E6E', zorder=20, annotation_clip=False,
+                bbox=dict(boxstyle='round,pad=0.12', facecolor='white',
+                          edgecolor='none', alpha=0.85),
+            )
 
 
 def plot_figure(summary):
@@ -630,14 +681,14 @@ def plot_figure(summary):
     # Same size and weight as the (a)-(f) titles, but anchored to the row rather
     # than to the polar axes, so it cannot collide with the topmost axis label.
     radar_box = ax_radar.get_position(fig)
-    fig.text(0.055, radar_box.y1 + 0.012, '(g) Scenario profile',
+    fig.text(0.055, radar_box.y1 + 0.012, '(g) Comparison of the four scenarios',
              fontsize=19, fontweight='bold', color='#222222',
              ha='left', va='bottom')
 
     # The shared x label belongs to the six bar panels, not to the radar, so it
     # sits just under the third row rather than at the foot of the figure.
     fig.text(
-        0.5, gs[2, 0].get_position(fig).y0 - 0.028,
+        0.5, gs[2, 0].get_position(fig).y0 - 0.013,
         'Change from 2010 baseline (%)',
         fontsize=17, ha='center', va='top',
     )
