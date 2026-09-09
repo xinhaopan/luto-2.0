@@ -38,13 +38,15 @@ import numpy as np
 import pandas as pd
 from adjustText import adjust_text
 
-from tools.parameters import EXCEL_DIR, OUTPUT_DIR
+from tools.parameters import EXCEL_DIR, GENERATE_TABLES, OUTPUT_DIR, SCENARIO_LABELS
+from tools.two_row_figure import export_long_tables, load_long_tables
 from tools.unit_text import mixed_xlabel, mixed_ylabel
 
 # Relative paths in tools.parameters are anchored to this directory.
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-WORKBOOK = '04_trade_off_percent_threshold.xlsx'
+SOURCE_WORKBOOK = '04_trade_off_percent_threshold.xlsx'
+WORKBOOK = '31_pairwise_points.xlsx'   # this figure's own cached table
 SHEET = 'summary'
 OUTPUT_NAME = '31_Pairwise.svg'
 
@@ -110,8 +112,14 @@ EXPECTED_2050 = {
 }
 
 
-def load_summary() -> pd.DataFrame:
-    path = os.path.join(EXCEL_DIR, WORKBOOK)
+def prepare_points() -> pd.DataFrame:
+    """Pull the four scenario points out of the trade-off workbook.
+
+    This is the GENERATE_TABLES half of the usual pattern: extract from the
+    processed outputs once, cache the result under EXCEL_DIR, and let every
+    later run of the script draw straight from that cache.
+    """
+    path = os.path.join(EXCEL_DIR, SOURCE_WORKBOOK)
     if not os.path.exists(path):
         raise FileNotFoundError(
             f'{path} not found. Run 04_Trade_off_percent_threshold.py first.'
@@ -127,7 +135,9 @@ def load_summary() -> pd.DataFrame:
         raise ValueError(f'Unrecognised scenario labels: {sorted(unknown)}')
 
     _verify(data)
-    return data
+    # Keep the run id as the key: export_long_tables adds scenario_label from
+    # it and load_long_tables strips that column again.
+    return data[['scenario'] + [c for c in REQUIRED_COLUMNS if c != 'scenario_label']]
 
 
 def _verify(data: pd.DataFrame) -> None:
@@ -259,7 +269,10 @@ def _padded(values: np.ndarray, fraction: float):
 
 
 def main() -> None:
-    data = load_summary()
+    if GENERATE_TABLES:
+        export_long_tables(WORKBOOK, points=prepare_points())
+    data = load_long_tables(WORKBOOK, 'points')['points']
+    data = data.assign(scenario_label=data['scenario'].map(SCENARIO_LABELS))
 
     # Straight from the Nature figure spec (static/fragments/backend/python.md).
     plt.rcParams.update({

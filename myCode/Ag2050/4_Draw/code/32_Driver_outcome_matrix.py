@@ -40,8 +40,11 @@ import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
 
-from tools.parameters import EXCEL_DIR, OUTPUT_DIR
+# SCENARIO_LABELS is deliberately not imported: this module keeps its own,
+# keyed by scenario code rather than by run id.
+from tools.parameters import EXCEL_DIR, GENERATE_TABLES, OUTPUT_DIR, input_files
 from tools.text_layout import balanced_wrap
+from tools.two_row_figure import export_long_tables, load_long_tables
 from tools.unit_text import mixed_xlabel
 
 # Relative paths in tools.parameters are anchored to this directory.
@@ -52,6 +55,7 @@ DRIVER_SHEET = 'series'
 OUTCOME_WORKBOOK = '04_trade_off_percent_threshold.xlsx'
 OUTCOME_SHEET = 'summary'
 OUTPUT_NAME = '32_Driver_outcome_matrix.svg'
+WORKBOOK = '32_driver_outcome_long_tables.xlsx'   # this figure's cached table
 
 YEAR = 2050
 MM = 1.0 / 25.4
@@ -73,6 +77,9 @@ SCENARIO_LABELS = {
     'AgS4': 'System Decline',
 }
 SCENARIO_ORDER = ['AgS1', 'AgS2', 'AgS3', 'AgS4']
+# The cached long tables key on the run id, which is what the shared table
+# helpers expect in a 'scenario' column.
+RUN_OF = {code: run for code, run in zip(SCENARIO_ORDER, input_files)}
 
 # A second, non-colour cue for scenario identity.  The palette is fixed by the
 # rest of the paper and cannot change, but this figure identifies scenarios by
@@ -209,9 +216,38 @@ def verify(drivers: dict, outcomes: dict) -> None:
           + ', '.join(coincide))
 
 
+def _tidy(drivers, outcomes):
+    """Long tables for the cache: one row per (panel, scenario) value."""
+    driver_rows = [{'panel': panel, 'scenario': RUN_OF[code], 'value': drivers[panel][code]}
+                   for _l, panel, _t in DRIVER_ROWS for code in SCENARIO_ORDER]
+    outcome_rows = [{'outcome': column, 'scenario': RUN_OF[code], 'value': outcomes[column][code]}
+                    for column, _t in OUTCOME_COLUMNS for code in SCENARIO_ORDER]
+    return pd.DataFrame(driver_rows), pd.DataFrame(outcome_rows)
+
+
+def _from_tables(driver_df, outcome_df):
+    """Rebuild the {panel: {code: value}} dicts from the cached long tables."""
+    code_of = {run: code for code, run in RUN_OF.items()}
+    drivers = {panel: {} for _l, panel, _t in DRIVER_ROWS}
+    for row in driver_df.itertuples():
+        drivers[row.panel][code_of[row.scenario]] = float(row.value)
+    outcomes = {column: {} for column, _t in OUTCOME_COLUMNS}
+    for row in outcome_df.itertuples():
+        outcomes[row.outcome][code_of[row.scenario]] = float(row.value)
+    return drivers, outcomes
+
+
 def main() -> None:
-    drivers = load_drivers()
-    outcomes = load_outcomes()
+    # GENERATE_TABLES: pull the values out of the processed workbooks and cache
+    # them here; otherwise draw straight from this figure's own cached table.
+    if GENERATE_TABLES:
+        drivers = load_drivers()
+        outcomes = load_outcomes()
+        verify(drivers, outcomes)
+        driver_df, outcome_df = _tidy(drivers, outcomes)
+        export_long_tables(WORKBOOK, drivers=driver_df, outcomes=outcome_df)
+    tables = load_long_tables(WORKBOOK, 'drivers', 'outcomes')
+    drivers, outcomes = _from_tables(tables['drivers'], tables['outcomes'])
     verify(drivers, outcomes)
 
     # Straight from the Nature figure spec (static/fragments/backend/python.md).

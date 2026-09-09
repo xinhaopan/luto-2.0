@@ -42,6 +42,7 @@ Outputs
 import _path_setup  # noqa: F401
 
 import importlib
+import importlib.util
 import itertools
 import os
 
@@ -52,7 +53,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from tools.parameters import EXCEL_DIR, OUTPUT_DIR, SCENARIO_LABELS, input_files
+from tools.parameters import (EXCEL_DIR, GENERATE_TABLES, OUTPUT_DIR,
+                              SCENARIO_LABELS, input_files)
 from tools.text_layout import balanced_wrap
 
 # Relative paths in tools.parameters are anchored to this directory.
@@ -62,8 +64,8 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 _map = importlib.import_module('02_Mapping')
 
 OUTPUT_NAME = '33_Consistency_maps.svg'
-TABLE_NAME = '33_consistency_agreement.xlsx'
-AREA_CACHE = '33_cell_areas.npz'
+TABLE_NAME = '33_consistency_agreement.xlsx'   # this figure's cached table
+AREA_CACHE = '33_cell_areas.npz'               # the extracted per-cell areas
 
 MM = 1.0 / 25.4
 FIG_W_MM = 183.0        # Nature double-column width
@@ -108,6 +110,31 @@ PANELS = (
 )
 LETTERS = 'abcdefghijkl'
 assert len(PANELS) == 12 == len(LETTERS)
+
+
+def build_cell_area_cache():
+    """Extract the per-cell areas from the run archives into EXCEL_DIR.
+
+    This is the GENERATE_TABLES half of the pattern.  It reads the xr_area_*
+    NetCDFs out of each Run_Archive.zip, which needs xarray and cf_xarray, so it
+    only works in the modelling environment; the drawing half needs nothing but
+    numpy.  The message says so rather than letting an ImportError surface.
+    """
+    # make_cell_area_cache imports xarray lazily, inside the reader, so check
+    # up front rather than letting a bare ModuleNotFoundError surface halfway
+    # through the extraction.
+    missing = [name for name in ('xarray', 'cf_xarray')
+               if importlib.util.find_spec(name) is None]
+    if missing:
+        raise ImportError(
+            f'Extracting the per-cell areas needs {" and ".join(missing)}, which '
+            'the plotting environment does not have. Either run '
+            '"<xpluto>/python.exe tools/make_cell_area_cache.py" once, or set '
+            'GENERATE_TABLES = False in tools/parameters.py to draw from the '
+            'cache that is already in EXCEL_DIR.'
+        )
+    from tools.make_cell_area_cache import main as extract
+    extract()
 
 
 def load_cell_areas():
@@ -220,6 +247,10 @@ def _pairwise(label, dominants, real_area, total_mha):
 
 
 def main() -> None:
+    # GENERATE_TABLES: re-extract the per-cell areas from the run archives into
+    # EXCEL_DIR first; otherwise draw straight from what is already cached there.
+    if GENERATE_TABLES:
+        build_cell_area_cache()
     cache = load_cell_areas()
     mask = raster_mask()
     real_area = cache['real_area']
