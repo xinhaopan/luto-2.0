@@ -235,7 +235,7 @@ def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     set_plot_style(font_size=font_size)
 
-    workbook = '02_area_long_tables.xlsx'
+    workbook = '01_area_long_tables.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
@@ -307,7 +307,7 @@ def main():
     add_patch_legend(ax_leg_lu, LU_COLORS, ncol=1)
     add_patch_legend(ax_leg_am, am_colors, ncol=1)
 
-    out = os.path.join(OUTPUT_DIR, '02_area.svg')
+    out = os.path.join(OUTPUT_DIR, '01_area.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight')
     plt.close(fig)
     print(f"Saved: {out}")

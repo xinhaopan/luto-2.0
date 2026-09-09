@@ -100,7 +100,7 @@ def prepare_am():
 
 
 def main():
-    workbook = '14_ghg_long_tables.xlsx'
+    workbook = '16_ghg_long_tables.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
@@ -125,7 +125,7 @@ def main():
         LU_COLORS,
         am_colors,
         "GHG emissions (MtCO₂e yr⁻¹)",
-        '14_ghg.svg',
+        '16_ghg.svg',
         y_label_x=0.020,
         overview_required_ticks=[-100, 100],
     )

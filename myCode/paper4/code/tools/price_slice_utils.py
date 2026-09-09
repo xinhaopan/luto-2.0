@@ -16,6 +16,7 @@ CODE_DIR = Path(__file__).resolve().parent.parent
 TASK_ROOT = (CODE_DIR / ".." / ".." / ".." / "output" / config.TASK_NAME).resolve()
 OUT_DIR = TASK_ROOT / "paper4" / "figures"
 DATA_DIR = TASK_ROOT / "paper4" / "data"
+CACHE_DIR = TASK_ROOT / "paper4" / "cache"  # large regenerable intermediate caches (e.g. extracted NetCDFs)
 
 PAPER4_COLOR_OVERRIDES = {
     "crops": "#aecb75",
@@ -37,6 +38,7 @@ DISPLAY_LABEL_REPLACEMENTS = {
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_paper4_paths():
@@ -135,9 +137,9 @@ def get_price_column(varying_key):
 
 def get_price_axis_label(varying_key):
     if varying_key == "cp":
-        return r"Carbon price (AU\$ tCO$_2$e$^{-1}$ yr$^{-1}$)"
+        return r"Carbon price (AU\$ tCO$_2$e$^{-1}$)"
     if varying_key == "bp":
-        return r"Biodiversity price (AU\$ ha$^{-1}$ yr$^{-1}$)"
+        return r"Biodiversity price (AU\$ ha$^{-1}$)"
     raise ValueError(f"Unsupported varying_key: {varying_key}")
 
 

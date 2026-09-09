@@ -33,7 +33,7 @@ EXTENT = [TIFF_LEFT, TIFF_RIGHT, TIFF_BOTTOM, TIFF_TOP]
 _HERE   = os.path.dirname(os.path.abspath(__file__))
 ASSETS  = os.path.normpath(os.path.join(_HERE, '../../../draw_all/code/Assets'))
 STE_SHP = os.path.join(ASSETS, 'AUS_adm/STE11aAust_mercator_simplified.shp')
-WORKBOOK = '03_mapping_tiff_manifest.xlsx'
+WORKBOOK = '02_mapping_tiff_manifest.xlsx'
 _TIFF_MANIFEST = None
 
 # ── 8-category LU scheme ──────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ def _lookup_manifest_tiff(scen, layer_name, cache_key):
     if not path or path == 'nan' or not os.path.exists(path):
         raise FileNotFoundError(
             f'Missing TIFF listed in table cache: {path}\n'
-            'Set GENERATE_TABLES = True in tools/parameters.py and run 03_Mapping.py once '
+            'Set GENERATE_TABLES = True in tools/parameters.py and run 02_Mapping.py once '
             'before plotting with GENERATE_TABLES = False.'
         )
     return path
@@ -308,7 +308,7 @@ def save_lu_maps(gdf_states):
                handlelength=1.0, handleheight=1.0,
                handletextpad=0.4, columnspacing=1.0, borderpad=0)
 
-    out = os.path.join(OUTPUT_DIR, '03a_landuse_maps.svg')
+    out = os.path.join(OUTPUT_DIR, '02a_landuse_maps.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     print(f'Saved: {out}')
@@ -379,7 +379,7 @@ def save_agmgt_maps(gdf_states):
                handlelength=1.0, handleheight=1.0,
                handletextpad=0.4, columnspacing=1.0, borderpad=0)
 
-    out = os.path.join(OUTPUT_DIR, '03b_agmgt_maps.svg')
+    out = os.path.join(OUTPUT_DIR, '02b_agmgt_maps.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     print(f'Saved: {out}')
@@ -429,7 +429,7 @@ def save_nonag_map(gdf_states):
                   handlelength=1.0, handleheight=1.0,
                   handletextpad=0.4, labelspacing=0.6, borderpad=0)
 
-    out = os.path.join(OUTPUT_DIR, '03c_nonag_map.svg')
+    out = os.path.join(OUTPUT_DIR, '02c_nonag_map.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     print(f'Saved: {out}')
@@ -586,7 +586,7 @@ def save_combined_maps(gdf_states):
                  ha='center', va='bottom',
                  fontsize=FONT_SIZE + 4, fontfamily='Arial', fontweight='bold')
 
-    out = os.path.join(OUTPUT_DIR, '03_maps.svg')
+    out = os.path.join(OUTPUT_DIR, '02_maps.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     print(f'Saved: {out}')

@@ -98,7 +98,7 @@ def prepare_am():
 
 
 def main():
-    workbook = '15_biodiversity_long_tables.xlsx'
+    workbook = '17_biodiversity_long_tables.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
@@ -123,7 +123,7 @@ def main():
         LU_COLORS,
         am_colors,
         "Biodiversity contribution-weighted area (Mha)",
-        '15_biodiversity.svg',
+        '17_biodiversity.svg',
         y_label_x=0.020,
     )
 

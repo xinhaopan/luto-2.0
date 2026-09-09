@@ -115,7 +115,7 @@ def prepare_am():
 
 
 def main():
-    workbook = '16_food_long_tables.xlsx'
+    workbook = '18_food_long_tables.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
@@ -140,7 +140,7 @@ def main():
         FOOD_COLORS,
         am_colors,
         'Agri-food production (Mt yr⁻¹)',
-        '16_food.svg',
+        '18_food.svg',
         y_label_x=0.020,
         top_legend_order=FOOD_LEGEND_ORDER,
     )

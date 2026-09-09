@@ -35,7 +35,7 @@ LABOUR_COST_FORECAST = os.path.abspath(os.path.join(
 ))
 
 YEARS = list(range(2010, 2051))
-WORKBOOK = '10_input_data_long_tables.xlsx'
+WORKBOOK = '12_input_data_long_tables.xlsx'
 LAST_HIST_YEAR = 2023
 LC_HIST_END = 2024
 FEEDLOT_HIST_END = 2024
@@ -444,7 +444,7 @@ def main():
                 ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(step))
                 break
 
-    out = os.path.join(OUTPUT_DIR, '10_input_data.svg')
+    out = os.path.join(OUTPUT_DIR, '12_input_data.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved: {out}')

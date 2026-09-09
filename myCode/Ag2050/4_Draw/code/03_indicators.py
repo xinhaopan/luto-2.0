@@ -190,7 +190,7 @@ def _load_water_correction(scenario):
 
 
 _CLIMATE_WATER_CACHE = None
-CLIMATE_WATER_CSV = '04_water_climate_impact_split.csv'
+CLIMATE_WATER_CSV = '03_water_climate_impact_split.csv'
 
 
 def _compute_climate_water_impact():
@@ -202,7 +202,7 @@ def _compute_climate_water_impact():
     at the 2010 agricultural dvar, so the result is the true scenario-invariant climate
     signal (≈ −7,668 GL yr⁻¹ by 2050); the livestock water-requirement change that
     write.py folds into its reported CCI is deliberately excluded. Writes the result to
-    EXCEL_DIR/04_water_climate_impact_split.csv and returns the DataFrame.
+    EXCEL_DIR/03_water_climate_impact_split.csv and returns the DataFrame.
 
     Requires the `luto` package importable (xpluto env) and the Data_RES*.lz4 files.
     Only invoked when the cache CSV is missing (one-time, ~2 min).
@@ -262,7 +262,7 @@ def _compute_climate_water_impact():
 def _load_climate_water_impact(force_regenerate=False):
     """Pure dryland/irrigated climate impact on water yield (GL), per (scenario, year).
 
-    Reads the per-task-root cache EXCEL_DIR/04_water_climate_impact_split.csv; if it is
+    Reads the per-task-root cache EXCEL_DIR/03_water_climate_impact_split.csv; if it is
     missing (e.g. first run on a new TASK_ROOT), computes it once from the raw
     Data_RES*.lz4 objects via _compute_climate_water_impact(). Cached at module level.
     """
@@ -494,14 +494,14 @@ def save_indicators_figure(all_dfs):
                  ha='center', va='bottom', fontsize=font_size,
                  fontweight='bold', fontfamily='Arial')
 
-    out = os.path.join(OUTPUT_DIR, '04_indicators.svg')
+    out = os.path.join(OUTPUT_DIR, '03_indicators.svg')
     fig.savefig(out, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved: {out}')
 
 
 def main():
-    workbook = '04_indicators_long_tables.xlsx'
+    workbook = '03_indicators_long_tables.xlsx'
     if GENERATE_TABLES:
         _load_climate_water_impact(force_regenerate=True)
         export_long_tables(

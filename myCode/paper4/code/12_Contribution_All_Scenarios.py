@@ -32,6 +32,7 @@ import xarray as xr
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from tools.tools import select_bio_backend
 from tools.price_slice_utils import (
     DATA_DIR,
     OUT_DIR,
@@ -56,7 +57,7 @@ COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 CACHE_PATH = DATA_DIR / f"12_Contribution_All_Scenarios_raw_data_{YEAR}.xlsx"
 
-FS = 18
+FS = 21
 SUM_LINE_LABEL = "Sum"
 GHG_METRIC = "GHGAbatement_2025_MtCO2e"
 BIO_METRIC = "BiodiversityContribution_2025_MhaYr"
@@ -238,6 +239,7 @@ def open_metric_da(zip_path, file_name):
             ds = cfxr.decode_compress_to_multi_index(ds, "layer")
 
         da = next(iter(ds.data_vars.values()))
+        da = select_bio_backend(da)
         return da.load()
     finally:
         ds.close()
@@ -743,7 +745,7 @@ for row_idx, area_type in enumerate(row_area_types):
 
 LEGEND_NCOL = {
     "_total": 5,
-    "Agricultural land-use": 5,
+    "Agricultural land-use": 3,  # 5 long labels -> wrap to two rows (3 + 2)
     "Ag management": 3,
     "Non-ag": 3,
 }

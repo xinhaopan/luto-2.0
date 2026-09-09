@@ -18,6 +18,7 @@ mpl.use("Agg")
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.ticker import MaxNLocator
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -44,7 +45,7 @@ COLOR_FILE = DRAW_ALL_TOOLS_DIR / "land use colors.xlsx"
 GROUP_FILE = DRAW_ALL_TOOLS_DIR / "land use group.xlsx"
 CACHE_PATH = DATA_DIR / f"11_Area_All_Scenarios_raw_data_{YEAR}.xlsx"
 
-FS = 18
+FS = 19
 SUM_LINE_LABEL = "Sum"
 OLD_LIVESTOCK_LABEL = "Livestock"
 MODIFIED_LIVESTOCK_LABEL = "Livestock (modified land)"
@@ -574,6 +575,12 @@ for row_idx, area_type in enumerate(row_area_types):
     cats_left = stacked_bar(ax_left, pivot_cp, area_type, "cp", show_xlabel=(row_idx == len(row_area_types) - 1))
     cats_right = stacked_bar(ax_right, pivot_bp, area_type, "bp", show_xlabel=(row_idx == len(row_area_types) - 1))
 
+    # Force integer y-ticks on every panel for a consistent look (avoids the lone
+    # 2.5-step decimal ticks matplotlib would otherwise pick for the 0-15.5 panel);
+    # cap at ~4-6 ticks so the axes stay uncluttered.
+    ax_left.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
+    ax_right.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=5))
+
     ax_left.set_ylabel(AREA_CONFIG[area_type]["ylabel"])
 
     legend_categories = get_category_order(area_type, list(dict.fromkeys(cats_left + cats_right)))
@@ -593,7 +600,7 @@ LEGEND_FS = {
     "Non-ag": FS,
 }
 
-fig.supylabel(r"Area (Mha)", x=0.065, y=0.5, fontsize=FS + 1, fontweight="bold")
+fig.supylabel(r"Absolute area (Mha)", x=0.065, y=0.5, fontsize=FS + 1, fontweight="bold")
 plt.tight_layout(rect=[0.075, 0, 1, 1])
 plt.subplots_adjust(hspace=0.44, wspace=0.28)
 fig.canvas.draw()
