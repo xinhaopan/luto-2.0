@@ -533,9 +533,14 @@ def _draw_radar(ax, summary):
     ax.set_yticklabels([])
     ax.set_xticks(angles)
     ax.set_xticklabels([])
-    ax.grid(color='#D9D9D9', linewidth=0.7)
-    ax.spines['polar'].set_color('#D9D9D9')
-    ax.spines['polar'].set_linewidth(0.7)
+    # The outer circle and the six spokes are the axes of this panel, so they
+    # are drawn in the same black and the same weight as the axis lines of the
+    # bar panels.  The rings are grid, and stay light, exactly as the vertical
+    # grid does in (a)-(f).
+    ax.grid(axis='x', color='#222222', linewidth=1.0)
+    ax.grid(axis='y', color='#D9D9D9', linewidth=0.8)
+    ax.spines['polar'].set_color('#222222')
+    ax.spines['polar'].set_linewidth(1.2)
     ax.set_axisbelow(True)
 
     closed = np.concatenate([angles, angles[:1]])
@@ -618,11 +623,11 @@ def plot_figure(summary):
     })
 
     # Three rows of two bar panels, then panel g alone across the fourth row.
-    fig = plt.figure(figsize=(14.0, 24.0))
+    fig = plt.figure(figsize=(14.0, 21.0))
     gs = fig.add_gridspec(
         4, 2,
-        height_ratios=[1.0, 1.0, 1.0, 2.45],
-        left=0.055, right=0.985, top=0.975, bottom=0.115,
+        height_ratios=[1.0, 1.0, 1.0, 2.20],
+        left=0.055, right=0.985, top=0.975, bottom=0.090,
         wspace=0.20, hspace=0.38,
     )
     axes = np.empty((3, 2), dtype=object)
@@ -635,7 +640,7 @@ def plot_figure(summary):
     # topmost axis label has somewhere to go and the panel title can sit above
     # that, centred over the panel exactly as (a)-(f) are.
     radar_cell = gs[3, :].subgridspec(1, 3, width_ratios=[1.0, 2.1, 1.0])
-    radar_column = radar_cell[0, 1].subgridspec(2, 1, height_ratios=[0.27, 1.0])
+    radar_column = radar_cell[0, 1].subgridspec(2, 1, height_ratios=[0.22, 1.0])
     ax_radar = fig.add_subplot(radar_column[1, 0], polar=True)
 
     # Match the indicator order used in 03_indicators.py.
