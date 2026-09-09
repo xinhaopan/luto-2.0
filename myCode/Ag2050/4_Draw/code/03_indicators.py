@@ -32,7 +32,7 @@ from tools.two_row_figure import (
     prepare_net_economic_return_overview,
 )
 from tools.data_helper import extract_nc_layer_as_tiff, list_output_years, load_output_dataset
-from tools.parameters import EXCEL_DIR, OUTPUT_DIR, SCENARIO_LABELS, TIF_DIR, font_size, GENERATE_TABLES
+from tools.parameters import EXCEL_DIR, OUTPUT_DIR, SCENARIO_LABELS, TIFF_DIR, font_size, GENERATE_TABLES
 from tools.plot_helper import calc_y_range, set_plot_style, stacked_area_pos_neg
 
 # ── Colors ────────────────────────────────────────────────────────────────────
@@ -356,22 +356,25 @@ def prepare_water():
 # ── Land-use GeoTIFF export ─────────────────────────────────────────────────────
 
 def export_landuse_tifs():
-    """Export the land-use map (lm='ALL') as a GeoTIFF, written directly into TIF_DIR
-    (no intermediate cache folder).
+    """Export the land-use map (lm='ALL') under a friendly name in TIFF_DIR.
 
     2010 is the fixed historical base year (identical across scenarios), so it is
     exported once. 2050 is scenario-specific and exported per scenario.
+
+    The extracted file is COPIED, not moved: it is also the extraction cache that
+    02_Mapping and 33_Consistency_maps reuse, and moving it away made them
+    re-extract the same layer from the run archive.
     """
-    os.makedirs(TIF_DIR, exist_ok=True)
+    os.makedirs(TIFF_DIR, exist_ok=True)
 
     def _extract_and_rename(scenario, year, dst_name):
-        src = extract_nc_layer_as_tiff(scenario, 'map_lumap', {'lm': 'ALL'}, year, output_dir=TIF_DIR)
+        src = extract_nc_layer_as_tiff(scenario, 'map_lumap', {'lm': 'ALL'}, year, output_dir=TIFF_DIR)
         if src is None:
             print(f'Land-use tif not found: {scenario} {year}')
             return
-        dst = os.path.join(TIF_DIR, dst_name)
+        dst = os.path.join(TIFF_DIR, dst_name)
         if os.path.abspath(src) != os.path.abspath(dst):
-            shutil.move(src, dst)
+            shutil.copy2(src, dst)
         print(f'Saved: {dst}')
 
     _extract_and_rename(input_files[0], 2010, 'landuse_2010.tif')

@@ -12,8 +12,12 @@ INPUT_DIR  = '../../../input'
 # All outputs under ag2050/ alongside run results
 AG2050_DIR  = f"../../../../output/{TASK_ROOT}/ag2050"
 OUTPUT_DIR  = f"{AG2050_DIR}/figures"   # charts and assembled maps
-TIFF_DIR    = f"{AG2050_DIR}/tiffs"     # extracted GeoTIFFs from zip (internal cache)
-TIF_DIR     = f"{AG2050_DIR}/tif"       # exported land-use GeoTIFFs (2010 & 2050)
+# One raster directory.  It used to be split into 'tiffs' (the extraction cache,
+# named _extracted_*) and 'tif' (the same rasters re-exported as landuse_*.tif),
+# which was not just redundant: 03_indicators MOVED the file out of the cache,
+# so 02_Mapping and 33_Consistency_maps had to extract it all over again.
+TIFF_DIR    = f"{AG2050_DIR}/tiffs"     # all GeoTIFFs: extraction cache + exports
+TIF_DIR     = TIFF_DIR                  # deprecated alias, kept so old code runs
 EXCEL_DIR   = f"{AG2050_DIR}/excel"     # exported long tables for figures
 
 # Table-cache switch used by all Ag2050 drawing scripts.

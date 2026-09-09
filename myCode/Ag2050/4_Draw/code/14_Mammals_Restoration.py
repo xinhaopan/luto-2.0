@@ -9,7 +9,7 @@ AgS2's restored 5 km cells, rank species, and draw the top-15 as a horizontal ba
 chart (EPBC-listed threatened species highlighted).
 
 Inputs:
-  - LUTO land-use GeoTIFFs in TIF_DIR: landuse_2010.tif, landuse_<AgS2>_2050.tif
+  - LUTO land-use GeoTIFFs in TIFF_DIR: landuse_2010.tif, landuse_<AgS2>_2050.tif
   - Species occurrence points: SPECIES_DIR/mammals/models/<Species>/occur.csv
 Outputs:
   - EXCEL_DIR/14_mammals_restoration_ranked.csv   (all 178 species, ranked)
@@ -26,7 +26,7 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-from tools.parameters import EXCEL_DIR, OUTPUT_DIR, TIF_DIR, input_files, GENERATE_TABLES
+from tools.parameters import EXCEL_DIR, OUTPUT_DIR, TIFF_DIR, input_files, GENERATE_TABLES
 from tools.two_row_figure import missing_table_error
 
 SPECIES_DIR = r'F:\Users\s222552331\Work\Species-occurance-points'
@@ -64,12 +64,12 @@ EPBC = {
 
 def build_restoration_mask():
     """Boolean 5 km mask: cells agricultural (0-27) in 2010 -> non-agricultural (>=100) in AgS2 2050."""
-    with rasterio.open(os.path.join(TIF_DIR, 'landuse_2010.tif')) as ds:
+    with rasterio.open(os.path.join(TIFF_DIR, 'landuse_2010.tif')) as ds:
         lu2010 = ds.read(1)
         transform = ds.transform
         shape = lu2010.shape
         crs = ds.crs
-    with rasterio.open(os.path.join(TIF_DIR, f'landuse_{RESTORE_SCENARIO}_2050.tif')) as ds:
+    with rasterio.open(os.path.join(TIFF_DIR, f'landuse_{RESTORE_SCENARIO}_2050.tif')) as ds:
         lu2050 = ds.read(1)
         target_transform = ds.transform
         target_crs = ds.crs
