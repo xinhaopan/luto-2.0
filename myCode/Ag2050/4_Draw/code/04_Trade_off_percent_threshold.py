@@ -441,7 +441,14 @@ RADAR_AXES = [
     ('food_2050_mt',          'Agri-food production',                  'Mt yr⁻¹',          +1),
     ('land_use_change_2010_2050_mha', 'Land-use change extent',        'Mha',                        -1),
 ]
-RADAR_RINGS = (0.25, 0.50, 0.75, 1.00)
+# The worst scenario on an axis is drawn on this inner ring rather than at the
+# exact centre.  With only four scenarios a plain min-max pins the worst at
+# radius zero, and a scenario that is worst on four of six axes then has a
+# polygon with no area at all -- System Decline came out as a bare line, which
+# is not a profile.  Lifting the floor changes nothing about the ordering and
+# nothing about which scenario is best; it only gives every scenario a shape.
+RADAR_FLOOR = 0.16
+RADAR_RINGS = (RADAR_FLOOR, 0.44, 0.72, 1.00)
 
 
 def _unit_font(unit):
@@ -472,7 +479,7 @@ def _draw_radar(ax, summary):
     lo = oriented.min(axis=1, keepdims=True)
     hi = oriented.max(axis=1, keepdims=True)
     span = np.where(hi - lo == 0, 1.0, hi - lo)
-    scaled = (oriented - lo) / span                      # (axis, scenario)
+    scaled = RADAR_FLOOR + (1.0 - RADAR_FLOOR) * (oriented - lo) / span
 
     ax.set_ylim(0.0, 1.0)
     ax.set_yticks(list(RADAR_RINGS))
@@ -485,13 +492,22 @@ def _draw_radar(ax, summary):
     ax.set_axisbelow(True)
 
     closed = np.concatenate([angles, angles[:1]])
-    for j, scenario in enumerate(summary['scenario']):
+    # Draw the roomiest polygon first so the tighter ones stay legible on top of
+    # it instead of disappearing under its fill.
+    order = np.argsort(-scaled.sum(axis=0))
+    for rank, j in enumerate(order):
+        scenario = summary['scenario'].iloc[j]
         values = np.concatenate([scaled[:, j], scaled[:1, j]])
         color = SCENARIO_COLORS[scenario]
         # Opaque stroke, barely-there fill: with four overlapping polygons a
         # heavier fill hides whichever is drawn first.
-        ax.plot(closed, values, color=color, linewidth=2.2, zorder=3)
-        ax.fill(closed, values, color=color, alpha=0.13, zorder=2)
+        ax.fill(closed, values, color=color, alpha=0.13, zorder=2 + rank)
+        ax.plot(closed, values, color=color, linewidth=2.2,
+                zorder=10 + rank, solid_joinstyle='round')
+        # A dot on every vertex, so a scenario that sits near the floor on most
+        # axes still shows where it actually is.
+        ax.plot(angles, scaled[:, j], linestyle='none', marker='o',
+                markersize=5, color=color, zorder=10 + rank)
 
     # Labels are placed by offsetting from the end of each axis in display
     # space, not by pushing the radius out.  A radial offset moves a label

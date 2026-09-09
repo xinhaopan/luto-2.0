@@ -93,18 +93,28 @@ Added to Fig. 4 as a seventh panel, alone on a fourth row.
 > framework diagram. Each axis is first oriented so that further from the centre
 > is better: net emissions and land-use change extent are negated, and change in
 > water yield needs no flip because a smaller loss is already the larger number.
-> Each axis is then scaled between the worst scenario, at the centre, and the
-> best, on the outer ring, so the panel compares scenarios against each other
-> and not indicators against each other; the rings carry no values for that
-> reason. The 2050 value behind every point is printed beside its axis, in
+> Each axis is then scaled between the worst scenario, on the innermost ring,
+> and the best, on the outer ring, so the panel compares scenarios against each
+> other and not indicators against each other; the rings carry no values for
+> that reason. The 2050 value behind every point is printed beside its axis, in
 > scenario colour and in scenario order.
 
-**Read the shape with care.** Because each axis is min-max scaled across just
-four scenarios, a scenario that is worst on an axis sits exactly at the centre.
-System Decline is worst on four of the six, so its polygon collapses to a
-near-line with a single spike on land-use change extent. That is the data, not a
-plotting fault, and it is worth a sentence in the text so a reader does not read
-it as an error.
+**Two things about the scaling, both deliberate.**
+
+*The worst scenario sits on the inner ring, not at the centre.* A plain min-max
+puts it at radius zero, and a scenario that is worst on four of six axes then
+has a polygon with no area: System Decline came out as a bare line. The floor
+(0.16 of the radius) changes no ordering and no winner, it only gives every
+scenario a shape. The innermost grey ring is that floor.
+
+*Radius is position within the four-scenario range, not proportional magnitude.*
+This is the part to be careful about in the text. The biodiversity score spans
+only 88.47 to 97.87 Mha across the four scenarios — System Decline is about 4%
+below Landscape Stewardship — yet min-max stretches that spread across the whole
+radius, so the panel makes a small difference look as large as a big one. That is
+why the raw 2050 values are printed beside every axis: the shape ranks the
+scenarios, the numbers give the size of the difference. Say so in the text rather
+than letting a reader infer magnitude from area.
 
 **Source.** `excel/04_trade_off_percent_threshold.xlsx`, sheet `summary` — the
 same sheet as panels a–f, so panel g cannot disagree with the bars above it.
