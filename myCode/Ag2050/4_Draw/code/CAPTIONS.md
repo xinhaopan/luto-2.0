@@ -10,6 +10,7 @@ into the paper and is settled at the end.
 | 32 | [32_Driver_outcome_matrix.py](32_Driver_outcome_matrix.py) | `figures/32_Driver_outcome_matrix.svg` | Extended Data Fig. 11 (provisional) |
 | 33 | [33_Consistency_maps.py](33_Consistency_maps.py) | `figures/33_Consistency_maps.svg` + `excel/33_consistency_agreement.xlsx` | Extended Data Fig. 12 (provisional) |
 | 04g | [04_Trade_off_percent_threshold.py](04_Trade_off_percent_threshold.py) | `figures/04_trade_off_percent_threshold.svg` | Fig. 4 panel g |
+| 34 | [34_Transition_matrix.py](34_Transition_matrix.py) | `figures/34_Transition_matrix.svg` + `excel/34_transition_matrix.csv` | Extended Data (provisional) |
 | 30 | *(pending — waits on Run_5_SCN_AgS1_VHP)* | `excel/30_table_*.xlsx` | Table S10 (provisional) |
 
 Output root: `output/20260714_Paper3_NCI/ag2050/`. SVG only — no PNG is written.
@@ -172,6 +173,33 @@ removed: with twelve panels and long titles the letters are what the caption can
 refer to. They sit inside each map's empty top-left corner so they cannot
 collide with a wrapped title. Set at 8 pt bold to match the Nature spec rather
 than the 9 pt in the original request — say the word and I will change it.
+
+---
+
+## 34 — Which land uses can convert into which
+
+> **Extended Data Fig. | Permitted land-use transitions.** Each cell says whether
+> the model may move land from the use named on the row into the use named on
+> the column. Green marks a permitted transition, pink one the model is not
+> allowed to make; the diagonal is green because leaving land where it is counts
+> as a permitted transition at zero cost. The pattern is a property of the model
+> rather than of any scenario, so it is the same in all four.
+
+**Source.** `luto.data.Data.T_MAT`, the from-use by to-use matrix of
+establishment costs per hectare that the solver uses. A NaN entry means the
+transition is not permitted; a finite entry is its cost. Only the permitted /
+not-permitted pattern is drawn.
+
+`T_MAT` is assembled in `luto/data.py` from five files in `input/` —
+`ag_tmatrix.npy`, `ag_to_ep_tmatrix.npy`, `ag_to_destock_tmatrix.npy`,
+`ep_to_ag_tmatrix.npy` and `transition_cost_clearing_forest.npz` — together with
+a set of rules that are not in any of those files: non-agricultural land cannot
+return to natural land, clearing non-agricultural land carries a specific cost,
+destocked natural land inherits the unallocated-natural costs for livestock, and
+so on. [tools/make_transition_cache.py](tools/make_transition_cache.py)
+therefore reads the finished matrix out of the Data object in a run archive
+instead of mirroring those rules, which would be a second copy free to drift
+away from the model.
 
 ---
 
