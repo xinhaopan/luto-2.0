@@ -112,9 +112,11 @@ same sheet as panels a–f, so panel g cannot disagree with the bars above it.
 `05_scenario_synthesis_2050.xlsx` uses a different definition of net economic
 returns and biodiversity and must not be used.
 
-**Wording.** The water axis is labelled "Difference in water yield relative to
-2010", the same phrase 03_indicators.py and 19_Water.py use, so the reader is
-not left wondering what -14,000 GL is relative to.
+**Wording and units.** The water axis is labelled "Difference in water yield
+relative to 2010", the same phrase 03_indicators.py and 19_Water.py use, so the
+reader is not left wondering what the number is relative to. Its ticks are in
+10³ GL yr⁻¹ — the values run to 18,000 GL, and four digits on every ring crowded
+the panel.
 
 **Axis order** matches Extended Data Fig. 1 deliberately, with the framework
 diagram's abbreviations written out in full, so a reader turning from the

@@ -432,16 +432,18 @@ def _draw_bars(ax, summary, column, formatter, x_values_extra=(), zero_line=True
 # reader turning from the framework to the results sees the same object.  The
 # abbreviations used there are written out in full here.
 #
-# (summary column, label, unit, +1 if larger is already better else -1)
+# (summary column, label, unit, +1 if larger is already better else -1,
+#  divisor applied to the tick values only -- water runs to 18,000 GL, which is
+#  four digits of tick label on every ring, so it is shown in thousands)
 RADAR_AXES = [
-    ('ghg_2050_mtco2e',       'Net GHG emissions from land',           'Mt CO₂e yr⁻¹', -1),
-    ('biodiversity_2050_mha', 'Biodiversity contribution-\nweighted score', 'Mha', +1),
+    ('ghg_2050_mtco2e',       'Net GHG emissions from land',           'Mt CO₂e yr⁻¹', -1, 1.0),
+    ('biodiversity_2050_mha', 'Biodiversity contribution-\nweighted score', 'Mha', +1, 1.0),
     # Same wording as 03_indicators and 19_Water: "relative to 2010" matters,
     # otherwise -14,000 GL has nothing to be relative to.
-    ('water_change_2050_gl',  'Difference in water yield\nrelative to 2010', 'GL yr⁻¹', +1),
-    ('ner_2050_baud',         'Net economic returns',                  'billion AU$ yr⁻¹', +1),
-    ('food_2050_mt',          'Agri-food production',                  'Mt yr⁻¹',          +1),
-    ('land_use_change_2010_2050_mha', 'Land-use change extent',        'Mha',                        -1),
+    ('water_change_2050_gl',  'Difference in water yield\nrelative to 2010', '10³ GL yr⁻¹', +1, 1000.0),
+    ('ner_2050_baud',         'Net economic returns',                  'billion AU$ yr⁻¹', +1, 1.0),
+    ('food_2050_mt',          'Agri-food production',                  'Mt yr⁻¹', +1, 1.0),
+    ('land_use_change_2010_2050_mha', 'Land-use change extent',        'Mha', -1, 1.0),
 ]
 # Every axis carries an ordinary scale with round tick values, like the bar
 # panels above: a nice step is chosen per axis and the rings sit at whole
@@ -512,8 +514,8 @@ def _draw_radar(ax, summary):
     ax.set_theta_direction(-1)           # and then clockwise
 
     raw = np.array([summary[column].astype(float).to_numpy()
-                    for column, _lab, _unit, _sign in RADAR_AXES])
-    oriented = raw * np.array([[sign] for _c, _l, _u, sign in RADAR_AXES])
+                    for column, _lab, _unit, _sign, _div in RADAR_AXES])
+    oriented = raw * np.array([[sign] for _c, _l, _u, sign, _d in RADAR_AXES])
 
     # One ordinary scale per axis: a round step, a round starting value, and
     # RADAR_INTERVALS rings, so every axis can be read off its own ticks while
@@ -565,7 +567,7 @@ def _draw_radar(ax, summary):
     # diagonally, so on the side axes the name and the numbers underneath it
     # drift into each other; offsetting in points keeps the numbers squarely
     # below the name whatever direction the axis points.
-    for i, (_column, label, unit, _sign) in enumerate(RADAR_AXES):
+    for i, (_column, label, unit, _sign, _divisor) in enumerate(RADAR_AXES):
         angle = angles[i]
         direction = (np.pi / 2.0) - angle          # theta_offset, then clockwise
         dx, dy = np.cos(direction), np.sin(direction)
@@ -597,7 +599,8 @@ def _draw_radar(ax, summary):
         # Ordinary tick values for this axis, at the rings.
         sign = RADAR_AXES[i][3]
         for k, ring in enumerate(rings, start=1):
-            value = (starts[i, 0] + k * steps[i, 0]) * sign   # undo the flip
+            divisor = RADAR_AXES[i][4]
+            value = (starts[i, 0] + k * steps[i, 0]) * sign / divisor
             # Horizontal, not tangential: these are the numbers the reader is
             # meant to check, and a rotated number is harder to read.  The white
             # halo keeps them legible where a polygon crosses a ring.
