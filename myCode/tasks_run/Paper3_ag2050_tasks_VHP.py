@@ -233,8 +233,7 @@ def main() -> None:
     # aquila runs `python python_script.py` in the run folder and blocks until
     # the simulation finishes; NCI and HPC hand it to the batch scheduler and
     # return as soon as the job is queued.
-    print(f'
-Submitting on platform: {args.platform}')
+    print(f'\nSubmitting on platform: {args.platform}')
     create_task_runs(
         task_root_dir,
         template,
