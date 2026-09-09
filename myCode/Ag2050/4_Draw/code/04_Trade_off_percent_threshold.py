@@ -446,7 +446,7 @@ RADAR_AXES = [
 # multiples of it.  Because the scale starts below the smallest value rather
 # than at it, no scenario is pinned to the centre -- an earlier min-max version
 # collapsed System Decline to a bare line.
-RADAR_INTERVALS = 4
+RADAR_INTERVALS = 5
 # Same size as the tick labels and value annotations of panels a-f.
 RADAR_FONTSIZE = 15
 
@@ -460,19 +460,23 @@ def _nice_scale(low, high, intervals=RADAR_INTERVALS):
     """
     if high <= low:
         high = low + 1.0
-    raw = (high - low) / intervals
-    magnitude = 10.0 ** np.floor(np.log10(raw))
-    for multiple in (1.0, 2.0, 2.5, 5.0, 10.0):
-        step = multiple * magnitude
-        if step >= raw:
-            break
-    start = np.floor(low / step) * step
-    if low - start < 0.15 * step:        # keep the smallest value off the centre
-        start -= step
-    while start + intervals * step < high:
-        step *= 2.0
-        start = np.floor(low / step) * step
-    return float(start), float(step)
+    magnitude = 10.0 ** np.floor(np.log10((high - low) / intervals))
+
+    # Walk the nice steps upwards and take the first that actually fits, rather
+    # than doubling once it fails.  Doubling overshoots badly: net emissions
+    # span 175 Mt, and a doubled step gave them a 400-wide axis, so the four
+    # scenarios were squeezed into the inner 44% of the radius.
+    for decade in (magnitude, magnitude * 10.0, magnitude * 100.0):
+        for multiple in (1.0, 2.0, 2.5, 5.0):
+            step = multiple * decade
+            start = np.floor(low / step) * step
+            if low - start < 0.15 * step:   # keep the smallest value off centre
+                start -= step
+            if start + intervals * step >= high:
+                return float(start), float(step)
+
+    step = (high - low) / intervals
+    return float(low - step), float(step)
 
 
 def _radar_tick(value):
@@ -585,7 +589,12 @@ def _draw_radar(ax, summary):
 
         # Ordinary tick values for this axis, at the rings.
         sign = RADAR_AXES[i][3]
+        # The innermost ring sits at a fifth of the radius, so its six labels
+        # would crowd the centre and land on the polygons there.  The ring is
+        # drawn; only its number is left off.
         for k, ring in enumerate(rings, start=1):
+            if k == 1:
+                continue
             value = (starts[i, 0] + k * steps[i, 0]) * sign   # undo the flip
             # Horizontal, not tangential: these are the numbers the reader is
             # meant to check, and a rotated number is harder to read.  The white
@@ -594,7 +603,9 @@ def _draw_radar(ax, summary):
                 _radar_tick(value), xy=(angle, ring),
                 xytext=(-dy * 10.0, dx * 10.0), textcoords='offset points',
                 ha='center', va='center', fontsize=RADAR_FONTSIZE,
-                color='#6E6E6E', zorder=20, annotation_clip=False,
+                # Under the polygons, not over them: at zorder 20 the halo was
+                # punching holes in the data lines where they crossed a ring.
+                color='#6E6E6E', zorder=5, annotation_clip=False,
                 bbox=dict(boxstyle='round,pad=0.12', facecolor='white',
                           edgecolor='none', alpha=0.85),
             )
