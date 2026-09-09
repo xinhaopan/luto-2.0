@@ -18,12 +18,33 @@ Output root: `output/20260714_Paper3_NCI/ag2050/`. SVG only — no PNG is writte
 
 ---
 
-## 02 — Legend symbols (Referee 1)
+## 02 — Land use, management and non-agricultural land use in 2050
 
-Referee 1 asked for the land-use and the agricultural-management legends to be
-told apart. Colour cannot carry that on its own, so in Fig. 2 each family now
-has its own symbol. Only the symbols changed: the colours still come from
-`tools/land use colors.xlsx` and the layout is unchanged.
+> **Fig. 2 | Simulated land use, agricultural management and non-agricultural
+> land use in 2050.** **Top block**, agricultural land use under each of the
+> four scenarios, split into dryland and irrigated cropland and horticulture,
+> dryland and irrigated grazing on modified pastures, grazing on native
+> vegetation, unallocated land, and land converted to a non-agricultural use.
+> **Middle block**, the agricultural management option adopted in each cell
+> under Regional Ag Capitals and Landscape Stewardship; the other two scenarios
+> adopt almost none and are not mapped. **Bottom block**, non-agricultural land
+> use under Landscape Stewardship, the scenario that plants most. Grey is land
+> the model does not allocate — public and indigenous land, urban land,
+> plantation forestry and water bodies.
+>
+> **Legend symbols mark which category a legend entry belongs to, not a
+> quantity: squares are agricultural land uses, circles are agricultural
+> management options, and triangles are non-agricultural land uses. A plain bar
+> marks land that is none of these.** Colour identifies the individual class
+> within a category, as in the maps. In the middle block, *No agricultural
+> management* is drawn as a hollow circle with a grey edge so that it is not
+> lost against the pale grey it marks on the map.
+
+**Revision note (Referee 1).** Referee 1 asked for the land-use and the
+agricultural-management legends to be told apart. Colour cannot carry that on
+its own, so each family was given a symbol. Only the symbols changed: the
+colours still come from `tools/land use colors.xlsx` and the layout is
+unchanged.
 
 | Family | Symbol |
 |---|---|
@@ -32,11 +53,10 @@ has its own symbol. Only the symbols changed: the colours still come from
 | Non-agricultural land-use | triangle `^` |
 | Neither (public and indigenous land, urban land, plantation forestry and water bodies) | plain bar |
 
-Panel (b) draws *No agricultural management* as a hollow circle with a mid-grey
-edge: filled, it is a pale grey dot on the pale grey land behind it and reads as
-nothing at all. Panel (a)'s *Non-agricultural land-use* entry is a triangle
-among squares, and panel (c)'s *Agricultural land-use* backdrop is a square
-among triangles, so each panel states which family it is showing.
+Because the symbol follows the entry rather than the panel, the top block shows
+its one non-agricultural category as a triangle among squares, and the bottom
+block shows its agricultural backdrop as a square among triangles — so each
+block states which family it is showing.
 
 The rule is applied by `legend_family()` in
 [tools/plot_helper.py](tools/plot_helper.py), which classifies an entry from its
