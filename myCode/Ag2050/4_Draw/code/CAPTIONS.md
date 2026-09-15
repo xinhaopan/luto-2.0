@@ -12,7 +12,9 @@ into the paper and is settled at the end.
 | 33 | [33_Consistency_maps.py](33_Consistency_maps.py) | `figures/33_Consistency_maps.svg` + `excel/33_consistency_agreement.xlsx` | Extended Data Fig. 12 (provisional) |
 | 04g | [04_Trade_off_percent_threshold.py](04_Trade_off_percent_threshold.py) | `figures/04_trade_off_percent_threshold.svg` | Fig. 4 panel g |
 | 34 | [34_Transition_matrix.py](34_Transition_matrix.py) | `figures/34_Transition_matrix.svg` + `excel/34_transition_matrix.csv` | Extended Data (provisional) |
-| 30 | *(pending — waits on Run_5_SCN_AgS1_VHP)* | `excel/30_table_*.xlsx` | Table S10 (provisional) |
+| 30-S9 | *(no script — written directly)* | `excel/30_new_supplementary_tables.xlsx`, sheet `Table S9` | Table S9 (provisional) |
+| 30-S10 | [30_table_S10.py](30_table_S10.py) | `excel/30_table_S10.xlsx` | Table S10 (provisional) |
+| 30-S11 | *(no script — written directly)* | `excel/30_new_supplementary_tables.xlsx`, sheet `Table S11` | Table S11 (provisional) |
 
 Output root: `output/20260714_Paper3_NCI/ag2050/`. SVG only — no PNG is written.
 
@@ -252,12 +254,119 @@ away from the model.
 
 ---
 
-## 30 — Table S10 (pending)
+## 30-S9 — Spatial datasets used in LUTO2
 
-Productivity sensitivity for Regional Ag Capitals: `Run_1_SCN_AgS1` (HIGH
-productivity, as published) against `Run_5_SCN_AgS1_VHP` (VERY_HIGH), six 2050
-indicators, with absolute and percentage differences. Caption to be written when
-the run finishes.
+> **Table S9 | Spatial datasets used in LUTO2.** The fifteen spatially explicit
+> datasets the model reads, what each represents, its resolution and unit, its
+> source, and the role it plays in the simulation. The first ten are the
+> datasets marked as spatial in Table S6; the last five are spatial layers the
+> model depends on that Table S6 does not list — the baseline land-use and
+> land-management map, the commodity exclusion layer by Statistical Area Level
+> 2, savanna burning eligibility, Natural Resource Management regions, and
+> drainage divisions.
+
+**Why it was added (Referee 2).** Table S6 already flags which datasets are
+spatial, in a column the referee did not find. Rather than argue the point, this
+table states the spatial inputs on their own, with the resolution and the use to
+which each is put.
+
+**One grid throughout.** Every layer sits on the same raster, so nothing is
+resampled inside the model: 0.01° × 0.01° in GDA94 (EPSG:4283), 3,364 × 4,071
+cells, of which 6,956,407 fall on land. Cell area runs 89.6–121.3 ha with
+latitude, mean 110.5 ha, 768.8 Mha in total. At `RESFACTOR = 3` each 3 × 3 block
+is one modelling unit of about 995 ha — which is why Table S1 now reads
+~1,000 ha, not the ~900 ha it used to (that figure came from rounding the base
+cell to 100 ha).
+
+Sources for the savanna burning, Natural Resource Management and drainage
+division layers come from the data preparation record on the N: drive (`Data-Master`), not
+from the model code, which loads them from prepared `.h5` files without a
+citation.
+
+---
+
+## 30-S10 — Productivity sensitivity (M1)
+
+> **Table S10 | Sensitivity of the 2050 outcomes to agricultural productivity
+> under Regional Ag Capitals.** The published Regional Ag Capitals run
+> (productivity HIGH) against an otherwise identical run with productivity
+> raised to VERY_HIGH and the matching very_high area-cost multiplier, on the
+> six indicators of Fig. 4. Higher productivity leaves agri-food production
+> essentially unchanged, because production is fixed by demand; instead it cuts
+> the land needed to meet that demand, roughly halving the extent of land-use
+> change and easing the pressure on water and habitat.
+
+| Indicator | Unit | HIGH | VERY_HIGH | Difference | % |
+|---|---|---|---|---|---|
+| Net economic returns | billion AU$ yr⁻¹ | 43.359 | 52.192 | +8.833 | +20.4 |
+| Agri-food production | Mt yr⁻¹ | 240.357 | 240.374 | +0.018 | +0.007 |
+| Net GHG emissions from land | Mt CO₂e yr⁻¹ | 67.123 | 66.993 | −0.130 | −0.19 |
+| Biodiversity contribution-weighted score | Mha | 89.391 | 90.172 | +0.780 | +0.87 |
+| Change in water yield relative to 2010 | GL yr⁻¹ | −16,369.5 | −12,443.8 | +3,925.7 | 24.0 |
+| Land-use change extent, 2010–2050 | Mha | 32.405 | 16.520 | −15.884 | −49.0 |
+
+**Reading the water row.** Both values are declines against 2010. The
+difference is a 24% *narrowing* of that decline, not an increase in yield — say
+"the decline in water yield is 24% smaller", never "water yield rises by 24%".
+
+**The biodiversity row is the notable one.** At VERY_HIGH the score reaches
+90.172 Mha, just above the 2010 baseline of 90.126, so Regional Ag Capitals no
+longer ends below where it started (the published run lands at 89.391, a net
+loss of 0.735). Productivity, not conservation policy, is what closes that gap —
+worth saying plainly, since it bears on Referee 2's question about whether the
+framework represents avoided habitat loss.
+
+**GHG barely moves** because this scenario's GHG lever is `maintain_historical`:
+both runs sit against the 2010 ceiling, so the constraint, not productivity,
+sets the number.
+
+**Provenance.** Both runs use the NCI input (`/g/data/jk53/LUTO_XH/LUTO2/input`);
+a second VERY_HIGH run on the local input was completed as a control and is kept
+as `Run_Archive_LOCAL_INPUT.zip`, but is not used here — only runs sharing an
+input are comparable.
+
+**How the numbers are made.** [30_table_S10.py](30_table_S10.py) does not
+re-implement anything: it points the shared scenario list at the two runs and a
+private cache, then calls the same export functions `01_Area` and
+`03_indicators` use and the same `build_summary_table()` behind Fig. 4. Because
+Run_1 goes through that path too, the script asserts that all 21 of its summary
+fields reproduce the published `04_trade_off_percent_threshold.xlsx` exactly,
+and stops if they do not. They do. The `verification` sheet records the check.
+
+---
+
+## 30-S11 — Commodity groupings
+
+> **Table S11 | The 26 modelled commodities and the two groupings used in the
+> paper.** LUTO2 solves for a quantity of each of 26 on-land commodities. No
+> figure shows them one by one: the agri-food panels sum them into six
+> production groups, while the scenario levers in Table 2 set demand on four
+> food-demand groups. Both groupings are listed against every commodity, with
+> the agricultural land use that produces it.
+
+**Why it was added (Referee 3).** The referee could not tell how the crop
+categories named in the text map onto the groups drawn in the figures. The
+reason is that the paper uses two different groupings, and **they do not nest**.
+Four cases account for all of it:
+
+- *Livestock products* holds dairy and wool together, but for demand dairy is a
+  ruminant product and wool is food and fibre.
+- *Grains and oilseeds* holds cereals, rice and oilseeds — all food and fibre
+  for demand — together with legumes, which are plant-based proteins.
+- Oilseeds are food and fibre for demand, not plant-based proteins, which is the
+  opposite of what the name suggests.
+- Nuts are drawn with horticulture but are a plant-based protein for demand.
+
+**Sources.** The six production groups are `COMMODITY_TO_FOOD_GROUP` in
+[tools/two_row_figure.py](tools/two_row_figure.py); the model raises an error if
+any commodity it produces is missing from that mapping, so the column is
+complete by construction. The four demand groups are as defined in the caption
+of Table 2 of the manuscript.
+
+Off-land commodities (pork, chicken, eggs, aquaculture) are excluded: LUTO2
+carries demand for them but they occupy no land. Beef and sheep are also
+produced on non-agricultural land, by agroforestry and farm forestry, and that
+output is added to the same commodity totals.
 
 ---
 

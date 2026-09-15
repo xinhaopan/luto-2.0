@@ -29,10 +29,16 @@ Deliberately NOT changed (all verified against the recorded Run_1 column):
 WHERE THE BASELINE COMES FROM
     Settings are taken from the recorded Run_1_SCN_AgS1 column of
         output/20260714_Paper3_NCI/grid_search_template.csv
-    which is the authoritative record of what actually ran -- NOT from
+    which records what actually ran for almost everything -- NOT from
     Paper3_ag2050_tasks_NCI.py, which has drifted since submission (that script
-    now says TIME=720:00:00 and SOLVE_TIME_LIMIT_SECONDS=2592000, while the run
-    actually used 48:00:00 and 14400).
+    now says TIME=720:00:00 and SOLVE_TIME_LIMIT_SECONDS=2592000).
+
+    The CSV is not authoritative for everything, though: it says
+    SOLVE_TIME_LIMIT_SECONDS=14400 while the settings.py archived inside Run_1's
+    and Run_2's Run_Archive.zip says 144000. Values raised after submission were
+    never written back. SCALAR_CORRECTIONS below carries such fields, taken from
+    the archived settings.py, which is the last word on anything the solver
+    depends on.
 
     Any setting that exists in today's luto/settings.py but was absent from that
     run's template is filled from today's default and reported in the audit
@@ -82,6 +88,27 @@ backup_dir    = f'{task_root_dir}/_original_NCI_grid'
 # The single-factor change: scenario key -> new map value.
 PRODUCTIVITY_OVERRIDE = ('AG2050_PRODUCTIVITY_MAP', 'AgS1', 'VERY_HIGH')
 AREA_COST_OVERRIDE    = ('AG2050_AC_MAP',           'AgS1', 'very_high')
+
+# Corrections to the template CSV, which under-records what the reference run
+# actually used.  These are NOT part of the sensitivity -- they restore fidelity
+# to Run_1, so they must match its archived luto/settings.py exactly.
+#
+#   SOLVE_TIME_LIMIT_SECONDS: the CSV says 14400 (4 h) for every run, but the
+#   settings.py inside Run_1's and Run_2's Run_Archive.zip says 144000 (40 h).
+#   The value was raised after submission and never written back to the CSV.
+#   Taking the CSV at face value gave this run a 4 h per-year limit, and year
+#   2017 -- whose crossover alone needs several hours -- was cut off twice and
+#   the run died at 2016.  Read the archived settings.py, not the CSV, for
+#   anything the solver depends on.
+#   MEM: the CSV says 200GB for every run, but the PBS records show Run_1 and
+#   Run_2 requested 400GB (and used 302GB / 192GB), Run_3 and Run_4 requested
+#   256GB (used ~207GB).  None of the four fitted in 200GB.  Given 200GB, this
+#   run solved all 41 years and then was OOM-killed (exit 137, 196GB) while
+#   writing outputs.  400GB matches the AgS1 reference run.
+SCALAR_CORRECTIONS = {
+    'SOLVE_TIME_LIMIT_SECONDS': '144000',
+    'MEM': '400GB',
+}
 
 # update_settings() rewrites these for the local machine, so they are expected
 # to differ from the NCI record and are excluded from the fidelity audit.
@@ -134,6 +161,12 @@ def build_settings() -> dict:
         settings_dict[key] = _override_scenario_map(settings_dict[key], scenario, new_value)
         print(f'  {key}[{scenario}]: {ast.literal_eval(before)[scenario]!r} -> {new_value!r}')
 
+    # 3b. Restore the values the CSV under-records (see SCALAR_CORRECTIONS).
+    for key, value in SCALAR_CORRECTIONS.items():
+        print(f'  {key}: {settings_dict.get(key)!r} -> {value!r}  '
+              '(corrected to Run_1 as archived)')
+        settings_dict[key] = value
+
     settings_dict = update_settings(settings_dict, RUN_NAME)
     settings_dict['JOB_NAME'] = RUN_NAME
 
@@ -150,7 +183,8 @@ def _audit(settings_dict: dict, recorded: dict, added: list, dropped: list) -> N
     intended = {PRODUCTIVITY_OVERRIDE[0], AREA_COST_OVERRIDE[0]}
     unintended = []
     for key, value in settings_dict.items():
-        if key in EXPECTED_DIFFS or key in intended or key not in recorded:
+        if (key in EXPECTED_DIFFS or key in intended
+                or key in SCALAR_CORRECTIONS or key not in recorded):
             continue
         if str(value) != str(recorded[key]):
             unintended.append((key, recorded[key], value))
@@ -160,6 +194,12 @@ def _audit(settings_dict: dict, recorded: dict, added: list, dropped: list) -> N
         print(f'  {key}')
         print(f'      was: {recorded[key]}')
         print(f'      now: {settings_dict[key]}')
+
+    print('\nCorrections to the CSV record (not part of the sensitivity):')
+    for key in sorted(SCALAR_CORRECTIONS):
+        print(f'  {key}')
+        print(f'      CSV records : {recorded.get(key)}')
+        print(f'      Run_1 archive: {settings_dict[key]}')
 
     if added:
         print(f'\nSettings added to luto/settings.py since the run ({len(added)}) '
