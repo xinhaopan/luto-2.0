@@ -332,7 +332,7 @@ def definitions_table():
             'interpretation': f'Totals come directly from {INDICATOR_WORKBOOK}/biodiversity',
         },
         {
-            'panel': 'Net GHG emissions',
+            'panel': 'GHG emissions',
             'metric': '100 * (GHG_2050 / GHG_2010 - 1)',
             'benchmark': '0% = 2010 net GHG emissions',
             'interpretation': f'Totals come directly from {INDICATOR_WORKBOOK}/ghg; below -100% means a net sink',
@@ -435,15 +435,19 @@ def _draw_bars(ax, summary, column, formatter, x_values_extra=(), zero_line=True
 # (summary column, label, unit, +1 if larger is already better else -1,
 #  divisor applied to the tick values only -- water runs to 18,000 GL, which is
 #  four digits of tick label on every ring, so it is shown in thousands)
+# The axis names are the panel titles of a-f, word for word, so that the radar
+# reads as a summary of the six panels above it rather than as a seventh set of
+# quantities.  They are short by design; what each one actually measures -- that
+# GHG emissions are net of sequestration and so may be negative, that
+# biodiversity is the contribution-weighted area, that water yield is the
+# difference relative to 2010 -- is spelled out in the caption.
 RADAR_AXES = [
-    ('ghg_2050_mtco2e',       'Net GHG emissions from land',           'Mt CO₂e yr⁻¹', -1, 1.0),
-    ('biodiversity_2050_mha', 'Biodiversity contribution-\nweighted area', 'Mha', +1, 1.0),
-    # Same wording as 03_indicators and 19_Water: "relative to 2010" matters,
-    # otherwise -14,000 GL has nothing to be relative to.
-    ('water_change_2050_gl',  'Difference in water yield\nrelative to 2010', '10³ GL yr⁻¹', +1, 1000.0),
-    ('ner_2050_baud',         'Net economic returns',                  'billion AU$ yr⁻¹', +1, 1.0),
-    ('food_2050_mt',          'Agri-food production',                  'Mt yr⁻¹', +1, 1.0),
-    ('land_use_change_2010_2050_mha', 'Land-use change extent',        'Mha', -1, 1.0),
+    ('ghg_2050_mtco2e',       'GHG emissions',        'Mt CO₂e yr⁻¹', -1, 1.0),
+    ('biodiversity_2050_mha', 'Biodiversity',         'Mha', +1, 1.0),
+    ('water_change_2050_gl',  'Water yield',          '10³ GL yr⁻¹', +1, 1000.0),
+    ('ner_2050_baud',         'Net economic returns', 'billion AU$ yr⁻¹', +1, 1.0),
+    ('food_2050_mt',          'Agri-food production', 'Mt yr⁻¹', +1, 1.0),
+    ('land_use_change_2010_2050_mha', 'Land-use change', 'Mha', -1, 1.0),
 ]
 # Every axis carries an ordinary scale with round tick values, like the bar
 # panels above: a nice step is chosen per axis and the rings sit at whole

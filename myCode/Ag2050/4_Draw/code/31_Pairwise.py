@@ -5,9 +5,9 @@ Pairwise comparison of 2050 outcomes across the four agricultural futures.
 A 2 x 2 panel of scatter plots, four points each (one per scenario):
 
     a  Agri-food production      vs  Biodiversity contribution-weighted area
-    b  Agri-food production      vs  Net GHG emissions from land
+    b  Agri-food production      vs  GHG emissions
     c  Net economic returns      vs  Biodiversity contribution-weighted area
-    d  Net economic returns      vs  Net GHG emissions from land
+    d  Net economic returns      vs  GHG emissions
 
 Answers Referee 3 ("the text claims a gain in one indicator costs another, but
 no figure shows a pairwise comparison") and Referee 2 ("the figures do not show
@@ -83,7 +83,7 @@ SCENARIO_COLORS = {
 FOOD_LABEL = 'Agri-food production (Mt yr⁻¹)'
 NER_LABEL = 'Net economic returns (billion AU$ yr⁻¹)'
 BIO_LABEL = 'Biodiversity contribution-weighted area (Mha)'
-GHG_LABEL = 'Net GHG emissions from land (Mt CO₂e yr⁻¹)'
+GHG_LABEL = 'GHG emissions (Mt CO₂e yr⁻¹)'
 
 # (letter, x column, y column, x label, y label, y-axis 2010 baseline column)
 # The 2010 baseline is drawn only where it is common to all four scenarios:

@@ -106,8 +106,8 @@ FOOD_LEGEND_ORDER = [
 
 # (label, colors, unit_label_two_lines, legend_order_or_None)
 ROW_CONFIG = [
-    ('NER',          NER_COLORS,   'Net economic returns\n(Billion AU$ yr⁻¹)', NER_LEGEND_ORDER),
-    ('GHG',          GHG_COLORS,   'GHG emissions\n(MtCO₂e yr⁻¹)',       None),
+    ('NER',          NER_COLORS,   'Net economic returns\n(billion AU$ yr⁻¹)', NER_LEGEND_ORDER),
+    ('GHG',          GHG_COLORS,   'GHG emissions\n(Mt CO₂e yr⁻¹)',       None),
     ('Biodiversity', BIO_COLORS,   'Biodiversity contribution-\nweighted area (Mha)', None),
     ('Agri-food',    FOOD_COLORS,  'Agri-food production\n(Mt yr⁻¹)',     FOOD_LEGEND_ORDER),
     ('Water',        WATER_COLORS, 'Difference in water yield\nrelative to 2010 (GL yr⁻¹)', WATER_LEGEND_ORDER),

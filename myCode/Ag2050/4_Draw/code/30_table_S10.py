@@ -5,7 +5,7 @@ Run_1_SCN_AgS1 (Regional Ag Capitals as published, productivity HIGH) against
 Run_5_SCN_AgS1_VHP (the same scenario with productivity VERY_HIGH and the
 matching very_high area-cost multiplier), on the six 2050 indicators of Fig. 4:
 
-    net economic returns, agri-food production, net GHG emissions,
+    net economic returns, agri-food production, GHG emissions,
     biodiversity contribution-weighted area, change in water yield relative
     to 2010, and land-use change extent.
 
@@ -99,7 +99,7 @@ OUTPUT_NAME = '30_table_S10.xlsx'
 INDICATORS = [
     ('ner_2050_baud',                 'Net economic returns',                     'billion AU$ yr⁻¹'),
     ('food_2050_mt',                  'Agri-food production',                     'Mt yr⁻¹'),
-    ('ghg_2050_mtco2e',               'Net GHG emissions from land',              'Mt CO₂e yr⁻¹'),
+    ('ghg_2050_mtco2e',               'GHG emissions',              'Mt CO₂e yr⁻¹'),
     ('biodiversity_2050_mha',         'Biodiversity contribution-weighted area', 'Mha'),
     ('water_change_2050_gl',          'Difference in water yield relative to 2010',   'GL yr⁻¹'),
     ('land_use_change_2010_2050_mha', 'Land-use change extent, 2010–2050',       'Mha'),

@@ -156,9 +156,9 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        'Net economic returns (Billion AU$ yr⁻¹)',
+        'Net economic returns (billion AU$ yr⁻¹)',
         '15_net_economic_return.svg',
-        total_legend_label='Net economic return',
+        total_legend_label='Net economic returns',
         y_label_x=0.020,
     )
 
