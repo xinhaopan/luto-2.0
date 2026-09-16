@@ -437,7 +437,7 @@ def _draw_bars(ax, summary, column, formatter, x_values_extra=(), zero_line=True
 #  four digits of tick label on every ring, so it is shown in thousands)
 RADAR_AXES = [
     ('ghg_2050_mtco2e',       'Net GHG emissions from land',           'Mt CO₂e yr⁻¹', -1, 1.0),
-    ('biodiversity_2050_mha', 'Biodiversity contribution-\nweighted score', 'Mha', +1, 1.0),
+    ('biodiversity_2050_mha', 'Biodiversity contribution-\nweighted area', 'Mha', +1, 1.0),
     # Same wording as 03_indicators and 19_Water: "relative to 2010" matters,
     # otherwise -14,000 GL has nothing to be relative to.
     ('water_change_2050_gl',  'Difference in water yield\nrelative to 2010', '10³ GL yr⁻¹', +1, 1000.0),

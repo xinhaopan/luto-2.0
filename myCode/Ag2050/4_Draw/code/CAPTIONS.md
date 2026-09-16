@@ -72,7 +72,7 @@ figures keep the legends they had.
 
 > **Fig. 5 | Pairwise comparison of 2050 outcomes across the four agricultural
 > futures.** The upper row plots agri-food production against the
-> contribution-weighted biodiversity score (left) and against net GHG emissions
+> contribution-weighted biodiversity area (left) and against net GHG emissions
 > from land (right); the lower row plots net economic returns against the same
 > two measures. Each
 > point is one scenario in 2050. With four scenarios these panels support
@@ -109,7 +109,7 @@ same quantities and must not be used.
 > **Extended Data Fig. 11 | Relationship between time-varying scenario drivers
 > and 2050 outcomes.** Rows correspond to the nine time-varying drivers shown in
 > Extended Data Fig. 2. Columns correspond to net GHG emissions from land, the
-> contribution-weighted biodiversity score, agri-food production, and change in
+> contribution-weighted biodiversity area, agri-food production, and change in
 > water yield relative to 2010. Each panel shows the 2050 value of the driver
 > against the 2050 value of the outcome, with one point per scenario. Each point
 > is the joint result of all drivers and all active constraints acting together,
@@ -139,7 +139,7 @@ a data error.
 Added to Fig. 4 as a seventh panel, alone on a fourth row.
 
 > **(g) Comparison of the four scenarios.** The six axes carry, clockwise from the top, net GHG
-> emissions from land, the contribution-weighted biodiversity score, change in
+> emissions from land, the contribution-weighted biodiversity area, change in
 > water yield relative to 2010, net economic returns, agri-food production and
 > land-use change
 > extent — the same six quantities, in the same order, as the radar in the
@@ -257,31 +257,55 @@ away from the model.
 ## 30-S9 — Spatial datasets used in LUTO2
 
 > **Table S9 | Spatial datasets used in LUTO2.** The fifteen spatially explicit
-> datasets the model reads, what each represents, its resolution and unit, its
-> source, and the role it plays in the simulation. The first ten are the
-> datasets marked as spatial in Table S6; the last five are spatial layers the
-> model depends on that Table S6 does not list — the baseline land-use and
-> land-management map, the commodity exclusion layer by Statistical Area Level
-> 2, savanna burning eligibility, Natural Resource Management regions, and
-> drainage divisions.
+> datasets the model reads, what each represents, the granularity and unit of
+> the data, its source, and the role it plays in the simulation. The first rows
+> are the datasets marked as spatial in Table S6; the remainder are spatial
+> layers the model depends on that Table S6 does not list — the natural land
+> carbon stock, the baseline land-use and land-management map, the commodity
+> exclusion layer, savanna burning eligibility, Natural Resource Management
+> regions and drainage divisions.
 
 **Why it was added (Referee 2).** Table S6 already flags which datasets are
 spatial, in a column the referee did not find. Rather than argue the point, this
-table states the spatial inputs on their own, with the resolution and the use to
-which each is put.
+table states the spatial inputs on their own, with the granularity and the use
+to which each is put.
 
-**One grid throughout.** Every layer sits on the same raster, so nothing is
-resampled inside the model: 0.01° × 0.01° in GDA94 (EPSG:4283), 3,364 × 4,071
-cells, of which 6,956,407 fall on land. Cell area runs 89.6–121.3 ha with
-latitude, mean 110.5 ha, 768.8 Mha in total. At `RESFACTOR = 3` each 3 × 3 block
-is one modelling unit of about 995 ha — which is why Table S1 now reads
-~1,000 ha, not the ~900 ha it used to (that figure came from rounding the base
-cell to 100 ha).
+**Every row was checked against `input/` and against the settings.py archived in
+Run_1's `Run_Archive.zip`**, not against the prose of Table S6. Six things an
+earlier draft had wrong, and which the referee could have checked:
+
+- **CO₂ fertilisation is off.** These runs set `CO2_FERT = "off"` and load
+  `climate_change_impacts_rcp4p5_CO2_FERT_OFF.h5`, so yields respond to climate
+  change but gain no fertilisation benefit. Do not write otherwise in Methods.
+- **Non-agricultural sequestration is t CO₂ ha⁻¹, not kg** — the variables are
+  `EP_BLOCK_TREES_T_CO2_HA` and siblings, a factor of 1,000 out.
+- **Transition emissions are not an input layer.** They are computed from the
+  natural land carbon stock, so that layer, not the derived emissions, is what
+  the table lists.
+- **The economic layers are SA2-level constants**, not per-cell surfaces:
+  price, yield and area cost for a given land use take only a few hundred
+  distinct values across 3.19 million cells. The two water prices take 18 and 21
+  distinct values. The biophysical layers really do vary cell by cell.
+- **Production cost is five components in two units** — area, fixed labour,
+  fixed operating and fixed depreciation in AU$ ha⁻¹, quantity cost in AU$ t⁻¹.
+- **The priority score is the Suitability layer** (`BIODIV_PRIORITY_SSP245`),
+  not Zonation: `data.py` reads `bio_NES_Zonation.nc` only when
+  `BIO_QUALITY_LAYER` contains `NES`, which these runs do not use.
+
+**One grid throughout.** Every layer is stored on the same raster: 0.01° × 0.01°
+in GDA94 (EPSG:4283), 3,364 × 4,071 cells, of which 6,956,407 fall on land. Cell
+area runs 89.6–121.3 ha with latitude, mean 110.5 ha, 768.8 Mha in total. At
+`RESFACTOR = 3` each 3 × 3 block is one modelling unit of about 1,000 ha — which
+is why Table S1 now reads ~1,000 ha rather than the ~900 ha it used to (that
+figure came from rounding the base cell to 100 ha).
+
+**A correction for Table S6.** It gives the water cost as AU$ t⁻¹. It is
+AU$ ML⁻¹.
 
 Sources for the savanna burning, Natural Resource Management and drainage
-division layers come from the data preparation record on the N: drive (`Data-Master`), not
-from the model code, which loads them from prepared `.h5` files without a
-citation.
+division layers come from the data preparation record on the N: drive
+(`Data-Master`), not from the model code, which loads them from prepared `.h5`
+files without a citation.
 
 ---
 
@@ -301,7 +325,7 @@ citation.
 | Net economic returns | billion AU$ yr⁻¹ | 43.359 | 52.192 | +8.833 | +20.4 |
 | Agri-food production | Mt yr⁻¹ | 240.357 | 240.374 | +0.018 | +0.007 |
 | Net GHG emissions from land | Mt CO₂e yr⁻¹ | 67.123 | 66.993 | −0.130 | −0.19 |
-| Biodiversity contribution-weighted score | Mha | 89.391 | 90.172 | +0.780 | +0.87 |
+| Biodiversity contribution-weighted area | Mha | 89.391 | 90.172 | +0.780 | +0.87 |
 | Change in water yield relative to 2010 | GL yr⁻¹ | −16,369.5 | −12,443.8 | +3,925.7 | 24.0 |
 | Land-use change extent, 2010–2050 | Mha | 32.405 | 16.520 | −15.884 | −49.0 |
 

@@ -119,7 +119,7 @@ ROW_TITLE_MAX_CHARS = 18
 # (column in the summary sheet, column title with units)
 OUTCOME_COLUMNS = [
     ('ghg_2050_mtco2e',      'Net GHG emissions from land\n(Mt CO₂e yr⁻¹)'),
-    ('biodiversity_2050_mha', 'Biodiversity contribution-\nweighted score (Mha)'),
+    ('biodiversity_2050_mha', 'Biodiversity contribution-\nweighted area (Mha)'),
     ('food_2050_mt',          'Agri-food production\n(Mt yr⁻¹)'),
     ('water_change_2050_gl',  'Change in water yield\n(GL yr⁻¹)'),
 ]
