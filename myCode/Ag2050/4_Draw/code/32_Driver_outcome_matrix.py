@@ -121,7 +121,7 @@ OUTCOME_COLUMNS = [
     ('ghg_2050_mtco2e',      'Net GHG emissions from land\n(Mt CO₂e yr⁻¹)'),
     ('biodiversity_2050_mha', 'Biodiversity contribution-\nweighted area (Mha)'),
     ('food_2050_mt',          'Agri-food production\n(Mt yr⁻¹)'),
-    ('water_change_2050_gl',  'Change in water yield\n(GL yr⁻¹)'),
+    ('water_change_2050_gl',  'Difference in water yield\nrelative to 2010 (GL yr⁻¹)'),
 ]
 
 # Published values, checked on load so a regenerated workbook cannot silently
