@@ -31,7 +31,8 @@ from tools.two_row_figure import (
     prepare_ghg_overview,
     prepare_net_economic_return_overview,
 )
-from tools.data_helper import extract_nc_layer_as_tiff, list_output_years, load_output_dataset
+from tools.data_helper import extract_nc_layer_as_tiff
+import tools.water_landuse_split as water_split
 from tools.parameters import EXCEL_DIR, OUTPUT_DIR, SCENARIO_LABELS, TIFF_DIR, font_size, GENERATE_TABLES
 from tools.plot_helper import calc_y_range, set_plot_style, stacked_area_pos_neg
 
@@ -108,7 +109,7 @@ FOOD_LEGEND_ORDER = [
 ROW_CONFIG = [
     ('NER',          NER_COLORS,   'Net economic returns\n(billion AU$ yr⁻¹)', NER_LEGEND_ORDER),
     ('GHG',          GHG_COLORS,   'GHG emissions\n(Mt CO₂e yr⁻¹)',       None),
-    ('Biodiversity', BIO_COLORS,   'Biodiversity contribution-\nweighted area (Mha)', None),
+    ('Biodiversity', BIO_COLORS,   'Contribution-weighted biodiversity\npriority score (Mha)', None),
     ('Agri-food',    FOOD_COLORS,  'Agri-food production\n(Mt yr⁻¹)',     FOOD_LEGEND_ORDER),
     ('Water',        WATER_COLORS, 'Difference in water yield\nrelative to 2010 (GL yr⁻¹)', WATER_LEGEND_ORDER),
 ]
@@ -143,50 +144,6 @@ def prepare_food():
                          'category': row['category'],
                          'value': float(row[FOOD_PRODUCTION_VALUE_COL]) / 1e6})
     return pd.DataFrame(rows)
-
-
-def _load_water_correction(scenario):
-    """
-    Per-cell attribution correction for water yield.
-
-    For each year, identifies cells that have non-ag land-use and returns their
-    total 2010 ag water yield split into (dryland_ML, irrigated_ML).
-
-    This correction re-attributes the baseline yield from "Dryland/Irrigated
-    agriculture" to "Non-agricultural land-use" so the non-ag delta correctly
-    shows the net effect of land conversion (typically negative for tree planting).
-    """
-    ds = load_output_dataset(scenario, 2010, 'xr_water_yield_ag_2010.nc')
-    if ds is None:
-        return {}
-    try:
-        data = ds['data'].values   # (cell, layer)
-        n_lu = len(ds.lu)          # 29: 'ALL' + 28 specific land-uses
-        # layer = lm_idx * n_lu + lu_idx  (lm: 0=ALL, 1=dry, 2=irr; lu_idx=0 for ALL)
-        ag10_dry = data[:, n_lu]       # lm=dry, lu=ALL
-        ag10_irr = data[:, 2 * n_lu]   # lm=irr, lu=ALL
-    except Exception:
-        return {}
-    finally:
-        ds.close()
-
-    corrections = {}
-    for year in list_output_years(scenario):
-        if year == 2010:
-            corrections[year] = (0.0, 0.0)
-            continue
-        ds_nag = load_output_dataset(scenario, year, f'xr_water_yield_non_ag_{year}.nc')
-        if ds_nag is None:
-            corrections[year] = (0.0, 0.0)
-            continue
-        try:
-            mask = ds_nag['data'].values[:, 0] > 0   # lu=ALL layer; True where non-ag exists
-            corrections[year] = (float(ag10_dry[mask].sum()), float(ag10_irr[mask].sum()))
-        except Exception:
-            corrections[year] = (0.0, 0.0)
-        finally:
-            ds_nag.close()
-    return corrections
 
 
 _CLIMATE_WATER_CACHE = None
@@ -288,64 +245,54 @@ def _load_climate_water_impact(force_regenerate=False):
     return _CLIMATE_WATER_CACHE
 
 
+WATER_GROUPS = {
+    'Dryland cropland and horticulture': 'Dryland agriculture',
+    'Dryland grazing (modified pastures)': 'Dryland agriculture',
+    'Grazing (native vegetation)': 'Dryland agriculture',
+    'Unallocated land': 'Dryland agriculture',
+    'Irrigated cropland and horticulture': 'Irrigated agriculture',
+    'Irrigated grazing (modified pastures)': 'Irrigated agriculture',
+    'Non-agricultural land-use': 'Non-agricultural land-use',
+}
+
+
 def prepare_water():
     rows = []
     vcol = 'Water Net Yield (ML)'
     climate = _load_climate_water_impact()
+    split, _totals = water_split.load()
     for scenario in input_files:
         water = load_report_source_csv(scenario, 'water_yield_separate_watershed')
         if water.empty:
             continue
         water = filter_water_detail_rows(water).replace(RENAME_AM_NON_AG)
 
-        irr    = water.query('Type == "Agricultural Land-use" and `Water Supply` == "Irrigated"').groupby('Year', as_index=False)[vcol].sum()
-        dry    = water.query('Type == "Agricultural Land-use" and `Water Supply` == "Dryland"').groupby('Year', as_index=False)[vcol].sum()
-        agmgt  = water.query('Type == "Agricultural Management"').groupby('Year', as_index=False)[vcol].sum()
-        non_ag = water.query('Type == "Non-Agricultural Land-use"').groupby('Year', as_index=False)[vcol].sum()
-
-        irr_d    = {} if irr.empty    else irr.set_index('Year')[vcol].to_dict()
-        dry_d    = {} if dry.empty    else dry.set_index('Year')[vcol].to_dict()
-        agmgt_d  = {} if agmgt.empty  else agmgt.set_index('Year')[vcol].to_dict()
-        non_ag_d = {} if non_ag.empty else non_ag.set_index('Year')[vcol].to_dict()
-
-        # 2010 baselines for delta calculation
-        dry_2010   = dry_d.get(2010, 0.0)
-        irr_2010   = irr_d.get(2010, 0.0)
+        agmgt   = water.query('Type == "Agricultural Management"').groupby('Year', as_index=False)[vcol].sum()
+        agmgt_d = {} if agmgt.empty else agmgt.set_index('Year')[vcol].to_dict()
         agmgt_2010 = agmgt_d.get(2010, 0.0)
 
-        # Per-cell correction: for each year, get the 2010 ag yield of cells now non-ag.
-        # Corrected non-ag delta  = (non_ag_yield_y) − (2010 ag yield of those cells)
-        # Corrected dryland delta = (dry_yield_y − dry_2010) + dry_corr
-        # Corrected irrigated delta = (irr_yield_y − irr_2010) + irr_corr
-        # This ensures the total water change is conserved while removing the
-        # artificial positive contribution from 2010-baseline = 0 for non-ag.
-        corrections = _load_water_correction(scenario)
-
-        # The raw "Water Net Yield" deltas above already have the climate effect baked in.
-        # We carve out only the PURE climate signal (water-yield change, land use held at
-        # the 2010 agricultural dvar), split dry/irr, from _load_climate_water_impact(). This signal
-        # is scenario-invariant (≈ −7,668 GL yr⁻¹ by 2050). The livestock water-requirement
-        # change that write.py folds into its reported CCI is deliberately NOT carved out —
-        # it is a management/stocking effect, not climate, so it stays inside Dryland/
-        # Irrigated agriculture. A proportional split is avoided because irrigated
-        # agriculture's 2010 net yield is negative, which would wrong-sign the irrigated share.
-        years = sorted(set(irr_d) | set(dry_d) | set(agmgt_d) | set(non_ag_d)
+        # Land-use categories come from the same cell-by-cell attribution as row 2
+        # of Extended Data Fig. 9 (tools/water_landuse_split.py): each category is
+        # the net yield change of land moving INTO it at the same year's rates,
+        # with the climate component already taken out on the 2010 pattern.  The
+        # seven detailed categories are merged into the three drawn here.
+        grouped = (split[split['scenario'] == scenario]
+                   .assign(group=lambda d: d['category'].map(WATER_GROUPS))
+                   .groupby(['year', 'group'])['value_GL'].sum())
+        years = sorted(set(split.loc[split['scenario'] == scenario, 'year'])
+                       | set(agmgt_d)
                        | {y for (s, y) in climate if s == scenario})
         for year in years:
-            dry_corr, irr_corr = corrections.get(int(year), (0.0, 0.0))
             dry_clim, irr_clim = climate.get((scenario, int(year)), (0.0, 0.0))  # GL, pure climate
-            rows.append({'year': int(year), 'scenario': scenario,
-                         'category': 'Irrigated agriculture',
-                         'value': (irr_d.get(year, 0.0) - irr_2010 + irr_corr) / 1e3 - irr_clim})
-            rows.append({'year': int(year), 'scenario': scenario,
-                         'category': 'Dryland agriculture',
-                         'value': (dry_d.get(year, 0.0) - dry_2010 + dry_corr) / 1e3 - dry_clim})
+            for group in ('Irrigated agriculture', 'Dryland agriculture'):
+                rows.append({'year': int(year), 'scenario': scenario, 'category': group,
+                             'value': float(grouped.get((year, group), 0.0))})
             rows.append({'year': int(year), 'scenario': scenario,
                          'category': 'Agricultural management',
                          'value': (agmgt_d.get(year, 0.0) - agmgt_2010) / 1e3})
             rows.append({'year': int(year), 'scenario': scenario,
                          'category': 'Non-agricultural land-use',
-                         'value': (non_ag_d.get(year, 0.0) - dry_corr - irr_corr) / 1e3})
+                         'value': float(grouped.get((year, 'Non-agricultural land-use'), 0.0))})
             rows.append({'year': int(year), 'scenario': scenario,
                          'category': 'Climate change impact',
                          'value': dry_clim + irr_clim})

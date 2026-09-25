@@ -24,7 +24,7 @@ from tools.two_row_figure import (
     load_report_source_csv,
     save_three_row_figure,
 )
-from tools.data_helper import list_output_years, load_output_dataset
+import tools.water_landuse_split as water_split
 
 VALUE_COL = 'Water Net Yield (ML)'
 SOURCE_CSV = 'water_yield_separate_watershed'
@@ -97,62 +97,6 @@ def _subtract_2010_baseline(rows_list):
     return df
 
 
-def _load_water_correction_by_category(scenario):
-    """
-    Attribute the 2010 agricultural water yield of cells converted to non-ag
-    land-use back to the original dryland/irrigated land-use categories.
-
-    This mirrors the correction used in 03_indicators.py, but keeps the
-    attribution at the detailed land-use legend level used in this figure.
-    """
-    ds = load_output_dataset(scenario, 2010, 'xr_water_yield_ag_2010.nc')
-    if ds is None:
-        return {}
-
-    try:
-        data = ds['data'].values
-        lu_names = [str(v) for v in ds['lu'].values]
-        n_lu = len(lu_names)
-        lm_index = {'dry': 1, 'irr': 2}
-        category_layers = {}
-        for lu_idx, lu_name in enumerate(lu_names):
-            if lu_name == 'ALL':
-                continue
-            for lm_name, lm_idx in lm_index.items():
-                category = classify_land_use(lu_name, lm_name)
-                if category is None:
-                    continue
-                layer_idx = lm_idx * n_lu + lu_idx
-                category_layers.setdefault(category, []).append(data[:, layer_idx])
-    except Exception:
-        return {}
-    finally:
-        ds.close()
-
-    corrections = {}
-    for year in list_output_years(scenario):
-        if year == 2010:
-            corrections[year] = {}
-            continue
-
-        ds_nag = load_output_dataset(scenario, year, f'xr_water_yield_non_ag_{year}.nc')
-        if ds_nag is None:
-            corrections[year] = {}
-            continue
-
-        try:
-            mask = ds_nag['data'].values[:, 0] > 0
-            corrections[year] = {
-                category: float(sum(layer[mask].sum() for layer in layers))
-                for category, layers in category_layers.items()
-            }
-        except Exception:
-            corrections[year] = {}
-        finally:
-            ds_nag.close()
-    return corrections
-
-
 def prepare_overview():
     """Overview row: two components — land use impact and climate change impact.
     Climate change impact = PURE climate water-yield change (scenario-invariant; read from
@@ -193,66 +137,38 @@ def prepare_overview():
 
 
 def prepare_land_use():
-    rows = []
-    for scenario in input_files:
-        water = load_water_australia(scenario)
-        if water.empty:
-            continue
+    """Row 2: land-use component of the water-yield change, by receiving category.
 
-        water_ag = water.query('Type == "Agricultural Land-use"').copy()
-        if not water_ag.empty:
-            water_ag['category'] = water_ag.apply(
-                lambda r: classify_land_use(r['Landuse'], r['Water Supply']), axis=1
-            )
-            water_ag = water_ag.dropna(subset=['category'])
-            water_ag = water_ag.groupby(['Year', 'category'], as_index=False)[VALUE_COL].sum()
+    Each category is the net change in water yield caused by land moving INTO it,
+    valued at the same year's rates, with the climate component taken out on the
+    2010 pattern exactly as in row 1.  The computation is cell by cell and lives in
+    tools/water_landuse_split.py; see its docstring for the method.  The seven
+    categories plus row 3 sum to row 1's land-use impact -- checked in main().
+    """
+    cats, _totals = water_split.load()
+    cats = cats[cats['scenario'].isin(input_files)]
+    return pd.DataFrame({
+        'year': cats['year'].astype(int),
+        'scenario': cats['scenario'],
+        'category': cats['category'],
+        'value': cats['value_GL'].astype(float),
+    })
 
-        water_non_ag = water.query('Type == "Non-Agricultural Land-use"').copy()
-        if not water_non_ag.empty:
-            water_non_ag = water_non_ag.groupby('Year', as_index=False)[VALUE_COL].sum()
 
-        ag_values = (
-            {} if water_ag.empty else
-            water_ag.set_index(['Year', 'category'])[VALUE_COL].to_dict()
-        )
-        non_ag_values = (
-            {} if water_non_ag.empty else
-            water_non_ag.set_index('Year')[VALUE_COL].to_dict()
-        )
-        baseline = {
-            category: ag_values.get((2010, category), 0.0)
-            for category in LU_COLORS
-            if category != 'Non-agricultural land-use'
-        }
-        baseline_non_ag = non_ag_values.get(2010, 0.0)
-
-        corrections = _load_water_correction_by_category(scenario)
-
-        all_years = sorted(
-            {year for year, _ in ag_values}
-            | set(non_ag_values)
-            | set(corrections)
-        )
-        for year in all_years:
-            correction_by_category = corrections.get(int(year), {})
-            total_correction = sum(correction_by_category.values())
-            for category in LU_COLORS:
-                if category == 'Non-agricultural land-use':
-                    value = non_ag_values.get(year, 0.0) - baseline_non_ag - total_correction
-                else:
-                    value = (
-                        ag_values.get((year, category), 0.0)
-                        - baseline.get(category, 0.0)
-                        + correction_by_category.get(category, 0.0)
-                    )
-                rows.append({
-                    'year': int(year),
-                    'scenario': scenario,
-                    'category': category,
-                    'value': value / 1e3,
-                })
-
-    return pd.DataFrame(rows)
+def check_conservation(overview_df, land_use_df, am_df, tol_gl=1.0):
+    """Row 2 summed + row 3 summed must equal row 1's land-use impact."""
+    lu = (overview_df[overview_df['category'] == 'Land use impact']
+          .set_index(['scenario', 'year'])['value'])
+    r2 = land_use_df.groupby(['scenario', 'year'])['value'].sum()
+    r3 = am_df.groupby(['scenario', 'year'])['value'].sum()
+    gap = (r2.add(r3, fill_value=0.0) - lu).dropna()
+    worst = gap.abs().max()
+    print(f'  conservation: max |row2 + row3 - row1 land-use| = {worst:.3f} GL '
+          f'over {len(gap)} scenario-years')
+    if worst > tol_gl:
+        bad = gap[gap.abs() > tol_gl]
+        print(bad.sort_values(key=abs, ascending=False).head(10).to_string())
+        raise AssertionError(f'row 2 + row 3 misses row 1 land-use impact by up to {worst:.2f} GL')
 
 
 def prepare_am():
@@ -286,6 +202,7 @@ def main():
     overview_df = tables['overview']
     land_use_df = tables['land_use']
     am_df       = tables['agricultural_management']
+    check_conservation(overview_df, land_use_df, am_df)
     am_colors = {
         label: color
         for label, color in get_am_colors().items()
