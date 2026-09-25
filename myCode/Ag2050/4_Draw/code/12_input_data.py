@@ -24,6 +24,9 @@ from _path_setup import *  # noqa: F401,F403
 from tools.parameters import OUTPUT_DIR, GENERATE_TABLES
 from tools.two_row_figure import export_long_tables, load_long_tables
 
+PNG_PRINT_WIDTH_MM = 183     # double-column width the PNG is sized for
+PNG_DPI = 600
+
 
 INPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../input'))
 
@@ -446,8 +449,26 @@ def main():
 
     out = os.path.join(OUTPUT_DIR, '12_input_data.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight')
-    plt.close(fig)
     print(f'Saved: {out}')
+
+    # PNG for the Word draft: 600 dpi at the 183 mm double-column print width.
+    # The canvas is drawn 18 in wide, so 600 dpi on the canvas itself would give a
+    # 10,800 px image; instead the raster is sized for the print width and the
+    # file's dpi tag set to 600 so Word places it at 183 mm by default.
+    from PIL import Image
+    fig.canvas.draw()
+    tight_in = fig.get_tightbbox(fig.canvas.get_renderer()).width
+    png_dpi = int(np.ceil(PNG_PRINT_WIDTH_MM / 25.4 * PNG_DPI / tight_in))
+    png = os.path.join(OUTPUT_DIR, '12_input_data.png')
+    fig.savefig(png, dpi=png_dpi, bbox_inches='tight')
+    plt.close(fig)
+    with Image.open(png) as im:
+        im.load()
+        width_px = im.size[0]
+        im.save(png, dpi=(PNG_DPI, PNG_DPI))
+    print(f'Saved: {png}  ({width_px:,} px wide, tagged {PNG_DPI} dpi)')
+    if width_px < 4000:
+        raise AssertionError(f'{png} is only {width_px} px wide; at least 4,000 required')
 
 
 if __name__ == '__main__':
