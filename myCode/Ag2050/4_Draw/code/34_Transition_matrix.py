@@ -6,6 +6,18 @@ the row's use into the column's use, pink where it is not. Rows are the origin,
 columns the destination, and the diagonal is always allowed because staying put
 is a permitted "transition" at zero cost.
 
+Two separate rules decide what the model can actually do, and the figure has to
+apply both or it contradicts itself.  T_MAT says which transitions exist and what
+they cost.  NON_AG_LAND_USES_REVERSIBLE then locks the irreversible non-
+agricultural land uses in place: once a cell fraction is committed to one, the
+solver receives a lower bound equal to last year's value, so that land can never
+leave.  In these runs every tree-based non-agricultural land use is irreversible
+and only destocked natural land is reversible, which means the tree rows of
+T_MAT are full of transitions the model is never able to make.  Drawing T_MAT
+alone would show those as permitted, so they are drawn pink like any other
+transition the model cannot make.  The two reasons are not distinguished by
+colour; the caption states them.
+
 Where the data comes from
     luto.data builds T_MAT, a from_lu x to_lu matrix of establishment costs per
     hectare, out of five files in input/ -- ag_tmatrix.npy, ag_to_ep_tmatrix.npy,
@@ -55,12 +67,14 @@ FIG_W_MM = 183.0        # Nature double-column width
 # around the labels is excluded.  The blocked colour is a neutral salmon with
 # equal green and blue, not the rose it was mistaken for.
 ALLOWED_COLOR = '#BCD6AE'    # green  -- the model may make this switch
-BLOCKED_COLOR = '#F4D0D0'    # pink   -- it may not
+BLOCKED_COLOR = '#F4D0D0'    # pink   -- it may not, for either reason
 GRID_COLOR = 'white'
 TEXT_COLOR = '#222222'
 LABEL_FONTSIZE = 5.0
+AXIS_TITLE_FONTSIZE = 6.5
 ROW_LABEL_MM = 47.0     # width taken by the row names
 COL_LABEL_MM = 47.0     # height taken by the rotated column names
+AXIS_TITLE_MM = 6.0     # strip outside the names for the "From"/"To" axis titles
 RIGHT_PAD_MM = 2.0
 LEGEND_MM = 13.0
 
@@ -136,6 +150,36 @@ def drop_unavailable(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.loc[keep, keep]
 
 
+def locked_sources() -> set:
+    """Non-agricultural land uses that are held in place in every scenario.
+
+    NON_AG_LAND_USES_REVERSIBLE == False means the solver is given a lower bound
+    equal to the previous year's allocation (get_non_ag_lb_matrices in
+    luto/economics/non_agricultural/transitions.py), so no land can leave that
+    use.  Every transition out of it is then unreachable whatever T_MAT says.
+
+    Read from the recorded run grid for the same reason drop_unavailable does,
+    so the figure follows the runs.  Checked against the settings.py archived in
+    each Run_Archive.zip: all four scenarios lock every non-agricultural land use
+    except destocked natural land.  Names come back in display spelling.
+    """
+    grid = os.path.normpath(os.path.join(EXCEL_DIR, '..', '..',
+                                         'grid_search_template.csv'))
+    if not os.path.exists(grid):
+        print(f'  {grid} not found; no land use marked as held in place')
+        return set()
+
+    row = pd.read_csv(grid).set_index('Name').loc['NON_AG_LAND_USES_REVERSIBLE']
+    per_run = [{name for name, on in ast.literal_eval(row[column]).items()
+                if not on}
+               for column in row.index]
+    names = set.intersection(*per_run) if per_run else set()
+    locked = {str(RENAME_NON_AG.get(name, name)) for name in names}
+    if locked:
+        print('  held in place once established: ' + ', '.join(sorted(locked)))
+    return locked
+
+
 def tidy_names(frame: pd.DataFrame) -> pd.DataFrame:
     """Spell the non-agricultural land uses the way the other figures do."""
     return frame.rename(index=RENAME_NON_AG, columns=RENAME_NON_AG)
@@ -145,15 +189,27 @@ def draw(frame: pd.DataFrame) -> None:
     allowed = frame.notna().to_numpy()
     n = len(frame)
 
+    # A cell is unreachable for either of two reasons, and the figure does not
+    # distinguish them: T_MAT has no entry for it, or the row's land use is
+    # locked in place so no land can leave it.  The diagonal is exempt from the
+    # lock, since staying put is exactly what the lock forces.
+    locked = locked_sources()
+    locked_row = np.array([lu in locked for lu in frame.index])[:, None]
+    held = allowed & locked_row & ~np.eye(n, dtype=bool)
+    available = allowed & ~held
+
     # Sized from the space the labels actually need rather than from a guessed
     # fraction: the longest name is about 42 characters, which at this size is
     # roughly ROW_LABEL_MM either rotated above the grid or written beside it.
-    grid_mm = FIG_W_MM - ROW_LABEL_MM - RIGHT_PAD_MM
-    fig_h_mm = grid_mm + COL_LABEL_MM + LEGEND_MM
+    # AXIS_TITLE_MM is the strip beyond the names that holds the From/To titles.
+    left_mm = ROW_LABEL_MM + AXIS_TITLE_MM
+    top_mm = COL_LABEL_MM + AXIS_TITLE_MM
+    grid_mm = FIG_W_MM - left_mm - RIGHT_PAD_MM
+    fig_h_mm = grid_mm + top_mm + LEGEND_MM
     fig, ax = plt.subplots(figsize=(FIG_W_MM * MM, fig_h_mm * MM))
 
     rgb = np.zeros((n, n, 3), dtype=float)
-    for flag, hexc in ((allowed, ALLOWED_COLOR), (~allowed, BLOCKED_COLOR)):
+    for flag, hexc in ((available, ALLOWED_COLOR), (~available, BLOCKED_COLOR)):
         rgb[flag] = [int(hexc[i:i + 2], 16) / 255.0 for i in (1, 3, 5)]
     ax.imshow(rgb, interpolation='nearest', aspect='equal')
 
@@ -165,25 +221,25 @@ def draw(frame: pd.DataFrame) -> None:
     ax.tick_params(which='minor', length=0)
 
     labels = list(frame.index)
-    # "From:" rides on the first row label and "To" sits above the row names, so
-    # the direction of the matrix is stated without a floating annotation that
-    # can land on top of a label.
-    row_labels = [f'From: {labels[0]}'] + labels[1:]
     ax.set_xticks(np.arange(n))
     ax.set_yticks(np.arange(n))
     ax.set_xticklabels(labels, rotation=90, fontsize=LABEL_FONTSIZE,
                        color=TEXT_COLOR)
-    ax.set_yticklabels(row_labels, fontsize=LABEL_FONTSIZE, color=TEXT_COLOR)
+    ax.set_yticklabels(labels, fontsize=LABEL_FONTSIZE, color=TEXT_COLOR)
     ax.xaxis.set_label_position('top')
     ax.xaxis.tick_top()
     ax.tick_params(axis='both', which='major', length=0, pad=2)
     for side in ax.spines.values():
         side.set_visible(False)
 
-    ax.annotate('To', xy=(0.0, 1.0), xycoords='axes fraction',
-                xytext=(-3.0, 3.0), textcoords='offset points',
-                ha='right', va='bottom', fontsize=LABEL_FONTSIZE + 1.0,
-                color=TEXT_COLOR, annotation_clip=False)
+    # Each direction is named on its own axis, centred and outside that axis's
+    # band of land-use names.  The previous "From:" prefix on the first row
+    # label read as part of a land-use name, and the corner "To" sat directly
+    # above the row names, which is the axis it does not describe.
+    ax.set_xlabel('To (destination land use)', fontsize=AXIS_TITLE_FONTSIZE,
+                  fontweight='bold', color=TEXT_COLOR, labelpad=3.0)
+    ax.set_ylabel('From (source land use)', fontsize=AXIS_TITLE_FONTSIZE,
+                  fontweight='bold', color=TEXT_COLOR, labelpad=3.0)
 
     handles = [
         mpatches.Patch(facecolor=ALLOWED_COLOR, edgecolor='none',
@@ -191,14 +247,14 @@ def draw(frame: pd.DataFrame) -> None:
         mpatches.Patch(facecolor=BLOCKED_COLOR, edgecolor='none',
                        label='Transition not permitted'),
     ]
-    fig.legend(handles=handles, loc='lower center', ncol=2, frameon=False,
-               fontsize=7, handlelength=1.1, handleheight=1.1,
+    fig.legend(handles=handles, loc='lower center', ncol=len(handles),
+               frameon=False, fontsize=7, handlelength=1.1, handleheight=1.1,
                handletextpad=0.5, columnspacing=2.0, bbox_to_anchor=(0.5, 0.012))
 
     fig.subplots_adjust(
-        left=ROW_LABEL_MM / FIG_W_MM,
+        left=left_mm / FIG_W_MM,
         right=1.0 - RIGHT_PAD_MM / FIG_W_MM,
-        top=1.0 - COL_LABEL_MM / fig_h_mm,
+        top=1.0 - top_mm / fig_h_mm,
         bottom=LEGEND_MM / fig_h_mm,
     )
 
@@ -216,13 +272,21 @@ def main() -> None:
         build_cache()
     frame = tidy_names(drop_unavailable(load_matrix()))
 
-    allowed = int(frame.notna().sum().sum())
+    n = frame.shape[0]
     total = frame.size
-    print(f'  {frame.shape[0]} land uses | permitted {allowed:,} of {total:,} '
-          f'({100.0 * allowed / total:.1f}%)')
+    in_tmat = int(frame.notna().sum().sum())
+    locked = locked_sources()
+    locked_row = np.array([lu in locked for lu in frame.index])[:, None]
+    held = int((frame.notna().to_numpy() & locked_row
+                & ~np.eye(n, dtype=bool)).sum())
+    print(f'  {n} land uses | in T_MAT {in_tmat:,} of {total:,} '
+          f'({100.0 * in_tmat / total:.1f}%) | of those {held:,} unreachable '
+          f'because the source is held in place | actually available '
+          f'{in_tmat - held:,} ({100.0 * (in_tmat - held) / total:.1f}%)')
     blocked_rows = frame.isna().sum(axis=1).sort_values(ascending=False)
-    print('  most restricted origins: '
-          + ', '.join(f'{lu} ({n})' for lu, n in blocked_rows.head(3).items()))
+    print('  most restricted origins in T_MAT: '
+          + ', '.join(f'{lu} ({n_blocked})'
+                      for lu, n_blocked in blocked_rows.head(3).items()))
     draw(frame)
 
 
