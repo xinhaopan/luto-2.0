@@ -82,7 +82,7 @@ SCENARIO_COLORS = {
 
 FOOD_LABEL = 'Agri-food production (Mt yr⁻¹)'
 NER_LABEL = 'Net economic returns (billion AU$ yr⁻¹)'
-BIO_LABEL = 'Biodiversity contribution-weighted area (Mha)'
+BIO_LABEL = 'Contribution-weighted biodiversity priority score (Mha)'
 GHG_LABEL = 'GHG emissions (Mt CO₂e yr⁻¹)'
 
 # (letter, x column, y column, x label, y label, y-axis 2010 baseline column)

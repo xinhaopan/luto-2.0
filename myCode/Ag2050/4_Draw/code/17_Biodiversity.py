@@ -122,7 +122,7 @@ def main():
         OVERVIEW_COLORS,
         LU_COLORS,
         am_colors,
-        "Biodiversity contribution-weighted area (Mha)",
+        "Contribution-weighted biodiversity priority score (Mha)",
         '17_biodiversity.svg',
         y_label_x=0.020,
     )
