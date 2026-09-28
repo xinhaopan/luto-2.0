@@ -1,5 +1,5 @@
 """
-07_GHG.py
+E_Fig_06.py -- Extended Data Fig. 6 | GHG emissions, 2010-2050.
 Combined stacked-area figure for land use and agricultural management GHG.
 """
 import _path_setup  # noqa: F401
@@ -100,7 +100,7 @@ def prepare_am():
 
 
 def main():
-    workbook = '16_ghg_long_tables.xlsx'
+    workbook = 'E_Fig_06.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
@@ -125,7 +125,7 @@ def main():
         LU_COLORS,
         am_colors,
         "GHG emissions (Mt CO₂e yr⁻¹)",
-        '16_ghg.svg',
+        'E_Fig_06.svg',
         y_label_x=0.020,
         overview_required_ticks=[-100, 100],
     )

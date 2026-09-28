@@ -1,5 +1,5 @@
 """
-04_indicators.py
+Fig_03.py -- Fig. 3 | Economic and environmental trajectories, 2010-2050.
 5-row × 4-column overview indicator figure.
 Rows:    NER, GHG, Biodiversity, Agri-food, Water
 Columns: 4 scenarios (AgS1–AgS4)
@@ -147,7 +147,7 @@ def prepare_food():
 
 
 _CLIMATE_WATER_CACHE = None
-CLIMATE_WATER_CSV = '03_water_climate_impact_split.csv'
+CLIMATE_WATER_CSV = 'Fig_03_water_climate.csv'
 
 
 def _compute_climate_water_impact():
@@ -159,7 +159,7 @@ def _compute_climate_water_impact():
     at the 2010 agricultural dvar, so the result is the true scenario-invariant climate
     signal (≈ −7,668 GL yr⁻¹ by 2050); the livestock water-requirement change that
     write.py folds into its reported CCI is deliberately excluded. Writes the result to
-    EXCEL_DIR/03_water_climate_impact_split.csv and returns the DataFrame.
+    EXCEL_DIR/Fig_03_water_climate.csv and returns the DataFrame.
 
     Requires the `luto` package importable (xpluto env) and the Data_RES*.lz4 files.
     Only invoked when the cache CSV is missing (one-time, ~2 min).
@@ -219,7 +219,7 @@ def _compute_climate_water_impact():
 def _load_climate_water_impact(force_regenerate=False):
     """Pure dryland/irrigated climate impact on water yield (GL), per (scenario, year).
 
-    Reads the per-task-root cache EXCEL_DIR/03_water_climate_impact_split.csv; if it is
+    Reads the per-task-root cache EXCEL_DIR/Fig_03_water_climate.csv; if it is
     missing (e.g. first run on a new TASK_ROOT), computes it once from the raw
     Data_RES*.lz4 objects via _compute_climate_water_impact(). Cached at module level.
     """
@@ -309,7 +309,7 @@ def export_landuse_tifs():
     exported once. 2050 is scenario-specific and exported per scenario.
 
     The extracted file is COPIED, not moved: it is also the extraction cache that
-    02_Mapping and 33_Consistency_maps reuse, and moving it away made them
+    Fig_02 and S_Fig_01 reuse, and moving it away made them
     re-extract the same layer from the run archive.
     """
     os.makedirs(TIFF_DIR, exist_ok=True)
@@ -444,14 +444,14 @@ def save_indicators_figure(all_dfs):
                  ha='center', va='bottom', fontsize=font_size,
                  fontweight='bold', fontfamily='Arial')
 
-    out = os.path.join(OUTPUT_DIR, '03_indicators.svg')
+    out = os.path.join(OUTPUT_DIR, 'Fig_03.svg')
     fig.savefig(out, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved: {out}')
 
 
 def main():
-    workbook = '03_indicators_long_tables.xlsx'
+    workbook = 'Fig_03.xlsx'
     if GENERATE_TABLES:
         _load_climate_water_impact(force_regenerate=True)
         export_long_tables(

@@ -1,5 +1,5 @@
 """
-11_Demand.py
+E_Fig_03.py -- Extended Data Fig. 3 | Agri-food demand trajectories by commodity, 2010-2050, under the four Ag2050 scenarios.
 Agri-food demand stacked-area figure.
 Uses the same CSV filter as LUTO data.py (AG2050_MODE):
   Domestic_diet='BAU', Global_diet='BAU', Convergence=2050,
@@ -58,7 +58,7 @@ CSV_PATH = os.path.join(
 )
 
 YEARS = list(range(2010, 2051))
-WORKBOOK = '13_demand_long_tables.xlsx'
+WORKBOOK = 'E_Fig_03.xlsx'
 
 
 def _compact_tick_label(value, _):
@@ -328,7 +328,7 @@ def draw_figure():
         columnspacing=2.5,
     )
 
-    out = os.path.join(OUTPUT_DIR, '13_demand.svg')
+    out = os.path.join(OUTPUT_DIR, 'E_Fig_03.svg')
     fig.savefig(out, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved: {out}')

@@ -1,5 +1,6 @@
 """
-03_Mapping.py — Combined SVG figure with three panels (a), (b), (c).
+Fig_02.py -- Fig. 2 | Spatial distribution of land use and agricultural management in 2050; also writes Figs. S2-S8 (each map of Fig. 2 at full page size).
+Combined SVG figure with three panels (a), (b), (c).
   (a) 2×2 grid (all 4 scenarios), 8-category LU with dryland/irrigated split
   (b) 1×2 grid (AgS1+AgS2 only), AG management types
   (c) single map (AgS2), non-ag land-use sub-types with side legend
@@ -33,7 +34,7 @@ EXTENT = [TIFF_LEFT, TIFF_RIGHT, TIFF_BOTTOM, TIFF_TOP]
 _HERE   = os.path.dirname(os.path.abspath(__file__))
 ASSETS  = os.path.normpath(os.path.join(_HERE, '../../../draw_all/code/Assets'))
 STE_SHP = os.path.join(ASSETS, 'AUS_adm/STE11aAust_mercator_simplified.shp')
-WORKBOOK = '02_mapping_tiff_manifest.xlsx'
+WORKBOOK = 'Fig_02.xlsx'
 _TIFF_MANIFEST = None
 
 # ── 8-category LU scheme ──────────────────────────────────────────────────────
@@ -169,7 +170,7 @@ def _lookup_manifest_tiff(scen, layer_name, cache_key):
     if not path or path == 'nan' or not os.path.exists(path):
         raise FileNotFoundError(
             f'Missing TIFF listed in table cache: {path}\n'
-            'Set GENERATE_TABLES = True in tools/parameters.py and run 02_Mapping.py once '
+            'Set GENERATE_TABLES = True in tools/parameters.py and run Fig_02.py once '
             'before plotting with GENERATE_TABLES = False.'
         )
     return path
@@ -586,14 +587,14 @@ def save_combined_maps(gdf_states):
                  ha='center', va='bottom',
                  fontsize=FONT_SIZE + 4, fontfamily='Arial', fontweight='bold')
 
-    out = os.path.join(OUTPUT_DIR, '02_maps.svg')
+    out = os.path.join(OUTPUT_DIR, 'Fig_02.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     print(f'Saved: {out}')
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Figs. S6–S12.  Everything above this line is Fig. 2 exactly as it stood in
+# Figs. S2–S8.  Everything above this line is Fig. 2 exactly as it stood in
 # commit 0cd8dc85 (July 2026), restored on 2026-09-26 and not to be changed.
 # The code below only adds the seven stand-alone maps; it draws the same data
 # with the same classification and colours, and does not touch Fig. 2.
@@ -602,13 +603,13 @@ from tools.plot_helper import category_handles, place_category_legend  # noqa: E
 
 NO_AM_LABEL = 'No agricultural management'
 
-# Figs. S6–S12 draw every legend entry as a filled square.  Passing one family
+# Figs. S2–S8 draw every legend entry as a filled square.  Passing one family
 # for all entries also squares the entries that belong to no family (the grey
 # 'public and indigenous land' class), which would otherwise be a plain bar.
 SQUARE = 'ag'
 
 
-# ── Map and legend builders for Figs. S6–S12 ─────────────────────────────────
+# ── Map and legend builders for Figs. S2–S8 ─────────────────────────────────
 # The map-drawing steps are the same as in save_combined_maps above.
 def _draw_lu_map(ax, gdf_states, scen):
     fill_states(ax, gdf_states)
@@ -682,14 +683,10 @@ def _nonag_entries():
     return entries
 
 
-# ── Figs. S6–S12: each Fig. 2 map on its own page ────────────────────────────
+# ── Figs. S2–S8: each Fig. 2 map on its own page ────────────────────────────
 SUPP_WIDTH_MM = 170
 SUPP_FONT_SIZE = 8
 SUPP_PNG_DPI = 600
-
-
-def _scenario_token(scen):
-    return SCENARIO_LABELS.get(scen, scen).split('\n')[0].replace(' ', '')
 
 
 def _save_single_map(draw, entries, ncol, legend_h_in, stem):
@@ -733,21 +730,21 @@ def _save_single_map(draw, entries, ncol, legend_h_in, stem):
 
 
 def save_supplementary_maps(gdf_states):
-    """Figs. S6–S12: the seven maps of Fig. 2, one per page."""
+    """Figs. S2–S8: the seven maps of Fig. 2, one per page."""
     am_plot = _am_plot_info()
     lu_entries = _lu_entries(include_other=True)
-    for number, scen in zip((6, 7, 8, 9), input_files):
+    for number, scen in zip((2, 3, 4, 5), input_files):
         _save_single_map(lambda ax, s=scen: _draw_lu_map(ax, gdf_states, s),
                          lu_entries, ncol=2, legend_h_in=1.3,
-                         stem=f'S{number:02d}_landuse_{_scenario_token(scen)}')
-    for number, scen in zip((10, 11), input_files[:2]):
+                         stem=f'S_Fig_{number:02d}')
+    for number, scen in zip((6, 7), input_files[:2]):
         _save_single_map(lambda ax, s=scen: _draw_am_map(ax, gdf_states, s, am_plot),
                          _am_entries(am_plot), ncol=3, legend_h_in=1.0,
-                         stem=f'S{number:02d}_agmgt_{_scenario_token(scen)}')
+                         stem=f'S_Fig_{number:02d}')
     scen = input_files[1]
     _save_single_map(lambda ax: _draw_nonag_map(ax, gdf_states, scen),
                      _nonag_entries(), ncol=2, legend_h_in=1.7,
-                     stem=f'S12_nonag_{_scenario_token(scen)}')
+                     stem='S_Fig_08')
 
 
 def main():

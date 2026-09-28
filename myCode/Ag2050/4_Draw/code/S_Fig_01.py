@@ -1,5 +1,5 @@
 """
-33_Consistency_maps.py -- Extended Data figure + companion table
+S_Fig_01.py -- Fig. S1 | Spatial agreement and divergence in 2050 land use across the four Ag2050 scenarios (+ companion table).
 
 Twelve Same/Different maps: where do the scenarios agree on the 2050 dominant
 land use, and where do they diverge?
@@ -29,12 +29,12 @@ Where the numbers come from
     non-modelled land must.
 
 The geography -- the 8-category scheme, the state boundaries, the extent and the
-CRS -- is imported from 02_Mapping.py, so this figure cannot drift away from
+CRS -- is imported from Fig_02.py, so this figure cannot drift away from
 Fig. 2.  A raster is read only to recover the 2-D position of each model cell.
 
 Outputs
-    OUTPUT_DIR/33_Consistency_maps.svg        (svg.fonttype='none')
-    EXCEL_DIR/33_consistency_agreement.xlsx   the map shows where the scenarios
+    OUTPUT_DIR/S_Fig_01.svg        (svg.fonttype='none')
+    EXCEL_DIR/S_Fig_01.xlsx   the map shows where the scenarios
         differ, the table how much: per-panel areas, and pairwise matrices for
         land use and for management.
 """
@@ -61,11 +61,11 @@ from tools.text_layout import balanced_wrap
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Single source of truth for the geography and the land-use categories.
-_map = importlib.import_module('02_Mapping')
+_map = importlib.import_module('Fig_02')
 
-OUTPUT_NAME = '33_Consistency_maps.svg'
-TABLE_NAME = '33_consistency_agreement.xlsx'   # this figure's cached table
-AREA_CACHE = '33_cell_areas.npz'               # the extracted per-cell areas
+OUTPUT_NAME = 'S_Fig_01.svg'
+TABLE_NAME = 'S_Fig_01.xlsx'   # this figure's cached table
+AREA_CACHE = 'S_Fig_01_cell_areas.npz'               # the extracted per-cell areas
 
 MM = 1.0 / 25.4
 FIG_W_MM = 183.0        # Nature double-column width
@@ -169,7 +169,7 @@ def raster_mask():
         f'_extracted_{RUN_OF[CODES[0]]}_map_lumap_lmALL_2050.tiff')
     if not os.path.exists(path):
         raise FileNotFoundError(
-            f'{path} not found. Run 02_Mapping.py first -- it extracts the '
+            f'{path} not found. Run Fig_02.py first -- it extracts the '
             'rasters from each run archive.')
     return ~np.isnan(_map.read_tiff(path))
 

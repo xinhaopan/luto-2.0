@@ -1,7 +1,7 @@
 """
 Land-use component of water-yield change, attributed cell by cell to the land-use
 category that RECEIVES the land.  Feeds row 2 of Extended Data Fig. 9
-(19_Water.py) and the water row of Fig. 3 (03_indicators.py).
+(E_Fig_09.py) and the water row of Fig. 3 (Fig_03.py).
 
 Why the old row 2 was wrong
     It plotted, for each category, (yield of the cells in that category this year)
@@ -40,13 +40,13 @@ What is computed instead
 
     Summed over categories the result equals row 1's land-use impact minus the
     agricultural-management change in row 3, to rounding -- checked here and again
-    in 19_Water.py.
+    in E_Fig_09.py.
 
 Why not a new model output
     The instruction was to add a per-cell, per-land-use climate output to LUTO2 and
     re-run the write step.  Every quantity needed is already in the Data_RES*.lz4
     object each run archives, so it is read from there, as the climate cache in
-    03_indicators.py already is.  No model code changes and no re-runs.
+    Fig_03.py already is.  No model code changes and no re-runs.
 
 Needs the xpluto environment (luto importable, joblib, lz4).
 """
@@ -72,8 +72,8 @@ CATEGORIES = [
     'Non-agricultural land-use',
 ]
 N_AG_CATS = len(CATEGORIES) - 1
-CACHE_CATS = '19_water_landuse_transfer.csv'
-CACHE_TOTALS = '19_water_landuse_transfer_totals.csv'
+CACHE_CATS = 'E_Fig_09_landuse_transfer.csv'
+CACHE_TOTALS = 'E_Fig_09_landuse_transfer_totals.csv'
 EPS = 1e-9          # below this a change in cell share is treated as none
 
 
@@ -188,7 +188,7 @@ def _one_scenario(scenario, ag_water, non_ag_water):
 
     oh = _onehot(data)
     base = data.YR_CAL_BASE
-    # Climate component exactly as row 1 takes it from 03_indicators: yield-only
+    # Climate component exactly as row 1 takes it from Fig_03: yield-only
     # rates on the unmasked 2010 allocation AG_L_MRJ.
     x_clim = np.asarray(data.AG_L_MRJ, dtype=np.float64)
     fx_clim = _flat(x_clim)

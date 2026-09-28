@@ -1,5 +1,5 @@
 """
-14_Mammals_Restoration.py
+E_Fig_04.py -- Extended Data Fig. 4 | Mammal species recorded in areas restored under the Landscape Stewardship scenario.
 Which mammal species occur where LUTO restores land (2010 agriculture -> 2050
 non-agricultural), using the Australian species occurrence dataset.
 
@@ -12,8 +12,8 @@ Inputs:
   - LUTO land-use GeoTIFFs in TIFF_DIR: landuse_2010.tif, landuse_<AgS2>_2050.tif
   - Species occurrence points: SPECIES_DIR/mammals/models/<Species>/occur.csv
 Outputs:
-  - EXCEL_DIR/14_mammals_restoration_ranked.csv   (all 178 species, ranked)
-  - OUTPUT_DIR/14_mammals_restoration.png          (top-15 bar chart)
+  - EXCEL_DIR/E_Fig_04.csv   (all 178 species, ranked)
+  - OUTPUT_DIR/E_Fig_04.png          (top-15 bar chart)
 """
 import _path_setup  # noqa: F401
 
@@ -132,7 +132,7 @@ def save_barchart(res):
                        mpatches.Patch(facecolor='#2d688f', label='Not listed / secure')],
               loc='lower right', fontsize=9.5, frameon=False)
 
-    out = os.path.join(OUTPUT_DIR, '14_mammals_restoration.png')
+    out = os.path.join(OUTPUT_DIR, 'E_Fig_04.png')
     fig.savefig(out, dpi=250, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     print(f'Saved: {out}')
@@ -141,7 +141,7 @@ def save_barchart(res):
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(EXCEL_DIR, exist_ok=True)
-    csv_path = os.path.join(EXCEL_DIR, '14_mammals_restoration_ranked.csv')
+    csv_path = os.path.join(EXCEL_DIR, 'E_Fig_04.csv')
     if GENERATE_TABLES:
         restored, transform, shape = build_restoration_mask()
         print(f'{RESTORE_SCENARIO}: {int(restored.sum())} restored 5 km cells')

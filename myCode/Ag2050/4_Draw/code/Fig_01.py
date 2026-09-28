@@ -1,5 +1,5 @@
 """
-05_Area.py
+Fig_01.py -- Fig. 1 | Land-use and agricultural management area, 2010-2050.
 Combined stacked-area figure for land use and agricultural management area.
 Layout: 2 rows x 4 columns (Land-use, AM; AgS1-AgS4).
 """
@@ -235,7 +235,7 @@ def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     set_plot_style(font_size=font_size)
 
-    workbook = '01_area_long_tables.xlsx'
+    workbook = 'Fig_01.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
@@ -307,7 +307,7 @@ def main():
     add_patch_legend(ax_leg_lu, LU_COLORS, ncol=1)
     add_patch_legend(ax_leg_am, am_colors, ncol=1)
 
-    out = os.path.join(OUTPUT_DIR, '01_area.svg')
+    out = os.path.join(OUTPUT_DIR, 'Fig_01.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight')
     plt.close(fig)
     print(f"Saved: {out}")

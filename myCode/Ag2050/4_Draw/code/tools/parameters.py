@@ -14,8 +14,8 @@ AG2050_DIR  = f"../../../../output/{TASK_ROOT}/ag2050"
 OUTPUT_DIR  = f"{AG2050_DIR}/figures"   # charts and assembled maps
 # One raster directory.  It used to be split into 'tiffs' (the extraction cache,
 # named _extracted_*) and 'tif' (the same rasters re-exported as landuse_*.tif),
-# which was not just redundant: 03_indicators MOVED the file out of the cache,
-# so 02_Mapping and 33_Consistency_maps had to extract it all over again.
+# which was not just redundant: Fig_03 MOVED the file out of the cache,
+# so Fig_02 and S_Fig_01 had to extract it all over again.
 TIFF_DIR    = f"{AG2050_DIR}/tiffs"     # all GeoTIFFs: extraction cache + exports
 TIF_DIR     = TIFF_DIR                  # deprecated alias, kept so old code runs
 EXCEL_DIR   = f"{AG2050_DIR}/excel"     # exported long tables for figures

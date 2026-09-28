@@ -1,4 +1,5 @@
-"""03_input_data.py
+"""
+E_Fig_02.py -- Extended Data Fig. 2 | Historical observations, fitted trends, and scenario-specific trajectories for the time-varying input parameters used in LUTO2.
 Scenario-specific input parameter plots for the Ag2050 Methods section.
 """
 
@@ -38,7 +39,7 @@ LABOUR_COST_FORECAST = os.path.abspath(os.path.join(
 ))
 
 YEARS = list(range(2010, 2051))
-WORKBOOK = '12_input_data_long_tables.xlsx'
+WORKBOOK = 'E_Fig_02.xlsx'
 LAST_HIST_YEAR = 2023
 LC_HIST_END = 2024
 FEEDLOT_HIST_END = 2024
@@ -447,7 +448,7 @@ def main():
                 ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(step))
                 break
 
-    out = os.path.join(OUTPUT_DIR, '12_input_data.svg')
+    out = os.path.join(OUTPUT_DIR, 'E_Fig_02.svg')
     fig.savefig(out, dpi=600, bbox_inches='tight')
     print(f'Saved: {out}')
 
@@ -459,7 +460,7 @@ def main():
     fig.canvas.draw()
     tight_in = fig.get_tightbbox(fig.canvas.get_renderer()).width
     png_dpi = int(np.ceil(PNG_PRINT_WIDTH_MM / 25.4 * PNG_DPI / tight_in))
-    png = os.path.join(OUTPUT_DIR, '12_input_data.png')
+    png = os.path.join(OUTPUT_DIR, 'E_Fig_02.png')
     fig.savefig(png, dpi=png_dpi, bbox_inches='tight')
     plt.close(fig)
     with Image.open(png) as im:

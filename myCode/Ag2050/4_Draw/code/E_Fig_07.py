@@ -1,5 +1,5 @@
 """
-08_Biodiversity.py
+E_Fig_07.py -- Extended Data Fig. 7 | Contribution-weighted biodiversity priority score, 2010-2050.
 Combined stacked-area figure for all-cell GBF2-style biodiversity contribution
 by land use and agricultural management.
 """
@@ -98,7 +98,7 @@ def prepare_am():
 
 
 def main():
-    workbook = '17_biodiversity_long_tables.xlsx'
+    workbook = 'E_Fig_07.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
@@ -123,7 +123,7 @@ def main():
         LU_COLORS,
         am_colors,
         "Contribution-weighted biodiversity priority score (Mha)",
-        '17_biodiversity.svg',
+        'E_Fig_07.svg',
         y_label_x=0.020,
     )
 

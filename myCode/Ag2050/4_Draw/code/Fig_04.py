@@ -1,4 +1,5 @@
-"""Fig. 4 showing scenario changes from the 2010 baseline.
+"""
+Fig_04.py -- Fig. 4 | Integrated comparison of the four agricultural futures in 2050.
 
 All six panels use percentages. Water uses absolute national yield totals before
 calculating its percentage; land-use change is scaled by total 2010 study area.
@@ -42,8 +43,8 @@ from tools.two_row_figure import (
 
 YEAR = 2050
 BASELINE_YEAR = 2010
-WORKBOOK = '04_trade_off_percent_threshold.xlsx'
-INDICATOR_WORKBOOK = '03_indicators_long_tables.xlsx'
+WORKBOOK = 'Fig_04.xlsx'
+INDICATOR_WORKBOOK = 'Fig_03.xlsx'
 
 SCENARIO_COLORS = {
     input_files[0]: '#2D688F',
@@ -95,7 +96,7 @@ def _percentage_change(totals, label):
 
 
 def _load_climate_water_2050():
-    path = Path(EXCEL_DIR) / '03_water_climate_impact_split.csv'
+    path = Path(EXCEL_DIR) / 'Fig_03_water_climate.csv'
     if not path.exists():
         raise missing_table_error(path)
     climate = pd.read_csv(path)
@@ -238,7 +239,7 @@ def _load_water_2010_baseline():
 
 
 def _load_land_area_2010():
-    area = load_long_tables('01_area_long_tables.xlsx', 'land_use')['land_use']
+    area = load_long_tables('Fig_01.xlsx', 'land_use')['land_use']
     totals = (
         area[area['year'].eq(BASELINE_YEAR)]
         .groupby('scenario')['value']
@@ -650,7 +651,7 @@ def plot_figure(summary):
     radar_column = radar_cell[0, 1].subgridspec(2, 1, height_ratios=[0.22, 1.0])
     ax_radar = fig.add_subplot(radar_column[1, 0], polar=True)
 
-    # Match the indicator order used in 03_indicators.py.
+    # Match the indicator order used in Fig_03.py.
     ax = axes[0, 0]
     _draw_bars(ax, summary, 'ner_change_pct', lambda value: f'{value:+,.1f}%')
     _set_panel_style(ax, 'Net economic returns', 'a')
@@ -750,8 +751,8 @@ def plot_figure(summary):
         columnspacing=2.0,
     )
 
-    svg_path = Path(OUTPUT_DIR) / '04_trade_off_percent_threshold.svg'
-    png_path = Path(OUTPUT_DIR) / '04_trade_off_percent_threshold.png'
+    svg_path = Path(OUTPUT_DIR) / 'Fig_04.svg'
+    png_path = Path(OUTPUT_DIR) / 'Fig_04.png'
     fig.savefig(svg_path, dpi=600, bbox_inches='tight', facecolor='white')
     fig.savefig(png_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close(fig)

@@ -15,7 +15,7 @@ Why not rebuild it here
     hectare.  Only the pattern matters for the figure.
 
 What it writes
-    EXCEL_DIR/34_transition_matrix.csv   from_lu x to_lu, NaN where not allowed
+    EXCEL_DIR/S_Fig_11.csv   from_lu x to_lu, NaN where not allowed
 
 Run it from the 4_Draw/code directory with the xpluto environment:
     <xpluto>/python.exe tools/make_transition_cache.py
@@ -35,7 +35,7 @@ os.chdir(os.path.dirname(_HERE))
 from tools.data_helper import get_zip_info                  # noqa: E402
 from tools.parameters import EXCEL_DIR, input_files         # noqa: E402
 
-CACHE_NAME = '34_transition_matrix.csv'
+CACHE_NAME = 'S_Fig_11.csv'
 
 
 def main() -> None:

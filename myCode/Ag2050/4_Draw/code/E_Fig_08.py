@@ -1,5 +1,5 @@
 """
-09_Food.py
+E_Fig_08.py -- Extended Data Fig. 8 | Agri-food production, 2010-2050.
 Combined stacked-area figure for food production by source type, commodity
 group, and agricultural management.
 """
@@ -115,7 +115,7 @@ def prepare_am():
 
 
 def main():
-    workbook = '18_food_long_tables.xlsx'
+    workbook = 'E_Fig_08.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
@@ -140,7 +140,7 @@ def main():
         FOOD_COLORS,
         am_colors,
         'Agri-food production (Mt yr⁻¹)',
-        '18_food.svg',
+        'E_Fig_08.svg',
         y_label_x=0.020,
         top_legend_order=FOOD_LEGEND_ORDER,
     )

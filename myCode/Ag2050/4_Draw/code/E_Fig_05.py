@@ -1,5 +1,5 @@
 """
-06_Net_Economic_Return.py
+E_Fig_05.py -- Extended Data Fig. 5 | Net economic returns, 2010-2050.
 Combined stacked-area figure for net economic return by land use and
 agricultural management.
 """
@@ -132,7 +132,7 @@ def prepare_am():
 
 
 def main():
-    workbook = '15_net_economic_return_long_tables.xlsx'
+    workbook = 'E_Fig_05.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
@@ -157,7 +157,7 @@ def main():
         LU_COLORS,
         am_colors,
         'Net economic returns (billion AU$ yr⁻¹)',
-        '15_net_economic_return.svg',
+        'E_Fig_05.svg',
         total_legend_label='Net economic returns',
         y_label_x=0.020,
     )

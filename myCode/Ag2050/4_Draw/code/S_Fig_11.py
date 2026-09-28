@@ -1,5 +1,6 @@
 """
-34_Transition_matrix.py -- which land uses can convert into which
+S_Fig_11.py -- Fig. S11 | Permitted land-use transitions.
+which land uses can convert into which
 
 A land-use by land-use grid: green where the model is allowed to move land from
 the row's use into the column's use, pink where it is not. Rows are the origin,
@@ -33,8 +34,8 @@ Where the data comes from
     tools/make_transition_cache.py.  GENERATE_TABLES controls which half runs.
 
 Outputs
-    OUTPUT_DIR/34_Transition_matrix.svg   (svg.fonttype='none')
-    EXCEL_DIR/34_transition_matrix.csv    the cached matrix itself
+    OUTPUT_DIR/S_Fig_11.svg   (svg.fonttype='none')
+    EXCEL_DIR/S_Fig_11.csv    the cached matrix itself
 """
 
 import _path_setup  # noqa: F401
@@ -56,8 +57,8 @@ from tools.parameters import EXCEL_DIR, GENERATE_TABLES, OUTPUT_DIR
 # Relative paths in tools.parameters are anchored to this directory.
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-OUTPUT_NAME = '34_Transition_matrix.svg'
-CACHE_NAME = '34_transition_matrix.csv'
+OUTPUT_NAME = 'S_Fig_11.svg'
+CACHE_NAME = 'S_Fig_11.csv'
 
 MM = 1.0 / 25.4
 FIG_W_MM = 183.0        # Nature double-column width

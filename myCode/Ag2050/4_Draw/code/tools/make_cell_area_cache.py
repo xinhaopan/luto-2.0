@@ -17,7 +17,7 @@ Why
     leaves a compact .npz the figure script can open with numpy alone.
 
 What it writes
-    EXCEL_DIR/33_cell_areas.npz
+    EXCEL_DIR/S_Fig_01_cell_areas.npz
         real_area_ha   (n_cells,)              LUTO's own per-cell area
         cat8_ha        (n_scen, 8, n_cells)    area in each of the 8 Fig. 2 categories
         am_ha          (n_scen, n_am, n_cells) area under each management option
@@ -45,10 +45,10 @@ from tools.two_row_figure import (                              # noqa: E402
     CROPLAND_LUS, MODIFIED_PASTURE_LUS, NATIVE_PASTURE_LUS, UNALLOCATED_LUS,
 )
 
-CACHE_NAME = '33_cell_areas.npz'
+CACHE_NAME = 'S_Fig_01_cell_areas.npz'
 YEAR = 2050
 
-# The eight categories of Fig. 2, in the order 02_Mapping.py numbers them.
+# The eight categories of Fig. 2, in the order Fig_02.py numbers them.
 CATEGORIES = [
     'Dryland cropland and horticulture',
     'Irrigated cropland and horticulture',

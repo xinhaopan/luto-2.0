@@ -1,5 +1,5 @@
 """
-31_Pairwise.py -- Fig. 5
+S_Fig_09.py -- Fig. S9 | Pairwise comparison of 2050 outcomes across the four Ag2050 scenarios.
 
 Pairwise comparison of 2050 outcomes across the four agricultural futures.
 A 2 x 2 panel of scatter plots, four points each (one per scenario):
@@ -14,7 +14,7 @@ no figure shows a pairwise comparison") and Referee 2 ("the figures do not show
 the trade-off").
 
 Source
-    EXCEL_DIR/04_trade_off_percent_threshold.xlsx, sheet 'summary'  -- ONLY this
+    EXCEL_DIR/Fig_04.xlsx, sheet 'summary'  -- ONLY this
     file.  05_scenario_synthesis_2050.xlsx holds a different, retired definition
     of the same quantities and must not be used here.
 
@@ -23,7 +23,7 @@ NOT support a fitted relationship, so no trend, regression or frontier line is
 drawn -- by design, not by omission.
 
 Output
-    OUTPUT_DIR/31_Pairwise.svg   (svg.fonttype='none', editable in Inkscape)
+    OUTPUT_DIR/S_Fig_09.svg   (svg.fonttype='none', editable in Inkscape)
 """
 
 import _path_setup  # noqa: F401
@@ -45,10 +45,10 @@ from tools.unit_text import mixed_xlabel, mixed_ylabel
 # Relative paths in tools.parameters are anchored to this directory.
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-SOURCE_WORKBOOK = '04_trade_off_percent_threshold.xlsx'
-WORKBOOK = '31_pairwise_points.xlsx'   # this figure's own cached table
+SOURCE_WORKBOOK = 'Fig_04.xlsx'
+WORKBOOK = 'S_Fig_09.xlsx'   # this figure's own cached table
 SHEET = 'summary'
-OUTPUT_NAME = '31_Pairwise.svg'
+OUTPUT_NAME = 'S_Fig_09.svg'
 
 MM = 1.0 / 25.4
 FIG_W_MM = 183.0        # Nature double-column width
@@ -71,7 +71,7 @@ SCENARIO_MARKERS = {
     'System Decline':        ('D', 0.86),
 }
 
-# Taken from 04_Trade_off_percent_threshold.py (Fig. 4). Fixed for the whole
+# Taken from Fig_04.py (Fig. 4). Fixed for the whole
 # paper -- do not re-pick.
 SCENARIO_COLORS = {
     'Regional Ag Capitals':  '#2D688F',
@@ -122,7 +122,7 @@ def prepare_points() -> pd.DataFrame:
     path = os.path.join(EXCEL_DIR, SOURCE_WORKBOOK)
     if not os.path.exists(path):
         raise FileNotFoundError(
-            f'{path} not found. Run 04_Trade_off_percent_threshold.py first.'
+            f'{path} not found. Run Fig_04.py first.'
         )
     data = pd.read_excel(path, sheet_name=SHEET)
 

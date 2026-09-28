@@ -1,5 +1,5 @@
 """
-32_Driver_outcome_matrix.py -- Extended Data figure
+S_Fig_10.py -- Fig. S10 | Relationships between time-varying scenario drivers and 2050 model outcomes.
 
 A 9 x 4 small-multiple scatter matrix: the nine time-varying scenario drivers
 (rows) against the four 2050 outcomes (columns), one point per scenario.
@@ -11,8 +11,8 @@ letting the reader see directly which outcomes track their drivers and which do
 not -- without compressing nine drivers into two axes.
 
 Sources (relative paths, both under EXCEL_DIR)
-    12_input_data_long_tables.xlsx, sheet 'series'  -- drivers  (y)
-    04_trade_off_percent_threshold.xlsx, sheet 'summary' -- outcomes (x)
+    E_Fig_02.xlsx, sheet 'series'  -- drivers  (y)
+    Fig_04.xlsx, sheet 'summary' -- outcomes (x)
 
 Driver rows a-e carry a scenario code directly.  Rows f-i are the feedlot
 adjustment ratios, which are keyed by pathway level rather than by scenario, so
@@ -25,7 +25,7 @@ point's position within a panel is NOT the effect of that row's driver alone on
 that column's outcome.  Hence no fitted or trend line is drawn anywhere.
 
 Output
-    OUTPUT_DIR/32_Driver_outcome_matrix.svg  (svg.fonttype='none')
+    OUTPUT_DIR/S_Fig_10.svg  (svg.fonttype='none')
 """
 
 import _path_setup  # noqa: F401
@@ -50,19 +50,19 @@ from tools.unit_text import mixed_xlabel
 # Relative paths in tools.parameters are anchored to this directory.
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-DRIVER_WORKBOOK = '12_input_data_long_tables.xlsx'
+DRIVER_WORKBOOK = 'E_Fig_02.xlsx'
 DRIVER_SHEET = 'series'
-OUTCOME_WORKBOOK = '04_trade_off_percent_threshold.xlsx'
+OUTCOME_WORKBOOK = 'Fig_04.xlsx'
 OUTCOME_SHEET = 'summary'
-OUTPUT_NAME = '32_Driver_outcome_matrix.svg'
-WORKBOOK = '32_driver_outcome_long_tables.xlsx'   # this figure's cached table
+OUTPUT_NAME = 'S_Fig_10.svg'
+WORKBOOK = 'S_Fig_10.xlsx'   # this figure's cached table
 
 YEAR = 2050
 MM = 1.0 / 25.4
 FIG_W_MM = 183.0        # Nature double-column width
 FIG_H_MM = 240.0
 
-# Taken from 04_Trade_off_percent_threshold.py (Fig. 4). Fixed for the whole
+# Taken from Fig_04.py (Fig. 4). Fixed for the whole
 # paper -- do not re-pick.
 SCENARIO_COLORS = {
     'AgS1': '#2D688F',
@@ -149,7 +149,7 @@ def load_drivers() -> dict:
     """Return {panel: {scenario_code: 2050 value}}."""
     path = os.path.join(EXCEL_DIR, DRIVER_WORKBOOK)
     if not os.path.exists(path):
-        raise FileNotFoundError(f'{path} not found. Run 12_input_data.py first.')
+        raise FileNotFoundError(f'{path} not found. Run E_Fig_02.py first.')
     series = pd.read_excel(path, sheet_name=DRIVER_SHEET)
 
     for column in ('panel', 'series_type', 'scenario', 'level', 'year', 'value'):
@@ -179,7 +179,7 @@ def load_outcomes() -> dict:
     path = os.path.join(EXCEL_DIR, OUTCOME_WORKBOOK)
     if not os.path.exists(path):
         raise FileNotFoundError(
-            f'{path} not found. Run 04_Trade_off_percent_threshold.py first.'
+            f'{path} not found. Run Fig_04.py first.'
         )
     summary = pd.read_excel(path, sheet_name=OUTCOME_SHEET)
     lookup = summary.set_index('scenario_code')

@@ -1,13 +1,13 @@
 """
-20_Irr_Dry.py
+E_Fig_10.py -- Extended Data Fig. 10 | Dryland and irrigated agricultural area and agri-food production, 2010-2050.
 4-row × 4-column figure comparing dryland vs irrigated agriculture.
 Rows:    1 Dryland land-use area      2 Irrigated land-use area
          3 Dryland agri-food output   4 Irrigated agri-food output
 Columns: 4 scenarios (AgS1–AgS4)
 
-Land-use area uses the same land-use classification as 19_Water.py row 2 (LU_COLORS),
+Land-use area uses the same land-use classification as E_Fig_09.py row 2 (LU_COLORS),
 split by water supply. Agri-food output uses the same food-group classification as
-04_indicators.py row 4 (FOOD_COLORS), split by water supply.
+Fig_03.py row 4 (FOOD_COLORS), split by water supply.
 """
 import _path_setup  # noqa: F401
 
@@ -59,7 +59,7 @@ FOOD_LEGEND_ORDER = [
 ]
 
 def _classify_area(name, water_supply):
-    """Same land-use grouping as 19_Water.py row 2 (LU_COLORS), given a water supply."""
+    """Same land-use grouping as E_Fig_09.py row 2 (LU_COLORS), given a water supply."""
     prefix = 'Dryland' if water_supply == 'Dryland' else 'Irrigated'
     if name in CROPLAND_LUS:
         return f'{prefix} cropland and horticulture'
@@ -217,14 +217,14 @@ def save_figure(row_config):
                  ha='center', va='bottom', fontsize=font_size,
                  fontweight='bold', fontfamily='Arial')
 
-    out = os.path.join(OUTPUT_DIR, '20_irr_dry.svg')
+    out = os.path.join(OUTPUT_DIR, 'E_Fig_10.svg')
     fig.savefig(out, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved: {out}')
 
 
 def main():
-    workbook = '20_irr_dry_long_tables.xlsx'
+    workbook = 'E_Fig_10.xlsx'
     if GENERATE_TABLES:
         export_long_tables(
             workbook,
