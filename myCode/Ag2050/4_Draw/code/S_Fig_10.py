@@ -131,11 +131,11 @@ EXPECTED_DRIVERS = {
     'Crop':          {'AgS1': 1.721, 'AgS2': 1.867, 'AgS3': 1.514, 'AgS4': 1.307},
     'Dairy':         {'AgS1': 1.220, 'AgS2': 1.331, 'AgS3': 1.063, 'AgS4': 0.906},
     'Sheep':         {'AgS1': 1.078, 'AgS2': 1.273, 'AgS3': 0.801, 'AgS4': 0.524},
-    'Labour cost':   {'AgS1': 2.485, 'AgS2': 2.959, 'AgS3': 2.087, 'AgS4': 1.752},
-    'Revenue ratio': {'AgS1': 1.100, 'AgS2': 1.117, 'AgS3': 1.066, 'AgS4': 1.066},
-    'Cost ratio':    {'AgS1': 1.071, 'AgS2': 1.083, 'AgS3': 1.047, 'AgS4': 1.047},
-    'GHG ratio':     {'AgS1': 0.970, 'AgS2': 0.965, 'AgS3': 0.980, 'AgS4': 0.980},
-    'Water ratio':   {'AgS1': 1.070, 'AgS2': 1.081, 'AgS3': 1.046, 'AgS4': 1.046},
+    'Labour cost':   {'AgS1': 2.485, 'AgS2': 2.485, 'AgS3': 2.087, 'AgS4': 1.752},
+    'Revenue ratio': {'AgS1': 1.117, 'AgS2': 1.100, 'AgS3': 1.066, 'AgS4': 1.066},
+    'Cost ratio':    {'AgS1': 1.083, 'AgS2': 1.071, 'AgS3': 1.047, 'AgS4': 1.047},
+    'GHG ratio':     {'AgS1': 0.965, 'AgS2': 0.970, 'AgS3': 0.980, 'AgS4': 0.980},
+    'Water ratio':   {'AgS1': 1.081, 'AgS2': 1.070, 'AgS3': 1.046, 'AgS4': 1.046},
 }
 EXPECTED_OUTCOMES = {
     'ghg_2050_mtco2e':       {'AgS1': 67.12, 'AgS2': -73.72, 'AgS3': 101.47, 'AgS4': 100.51},
@@ -171,6 +171,10 @@ def load_drivers() -> dict:
             lookup = rows.set_index('level')['value']
             values = {s: float(lookup[LEVEL_MAP[s]]) for s in SCENARIO_ORDER}
         drivers[panel] = values
+    # The model gives Landscape Stewardship the same labour cost as Regional Ag
+    # Capitals (settings.AG2050_FLC_MAP: both 'FLC_multiplier_high'), but
+    # E_Fig_02's ABARES_PLOT_COL plots AgS2 on the very-high labour path.
+    drivers['Labour cost']['AgS2'] = drivers['Labour cost']['AgS1']
     return drivers
 
 

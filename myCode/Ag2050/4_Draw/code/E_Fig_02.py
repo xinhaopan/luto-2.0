@@ -101,11 +101,13 @@ ABARES_VARS = {
     'Dairy': 'Dairy Productivity',
     'Sheep': 'Sheep Productivity',
 }
+# Feedlot CSV columns are scenario codes, but each carries a pathway level
+# (1_Scripts/12_cattle_FCR_scaled_paramsters.py, scenario_map): AgS1 = very high,
+# AgS2 = high, AgS3 and AgS4 = medium (identical columns). No scenario uses low.
 FEEDLOT_LEVELS = {
-    'High': {'source': 'AgS1', 'color': SCENARIOS['AgS1']['color']},
-    'Very High': {'source': 'AgS2', 'color': SCENARIOS['AgS2']['color']},
+    'Very High': {'source': 'AgS1', 'color': SCENARIOS['AgS2']['color']},
+    'High': {'source': 'AgS2', 'color': SCENARIOS['AgS1']['color']},
     'Medium': {'source': 'AgS3', 'color': SCENARIOS['AgS3']['color']},
-    'Low': {'source': 'AgS4', 'color': SCENARIOS['AgS4']['color']},
 }
 
 TEXT_SIZE = 25
