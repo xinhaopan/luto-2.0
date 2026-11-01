@@ -30,6 +30,8 @@ from joblib import Parallel, delayed
 import tools.data_helper as data_helper
 from tools.data_helper import get_dict_data, aggregate_by_mapping
 from tools.map_helper import generate_basemap, reproject_overlay, overlay_map, crop_map, add_shp
+from rasterio.transform import from_origin
+from rasterio.warp import reproject, Resampling
 
 # ============================================================================
 # Configuration
@@ -39,7 +41,10 @@ SCENARIO_TAG = 'high_high'                      # used in the output file name
 # folder holding the Run_* directories (env VIDEO_DATA_ROOT overrides; it is inherited by the joblib workers)
 DATA_ROOT = os.environ.get('VIDEO_DATA_ROOT', 'N:/LUF-Modelling/LUTO2_XH/output1/20250705_Paper1_Results')
 
-WIDTH, HEIGHT = 1920, 1080
+WIDTH, HEIGHT = 1920, 1080   # layout units (all positions below are in these pixels)
+OUT_SCALE = 2                # output = 3840 x 2160 (4K)
+OUT_DPI = 300                # 12.8 x 7.2 inch canvas at 300 dpi
+FINE_RES = 0.01              # map grid (deg); each 0.05 deg LUTO cell = 5 x 5 px
 FPS = 25
 SECONDS_PER_YEAR = 0.6
 LEAD_S = 1.0           # hold on 2010
@@ -47,21 +52,26 @@ HOLD_S = 4.0           # hold on 2050
 N_JOBS = 8
 
 YEARS = list(range(2010, 2051))
+SCENARIO_LINE = 'Most ambitious climate and biodiversity targets'   # under the year
+CITATION = 'Pan et al. (2026) Earth’s Future'                  # bottom right
+MAP_TOP = 124         # map top edge (px); leaves room for SCENARIO_LINE, map bottom edge unchanged
 
 OUT_DIR = '../output/video'
-MAP_CACHE_DIR = f'{OUT_DIR}/map_cache_{SCENARIO}'
-FRAME_DIR = f'{OUT_DIR}/frames_{SCENARIO}'
-PREVIEW_DIR = f'{OUT_DIR}/preview_{SCENARIO}'
+MAP_CACHE_DIR = f'{OUT_DIR}/map_cache_{SCENARIO}_fine'
+FRAME_DIR = f'{OUT_DIR}/frames_{SCENARIO}_{WIDTH * OUT_SCALE}'
+PREVIEW_DIR = f'{OUT_DIR}/preview_{SCENARIO}_{WIDTH * OUT_SCALE}'
 VIDEO_DIR = OUT_DIR
-VIDEO_NAME = f'{date.today():%Y%m%d}_LUTO2_landuse_2010_2050_{SCENARIO_TAG}.mp4'
-FFMPEG = shutil.which('ffmpeg') or 'ffmpeg'
+VIDEO_NAME = f'{date.today():%Y%m%d}_LUTO2_landuse_2010_2050_{SCENARIO_TAG}_4k.mp4'
+# 64-bit ffmpeg needed for 4K (the 32-bit build on PATH fails to allocate); env VIDEO_FFMPEG overrides
+FFMPEG = os.environ.get('VIDEO_FFMPEG') or next(
+    (p for p in ('F:/Applications/Timelapse/ffmpeg.exe',) if os.path.exists(p)), shutil.which('ffmpeg') or 'ffmpeg')
 
 COLORS_XLSX = 'tools/land use colors.xlsx'
 GROUP_XLSX = 'tools/land use group.xlsx'
 BASEMAP_TIF = 'Assets/basemap.tif'
 SHP_PATH = 'Assets/shp/GCCSA_line.shp'
 
-# Text sizes in pixels (figure dpi = 100, so pt = px * 0.72)
+# Text sizes in layout pixels (scaled by OUT_SCALE on output)
 PX_TITLE, PX_PANEL, PX_AXIS, PX_YEAR = 34, 22, 18, 72
 BG = '#FFFFFF'
 TEXT = '#1A1A1A'
@@ -78,16 +88,16 @@ AM_LABELS = {
     1: 'Methane reduction (livestock)', 2: 'Agricultural technology (fertiliser)',
     3: 'Regenerative agriculture (livestock)', 4: 'Early dry-season savanna burning',
     5: 'Agricultural technology (energy)', 6: 'Biochar',
-    7: 'Human-induced regeneration (beef)', 8: 'Human-induced regeneration (sheep)',
+    7: 'Managed regeneration (beef)', 8: 'Managed regeneration (sheep)',
     0: 'No agricultural management', -1: 'Other land',
 }
 
-DPI = 100
 plt.rcParams.update({'font.family': 'Arial', 'axes.unicode_minus': True})
 
 
 def pt(px):
-    return px * 72 / DPI
+    """Layout pixels -> points at the output resolution."""
+    return px * OUT_SCALE * 72 / OUT_DPI
 
 
 def get_path(path_name):
@@ -190,13 +200,48 @@ def _color_overlay(geo_tif, rgb_tif, table, shift=None, background_value=-9999):
             dst.write(rgb[:, :, i], i + 1)
 
 
-def render_year_map(layer, year, basemap_rgb, force=False):
+def build_fine_grid():
+    """Paper basemap colours resampled to a FINE_RES grid around Australia.
+
+    The RGB comes from generate_basemap on the global basemap (paper colour ramp and min/max),
+    then is resampled, so the ocean shading is identical to the paper maps.
+    Returns (single-band grid template, RGB basemap) on that grid.
+    """
+    grid_tif = f'{MAP_CACHE_DIR}/basemap_grid_fine.tif'
+    rgb_fine = f'{MAP_CACHE_DIR}/basemap_rgb_fine.tif'
+    if os.path.exists(grid_tif) and os.path.exists(rgb_fine):
+        return grid_tif, rgb_fine
+    rgb_global = f'{MAP_CACHE_DIR}/basemap_rgb.tif'
+    if not os.path.exists(rgb_global):
+        generate_basemap(BASEMAP_TIF, rgb_global)
+    with rasterio.open(os.path.join(get_path(SCENARIO), f'out_{YEARS[0]}', f'lumap_{YEARS[0]}.tiff')) as s:
+        b = s.bounds
+    pad = 1.5                                            # crop_map keeps a 1 deg buffer
+    w = int(round((b.right - b.left + 2 * pad) / FINE_RES))
+    h = int(round((b.top - b.bottom + 2 * pad) / FINE_RES))
+    transform = from_origin(b.left - pad, b.top + pad, FINE_RES, FINE_RES)
+    with rasterio.open(rgb_global) as src:
+        crs = src.crs
+        rgb = np.zeros((3, h, w), dtype=np.uint8)
+        for i in range(3):
+            reproject(source=rasterio.band(src, i + 1), destination=rgb[i], dst_transform=transform,
+                      dst_crs=crs, resampling=Resampling.bilinear)
+    meta = dict(driver='GTiff', height=h, width=w, crs=crs, transform=transform)
+    with rasterio.open(rgb_fine, 'w', count=3, dtype='uint8', **meta) as dst:
+        dst.write(rgb)
+    with rasterio.open(grid_tif, 'w', count=1, dtype='float32', **meta) as dst:
+        dst.write(np.zeros((1, h, w), dtype=np.float32))
+    return grid_tif, rgb_fine
+
+
+def render_year_map(layer, year, grid, force=False):
     png = f'{MAP_CACHE_DIR}/{layer}_{year}.png'
     if os.path.exists(png) and not force:
         return png
     tmp = f'{MAP_CACHE_DIR}/tmp_{layer}_{year}'
     src = os.path.join(get_path(SCENARIO), f'out_{year}', f'{LAYERS[layer]}_{year}.tiff')
-    reproject_overlay(src, BASEMAP_TIF, f'{tmp}_reproj.tif')
+    grid_tif, basemap_rgb = grid
+    reproject_overlay(src, grid_tif, f'{tmp}_reproj.tif')
     _color_overlay(f'{tmp}_reproj.tif', f'{tmp}_rgb.tif', layer_table(layer), layer_shift(layer))
     overlay_map(basemap_rgb, f'{tmp}_rgb.tif', f'{tmp}_overlay.tif')
     crop_map(f'{tmp}_overlay.tif', src, f'{tmp}_crop.tif')
@@ -212,11 +257,9 @@ def render_year_map(layer, year, basemap_rgb, force=False):
 
 def build_map_cache(years, force=False):
     os.makedirs(MAP_CACHE_DIR, exist_ok=True)
-    basemap_rgb = f'{MAP_CACHE_DIR}/basemap_rgb.tif'
-    if not os.path.exists(basemap_rgb):
-        generate_basemap(BASEMAP_TIF, basemap_rgb)
+    grid = build_fine_grid()
     jobs = [(layer, y) for layer in LAYERS for y in years]
-    Parallel(n_jobs=min(N_JOBS, len(jobs)))(delayed(render_year_map)(l, y, basemap_rgb, force) for l, y in jobs)
+    Parallel(n_jobs=min(N_JOBS, len(jobs)))(delayed(render_year_map)(l, y, grid, force) for l, y in jobs)
 
 
 def codes_present(layer):
@@ -234,26 +277,27 @@ def codes_present(layer):
 _MAP_CACHE = {}     # plain dict (an lru_cache wrapper does not pickle into the joblib workers)
 
 
-def _map_array(layer, year):
-    key = (layer, year)
+def _map_array(layer, year, size):
+    """Cached map resized once (Lanczos) to its exact on-screen pixel size."""
+    key = (layer, year, size)
     if key not in _MAP_CACHE:
         if len(_MAP_CACHE) > 8:
             _MAP_CACHE.clear()
-        _MAP_CACHE[key] = np.asarray(Image.open(f'{MAP_CACHE_DIR}/{layer}_{year}.png').convert('RGB'),
-                                     dtype=np.float32)
+        im = Image.open(f'{MAP_CACHE_DIR}/{layer}_{year}.png').convert('RGB').resize(size, Image.LANCZOS)
+        _MAP_CACHE[key] = np.asarray(im, dtype=np.float32)
     return _MAP_CACHE[key]
 
 
-def blended_map(layer, t_year):
+def blended_map(layer, t_year, size):
     """Hold each year, cross-fade to the next centred on the year switch (frac 0.25 -> 0.75)."""
     y0 = int(np.floor(t_year))
     if y0 >= YEARS[-1]:
-        return _map_array(layer, YEARS[-1]).astype(np.uint8)
+        return _map_array(layer, YEARS[-1], size).astype(np.uint8)
     w = np.clip((t_year - y0 - 0.25) / 0.5, 0, 1)
     w = w * w * (3 - 2 * w)
     if w == 0:
-        return _map_array(layer, y0).astype(np.uint8)
-    return ((1 - w) * _map_array(layer, y0) + w * _map_array(layer, y0 + 1)).astype(np.uint8)
+        return _map_array(layer, y0, size).astype(np.uint8)
+    return ((1 - w) * _map_array(layer, y0, size) + w * _map_array(layer, y0 + 1, size)).astype(np.uint8)
 
 
 # ============================================================================
@@ -310,21 +354,23 @@ class Layout:
                         seen.add(label)
                         items.append((label, col))
             self.legend[layer] = items
-        h, w = _map_array('lu', YEARS[0]).shape[:2]
+        w, h = Image.open(f'{MAP_CACHE_DIR}/lu_{YEARS[0]}.png').size
         self.map_aspect = h / w
+        self.mh = int(860 * self.map_aspect) - (MAP_TOP - 88)   # same bottom edge as an 860 px wide map at y = 88
+        self.mw = int(self.mh / self.map_aspect)
+        self.map_px = (self.mw * OUT_SCALE, self.mh * OUT_SCALE)   # on-screen size in output pixels
 
 
 def draw_panel(fig, L, layer, title, x0, t_year):
     # title
     fig_text(fig, x0, 62, title, PX_TITLE, weight='bold', va='baseline')
     # map
-    mw = 860
-    mh = int(mw * L.map_aspect)
-    axm = px_axes(fig, x0, 88, mw, mh)
-    axm.imshow(blended_map(layer, t_year), interpolation='antialiased')
-    axm.set_axis_off()
+    mh = L.mh
+    # placed 1:1 in output pixels (no matplotlib resampling)
+    fig.figimage(blended_map(layer, t_year, L.map_px), xo=x0 * OUT_SCALE, yo=(HEIGHT - MAP_TOP - mh) * OUT_SCALE,
+                 origin='upper', zorder=1)
     # area chart (only classes drawn on the map, same colours)
-    y_chart = 88 + mh + 34
+    y_chart = MAP_TOP + mh + 34
     fig_text(fig, x0, y_chart - 10, 'Area (million hectares)', PX_PANEL, va='baseline')
     ax = px_axes(fig, x0 + 52, y_chart + 6, 340, HEIGHT - y_chart - 6 - 40)
     df = upto(L.areas[layer], t_year)
@@ -348,13 +394,15 @@ def draw_panel(fig, L, layer, title, x0, t_year):
 
 
 def draw_frame(L, t_year, out_png):
-    fig = plt.figure(figsize=(WIDTH / DPI, HEIGHT / DPI), dpi=DPI, facecolor=BG)
+    fig = plt.figure(figsize=(WIDTH * OUT_SCALE / OUT_DPI, HEIGHT * OUT_SCALE / OUT_DPI), dpi=OUT_DPI, facecolor=BG)
     draw_panel(fig, L, 'lu', 'Land use', 60, t_year)
     draw_panel(fig, L, 'am', 'Agricultural management', 1000, t_year)
     fig_text(fig, WIDTH - 40, 26, 'Simulation year', PX_PANEL, ha='right', va='baseline', color='#444444')
     fig_text(fig, WIDTH - 40, 86, f'{int(round(t_year))}', PX_YEAR, ha='right', va='baseline',
              color=YEAR_RED, weight='bold')
-    fig.savefig(out_png, dpi=DPI, facecolor=BG)
+    fig_text(fig, WIDTH - 40, 114, SCENARIO_LINE, PX_AXIS, ha='right', va='baseline', color='#444444')
+    fig_text(fig, WIDTH - 40, HEIGHT - 16, CITATION, PX_AXIS, ha='right', va='baseline', color='#444444')
+    fig.savefig(out_png, dpi=OUT_DPI, facecolor=BG)
     plt.close(fig)
     return out_png
 
