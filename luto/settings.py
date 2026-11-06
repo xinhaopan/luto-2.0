@@ -62,7 +62,7 @@ FEED_EFFICIENCY = 'BAU'              # 'BAU' or 'High'
 APPLY_DEMAND_MULTIPLIERS = False     # [Xinhao] kept master value (jinzhu default: True)
 
 # Productivity trend; 
-PRODUCTIVITY_TREND = 'BAU'           # 'BAU', 'CONSTANT', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'
+PRODUCTIVITY_TREND = 'BAU'           # 'BAU', 'CONSTANT', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH' (or any of the last four + '_ACTUAL')
                                      # 'CONSTANT' fixes every annual productivity multiplier at 1.0
 
 

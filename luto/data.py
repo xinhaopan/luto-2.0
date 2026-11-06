@@ -952,7 +952,12 @@ class Data:
                 .unstack('dim_1')
                 .rename({'Year':'year', 'dim_1_level_0':'lm', 'dim_1_level_1':'product'})
             )
-        elif productivity_trend_name in {'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'}:
+        elif productivity_trend_name in {
+            'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH',
+            # *_ACTUAL: observed ABARES productivity for 2010-2023, identical to
+            # the plain sheet from 2024 on (initial-transition sensitivity).
+            'LOW_ACTUAL', 'MEDIUM_ACTUAL', 'HIGH_ACTUAL', 'VERY_HIGH_ACTUAL',
+        }:
             fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_ag_2050.xlsx")
             productivity_trend = pd.read_excel(
                 fpath,
@@ -970,7 +975,8 @@ class Data:
         else:
             raise ValueError(
                 "PRODUCTIVITY_TREND must be one of BAU, CONSTANT, LOW, "
-                f"MEDIUM, HIGH, or VERY_HIGH; got {settings.PRODUCTIVITY_TREND!r}"
+                "MEDIUM, HIGH, VERY_HIGH, or one of the last four with an "
+                f"_ACTUAL suffix; got {settings.PRODUCTIVITY_TREND!r}"
             )
 
 
