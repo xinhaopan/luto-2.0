@@ -1,7 +1,6 @@
 """
-S_Table_initial_transition.py -- Sensitivity of 2050 outcomes to the initial
-transition (Referee 1, comment 8).  Rename to S_Table_NN.py once the table has a
-number in the manuscript.
+S_Table_13.py -- Table S13 | Sensitivity of 2050 outcomes to the initial
+transition (Referee 1, comment 8).
 
 Each main run is compared with the same scenario re-run with observed
 2010-2023 productivity, area-cost and labour-cost multipliers (the *_actual
@@ -18,7 +17,7 @@ of a pair start from different 2010 multipliers.  (Water yield and land-use
 change extent are defined against each run's own 2010 in Fig. 4 and are kept
 that way, so the rows mean the same as in the main table.)
 
-How the numbers are produced -- same method as S_Table_03.py (the M1 table):
+How the numbers are produced -- same method as S_Table_04.py (the M1 table):
 the shared scenario list is pointed at the eight runs and a private cache,
 then the Fig_01 / Fig_03 exports and Fig_04.build_summary_table() run
 unchanged.  Run_1-Run_4 come out of this path too and must reproduce the
@@ -30,22 +29,23 @@ GENERATE_TABLES (tools/parameters.py)
     False  read the summary already in the private cache.
 
 Outputs
-    EXCEL_DIR/S_Table_initial_transition.xlsx
+    EXCEL_DIR/S_Table_13.xlsx
         table          scenario x indicator: main, observed 2010-2023, abs and % difference
         summary_raw    every summary field for all eight runs
         verification   Run_1-4 via this path against the published summary
-    EXCEL_DIR/S_Table_initial_transition_cache/
+    EXCEL_DIR/S_Table_13_cache/
 """
 
 import _path_setup  # noqa: F401
 
 import importlib
 import os
+import sys
 
 import numpy as np
 import pandas as pd
 
-# Order matters (see S_Table_03.py): EXCEL_DIR is redirected BEFORE the modules
+# Order matters (see S_Table_04.py): EXCEL_DIR is redirected BEFORE the modules
 # import it; input_files is shrunk/extended in place AFTER, because Fig_04
 # indexes input_files[0..3] at import.
 from tools import parameters as P
@@ -56,7 +56,7 @@ PAIRS = {
     'Run_3_SCN_AgS3': 'Run_8_SCN_AgS3_ACT',
     'Run_4_SCN_AgS4': 'Run_9_SCN_AgS4_ACT',
 }
-NAME = 'S_Table_initial_transition'
+NAME = 'S_Table_13'
 MAIN_EXCEL_DIR = P.EXCEL_DIR
 CACHE = os.path.join(P.EXCEL_DIR, f'{NAME}_cache')
 
@@ -86,7 +86,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 OUTPUT_NAME = f'{NAME}.xlsx'
 
-# Same indicators, labels and units as S_Table_03.
+# Same indicators, labels and units as S_Table_04.
 INDICATORS = [
     ('ner_2050_baud',                 'Net economic returns',                              'billion AU$ yr⁻¹'),
     ('food_2050_mt',                  'Agri-food production',                              'Mt yr⁻¹'),
@@ -190,6 +190,8 @@ def main():
         summary.to_excel(w, sheet_name='summary_raw', index=False)
         check.to_excel(w, sheet_name='verification', index=False)
     print(f'  wrote {out}\n')
+    # Units contain superscripts (yr⁻¹); a redirected Windows console is cp1252.
+    sys.stdout.reconfigure(encoding='utf-8')
     print(table.to_string(index=False, float_format=lambda v: f'{v:,.3f}'))
 
 

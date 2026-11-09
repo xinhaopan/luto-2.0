@@ -1,5 +1,5 @@
 """
-S_Table_03.py -- Table S3 | Sensitivity of 2050 outcomes to the agricultural productivity assumption in the Regional Ag Capitals scenario.
+S_Table_04.py -- Table S4 | Sensitivity of 2050 outcomes to the agricultural productivity assumption in the Regional Ag Capitals scenario.
 
 Run_1_SCN_AgS1 (Regional Ag Capitals as published, productivity HIGH) against
 Run_5_SCN_AgS1_VHP (the same scenario with productivity VERY_HIGH and the
@@ -22,7 +22,7 @@ How the numbers are produced
     the last decimal.  If it does, the method is proven identical and Run_5's
     numbers can be trusted; if it does not, the script stops.
 
-    The private cache (EXCEL_DIR/S_Table_03_cache/) keeps the four-scenario caches
+    The private cache (EXCEL_DIR/S_Table_04_cache/) keeps the four-scenario caches
     that every other figure reads untouched.
 
 GENERATE_TABLES (tools/parameters.py)
@@ -32,12 +32,12 @@ GENERATE_TABLES (tools/parameters.py)
     False  read the summary already in the private cache and write the table.
 
 Outputs
-    EXCEL_DIR/S_Table_03.xlsx
-        S_Table_03     the two-column comparison with absolute and % differences
+    EXCEL_DIR/S_Table_04.xlsx
+        S_Table_04     the two-column comparison with absolute and % differences
         summary_raw    every summary field for both runs, as build_summary_table
                        produced them
         verification   Run_1 via this path against Run_1 in the main summary
-    EXCEL_DIR/S_Table_03_cache/   the private cache (01/03/04 workbooks for the two runs)
+    EXCEL_DIR/S_Table_04_cache/   the private cache (01/03/04 workbooks for the two runs)
 """
 
 import _path_setup  # noqa: F401
@@ -64,7 +64,7 @@ from tools import parameters as P
 BASELINE = 'Run_1_SCN_AgS1'
 SENSITIVITY = 'Run_5_SCN_AgS1_VHP'
 MAIN_EXCEL_DIR = P.EXCEL_DIR                       # where the published caches live
-S10_CACHE = os.path.join(P.EXCEL_DIR, 'S_Table_03_cache')
+S10_CACHE = os.path.join(P.EXCEL_DIR, 'S_Table_04_cache')
 
 P.EXCEL_DIR = S10_CACHE
 P.SCENARIO_LABELS[SENSITIVITY] = 'Regional Ag Capitals (very high productivity)'
@@ -89,14 +89,14 @@ for _m in (mod01, mod03, mod04, _trf):
     assert _m.input_files is P.input_files, f'{_m.__name__} holds a different list'
 # 01 has no EXCEL_DIR of its own -- its exports go through two_row_figure.
 for _m in (mod03, mod04, _trf, water_split):
-    assert 'S_Table_03_cache' in _m.EXCEL_DIR, f'{_m.__name__}.EXCEL_DIR not redirected'
+    assert 'S_Table_04_cache' in _m.EXCEL_DIR, f'{_m.__name__}.EXCEL_DIR not redirected'
 
 # Relative paths in tools.parameters are anchored to this directory.
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-OUTPUT_NAME = 'S_Table_03.xlsx'
+OUTPUT_NAME = 'S_Table_04.xlsx'
 
-# (summary column, row label, unit) in the order Table S3 lists them.
+# (summary column, row label, unit) in the order Table S4 lists them.
 INDICATORS = [
     ('ner_2050_baud',                 'Net economic returns',                     'billion AU$ yr⁻¹'),
     ('food_2050_mt',                  'Agri-food production',                     'Mt yr⁻¹'),
@@ -214,7 +214,7 @@ def main():
     os.makedirs(MAIN_EXCEL_DIR, exist_ok=True)
     out = os.path.join(MAIN_EXCEL_DIR, OUTPUT_NAME)
     with pd.ExcelWriter(out, engine='openpyxl') as w:
-        table.to_excel(w, sheet_name='S_Table_03', index=False)
+        table.to_excel(w, sheet_name='S_Table_04', index=False)
         summary.to_excel(w, sheet_name='summary_raw', index=False)
         check.to_excel(w, sheet_name='verification', index=False)
     print(f'  wrote {out}')
