@@ -16,7 +16,7 @@ The area-cost multiplier is moved with productivity on purpose.  The four main
 scenarios tie the two together (AgS1 high/high, AgS2 very_high/very_high), so
 holding area cost at 'high' while yields jump to VERY_HIGH would give a run
 that is internally inconsistent -- higher output at unchanged establishment and
-maintenance cost.  This choice is stated in the appendix alongside Table S10.
+maintenance cost.  This choice is stated in the appendix alongside Table S4.
 
 Deliberately NOT changed (all verified against the recorded Run_1 column):
     AG2050_GHG_MAP['AgS1']  = 'maintain_historical'   GHG <= 2010 level
