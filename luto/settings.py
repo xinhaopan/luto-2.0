@@ -210,6 +210,29 @@ BARHOMOGENOUS = -1   # Useful for recognizing infeasibility or unboundedness. At
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = min(32, os.cpu_count())
 
+# Fallback solver settings, tried in order when the standard solve above is not accepted.
+# Each entry is (NumericFocus, Method, Crossover, Presolve, BarHomogeneous), as RETRY_PARAMS in the upstream model.
+# The standard solve itself always uses NUMERIC_FOCUS, SOLVE_METHOD, CROSSOVER, PRESOLVE and BARHOMOGENOUS,
+# so a year that solves at once is not affected by this list.
+RETRY_PARAMS = [
+    (3, 2, -1,  0, -1),   # barrier with automatic crossover, which cleans up sub-optimal termination
+    (0, 1,  0, -1,  0),   # dual simplex with automatic presolve, the fallback of the upstream model
+]
+
+# False accepts a SUBOPTIMAL solve, as the model did before. True sends it through RETRY_PARAMS and accepts only OPTIMAL.
+RETRY_ON_SUBOPTIMAL = False
+
+# Time limit in seconds for each fallback attempt and for the IIS computation of an infeasible year.
+# A year that fails then costs at most three such periods (two fallbacks and the IIS) before the run stops.
+RETRY_TIME_LIMIT = 2 * 3600
+
+# Write a checkpoint (data_<year>.lz4 in the output folder of the run) after every N solved years.
+# Only the latest checkpoint is kept, and a run that is started again continues from it. 0 switches checkpoints off.
+CHECKPOINT_INTERVAL = 1
+
+# Relative margin of the bound report that is written for a year that cannot be solved (luto/solvers/tools.py).
+BOUND_PROP_REL_TOL = 1e-6
+
 
 
 # ---------------------------------------------------------------------------- #

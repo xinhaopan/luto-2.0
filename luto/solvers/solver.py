@@ -1584,6 +1584,10 @@ class LutoSolver:
         # Magic.
         self.gurobi_model.optimize()
 
+        return self.collect_solution()
+
+    def collect_solution(self) -> SolverSolution:
+        """Read the solution left by the last `optimize()` call into the LUTO format."""
         print("Completed solve, collecting results...\n", flush=True)
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module

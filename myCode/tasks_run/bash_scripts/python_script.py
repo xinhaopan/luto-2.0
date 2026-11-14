@@ -249,6 +249,18 @@ def get_archive_paths(data):
 
     return output_dir, simulation_root, report_zip_path, archive_path
 
+def find_checkpoint_dir(output_path="output"):
+    """The newest run folder in `output_path` that holds a data_<year>.lz4 checkpoint, or None."""
+    import re
+    if not os.path.isdir(output_path):
+        return None
+    for folder in sorted(os.listdir(output_path), reverse=True):
+        path = os.path.join(output_path, folder)
+        if os.path.isdir(path) and any(re.fullmatch(r'data_\d{4}\.lz4', f) for f in os.listdir(path)):
+            return path
+    return None
+
+
 def main():
     import luto.simulation as sim
     import luto.settings as settings
@@ -262,12 +274,18 @@ def main():
         write_log("Simulation started")
         overall_start_time = time.time()
 
-        # 监控加载数据
-        data, load_data_memory = monitor_memory(sim.load_data)
-        write_log(f"Data loaded. Peak memory usage: {load_data_memory:.2f} GB")
+        # A run that is started again continues from its latest checkpoint and skips the data load
+        checkpoint_dir = find_checkpoint_dir(settings.OUTPUT_DIR)
+        if checkpoint_dir:
+            write_log(f"Checkpoint found in {checkpoint_dir}. Resuming without loading the input data again.")
+            load_data_memory = 0.0
+        else:
+            # 监控加载数据
+            data, load_data_memory = monitor_memory(sim.load_data)
+            write_log(f"Data loaded. Peak memory usage: {load_data_memory:.2f} GB")
 
         # 监控运行模拟
-        _, simulation_memory = monitor_memory(sim.run, data=data)
+        data, simulation_memory = monitor_memory(sim.run, data=data, checkpoint_dir=checkpoint_dir)
         write_log(f"Run completed. Peak memory usage: {simulation_memory:.2f} GB")
 
         write_log(f"Model finished in {data.last_year}")
