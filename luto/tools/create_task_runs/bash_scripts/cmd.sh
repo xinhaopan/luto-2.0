@@ -29,7 +29,10 @@ cat << EOF > $SCRIPT_PBS
 
 export JOBLIB_TEMP_FOLDER=\$PBS_JOBFS
 
-conda run -n luto python "${SCRIPT_DIR}/python_script.py"
+# paper2_v1: env built from requirements.yml on /g/data, since the luto env in each home differs
+source \$HOME/apps/miniforge3/etc/profile.d/conda.sh
+conda activate ${LUTO_CONDA_ENV:-/g/data/jk53/LUTO_XH/envs/luto_v1}
+python "${SCRIPT_DIR}/python_script.py"
 EOF
 
 qsub "${SCRIPT_PBS}"
