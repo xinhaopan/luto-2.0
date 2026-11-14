@@ -41,3 +41,4 @@ dependencies:
       - gurobipy==13.0.3
       - numpy_financial==1.1.0
       - xlrd==2.0.2                # .xls reader for luto/tools/ag_mgt_caps.py (ABS 4627.0)
+      - memory_profiler==0.61.0    # used by myCode/tasks_run/bash_scripts/python_script.py

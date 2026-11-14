@@ -1,0 +1,35 @@
+#!/bin/bash
+
+echo "[$(date '+%F %T')] Script started"
+script_name="$1"
+echo "script_name: $script_name"
+# Read the settings_bash file ==> JOB_NAME, QUEUE, NCPUS, MEM, TIME
+source luto/settings_bash.py
+
+# Activate the Conda environment and get the path to the Python executable
+source ~/.bashrc
+conda activate /g/data/jk53/LUTO_XH/envs/luto_v1
+PYTHON=$(which python)
+
+# Create a temporary script file
+SCRIPT_PBS=$(mktemp)
+
+cat << EOF > $SCRIPT_PBS
+#!/bin/bash
+#PBS -N ${JOB_NAME}
+#PBS -q ${QUEUE}
+#PBS -l storage=scratch/${PROJECT}+gdata/${PROJECT}
+#PBS -l ncpus=${NCPUS}
+#PBS -l mem=${MEM}
+#PBS -l jobfs=10GB
+#PBS -l walltime=${TIME}
+#PBS -l wd="$(dirname "$0")"
+
+${PYTHON} ${script_name}
+EOF
+
+# Submit the job to PBS
+qsub ${SCRIPT_PBS}
+
+# Remove the temporary script file
+rm $SCRIPT_PBS
