@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
+import functools
+import os
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -344,6 +346,27 @@ def get_ghg_rhs(inputs: RowInputs) -> dict[str, float]:
     }
 
 
+@functools.lru_cache(maxsize=1)
+def read_net_ghg_targets(path: str) -> pd.DataFrame:
+    """The old net GHG pathways (t CO2e, one row per year 2010-2100), read once per run."""
+    return pd.read_excel(path, sheet_name="Data", index_col="YEAR")
+
+
+def get_ghg_net_row(inputs: RowInputs, cols: xr.Dataset):
+    """ONE net GHG row (settings.GHG_NET_ROW, Paper 2 revision): the two rows' coefficients summed, which is the net
+    row of the code up to 2026-10 (get_ghg_coeffs), against GHG_targets.xlsx[GHG_NET_TARGETS_DICT[level]][year].
+    The off-land emissions are a constant on the left-hand side, so they move to the right-hand side.
+    Imposed in every solved year, as in the first submission, whatever the role of the new series in that year."""
+    column = settings.GHG_NET_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]
+    net_target = float(read_net_ghg_targets(os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx")).loc[inputs.target_year, column])
+    coeff = get_ghg_coeffs(inputs, cols)
+    net_row = sparse.csr_matrix((coeff["AG"].astype(np.float64) + coeff["LULUCF"].astype(np.float64))[None, :])
+    print(f"│   ├── Adding ONE <hard> net GHG row ({column}): {net_target:,.0f} tCO2e in {inputs.target_year} "
+          f"(off-land {inputs.offland_ghg:,.0f} tCO2e moved to the rhs); the agriculture and LULUCF rows are not added")
+    row_matrix, rhs, scale = contract(net_row, np.array([net_target - inputs.offland_ghg], dtype=np.float64), rescale=True)
+    return make_part("ghg", row_matrix, rhs, "<", ["ghg_emissions_limit_ub"], scale)
+
+
 def get_ghg(inputs: RowInputs, cols: xr.Dataset):
     """Two global rows, agriculture and net LULUCF, in the years the target series bind (role 'BINDING');
     in the other years the series are benchmarks and no row is added (``simulation.store_solution`` reports both).
@@ -351,6 +374,8 @@ def get_ghg(inputs: RowInputs, cols: xr.Dataset):
     if settings.GHG_EMISSIONS_LIMITS == "off":
         print("│   ├── TURNING OFF GHG emissions constraints ...")
         return None, None
+    if settings.GHG_NET_ROW:                                             # Paper 2 revision: the first submission's single net row
+        return get_ghg_net_row(inputs, cols)
     targets = inputs.limits["ghg"]
     if targets['role'] != 'BINDING':
         print(f"│   ├── GHG series are benchmarks in {inputs.target_year} (role {targets['role']}): no GHG rows, deviation reported after the solve")

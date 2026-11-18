@@ -877,6 +877,24 @@ The GHG rows held as benchmarks in the years the target series bind: the row is 
 GHG_emissions_split_<yr>.csv with its deviation from its series, but not imposed. [] = both rows binding (default);
 any of 'AG' (agriculture) and 'LULUCF' (net LULUCF), e.g. ['AG'] in calibration runs until activity is calibrated.
 '''
+
+# Paper 2 revision (paper2_v1 branch, 2026-11-19) *******************************
+GHG_NET_ROW = False
+"""
+True: ONE net GHG row in every solved year, as in the code of the first Paper 2 submission, in place of the two
+rows (agriculture, net LULUCF) against input/Nick_build/ghg_targets:
+    sum of ag + ag-mgt + non-ag + ag->ag transition emissions + off-land emissions <= GHG_targets.xlsx[column][year]
+The column is GHG_NET_TARGETS_DICT[GHG_EMISSIONS_LIMITS]. GHG_EMISSIONS_LIMITS still picks the AusTIMES demand
+pathway and the 'AS_GHG' carbon price through GHG_TARGETS_DICT, so 'low' pairs the 1.8C target with the 1.8C demand
+and 'high' pairs the 1.5C target with the 1.5C demand, as in the first submission. No exogenous LULUCF, plantings
+baseline or HIR baseline enters the row (the old targets had none); the emission coefficients are the current code's.
+The same construction as Jinzhu's run-local NET_ROW_PATCH (Custom_runs/Explore_CMA_narrative, 2026-11-12).
+False (default): the current code's two rows.
+"""
+GHG_NET_TARGETS_DICT = {
+    'low':  '1.8C (67%) excl. avoided emis SCOPE1',     # 2050: -74.72 Mt CO2e
+    'high': '1.5C (67%) excl. avoided emis SCOPE1',     # 2050: -287.77 Mt CO2e
+}
   	  	  
 
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or 'CONSTANT', or NONE.
