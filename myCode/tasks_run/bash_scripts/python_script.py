@@ -86,7 +86,7 @@ def zip_only():
 def write_only():
     """Load .lz4, run write_outputs, then create_zip (no simulation)."""
     import joblib, sys
-    from luto.tools.write import write_outputs
+    from luto.tools.write_output import write_outputs
     import luto.settings as settings
 
     # If a valid archive already exists, clean up and exit
@@ -148,7 +148,7 @@ def rewrite_only():
     extract_output_from_archive(archive_path)
     print("Output extraction complete; current code and settings were preserved.")
 
-    from luto.tools.write import write_outputs
+    from luto.tools.write_output import write_outputs
     import luto.settings as settings
 
     lz4_path, _ = _find_lz4()

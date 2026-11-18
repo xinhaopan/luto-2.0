@@ -3,44 +3,38 @@ import numpy as np
 import pandas as pd
 from tools.helpers import create_grid_search_template,create_task_runs
 
-# Test of the current LUTO2 (branch paper2_v1, from land-use-trade-offs/jinzhu e95e9c0d, 2026-11-11)
-# Input: copy of Jinzhu's NCI input /g/data/jk53/jinzhu/LUTO/luto-2.0/input (2026-10-22)
-# climate_change_impacts_rcp7p0_* in the input is the RCP6.0 layer under the rcp7p0 name
-# Test only: 2020-2050 in 5-year steps. The formal Paper 2 runs are 2010-2050 yearly.
+# Test of the current LUTO2 with cell grouping (branch paper2_v1, merged from land-use-trade-offs/jinzhu 95c23d5b, 2026-11-18)
+# Input: copy of Jinzhu's NCI input /g/data/jk53/jinzhu/LUTO/luto-2.0/input (synced 2026-11-18)
+# SSP 370 takes the RCP 6.0 yield layer in the code (luto/settings.py YIELD_RCP), since GAEZ has no RCP 7.0
+# RES1 settings follow Jinzhu's notes of 2026-11-18: CELL_GROUPING on, BIO_ROW_GENERATION off, ELASTIC_FAMILIES empty,
+# GBF8 off, RETRY_PARAMS and SOLUTION_SHARE_FLOOR left at their defaults, no report (WRITE_OUTPUTS False)
 
 grid_search = {
-    'TASK_NAME': ['20261114_Paper2_v1_test'],
+    'TASK_NAME': ['20261118_Paper2_v1_test'],
     'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
     'QUEUE': ['normalsr'],
     # ---------Computational settings, which are not relevant to LUTO itself---------
-    'MEM': ['128GB', '500GB'],
-    'NCPUS': ['32', '104'],
-    'TIME': ['10:00:00', '48:00:00'],
-    'WRITE_REPORT_MAX_MEM_MB': [100 * 1024, 300 * 1024],
+    'MEM': ['500GB'],
+    'NCPUS': ['104'],
+    'TIME': ['48:00:00'],
 
     # ---------------------------------- Model settings ------------------------------
-    'RESFACTOR': [5, 1],
-    'SIM_YEARS': [[i for i in range(2020,2051,5)]],
-    'WRITE_OUTPUTS': [True],
+    'RESFACTOR': [1],
+    'SIM_YEARS': [[i for i in range(2010,2051,1)]],
+    'WRITE_OUTPUTS': [False],             # writing and the dashboard are untested at RES1 with grouping
+    'CELL_GROUPING': [True],
+    'BIO_ROW_GENERATION': [False],
+    'ELASTIC_FAMILIES': [[]],
 
     # ----------------------------------- GHG settings --------------------------------
-    'GHG_EMISSIONS_LIMITS': ['low'],      # two rows in the current code: agriculture and net LULUCF
+    'GHG_EMISSIONS_LIMITS': ['low'],      # one GHG series (agriculture and LULUCF rows); low or high only sets demand and carbon price
 
     # ----------------------------- Biodiversity settings -------------------------------
     'GBF2_TARGET': ['high'],
+    'GBF8_TARGET': ['off'],
 }
 
-# RES5 and RES1 each take their own resources
-conditional_rules = [
-    {
-        'conditions': {'RESFACTOR': [5]},
-        'restrictions': {'MEM': ['128GB'], 'NCPUS': ['32'], 'TIME': ['10:00:00'], 'WRITE_REPORT_MAX_MEM_MB': [100 * 1024]}
-    },
-    {
-        'conditions': {'RESFACTOR': [1]},
-        'restrictions': {'MEM': ['500GB'], 'NCPUS': ['104'], 'TIME': ['48:00:00'], 'WRITE_REPORT_MAX_MEM_MB': [300 * 1024]}
-    },
-]
+conditional_rules = []
 
 
 settings_name_dict = {

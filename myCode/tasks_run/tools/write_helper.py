@@ -152,7 +152,7 @@ def write_repeat(task_root_dir,n_jobs=2,force=False, write_threads=2):
         
 import gzip
 import dill
-from luto.tools.write import write_outputs
+from luto.tools.write_output import write_outputs
 import luto.settings as settings
 
 gz_path = sys.argv[1]
