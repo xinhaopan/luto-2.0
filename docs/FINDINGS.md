@@ -5,6 +5,116 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261119 — cuOpt's GPU barrier does not solve the default grouped RES1 model; Gurobi stays the engine
+
+### TL;DR
+
+On 2026-11-06 a grouped RES1 model (2045 → 2050, GHG and GBF2 off, HIR off, 28.5 M nonzeros) was solved to a vertex in
+about 230 s by cuOpt's barrier on the GPU followed by Gurobi's crossover from cuOpt's point (x and row duals as `PStart` /
+`DStart`, `LPWarmStart 2`), against 758 s for Gurobi alone. The same hand-over was tried on the model LUTO's defaults
+give, as the RES1 run of 2026-11-18 solved it for 2020 → 2025 (GHG 'low', GBF2 'high', HIR on; 251,337 blobs, 8.22 M
+rows × 11.35 M columns, 55.2 M nonzeros). cuOpt solved it in none of three settings. Conclusion: cuOpt is not reliable
+on LUTO's models: whether it solves depends on which targets are on. Gurobi's homogeneous barrier + crossover stays
+(on this model 261 iterations, 1,337 s, vertex 4,928.760657).
+
+### Results (cuOpt 26.08, NVIDIA L40S 45 GB, local)
+
+| cuOpt setting | Result |
+|---|---|
+| PSLP presolve, ADAT system | presolve ~430 s (the 11-06 model: 24 s), symbolic factorisation 237 s (14 s), factor 3.41e7 nonzeros, GPU 22.3 GB; iteration 0: `||ADAT*dy - h|| = 1.77e7` against `||h|| = 7.9e11`, "Search direction computation failed", NumericalError, no solution |
+| PaPILO presolve | still in presolve after 40 min (past its 1,800 s time limit), one thread, 220 GB of RAM; stopped |
+| PSLP presolve, augmented system | iterates (~7 s each, GPU full), primal residual 1.15e4 → 147 by iteration 37, but the primal (−4.3e8) and dual (+5.7e15) objectives move apart (optimum ~4,929) and complementarity rises 12 → 2.1e4; no output for 3 min after that; stopped |
+
+- **Not the coefficient range:** the two models' ranges are about the same (matrix 1e-6 .. 4e5 against 3e-6 .. 8e5).
+- **Not isolated:** the two models differ in year, GHG (two rows over nearly every column), GBF2, HIR and GBF4 at once. The
+  full model is 34 % larger (498 M against 373 M nonzeros); there are 60 % more blobs with fewer distinct keys (47,048
+  against 51,444), so the extra blobs come from the SVD bins. The failure matches every earlier model with GBF8 species
+  rows (ADAT fails at iteration 0, the augmented system does not converge: 20260930 and the 11-04 tests), which points at
+  wide dense rows; untested: the same model without the GHG or the GBF2 rows.
+- Even had it solved, cuOpt's presolve and symbolic factorisation alone took ~11 min, half of Gurobi's whole barrier.
+
+Scripts and logs: `jinzhu_inspect_code/LUTO_cluster_cols/` (`script/merge_hybrid_res1.py`, `log/merge_hybrid_res1*.log`,
+`data/bench_res1/`, `doc/progress.md`).
+
+### Every cuOpt test so far (cuOpt 26.08, cuDSS 0.7.1; L40S 45 GB local unless marked H200)
+
+Tolerances mapped from LUTO's (primal 1e-6, dual 1e-2, gap 1e-5). PSLP = cuOpt's default presolve (`CUOPT_PRESOLVE` −1 / 2),
+PaPILO = 1, off = 0. ADAT = normal equations (the default), augmented = `CUOPT_AUGMENTED 1`, dualized = `CUOPT_DUALIZE 1`.
+Gurobi times are its CPU barrier (+ crossover) on the same model.
+
+**RES5, one 2010 → 2050 step (2026-09-29/30; `jinzhu_inspect_code/_Back_up/GP_GPU_solve/doc/findings.md`)**
+
+| Model | nnz | cuOpt setting | Result | Gurobi |
+|---|---|---|---|---|
+| demand, GHG low, GBF2 high, water | 32.3 M | PSLP, ADAT, no crossover | **Optimal 215 s**, feasible to 6e-7, 0.027 % below the vertex | 768 s |
+| same | 32.3 M | PaPILO, ADAT | **Optimal 201 s** | |
+| same | 32.3 M | PSLP, ADAT, cuOpt's crossover | crossover ~1,000 pushes per 30 s on the CPU: ~26 h projected; stopped | crossover 204 s |
+| same | 32.3 M | presolve off, ADAT | reaches the optimum by ~206 s, then stalls on the dual residual (1.3e-3, `ADAT*dy` accuracy warnings), never declares convergence | |
+| same | 32.3 M | hybrid A: PSLP → Gurobi primal simplex from x only | Gurobi > 1,444 s, dual infeasibility ~2e7; stopped | |
+| same | 32.3 M | hybrid B: presolve off (260 s) → Gurobi crossover from x + y | Gurobi's push 20 s, then the clean-up stalls (dual infeasibility rising to 2.8e7); stopped | |
+| + GBF3 + GBF4 (GBF8 off) | 33.2 M | PSLP, ADAT | **Optimal 221 s**; through LUTO's post_solve the lumap = Gurobi's in 99.4 % of cells, but 133 k ag shares < 1 % (Gurobi 51) | 592 s |
+| same | 33.2 M | augmented | factor 8.69e9 nonzeros (~70 GB): `cudss_device_alloc` error | |
+| same | 33.2 M | hybrid B (presolve off, 300 s) | push done at 36 s, then the clean-up crawls (dual infeasibility 1e8 – 6e12); stopped, slower than Gurobi alone | |
+| + GBF8 20 species | 54.5 M | PSLP, ADAT | NumericalError at iteration 0 | 491 s |
+| same | 54.5 M | augmented | iterates, residuals small, but primal −3.5e6 vs dual +1.8e12 (optimum −241,566); time limit | |
+| same | 54.5 M | dualized | out of memory: tried to allocate 14.5 TB | |
+| + GBF8 20 + renewables | 69.3 M | PSLP, ADAT | symbolic 708 s, NumericalError at iteration 0 | |
+| same | 69.3 M | augmented | primal −4.6e6 vs dual +1.7e13; time limit | |
+| + GBF8 100 + renewables | 182.4 M | PSLP, ADAT | PSLP 408 s, then the card full (45 GB) in setup for > 20 min; stopped | numerical trouble at 877 s |
+| calibration LPs (2 × 4 rows) | — | PSLP / PaPILO / off | row duals mis-signed with PSLP, lost with PaPILO (rows turned into bounds); right only with presolve off | |
+
+**RES1, 2045 → 2050, cell-clustering prototype (2026-11-04/06; `jinzhu_inspect_code/LUTO_cluster_cols/doc/progress.md`)** —
+scenario `Run_RES1_T150_ag0_noHIR`: GHG off, GBF2 off, HIR off, SNES / ECNES `SPECIFIED`, water on.
+
+| Model | nnz | cuOpt setting | Result | Gurobi |
+|---|---|---|---|---|
+| grouped, no GBF rows (150,740 blobs) | 28.5 M | PSLP, ADAT | **Optimal 97 s** (224 iterations, 11.5 GB), 1.2e-5 below | 713 s local |
+| same | 28.5 M | PSLP, ADAT, cuOpt's crossover | ~1,000 pushes per 24.6 s: ~18 h projected; stopped | 40 s |
+| same | 28.5 M | **hybrid: PSLP → Gurobi crossover from x + y** (`LPWarmStart 2`) | **works: 111 + 119 s ≈ 230 s to a vertex** (push 52 s); only 1,377 of 2.5 M duals mis-signed, repairing them changed nothing | 758 s |
+| same | 28.5 M | presolve off | NumericalError at 245 s (dual residual 9.7e12) | |
+| exact freeze model, 73 GBF8 rows | 384 M after PSLP | PSLP | stopped at the barrier's start (24 GB) to try PaPILO | 4,959 s |
+| same | 246 M after PaPILO | PaPILO, ADAT | card full 10 s after the start, no iteration | |
+| same, 9 GBF8 rows | 203 M | PaPILO, ADAT | card full, no iteration | |
+| same, 9 GBF8 rows | 176 M | PSLP, augmented | card full > 3 min, no iteration (PSLP stopped at its own 60 s limit) | |
+| same, 9 GBF8 rows, **H200** | 183 M | PSLP, ADAT | fits (81.6 GB), NumericalError at iteration 0 | |
+| same, 9 GBF8 rows, **H200** | | PSLP, augmented | iterates (~9 s each, 85 GB), primal −3.9e5 vs dual +2.6e11 (optimum −30,104); time limit | |
+| same, 9 GBF8 rows, **H200** | | presolve off, ADAT | NumericalError at iteration 0 (101 GB) | |
+| freeze + grouped free cells, 9 GBF8 rows | 39.5 M | PSLP, ADAT | **Optimal 181 s** (15 GB); every target met, but 27.4 % loss from those blobs | |
+| same on the IAD round-3 blobs | 44.9 M | PSLP, ADAT | **Optimal 210 s** (17 GB), 1.07 % loss; its duals priced the full model within a 30.6 % bracket only | |
+
+**RES1, 2020 → 2025, LUTO defaults (2026-11-19, this entry)** — GHG low, GBF2 high, HIR on, grouped 251,337 blobs, 55.2 M
+nnz: PSLP + ADAT NumericalError at iteration 0; PaPILO hung in presolve 40 min past its time limit; PSLP + augmented
+misconverging. Gurobi: 1,337 s (homogeneous barrier).
+
+**Also on the GPU:** Gurobi 13's PDHG (`Method 6, PDHGGPU 1`) never converged on any LUTO model (three RES5 models and the
+RES1 freeze model, 1,800 s each; ~2.5 – 10.7 GB, no factorisation).
+
+### Why cuOpt is not reliable for LUTO
+
+1. **Whether it solves depends on the targets switched on.** It solved every model of a few wide rows (RES5 without GBF8;
+   RES1 grouped with GHG and GBF2 off; grouped models with 9 GBF8 rows) in 1.6 – 3.7 min, and failed on every model with
+   GBF8 species rows at RES5 (20 species are enough) and on LUTO's default RES1 grouped model. Not explained by size or
+   coefficient range alone: RES5 with GHG and GBF2 (32 M nnz) solved, RES1 grouped with GHG, GBF2 and HIR (55 M) did not;
+   the GBF8 failures and the default RES1 failure share the signature of wide dense rows.
+2. **Each linear system has its own failure:** ADAT fails at iteration 0 (search direction); the augmented system iterates
+   with small residuals but primal and dual objectives that never meet, or its fill explodes (8.7e9 nonzeros from a model
+   barely larger than one that solved); dualized runs out of memory (14.5 TB). No setting is a safe fallback.
+3. **No usable crossover:** cuOpt's own pushes one variable at a time on the CPU (~25 – 30 ms each): 18 – 26 h projected.
+   Without crossover a grouped model is unusable (a blob is whole only at a vertex), and an ungrouped answer carries ~133 k
+   sub-1 % slivers into the next year's base.
+4. **The hybrid works only on the easy models:** Gurobi's crossover from cuOpt's point needs cuOpt's presolve ON (with it off
+   the barrier stalls or fails), and its duals were mis-signed on the calibration LPs with presolve on (harmless on the
+   grouped no-GBF model). When cuOpt's barrier fails there is nothing to hand over.
+5. **Presolve is slow and does not always respect its limit:** PSLP 24 s on a 28 M model, 430 s on 55 M, 408 s on 182 M;
+   PaPILO ran 40 min single-threaded at 220 GB RAM, past `CUOPT_TIME_LIMIT`.
+6. **GPU memory follows the factor's fill, not the model's size:** 11 – 17 GB for every model it solved; the exact freeze
+   model needs 82 – 101 GB (H200), and fits there only to fail numerically.
+
+Re-test when cuOpt is upgraded beyond 26.08 (the dual postsolve, the dense-row handling); a quick check is this entry's
+model (`merge_hybrid_res1.py build` once, then `cuopt -1 1800`), since Gurobi alone solves it in 1,337 s.
+
+---
+
 ## 20261118 — cell grouping in the solver (`CELL_GROUPING`): a GBF row's footprint must be in the blob key; the RES1 size cut survives it
 
 ### TL;DR
@@ -73,6 +183,46 @@ Land use of the two runs (`script/merge_test_compare.py`, from the stored soluti
 - **Land use is nearly identical.** The largest 2050 differences: HIR - Beef +48,663 ha of 9.90 M ha (0.5 %), dry Winter cereals +8,850 ha of 25.8 M ha, dry Beef - modified land −8,359 ha, Environmental Plantings +4,770 ha of 19.1 M ha.
 - **Grouping adds no fractional cells:** 71,409 cells hold one whole land use in 2050 in both runs (70,831 against 70,835 in 2020).
 - **At RES5 grouping is slower**, in six of seven years: the model is 1.25× smaller, the barrier needs 1.4–2.2× the iterations.
+
+### RES1: grouping widens the coefficient range; Gurobi's geometric scaling takes the iterations back (2045 → 2050, 34 GBF4 rows, 157,377 blobs)
+
+A grouped column's coefficient is the sum over its blob's cells, so a blob of thousands of cells carries numbers thousands of times larger than a blob of one. The ranges Gurobi reports (year 2020 of each run):
+
+| Model | Matrix coefficients | Objective coefficients | Barrier iterations |
+|---|---|---|---|
+| RES5, plain | 1e-4 to 2e3 | 1e-4 to 5e2 | 88 |
+| RES5, grouped | 1e-5 to 6e4 | 8e-5 to 4e5 | 190 |
+| RES1, grouped | 8e-7 to 3e5 | 2e-7 to 3e5 | 280 |
+
+Three solves of the same grouped RES1 model (`merge_rescale_test.py`; 28 threads, barrier with crossover; the machine shared with another run, so the times are indicative):
+
+| Solve | Barrier iterations | Barrier time | Whole solve | Objective (M AUD) | Full-model rows over 1e-5 |
+|---|---|---|---|---|---|
+| Baseline: the grouped model as built, `ScaleFlag = 0` (LUTO's setting) | 246 | 806 s | 837 s | 35,766.55 | 0 |
+| **Gurobi's geometric scaling, `ScaleFlag = 2`** | **159** | **501 s** | **536 s** | **35,766.59** | 0 |
+| Rescaled by hand: every grouped column divided by its cell count, per-cell rows to a largest coefficient of 1, wide rows as `contract` | 144 | 527 s | 2,015 s | 35,619.16 | 0 |
+
+- **`ScaleFlag = 2` is the fix:** 35 % fewer iterations, the solve 36 % shorter, the same objective. One parameter, no change to the tables.
+- **The hand rescale is rejected.** It narrows the matrix range (to 2e-6 .. 3e3) and the barrier is as quick, but the objective is 0.41 % lower and crossover takes 1,480 s (4.9 M simplex iterations). Likely reason: dividing a column by its blob's cell count (up to 83,463) shrinks its objective coefficient by the same factor (range 3e-8 .. 11), while `OPTIMALITY_TOLERANCE` (1e-2) is an absolute tolerance on reduced costs, so the solver accepts a point that is far from optimal in real terms. Not tested further.
+- The baseline's objective is 0.016 % below the full model's 35,772.26: with the GBF footprints in the key the loss is the prototype's.
+- Not yet done: `ScaleFlag = 2` on the multi-year chain, and on the plain (ungrouped) model, where `settings.SCALE_FLAG` notes that 1 tripled the solve time and 3 gave numerical problems. It is not switched on in the code.
+
+### RES1, default targets: the grouped 2025 model needs the homogeneous barrier (2020 → 2025, GHG rows enforced, 251,337 blobs, 43.5 M presolved nonzeros)
+
+The first RES1 run with grouping and the default settings solved 2010 → 2020 with the plain barrier (205,369 blobs, 10.7× fewer nonzeros, 280 iterations, 854 s). The next year, the first with the two GHG rows, did not:
+
+| Attempt on the same grouped 2025 model | Iterations | Time | Per iteration | Result |
+|---|---|---|---|---|
+| Barrier, `ScaleFlag = 0` | 545 | 1,810 s | 3.3 s | "Numerical trouble encountered"; Gurobi then went on in simplex (dual infeasibility 1e9 – 1e16), stopped by hand after 10 min |
+| Barrier, `ScaleFlag = 2` | 507 | 1,701 s | 3.4 s | "Numerical trouble encountered" |
+| **Homogeneous barrier (`BarHomogeneous = 1`), `ScaleFlag = 2`** | **261** | **1,292 s** | **5.0 s** | **Optimal; crossover 20 s** |
+
+- **Both plain-barrier attempts diverged at the same place:** converging normally to about iteration 300 (primal residual about 0.5, complementarity 3e-3), then a jump back by several orders of magnitude, and no recovery. Scaling made the path cleaner (dual residual at 1e-11 from iteration 30, against 1e-2 – 1e-5 without) but did not remove the jump.
+- **The homogeneous barrier passed that point without a jump.** A step costs about half as much again, but it needs half the steps.
+- **The solution is valid for the full model:** no row over tolerance (worst 3e-7), bounds to 1e-6; agriculture 72.5 Mt against the 75.2 Mt limit, LULUCF −109.4 Mt against −51.4 Mt.
+- **A failed barrier falls into simplex.** With crossover on (grouping needs it), Gurobi carries on in simplex from the failed point. During the run a message callback terminated such an attempt so the next entry of `RETRY_PARAMS` could start (status 11, the homogeneous attempt 6 s later); it was removed on 2026-11-19 together with the plain-barrier attempt, so `RETRY_PARAMS` holds the homogeneous barrier alone and a failed barrier would again go on in simplex.
+- **Also found:** in the second year a few grouped columns have a lower bound above their upper bound by under 1e-6 (3 of about 10 million; cells of a blob share their base only to `ROUND_DECIMALS`, and a locked-in share has lb = ub = base). `aggregate` stopped the year on it; it now sets the two to their midpoint within 10 × `FEASIBILITY_TOLERANCE` and logs it (local, uncommitted).
+- **Now the defaults in `settings.py` (local, 2026-11-19):** `SCALE_FLAG = 2`, `RETRY_PARAMS = [(0, 2, -1, -1, 1)]`: the homogeneous barrier, one attempt. A failed plain attempt cost about 28 minutes a year. Not yet measured on a model without cell grouping.
 
 ### Not yet known
 
