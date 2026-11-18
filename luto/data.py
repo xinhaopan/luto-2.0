@@ -237,7 +237,7 @@ class Data:
         #   (column, cell) at the model cells, the columns labelled (field, lm, lu) / (field, animal)
         #   Each table is read one column at a time: a chunk holds one column of every full-res cell, so a column is
         #   inflated whole and cut to the model cells (loading the whole table would hold every full-res column in
-        #   memory). The cells are labelled 0 … NCELLS−1 (NCELLS is not set yet: the count of MASK).
+        #   memory). The cells are labelled 0 … NCELLS-1 (NCELLS is not set yet: the count of MASK).
         with xr.open_dataset(os.path.join(settings.INPUT_DIR, "agec_crops.nc")) as agec_crops_file:
             agec_crops = agec_crops_file['AGEC_CROPS']
             self.AGEC_CROPS = xr.DataArray(
@@ -548,7 +548,7 @@ class Data:
         print("├── Loading climate change data", flush=True)
 
         #   (column, cell) at the model cells, the columns labelled (lm, lu, year)
-        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".nc")) as cci_file:
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.YIELD_RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".nc")) as cci_file:
             cci = cci_file['CLIMATE_CHANGE_IMPACT']
             self.CLIMATE_CHANGE_IMPACT = xr.DataArray(
                 np.stack([cci.isel(column=i).values[self.MASK] for i in range(cci.sizes['column'])]),
@@ -821,8 +821,12 @@ class Data:
                 .assign(Renewable_Target_MWh=lambda df: df['Renewable_Target_TWh'] * 1e6)
             )
 
-            self.SOLAR_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')
-            self.WIND_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
+            # 'Other Territories' (the Jervis Bay cells, enclosed by NSW) has no row in the price tables: it sells at
+            # the NSW price. Model cells land there at RES1, and at RES 2-15 since coastal blocks are modelled (ce25e72e).
+            solar_prices = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')
+            wind_prices = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
+            self.SOLAR_PRICES = pd.concat([solar_prices, solar_prices.query("State == 'New South Wales'").assign(State='Other Territories')], ignore_index=True)
+            self.WIND_PRICES = pd.concat([wind_prices, wind_prices.query("State == 'New South Wales'").assign(State='Other Territories')], ignore_index=True)
 
             # Renewable energy related raster layers
             #   Compute before isel to avoid isel working on dask chunks
@@ -1601,10 +1605,7 @@ class Data:
         
   
         # Conservation performance curve 
-        conservation_performance_curve = pd.read_excel(
-            os.path.join(settings.INPUT_DIR, 'Biodiversity_conserve_performance.xlsx'),
-            sheet_name=performance_sheet
-        ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+        conservation_performance_curve = self.load_bio_performance_curve(performance_sheet)
 
 
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
@@ -2249,7 +2250,7 @@ class Data:
 
         def path(fname):
             return os.path.join(settings.INPUT_DIR, fname)
-        cci_file = "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".nc"
+        cci_file = "climate_change_impacts_" + settings.YIELD_RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".nc"
 
         # Coarse cell of each fine land cell (-1 if its block has none): the spatial lookup (S1).
         f2c = self.FULL2RES_IDX_MAP
@@ -2592,6 +2593,14 @@ class Data:
         self.raise_nan_report(found, 'guarded arrays, eligible (allocated for the climate multiplier)')
 
 
+    def get_renewable_price_r(self, prices: pd.DataFrame, yr_cal: int) -> np.ndarray:
+        """The electricity price (AUD/MWh) of every cell in `yr_cal`: its state's price from `prices`
+        (SOLAR_PRICES / WIND_PRICES). Raises KeyError if a cell's state has no price that year."""
+        price_of_state = prices.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh']
+        states, state_idx_of_cell = np.unique(self.REGION_STATE_NAME.astype(str), return_inverse=True)
+        return price_of_state.loc[states].to_numpy(np.float32)[state_idx_of_cell]
+
+
     def check_ag_man_nan(self, effects: dict[str, dict[str, np.ndarray]], yr_cal: int) -> None:
         """
         NaN guard on the ag-management effect matrices, which `check_eligible_nan` does not see (they also read
@@ -2879,14 +2888,16 @@ class Data:
         self.WATER_OUTSIDE_LUTO_HIST = self.WATER_YIELD_OUTSIDE_LUTO_HIST[settings.WATER_REGION_DEF]          # over region_id
 
 
-        # Using high res factor will make some small river regions disappear; hence we update the data with validated river region ids
+        # A region with no model cell is left out of the water rows: at RESFACTOR 1 it holds no land-use cell (islands,
+        # conservation and Indigenous land), at RESFACTOR > 1 also a small region no block represents
         if valid_watershed_id is None:
             valid_watershed_id = np.unique(self.WATER_REGION_ID)
-        self.WATERSHED_DISAPPEARING = [self.WATER_REGION_NAMES[i] for i in set(self.WATER_REGION_NAMES.keys()) - set(valid_watershed_id)]
-        
+        self.WATERSHED_DISAPPEARING = sorted(str(self.WATER_REGION_NAMES[i]) for i in set(self.WATER_REGION_NAMES.keys()) - set(valid_watershed_id))
+
         if self.WATERSHED_DISAPPEARING:
-            print(f"│   ⚠ WARNING: {len(self.WATERSHED_DISAPPEARING)} river regions are disappearing due to using high resolution factors.", flush=True)
-            [print(f"       - {list(i)}") for i in np.array_split(self.WATERSHED_DISAPPEARING, len(self.WATERSHED_DISAPPEARING)//3)]
+            print(f"│   ⚠ WARNING: {len(self.WATERSHED_DISAPPEARING)} water regions have no model cell at RES{settings.RESFACTOR} and are left out of the water constraints:", flush=True)
+            for start in range(0, len(self.WATERSHED_DISAPPEARING), 4):
+                print(f"│       - {', '.join(self.WATERSHED_DISAPPEARING[start:start + 4])}", flush=True)
             self.WATER_REGION_NAMES = {k: v for k, v in self.WATER_REGION_NAMES.items() if k in valid_watershed_id}
             self.WATER_REGION_HIST_LEVEL = self.WATER_REGION_HIST_LEVEL.sel(region_id=[k for k in self.WATER_REGION_HIST_LEVEL['region_id'].values if k in valid_watershed_id])
             self.WATER_OUTSIDE_LUTO_BY_CCI = self.WATER_OUTSIDE_LUTO_BY_CCI.sel(region_id=[k for k in self.WATER_OUTSIDE_LUTO_BY_CCI['region_id'].values if k in valid_watershed_id])
@@ -3605,8 +3616,18 @@ class Data:
 
         return (dr_prop * water_dr_yield + (1 - dr_prop) * water_sr_yield)
 
-    def load_bio_quality_layer(self, backend_layer: str, biodiv_ds=None) -> tuple[np.ndarray, str]:
-        """Return (raw priority values on MASK, performance-curve sheet name) for a backend layer.
+    def load_bio_performance_curve(self, performance_sheet: str) -> dict:
+        """{area coverage percent: priority rank} of a quality layer, from its sheet of
+        Biodiversity_conserve_performance.xlsx: the rank that cuts the study area at each percentage, in the units
+        of the layer (load_bio_quality_layer)."""
+        return pd.read_excel(
+            os.path.join(settings.INPUT_DIR, 'Biodiversity_conserve_performance.xlsx'),
+            sheet_name=performance_sheet
+        ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+
+    def load_bio_quality_layer(self, backend_layer: str, biodiv_ds=None, mask=None) -> tuple[np.ndarray, str]:
+        """Return (raw priority values on MASK, performance-curve sheet name) for a backend layer. Every layer is a
+        priority rank on 0-1 in its input file (RHI too: Data-Master script 5_3 divides DCCEEW's 0-100 by 100).
 
         The values are *unweighted* — connectivity is applied by the callers that want it.
         The GBF2 and renewable exclusion masks deliberately threshold these unweighted values,
@@ -3615,21 +3636,25 @@ class Data:
 
         `biodiv_ds` lets __init__ pass the priority/connectivity Dataset it has already read (at the model cells),
         avoiding a second read of the file for the 'Suitability' backend.
+
+        `mask` (over the full-resolution land cells): the cells to return, in place of the model cells (self.MASK);
+        the report's input maps read every cell this way to average a layer over a coarse cell's block.
         """
+        mask = self.MASK if mask is None else mask
         if backend_layer == 'Suitability':
             if biodiv_ds is None:
                 with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.nc')) as bio_priority:
-                    biodiv_ds = bio_priority[['BIODIV_PRIORITY']].sel(ssp=[settings.SSP]).load().isel(cell=self.MASK)
+                    biodiv_ds = bio_priority[['BIODIV_PRIORITY']].sel(ssp=[settings.SSP]).load().isel(cell=mask)
             return biodiv_ds['BIODIV_PRIORITY'].sel(ssp=settings.SSP).values.astype(np.float32), f'ssp{settings.SSP}'
 
         if 'NES' in backend_layer:
             with xr.open_dataarray(os.path.join(settings.INPUT_DIR, 'bio_NES_Zonation.nc')) as nes_zonation:
-                return nes_zonation.sel(layer=backend_layer).values[self.MASK].astype(np.float32), backend_layer
+                return nes_zonation.sel(layer=backend_layer).values[mask].astype(np.float32), backend_layer
 
         if backend_layer == 'RHI':
             return (
                 xr.load_dataarray(os.path.join(settings.INPUT_DIR, 'bio_RHI_Zonation.nc'))
-                .values[self.MASK]
+                .values[mask]
                 .astype(np.float32)
             ), 'RHI'
 

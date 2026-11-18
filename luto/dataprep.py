@@ -33,7 +33,6 @@ from itertools import product
 from luto.settings import INPUT_DIR, RAW_DATA
 
 
-
 def create_new_dataset(refresh=False):
     """Creates a new LUTO input dataset from source data"""
 
@@ -103,7 +102,7 @@ def create_new_dataset(refresh=False):
     # TODO (2026-10-20): OUTDATED demand file — this name no longer exists on N:; LUTO runs on the copy already in
     # input/ (demand_projections.h5 / .nc). N: now holds only Michalis' update, ..._2026-07-20.csv, which is NOT adopted:
     # under IMPORT_TREND = 'Trend' its imports exceed domestic use + exports for several commodities, so demand goes
-    # negative (default scenario 2050: sheep meat −9.3 Mt; also citrus, pears, hay, tropical stone fruit, other non-cereal
+    # negative (default scenario 2050: sheep meat -9.3 Mt; also citrus, pears, hay, tropical stone fruit, other non-cereal
     # crops, cotton) and data.py clamps it to 0. Talk with Michalis before switching to it.
     shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
     shutil.copyfile(f'{demand_elasticity_inpath}/20260311_values for runs.csv', outpath + 'demand_elasticity.csv')
@@ -342,9 +341,10 @@ def create_new_dataset(refresh=False):
     # Copy biodiversity NES Zonation files
     shutil.copyfile(bio_NES_Zonation_inpath + 'bio_NES_Zonation.nc', outpath + 'bio_NES_Zonation.nc')
 
-    # Copy biodiversity RHI Zonation file (DCCEEW's native 0-100 ranks, no rescaling). data.py thresholds
-    # it against the 'RHI' sheet of Biodiversity_conserve_performance.xlsx, which script 5_4 builds from
-    # these same values over in-LUTO cells and writes alongside this layer, so the two share a scale.
+    # Copy biodiversity RHI Zonation file: DCCEEW's ranks on 0-1, the scale of the other quality layers (script 5_3
+    # divides the native 0-100 by 100). data.py thresholds it against the 'RHI' sheet of
+    # Biodiversity_conserve_performance.xlsx, which script 5_4 builds from these same values over in-LUTO cells
+    # and writes alongside this layer, so the two share a scale.
     shutil.copyfile(f'{bio_RHI_Zonation_inpath}/bio_RHI_Zonation.nc', outpath + 'bio_RHI_Zonation.nc')
 
     # Copy renewable energy data files
@@ -376,6 +376,11 @@ def create_new_dataset(refresh=False):
                           , skiprows = 5
                           , nrows = 11
                           , index_col = 0)
+
+    # The workbook and its category table as they are, for the report: the inputs view shows the same table part by
+    # part (luto/tools/write_input.get_transition_cost_parts reads the workbook's formulas)
+    shutil.copyfile(raw_data + 'transitions_costs_20251002.xlsx', outpath + 'transitions_costs.xlsx')
+    shutil.copyfile(raw_data + 'tmatrix_cat2lus.csv', outpath + 'tmatrix_cat2lus.csv')
 
     # Read transition costs from agricultural land to environmental plantings
     ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20251002.xlsx'
