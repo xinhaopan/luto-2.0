@@ -23,7 +23,7 @@ from tools.helpers import create_grid_search_template,create_task_runs
 
 grid_search = {
     'TASK_NAME': ['20261119_Paper2_v1_test'],
-    'KEEP_OUTPUTS': [True],  # If False, only keep report HTML
+    'KEEP_OUTPUTS': [False],  # False zips each run into Run_Archive.zip and deletes the rest (gdata file-count quota)
     'QUEUE': ['normalsr'],
     # ---------Computational settings, which are not relevant to LUTO itself---------
     'MEM': ['500GB'],
