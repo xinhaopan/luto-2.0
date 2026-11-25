@@ -1,0 +1,39 @@
+run_idx,run,stage,GHG_EMISSIONS_LIMITS,GBF2_TARGET,GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT,changes_from_common
+1,GHG_off_BIO_off_CUT_50,scenario grid,off,off,50,
+2,GHG_high_BIO_off_CUT_50,scenario grid,high,off,50,
+3,GHG_off_BIO_high_CUT_50,scenario grid,off,high,50,
+4,GHG_high_BIO_high_CUT_50,scenario grid,high,high,50,
+5,GHG_high_BIO_high_CUT_40,scenario grid,high,high,40,
+6,GHG_high_BIO_high_CUT_30,scenario grid,high,high,30,
+7,GHG_high_BIO_high_CUT_20,scenario grid,high,high,20,
+8,GHG_high_BIO_high_CUT_10,scenario grid,high,high,10,
+9,GHG_low_BIO_high_CUT_50,scenario grid,low,high,50,
+10,GHG_low_BIO_high_CUT_40,scenario grid,low,high,40,
+11,GHG_low_BIO_high_CUT_30,scenario grid,low,high,30,
+12,GHG_low_BIO_high_CUT_20,scenario grid,low,high,20,
+13,GHG_low_BIO_high_CUT_10,scenario grid,low,high,10,
+14,GHG_off_BIO_high_CUT_40,scenario grid,off,high,40,
+15,GHG_off_BIO_high_CUT_30,scenario grid,off,high,30,
+16,GHG_off_BIO_high_CUT_20,scenario grid,off,high,20,
+17,GHG_off_BIO_high_CUT_10,scenario grid,off,high,10,
+18,GHG_low_BIO_off_CUT_50,scenario grid,low,off,50,
+19,GHG_off_BIO_off_CUT_50_SSP126,sensitivity,off,off,50,SSP='126'
+20,GHG_high_BIO_off_CUT_50_SSP126,sensitivity,high,off,50,SSP='126'
+21,GHG_off_BIO_high_CUT_50_SSP126,sensitivity,off,high,50,SSP='126'
+22,GHG_high_BIO_high_CUT_50_SSP126,sensitivity,high,high,50,SSP='126'
+23,GHG_off_BIO_off_CUT_50_SSP585,sensitivity,off,off,50,SSP='585'
+24,GHG_high_BIO_off_CUT_50_SSP585,sensitivity,high,off,50,SSP='585'
+25,GHG_off_BIO_high_CUT_50_SSP585,sensitivity,off,high,50,SSP='585'
+26,GHG_high_BIO_high_CUT_50_SSP585,sensitivity,high,high,50,SSP='585'
+27,GHG_off_BIO_off_CUT_50_CO2_on,sensitivity,off,off,50,CO2_FERT='on'
+28,GHG_high_BIO_off_CUT_50_CO2_on,sensitivity,high,off,50,CO2_FERT='on'
+29,GHG_off_BIO_high_CUT_50_CO2_on,sensitivity,off,high,50,CO2_FERT='on'
+30,GHG_high_BIO_high_CUT_50_CO2_on,sensitivity,high,high,50,CO2_FERT='on'
+31,GHG_off_BIO_off_CUT_50_DP_on,sensitivity,off,off,50,DYNAMIC_PRICE=True
+32,GHG_high_BIO_off_CUT_50_DP_on,sensitivity,high,off,50,DYNAMIC_PRICE=True
+33,GHG_off_BIO_high_CUT_50_DP_on,sensitivity,off,high,50,DYNAMIC_PRICE=True
+34,GHG_high_BIO_high_CUT_50_DP_on,sensitivity,high,high,50,DYNAMIC_PRICE=True
+35,GHG_off_BIO_off_CUT_50_AMORT,amortised,off,off,50,AMORTISE_UPFRONT_COSTS=True; AMORTISATION_PERIOD=60; DISCOUNT_RATE=0.07
+36,GHG_high_BIO_off_CUT_50_AMORT,amortised,high,off,50,AMORTISE_UPFRONT_COSTS=True; AMORTISATION_PERIOD=60; DISCOUNT_RATE=0.07
+37,GHG_off_BIO_high_CUT_50_AMORT,amortised,off,high,50,AMORTISE_UPFRONT_COSTS=True; AMORTISATION_PERIOD=60; DISCOUNT_RATE=0.07
+38,GHG_high_BIO_high_CUT_50_AMORT,amortised,high,high,50,AMORTISE_UPFRONT_COSTS=True; AMORTISATION_PERIOD=60; DISCOUNT_RATE=0.07
