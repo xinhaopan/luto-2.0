@@ -5,6 +5,244 @@ Entries are in **descending date order** (newest first). Each entry stands on it
 
 ---
 
+## 20261124 — clear small shares every year, and make irreversibility hold only above the floor
+
+### TL;DR
+
+Every share a solved year leaves in a cell becomes the next year's source: its own transition arcs, a node-balance row
+whose constant is that share, and, for an irreversible land use, a lower bound carried on for good. Small shares pile
+up year on year (distinct cell-grouping keys in a RES1 annual run: 37 k in 2024, 43 k in 2026, 49 k in 2027), and from
+2027 cuOpt's barrier needed 5–10x the iterations it needed before (1,600–3,000 against 210–355). The tool exists:
+`settings.SOLUTION_SHARE_FLOOR` (`post_solve.clear_specks`) clears every ag / non-ag share at or below the floor before
+the solution is stored and adds it to the cell's largest share of the same kind. It is off (`None`); its comment
+recommends `1e-4`, for barrier runs without crossover. The plan is to use it at **0.01** and to amend the
+irreversibility rule to match.
+
+### The amended rule
+
+An irreversible land use (the non-ag land uses with `NON_AG_LAND_USES_REVERSIBLE` False; HIR, Utility Solar PV, Onshore
+Wind in `AG_MANAGEMENTS_REVERSIBLE`) cannot be removed once its share of a cell is **above** `SOLUTION_SHARE_FLOOR`; a
+share at or below it is cleared like any other. The code already behaves this way when the floor is set — the
+irreversibility bounds are read from the stored, cleared solution — so the change is to the rule as written (settings
+comments, docs). Irreversibility then protects decisions, not the slivers a vertex or numerical dust leaves.
+
+### To decide and to state when it is adopted
+
+- [ ] Test first (Gurobi only, so the effect is the model's size, not one engine's): the same scenario twice, floor
+      `None` against `0.01`; compare per-year solve time, model size (rows, columns, nonzeros) and the results
+      (objective, production, GHG, GBF scores) year by year.
+- [ ] Carbon continuity: a cleared planting's sequestration stops the next year; no emission or transition cost is
+      charged for its removal. Small at 1 % of a cell, but an accounting break to state in the report.
+- [ ] 1 % of a cell is a different area at each resolution (about 1 ha at RES1, about 25 ha at RES5). A floor in
+      hectares would be resolution-free.
+- [ ] A floor changes results: runs with it are not comparable with runs without it.
+- [ ] Considered and dropped: "at most three land uses per cell" (a cardinality rule needs a binary per (cell, land
+      use) — a MIP with hundreds of millions of binaries at RES1).
+
+---
+
+## 20261123 — the two GHG rows (agriculture, net LULUCF): review before talking with Nick
+
+### TL;DR
+
+The GHG constraint was split into an agriculture row and a net LULUCF row (`cdc90a0d`, PR #229, merged 2026-10-22;
+before it, one net row over ag + non-ag + ag-mgt + transitions, as in the 2010-base code Xinhao's runs use). A first
+read of the code (2026-11-23) found the split's algebra sound — every sub-term sits on exactly one row and the two rows
+sum to the old net row — but three accounting questions, and a default under which **neither row ever binds**. Several
+parts also break the design rules of `docs/COLLABORATION.md`. Nothing has been changed. To go through, then decide
+with Nick.
+
+### 1. Decide first: what the GHG target is meant to do
+
+The rows hold LUTO to the DCCEEW 2025 projection: agriculture ≤ the AG series (about 75 Mt, flat from 2040), net
+LULUCF ≤ the projection ("modelled" part 0). In the default RES1 run of 2026-11-18 (2020 → 2050, 5-year steps,
+current code) the slack of each row was:
+
+| Year | AG row: LUTO vs series | slack | LULUCF row: LUTO vs series | slack |
+|---|---|---|---|---|
+| 2025 | 72.8 vs 75.2 Mt | 2.4 Mt | −114.8 vs −51.4 Mt | 63 Mt |
+| 2030 | 69.3 vs 75.3 Mt | 6.0 Mt | −126.5 vs −46.3 Mt | 80 Mt |
+| 2035 | 66.2 vs 75.7 Mt | 9.5 Mt | −140.5 vs −44.2 Mt | 96 Mt |
+| 2040 | 63.9 vs 75.9 Mt | 12.0 Mt | −159.0 vs −47.3 Mt | 112 Mt |
+
+At the carbon price in the objective LUTO already does better than the projection, so the GHG policy has no effect in
+the default settings. (The old net row in the 2010-base code binds hard: 73.9 → 47.5 Mt from 2020 to 2021, shadow price
+89.5 AUD/t.)
+
+- [ ] Is "no worse than the projection" the intended target, or should it be a reduction pathway?
+- [ ] Two rows or one net row? Two rows forbid trading agriculture emissions against LULUCF removals (more cattle paid
+      for by more plantings); one net row allows it. A policy choice, not a solver need.
+- [ ] Is the cumulative LULUCF budget (`budget.csv`, loaded as `Data.GHG_LULUCF_BUDGET`) meant to be imposed? It is
+      read and never used.
+
+### 2. Accounting questions
+
+- [ ] **Double count from the 2010 base year.** In 2020, a reference year, LUTO's LULUCF row is −93.6 Mt against the
+      inventory's −60.3 Mt: 33 Mt lower before any target applies. The exogenous series (`LULUCF_EXO`) reflects what
+      actually happened, and LUTO's own plantings and regrowth since 2010 are added on top of it as additional. Check
+      what EXO contains; the move of the base year to 2021 should shrink this.
+- [ ] **Scope of the AG row.** It holds energy and lifecycle emissions NIR sector 3 does not (Precision Agriculture,
+      AgTech EI, irrigated pasture energy, the off-land on-farm energy CO2). Nick's comment in
+      `economics/agricultural/ghg.py` calls them scope-1 leaks to be moved out. Size them, then decide.
+- [ ] **BECCS** is off both inventories but sits on the LULUCF row (off by default).
+- [ ] **Savanna burning on LULUCF**: the comment says NIR 2024 reports savanna fire under 4(IV), 3.E being IE. Check
+      against the NIR.
+- [ ] **AG benchmark tolerance** is ±14.3 Mt (about 20 % of the series): too wide to tell a calibration error.
+- [ ] **HIR baseline** (existing projects): LUTO's HIR counts only above the existing projects' regrowth and destocking,
+      while those projects are not in LUTO's base-year state. If LUTO does not adopt HIR on those cells, the rows ask
+      for the same amount from elsewhere. Would putting the projects in the base-year state be cleaner?
+- [ ] Not yet read: the build script `input/Nick_build/scripts/ghg_targets.py` and the NIR category mapping
+      (`scope_matrix.csv`).
+
+### 3. Design-rule breaks (`docs/COLLABORATION.md`)
+
+- [ ] **Rule 2, `Data` only reads.** `Data.load_ghg_targets` (`luto/data.py`) selects the plantings-baseline row by
+      matching "(LEAN)" in a status text, takes the anchor year out of a free-text field with a regex, and computes
+      rate × (year − anchor). The build script should write it as a yearly series file; `Data` should only read it.
+- [ ] **Rule 5, fail loudly.**
+  - `series_agriculture_exogenous.csv` missing → 0 for every year.
+  - The AG tolerance is NaN in years without one.
+  - The HIR baseline clips a project share above 1 with `np.minimum(..., 1.0)` (`get_hir_baseline_t`) instead of
+    raising.
+  - The off-land energy part is found by the substring "energy" in `Emission Type` (`row_inputs.get_row_inputs`); the
+    input file should carry the scope as a column.
+- [ ] **Rule 5, one quantity in one place.** The rows' left-hand side is computed three times: the row coefficients
+      (`row_builder.get_ghg_coeffs`), the GHG total in `simulation.store_solution`, and `simulation.get_ghg_split`,
+      which calls the economics functions again and splits term 1 by subtraction a second time (as
+      `get_ghg_matrices_parts` does). The constants on the right-hand side (EXO, the two baselines) are written in
+      `get_ghg_rhs` and again in `get_ghg_split`. They agree today; a change in one will not show in the other.
+- [ ] **One family, one `get_*` (the row_builder rule).** Today one `get_ghg` builds both rows, their coefficients and
+      right-hand sides computed together as `{'AG': ..., 'LULUCF': ...}` dicts (`get_ghg_coeffs`, `get_ghg_rhs`), and
+      the single net row of Xinhao's Paper 2 runs is a branch inside it (`GHG_NET_ROW`). Jinzhu's alternative: one
+      self-contained function per row — `get_ghg_ag`, `get_ghg_lulucf` (and `get_ghg_net`), each reading its own
+      target and building its own row — and the year's GHG report read off the rows themselves (each row's
+      coefficients · x plus its constants), so that `simulation.get_ghg_split` (Nick's, `cdc90a0d`) no longer computes
+      the left-hand side and the constants a second time.
+- [ ] **Unused input**: `Data.GHG_LULUCF_BUDGET` (above).
+- [ ] Smaller:
+  - `get_ghg_rhs` writes the LULUCF right-hand side as (MOD + EXO) − EXO.
+  - The HIR baseline indexes by position (`[:, :, 0]`, `ha_mj[fy][m, j]`).
+  - `GHG_EMISSIONS_LIMITS` 'low' / 'high' no longer choose the targets, only the AusTIMES demand pathway and the carbon
+    price, so the name misleads.
+
+### What is right and should stay
+
+- The sub-term → row tables sit beside the functions that make the sub-terms (`AG_MAN_GHG_SUBTERMS`,
+  `NON_AG_GHG_SUBTERMS`), keyed by name; a name that does not match raises.
+- The rows are added only in years whose role is BINDING (from 2025); `GHG_BENCHMARK_ROWS` is checked loudly.
+- The series files are checked on reading: years aligned, no blanks, the roles of the series agree.
+
+### For the solver (GPU pipeline)
+
+The LULUCF row is what the GPU barrier fails on, even where it does not bind (a 2025 RES1 model: optimal without it,
+numerical error with it); the AG row can stay in the matrix. While neither row binds, a solve without the LULUCF row
+followed by a check that it holds is enough. A price search on it is needed only once the target binds.
+
+---
+
+## 20261120 — transition matrices: store "not allowed" without NaN
+
+### TL;DR
+
+`docs/COLLABORATION.md` (rules 2 and 5) now says no input file may hold NaN and LUTO never fills NaN. The transition matrices are the written exception: they use NaN to mean "this land-use change is not allowed". Re-encode that so they can follow the rule too.
+
+### Today
+
+| File | Shape | NaN |
+|---|---|---|
+| `ag_tmatrix.npy` | 28 × 28 (from, to ag land use) | 103 |
+| `ag_to_destock_tmatrix.npy` | 28 | 25 |
+| `ag_to_ep_tmatrix.npy` | 28 | 4 |
+| `ep_to_ag_tmatrix.npy` | 28 | 1 |
+
+`transition_cost_clearing_forest.npz` holds no NaN. The NaN is read as "no arc" (`T_MAT`: `~np.isnan`) and in the `t_ij` / `t_*_j` readers (`agricultural/transitions.py`, `non_agricultural/transitions.py`). Filling it with 0 would make the forbidden changes allowed and free, silently.
+
+### What to do
+
+1. In `dataprep.py`, write each matrix as two files: the cost with 0 where not allowed, and a yes/no file of the allowed changes.
+2. Read the allowed mask wherever `np.isnan` of a transition matrix is read today; the cost is then read with no NaN.
+3. Check that the arcs and transition costs of one solve step are identical before and after, then drop the exception from `COLLABORATION.md` and the "NaN in a transition matrix" line from `CLAUDE.md`.
+
+---
+
+## 20261119 — inputs: no NaN upstream of dataprep; the exclusion mask alone says where a land use is on
+
+### TL;DR
+
+Every input layer is to be dense over all 6,956,407 land cells, with no NaN, even on cells where its land use is not valid. Whether a land use is on or off in a cell is decided by the exclusion mask (`x_mrj`, read into `Data.EXCLUDE`) and by nothing else. With that, reading a coarse block's inputs at its centre cell always finds a value, and the special handling in `Data` goes away.
+
+### Why
+
+Today an input is filled only where its land use occurs: irrigated pear yield has a value on 6,224 of the 6,956,407 cells and NaN elsewhere. Two things then say "off": the mask, and NaN in the data. At `RESFACTOR > 1` they disagree.
+
+| Step | What happens |
+|---|---|
+| 1 | A block is on for a land use when any of its full-resolution cells is on (the mask is aggregated over the block) |
+| 2 | The block's inputs are read at its centre cell |
+| 3 | If the centre cell is off, its inputs are NaN: the block is on with no data (the NaN issue) |
+| 4 | Dropping or zeroing that entry discards the land use the block really holds (the dropping issue) |
+
+Measured at RES5 on 2026-11-19 with plain centre picking: 14,555 of 1,441,891 eligible entries had no data; they held 68,500 ha of base-year land, 2-11 % of the area of the small horticultural land uses (pears 10.9 %, apples 6.1 %).
+
+### What to do
+
+1. **Upstream of `dataprep.py`:** each layer is delivered dense. A cell without a value of its own takes the value of the nearest cell that has one (`scipy.ndimage.distance_transform_edt(..., return_indices=True)` on the 2D grid: about 1 s per layer on the 3,364 x 4,071 grid).
+2. **Before that fill:** check that every cell where the land use is on already has a real value, and stop if one does not. After the fill a missing value can no longer be seen, so this is the only place the check can run.
+3. **`dataprep.py`:** refuse any input that contains NaN.
+4. **`Data`:** nothing to remove any more: the NaN guards (`check_eligible_nan` with its `RESFACTOR > 1` not-allowed branch, `check_ag_man_nan`, `raise_nan_report`) were removed on 2026-11-19; no NaN in an input is a rule of data processing, not a check in LUTO. The coarse reader `Data.get_resfactored_average` (`Data.block_mean`: the mean over a block's land-use cells that have a value, cached in `input/_cache`) keeps working on dense inputs: the mean then runs over every land-use cell of the block, so decide at that point whether a land use's values on cells where it is off should count in its block mean. Which inputs hold NaN today (2026-11-19 survey): `AGEC_CROPS` / `AGGHG_CROPS` (87 % of land-use cells, NaN wherever the crop does not occur), `CLIMATE_CHANGE_IMPACT` (82 %, every climate file), `cell_BECCS.nc` (92 %), `AGEC_LVSTK`, `FEED_REQ`, `WATER_DELIVERY_PRICE` (0.11 %); every other input is NaN-free.
+5. **Readers:** remove the `fillna(0)` / `np.nan_to_num` calls on these inputs once the files are dense; each one is then dead code. LUTO then breaks fast on a NaN input (Gurobi rejects a NaN coefficient); there is no NaN guard in `Data` any more (`check_eligible_nan`, `check_ag_man_nan`, `raise_nan_report` removed 2026-11-19). The calls, as of 2026-11-19:
+   - `luto/data.py`: `FEED_REQ`, `LVSTK_K`, `STUBBLE_DSE_HA` (two), `WREQ_DRY_RJ` / `WREQ_IRR_RJ`, `WATER_LICENCE_PRICE`, `WATER_DELIVERY_PRICE`
+   - `luto/economics/agricultural/`: `quantity.py` (climate multiplier filled with 1, stubble quantity, `q_rp`), `cost.py` (stubble cost, `cost.fillna`), `revenue.py` (two), `ghg.py` (stubble, `g_rj`, the four `AGGHG_CROPS` reads), `water.py` (stubble drinking water)
+   - `luto/economics/non_agricultural/`: BECCS in `cost.py`, `revenue.py` (two), `ghg.py` (two); in `transitions.py` the two water licence costs (water requirement x licence price: an input, not a transition matrix)
+   - `luto/solvers/row_inputs.py`: the three objective arrays (`ag_obj_mrj`, `non_ag_obj_rk`, `ag_man_objs`)
+
+   They stay: NaN in a transition matrix means "transition not allowed" (`agricultural/transitions.py` `t_ij`, every `t_j` / `t_*_j` and `base_ep_to_ag_t` in `non_agricultural/transitions.py`); `solvers/rowgen.py` fills computed values (a shortfall, the duals not read), not inputs; `tools/ag_mgt_caps.py` parses blanks in a source spreadsheet (data building).
+
+### Open points
+
+- An inventory of which input files contain NaN today, and how many cells each, has not been made.
+- `T_MAT` uses NaN to mean "this transition is not allowed". It is a land-use by land-use table, not a spatial layer; decide whether the rule covers it.
+- Dense files take more disk; a nearest-value fill is piecewise constant and should compress well. Not measured.
+- The inputs must be regenerated and copied to every machine that runs the model; runs on the old and the new files are comparable at RES1 (no cell that is on changes) but not at `RESFACTOR > 1`.
+- Natural moment: the rebuild of the inputs for the 2021 base year.
+
+---
+
+## 20261119 — stubble grazing: the effective stubble rate comes from the input file, not from a function in `Data`
+
+### Status (20261120)
+
+Steps 2 and the scope-1 open point are done: `get_stubble_effective_rate` and `STUBBLE_SHEEP_AGEC_FIELDS` are gone from `luto/data.py`, which now reads the stubble file and block-averages it, nothing else (a TODO there points here). The rule lives in `input/Nick_build/scripts/stubble_dse.py`, which applies it to the raw rate at full resolution and checks every sheep emission source (on the current inputs exactly the same cells as the scope-1 sources only). Waiting on: Nick's raw stubble rate, to run the script on (step 1); until then `STUBBLE_DSE_FILE` must stay `None`, because a raw file read directly would skip the rule.
+
+### TL;DR
+
+`Data.get_stubble_effective_rate` (`luto/data.py`) rewrites the stubble carrying rate after it is read: the rate is set to 0 on every cell that lacks the sheep per-head data the stubble code needs. That rule is a property of the input and should be applied when the input file is built, so `Data` only reads it. Remove the function and feed the finished rate in.
+
+### What the function does today
+
+It runs once, where `STUBBLE_DSE_HA` is loaded, and only when `settings.STUBBLE_DSE_FILE` is set (default `None`: the feature is off and no stubble file is in `input/`).
+
+| Step | Detail |
+|---|---|
+| Reads | the stubble rate (DSE per ha, per cell); the sheep fields of `AGEC_LVSTK` listed in `STUBBLE_SHEEP_AGEC_FIELDS`; the sheep sources of `AGGHG_LVSTK` (scope 1 only when `USE_GHG_SCOPE_1`); `water_delivery_price.nc`, read a second time before its NaN fill |
+| Rule | a cell missing any of those values gets rate 0: no stubble sheep there, for quantity, revenue, cost, GHG and water alike |
+| Keeps | a NaN rate stays NaN (the NaN guard that reported it was removed on 2026-11-19; the fill to 0 follows) |
+
+Why it exists: the five stubble consumers each read different sheep fields and each turn their own NaN into 0. Without one shared rule, a cell with sheep quantities but no water price would produce stubble meat at no water cost.
+
+### What to do
+
+1. Apply the rule where the stubble file is built (the livestock allocation tooling, outside `luto/`), so the file already holds 0 on cells without sheep data. The author of that tooling has stated that its next regeneration does this.
+2. In `Data`, read the rate and nothing else: delete `get_stubble_effective_rate` and its call.
+3. Check the rule where the file is built: LUTO no longer has a NaN guard (removed 2026-11-19), so a file that breaks it is silently zeroed at load.
+
+### Open points
+
+- The rule depends on `USE_GHG_SCOPE_1` (which sheep emission sources count as needed). A file built once cannot follow a setting. Either build the file for the stricter case (all sources), or drop that dependence.
+- Whether stubble grazing stays a fixed co-product of the cereal land uses at all, or becomes an agricultural management option fed from a bundle plus a rate layer (as solar and wind are), is undecided. If it becomes an option, this item is done as part of that change.
+
+---
+
 ## 20261118 — model build: stop computing the same input several times a year (caches, one hoisted call)
 
 ### TL;DR
@@ -84,7 +322,7 @@ Both are real gains on paper. Neither is worth its restructuring now; they are r
 ### Also worth a look, same goal
 
 - Bound propagation on the wide rows only, or on the grouped tables: most of its 75.7 M rows are per-cell rows.
-- The checkpoint: about 3 minutes per save of the data object at RES1, once before the first year and once after every year.
+- The checkpoint: about 3 minutes per save of the data object at RES1, once before the first year and once after every year. **Done 2026-11-23**: the data object is saved once, and after every year only the solved state (4 s at RES1; `docs/FINDINGS.md`, 20261123).
 
 ---
 
@@ -256,7 +494,7 @@ On 2026-11-01 two RES1 write jobs failed after about 4 h, costing about 390 SU e
 - For each commit, answer and record:
   1. What does it change in the model's numbers? Is it on by default?
   2. What new functions, settings and input files does it add? Who calls each one? Is it still needed?
-  3. What can it stop? For every `raise` / `assert`: when does it fire, how long into a run, and is its tolerance safe against float32, `get_base_held`, `SOLUTION_SHARE_FLOOR` and `SOLVER_COEFF_MIN`?
+  3. What can it stop? For every `raise` / `assert`: when does it fire, how long into a run, and is its tolerance safe against float32, `get_base_held` and `SOLUTION_SHARE_FLOOR`?
   4. For anything comparing two totals: was it only ever run at coarse resolution?
   5. Do I agree with it? Keep, change, or remove.
 - **Review the merges too.** Conflict resolutions are changes as well, so read `git show --cc <merge>` alongside Nick's commits. `948d88b0` (Nick's stack + S2 / S6) resolved 27 conflict hunks across 9 files, and that merge's diff touches 29 files. Each resolution is new code that neither side wrote or reviewed as it stands.
@@ -327,6 +565,13 @@ Start with the small independent fixes, then the two that change the model most.
 | #230 | `24984b54` | Validation scripts cover k and stubble | Moved out of `luto/` |
 | #230 | `8e0f1e9e` | No sheep per-head data means no stubble sheep | `get_stubble_effective_rate` |
 | merge | `948d88b0` | **Conflict resolutions: Nick's stack + S2 / S6** | |
+
+### Status 2026-11-19
+
+- `coarsen_guarded_arrays` and the livestock / stubble accessors are **removed**. At `RESFACTOR > 1` every per-ha / per-head input is the unweighted mean over the block's land-use cells (`Data.get_resfactored_average`, cached in `input/_cache`), `REAL_AREA` is the block's land-use area, shares are means over the same cells (`Data.block_mean`). Measured at RES5 against RES1 (base year): area exact; revenue -0.3 %, cost -0.9 %, production 0.7 % mean per commodity (the chains got the agricultural economics to ~0, the plain mean is the price of treating every input alike). Details: `docs/FINDINGS.md`, 20261119.
+- The NaN guards (`check_eligible_nan`, `check_ag_man_nan`, `raise_nan_report`) are **removed**; no NaN in an input is a data-processing rule.
+- `ghg_targets.py` and `ag_mgt_caps.py` **moved out of `luto/`** (they build inputs); their output lives in `input/Nick_build/`, `dataprep.py` only points there. `ag_mgt_caps` is not built locally: the CER register no longer matches its sha256 pin.
+- The NaN-fill audit below is partly answered: the fills to remove once inputs are dense, and the ones that stay, are listed in the 20261119 entry "inputs: no NaN upstream of dataprep", step 5.
 
 ### Open questions carried over
 

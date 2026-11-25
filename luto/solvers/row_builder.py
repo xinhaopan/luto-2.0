@@ -33,6 +33,12 @@ from luto.solvers.row_inputs import EconomicInputs, RowInputs
 from luto.solvers.row_table import ROW_FILL, ROW_SCHEMA, make_part
 
 
+# The families whose every row lies in ONE cell — one row per ag-mgt column, cell, source or node: the structural rows
+# of get_rows, listed after the wide ones. Cell grouping (aggregate.py) joins such rows within a blob; every other
+# family is a wide row. A family added to get_rows whose rows each sit in one cell belongs here.
+PER_CELL_FAMILIES = ('ag_mgt_link', 'renewable_ceiling', 'source_cap_ag', 'source_cap_nonag', 'node_balance_ag', 'node_balance_nonag')
+
+
 # ═══════════════════════════ get_rows: the row space of one step ═══════════════════════════
 
 def get_rows(inputs: RowInputs, cols: xr.Dataset, support: ColSupport) -> tuple[sparse.csr_matrix, xr.Dataset]:
@@ -164,14 +170,13 @@ def weight_rows(weights, ncells: int) -> sparse.csr_matrix:
 
 def contract(block: sparse.csr_matrix, rhs=None, rescale: bool = False) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray]:
     """
-    1. Drop tiny coefficients (abs < SOLVER_COEFF_MIN) and eliminate zeros.
-    2. Sort the indices of every row (a product such as ``W @ bio_S`` leaves them unsorted): every block leaves in one layout.
-    3. If ``rescale`` is True, geometrically rescale every row and the RHS.
+    1. Eliminate the stored zeros and sort the indices of every row (a product such as ``W @ bio_S`` leaves them unsorted): every block leaves in one layout.
+    2. If ``rescale`` is True, geometrically rescale every row and the RHS.
     The block is a CSR matrix, modified in place (every caller hands over a freshly built block), and returned with float32 coefficients.
+    No coefficient is dropped: the SOLVER_COEFF_MIN floor (1e-4, before and after the rescale) was retired on 2026-11-23
+    (docs/FINDINGS.md, 20261123: no gain in speed or stability, and a net row such as GHG loses accuracy when its small entries go).
     """
 
-    # Drop tiny coefficients and eliminate zeros
-    block.data[np.abs(block.data) < settings.SOLVER_COEFF_MIN] = 0.0       # the drop
     block.eliminate_zeros()
     block.sort_indices()
     
@@ -190,14 +195,12 @@ def contract(block: sparse.csr_matrix, rhs=None, rescale: bool = False) -> tuple
     # the row's factor: the geometric mean of the two, so both land around RESCALE_FACTOR
     scale = np.sqrt(row_max * rhs_abs)
     scale[rhs_abs == 0] = row_max[rhs_abs == 0]                            # rhs = 0: the row max is the scaler
-    scale[row_max == 0] = settings.RESCALE_FACTOR                          # all-zero row (every entry under SOLVER_COEFF_MIN): RESCALE_FACTOR, so factor 1 below
+    scale[row_max == 0] = settings.RESCALE_FACTOR                          # a row with no entry: RESCALE_FACTOR, so factor 1 below
     scale /= settings.RESCALE_FACTOR
 
     # divide every entry by its row's factor
     block.data /= np.repeat(scale, np.diff(block.indptr))                  # a per-row broadcast (each row's factor over its slice of data, the sparse A / scale[:, None]); in place, in the data's own precision ...
     block.data = block.data.astype(np.float32, copy=False)                 # ... then float32 (no copy when it already is)
-    block.data[np.abs(block.data) < settings.SOLVER_COEFF_MIN] = 0.0       # floor the scaled row
-    block.eliminate_zeros()
     return block, rhs / scale, scale
 
 
@@ -222,8 +225,8 @@ def get_bio_contribution(inputs: RowInputs, cols: xr.Dataset) -> np.ndarray:
 def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.ndarray:
     """The objective coefficient of every column (on ``col``), as Gurobi takes it: the operating economics on
     the accounting columns and the transition costs on the arcs, both signed for the objective in ``get_economics``
-    — raw AUD, float32 — scaled to million AUD and floored: a coefficient under SOLVER_COEFF_MIN million AUD
-    (100 AUD) is dropped."""
+    — raw AUD, float32 — scaled to million AUD. No coefficient is dropped (the floor at 100 AUD was retired on
+    2026-11-23 with the rows' own, see ``contract``)."""
     # ── one gather over the six blocks: the operating economics on the accounting columns, the transition costs on the arcs ──
     obj = gather(
         cols, inputs, econ.ag_obj_mrj, 
@@ -231,10 +234,8 @@ def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.nda
         econ.flow_obj_ag2ag, econ.flow_obj_ag2nonag, econ.flow_obj_nonag2ag
     )
 
-    # ── the scaling to million AUD, floor to make a health obj range ──
-    obj = obj * (1.0 / 1e6)                                                    # raw AUD -> million AUD (float32, a reciprocal multiply as gurobipy did)
-    obj[np.abs(obj) < settings.SOLVER_COEFF_MIN] = 0.0                         # the floor: |obj| < SOLVER_COEFF_MIN million AUD (100 AUD)
-    return obj
+    # ── the scaling to million AUD ──
+    return obj * (1.0 / 1e6)                                                   # raw AUD -> million AUD (float32, a reciprocal multiply as gurobipy did)
 
 
 
@@ -558,7 +559,13 @@ def get_GBF8_targets(inputs: RowInputs, support: ColSupport):
 
 
 def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset):
-    """One row per (option, land use): Σ X_am - limit · Σ X_ag ≤ 0."""
+    """One row per (option, land use) whose limit is under 100 %: Σ X_am - limit · Σ X_ag ≤ 0.
+
+    At a limit of 100 % or more no row is built: it would say Σ X_am ≤ Σ X_ag, which the ag-mgt link rows already say
+    column by column (X_am ≤ X_ag, one row per am column; ``get_ag_mgt_link``). Such a row restricts nothing, and it
+    has no interior: six of them (HIR - Beef, HIR - Sheep, four Savanna Burning) stalled the barrier of a RES1 step
+    ("Numerical trouble"; docs/FINDINGS.md, 20261123). A row at a 0 % limit is a real constraint (it forbids the
+    option) and is built."""
     print("│   ├── Adding ag-management adoption-limit constraints...")
     am      = np.flatnonzero(cols['block'].values == 'am')
     ag      = np.flatnonzero(cols['block'].values == 'ag')
@@ -571,11 +578,15 @@ def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset):
     names = []
     key_am = []
     key_lu = []
+    implied = []                                                          # the (option, land use) at a limit of 100 % or more: no row
     for option, lus in inputs.agman2lu.items():
         option_idx = inputs.am_options.index(option)                     # the option's fixed am_idx
         for lu_idx, j in enumerate(lus):
-            row = len(names)
             adoption_limit = float(inputs.ag_man_limits[option][j])
+            if adoption_limit >= 1.0:
+                implied.append(f"{option} / {j}")
+                continue
+            row = len(names)
             am_cols = am[(am_idx == option_idx) & (j_idx == lu_idx)]              # the slot's am columns, both lm, dry first
             ag_cols = ag[ag_j == j]                                               # the ag columns of j: both lm, dry first, cells ascending
             row_idx += [np.full(am_cols.size, row), np.full(ag_cols.size, row)]
@@ -585,6 +596,9 @@ def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset):
             key_am.append(option_idx)
             key_lu.append(j)
     n_rows = len(names)
+    print(f"│   │   {n_rows} rows; no row at a limit of 100 % or more ({len(implied)}: {', '.join(implied) if implied else 'none'})")
+    if n_rows == 0:
+        return None, None
     row_matrix, _, _ = contract(sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(n_rows, cols.sizes['col'])))
     return make_part('ag_mgt_adoption', row_matrix, np.zeros(n_rows), '<', names, am_idx=key_am, j=key_lu)
 
@@ -813,7 +827,8 @@ def get_ag_mgt_link(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     j        = cols['j'].values[am_cols]
     cells    = cols['cell'].values[am_cols]
     ag_cols  = support.ag_mrj2col[m, cells, j]                                          # ... and the ag column each sits on
-    names    = [f"const_ag_man_{options[a]}_usage_{inputs.landmans[lm]}_{lu}_{r}".replace(" ", "_") for a, lm, lu, r in zip(am_idx, m, j, cells)]
+    option_names = [option.replace(" ", "_") for option in options]                    # once per option, not once per row (38.9 M rows at RES1)
+    names    = [f"const_ag_man_{option_names[a]}_usage_{inputs.landmans[lm]}_{lu}_{r}" for a, lm, lu, r in zip(am_idx, m, j, cells)]
     n_rows = am_cols.size
     rows = np.arange(n_rows)
     row_matrix = sparse.csr_matrix(

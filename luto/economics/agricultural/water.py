@@ -64,7 +64,7 @@ def get_wreq_matrices(data, yr_idx) -> np.ndarray:
             w_req_mrj[1, :, j] = w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)       # Water reqs depend on initial stocking rate for irrigation
         if lu in data.LU_STUBBLE:                                         # drinking water of the sheep grazing its stubble
             for m, lm in enumerate(data.LANDMANS):
-                wr_drn = data.stubble(lu, lm)['AGEC_LVSTK'].sel(field='WR_DRN', animal='SHEEP').values
+                wr_drn = data.AGEC_LVSTK.sel(field='WR_DRN', animal='SHEEP').values
                 w_req_mrj[m, :, j] += np.nan_to_num(wr_drn * settings.LIVESTOCK_DRINKING_WATER * get_stubble_yield_pot(data, lu, lm))   # no sheep data: no stubble sheep
 
     w_req_mrj *= data.REAL_AREA.values[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
@@ -361,7 +361,7 @@ def get_beef_hir_effect_w_mrj(data, yr_idx):
     - yr_idx: The index of the year.
 
     Returns:
-    - w_mrj_effects <unit:ML/cell>: The updated water net yield data with Biochar applied.
+    - w_mrj_effects <unit:ML/cell>: The water net-yield effect of HIR (positive: less water used).
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
 
@@ -371,17 +371,17 @@ def get_beef_hir_effect_w_mrj(data, yr_idx):
     for lu_idx, lu in enumerate(land_uses):
         j = data.DESC2AGLU[lu]
 
-        multiplier = settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1 # Negative value, indicating reduction in water requirements
+        reduction = 1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION     # share of the stocking HIR removes; its water use is saved
 
-        # Reduce water requirements due to drop in yield potential (increase in net yield)
+        # The removed stocking's water requirement is a net-yield gain (positive), in ML/cell like the other options
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
 
             w_mrj_effects[0, :, lu_idx] = (
-                multiplier * base_w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)
+                reduction * base_w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx) * data.REAL_AREA.values
             )
             w_mrj_effects[1, :, lu_idx] = (
-                multiplier * base_w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)
+                reduction * base_w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0) * data.REAL_AREA.values
             )
 
     return w_mrj_effects
@@ -398,7 +398,7 @@ def get_sheep_hir_effect_w_mrj(data, yr_idx):
     - yr_idx: The index of the year.
 
     Returns:
-    - w_mrj_effects <unit:ML/cell>: The updated water net yield data with Biochar applied.
+    - w_mrj_effects <unit:ML/cell>: The water net-yield effect of HIR (positive: less water used).
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
 
@@ -408,17 +408,17 @@ def get_sheep_hir_effect_w_mrj(data, yr_idx):
     for lu_idx, lu in enumerate(land_uses):
         j = data.DESC2AGLU[lu]
 
-        multiplier = settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1 # Negative value, indicating reduction in water requirements
+        reduction = 1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION     # share of the stocking HIR removes; its water use is saved
 
-        # Reduce water requirements due to drop in yield potential (increase in net yield)
+        # The removed stocking's water requirement is a net-yield gain (positive), in ML/cell like the other options
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
 
             w_mrj_effects[0, :, lu_idx] = (
-                multiplier * base_w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)
+                reduction * base_w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx) * data.REAL_AREA.values
             )
             w_mrj_effects[1, :, lu_idx] = (
-                multiplier * base_w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)
+                reduction * base_w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0) * data.REAL_AREA.values
             )
 
         # TODO - potential effects of increased water yield of HIR areas?
@@ -450,7 +450,8 @@ def get_utility_solar_pv_effect_w_mrj(data, yr_idx):
         water_impact = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['INPUT-wrt_water-required'].item()
         if water_impact != 1:
             j = lu_codes[lu_idx]
-            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (water_impact - 1)
+            # A multiplier below 1 is less water used: a gain in net yield (positive), as for the other options
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1 - water_impact)
     return w_mrj_effect
 
 def get_onshore_wind_effect_w_mrj(data, yr_idx):
@@ -478,7 +479,8 @@ def get_onshore_wind_effect_w_mrj(data, yr_idx):
         water_impact = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['INPUT-wrt_water-required'].item()
         if water_impact != 1:
             j = lu_codes[lu_idx]
-            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (water_impact - 1)
+            # A multiplier below 1 is less water used: a gain in net yield (positive), as for the other options
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1 - water_impact)
     return w_mrj_effect
 
 def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.ndarray]:

@@ -21,16 +21,16 @@ Outputs (into --out):
 
 Run as a plain script from the repo root (no luto imports):
 
-    python luto/tools/ag_mgt_caps.py --out input/ag_mgt_caps --input input [--cache DIR]
+    python input/Nick_build/scripts/ag_mgt_caps.py --out input/Nick_build/ag_mgt_caps --input input --cache input/Nick_build/ag_mgt_caps_cache
 
 --input is LUTO's input folder, for NLUM_2010-11_mask.tif, lumap.nc, real_area.nc and ag_landuses.csv.
 Dependencies: pandas, numpy, geopandas (pyogrio, pyarrow), shapely, rasterio, xlrd (all in requirements.yml).
 Output is deterministic.
 """
+from pathlib import Path
 import argparse
 import hashlib
 import io
-import os
 import re
 import sys
 import time
@@ -82,8 +82,8 @@ def sha(b):
 
 def fetch(url, cache, name=None):
     """Bytes of url: read from cache if present, else download (and store in cache)."""
-    path = os.path.join(cache, name or os.path.basename(url)) if cache else None
-    if path and os.path.exists(path):
+    path = Path(cache) / (name or Path(url).name) if cache else None
+    if path and Path(path).exists():
         return open(path, 'rb').read()
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (LUTO2 ag_mgt_caps.py)'})
     for attempt in range(3):
@@ -96,7 +96,7 @@ def fetch(url, cache, name=None):
                 raise
             time.sleep(2)
     if path:
-        os.makedirs(cache, exist_ok=True)
+        Path(cache).mkdir(parents=True, exist_ok=True)
         open(path, 'wb').write(b)
     time.sleep(0.5)
     return b
@@ -173,16 +173,16 @@ def main():
     ap.add_argument('--input', required=True, help="LUTO input folder (NLUM mask, lumap.nc, real_area.nc, ag_landuses.csv)")
     ap.add_argument('--cache', default=None, help='directory to cache downloaded files in')
     a = ap.parse_args()
-    os.makedirs(a.out, exist_ok=True)
+    Path(a.out).mkdir(parents=True, exist_ok=True)
 
     # ---- LUTO grid: NLUM land cells in np.nonzero order, their base-year land use and real area ----
-    with rasterio.open(os.path.join(a.input, 'NLUM_2010-11_mask.tif')) as r:
+    with rasterio.open(Path(a.input) / 'NLUM_2010-11_mask.tif') as r:
         nlum, transform, crs = r.read(1), r.transform, r.crs
     land_index = np.full(nlum.shape, -1, np.int64)
     land_index[np.nonzero(nlum == 1)] = np.arange(int((nlum == 1).sum()))
-    lumap = xr.load_dataarray(os.path.join(a.input, 'lumap.nc')).values
-    real_area = xr.load_dataarray(os.path.join(a.input, 'real_area.nc')).values
-    ag_lus = open(os.path.join(a.input, 'ag_landuses.csv')).read().split('\n')
+    lumap = xr.load_dataarray(Path(a.input) / 'lumap.nc').values
+    real_area = xr.load_dataarray(Path(a.input) / 'real_area.nc').values
+    ag_lus = open(Path(a.input) / 'ag_landuses.csv').read().split('\n')
     ag_lus = [lu.strip() for lu in ag_lus if lu.strip()]
     if len(lumap) != len(real_area) or len(lumap) != land_index.max() + 1:
         raise SystemExit('lumap.nc, real_area.nc and the NLUM mask disagree on the number of land cells.')
@@ -247,22 +247,22 @@ def main():
     caps = pd.DataFrame(rows, columns=['option', 'land_use', 'year_end', 'cap_fraction', 'source', 'status'])
     caps = caps.sort_values(['option', 'land_use', 'year_end']).reset_index(drop=True)
 
-    write_csv(os.path.join(a.out, 'caps.csv'), caps)
-    write_csv(os.path.join(a.out, 'hir_project_cells.csv'), cells)
-    write_csv(os.path.join(a.out, 'hir_projects.csv'), proj.drop(columns='cea_url'))
-    write_csv(os.path.join(a.out, 'hir_scaling.csv'), scaling)
-    write_csv(os.path.join(a.out, 'cea_manifest.csv'), manifest)
+    write_csv(Path(a.out) / 'caps.csv', caps)
+    write_csv(Path(a.out) / 'hir_project_cells.csv', cells)
+    write_csv(Path(a.out) / 'hir_projects.csv', proj.drop(columns='cea_url'))
+    write_csv(Path(a.out) / 'hir_scaling.csv', scaling)
+    write_csv(Path(a.out) / 'cea_manifest.csv', manifest)
 
     # ---- provenance (last; hashes the other outputs) ----
-    me = open(os.path.abspath(__file__), 'rb').read()
+    me = open(Path(__file__).absolute(), 'rb').read()
     P = [['source', 'CER ACCU Scheme project register (CSV)', CER_REGISTER_URL, sha(reg_raw), 'sha256 of raw file', SOURCE_DATES['CER']],
          ['source', f'CER CEA mapping files ({len(manifest)} HIR projects)', 'cea_manifest.csv', sha(canon),
           'sha256 of sorted project_id,url,sha256 lines', SOURCE_DATES['CER']],
          ['source', 'ABS 4627.0 2016-17, Table 1 Australia', ABS_4627_URL, sha(abs_raw), 'sha256 of raw file', SOURCE_DATES['ABS']],
-         ['script', 'luto/tools/ag_mgt_caps.py', '', sha(me), 'sha256 of script', '']]
-    for f in sorted(f for f in os.listdir(a.out) if f.endswith('.csv') and f != 'provenance.csv'):
-        P.append(['output', f, '', sha(open(os.path.join(a.out, f), 'rb').read()), 'sha256', ''])
-    write_csv(os.path.join(a.out, 'provenance.csv'), pd.DataFrame(P, columns=['kind', 'item', 'url_or_endpoint', 'sha256', 'note', 'source_date']))
+         ['script', 'input/Nick_build/scripts/ag_mgt_caps.py', '', sha(me), 'sha256 of script', '']]
+    for f in sorted(f.name for f in Path(a.out).iterdir() if f.suffix == '.csv' and f.name != 'provenance.csv'):
+        P.append(['output', f, '', sha(open(Path(a.out) / f, 'rb').read()), 'sha256', ''])
+    write_csv(Path(a.out) / 'provenance.csv', pd.DataFrame(P, columns=['kind', 'item', 'url_or_endpoint', 'sha256', 'note', 'source_date']))
     print(f'ag_mgt_caps: {len(proj)} HIR projects, {len(manifest)} mapped, scale {scale:.4f}; PA cap {pa:.4f}, Biochar cap {bc:.6f}')
 
 

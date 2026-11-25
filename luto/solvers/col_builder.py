@@ -117,21 +117,7 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
     nonag2ag_cols                = nonag2ag_space(valid_nonag2ag, trans_source_nonag)
     
     # ── 8. summarise all columns into an xr.Dataset container. ──
-    col_space = column_space(ag_cols, nonag_cols, am_cols, ag2ag_cols, ag2nonag_cols, nonag2ag_cols)   # every column labelled with its block
-    print(f"Column space: {col_space.sizes['col']:,} columns", flush=True)
-    
-    blocks_table = (
-        pd.Series(col_space['block'].values)
-        .groupby(col_space['block'].values, sort=False)
-        .size()
-        .rename_axis('block')
-        .reset_index(name='columns')
-        .to_markdown(index=False, tablefmt='psql', intfmt=',')
-        .split('\n') 
-    ) 
-    
-    for line in blocks_table:
-        print(f"│   {line}", flush=True)
+    col_space = column_space(ag_cols, nonag_cols, am_cols, ag2ag_cols, ag2nonag_cols, nonag2ag_cols)   # every column labelled with its block; prints the blocks' sizes
 
     # ── 9. the support of the SUM families: the region of every cell, and the cell → column incidence ──
     """
@@ -194,9 +180,13 @@ def get_base_nonag_rk(data: Data, base_year: int) -> np.ndarray:
     return data.non_ag_dvars[base_year]
 
 def get_trans_ub_ag_mrj(data: Data, base_year: int) -> np.ndarray:
-    """Ag target upper bound (ag2ag + nonag2ag), raised to the base so a cell can always keep its base land use."""
+    """Ag target upper bound: what can reach (lm, lu) from the ag and the non-ag sources together (ag2ag + nonag2ag), capped
+    by the cell's eligible share (data.EXCLUDE_FRAC: a cell holds no more of (lm, lu) than its eligible fine cells), then
+    raised to the base so a cell can always keep its base land use. The cap is on the total, so it sits here, where the
+    two parts are first added. At RESFACTOR 1 the share is 0 or 1 and the cap changes nothing."""
     print('Getting agricultural target upper bounds...', flush=True)
     ub = (ag_transition.get_ag2ag_ub(data, base_year) + non_ag_transition.get_nonag2ag_ub(data, base_year))
+    ub = np.minimum(ub, data.EXCLUDE_FRAC)
     return tools.clamp_dvar_bound(ub, tools.get_base_held(data.ag_dvars[base_year]), np.inf, 'Ag ub raised to base')
 
 def get_trans_ub_nonag_rk(data: Data, base_year: int) -> np.ndarray:
@@ -229,9 +219,10 @@ def get_arc_ag2ag_src(data: Data, base_year: int, trans_source_ag: dict) -> dict
     share × its T_MAT reach row × EXCLUDE × no-go, its own entry dropped because staying is not a transition;
     ``local_r`` indexes the source's cells in ``trans_source_ag``."""
     print('Getting ag2ag arc upper bounds...', flush=True)
+    base_dvar_mrj = data.ag_dvars[base_year]                                              # read once for every source (a sparse store: each read rebuilds it)
     arcs = {}
     for (from_m, from_j), src_cells in trans_source_ag.items():
-        ub = ag_transition.get_ag2ag_ub_src(data, base_year, from_m, from_j, src_cells)   # (NLMS, ncells_src, N_AG)
+        ub = ag_transition.get_ag2ag_ub_src(data, base_dvar_mrj, from_m, from_j, src_cells)   # (NLMS, ncells_src, N_AG)
         ub[from_m, :, from_j] = 0                                                         # staying is not a transition
         arcs[(from_m, from_j)] = ub > 0
     return arcs
@@ -240,8 +231,9 @@ def get_arc_nonag2ag_src(data: Data, base_year: int, trans_source_nonag: dict) -
     """{from_k: bool (to_m, local_r, to_j)} — where ONE non-ag source's own upper bound is above zero; ``local_r``
     indexes the source's cells in ``trans_source_nonag``."""
     print('Getting nonag2ag arc upper bounds...', flush=True)
+    base_dvar_rk = data.non_ag_dvars[base_year]                                           # read once for every source (a sparse store: each read rebuilds it)
     return {
-        from_k: non_ag_transition.get_nonag2ag_ub_src(data, base_year, from_k, src_cells) > 0   # (NLMS, ncells_k, N_AG)
+        from_k: non_ag_transition.get_nonag2ag_ub_src(data, base_dvar_rk, from_k, src_cells) > 0   # (NLMS, ncells_k, N_AG)
         for from_k, src_cells in trans_source_nonag.items()
     }
 
@@ -429,6 +421,10 @@ def column_space(ag_cols: dict, nonag_cols: dict, am_cols: dict, ag2ag_cols: dic
     # (charged per arc: transition cost in the objective, transition emissions in the GHG row)
     blocks = dict(ag=ag_cols, nonag=nonag_cols, am=am_cols, ag2ag=ag2ag_cols, ag2nonag=ag2nonag_cols, nonag2ag=nonag2ag_cols)
     widths = [cols['cell'].size for cols in blocks.values()]
+    print(f"Column space: {sum(widths):,} columns", flush=True)
+    sizes = pd.DataFrame({'block': list(blocks), 'columns': widths}).to_markdown(index=False, tablefmt='psql', intfmt=',')
+    for line in sizes.split('\n'):
+        print(f"│   {line}", flush=True)
 
     # a field over the whole table: -1 (or the fill) on the blocks that have no such field, e.g. slot / am_idx / j_idx off the am block
     def field(field_name, dtype, fill):
@@ -441,7 +437,10 @@ def column_space(ag_cols: dict, nonag_cols: dict, am_cols: dict, ag2ag_cols: dic
         return np.concatenate(per_block)                         # the blocks back to back: one value per column of the table
 
     return xr.Dataset(
-        dict(block  =(('col',), np.repeat(np.array(list(blocks), dtype=object), widths)),    # the block the column belongs to — ag, nonag, am, ag2ag, ag2nonag, nonag2ag — one shared str per column
+        # the block the column belongs to — ag, nonag, am, ag2ag, ag2nonag, nonag2ag — as fixed-width strings ('<U8'), not
+        # Python str objects: xarray hands an object array to pandas, which converts it (13 s at RES1, 100 M columns), and
+        # a block mask (cols['block'].values == 'ag') is 2.5 times faster on them (0.36 s at RES1); 3.2 GB against 0.8 GB
+        dict(block  =(('col',), np.repeat(np.array(list(blocks)), widths)),
              m      =(('col',), field('m', np.int32, -1)),                                   # the ag (lm, lu) the column lands on: own (ag), host (am), TO fields (ag2ag, nonag2ag)
              j      =(('col',), field('j', np.int32, -1)),
              k      =(('col',), field('k', np.int32, -1)),                                   # the non-ag land use it lands on: own (nonag), TO field (ag2nonag)

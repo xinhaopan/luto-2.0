@@ -131,7 +131,7 @@ TRANSITION_COST_MULT = 1
 TECH_ADOPT_MULT = 1
 
 # Observed ag-management adoption caps (DCCEEW baseline calibration run). None = off (no caps).
-# Otherwise a path under INPUT_DIR to the caps file written by luto/tools/ag_mgt_caps.py (e.g. 'ag_mgt_caps/caps.csv').
+# Otherwise a path under INPUT_DIR to the caps file built outside LUTO (e.g. 'Nick_build/ag_mgt_caps/caps.csv').
 # Each (option, land use) with rows is limited to min(current limit, observed cap); the cap is held flat after the
 # file's last year, and an (option, land use) with no rows keeps its current limit.
 AG_MANAGEMENT_OBSERVED_CAPS = None
@@ -205,26 +205,6 @@ All input data before feeding into the solver is rescaled in the range between 0
 This is to avoid numerical issues with the solver when dealing with very small/large numbers. 
 E.g., the water yield for some cells is 10t but the Biodiversity-score is 1e-7, making the 
 the model sensitive to variations in input data. 
-'''
-
-SOLVER_COEFF_MIN = 1e-4
-'''
-Minimum absolute coefficient threshold applied by ``_qsum()`` in solver.py before
-adding a term to any Gurobi expression (constraints and objective alike).
-
-After rescaling, cross-products of two rescaled values can still be tiny (e.g.
-val_vector[r]=1e-3 × coeff[j]=1e-5 = 1e-8), stretching the matrix/objective
-coefficient range far below Gurobi's recommended [1e-3, 1e6] band and causing
-barrier divergence ("Numerical trouble encountered"). This threshold filters such
-terms before they enter Gurobi.
-
-Applied to ALL constraint / objective builders:
-  Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8,
-  Demand/Quantity, and Regional Adoption limits.
-
-1e-4 was chosen empirically: 1e-3 caused ~3% economic loss by filtering meaningful
-small production coefficients; 1e-4 retains those while keeping the matrix range
-ratio at 1e8 (well within Gurobi's safe zone).
 '''
 
 BOUND_PROP_REL_TOL = 1e-6
@@ -351,6 +331,15 @@ VERBOSE = 1
 # Number of threads to use in parallel algorithms (e.g., barrier). PBS_NCPUS is the requested CPUs on GADI hpc.
 THREADS = 32
 
+# Threads for the get_* calls of a solve step (solvers/row_inputs.py: get_row_inputs, get_economics), in two waves.
+LOADING_THREADS = 4
+'''
+The calls read the one large Data and return large arrays (GBs at RES1), so threads, not processes: threads share
+them, processes would have to pickle them. Measured 2026-11-19 (RES1, one step): 222 s one after another, 124 s with 4
+threads, 128 s with 8, every result identical; nothing gained past 4 (part of each call holds the GIL, and the array
+work competes for memory bandwidth). 1 = one after another.
+'''
+
 # Primal feasibility tolerance — defines the solver precision granule.
 # ROUND_DECIMALS is derived from this: floor-truncation keeps digits down to
 # this precision, so lb values are exact multiples of FEASIBILITY_TOLERANCE.
@@ -358,8 +347,11 @@ THREADS = 32
 FEASIBILITY_TOLERANCE = 1e-6
 ''' Primal feasibility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
 
-OPTIMALITY_TOLERANCE = 1e-2               
-''' Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
+OPTIMALITY_TOLERANCE = 1e-6
+''' Dual feasibility tolerance - Gurobi default: 1e-6, Min: 1e-9, Max: 1e-2.
+How much improvement a solve may leave on the table: the objective is million AUD and a column a share (0-1), so
+1e-2 let Gurobi stop with a column still worth up to $10,000. 1e-2 until 2026-11-20; 1e-6 since: on the cached RES1
+grouped 2010 -> 2050 step, barrier unchanged (212 iterations), crossover 89 s -> 30 s, objective unchanged.'''
 
 BARRIER_CONVERGENCE_TOLERANCE = 1e-5
 '''
@@ -386,6 +378,10 @@ that 1 tripled solve time, 3 led to numerical problems.
    of cells) and the matrix range grows from 7 to 11-12 orders of magnitude. On the grouped RES1 model (2045 -> 2050):
    159 barrier iterations against 246, the solve 536 s against 837 s, the same objective. Not yet measured on a model
    without cell grouping. See docs/FINDINGS.md, 20261118.
+ - 20261123: 3 is a setting to retry a failed year with, not a default. It got three RES1 solves through that fail
+   with 2 (2021 twice, 2042), and took 39 % more work on a year that solves with 2 (2022: 669 against 456 barrier
+   iterations, the same answer). The "numerical problems" above were on an earlier formulation. See docs/FINDINGS.md,
+   20261123.
 '''
 
 RETRY_PARAMS = [
@@ -796,8 +792,8 @@ HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 # HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
 HIR_CEILING_PERCENTAGE = 0.8
 
-# Existing-HIR-project baseline on the two GHG rows. None = off. Otherwise a folder under INPUT_DIR written by
-# luto/tools/ag_mgt_caps.py (e.g. 'ag_mgt_caps'). LUTO's HIR then counts only above the regrowth (LULUCF row) and
+# Existing-HIR-project baseline on the two GHG rows. None = off. Otherwise a folder under INPUT_DIR built outside LUTO
+# (e.g. 'Nick_build/ag_mgt_caps'). LUTO's HIR then counts only above the regrowth (LULUCF row) and
 # destocking (AG row) of the existing ACCU HIR projects on their mapped cells, as its plantings count above the
 # plantings baseline: the NIR series already carry those projects.
 HIR_BASELINE = None
@@ -863,7 +859,7 @@ GHG_EMISSIONS_LIMITS = 'low'         # 'off', 'low', or 'high'
 '''
 Any level but 'off' adds two GHG rows in the years the target series bind: agriculture-sector emissions and net
 LULUCF, each against its own series in input/Nick_build/ghg_targets/ (NIR 2024 history, DCCEEW 2025 baseline projections,
-built by luto/tools/ghg_targets.py). In the other years the series are benchmarks, reported in
+built outside LUTO). In the other years the series are benchmarks, reported in
 GHG_emissions_split_<yr>.csv but not imposed. 'off' adds no GHG row.
 
 Historical `GHG_EMISSIONS_LIMITS` options (targets from the retired GHG_targets.xlsx):
@@ -1404,30 +1400,18 @@ CELL_GROUPING_SVD_DIMS = 16         # the SVD directions a cell's coefficients a
 CELL_GROUPING_TOLERANCE = 1.0       # the bin width on each direction, in the scaled signature's own units: ONE value for every run
 CELL_GROUPING_RIPARIAN_BINS = 5     # Riparian Plantings' ub joins the key in this many natural-break bins (a blob takes its smallest ub)
 
-CELL_GROUPING_DROP_REL = 1e-6
-'''
-Drop the tiny coefficients of the grouped model (only with CELL_GROUPING).
-- 0: off, nothing is dropped.
-- Any value above 0 (default 1e-6): on, and the value is the cut-off, relative to each row. In every wide row (demand,
-  GHG, water, renewables, regional adoption, the GBF targets), a coefficient smaller than this fraction of the row's
-  largest coefficient is removed. Example: a demand row whose largest coefficient is 400,000 loses every coefficient
-  below 0.4 (1e-6 x 400,000). The per-cell rows (PER_CELL_FAMILIES: node balance, source cap, ag-mgt link, renewable
-  ceiling) are never touched.
-Why: a grouped column sums its blob's cells, so one grouped row can hold coefficients from 3e-7 to 4e5 (RES1), which
-the solver handles badly. Test (RES1 grouped 2010 -> 2050, Gadi, 2026-11-20): Gurobi 1,711 s -> 815 s, objective
--0.004 %; the cost: 4 demand rows of the full model miss their target (worst: other non-cereal crops, 508 t, 0.59 %).
-'''
 CELL_GROUPING_RESCALE = True
 '''
 Rescale the grouped model's wide rows again (only with CELL_GROUPING). True (default) or False.
-True: after grouping (and after CELL_GROUPING_DROP_REL), every wide row goes through row_builder.contract once more,
-as the full model's rows did before grouping: coefficients below SOLVER_COEFF_MIN are dropped, the row and its rhs
-are divided by one factor so its numbers sit around RESCALE_FACTOR, and the tiny coefficients left after that are
-dropped too. The row's `scale` takes the new factor, so shadow prices still come out in real units. The grouped
-objective is floored at SOLVER_COEFF_MIN, as get_obj floors the full one. The per-cell rows are left as they are:
-rescaling a node-balance equality and flooring it made a RES10 model infeasible.
-Test (same run): barrier 212 -> 143 iterations, but a longer crossover (412 s); Gurobi 1,711 s -> 1,410 s; objective
-unchanged; 32 rows of the full model over tolerance (worst: a demand row, 1.7 t of sheep live exports).
+True: after grouping, every wide row (demand, GHG, water, renewables, regional adoption, the GBF targets) goes through
+row_builder.contract once more, as the full model's rows did before grouping: the row and its rhs are divided by one
+factor so its numbers sit around RESCALE_FACTOR. The row's `scale` takes the new factor, so shadow prices still come
+out in real units. An exact change of the row's unit: no coefficient is dropped. The per-cell rows are left as they
+are.
+Why: a grouped column sums its blob's cells, so one grouped row can hold coefficients from 3e-7 to 4e5 (RES1).
+
+No small coefficient is dropped anywhere since 2026-11-23: SOLVER_COEFF_MIN (1e-4, every row and the objective) and
+CELL_GROUPING_DROP_REL (1e-6 of a grouped row's largest entry) were retired (docs/FINDINGS.md, 20261123).
 '''
 
 

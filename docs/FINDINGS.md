@@ -5,6 +5,814 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261125 — RES5 let 1.1 Mha of agriculture sit on land its fine cells exclude; the eligible-share cap (PR #236) removes it, at 3.5 % of the objective
+
+### TL;DR
+
+At `RESFACTOR > 1` a block was eligible for an agricultural (lm, lu) as soon as ONE of its fine cells was (`EXCLUDE`
+= the eligible share `> 0`), and its upper bound was then only what the block's base-year land could reach — up to
+the whole block. In one RES5 step to 2050 the model placed 1.10 Mha above what the eligible fine cells could hold.
+Nick's PR #236 keeps the share (`Data.EXCLUDE_FRAC`) and caps the ag upper bound by it. With the cap the excess is 0,
+the objective is 3.5 % lower, and about 4.6 Mha of agricultural land use moves. RES1 is unaffected except for float32
+noise. **Coarse runs before and after the cap do not compare.**
+
+### The two limits on an ag upper bound
+
+- **Source side (unchanged):** land moves only from what the cell held in the previous year — the reachable share,
+  `get_ag2ag_ub + get_nonag2ag_ub`.
+- **Target side (new at RESFACTOR > 1):** `x_mrj.nc` says per fine cell whether (lm, lu) is allowed. A block with 15 of
+  its 25 land-use cells eligible now holds at most 0.6 of that land use: `ub = min(reachable, eligible share)`, then
+  raised to the base-year share so held land can stay (`col_builder.get_trans_ub_ag_mrj`). The cap is on the total
+  from ag and non-ag sources, so it sits where the two are added. A product (reachable × share) would be too tight:
+  a block 50 % cropland and 60 % eligible may still convert all its cropland.
+
+### Measured (RES5, default settings, `CELL_GROUPING` off, one step 2010 → 2050; "before" = the cap made a no-op)
+
+| | before | after |
+|---|---|---|
+| eligible (lm, cell, lu) entries with a share below 1 | 94,928 of 1,441,891 (smallest 0.04) | the same |
+| ag upper bounds lowered / raised by the cap | | 99,707 of 1,258,471 / 0 |
+| model: rows × columns, nonzeros | 4,091,365 × 7,508,805, 33.06 M | the same |
+| barrier iterations; work units (total) | 121; 616 | 95; 460 |
+| objective (million AUD) | −177,990.3 | −184,295.8 (−3.5 %) |
+| ag allocation above max(eligible share, base share) | 1,099,307 ha in 1,124 entries | 0 ha |
+| GHG agriculture / LULUCF row, 2050 (Mt) | 58.80 / −206.10 | 58.18 / −206.36 (neither binds) |
+
+- Where the excess sat before: beef and dairy on modified land, winter legumes, winter oilseeds, sugar, hay.
+- 2050 land use, after against before: winter cereals +966 kha (+3.5 %), Destocked natural land +665 kha (+45 %),
+  unallocated modified land −625 kha (−7.6 %), beef on modified land −563 kha (−2.8 %), HIR - Beef −521 kha (−5.8 %),
+  winter legumes +223 kha (+11.8 %).
+- Nick's own figure over seven 5-year steps: 1.028 Mha above eligibility in 2050 → 56 ha.
+
+### Changes on top of Nick's PR
+
+- `EXCLUDE_FRAC` is a plain attribute set beside `EXCLUDE` in `Data.__init__`, from the one read of `x_mrj.nc` (it was a
+  `cached_property` that read the file again); at RESFACTOR 1 it is the `EXCLUDE` array itself.
+- The cap has no `if RESFACTOR > 1`. Where the share is 0 or 1 it only trims float32 noise: the summed bound is
+  1.0000001 on 10,592 entries (RES5, with the 0/1 flag in place of the share), which the cap makes 1.0; nothing else
+  changes, the bound being already 0 wherever `EXCLUDE` is False.
+
+### Not done, and limits
+
+- RES1 was not run. Its model changes by at most 1.2e-7 on bounds that summed to just above 1.
+- The cap is per (lm, lu): several land uses competing for the same eligible fine cells can together still exceed them.
+- Only agricultural land uses (`x_mrj` describes no other). The non-ag upper bounds and the ag-management options
+  (Savanna Burning +61 % against RES1, entry 20261119) are a separate matter.
+- Scripts and results: `jinzhu_inspect_code/Review_Nick_PR/script/test_pr236.py`, `output/pr236/`.
+
+---
+
+## 20261124 — a 1 % share floor (`SOLUTION_SHARE_FLOOR = 0.01`) on a crossover solution: about 6 % less Gurobi work, the same barrier iterations, 0.32 % less objective
+
+### TL;DR
+
+The idea (`docs/FUTURES.md`, 20261124): every share a solved year leaves in a cell becomes the next year's source
+(arcs, a node-balance row, for an irreversible land use a lower bound), so clearing the small ones
+(`post_solve.clear_specks`) should make the next year's model smaller and faster. Measured on one RES1 year: the model is
+1 % smaller and Gurobi does 6 % less work, the barrier takes the same number of iterations, and the year's objective is
+0.32 % lower. A crossover solution leaves few slivers. The floor is not worth switching on for speed; the amended
+irreversibility rule has to stand on modelling grounds alone.
+
+### Setup
+
+- Xinhao's Paper 2 scenario at RES1 with cell grouping and the single net GHG row, yearly steps; the 2033 state from a
+  run of the current code whose years were solved to an optimal vertex (GPU barrier, then Gurobi's crossover).
+- A: 2034 built from the 2033 state as solved. B: 2034 built from the same state after `clear_specks` at 0.01, which
+  cleared 8,803 ag shares (3.1 cell-fractions in all), 12,373 non-ag shares (95.2) and 1,801 ag-mgt shares, in 21,002
+  of 4,218,733 cells (0.5 %).
+- Each solved by Gurobi 13.0.3 alone, the whole model with the GHG row, homogeneous barrier, ScaleFlag 2, crossover
+  on, 24 threads, LUTO's tolerances; Gadi hugemem, two nodes (wall time not comparable; work units are).
+
+### Measured
+
+| 2034 | A (as solved) | B (1 % floor) | B vs A |
+|---|---|---|---|
+| full model: columns / rows / nonzeros | 99.31 M / 74.99 M / 483.1 M | 99.19 M / 74.97 M / 482.7 M | −0.12 % / −0.02 % / −0.07 % |
+| cell grouping: distinct keys / blobs | 82,826 / 256,987 | 80,241 / 254,629 | −3.1 % / −0.9 % |
+| grouped model: rows × columns, nonzeros | 8.49 M × 12.05 M, 57.44 M | 8.41 M × 11.91 M, 56.86 M | about −1 % |
+| after presolve; factor operations per iteration | 4.97 M × 8.17 M; 2.016e9 | 4.90 M × 8.04 M; 1.956e9 | −1.5 %; −3.0 % |
+| barrier iterations | 286 | 292 | +2 % |
+| barrier work units | 1,727 | 1,605 | **−7.0 %** |
+| total work units (with crossover) | 1,761 | 1,657 | **−5.9 %** |
+| wall time, solve (different nodes) | 2,651 s | 2,627 s | −1 % |
+| objective (million AUD) | 7,324.50 | 7,301.40 | **−0.32 %** |
+
+Both optimal at ScaleFlag 2. Peak memory 219.4 GB (A), 211.7 GB (B).
+
+### What it means
+
+- The gain is the model's size, not its difficulty: the barrier needs as many iterations with the slivers as without.
+  Slivers are therefore an unlikely cause of the GPU barrier's 5–10x iteration jump from 2027 in the same run (open).
+- The objective falls 0.32 % for changing 0.5 % of cells: more than the cleared shares account for. Not explained yet.
+- Not measured: a floor applied every year over many years (slivers could accumulate without it), and a run solved
+  without crossover, where the floor's own comment says it matters (barrier solutions leave millions of near-zero
+  shares).
+- One pair of runs; the deterministic measures (model size, iterations, work units) carry the comparison.
+
+---
+
+## 20261123 — a RES1 step's work outside the solve: 22 min -> 13 min, every result the same
+
+### TL;DR
+
+Eight commits of 2026-11-23 (`8678a0a7` to `8efc0bc0`) take the work of one RES1 solve step outside the solve from
+1,339 s to 774 s (−42 %) on the same machine, the same saved `Data` and the same step, and every result is what it was.
+The largest gains: the economics (with `DYNAMIC_PRICE` off the old code still computed the target year's potential
+production, about 14 GB of quantity layers, for a price multiplier it then set to 1), cell grouping, and bound
+propagation over the grouped tables.
+
+### Measured (RES1, 2020 -> 2025, one saved Data, cell grouping on, DYNAMIC_PRICE off: Xinhao's settings)
+
+Old code `e97c7118` against new code `8efc0bc0` on the local machine, each run with no other job on it
+(`stage_benchmark.py`, each stage as `simulation.solve_timeseries` runs it):
+
+| Stage | Old (s) | New (s) | What changed |
+|---|---|---|---|
+| column space | 73 | 41 | the base year read once for every arc source (Data keeps solved years sparse: each read rebuilt the array); block labels as fixed-width strings |
+| row inputs | 139 | 87 | the `get_*` calls in two waves of threads (`LOADING_THREADS`); `get_ccimpact` cached |
+| rows | 211 | 155 | `make_part` builds a family's table without pandas' string inference (18 s for the link rows alone) |
+| economics (objective) | 226 | 60 | threads; the elasticity multiplier returns 1 before the potential production when `DYNAMIC_PRICE` is off |
+| cell grouping | 360 | 232 | the column types once, numbered by hashing instead of sorting 100 M columns; the SVD dimensions by lookup |
+| bound propagation | 138 | 16 | over the grouped tables (8.5 M rows) instead of the full ones (75.6 M) |
+| after the solve: Production | 145 | 148 | read off the step's own quantities: a design change (one source for the demand rows and the report), not a speed-up — the time is the product of the shares and the quantities over every cell, not the quantities |
+| after the solve: GHG report | 46 | 36 | the GHG sub-terms read off `RowInputs` instead of computed again |
+| **total** | **1,339** | **774** | |
+
+Loading the saved `Data` (once a run: 150 s and 169 s) is not in the total. Not measured here: building the Gurobi
+model and the yearly checkpoint (224 s -> 4 s at RES1 since `59f097d3`). The saved `Data` is an older one with its
+solved years dense, so neither run paid for rebuilding a solved year from the sparse store; a run of the new code
+does, about 1 s for each of the dozen or so base-year reads a step still makes.
+
+Compared, old against new: the column table, the row table and matrix, the objective, every cell's blob, the grouped
+row matrix, row table (but the grouped per-cell rows' `cell` label, changed on purpose by `b6359883`), column table and
+objective, the stored Production and the GHG report — 11 results, 0 differ.
+
+A first measurement of the old code (2,173 s) overlapped a RES1 run started by mistake and was discarded; the numbers
+above were measured again with nothing else running.
+
+### What it means for a run
+
+In Xinhao's RES1 run (yearly steps, Gadi) the work outside the solve took 32 min a year (median; growing to over 40 min
+with the checkpoint), the solve 34.5 min. At these rates a 40-year RES1 run spends about 8.6 h outside the solve,
+against about 15 h with the old code on the same machine.
+
+### Tried and rejected
+
+loky processes in place of threads for the `get_*` calls: 67 s against 14 s one after another at RES5; at RES1 a worker
+died with 132 GB of memory-mapped `Data` in `/dev/shm`. Every process needs the `Data`, and every result comes back.
+
+---
+
+## 20261123 — the yearly checkpoint rewrote the whole `Data`: 224 s a year at RES1, 4 s when only the solved state is saved
+
+### TL;DR
+
+After every solved year the run saved the whole `Data` object (`data_<year>.lz4`). Almost all of it is inputs that
+never change after loading: of its 229 attributes a solve step changes 13 in content, the 12 that hold the solved
+state and one cache. The checkpoint is now two files (`luto/simulation.py`): `data_<year>.lz4`, the whole `Data`,
+written ONCE before the first solve, and `solution_<year>.lz4`, the solved state, rewritten after every solved year.
+
+### Measured on a real RES1 `Data` (the base year and 7 solved years; quiet machine, local disk; no solve, the save and load functions called on the object)
+
+| | Time | File |
+|---|---|---|
+| Before: the whole `Data`, after every solved year | 224 s | 4.30 GB |
+| After, once per run: `data_2010.lz4` | 185 s | 4.12 GB |
+| After, every solved year: `solution_<year>.lz4` | **4 s** | **0.19 GB** |
+| Resume: both files loaded and put together | 117 s | |
+
+Over 40 yearly steps about 2.5 hours of saving become one save of 3 minutes and 40 short ones. The solution file holds
+every solved year so far (about 25 MB a year compressed), so it grows to about 1 GB and some 20 s by the last year.
+This comes on top of the sparse store of the entry below, which removed the part of the save that grew with the years
+(168 s in 2010 to 916 s in 2041 in a run with dense solutions).
+
+### What is saved, and where it is declared
+
+- The solved state is 12 attributes: `last_year`, the maps (`lumaps`, `lmmaps`, `ammaps`), the shares and deltas
+  (`ag_dvars`, `non_ag_dvars`, `ag_man_dvars`, `delta_dvars_ag2ag`, `delta_dvars_ag2nonag`, `delta_dvars_nonag2ag`),
+  `prod_data` and `obj_vals`. They are declared in ONE place, a dict in `Data.__init__`: each entry becomes the
+  attribute of that name, and the dict's keys are `Data.SOLVED_STATE`, which is all the checkpoint reads. An entry
+  added there is saved and restored without another change.
+- `DEMAND_ELASTICITY_MUL` also changes while a run solves, but it is a cache computed from inputs: not saved, and
+  rebuilt on a resumed run.
+- The final `Data_RES<n>.lz4` at the end of a run is unchanged (the whole object, read by `write_output.py`).
+- A checkpoint written before this change is not supported: its `Data` carries no `SOLVED_STATE`, so the first save
+  after a resume fails. No conversion is kept in the code (a decision: one would be written if an old run had to be
+  resumed).
+
+### Checks
+
+- RES1: the `Data` put together from the two files against the one in memory, every attribute compared by content:
+  228 compared, 0 differ.
+- RES5, one step 2010 → 2050 run start to end, then the same folder resumed from its two files: the stored solutions
+  identical to the run before this change in every container; the resumed `Data` identical to the run's in every
+  container and in 229 of 230 attributes. The one that differs is the cache `DEMAND_ELASTICITY_MUL` ({2050: ...} in
+  the run, empty on the resumed `Data`: filled again when asked). At RES5: `data_2010.lz4` 26 s and 1.02 GB once,
+  `solution_2050.lz4` under a second.
+
+---
+
+## 20261123 — every solved year stayed in `Data` as dense arrays: 8.9 GB a year at RES1, 0.14 GB kept sparse
+
+### TL;DR
+
+In a RES1 run with yearly steps the memory at the START of a year grew by about 8 GB per solved year (183 GB in 2014,
+432 GB in 2042, a peak of 489 GB; the year's own work stayed at 55 GB), and the yearly checkpoint grew from 168 s to
+916 s. The cause: every solved year's shares stay in `Data` to the end of the run as dense (lm, cell, lu) float32
+arrays that are almost all zeros. Since commit 41e5cfa3 they are kept sparse (`luto/data.py`: `SparseYears`, a
+dict-like container holding scipy `coo_array`s and giving the dense array back on read, so no reader changed).
+
+### One solved RES1 year (measured on a real run; sparse size from the nonzero counts)
+
+| | Dense | Sparse (`coo_array`) | Nonzeros |
+|---|---|---|---|
+| ag-management shares (7 options) | 6.615 GB | 7 to 21 MB | 0.25 to 0.76 M |
+| ag shares | 0.945 GB | 113 to 118 MB | about 4.1 M |
+| ag → ag deltas | 0.91 to 0.95 GB | under 2 MB | 8 k to 54 k |
+| non-ag shares, the other deltas, the ag-management maps | 0.4 GB | 5 to 14 MB | |
+| **A solved year** | **8.86 GB** | **130 to 149 MB (60 to 68 times smaller)** | |
+
+Forty solved years: about 355 GB dense, about 6 GB sparse.
+
+### In a process (the base year and 7 solved years, dense dicts and then the same containers in `SparseYears`)
+
+| | Dense | Sparse |
+|---|---|---|
+| Resident memory | 145.9 GB | **84.6 GB (−61.2 GB: 8.7 GB a solved year)** |
+| The base-year reads of one solve step (ag shares 50 times: once per source) | 0 s | 54 s |
+| Writing the per-year containers to disk (lz4) | 1,543 s | **10 s** |
+| Storing one solved year sparse | | 16 to 20 s |
+
+The memory figures stand; the times were taken on a busy machine and are indicative. The trade: about a minute a year
+more to read the base year back, against a checkpoint that no longer grows (the dense arrays are zeros, but every byte
+went through the compressor at every save).
+
+### Checks and choices
+
+- RES5, one step 2010 → 2050, before and after: the stored solutions identical in every container; the files written
+  by `write_output.write_data` identical (107 files); the functions that read a solved year as the next base year
+  identical (source maps, lock-in lower bounds, the whole column table).
+- scipy's COO, not CSR: CSR cannot hold a 3-D array, and on the array reshaped to 2-D its row pointer costs 34 MB per
+  array, more than a whole ag-management array (3 MB as COO).
+- `lumaps` and `lmmaps` stay plain dicts: one int8 per cell, and a lumap is 9 times larger sparse.
+- The yearly checkpoint no longer rewrites the whole `Data` (the entry above). Not done: the base year's dense
+  arrays stay in `Data` as attributes.
+
+---
+
+## 20261123 — RES1 years that fail in barrier: two separate causes (redundant adoption rows; the GHG row when it first binds), and dropping small coefficients cures neither
+
+### TL;DR
+
+A RES1 run with cell grouping (2010 → 2050, yearly steps, GHG 'high', GBF2 'high', HIR on, one net GHG row) had years
+whose barrier ended in `Sub-optimal termination` or `Numerical trouble` and fell back to simplex (30 minutes in 2021,
+more than 25 hours in 2042). The cause was looked for by elimination on the exact model Gurobi was given
+(`docs/CLAUDE_SKILL/diagnose_infeasible_or_numerical.md`), one change per solve.
+
+1. **2042: six adoption rows at a 100 % limit** (HIR - Beef, HIR - Sheep, four Savanna Burning), together with the
+   conditioning of the grouped wide rows. At a 100 % limit an adoption row repeats the ag-mgt link rows (X_am ≤ X_ag):
+   it restricts nothing and has no interior. Without the six rows the year solves in 408 iterations. **Fixed on
+   2026-11-23: such a row is no longer built.**
+2. **2021: the net GHG row, in the first year it binds.** The limit falls from 73.9 to 47.5 Mt between 2020 and 2021
+   (the series changes from its historical reference to the 1.5 °C pathway) and the row's shadow price goes from 0 to
+   89.5 AUD / tCO2e. Without the row the year solves in 276 iterations; with it, 570 to 890 or not at all. The six
+   rows play no part in this year.
+3. **Dropping small coefficients cures neither**, at the cell level (`SOLVER_COEFF_MIN`) or the group level
+   (`CELL_GROUPING_DROP_REL`). The group drop at 1e-6 breaks the full model's GHG cap by 2 to 5 Mt. **Both drops were
+   retired on 2026-11-23** (commit 2d6de172); at RES1 that lowers profit by 0.03 to 0.5 %, so RES1 runs before and
+   after are not comparable.
+4. **Gurobi `ScaleFlag 3` (the run used 2) gets both failing years through**, the cheapest of six solver settings
+   tried. It makes the solve pass; the years stay slow (520 to 550 iterations). On a year that solves anyway it is
+   slower (2022, like for like: 669 against 456 iterations): a retry setting, not a default.
+5. **cuOpt's GPU barrier fails on the GHG (LULUCF) row** of the default RES1 model, at iteration 0, even in a year
+   where the row does not bind. Removing the row is the only change that lets it solve.
+6. **The GPU solves the binding year when the GHG row is a price in the objective**, not a row of the matrix: four
+   solves (about 720 s), then a Gurobi crossover push from that point (118 s) reaches the optimal vertex, GHG exactly
+   at its cap.
+
+Not the cause, each tested: the matrix or objective range, small coefficients, the node-balance rows, repeated or
+contradicting rows in 2021, the water and GBF2 targets.
+
+### 2042: the six redundant adoption rows
+
+The grouped model as the run built it (group drop 1e-6 and rescale on; 65 `ag_mgt_adoption` rows):
+
+| Change (one per solve, 24 threads) | Barrier |
+|---|---|
+| none | not converged after 1,000 iterations (the run itself: `Numerical trouble` at 460) |
+| zero objective / a violation variable on every wide row | solved in 215 / total violation 1.7e-8: the model is feasible |
+| without GHG, water or GBF2 | still failing |
+| without the 65 adoption rows | solved, 321 iterations |
+| **without the 6 rows at a 100 % limit** | **solved, 408 iterations** |
+| without the other 59 (the 6 kept) | `Numerical trouble` at 355 |
+| the same year built without the group drop and rescale (the 6 rows in it) | solved, 261 iterations |
+| the model as built, `ScaleFlag 3` | solved, 520 iterations |
+
+- An adoption row is Σ X_am − limit · Σ X_ag ≤ 0, counted in cells. At limit = 1 the two HIR rows equal, entry for
+  entry, Σ (cells of the blob) × (the blob's link row); 18,697 of those link rows are pinned at equality by the bounds
+  because HIR is not reversible.
+- The cause needs both the rows and the conditioning of the grouped rows; removing either cures it.
+
+**The fix (2026-11-23, `row_builder.get_ag_mgt_adoption`): no adoption row is built at a limit of 100 % or more.**
+
+- Why it is exact: such a row says Σ X_am ≤ Σ X_ag over a land use. The ag-mgt link rows say X_am ≤ X_ag for every am
+  column on its own, and X_ag ≥ 0, so their sum already gives it. The row removes no point from the feasible set.
+- Why it matters although it restricts nothing: a row that only repeats other rows has no interior of its own (it is
+  tight exactly when the rows it repeats are), and barrier's linear system comes close to singular.
+- What is kept: a row at a limit under 100 % (a real cap), and a row at 0 % (am entries only: it forbids the option).
+- Which rows go today: Savanna Burning on its four land uses (unallocated, beef, sheep and dairy on natural land) and
+  HIR on beef and sheep natural land. The rule reads the year's own limits, so a row that reaches 100 % in a later
+  year goes then, and an observed cap under 100 % brings a row back.
+- The log names them at every step: `59 rows; no row at a limit of 100 % or more (6: Savanna Burning / 2, ...)`.
+
+Check at RES5 (one step 2010 → 2050, the code before and after):
+
+| | 65 rows (before) | 59 rows (after) |
+|---|---|---|
+| **No grouping**: barrier iterations / work units, barrier + crossover | 92 / 501.8 | 100 / 477.9 |
+| objective | −177,990.349202 | −177,990.349201 (6e-12 of it) |
+| GHG; production of the 26 commodities; area of every land use and option | | equal (GHG to 6e-7; production and areas exactly) |
+| **Cell grouping**: barrier iterations / work units, barrier + crossover | 103 / 423.3 | 102 / 419.9 |
+| grouped model | 6,071,573 columns | 6,067,713 columns (3,860 fewer) |
+| objective | −178,504.95 | −178,602.59 (5.5e-4 lower) |
+| rows of the full model over 1e-5 at the mapped-back solution | 11, worst 1.2e-4 (an adoption row) | 9, worst 2.1e-5 (a demand row) |
+
+- **Without grouping the answer is the same**: objective, GHG, production and every area. The two solutions sit on
+  different vertices (a few thousand arc entries differ, some by a whole cell), which an LP with ties allows; nothing
+  that is reported moves.
+- **The six rows hold at the new solution, far from binding**: Savanna Burning is adopted on 0 to 2 % of the land that
+  could take it, HIR on 14 to 15 %.
+- **With cell grouping the blobs change**, and with them the grouped optimum, by 0.055 % of the objective (114 kha of
+  465 Mha under another land use; Destocked natural land +85 kha). The six rows were wide rows, and a wide row's
+  coefficients are part of what makes two cells alike: with them gone, 3,860 grouped columns merge. The loss of the
+  grouping against the ungrouped optimum goes from 0.29 % to 0.34 % at RES5. This is the grouping's tolerance moving,
+  not the model: no row that restricts anything was removed. Not measured at RES1.
+
+**What the grouping's loss is, for reading the 0.055 % above.** Two cells share a decision when their key is the same.
+Half of the key is exact (the land uses the cell holds, its region, the GBF rows it has a coefficient in) and loses
+nothing. The other half is close, not equal: the cell's coefficients per hectare in the objective and in the wide
+rows, projected on 16 SVD directions and binned at one tolerance. Cells in one bin are treated as the same, and that
+is where information goes: the grouped solution is feasible for the full model (checked every year in
+`grouping_<year>.csv`), and it gives up some optimality. How much, measured so far:
+
+| Model | Loss of the grouped optimum against the ungrouped one |
+|---|---|
+| RES1, one 5-year step (2045 → 2050, older code, no GBF) | 0.015 % |
+| RES1, one 40-year step (2010 → 2050; section 20261119) | at least 0.56 % |
+| RES5, one 40-year step (2010 → 2050; this check) | 0.29 % with the six rows, 0.34 % without |
+
+So the loss is not one number: it grows with how much land a step moves (a 40-year step far more than a 5-year one),
+and anything that changes the wide rows moves the bins and the loss with them, as removing six rows did here. A change
+of a few hundredths of a percent between two grouped runs is inside what the grouping itself gives up.
+
+### 2021: the GHG row when it first binds
+
+| Year | Net GHG limit (Mt CO2e) | Shadow price (AUD / tCO2e) | Barrier in the original run (104 threads) |
+|---|---|---|---|
+| 2018 | 81.6 | 0 | 313 iterations |
+| 2019 | 69.6 | 0 | 314 |
+| 2020 | 73.9 | 0 | 337 |
+| **2021** | **47.5** | **89.5** | **699, sub-optimal**; simplex then took 30 minutes (6,186 s in all; neighbours about 1,700 s) |
+| 2022 | 32.0 | 162.7 | 293 |
+
+The model answers the 2021 limit with 33 Mt more LULUCF sequestration in one year (−71.7 → −105.1 Mt). The limit
+falls again in 2022, where the row binds harder (162.7 AUD / tCO2e), and that year solved easily in the original run:
+"the row binds" is not the whole reason.
+
+Elimination on the 2021 model (cell drop, the six rows not built, no group conditioning):
+
+| Change | Outcome | Iterations | Objective |
+|---|---|---|---|
+| none | sub-optimal | 809 | |
+| zero objective / violation variables | solved; total violation 4e-13: feasible | 30 / 47 | |
+| **without the GHG row** | **solved** | **276** | 29,636 |
+| without the 13 water rows | solved | 475 | 29,489 |
+| without the GBF2 row | solved | 584 | 29,666 |
+| without the 59 adoption rows / the source-cap rows | sub-optimal | 887 / 648 | |
+
+No row of this model is a multiple of another; 152,567 node-balance rows are pinned by the bounds, as many as in 2042
+(172,997), which solves once the six rows are gone.
+
+The same model, one solver parameter changed (the run's settings: ScaleFlag 2, BarHomogeneous 1, NumericFocus 0):
+
+| Changed parameter | Outcome | Iterations | Work units | Objective |
+|---|---|---|---|---|
+| none | sub-optimal | 809 | | |
+| **ScaleFlag 3** | **solved** | **278** | **1,102** | 29,508.85 |
+| NumericFocus 2 / 3 | solved (the same path) | 249 | 2,922 | 29,503.56 |
+| Aggregate 0 | solved | 535 | 3,282 | 29,509.40 |
+| Presolve 2 | sub-optimal | 751 | | |
+| BarHomogeneous 0 | `Numerical trouble` | 444 | | |
+
+The original run's simplex ended at 29,507.75: the three solves agree with it. Gurobi documents ScaleFlag 2 as
+geometric-mean scaling and does not say what 3 does. LUTO's own row rescale did not help this row; Gurobi scales
+columns as well as rows.
+
+2021 across configurations (24 threads unless marked; failures are borderline, the same model can fail on one machine
+and pass on another):
+
+| Configuration | 2021 |
+|---|---|
+| original run (cell drop, six rows, 104 threads) | sub-optimal at 699 |
+| cell drop, six rows kept | solved, 573 |
+| cell drop, six rows not built | sub-optimal at 809 |
+| no cell drop, six rows not built | solved, 661 |
+| no drop at any level + group rescale, six rows not built | sub-optimal at 626 |
+| the same, `ScaleFlag 3` | solved, 550 |
+
+### ScaleFlag 3: it gets a failing barrier through, and costs 39 % more work where the barrier does not fail
+
+`settings.SCALE_FLAG` is Gurobi's `ScaleFlag`, the scaling Gurobi applies to rows and columns on top of LUTO's own row
+rescale; 2 (geometric mean) since 2026-11-18. Every case below is the same model solved twice, only ScaleFlag differing
+(24 threads; the first three on the exported model or in a rerun of the year, the last from one saved state):
+
+| Model | ScaleFlag 2 | ScaleFlag 3 |
+|---|---|---|
+| 2021, the model that fails (cell drop, six rows not built, no group conditioning) | sub-optimal at 809 | **solved, 278 iterations, 1,102 work units** |
+| 2021, production configuration (no drop, group rescale, six rows not built) | sub-optimal at 626 | **solved, 550 iterations, 2,613 work units** |
+| 2042, the original model (six redundant rows in it, group drop + rescale) | `Numerical trouble` at 460 in the run; not converged after 1,000 iterations on the exported model | **solved, 520 iterations, 3,135 work units** |
+| **2022, production configuration, a year that solves either way** | **solved, 456 iterations, 2,170 work units** | solved, 669 iterations, 3,020 work units (+39 %) |
+
+The 2022 pair in full: objective 27,504.56 against 27,505.30; the same check of the full model at the mapped-back
+solution (24 rows over 1e-5, worst 2.6e-4, a demand row); GHG agriculture 73.858 against 73.859 Mt, LULUCF −112.242
+against −112.243 Mt. The two settings reach the same answer.
+
+- **Three failing solves out of three got through with ScaleFlag 3**, none of them quickly (the years around them take
+  about 300 iterations with ScaleFlag 2).
+- **On the one year measured that solves anyway it costs 39 % more work.** One pair is thin, but it is the only
+  like-for-like one: an earlier reading (631 against 293 iterations for 2022) compared two runs that also differed in
+  the cell drop and the group rescale, and said nothing.
+- So ScaleFlag 3 is a setting to RETRY a year with after its barrier fails, not a default. NumericFocus 2 does the
+  same job on the 2021 model at 2.7 times the work (table above).
+- Not implemented: ScaleFlag is set once on the Gurobi environment when `solvers/solver.py` is imported; the attempts
+  of `settings.RETRY_PARAMS` (NumericFocus, Method, Crossover, Presolve, BarHomogeneous) cannot change it.
+- What 3 does: Gurobi documents 2 as geometric-mean scaling and says of 1 and 3 only that they are "not as directly
+  connected to any specific model characteristics". The older note in `settings.py` ("3 led to numerical problems")
+  was made on an earlier formulation of the model and does not hold for these.
+
+### Dropping small coefficients: no gain in speed or stability; retired on 2026-11-23
+
+- **Group level** (`CELL_GROUPING_DROP_REL = 1e-6`): the grouped model solves, but the solution mapped back to the
+  cells breaks the full model. 2042 end to end with the run's settings and the six rows not built: barrier 275
+  iterations, GHG over its cap by 2.05 Mt and 22 demand rows off. A net row such as GHG (large positive and negative
+  entries that cancel) loses accuracy fast when its small entries go.
+- **Cell level** (`SOLVER_COEFF_MIN = 1e-4`): almost no cost in accuracy, and no steady effect: 2035 solves in 248
+  iterations with it and 303 without; 2021 fails with it and solves without it.
+- **No drop at all + the group rescale**, ten years in production (2011 to 2020): every year solved, 212 to 466
+  iterations (the original run: 162 to 482). The full model's worst row excess is 1e-4 to 2e-3 in scaled units (a few
+  tonnes): the solver's 1e-6 tolerance seen through the group rescale's factor.
+- **One test the other way, for the record**: on a RES1 grouped single step (2010 → 2050, 2026-11-20) the group drop
+  halved Gurobi's time (1,711 s → 815 s) with 4 demand rows of the full model off (508 t at most). A speed that comes
+  with broken targets is not usable; the drop is retired for accuracy, not because it never helps.
+
+**The cell-level floor in a coarse run** (RES5, default settings, no grouping, seven steps, floor 1e-4 against floor 0,
+the two runs at once on one machine):
+
+| Year | Floor 1e-4: barrier iterations / work units (barrier + crossover) | Floor 0 | Objective, relative difference |
+|---|---|---|---|
+| 2020 | 87 / 390 | 91 / 411 | 7.7e-9 |
+| 2025 | 156 / 598 | 128 / 601 | 2.2e-8 |
+| 2030 | 150 / 585 | 169 / 683 | 2.0e-7 |
+| 2035 | 122 / 568 | 135 / 512 | 1.1e-6 |
+| 2040 | 141 / 605 | 103 / 514 | 1.1e-8 |
+| 2045 | 124 / 533 | 89 / 438 | 1.3e-7 |
+| 2050 | 106 / 519 | 100 / 408 | 7.4e-6 |
+| **All** | **3,799 work units** | **3,568 (−6 %)** | |
+
+Nonzeros +0.9 % without the floor; matrix range [1e-4, 2e3] becomes [2e-9, 2e3]; the GHG rows agree to 3 t
+(agriculture) and 2,000 t of 113 Mt (LULUCF). No year is harder without the floor.
+
+**The retirement** (commit 2d6de172): `row_builder.contract` and `get_obj` drop nothing, `aggregate.condition_grouped`
+only rescales; `SOLVER_COEFF_MIN` and `CELL_GROUPING_DROP_REL` are gone.
+
+- Removing the code equals a threshold of 0: RES5, one step 2010 → 2050, the code before with both thresholds at 0
+  against the code after, without and with cell grouping: the stored solutions identical in every container (92
+  iterations and 456.78 work units both ways without grouping; 103 and 395.00 with it).
+- **At RES1 the floor changed the answer, not only the numerics.** The 2020 → 2025 default model with its two GHG
+  rows left out: 4,924.7 with the floor (cuOpt), 4,901.3 without it (Gurobi's barrier, 331 iterations; cuOpt on the
+  same model 4,902.2): **profit 0.48 % lower without the floor**. The two models were built separately and group
+  their cells slightly differently, so the figure is indicative. In Xinhao's yearly run the 2011 step was 0.03 %
+  lower without it. At RES5 the difference is a few parts in a million. Reading: a RES1 cell is 25 times smaller,
+  so many more of its real small costs and revenues fell under the 100 AUD floor on the objective. The model without
+  the floor is the more accurate one; **RES1 results before and after the retirement are not comparable.**
+- The GPU still solves without the floor: cuOpt on that model, optimal in 314 iterations and 280 s (with the floor
+  304 iterations, 238 s); 170,870 of its entries are under 1e-4, the smallest 6.9e-9.
+
+### The GPU (cuOpt 26.08 barrier, L40S) fails on the GHG row
+
+The default grouped RES1 model of section 20261119 (2020 → 2025, two GHG rows; "Search direction computation failed"
+at iteration 0):
+
+| Change | cuOpt |
+|---|---|
+| none; no cell drop; the six adoption rows removed; both | fails at iteration 0 |
+| **without the two GHG rows** | **optimal, 238 s** |
+| **without the LULUCF row only** | **optimal, about 350 s**, objective within 0.04 % of Gurobi's vertex |
+| without the AG GHG row only | past iteration 0, then diverges |
+| without GBF2 / the source-cap rows | fails at iteration 0 |
+| the LULUCF row kept and row-rescaled, divided by its largest entry, split exactly into 10 or 1,000 rows, its small entries dropped, or its rhs moved to where it cannot bind | fails at iteration 0 |
+| Ruiz equilibration of the whole model (rows and columns) | past iteration 0, no convergence in 2,400 s |
+
+- The LULUCF row holds 3.03 M entries (27 % of the columns), |a| from 1.2e-4 to 3.95e5, spread evenly over seven
+  decades. It does not bind in this year (activity −355,453 against a rhs of −1,339, scaled), yet its presence fails
+  the solve and keeps cuOpt's presolve from removing 730 k rows and 880 k columns.
+- Splitting it into short rows changes nothing: the row's length is not the mechanism.
+- No GPU simplex exists (cuOpt's dual simplex and Gurobi's simplex run on the CPU); the GPU first-order method
+  (Gurobi PDHG) did not converge on a LUTO model in 30 minutes (2026-11-04).
+
+### The GPU solves a year whose GHG row binds when the row is a price in the objective
+
+The 2021 model above (one net GHG row, binding) on cuOpt's GPU barrier. With the row in the matrix: no convergence in
+1,200 s (1,364 iterations, the dual residual diverging). With the row taken out and c.x − price · a.x maximised over
+every other row, every solve is optimal in about 180 s, and GHG falls as the price rises, so the price is found by a
+search on one number:
+
+| Price (AUD / tCO2e) | GHG − cap (scaled; the cap is 8,556) | Objective c.x |
+|---|---|---|
+| 0 | +750.7 | 29,632.77 |
+| 50.0 | +257.1 | 29,589.29 |
+| 79.9 | +10.65 | 29,507.02 |
+| 81.4 | −5.46 | 29,504.21 |
+
+- The last two solves mixed (34 % / 66 %) meet the cap exactly (−1.8e-12) and every other row within 1.9e-6: a convex
+  combination of two feasible points. Objective **29,505.16, 0.009 % under Gurobi's vertex (29,507.75)**.
+- Four solves, 736 s on one L40S, against 1,555 s for Gurobi with ScaleFlag 3 on 24 CPUs. The first price was a
+  guess of 50 AUD / tCO2e; the next ones the secant through the two solves nearest the cap.
+- The GPU solves certify their own answer: weak duality puts the optimum at 29,511.78 or less, the mix reaches
+  29,505.16 (a gap of 0.022 %, each solve's own primal-dual gap).
+- **From the mix to a vertex.** Cell grouping needs a vertex and the mix is an interior point (8.30 M of 10.59 M
+  columns strictly between their bounds). Handed to Gurobi as PStart / DStart (`LPWarmStart 2`; duals = the two
+  solves' duals mixed, the mixed price on the GHG row) on the whole model, GHG row included, the crossover push took
+  118 s and ended at the optimal vertex: 29,509.31 (Gurobi's own solves of this model: 29,508.85 and 29,509.40), GHG
+  at its cap, 1,475 columns between their bounds. GPU search + crossover: about 830 s for a year whose CPU barrier
+  fails with the run's settings.
+- A first search with a starting price eleven times too high and bisection steps used 8 solves and ended 0.06 % under:
+  the starting price and the search rule matter. Last year's shadow price is the natural start.
+- Limits: one row (two GHG rows would be a search on two numbers); one model tested; a test script
+  (`jinzhu_inspect_code/LUTO_cluster_cols/script/gpu_ghg_price.py`), nothing in `luto/`.
+
+### Open at the time of writing (2026-11-23)
+
+- The production run (no drop, group rescale, redundant adoption rows not built, `ScaleFlag 3` from 2021) solved 2021
+  in 550 iterations and 2022 in 631, and was stopped there by Jinzhu's decision: the route taken is a local pipeline
+  (the GPU price search above), not this configuration on Gadi. Whether it would have reached 2050 is not known.
+- ScaleFlag 3 as a retry setting is not built into the retry attempts yet (section above).
+- Tested and not supported: that the lock-in of the non-reversible options (non-ag land uses, HIR) makes 2021 hard and
+  the later years easy. The original settings with every option reversible in the solved year, 24 threads: 2021 still
+  sub-optimal (482 iterations; 573 solved / 699 sub-optimal with the lock-in), 2022 solved in 306 (293 with the
+  lock-in). What sets 2021 apart from 2022, where the GHG row binds harder, is still open.
+- Decided and done: both drops retired, and no adoption row at a limit of 100 % or more is built (both above).
+
+Working files: `jinzhu_inspect_code/LUTO_cluster_cols/doc/progress.md` (every job, table and void result).
+
+---
+
+## 20261120 — `OPTIMALITY_TOLERANCE` 1e-2 → 1e-6: the same barrier, a shorter crossover, the same answer
+
+### TL;DR
+
+`settings.OPTIMALITY_TOLERANCE` (Gurobi `OptimalityTol`) was 1e-2 until 2026-11-20 and is 1e-6 (Gurobi's own default)
+in the working tree since. Tested on two models, one change per solve. **The barrier does not read it** (identical
+iterations and work units; barrier stops on `BarConvTol`); it is the tolerance crossover and the clean-up simplex work
+to. At 1e-6 the crossover is shorter, the clean-up simplex after it all but disappears, and the objective moves by
+1e-6 of itself, in the better direction. Nothing got slower in work units, and the full model's rows stay within
+tolerance.
+
+Why 1e-2 was loose: the objective is in million AUD and a column is a share (0 to 1), so a reduced cost of 1e-2 let
+Gurobi stop with a column still worth up to 10,000 AUD per unit of share.
+
+### RES1 with cell grouping, one step 2010 → 2050 (the cached grouped model, 32 threads, Gadi)
+
+| | OptimalityTol 1e-2 | OptimalityTol 1e-6 |
+|---|---|---|
+| Barrier iterations / work units | 212 / 1,378.14 | 212 / 1,378.14 |
+| Infeasibility left after the crossover push (primal / dual) | 1.11 / 3,171 | 0.023 / 32.3 |
+| Crossover | 88.95 s (342.45 work units) | **30.39 s (61.35 work units)** |
+| Clean-up simplex iterations after uncrush | 453 | 5 |
+| Simplex iterations in all | 3,903,447 | 3,566,792 |
+| Work units in all | 1,738.05 | **1,456.96 (−16 %)** |
+| Objective (maximised) | −167,714.5885 | −167,714.3589 (+0.23, 1.4e-6 of it) |
+| Rows of the full model over tolerance at the mapped solution | 0 | 0 |
+
+Wall time was 1,666 s against 1,729 s: the barrier phase took 122 s longer in the second job on the SAME work
+(identical iterations and work units), which is the machine, not the setting. Compare work units.
+
+The same pair with every demand equality widened to a ±0.1 % band (a separate question; 25 demand rows of the full
+model then sit outside tolerance): barrier 175 iterations and 1,077.67 work units both ways; crossover 37.81 s →
+32.93 s (139.69 → 102.79 work units); clean-up simplex 475 → 0; objective −167,293.9074 → −167,293.8567.
+
+### RES5 without grouping, one step 2010 → 2020 (16 threads, Gadi, code 6716a000)
+
+| | OptimalityTol 1e-2 | OptimalityTol 1e-6 |
+|---|---|---|
+| Barrier iterations / work units | 93 / 375.26 | 93 / 375.26 |
+| Crossover | 18.56 s (54.23 work units) | 14.56 s (27.07 work units) |
+| Clean-up simplex iterations after uncrush | 3,342 | 0 |
+| Solve in all | 411.27 s, 441.66 work units | **376.79 s, 404.36 work units (−8 %)** |
+| Objective (maximised) | 5,685.173094 | 5,685.180705 (+0.0076, 1.3e-6 of it) |
+| GHG agriculture row, 2020 | 73,397,772 tCO2e | 73,397,588 tCO2e (−184 t) |
+
+### Reading
+
+- Three pairs, the same result each time: barrier untouched, crossover and clean-up cheaper, objective better by about
+  1e-6 of itself. A tighter tolerance makes the push end nearer the vertex, so the simplex that follows has little
+  left to do.
+- It does not help a year whose BARRIER fails (section 20261123): the barrier never reads this tolerance.
+- Status on 2026-11-23: changed in `luto/settings.py` in the working tree, not committed. Xinhao's RES1 paper-2 run
+  and every test made on it (section 20261123) ran with 1e-2, his copy's setting.
+
+Files (Gadi, `/g/data/jk53/jinzhu/LUTO/Custom_runs/`): `LUTO_cluster_cols/Run_cached_RES1/output/demand_band/`
+(`baseline`, `opttol_1e-6`, `band_1e-3`, `band_1e-3__opttol_1e-6`: `summary.csv`, `grouping_2050.csv` and the solver
+log of each) and `OptTol_RES5_test/` (`opttol_1e-2.log`, `opttol_1e-6.log`). Script:
+`jinzhu_inspect_code/LUTO_cluster_cols/script/test_cached_demand_band.py` (variant `opttol:<t>`).
+
+---
+
+## 20261120 — a coarse run (RESFACTOR > 1) is not made to match RES1 by adjusting its inputs; the gaps are block accounting, not input values
+
+### TL;DR
+
+The question: can a coarse run (`RESFACTOR > 1`, any block size) be made to give RES1's answer by correcting what it
+reads — distribution matching, per-input or per-mask adjustments? Measured at RES5, the case at hand. At RES5 (block
+means of the inputs, section 20261119) the 2010 -> 2050 land use differs from RES1 by 0.91 % nationally,
+1.46 % by state and 1.87 % by NRM; the largest gaps are Savanna Burning +61 % (6.35 against 3.95 Mha), Riparian
+Plantings +70 % and Destocked natural land (1.47 Mha against 4 kha). Matching an input's distribution to RES1 changed
+nothing, and the Savanna Burning gap turned out to be how a block counts a 0/1 mask, not a value. **Decision (Jinzhu):
+no input-level correction of any coarse run** (no distribution matching, no per-input or per-mask fixes, at any
+RESFACTOR): each would be one hand-built correction per input or per pair of masks, the same cost that retired the
+chain weighting, and none can do better than exact aggregation. A coarse run keeps one rule (block means) and documents
+its gaps; making a coarse model match RES1 belongs in the model space (build the coefficients at RES1, aggregate them
+over sets of cells), which cell grouping already does — a RESFACTOR block is then just one choice of those sets.
+
+### Savanna Burning: the gap is GBF2 area accounting
+
+Abatement per ha on eligible land under a compatible land use, base year:
+
+| | land (Mha) | total abatement (MtCO2e/yr) | median | p90 | max |
+|---|---|---|---|---|---|
+| RES1 cells | 47.83 | 1.403 | 0.0182 | 0.0731 | 0.624 |
+| RES5 block mean | 47.80 | 1.215 (-13 %) | 0.0148 | 0.0625 | 0.369 |
+| RES5 quantile-mapped to RES1 | 47.80 | 1.402 | 0.0182 | 0.0731 | 0.624 |
+
+Averaging squeezes the distribution, but RES5 offers LESS abatement than RES1 and still adopts 61 % more land. Mapping
+every block to the RES1 value at its area-weighted rank and solving again left Savanna Burning at 6,350 kha to the
+hectare (Destocked and Riparian unchanged too). The 2050 shadow prices say why:
+
+| row | RES1 | RES5 |
+|---|---|---|
+| GBF2 | -12,690 AUD/ha | -14,710 AUD/ha (+16 %) |
+| GHG agriculture / LULUCF | not binding (slack 17 Mt / 147 Mt) | not binding |
+| water, South East Coast (Victoria) | not binding | binding, -295 AUD/ML |
+| demand (25 equality rows) | binding | binding, similar prices |
+
+No GHG row binds, so abatement is worth nothing; Savanna Burning (10 AUD/ha) is adopted for GBF2, where it wins back
+the late-dry-season penalty, (1 - `BIO_CONTRIBUTION_LDS`) = 0.25 ha per ha adopted on eligible land in the GBF2 mask:
+
+| | land where it raises GBF2 | GBF2 area it can win back | gain per ha adopted |
+|---|---|---|---|
+| RES1 cells | 3.946 Mha | 0.987 Mha | 0.25 |
+| RES5 blocks | 6.350 Mha | 0.967 Mha | 0.15 |
+
+The land where it raises GBF2 IS the 2050 adopted area at each resolution: it is adopted wherever it helps GBF2. The
+GBF2 area won back is the same; RES5 spreads it over more land because the GBF2 mask is a block fraction and
+eligibility the centre cell's flag, so a block with 9 eligible in-mask cells of 25 adopts all 25 at 9/25 of the value
+(and pays the cost on 25). The +61 % is an area-accounting artefact, not a different decision; the GBF2 outcome
+matches.
+
+Confirmed by making the area consistent in a RES5 run (a test patch, not adopted): each Savanna Burning column capped
+at its block's eligible, in-mask, host share; 0.25 per adopted ha in GBF2; the base-year penalty as RES1 counts it.
+Savanna Burning came out at **3,946 kha, RES1's figure exactly**, and nothing else moved: GBF2 shadow price -14,686
+AUD/ha (unchanged), the water row still binding (-294 AUD/ML), Destocked 1,443 kha (1,468 before), Riparian 1,456 kha,
+land use off 0.91 / 1.46 / 1.87 % (unchanged). So the Savanna Burning gap is pure accounting, and the Destocked,
+Riparian and GBF2-price gaps have other causes.
+
+### Why input-level matching is the wrong tool (at any RESFACTOR)
+
+The causes below are structural — they come from a block standing for many cells — so they grow with the block size
+and do not depend on which inputs are corrected.
+
+- **Masks are categorical.** At RES1 a cell is in or out (GBF2 mask, eligibility, stream buffer, no-go areas); RES1
+  combines them per cell (eligible AND in the mask AND grazing). At RES5 each becomes a block fraction, and the
+  fraction of an AND is not the product of the fractions — the masks' version of "the mean of a product is not the
+  product of the means". There is no distribution to match, and an area-consistent fix for Savanna Burning alone needs
+  four coordinated changes (the column bound, the GBF2 contribution, the base-year penalty, the eligibility flag); every
+  other pair of masks would need its own set.
+- **Matching one input moves values between blocks.** A quantile-mapped block carries the RES1 value at its rank, not
+  its own cells' value: the national distribution is right, each block is not.
+- **It cannot beat exact aggregation.** Matching needs the RES1 values; once they exist, summing each block's cells'
+  finished coefficients is exact, with nothing to align. That is cell grouping (`luto/solvers/aggregate.py`) with the
+  RES5 block in the blob key.
+
+### What stays
+
+- Coarse runs keep block means (one rule, every RESFACTOR) and their known gaps are documented, from RES5: Savanna
+  Burning's reported area about 1.6x for the same GBF2 gain (a 0/1 mask read as a block fraction: any coarse run with
+  an option tied to an AND of masks reports area this way); a water row (South East Coast, Victoria) that binds only at
+  RES5; Destocked and the 16 % dearer GBF2 there. Larger blocks (RES10 and up) mix more cells per block, so the same
+  gaps are expected to be at least as large (not measured).
+- Comparing a coarse run with RES1: compare outcomes in the units the targets use (GBF2 area won back, production,
+  emissions), not only the area a land use or option is reported on — the Savanna Burning case matches RES1 on GBF2
+  and differs only in reported area.
+- **Answered (2026-11-20 12:12): a coarse model built at RES1 and aggregated by block reproduces RES1.** The RES1 2050
+  step (2010 -> 2050) was built at RES1 (every cell's coefficients and rows, as usual) and grouped with blob = the
+  exact key x the RES5 block: the cells of one 5 x 5 block that start from the same land-use mix, lie in the same state
+  and NRM, count toward the same GBF rows and fall in the same Riparian cap bin share one decision; no SVD, so within a
+  block no values are compared (nearness stands in for similarity). Coefficients are the sums of the cells' finished
+  coefficients, so no input is averaged and no mask becomes a fraction. 642,101 blobs (240,499 of one cell) from
+  187,755 blocks; 24.4 M columns, 119.8 M nonzeros (SVD grouping: 252,400 blobs, 11.4 M, 56.6 M). Every row of the full
+  RES1 model holds at the mapped-back answer (worst 4.7e-10).
+
+  | 2050 | RES1, SVD grouping | RES1, grouped by RES5 block | RES5, block means |
+  |---|---|---|---|
+  | land use off vs RES1 SVD (national / state / NRM) | - | 0.06 / 0.17 / 0.24 % | 0.91 / 1.46 / 1.87 % |
+  | Savanna Burning | 3,946 kha | 3,946 kha | 6,350 kha |
+  | Destocked natural land | 4 kha | 12 kha | 1,468 kha |
+  | Riparian Plantings | 855 kha | 919 kha | 1,456 kha |
+  | Environmental Plantings | 20,521 kha | 20,390 kha | 20,812 kha |
+  | objective, full model at the mapped x (M AUD) | -167,714.59 | **-166,769.75** | (another model) |
+  | Gurobi (Gadi normalsr, 32 threads) | 1,711 s (212 barrier it) | 2,326 s (147 it; crossover 305 s) | - |
+
+  So RES5's gaps come from building it out of averaged inputs and fractional masks, not from one decision per 5 x 5
+  block: the same blocks over exact RES1 coefficients land within 0.2 % of RES1. The route for a coarse model that
+  matches RES1 is build at RES1, aggregate by block — no input corrections. Its cost is the RES1 build (time and memory:
+  the solve is the only saving), and its model is about twice SVD grouping's.
+- **Found on the way: SVD grouping loses at least 0.56 % on this step.** Both answers are feasible for the full model
+  and scored by its objective; the block-grouped one is 945 M AUD (0.56 %) higher, so SVD grouping (the default) is at
+  least that far below the full optimum on a single 40-year step (2010 -> 2050). The 0.015 % measured earlier was a
+  2045 -> 2050 step on older code; a long step moves far more land, which is harder on blobs that join similar cells
+  across the continent. Not an equal-size comparison (642 k against 252 k blobs). Open: SVD grouping's loss on 5-year
+  steps (the 2020-2050 series, running), and at an SVD tolerance that gives ~640 k blobs.
+
+---
+
+## 20261119 — coarse inputs (RESFACTOR > 1): the block's land-use cells, not its centre cell or its 25 cells
+
+### TL;DR
+
+At `RESFACTOR > 1` a model cell stands for a block of RESFACTOR x RESFACTOR full-resolution cells. Measured at RES5
+against RES1, four coarse rules were wrong by far more than any weighting question: the model area (+11 %), the GBF2
+priority area (+72 %), existing wind (4-8x) and GBF4 habitat (+9 %). All four now equal RES1. The rule behind every
+fix: **a block is its land-use cells** (the cells RES1 models). Its area is their summed area, a rate is their mean,
+a share is their share.
+
+### What was wrong, and the measurement (RES5, 2010)
+
+| Quantity | RES1 | before | now | cause |
+|---|---|---|---|---|
+| model area (sum of `REAL_AREA`) | 465.08 Mha | 516.36 Mha (+11.0 %) | 465.08 Mha | `REAL_AREA` was the representative cell's area x 25: a block's sea, public, urban and water cells counted as land (edge blocks, and interior blocks with a town or reservoir) |
+| GBF2 priority area | 69.762 Mha | 119.781 Mha (+71.7 %) | 69.762 Mha | the cut on the priority rank was made at the centre cell and the block counted whole |
+| existing onshore wind area, 2000 / 2035 | 42 / 371 ha | 348 / 1,502 ha | 42 / 371 ha | the existing-renewable fraction was averaged over the block's cells above zero only: one built cell made the block built |
+| GBF4 SNES likely habitat, 20 species | 6,200,594 ha | +8.82 % | -0.000 % | habitat on the block's non-land-use cells counted |
+| eligible (lm, cell, lu) entries with no data | 0 | 14,555 of 1,441,891 (68,500 ha of base-year land; pears 10.9 %, apples 6.1 % of their area) | 0 | inputs read at the centre cell, which often lacks the land use the block holds |
+
+Every-cell potentials followed the area: EP sequestration +23.5 %, natural-land carbon +21.1 %, natural-land water
+yield +43.4 % before; -0.007 %, -0.004 %, +0.002 % now. So before the fix the non-agricultural land uses had about 11 %
+more land at RES5 than at RES1.
+
+### The coarse rules now (`luto/data.py`)
+
+| Function | Computes | Used for |
+|---|---|---|
+| `Data.block_sum(arr)` | sum over the block's land-use cells; a NaN cell adds nothing | existing renewable MWh, stream length, the renewable no-go masks (any land-use cell in) |
+| `Data.block_mean(arr)` | `block_sum(arr) / block_sum(~isnan(arr))`: the mean over the block's land-use cells with a value | shares (`EXCLUDE` > 0, `AG_L_MRJ`, GBF2 mask, GBF3 / GBF4 layers, existing renewables) and, through the next, every rate |
+| `Data.get_resfactored_average(layer, cache_name)` | `block_mean` of each slice of an input layer, cached in `input/_cache/cache_<name>_RES<n>.nc` (none at RES1) | every per-ha / per-head input: the agricultural tables, climate impact, pasture, plantings, carbon, water, BECCS, biodiversity, renewable layers |
+| `REAL_AREA` | `block_sum(REAL_AREA_NO_RESFACTOR)` | share x `REAL_AREA` = the land's own area |
+
+Labels, codes and flags (regions, zones, the land-use map, the savanna eligibility flag) stay at the representative
+cell; stream length stays a block total (#228).
+
+### The weighting question (base-year totals, RES5 vs RES1, %)
+
+| Total | block mean (now) | centre cell | Nick's chain weighting (retired) |
+|---|---|---|---|
+| revenue | -0.32 | -1.53 | -0.00001 |
+| cost | -0.93 | -1.84 | 0.00002 |
+| agricultural GHG | -0.43 | -0.15 | 0.00004 |
+| water requirement | -0.13 | -0.94 | -0.000003 |
+| production, mean of 26 commodities' abs. % | 0.69 | 2.49 | 0.001 |
+
+The chains (one hand-derived weight per agricultural input: area x yield x price ...) reproduce RES1 for the
+agricultural economics; the unweighted block mean is 4x closer than the centre cell but carries the mean-of-factors
+bias (mean yield x mean price is not the mean revenue): pears revenue -11.7 %, dairy on natural land cost +6.5 %, the
+rest of the land uses under 3 %. The chains covered the agricultural tables only and kept the centre-cell GBF2 mask
+and the x 25 area, the two largest errors above. Retired for one rule applied to every input.
+
+### Also found on the way
+
+- The cache must follow the `Data` it serves: a joblib worker of `write_outputs` re-imports `luto.settings`, so a
+  run whose `RESFACTOR` was set in code read the default resolution's cache in the worker (shapes 187,755 vs
+  49,753). `get_resfactored_average` now takes the resolution from `Data.RESMULT`. The GBF8 species cache
+  (`cache_bio_GBF8_..._RES{settings.RESFACTOR}`) has the same pattern and is unchanged.
+- Integer quantities on file (`pasture_kg_dm_ha.nc` int16, `water_licence_price.nc` int16, `CO2E_KG_HA_HARVEST`
+  int8) are cast to float where they are read, and the cache is saved without the input's encoding (an int16
+  encoding rounded the means back to integers).
+
+### Consequence
+
+Coarse results from before and after 2026-11-19 do not compare; RES1 results are unaffected.
+
+---
+
 ## 20261119 — cuOpt's GPU barrier does not solve the default grouped RES1 model; Gurobi stays the engine
 
 ### TL;DR

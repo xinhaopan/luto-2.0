@@ -312,10 +312,10 @@ IBRA bioregion targets run through the NVIS stream — select them with `GBF3_NV
 
 ### Checkpointing and Resume
 
-Long runs (typically full-resolution jobs on HPC) can checkpoint after each solved year. Pass a `checkpoint_dir`; a `data_<year>.lz4` file is written whenever a year solves to optimality, and re-running the same command resumes from the latest checkpoint instead of starting over:
+Every run checkpoints into its own output folder, as two files: `data_<year>.lz4`, the whole `Data`, written once before the first solve (`<year>` is where the run starts), and `solution_<year>.lz4`, what solving has written on `Data` so far (the attributes `Data.SOLVED_STATE` names), rewritten whenever a year solves to optimality with only the latest kept. The inputs never change after loading, so only the small file is rewritten each year (RES1: 4 s and 0.2 GB, against about 4 minutes and 4.3 GB for the whole `Data`). Pass the run's folder as `checkpoint_dir` to resume from the latest solved year instead of starting over:
 
 ```python
-sim.run(data=data, checkpoint_dir='output/my_run/checkpoint')
+sim.run(data=None, checkpoint_dir='output/<run timestamp>_RF1_2010-2050')
 ```
 
 A year is only accepted (and checkpointed) when the solver returns `GRB.OPTIMAL`. If a solve attempt fails, the next attempt listed in `settings.RETRY_PARAMS` is tried; the default lists one, so a failed year stops the run and can be resumed from its checkpoint.
@@ -428,7 +428,7 @@ Transitions are modelled as explicit per-source delta flows: each cell's land is
 - `CELL_GROUPING`: Cells that are alike share one decision, so the solver sees a much smaller model (default `False`). At RES1 about 4.2 M cells become about 250 k blobs and the solved model has about 9× fewer nonzeros, about the size of an ungrouped RES5 model. A blob is cells with the same starting land use and options, the same regions and GBF target footprints, and close coefficients (an SVD of the objective and the wide rows: `CELL_GROUPING_SVD_DIMS`, `CELL_GROUPING_TOLERANCE`; `CELL_GROUPING_RIPARIAN_BINS`). The solution is mapped back to every cell and checked against the full model each year (`out_<year>/grouping_<year>.csv`, `grouping_rows_<year>.csv`): it is always feasible there, and the cost is optimality (within 0.12 % of the ungrouped run at RES5, 2020–2050). It shortens the solve only — the full tables are still built — needs crossover, and cannot be combined with `BIO_ROW_GENERATION` or `ELASTIC_FAMILIES`; with GBF8 targets most of the speed-up is lost. Design: `luto/solvers/README.md`
 - `FEASIBILITY_TOLERANCE` / `OPTIMALITY_TOLERANCE` / `BARRIER_CONVERGENCE_TOLERANCE`: Solver tolerances. `ROUND_DECIMALS` and the near-zero bound snapping threshold are derived from `FEASIBILITY_TOLERANCE`
 - `RESCALE_FACTOR`: Target magnitude (1e3) that solver input arrays are rescaled to for numerical stability
-- `SOLVER_COEFF_MIN`: Universal floor (1e-4) below which a term's coefficient is dropped before entering Gurobi, keeping the constraint matrix range within Gurobi's safe zone
+- No coefficient floor: `SOLVER_COEFF_MIN` (1e-4) was retired on 2026-11-23; every coefficient reaches Gurobi as built (rows rescaled, nothing dropped)
 - `BOUND_PROP_REL_TOL`: Relative margin (default 1e-6) of the pre-solve bound check (see [Diagnosing Infeasible Years](#diagnosing-infeasible-years)). A row is called impossible or redundant only beyond max(10 × `FEASIBILITY_TOLERANCE`, `BOUND_PROP_REL_TOL` × the magnitude of the row's terms); a borderline row is kept
 - `BOUND_PROP_DROP_FAMILIES`: Constraint families whose provably redundant rows are dropped before the model is built (default `[]`; e.g. `['GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8']`). Exact — the solution does not change — and every row is still reported
 - `BOUND_PROP_ON_IMPOSSIBLE`: `'stop'` (default) ends the run at a year with a provably impossible row, before its model is built; `'solve'` reports the row and solves anyway

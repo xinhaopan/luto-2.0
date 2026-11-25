@@ -5,20 +5,19 @@ Sources (public, downloaded at run time, sha256-checked against pinned values):
   - Australia's National Greenhouse Accounts (ANGA) API, NIR 2024 (full CRT tree, sectors 3 and 4, AR5 GWP100).
   - DCCEEW "Australia's emissions projections 2025" chart-data workbook (Baseline scenario).
 
-Run as a plain script from the repo root (do NOT use `python -m luto.tools...`: that imports
-luto/tools/__init__.py, which imports luto.settings and the model stack):
+Run as a plain script from the repo root (it sits in input/Nick_build/scripts/, outside the luto package):
 
-    python luto/tools/ghg_targets.py --out input/Nick_build/ghg_targets --scope-matrix input/Nick_build/ghg_targets/scope_matrix.csv [--cache DIR]
+    python input/Nick_build/scripts/ghg_targets.py --out input/Nick_build/ghg_targets --scope-matrix input/Nick_build/ghg_targets/scope_matrix.csv [--cache DIR]
 
 Dependencies: Python stdlib, pandas, openpyxl (both in requirements.yml). No luto imports.
 Output is deterministic: sorted rows, fixed float formatting, LF line endings, no run timestamps.
 """
+from pathlib import Path
 import argparse
 import hashlib
 import io
 import json
 import math
-import os
 import re
 import sys
 import time
@@ -132,9 +131,9 @@ def cache_file_name(url):
 
 
 def cache_update_index(cache_dir, fname, url):
-    index_path = os.path.join(cache_dir, CACHE_INDEX_NAME)
+    index_path = Path(cache_dir) / CACHE_INDEX_NAME
     entries = {}
-    if os.path.exists(index_path):
+    if Path(index_path).exists():
         with open(index_path, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.rstrip('\n')
@@ -151,14 +150,14 @@ def cache_update_index(cache_dir, fname, url):
 def fetch(url, accept='application/json'):
     if CACHE_DIR:
         fname = cache_file_name(url)
-        fpath = os.path.join(CACHE_DIR, fname)
-        if os.path.exists(fpath):
+        fpath = Path(CACHE_DIR) / fname
+        if Path(fpath).exists():
             with open(fpath, 'rb') as f:
                 return f.read()
         if OFFLINE:
             raise SystemExit(f'--offline: no cached copy for {url}')
         raw = http_get(url, accept=accept)
-        os.makedirs(CACHE_DIR, exist_ok=True)
+        Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
         with open(fpath, 'wb') as f:
             f.write(raw)
         cache_update_index(CACHE_DIR, fname, url)
@@ -358,8 +357,8 @@ def main():
     ap.add_argument('--cache', default=None, help='directory to cache downloaded files in (read cache if present, else download and store)')
     ap.add_argument('--offline', action='store_true', help='fail instead of downloading on a cache miss (requires --cache)')
     a = ap.parse_args()
-    os.makedirs(a.out, exist_ok=True)
-    scope_path = a.scope_matrix or os.path.join(a.out, '..', 'scope_matrix.csv')
+    Path(a.out).mkdir(parents=True, exist_ok=True)
+    scope_path = a.scope_matrix or Path(a.out) / '..' / 'scope_matrix.csv'
     global CACHE_DIR, OFFLINE
     CACHE_DIR = a.cache
     OFFLINE = a.offline
@@ -493,7 +492,7 @@ def main():
                          'held flat at FY2040 (Nick: "Hold flat at 2040")', 'BINDING'])
         fn = {'AG': 'series_agriculture.csv', 'AG_EXO': 'series_agriculture_exogenous.csv', 'LULUCF_MOD': 'series_lulucf_modelled.csv',
               'LULUCF_EXO': 'series_lulucf_exogenous.csv'}[k]
-        write_csv(os.path.join(a.out, fn), hdr, rows)
+        write_csv(Path(a.out) / fn, hdr, rows)
 
     # ---- components long ----
     comp = []
@@ -511,7 +510,7 @@ def main():
         comp.append([y, 'LULUCF_EXO', 'DCCEEW:Figure30:ForestConversion:EXO', 'forest-conversion bucket x (1 - MOD share)', fmt((1 - share) * FCp[yy]), 'DCCEEW2025', st])
         comp.append([y, 'LULUCF_MOD', 'DCCEEW:Figure30:ForestConversion:MOD', 'forest-conversion bucket x MOD share', fmt(share * FCp[yy]), 'DCCEEW2025', st])
     comp.sort(key=lambda r: (r[0], r[1], r[2]))
-    write_csv(os.path.join(a.out, 'series_components_long.csv'),
+    write_csv(Path(a.out) / 'series_components_long.csv',
               ['year_end', 'series', 'component_id', 'component', 'value_kt_co2e_ar5', 'source', 'status'], comp)
 
     # AG_EXO is a part of AG, not a fourth series: it never enters the sum check below
@@ -535,7 +534,7 @@ def main():
         held_ok = '' if y <= 2040 else str(all(full[k][y] == full[k][2040] for k in full))
         sc.append([y, fy(y), fmt(full['AG'][y]), fmt(full['LULUCF_MOD'][y]), fmt(full['LULUCF_EXO'][y]), fmt(s3), fmt(ref), rdef,
                    fmt(d, 9), 'True', raw, held_ok])
-    write_csv(os.path.join(a.out, 'sum_check.csv'),
+    write_csv(Path(a.out) / 'sum_check.csv',
               ['year_end', 'fy_label', 'ag_kt', 'lulucf_mod_kt', 'lulucf_exo_kt', 'sum_three_kt', 'reference_kt', 'reference_def',
                'diff_kt', 'pass', 'dcceew_raw_sector_sum_kt', 'held_equals_fy2040'], sc)
 
@@ -551,9 +550,9 @@ def main():
                 fmt(UNC_FOREST_CONVERSION * bud, 3), 'NIR 2024 Vol 2 Annex II Table A2.4 (printed p.21) B.2/C.2 +/-27.9%, fully correlated across years (lean)', 'PROPOSAL'])
     tol.append(['LULUCF_MOD_BUDGET', 'cumulative window FY2021-FY2024 (alternative: independent years)', '2021-2024', fmt(bud, 3),
                 fmt(100 * unc / bud, 3) if bud else '', fmt(unc, 3), 'as above, quadrature over the four years', 'PROPOSAL'])
-    write_csv(os.path.join(a.out, 'tolerances.csv'),
+    write_csv(Path(a.out) / 'tolerances.csv',
               ['series', 'applies_to', 'year_end', 'reference_kt', 'tolerance_pct', 'tolerance_kt', 'basis', 'status'], tol)
-    write_csv(os.path.join(a.out, 'budget.csv'),
+    write_csv(Path(a.out) / 'budget.csv',
               ['series', 'window_start_year_end', 'window_end_year_end', 'window_luto_years', 'window_solve_years', 'budget_kt',
                'tolerance_kt', 'by_year_kt', 'rule', 'status'],
               [['LULUCF_MOD', w0, w1, '2021-2024', '2022-2024 (2021 is the base year)', fmt(bud, 3), fmt(UNC_FOREST_CONVERSION * bud, 3),
@@ -581,7 +580,7 @@ def main():
     prow.append(['planted area (ha / yr)', 'annual new planted area', '', '',
                  'NOT AVAILABLE: the NIR 2024 LULUCF activity table (Tables 1a-17) has no plantation or environmental-planting area series',
                  'n/a', 'UNVERIFIED (no public series found)'])
-    write_csv(os.path.join(a.out, 'plantings_baseline.csv'),
+    write_csv(Path(a.out) / 'plantings_baseline.csv',
               ['quantity', 'definition', 'value', 'by_year', 'basis', 'carried_forward', 'status'], prow)
 
     # ---- agriculture not modelled (history of series_agriculture_exogenous.csv, by modelled / not modelled) ----
@@ -589,14 +588,14 @@ def main():
               fmt(ssum(lambda r: r['assignment'] == 'AG' and r['modelled_by_luto'] == 'yes', y)), fmt(NIR3[y]), 'NIR2024',
               'INFO (history of series_agriculture_exogenous.csv)']
              for y in YR_HIST]
-    write_csv(os.path.join(a.out, 'ag_not_modelled.csv'),
+    write_csv(Path(a.out) / 'ag_not_modelled.csv',
               ['year_end', 'ag_not_modelled_kt', 'ag_modelled_kt', 'ag_total_kt', 'source', 'status'], ag_nm)
 
     # ---- provenance (last; hashes the other outputs) ----
-    scope_in_out = os.path.abspath(os.path.dirname(scope_path)) == os.path.abspath(a.out)   # hashed once, by its own row below
-    outs = sorted(f for f in os.listdir(a.out) if f.endswith('.csv') and f != 'provenance.csv'
-                  and not (scope_in_out and f == os.path.basename(scope_path)))
-    me = open(os.path.abspath(__file__), 'rb').read()
+    scope_in_out = Path(scope_path).parent.resolve() == Path(a.out).resolve()   # hashed once, by its own row below
+    outs = sorted(f.name for f in Path(a.out).iterdir() if f.suffix == '.csv' and f.name != 'provenance.csv'
+                  and not (scope_in_out and f == Path(scope_path).name))
+    me = open(Path(__file__).absolute(), 'rb').read()
     P = [
         ['source', 'NIR 2024 sectors 3 and 4 (ANGA API OutputTimeSeries, gas ALL)', ANGA_BASE + 'OutputTimeSeries', all_sha,
          'sha256 of canonical sorted values', SOURCE_DATES['NIR2024'], 'AR5 GWP100'],
@@ -606,7 +605,7 @@ def main():
          SOURCE_DATES['NIR2024'], ''],
         ['source', "DCCEEW Australia's emissions projections 2025 chart data (Figures 6, 25, 30; Baseline scenario)", DCCEEW_XLSX_URL,
          xlsx_sha, 'sha256 of raw file', f'{xlsx_modified} (workbook modified property)', 'AR5 GWP100 (report fn 55)'],
-        ['script', 'luto/tools/ghg_targets.py', '', sha(me), 'sha256 of script', '', ''],
+        ['script', 'input/Nick_build/scripts/ghg_targets.py', '', sha(me), 'sha256 of script', '', ''],
     ]
     P += [['decision', f'Nick decision {n + 1} (verbatim)', '', '', d, '', ''] for n, d in enumerate(NICK_DECISIONS)]
     P += [['decided', 'LULUCF_MOD definition', '', '', 'no NIR leaf: direct clearing is exogenous (Nick decision B); LUTO term 4 is additional', '', ''],
@@ -616,9 +615,9 @@ def main():
           ['provisional', 'tolerances', '', '', 'tolerances.csv, PROPOSAL (open)', '', ''],
           ['decided', 'plantings baseline', '', '', 'plantings_baseline.csv, LEAN environmental plantings rate over FY2016-21 (decision C)', '', ''],
           ['year_basis', 'LUTO year Y = FY ending Y; base year 2021 (NLUM 2020-21)', '', '', '', '', '']]
-    P += [['output', f, '', sha(open(os.path.join(a.out, f), 'rb').read()), 'sha256', '', ''] for f in outs]
-    P += [['output', os.path.basename(scope_path), '', sha(open(scope_path, 'rb').read()), 'sha256', '', '']]
-    write_csv(os.path.join(a.out, 'provenance.csv'),
+    P += [['output', f, '', sha(open(Path(a.out) / f, 'rb').read()), 'sha256', '', ''] for f in outs]
+    P += [['output', Path(scope_path).name, '', sha(open(scope_path, 'rb').read()), 'sha256', '', '']]
+    write_csv(Path(a.out) / 'provenance.csv',
               ['kind', 'item', 'url_or_endpoint', 'sha256', 'note', 'source_date', 'gwp'], P)
     print(f'wrote {len(outs) + 2} files to {a.out}; MOD share {share:.6f}; budget {bud:.3f} kt')
 

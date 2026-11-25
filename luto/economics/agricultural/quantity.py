@@ -67,6 +67,10 @@ def get_ccimpact(data, lu, lm, yr_idx):
     """
     Return climate change impact multiplier at (zero-based) year index.
 
+    Kept for the year (`get_ccimpact.results`): a solve step asks for the same (lu, lm) several times (288 calls, at most
+    56 distinct, at RES5), and the next year never asks for this year's again, so a new year (or a new Data) drops the
+    previous year's results (about 2 GB at RES1, 38 MB each). The arrays are read-only: every caller shares them.
+
     Parameters
     - data: The data object containing climate change impact data.
     - lu: The land-use for which the climate change impact is calculated.
@@ -76,26 +80,42 @@ def get_ccimpact(data, lu, lm, yr_idx):
     Returns
     - The climate change impact multiplier at the specified year index.
     """
+    def _get_ccimpact():
+        # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return ones
+        if (lm, lu) not in data.CLIMATE_CHANGE_IMPACT.indexes['column'].droplevel('year'):
+            impact = np.ones((data.NCELLS))
+            impact.setflags(write=False)
+            return impact
 
-    # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return ones
-    if (lm, lu) not in data.CLIMATE_CHANGE_IMPACT.indexes['column'].droplevel('year'):
-        return np.ones((data.NCELLS))
+        # Convert year index to calendar year to match the climate impact data which is by calendar year.
+        yr_cal = data.YR_CAL_BASE + yr_idx
 
-    # Convert year index to calendar year to match the climate impact data which is by calendar year.
-    yr_cal = data.YR_CAL_BASE + yr_idx
+        # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
+        anchor = data.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR          # The year the file's multipliers are relative to (2010)
+        xs = set(data.CLIMATE_CHANGE_IMPACT['year'].values.tolist())  # Returns set {2020, 2050, 2080}
+        xs.add(anchor)                                           # Adds the anchor year and returns set {2010, 2020, 2050, 2080}
+        xs = sorted(xs)                                          # Returns list and ensures sorted lowest to highest [2010, 2020, 2050, 2080]
+        yys = data.CLIMATE_CHANGE_IMPACT.sel(lm=lm, lu=lu).to_pandas().T.fillna(1)   # The (cell, year) columns, NaNs replaced with ones to avoid issues with calculating water use limits
+        yys.insert(0, str(anchor), 1)                            # Insert a new column for the anchor year with value of 1 to ensure no climate change impact there
+        yys = yys.astype(np.float32)
 
-    # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
-    anchor = data.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR          # The year the file's multipliers are relative to (2010)
-    xs = set(data.CLIMATE_CHANGE_IMPACT['year'].values.tolist())  # Returns set {2020, 2050, 2080}
-    xs.add(anchor)                                           # Adds the anchor year and returns set {2010, 2020, 2050, 2080}
-    xs = sorted(xs)                                          # Returns list and ensures sorted lowest to highest [2010, 2020, 2050, 2080]
-    yys = data.CLIMATE_CHANGE_IMPACT.sel(lm=lm, lu=lu).to_pandas().T.fillna(1)   # The (cell, year) columns, NaNs replaced with ones to avoid issues with calculating water use limits
-    yys.insert(0, str(anchor), 1)                            # Insert a new column for the anchor year with value of 1 to ensure no climate change impact there
-    yys = yys.astype(np.float32)
+        # Create linear function f and interpolate climate change impact
+        f = interp1d(xs, yys, kind='linear', fill_value='extrapolate')
+        impact = f(yr_cal)
+        impact.setflags(write=False)
+        return impact
 
-    # Create linear function f and interpolate climate change impact
-    f = interp1d(xs, yys, kind='linear', fill_value='extrapolate')
-    return f(yr_cal)
+    results = get_ccimpact.results
+    if results.get('year') != (data, yr_idx):                          # a new year: the previous year's results go
+        results.clear()
+        results['year'] = (data, yr_idx)                                 # the Data itself, not its id: a freed id can be reused
+    if (lu, lm) not in results:
+        results[(lu, lm)] = _get_ccimpact()
+    return results[(lu, lm)]
+
+
+get_ccimpact.results = {}                                                # {'year': (data, yr_idx), (lu, lm): the multiplier}
+get_ccimpact.cache_clear = get_ccimpact.results.clear                    # as an lru_cache's, for tools.write_input
 
 
 # Feed per head <unit: DSE> and the share of it from pasture, by livestock type
@@ -124,13 +144,12 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     if vegtype not in ('natural land', 'modified land'):
         raise KeyError(f"Land cover type '{vegtype}' not identified.")
     lu = f'{lvstype.capitalize()} - {vegtype}'
-    _, pasture_kg_dm_ha, safe_pur = data.lvstk_pasture(lu, lm)
 
-    # Base potential: the type's stocking calibration k (FEED_REQ without a per-type file; block-aggregated at RESFACTOR > 1).
-    yield_pot = data.lvstk_k(lu, lm) * pasture_kg_dm_ha / denominator
+    # Base potential: the type's stocking calibration k (FEED_REQ without a per-type file).
+    yield_pot = data.LVSTK_K[lvstype].values * data.PASTURE_KG_DM_HA.values / denominator
 
     # Multiply potential by appropriate SAFE_PUR (safe pasture utilisation rate; NATL or MODL by vegtype).
-    yield_pot *= safe_pur
+    yield_pot *= (data.SAFE_PUR_NATL if vegtype == 'natural land' else data.SAFE_PUR_MODL).values
 
     # Multiply livestock yield potential by appropriate irrigation factor (i.e., 2).
     if lm == 'irr':
@@ -147,11 +166,10 @@ def get_stubble_yield_pot(data, lu, lm):
     """
     Return sheep grazing cereal stubble <unit: head/ha of cereal>: k_sheep x STUBBLE_DSE_HA / (DSE per head x grassfed
     factor), the pasture basis with the stubble carrying rate (DSE per ha, annualised) in place of the pasture feed.
-    No irrigation factor and no climate multiplier. 0 without a stubble file. (`lu`, `lm`) select the block-aggregated
-    values at RESFACTOR > 1 (Data.stubble); at RESFACTOR 1 every stubble land use and lm has the same cell values.
+    No irrigation factor and no climate multiplier. 0 without a stubble file. Every stubble land use and lm has the
+    same cell values (`lu`, `lm` are kept for the callers, which loop over them).
     """
-    s = data.stubble(lu, lm)
-    return s['K_SHEEP'] * s['STUBBLE_DSE_HA'] / (DSE_PER_HEAD['SHEEP'] * GRASSFED_FACTOR['SHEEP'])
+    return data.LVSTK_K['SHEEP'].values * data.STUBBLE_DSE_HA.values / (DSE_PER_HEAD['SHEEP'] * GRASSFED_FACTOR['SHEEP'])
 
 
 def get_quantity_stubble(data, pr, lm):
@@ -160,7 +178,7 @@ def get_quantity_stubble(data, pr, lm):
     stubble stocking rate."""
     fq = {'MEAT': ('F1', 'Q1'), 'WOOL': ('F2', 'Q2'), 'LEXP': ('F3', 'Q3')}[pr.split()[-1]]
     lu = data.PR2LU_DICT[pr]
-    agec = data.stubble(lu, lm)['AGEC_LVSTK']
+    agec = data.AGEC_LVSTK
     quantity = agec.sel(field=fq[0], animal='SHEEP').values * agec.sel(field=fq[1], animal='SHEEP').values
     return np.nan_to_num(quantity * get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA.values)   # a new array, writable (get_quantity scales it in place); no sheep data: 0
 
@@ -188,7 +206,7 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
 
     # Get the yield potential. Since [20251027], here uses a constant multiplier from settings for production intensification
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
-    agec = data.agec_lvstk(f'{lvstype.capitalize()} - {vegtype}', lm)
+    agec = data.AGEC_LVSTK
 
     # Determine base quantity case-by-case.
 
