@@ -7,7 +7,7 @@ COMMON = {
     'OBJECTIVE': ['maxprofit'],
     'RESFACTOR': [1],
     'SIM_YEARS': [list(range(2010, 2051))],
-    'WRITE_OUTPUTS': [False],
+    'WRITE_OUTPUTS': [True],
 
     # ------------------------- Cell grouping (Jinzhu, 2026-11-18) -------------------------
     'CELL_GROUPING': [True],

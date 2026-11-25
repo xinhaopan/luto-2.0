@@ -21,4 +21,4 @@ All 38 runs are needed for the revision.
 
 ## What I need back
 
-For each run, the Data object (`Data_RES1.lz4`) and the `shadow_prices_<year>.csv` files for every year from 2011 to 2050. The shadow prices need a crossover in every year, because `record_shadow_prices` skips a year solved by barrier alone (`luto/solvers/reports.py` line 62). I will write the outputs and do the price calculations from these files on Deakin HPC, so no output writing is needed on NCI.
+For each run, the written outputs of `write_outputs`, the Data object (`Data_RES1.lz4`) and the `shadow_prices_<year>.csv` files for every year from 2011 to 2050. The shadow prices need a crossover in every year, because `record_shadow_prices` skips a year solved by barrier alone (`luto/solvers/reports.py` line 62). `WRITE_OUTPUTS` is on in `common_settings.py`, so the outputs are written at the end of each run. I will only do the post-processing and the price calculations from these files.
