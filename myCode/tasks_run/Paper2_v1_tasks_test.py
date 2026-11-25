@@ -22,7 +22,7 @@ from tools.helpers import create_grid_search_template,create_task_runs
 #        cell grouping is untested (Jinzhu, 2026-11-18). Data_RES1.lz4 is saved either way (luto/simulation.py:172)
 
 grid_search = {
-    'TASK_NAME': ['20261119_Paper2_v1_test'],
+    'TASK_NAME': ['20261125_Paper2_v1_test'],
     'KEEP_OUTPUTS': [False],  # False zips each run into Run_Archive.zip and deletes the rest (gdata file-count quota)
     'QUEUE': ['normalsr'],
     # ---------Computational settings, which are not relevant to LUTO itself---------
