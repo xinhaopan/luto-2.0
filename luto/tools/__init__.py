@@ -130,9 +130,9 @@ def get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx) 
     w_base   = w_mrj[from_m, cells, from_j]
     w_cost   = (w_target - w_base[None, :, None]) * data.WATER_LICENCE_PRICE.sel(cell=cells).values[:, None] * data.WATER_LICENSE_COST_MULTS[yr_cal]
     if from_m == 0:    # was dryland → irrigation setup when switching to irrigated (m=1)
-        w_cost[1] += settings.NEW_IRRIG_COST    * data.IRRIG_COST_MULTS[yr_cal] * area[:, None]
+        w_cost[1] += settings.NEW_IRRIG_COST * data.DOLLAR_FACTOR    * data.IRRIG_COST_MULTS[yr_cal] * area[:, None]
     else:              # was irrigated → teardown when switching to dryland (m=0)
-        w_cost[0] += settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal] * area[:, None]
+        w_cost[0] += settings.REMOVE_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[yr_cal] * area[:, None]
     return w_cost.astype(np.float32)
 
 
@@ -297,7 +297,8 @@ def set_path() -> str:
         """Create a folder for storing outputs and return folder name."""
         years = [i for i in settings.SIM_YEARS]
         path = f"{settings.OUTPUT_DIR}/{read_timestamp()}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
-        paths = [path] + [f"{path}/out_{yr}" for yr in years]
+        out_years = ([settings.YR_CAL_BASE] if settings.WRITE_BASE_YEAR else []) + years   # the base year's folder when it is written
+        paths = [path] + [f"{path}/out_{yr}" for yr in out_years]
         
         for p in paths:
             Path(p).mkdir(exist_ok=True)

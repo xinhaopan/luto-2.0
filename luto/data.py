@@ -44,7 +44,6 @@ from scipy.sparse import coo_array
 from math import ceil
 
 
-
 class SparseYears(MutableMapping):
     """{year: solution} as `Data` holds it for every solved year, the arrays kept sparse (2026-11-23).
 
@@ -137,7 +136,15 @@ class Data:
         print('')
         print(f'Data Initialization at RES{settings.RESFACTOR}')
 
-        self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
+        self.YR_CAL_BASE = settings.YR_CAL_BASE  # The base year, i.e. where year index yr_idx == 0.
+        # TEMPORARY, until the base year is flipped to 2020-21: the inputs that describe the base year are chosen by YR_CAL_BASE
+        # at their read lines below, {base year: file}; a base year without inputs fails at the first of them. The block-mean
+        # cache (input/_cache) of such a file carries this tag, so the two bases never share a cache file
+        base_year_tag = {2010: '', 2021: '_2021'}[settings.YR_CAL_BASE]
+        # TEMPORARY too: the 2020-21 economics are in FY2020-21 dollars, while the cost constants of settings, the ag-management
+        # bundle costs, BECCS, the renewable costs and the transition cost files are in 2010 dollars. Each is multiplied by this
+        # factor where it is read or used: ABS CPI All groups (A2325846C), financial-year mean, FY2021 81.6025 / FY2011 67.8725
+        self.DOLLAR_FACTOR = {2010: 1, 2021: 81.6025 / 67.8725}[settings.YR_CAL_BASE]
 
         ###############################################################
         # Masking and spatial coarse graining.
@@ -152,7 +159,8 @@ class Data:
         self.MASK_LU_CODE = -1
 
         # Load LUMAP without resfactor
-        self.LUMAP_NO_RESFACTOR = xr.load_dataarray(Path(settings.INPUT_DIR) / "lumap.nc").astype(np.int8)       # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
+        lumap_file = {2010: "lumap.nc", 2021: "Nick_build/livestock_map/lumap.nc"}[settings.YR_CAL_BASE]
+        self.LUMAP_NO_RESFACTOR = xr.load_dataarray(Path(settings.INPUT_DIR) / lumap_file).astype(np.int8)       # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
         # NLUM mask.
         with rasterio.open(Path(settings.INPUT_DIR) / "NLUM_2010-11_mask.tif") as rst:
@@ -247,10 +255,12 @@ class Data:
         #   Each table is read one column at a time: a chunk holds one column of every full-res cell, so a column is
         #   inflated whole and cut to the model cells (loading the whole table would hold every full-res column in
         #   memory). The cells are labelled 0 … NCELLS-1 (NCELLS is not set yet: the count of MASK).
-        with xr.open_dataset(Path(settings.INPUT_DIR) / "agec_crops.nc") as table:
-            self.AGEC_CROPS = self.get_resfactored_average(table['AGEC_CROPS'], "agec_crops.nc").set_xindex(['field', 'lm', 'lu'])
-        with xr.open_dataset(Path(settings.INPUT_DIR) / "agec_lvstk.nc") as table:
-            self.AGEC_LVSTK = self.get_resfactored_average(table['AGEC_LVSTK'], "agec_lvstk.nc").set_xindex(['field', 'animal'])
+        agec_crops_file = {2010: "agec_crops.nc", 2021: "Nick_build/crop_economics/agec_crops.nc"}[settings.YR_CAL_BASE]
+        with xr.open_dataset(Path(settings.INPUT_DIR) / agec_crops_file) as table:
+            self.AGEC_CROPS = self.get_resfactored_average(table['AGEC_CROPS'], f"agec_crops{base_year_tag}").set_xindex(['field', 'lm', 'lu'])
+        agec_lvstk_file = {2010: "agec_lvstk.nc", 2021: "Nick_build/livestock_economics/agec_lvstk.nc"}[settings.YR_CAL_BASE]
+        with xr.open_dataset(Path(settings.INPUT_DIR) / agec_lvstk_file) as table:
+            self.AGEC_LVSTK = self.get_resfactored_average(table['AGEC_LVSTK'], f"agec_lvstk{base_year_tag}").set_xindex(['field', 'animal'])
         
         # Price multipliers for livestock and crops over the years.
         self.CROP_PRICE_MULTIPLIERS = pd.read_excel(Path(settings.INPUT_DIR) / "ag_price_multipliers.xlsx", sheet_name="AGEC_CROPS", index_col="Year")
@@ -361,11 +371,11 @@ class Data:
             'SHEEP - NATURAL LAND WOOL'
         ]
         
-        # Sheep grazing cereal stubble (settings.STUBBLE_DSE_FILE): its own products on each cereal land use, so that
+        # Sheep grazing cereal stubble (settings.STUBBLE_GRAZING): its own products on each cereal land use, so that
         # cereal columns carry sheep meat, wool and live exports into the sheep commodities' demand rows. One set per
         # stubble land use ('SHEEP - STUBBLE WINTER MEAT', ...), so each product has one land use and its quantity can
         # follow that land use's cells; the names never contain both words of a crop commodity.
-        self.LU_STUBBLE = settings.STUBBLE_LAND_USES if settings.STUBBLE_DSE_FILE else []
+        self.LU_STUBBLE = settings.STUBBLE_LAND_USES if settings.STUBBLE_GRAZING else []
         self.LU2PR_STUBBLE = {lu: [f'SHEEP - STUBBLE {lu.split()[0].upper()} {x}' for x in ('LEXP', 'MEAT', 'WOOL')]
                               for lu in self.LU_STUBBLE}
         self.PR_STUBBLE = [pr for prs in self.LU2PR_STUBBLE.values() for pr in prs]
@@ -502,7 +512,8 @@ class Data:
         self.NCELLS = self.REAL_AREA.sizes['cell']
         
         # Initial (2010) ag decision variable (X_mrj).
-        self.LMMAP_NO_RESFACTOR = xr.load_dataarray(Path(settings.INPUT_DIR) / "lmmap.nc")
+        lmmap_file = {2010: "lmmap.nc", 2021: "Nick_build/livestock_map/lmmap.nc"}[settings.YR_CAL_BASE]
+        self.LMMAP_NO_RESFACTOR = xr.load_dataarray(Path(settings.INPUT_DIR) / lmmap_file)
         self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj()
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
         
@@ -553,12 +564,22 @@ class Data:
 
         #   (column, cell) at the model cells, the columns labelled (lm, lu, year)
         cci_name = "climate_change_impacts_" + settings.YIELD_RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".nc"
-        with xr.open_dataset(Path(settings.INPUT_DIR) / cci_name) as table:
-            self.CLIMATE_CHANGE_IMPACT = self.get_resfactored_average(table['CLIMATE_CHANGE_IMPACT'], cci_name).set_xindex(['lm', 'lu', 'year'])
+        cci_file = {2010: cci_name, 2021: f"Nick_build/cci_fill/{cci_name}"}[settings.YR_CAL_BASE]
+        with xr.open_dataset(Path(settings.INPUT_DIR) / cci_file) as table:
+            self.CLIMATE_CHANGE_IMPACT = self.get_resfactored_average(table['CLIMATE_CHANGE_IMPACT'], f"{Path(cci_name).stem}{base_year_tag}").set_xindex(['lm', 'lu', 'year'])
         
-        # The impact files are multipliers relative to 2010: their years are {2020, 2050, 2080} and 2010 is 1 by
-        # construction. The anchor is a property of the files, not of the model's base year.
-        self.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR = 2010
+        # The impact files are multipliers relative to 2010: their years are {2020, 2050, 2080} and 2010 is 1 by construction.
+        # TEMPORARY, until the files are built relative to their own base year: for the 2020-21 base every column is divided by
+        # its (lm, lu)'s multiplier in 2021, linear between the file's 2020 and 2050 values, so the multiplier is 1 in 2021.
+        # A cell without a value keeps none.
+        if settings.YR_CAL_BASE == 2021:
+            columns = self.CLIMATE_CHANGE_IMPACT.indexes['column']                       # (lm, lu, year)
+            values = self.CLIMATE_CHANGE_IMPACT.values.astype(np.float64)
+            in_2020 = values[[columns.get_loc((lm, lu, 2020)) for lm, lu, _ in columns]]
+            in_2050 = values[[columns.get_loc((lm, lu, 2050)) for lm, lu, _ in columns]]
+            in_2021 = in_2020 + (in_2050 - in_2020) * ((2021 - 2020) / (2050 - 2020))
+            self.CLIMATE_CHANGE_IMPACT = self.CLIMATE_CHANGE_IMPACT.copy(data=(values / in_2021).astype(np.float32))
+        self.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR = self.YR_CAL_BASE                        # the year the multipliers are 1 in
 
         ###############################################################
         # Regional coverage layers, mainly for regional reporting.
@@ -697,29 +718,37 @@ class Data:
 
         # The stocking calibration k per livestock type, in place of FEED_REQ: one layer per type over the model cells,
         # each cell carrying its SA2's k for that type. Without a file every type takes FEED_REQ (the model as before).
-        if settings.LVSTK_K_FILE:
-            lvstk_k = xr.load_dataset(Path(settings.INPUT_DIR) / settings.LVSTK_K_FILE)
+        lvstk_k_file = {2010: settings.LVSTK_K_FILE, 2021: 'Nick_build/livestock_map/lvstk_k.nc'}[settings.YR_CAL_BASE]
+        if lvstk_k_file:
+            lvstk_k = xr.load_dataset(Path(settings.INPUT_DIR) / lvstk_k_file)
             self.LVSTK_K = {
-                lvstype: self.get_resfactored_average(lvstk_k[lvstype], f'{Path(settings.LVSTK_K_FILE).stem}_{lvstype}').fillna(0)
+                lvstype: self.get_resfactored_average(lvstk_k[lvstype], f'{Path(lvstk_k_file).stem}_{lvstype}').fillna(0)
                 for lvstype in ('BEEF', 'SHEEP', 'DAIRY')
             }
         else:
             self.LVSTK_K = {lvstype: self.FEED_REQ for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}
 
+        # Feed per head, the divisor of the stocking rate (quantity.get_yield_pot), in the unit the k above was calibrated with:
+        # 2010-11 in DSE per head; 2020-21 in kg dry matter per head per day, the intake ratings written by the build beside its k
+        # (read at full precision: they are the figures the k was fitted with)
+        if settings.YR_CAL_BASE == 2021:
+            self.FEED_PER_HEAD = pd.read_csv(
+                Path(settings.INPUT_DIR) / 'Nick_build/livestock_map/livestock_dse_ratings.csv', float_precision='round_trip'
+            ).set_index('animal')['intake_kg_dm_day'].to_dict()
+        else:
+            self.FEED_PER_HEAD = {'BEEF': 8, 'SHEEP': 1.5, 'DAIRY': 17}
+
         # The stubble carrying rate <unit: DSE per ha, annualised>, read on every cell and applied on the cereal land uses
-        # only (quantity.get_stubble_yield_pot); 0 where no file is given
-        if settings.STUBBLE_DSE_FILE:
-            # TODO: the file must already hold 0 on every cell without the sheep per-head data the stubble consumers read
-            #   (the sheep fields of agec_lvstk.nc, the sheep sources of agGHG_lvstk.nc, water_delivery_price.nc), so a cell
-            #   carries no stubble emissions without stubble production, revenue and cost. Build it from Nick's raw rate with
-            #   input/Nick_build/scripts/stubble_dse.py; Data no longer applies that rule (get_stubble_effective_rate, removed
-            #   2026-11-20). Nick's raw file is not here yet.
-            stubble_raw = xr.load_dataarray(Path(settings.INPUT_DIR) / settings.STUBBLE_DSE_FILE)
-            self.STUBBLE_DSE_HA = self.get_resfactored_average(stubble_raw, settings.STUBBLE_DSE_FILE)
+        # only (quantity.get_stubble_yield_pot); 0 without stubble grazing
+        if settings.STUBBLE_GRAZING:
+            # Built by input/Nick_build/scripts/stubble_dse.py: 0 on every cell without the sheep per-head data, no NaN
+            stubble_raw = xr.load_dataarray(Path(settings.INPUT_DIR) / 'Nick_build/stubble_dse/stubble_dse_ha.nc')
+            self.STUBBLE_DSE_HA = self.get_resfactored_average(stubble_raw, 'stubble_dse_ha')
         else:
             self.STUBBLE_DSE_HA = xr.DataArray(np.zeros(self.NCELLS, dtype=np.float32), dims=['cell'], coords={'cell': np.arange(self.NCELLS)})
 
-        self.PASTURE_KG_DM_HA = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / "pasture_kg_dm_ha.nc").astype(np.float32), "pasture_kg_dm_ha.nc")   # int16 on file
+        pasture_file = {2010: "pasture_kg_dm_ha.nc", 2021: "Nick_build/pasture_productivity/pasture_kg_dm_ha.nc"}[settings.YR_CAL_BASE]
+        self.PASTURE_KG_DM_HA = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / pasture_file).astype(np.float32), f"pasture_kg_dm_ha{base_year_tag}")   # int16 on file
         self.SAFE_PUR_NATL = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / "safe_pur_natl.nc"), "safe_pur_natl.nc")
         self.SAFE_PUR_MODL = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / "safe_pur_modl.nc"), "safe_pur_modl.nc")
 
@@ -912,12 +941,16 @@ class Data:
 
         # Yield increases.
         if settings.PRODUCTIVITY_TREND == 'BAU':
-            fpath = Path(settings.INPUT_DIR) / "yieldincreases_bau2022.csv"
+            yield_increase_file = {2010: "yieldincreases_bau2022.csv", 2021: "Nick_build/livestock_economics/yieldincreases_bau2022.csv"}[settings.YR_CAL_BASE]
+            fpath = Path(settings.INPUT_DIR) / yield_increase_file
             productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
             # The csv has no year column: row 0 is 2010 (multiplier 1.0, cumulative growth since then). The
             # first year is a property of the file, not of the model's base year.
             productivity_trend.index = productivity_trend.index + 2010  # Adjust year to absolute year
             productivity_trend.index.name = 'Year'
+            # TEMPORARY, until the file is built relative to its own base year: divided by its row at the base year, so the
+            # multiplier is 1 there (the 2010 row is all ones)
+            productivity_trend = productivity_trend / productivity_trend.loc[settings.YR_CAL_BASE]
             
             # Convert to xarray for easier accessing.
             self.PRODUCTIVITY_MUL_xr = (
@@ -933,7 +966,8 @@ class Data:
                 header=[0, 1],
                 index_col=0
             ).astype(np.float32)
-            
+            productivity_trend = productivity_trend / productivity_trend.loc[settings.YR_CAL_BASE]   # 1 at the base year, as for 'BAU'
+
             # Convert to xarray for easier accessing.
             self.PRODUCTIVITY_MUL_xr = (
                 xr.DataArray(productivity_trend)
@@ -979,21 +1013,28 @@ class Data:
         # Load greenhouse gas emissions from agriculture
         #   (column, cell) at the model cells, the columns labelled (field, lm, lu) / (animal, field); the irrigated
         #   pasture emissions one variable per column over cell
-        with xr.open_dataset(Path(settings.INPUT_DIR) / "agGHG_crops.nc") as table:
-            self.AGGHG_CROPS = self.get_resfactored_average(table['AGGHG_CROPS'], "agGHG_crops.nc").set_xindex(['field', 'lm', 'lu'])
-        with xr.open_dataset(Path(settings.INPUT_DIR) / "agGHG_lvstk.nc") as table:
-            self.AGGHG_LVSTK = self.get_resfactored_average(table['AGGHG_LVSTK'], "agGHG_lvstk.nc").set_xindex(['animal', 'field'])
+        agghg_crops_file = {2010: "agGHG_crops.nc", 2021: "Nick_build/crop_economics/agGHG_crops.nc"}[settings.YR_CAL_BASE]
+        with xr.open_dataset(Path(settings.INPUT_DIR) / agghg_crops_file) as table:
+            self.AGGHG_CROPS = self.get_resfactored_average(table['AGGHG_CROPS'], f"agGHG_crops{base_year_tag}").set_xindex(['field', 'lm', 'lu'])
+        agghg_lvstk_file = {2010: "agGHG_lvstk.nc", 2021: "Nick_build/ghg_factors/agGHG_lvstk.nc"}[settings.YR_CAL_BASE]
+        with xr.open_dataset(Path(settings.INPUT_DIR) / agghg_lvstk_file) as table:
+            self.AGGHG_LVSTK = self.get_resfactored_average(table['AGGHG_LVSTK'], f"agGHG_lvstk{base_year_tag}").set_xindex(['animal', 'field'])
         
-        agghg_irrpast = xr.load_dataset(Path(settings.INPUT_DIR) / "agGHG_irrpast.nc")
+        agghg_irrpast_file = {2010: "agGHG_irrpast.nc", 2021: "Nick_build/ghg_factors/agGHG_irrpast.nc"}[settings.YR_CAL_BASE]
+        agghg_irrpast = xr.load_dataset(Path(settings.INPUT_DIR) / agghg_irrpast_file)
         self.AGGHG_IRRPAST = xr.Dataset({                                     # the CO2E columns; CELL_ID and SA2_ID (ids) are not read
-            name: self.get_resfactored_average(agghg_irrpast[name].astype(np.float32), f'agGHG_irrpast_{name}')   # CO2E_KG_HA_HARVEST is int8 on file
+            name: self.get_resfactored_average(agghg_irrpast[name].astype(np.float32), f'agGHG_irrpast_{name}{base_year_tag}')   # CO2E_KG_HA_HARVEST is int8 on file
             for name in agghg_irrpast.data_vars if name.startswith('CO2E')
         })
 
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
-        self.AG_TMATRIX = np.load(Path(settings.INPUT_DIR) / "ag_tmatrix.npy")
-        self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = np.load(Path(settings.INPUT_DIR) / "ag_to_destock_tmatrix.npy")
+        # The transition cost files state no price year: taken as 2010 dollars (an ASSUMPTION), here and for ag_to_ep, ep_to_ag
+        # and the clearing costs below.
+        self.AG_TMATRIX = np.load(Path(settings.INPUT_DIR) / "ag_tmatrix.npy") * self.DOLLAR_FACTOR
+        self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = (
+            np.load(Path(settings.INPUT_DIR) / "ag_to_destock_tmatrix.npy") * self.DOLLAR_FACTOR
+        )
 
         
   
@@ -1001,7 +1042,8 @@ class Data:
         # (lm, lu) at all; EXCLUDE_FRAC how much of it may: the share of the block's land-use cells (LUMASK, the cells
         # RESFACTOR 1 models) that are eligible, which caps the cell's ag upper bound (col_builder.get_trans_ub_ag_mrj).
         # At RESFACTOR 1 a cell is eligible or not, so the share is EXCLUDE itself.
-        x_mrj_full = xr.load_dataarray(Path(settings.INPUT_DIR) / "x_mrj.nc")                                       # (lm, cell, lu) over the FULL-RES cells, no cell coordinate
+        x_mrj_file = {2010: "x_mrj.nc", 2021: "Nick_build/eligibility/x_mrj.nc"}[settings.YR_CAL_BASE]
+        x_mrj_full = xr.load_dataarray(Path(settings.INPUT_DIR) / x_mrj_file)                                       # (lm, cell, lu) over the FULL-RES cells, no cell coordinate
         if settings.RESFACTOR == 1:
             self.EXCLUDE = x_mrj_full.sel(lm=self.LANDMANS, lu=self.AGRICULTURAL_LANDUSES).isel(cell=self.MASK).values
             self.EXCLUDE_FRAC = self.EXCLUDE
@@ -1025,6 +1067,7 @@ class Data:
         # Load plantings economic data
         est_cost = xr.load_dataset(Path(settings.INPUT_DIR) / "plantings_est_cost_ha.nc")
         est_cost = xr.Dataset({name: self.get_resfactored_average(est_cost[name], f'plantings_est_cost_ha_{name}') for name in est_cost.data_vars}).astype(np.float32)
+        est_cost = est_cost * np.float32({2010: 1, 2021: 118.8 / 99.2}[settings.YR_CAL_BASE])   # converted from 2021 to 2010 dollars (x 99.2 / 118.8) when built; undone for the 2020-21 base
         self.EP_EST_COST_HA = est_cost['EP_EST_COST_HA']
         self.RP_EST_COST_HA = self.EP_EST_COST_HA.copy()  # Riparian plantings have the same establishment cost as environmental plantings
         self.AF_EST_COST_HA = self.EP_EST_COST_HA.copy()  # Agroforestry plantings have the same establishment cost as environmental plantings
@@ -1091,12 +1134,12 @@ class Data:
         # Agricultural land use to plantings raw transition costs:
         self.AG2EP_TRANSITION_COSTS_HA = np.load(
             Path(settings.INPUT_DIR) / "ag_to_ep_tmatrix.npy"
-        )  # shape: (28,)
+        ) * self.DOLLAR_FACTOR  # shape: (28,); 2010 dollars assumed (see AG_TMATRIX)
 
         # EP to agricultural land use transition costs:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             Path(settings.INPUT_DIR) / "ep_to_ag_tmatrix.npy"
-        )  # shape: (28,)
+        ) * self.DOLLAR_FACTOR  # shape: (28,); 2010 dollars assumed (see AG_TMATRIX)
         
         
         ##############################################################
@@ -1119,7 +1162,8 @@ class Data:
         
         
         # Transition matrix of non-ag to unallocated-modified land (land clearing)
-        tmat_wood_clear = np.load(Path(settings.INPUT_DIR) / 'transition_cost_clearing_forest.npz')
+        with np.load(Path(settings.INPUT_DIR) / 'transition_cost_clearing_forest.npz') as z:   # 2010 dollars assumed (see AG_TMATRIX)
+            tmat_wood_clear = {k: z[k] * self.DOLLAR_FACTOR for k in z.files}
         
         tmat_clear_EP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_RP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
@@ -1212,13 +1256,15 @@ class Data:
         )
 
         # Spatially explicit costs of a water licence per ML.
+        water_licence_file = {2010: "water_licence_price.nc", 2021: "Nick_build/water_licence_price/water_licence_price.nc"}[settings.YR_CAL_BASE]
         self.WATER_LICENCE_PRICE = self.get_resfactored_average(
-            xr.load_dataarray(Path(settings.INPUT_DIR) / "water_licence_price.nc").astype(np.float32),   # int16 on file: a price, averaged as one; no NaN
-            "water_licence_price.nc",
+            xr.load_dataarray(Path(settings.INPUT_DIR) / water_licence_file).astype(np.float32),   # int16 on file: a price, averaged as one; no NaN
+            f"water_licence_price{base_year_tag}",
         )
 
         # Spatially explicit costs of water delivery per ML.
-        self.WATER_DELIVERY_PRICE = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / "water_delivery_price.nc"), "water_delivery_price.nc").fillna(0)
+        water_delivery_file = {2010: "water_delivery_price.nc", 2021: "Nick_build/livestock_economics/water_delivery_price.nc"}[settings.YR_CAL_BASE]
+        self.WATER_DELIVERY_PRICE = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / water_delivery_file), f"water_delivery_price{base_year_tag}").fillna(0)
        
 
         # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural land
@@ -1246,7 +1292,8 @@ class Data:
                 self.WATER_YIELD_OUTSIDE_LUTO_HIST[region_type] = water_region['OUTSIDE_LUTO_HIST_ML'].load()
         
         # Water use for domestic and industrial sectors.
-        water_use_domestic = pd.read_csv(Path(settings.INPUT_DIR) / "Water_Use_Domestic.csv").query(f"REGION_TYPE == '{settings.WATER_REGION_DEF}'")
+        water_use_domestic_file = {2010: "Water_Use_Domestic.csv", 2021: "Nick_build/water_domestic/Water_Use_Domestic.csv"}[settings.YR_CAL_BASE]
+        water_use_domestic = pd.read_csv(Path(settings.INPUT_DIR) / water_use_domestic_file).query(f"REGION_TYPE == '{settings.WATER_REGION_DEF}'")
         self.WATER_USE_DOMESTIC = water_use_domestic.set_index('REGION_ID')['DOMESTIC_INDUSTRIAL_WATER_USE_ML'].to_dict()
 
         # Call the function to create watershed components
@@ -1512,7 +1559,7 @@ class Data:
         # self.SAVBURN_SEQ_CO2_TCO2E_HA = savburn['SAV_SEQ_CO2_TCO2E_HA']    # Additional carbon sequestration - carbon dioxide
 
         # Cost per hectare in dollars from settings
-        self.SAVBURN_COST_HA = settings.SAVBURN_COST_HA_YR
+        self.SAVBURN_COST_HA = settings.SAVBURN_COST_HA_YR * self.DOLLAR_FACTOR
 
 
 
@@ -1835,8 +1882,8 @@ class Data:
         })
 
         # Capture as DataArrays over the model cells
-        self.BECCS_COSTS_AUD_HA_YR = beccs['BECCS_COSTS_AUD_HA_YR']
-        self.BECCS_REV_AUD_HA_YR = beccs['BECCS_REV_AUD_HA_YR']
+        self.BECCS_COSTS_AUD_HA_YR = beccs['BECCS_COSTS_AUD_HA_YR'] * self.DOLLAR_FACTOR    # 2010 dollars
+        self.BECCS_REV_AUD_HA_YR = beccs['BECCS_REV_AUD_HA_YR'] * self.DOLLAR_FACTOR        # 2010 dollars
         self.BECCS_TCO2E_HA_YR = beccs['BECCS_TCO2E_HA_YR']
         self.BECCS_MWH_HA_YR = beccs['BECCS_MWH_HA_YR']
 
@@ -2646,7 +2693,7 @@ class Data:
 
             for _, row in targets_df.iterrows():
                 f = interp1d(
-                    [2010, 2030, 2050, 2100],
+                    [self.YR_CAL_BASE, 2030, 2050, 2100],
                     [min(row['BASEYEAR_LEVEL'], row['TARGET_LEVEL_2030']),
                     row['TARGET_LEVEL_2030'],
                     row['TARGET_LEVEL_2050'],
@@ -2678,7 +2725,7 @@ class Data:
             species  = row['SCIENTIFIC_NAME']
             presence = row['presence']
             f = interp1d(
-                [2010, 2030, 2050, 2100],
+                [self.YR_CAL_BASE, 2030, 2050, 2100],
                 [min(row['BASEYEAR_LEVEL'], row['TARGET_LEVEL_2030']),
                  row['TARGET_LEVEL_2030'], row['TARGET_LEVEL_2050'], row['TARGET_LEVEL_2100']],
                 kind='linear', fill_value='extrapolate',
@@ -2709,7 +2756,7 @@ class Data:
             species  = row['COMMUNITY']
             presence = row['presence']
             f = interp1d(
-                [2010, 2030, 2050, 2100],
+                [self.YR_CAL_BASE, 2030, 2050, 2100],
                 [min(row['BASEYEAR_LEVEL'], row['TARGET_LEVEL_2030']),
                  row['TARGET_LEVEL_2030'], row['TARGET_LEVEL_2050'], row['TARGET_LEVEL_2100']],
                 kind='linear', fill_value='extrapolate',
@@ -2834,7 +2881,7 @@ class Data:
         target_pct = []
         for _,row in self.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.iterrows():
             f = interp1d(
-                [2010, 2030, 2050, 2100],
+                [self.YR_CAL_BASE, 2030, 2050, 2100],
                 [min(row['HABITAT_SUITABILITY_BASELINE_PERCENT'], row['TARGET_LEVEL_2030']), row[f'TARGET_LEVEL_2030'], row[f'TARGET_LEVEL_2050'], row[f'TARGET_LEVEL_2100']],
                 kind="linear",
                 fill_value="extrapolate",
@@ -2895,7 +2942,7 @@ class Data:
         reg_adop_limits = []
         for _,row in self.REGIONAL_ADOPTION_TARGETS.iterrows():
             f = interp1d(
-                [2010, 2030, 2050, 2100],
+                [self.YR_CAL_BASE, 2030, 2050, 2100],
                 [row['BASE_LANDUSE_AREA_PERCENT'], row['ADOPTION_PERCENTAGE_2030'], row['ADOPTION_PERCENTAGE_2050'], row['ADOPTION_PERCENTAGE_2100']],
                 kind="linear",
                 fill_value="extrapolate",
