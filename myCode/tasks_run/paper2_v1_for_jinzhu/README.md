@@ -9,7 +9,7 @@ Thanks for running these. This folder holds everything the runs need. It is in t
 
 ## Code
 
-The code is `/g/data/jk53/LUTO_XH/LUTO2_paper2_v1`, branch `paper2_v1`, commit `dcb03540`, which merges your jinzhu branch at `b578e1d7`. The only change of ours is `GHG_NET_ROW`, which puts back the single net emissions row of the first submission (`luto/settings.py` lines 883 to 899, `luto/solvers/row_builder.py` lines 356 to 378). With it on, GHG low uses the 1.8C (67%) SCOPE1 column of `GHG_targets.xlsx` and GHG high uses the 1.5C (67%) column. If your speed-up code sits on a newer commit, please merge these two pieces or tell me and I will port them.
+The code is `/g/data/jk53/LUTO_XH/LUTO2_paper2_v1`, branch `paper2_v1`, merge commit `d1cad996`. It merges your jinzhu branch at `cc5d82c6`, which is `626db273` with the two cuOpt fixes `3bd9e325` and `cc5d82c6`, so its `luto/` folder is the same file for file as the `code/luto` of your runs on Gadi. The only change of ours is `GHG_NET_ROW`, which puts back the single net emissions row of the first submission (`luto/settings.py` and `luto/solvers/row_builder.py`). With it on, GHG low uses the 1.8C (67%) SCOPE1 column of `GHG_targets.xlsx` and GHG high uses the 1.5C (67%) column. The yearly solve of your runs (the GPU price search and the Gurobi crossover) lives in your run scripts, not in `luto/`.
 
 ## Runs
 
